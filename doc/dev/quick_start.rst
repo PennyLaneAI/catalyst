@@ -29,7 +29,7 @@ provided by JAX.
 
 .. code-block:: python
 
-    from catalyst import qjit, measure, cond, for_loop, while_loop
+    from catalyst import qjit, measure, cond, for_loop, while_loop, grad
     import pennylane as qml
     from jax import numpy as jnp
 
@@ -645,25 +645,25 @@ Optimizers
 ----------
 
 You can develop your own optimization algorithm using the :func:`.grad` method, control-flow operators that are
-compatible with QJIT, or by utilizing differentiable optimizers in `JAXopt <https://jaxopt.github.io/stable/index.html>`_.
+compatible with QJIT, or by utilizing differentiable optimizers in `Optax <https://optax.readthedocs.io/en/stable/index.html>`_.
 
 .. warning::
 
     Catalyst currently does not provide any optimization tools and does not support the optimizers offered
     by PennyLane. However, this feature is planned for future implementation.
 
-For example, you can use ``jaxopt.GradientDescent`` in a QJIT workflow to calculate
+For example, you can use ``optax.sgd`` in a QJIT workflow to calculate
 the gradient descent optimizer. The following example shows a simple use case of this
 feature in Catalyst.
 
-The ``jaxopt.GradientDescent`` gets a smooth function of the form ``gd_fun(params, *args, **kwargs)``
+The ``optax.sgd`` gets a smooth function of the form ``gd_fun(params, *args, **kwargs)``
 and calculates either just the value or both the value and gradient of the function depending on
 the value of ``value_and_grad`` argument. To optimize params iteratively, you later need to use
 ``jax.lax.fori_loop`` to loop over the gradient descent steps.
 
 .. code-block:: python
 
-    import jaxopt
+    import optax
     from jax.lax import fori_loop
 
     dev = qml.device("lightning.qubit", wires=1)
@@ -680,15 +680,18 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
             diff = grad(circuit, argnum=0)
             return circuit(param), diff(param)
 
-        opt = jaxopt.GradientDescent(gd_fun, stepsize=0.4, value_and_grad=True)
+        opt = optax.sgd(learning_rate=0.4)
 
         def gd_update(i, args):
-            (param, state) = opt.update(*args)
+            param, state = args
+            _, gradient = gd_fun(param)
+            (updates, state) = opt.update(gradient, state)
+            param = optax.apply_updates(param, updates)
             return (param, state)
 
         param = 0.1
-        state = opt.init_state(param)
-        (param, _) = jax.lax.fori_loop(0, 100, gd_update, (param, state))
+        state = opt.init(param)
+        (param, _) = fori_loop(0, 100, gd_update, (param, state))
         return param
 
 >>> workflow()
@@ -741,12 +744,3 @@ as well as vectorized using ``jax.vmap``:
 
 >>> jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
 Array([1.32269195, 1.53905377], dtype=float64)
-
-In particular, this allows for a reduction in boilerplate when using
-JAX-compatible optimizers such as ``jaxopt``:
-
->>> opt = jaxopt.GradientDescent(cost_fn)
->>> params = jnp.array([0.1, 0.2, 0.3])
->>> (final_params, _) = jax.jit(opt.run)(params)
->>> final_params
-Array([-0.00320799,  0.03475223,  0.29362844], dtype=float64)

@@ -13,6 +13,8 @@
 # limitations under the License.
 """Test suite for loop operations in Catalyst."""
 
+from textwrap import dedent
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -28,16 +30,20 @@ class TestLoopToJaxpr:
     def test_while_loop(self):
         """Check the while loop JAXPR."""
 
-        expected = """\
-{ lambda ; a:f64[]. let
-    b:i64[] c:f64[] = while_loop[
-      body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
-      body_nconsts=0
-      cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
-      cond_nconsts=0
-    ] 0 a
-  in (b, c) }\
-"""
+        expected = dedent(
+            """
+            { lambda ; a:f64[]. let
+                b:i64[] c:f64[] = while_loop[
+                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+                  body_nconsts=0
+                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+                  cond_nconsts=0
+                  nimplicit=0
+                  preserve_dimensions=True
+                ] 0 a
+              in (b, c) }
+            """
+        )
 
         @qjit
         def circuit(x: float):
@@ -47,22 +53,26 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected == str(circuit.jaxpr)
+        assert expected.strip() == str(circuit.jaxpr).strip()
 
     def test_for_loop(self):
         """Check the for loop JAXPR."""
 
-        expected = """\
-{ lambda ; a:f64[] b:i64[]. let
-    c:i64[] d:f64[] = for_loop[
-      apply_reverse_transform=False
-      body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
-          h:i64[] = add f 1
-        in (h, g) }
-      body_nconsts=0
-    ] 0 b 1 0 0 a
-  in (c, d) }\
-"""
+        expected = dedent(
+            """
+            { lambda ; a:f64[] b:i64[]. let
+                c:i64[] d:f64[] = for_loop[
+                  apply_reverse_transform=False
+                  body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
+                      h:i64[] = add f 1
+                    in (h, g) }
+                  body_nconsts=0
+                  nimplicit=0
+                  preserve_dimensions=True
+                ] 0 b 1 0 0 a
+              in (c, d) }
+        """
+        )
 
         @qjit
         def circuit(x: float, n: int):
@@ -72,7 +82,7 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected == str(circuit.jaxpr)
+        assert expected.strip() == str(circuit.jaxpr).strip()
 
 
 class TestWhileLoops:

@@ -20,10 +20,12 @@ import pathlib
 # pylint: disable=unused-argument
 import platform
 import tempfile
+from dataclasses import replace
 from functools import partial
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pennylane as qml
@@ -45,6 +47,12 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
+from catalyst.device import (
+    QJITDeviceNewAPI,
+    extract_backend_info,
+    get_device_capabilities,
+    get_device_toml_config,
+)
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
@@ -58,7 +66,6 @@ from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
     TOMLDocument,
-    get_device_capabilities,
     load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
@@ -330,6 +337,69 @@ class TestPreprocess:
         assert "expval" not in mlir
         assert "counts" in mlir
 
+    def test_non_commuting_measurements_are_split(self, mocker):
+        """Test that the split_non_commuting transform is added to the transform
+        program from preprocess when non_commuting_observables_flag is False"""
+
+        # dummy device supports non_commuting observables by default
+        dev = DummyDevice(wires=4, shots=1000)
+
+        # Create a qjit device that supports non-commuting observables
+        dev_capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
+        backend_info = extract_backend_info(dev, dev_capabilities)
+        qjit_dev1 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+        # Create a qjit device that does NOT support non-commuting observables
+        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
+        backend_info = extract_backend_info(dev, dev_capabilities)
+        qjit_dev2 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+        # Check the preprocess
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            transform_program1, _ = qjit_dev1.preprocess(ctx)
+            transform_program2, _ = qjit_dev2.preprocess(ctx)
+
+        assert split_non_commuting not in transform_program1
+        assert split_non_commuting in transform_program2
+
+    def test_split_non_commuting_execution(self, mocker):
+        """Test that the results of the execution for a tape with non-commuting observables is
+        consistent (on a backend that does, in fact, support non-commuting observables) regardless
+        of whether split_non_commuting is applied or not as expected"""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def unjitted_circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RY(0.89, 1)
+            return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
+
+        expected_result = unjitted_circuit(1.2)
+
+        config = get_device_toml_config(dev)
+        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+
+        # mock TOML file output to indicate non-commuting observables are supported
+        config["compilation"]["non_commuting_observables"] = True
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            jitted_circuit = qml.qjit(unjitted_circuit)
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 2
+            assert np.allclose(jitted_circuit(1.2), expected_result)
+
+        transform_program, _ = spy.spy_return
+        assert split_non_commuting not in transform_program
+
+        # mock TOML file output to indicate non-commuting observables are NOT supported
+        config["compilation"]["non_commuting_observables"] = False
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            jitted_circuit = qml.qjit(unjitted_circuit)
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 2
+            assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
+
+        transform_program, _ = spy.spy_return
+        assert split_non_commuting in transform_program
+
 
 # tapes and regions for generating HybridOps
 tape1 = QuantumScript([qml.X(0), qml.Hadamard(1)])
@@ -440,7 +510,7 @@ class TestPreprocessHybridOp:
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
-            adjoint(OtherRX(x, 0))
+            adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
         mlir = qml.qjit(circuit, target="mlir").mlir

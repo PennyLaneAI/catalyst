@@ -21,8 +21,8 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
-from catalyst.device import QJITDevice, validate_device_capabilities
-from catalyst.device.qjit_device import check_no_overlap, validate_device_capabilities
+from catalyst.device import QJITDeviceNewAPI
+from catalyst.device.qjit_device import validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     DeviceCapabilities,
@@ -302,13 +302,6 @@ def test_get_matrix_decomposable_gates_schema2():
     assert "PauliZ" in device_capabilities.to_matrix_ops
 
 
-def test_check_overlap_msg():
-    """Test error is raised if there is an overlap in sets."""
-    msg = "Device 'test' has overlapping gates."
-    with pytest.raises(CompileError, match=msg):
-        check_no_overlap(["A"], ["A"], ["A"], device_name="test")
-
-
 def test_config_invalid_attr():
     """Check the gate condition handling logic"""
     with pytest.raises(
@@ -390,7 +383,8 @@ def test_config_qjit_device_operations():
             """
         ),
     )
-    qjit_device = QJITDevice(capabilities, shots=1000, wires=2)
+    device = qml.device("lightning.qubit", wires=2, shots=1000)
+    qjit_device = QJITDeviceNewAPI(device, capabilities)
     assert "PauliX" in qjit_device.operations
     assert "PauliY" in qjit_device.observables
 

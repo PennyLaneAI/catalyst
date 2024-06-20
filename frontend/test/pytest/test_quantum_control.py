@@ -479,9 +479,7 @@ class TestCatalystControlled:
             res_classical_tracers=[],
             trace=None,
         )
-        qctrl = HybridCtrl(
-            control_wires=[0], regions=[X], in_classical_tracers=[], out_classical_tracers=[0]
-        )
+        qctrl = HybridCtrl([], [], [X], control_wires=[0])
         new_qctrl = qctrl.map_wires({1: 0, 0: 1})
         assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
         assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
@@ -500,6 +498,37 @@ class TestCatalystControlled:
         assert result.control_wires == expected.control_wires
         assert result.control_values == expected.control_values
         assert result.work_wires == expected.work_wires
+
+    def test_control_decomp_trotter(self):
+        """Test that the Catalyst control can safelt decompose TrotterProduct."""
+
+        coeffs = [0.25, 0.75]
+        ops = [qml.X(0), qml.Z(0)]
+        H = qml.dot(coeffs, ops)
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            qml.ControlledSequence(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
+            return qml.expval(qml.PauliZ(0))
+
+        assert qml.math.allclose(qml.qjit(circuit)(), circuit())
+
+    def test_distribute_controlled_with_adj(self):
+        """Test that the distribute_controlled function with a PennyLane Adjoint,
+        creates the equivalent Adjoint(Ctrl(base)) instead of Ctrl(Adj(base))"""
+
+        # pylint: disable=import-outside-toplevel
+        from catalyst.api_extensions.quantum_operators import ctrl_distribute
+
+        tape = qml.tape.QuantumScript([qml.ops.Adjoint(qml.RX(1.2, 0)), qml.Hadamard(1)])
+
+        new_ops = ctrl_distribute(tape, control_wires=[2, 3], control_values=[True, True])
+
+        assert new_ops[0] == qml.ops.Adjoint(Controlled(qml.RX(1.2, 0), control_wires=[2, 3]))
+        assert new_ops[1] == Controlled(qml.Hadamard(1), control_wires=[2, 3])
 
 
 ########################################################################################
@@ -840,13 +869,12 @@ class TestControlledMiscMethods:
         assert data[0] is target
         assert len(data) == 1
 
-        assert len(metadata[0]) == 3  # tracing_artifacts
-        assert metadata[1] == control_wires
-        assert metadata[2] == control_values
-        assert metadata[3] == work_wires
+        assert len(metadata) == 3
+        assert metadata[0] == control_wires
+        assert metadata[1] == control_values
+        assert metadata[2] == work_wires
 
-        # FIXME: 'HybridOpRegion` is not hashable
-        # assert hash(metadata)
+        assert hash(metadata)
 
         new_op = type(op)._unflatten(*op._flatten())
         assert qml.equal(op, new_op)
@@ -1667,12 +1695,9 @@ class TestDecomposition:
     def test_decomposition_nested(self):
         """Tests decompositions of nested controlled operations"""
 
-        ctrl_op = C_ctrl(C_ctrl(qml.RZ(0.123, wires=0), control=1), control=2)
+        ctrl_op = C_ctrl(C_ctrl(lambda: qml.RZ(0.123, wires=0), control=1), control=2)()
         expected = [
-            qml.ControlledPhaseShift(0.123 / 2, wires=[2, 0]),
-            qml.Toffoli(wires=[2, 1, 0]),
-            qml.ControlledPhaseShift(-0.123 / 2, wires=[2, 0]),
-            qml.Toffoli(wires=[2, 1, 0]),
+            qml.ops.Controlled(qml.RZ(0.123, wires=0), control_wires=[1, 2]),
         ]
         assert ctrl_op.decomposition() == expected
         assert ctrl_op.expand().circuit == expected

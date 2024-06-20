@@ -24,10 +24,11 @@ import re
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
+from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -36,14 +37,24 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.programs.verification import (
+    validate_observables_adjoint_diff,
+    validate_observables_parameter_shift,
+    verify_no_state_variance_returns,
+    verify_operations,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
 from catalyst.utils.toml import (
     DeviceCapabilities,
     OperationProperties,
+    ProgramFeatures,
+    TOMLDocument,
     intersect_operations,
+    load_device_capabilities,
     pennylane_operation_set,
+    read_toml_file,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,6 +111,11 @@ SUPPORTED_RT_DEVICES = {
 }
 
 
+def get_device_shots(dev):
+    """Helper function to get device shots."""
+    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+
+
 @dataclass
 class BackendInfo:
     """Backend information"""
@@ -146,11 +162,8 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        if isinstance(device, qml.devices.LegacyDevice):
-            device_kwargs["shots"] = device.shots if device.shots else 0
-        else:
-            # TODO: support shot vectors
-            device_kwargs["shots"] = device.shots.total_shots if device.shots else 0
+        shots = get_device_shots(device) or 0
+        device_kwargs["shots"] = shots
 
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
@@ -178,17 +191,16 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
-    qjit_config = deepcopy(target_capabilities)
+    qjit_capabilities = deepcopy(target_capabilities)
 
     # Gates that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
 
     # Intersection of the above
-    qjit_config.native_ops = intersect_operations(target_capabilities.native_ops, qir_gates)
+    qjit_capabilities.native_ops = intersect_operations(target_capabilities.native_ops, qir_gates)
 
-    # Control-flow gates to be lowered down to the LLVM control-flow instructions,
-    # all of which can be inverted, controlled, and differentiated.
-    qjit_config.native_ops.update(
+    # Control-flow gates to be lowered down to the LLVM control-flow instructions
+    qjit_capabilities.native_ops.update(
         {
             "Cond": OperationProperties(invertible=True, controllable=True, differentiable=True),
             "WhileLoop": OperationProperties(
@@ -200,17 +212,17 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
 
     # Optionally enable runtime-powered mid-circuit measurments
     if target_capabilities.mid_circuit_measurement_flag:  # pragma: no branch
-        qjit_config.native_ops.update(
+        qjit_capabilities.native_ops.update(
             {
                 "MidCircuitMeasure": OperationProperties(
-                    invertible=True, controllable=True, differentiable=False
+                    invertible=False, controllable=False, differentiable=False
                 )
             }
         )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if all(ng.invertible for ng in target_capabilities.native_ops.values()):
-        qjit_config.native_ops.update(
+    if any(ng.invertible for ng in target_capabilities.native_ops.values()):
+        qjit_capabilities.native_ops.update(
             {
                 "HybridAdjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
@@ -218,7 +230,18 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
             }
         )
 
-    return qjit_config
+    # TODO: Optionally enable runtime-powered quantum gate controlling once they
+    #       are supported natively in MLIR.
+    # if any(ng.controllable for ng in target_capabilities.native_ops.values()):
+    #     qjit_capabilities.native_ops.update(
+    #         {
+    #             "HybridCtrl": OperationProperties(
+    #                 invertible=True, controllable=True, differentiable=True
+    #             )
+    #
+    #     )
+
+    return qjit_capabilities
 
 
 class QJITDevice(qml.QubitDevice):
@@ -255,12 +278,12 @@ class QJITDevice(qml.QubitDevice):
     @debug_logger_init
     def __init__(
         self,
+        original_device,
         original_device_capabilities: DeviceCapabilities,
-        shots=None,
-        wires=None,
         backend: Optional[BackendInfo] = None,
     ):
-        super().__init__(wires=wires, shots=shots)
+        self.original_device = original_device
+        super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         check_device_wires(self.wires)
 
@@ -309,7 +332,7 @@ class QJITDevice(qml.QubitDevice):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
-            self.capabilities
+            self.qjit_capabilities
         )
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
@@ -404,6 +427,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
 
+        if self.qjit_capabilities.non_commuting_observables_flag is False:
+            program.add_transform(split_non_commuting)
+
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(
             catalyst_decompose,
@@ -415,7 +441,16 @@ class QJITDeviceNewAPI(qml.devices.Device):
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
 
-        # TODO: Add Catalyst program verification and validation
+        program.add_transform(
+            verify_operations, grad_method=config.gradient_method, qjit_device=self
+        )
+        if config.gradient_method is not None:
+            program.add_transform(verify_no_state_variance_returns)
+        if config.gradient_method == "adjoint":
+            program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
+        elif config.gradient_method == "parameter-shift":
+            program.add_transform(validate_observables_parameter_shift)
+
         return program, config
 
     def execute(self, circuits, execution_config):
@@ -425,48 +460,25 @@ class QJITDeviceNewAPI(qml.devices.Device):
         raise RuntimeError("QJIT devices cannot execute tapes.")
 
 
-def filter_out_adjoint(operations):
-    """Remove Adjoint from operations.
+# Alias for either an old-style or a new-style QJITDevice
+AnyQJITDevice = Union[QJITDevice, QJITDeviceNewAPI]
+
+
+def filter_out_modifiers(operations):
+    """Remove Adjoint/Control from operations.
 
     Args:
-        operations (List[Str]): List of strings with names of supported operations
+        operations (Iterable[str]): list of operation names
 
     Returns:
-        List: A list of strings with names of supported operations with Adjoint and C gates
-        removed.
+        Set: filtered set of operation names
     """
-    adjoint = re.compile(r"^Adjoint\(.*\)$")
+    pattern = re.compile(r"^(C|Adjoint)\(.*\)$")
 
-    def is_not_adj(op):
-        return not re.match(adjoint, op)
+    def is_not_modifier(op):
+        return not re.match(pattern, op)
 
-    operations_no_adj = filter(is_not_adj, operations)
-    return set(operations_no_adj)
-
-
-def check_no_overlap(*args, device_name):
-    """Check items in *args are mutually exclusive.
-
-    Args:
-        *args (List[Str]): List of strings.
-        device_name (str): Device name for error reporting.
-
-    Raises:
-        CompileError
-    """
-    set_of_sets = [set(arg) for arg in args]
-    union = set.union(*set_of_sets)
-    len_of_sets = [len(arg) for arg in args]
-    if sum(len_of_sets) == len(union):
-        return
-
-    overlaps = set()
-    for s in set_of_sets:
-        overlaps.update(s - union)
-        union = union - s
-
-    msg = f"Device '{device_name}' has overlapping gates: {overlaps}"
-    raise CompileError(msg)
+    return set(filter(is_not_modifier, operations))
 
 
 @debug_logger
@@ -496,21 +508,19 @@ def validate_device_capabilities(
 
     device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
 
-    native = pennylane_operation_set(device_capabilities.native_ops)
-    decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)
-    matrix = pennylane_operation_set(device_capabilities.to_matrix_ops)
+    native = set(device_capabilities.native_ops.keys())
+    decomposable = set(device_capabilities.to_decomp_ops.keys())
+    matrix = set(device_capabilities.to_matrix_ops.keys())
 
-    check_no_overlap(native, decomposable, matrix, device_name=device_name)
+    overlap = (native & decomposable) | (native & matrix) | (decomposable & matrix)
+    if overlap:
+        raise CompileError(f"Device '{device_name}' has overlapping gates: {overlap}")
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
-        # For gates, we require strict match
-        device_gates = filter_out_adjoint(set(device.operations))
-        # Lightning-kokkis might support C(GlobalPhase) in Python, but not in C++. We remove this
-        # gate before calling the validation.
-        # See https://github.com/PennyLaneAI/pennylane-lightning/pull/642#discussion_r1535478642
-        if device_name == "lightning.kokkos":
-            device_gates = device_gates - {"C(GlobalPhase)"}
-        spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
+        # For validation against PL device properties we only check base gates as Adjoint/Control
+        # declarations can be very sporadic.
+        device_gates = filter_out_modifiers(device.operations)
+        spec_gates = native | decomposable | matrix
         if device_gates != spec_gates:
             raise CompileError(
                 "Gates in qml.device.operations and specification file do not match for "
@@ -528,6 +538,51 @@ def validate_device_capabilities(
                 "Observables in qml.device.observables and specification file do not match.\n"
                 f"Observables that present only in spec: {spec_observables - device_observables}\n"
             )
+
+
+def get_device_toml_config(device) -> TOMLDocument:
+    """Get the contents of the device config file."""
+    if hasattr(device, "config"):
+        # The expected case: device specifies its own config.
+        toml_file = device.config
+    else:
+        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # field.
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+
+        name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+        # The toml files name convention we follow is to replace
+        # the dots with underscores in the device short name.
+        toml_file_name = name.replace(".", "_") + ".toml"
+        # And they are currently saved in the following directory.
+        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+
+    try:
+        config = read_toml_file(toml_file)
+    except FileNotFoundError as e:
+        raise CompileError(
+            "Attempting to compile program for incompatible device: "
+            f"Config file ({toml_file}) does not exist"
+        ) from e
+
+    return config
+
+
+def get_device_capabilities(
+    device, program_features: Optional[ProgramFeatures] = None
+) -> DeviceCapabilities:
+    """Get or load DeviceCapabilities structure from device"""
+    if hasattr(device, "qjit_capabilities"):
+        return device.qjit_capabilities
+    else:
+        program_features = (
+            program_features if program_features else ProgramFeatures(device.shots is not None)
+        )
+        device_name = (
+            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+        )
+        device_config = get_device_toml_config(device)
+        return load_device_capabilities(device_config, program_features, device_name)
 
 
 def check_device_wires(wires):

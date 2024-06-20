@@ -16,16 +16,12 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-import pathlib
 from dataclasses import dataclass
 from functools import reduce
 from itertools import repeat
-from typing import Any, Dict, List, Optional, Set
-
-import pennylane as qml
+from typing import Any, Dict, List, Set
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import get_lib_path
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
@@ -89,6 +85,7 @@ class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
+    non_commuting_observables_flag: bool
     options: Dict[str, bool]
 
 
@@ -107,6 +104,11 @@ def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[s
         ops.update({g})
         if props.controllable:
             ops.update({f"C({g})"})
+        if props.invertible:
+            ops.update({f"Adjoint({g})"})
+        if props.controllable and props.invertible:
+            ops.update({f"Adjoint(C({g}))"})
+            ops.update({f"C(Adjoint({g}))"})
     return ops
 
 
@@ -260,8 +262,8 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
 
 
 def patch_schema1_collections(
-    config, _device_name, native_gate_props, matrix_decomp_props, decomp_props
-):
+    config, _device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
+):  # pylint: disable=too-many-branches
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
 
     # The deduction logic is the following:
@@ -302,6 +304,13 @@ def patch_schema1_collections(
         for props in native_gate_props.values():
             props.invertible = True
 
+    # Mark all gates as differentiable
+    for props in native_gate_props.values():
+        props.differentiable = True
+    # Mark all observables as differentiable
+    for props in observable_props.values():
+        props.differentiable = True
+
     # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
     # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
     # listed in either matrix or decomposable sections. This is a contradiction, because
@@ -320,52 +329,6 @@ def patch_schema1_collections(
             matrix_decomp_props.pop("ControlledPhaseShift")
         if "ControlledPhaseShift" in decomp_props:
             decomp_props.pop("ControlledPhaseShift")
-
-
-def get_device_toml_config(device) -> TOMLDocument:
-    """Get the contents of the device config file."""
-    if hasattr(device, "config"):
-        # The expected case: device specifies its own config.
-        toml_file = device.config
-    else:
-        # TODO: Remove this section when `qml.devices.LegacyDevice`s are guaranteed
-        # to have their own config file field.
-        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-
-        name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-        # The toml files name convention we follow is to replace
-        # the dots with underscores in the device short name.
-        toml_file_name = name.replace(".", "_") + ".toml"
-        # And they are currently saved in the following directory.
-        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
-
-    try:
-        config = read_toml_file(toml_file)
-    except FileNotFoundError as e:
-        raise CompileError(
-            "Attempting to compile program for incompatible device: "
-            f"Config file ({toml_file}) does not exist"
-        ) from e
-
-    return config
-
-
-def get_device_capabilities(
-    device, program_features: Optional[ProgramFeatures] = None
-) -> DeviceCapabilities:
-    """Get or load DeviceCapabilities structure from device"""
-
-    if hasattr(device, "qjit_capabilities"):
-        return device.qjit_capabilities
-    else:
-        program_features = (
-            program_features if program_features else ProgramFeatures(device.shots is not None)
-        )
-        device_name = (
-            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-        )
-        device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features, device_name)
 
 
 def load_device_capabilities(
@@ -402,6 +365,7 @@ def load_device_capabilities(
             native_gate_props,
             matrix_decomp_props,
             decomp_props,
+            observable_props,
         )
 
     return DeviceCapabilities(
@@ -414,5 +378,6 @@ def load_device_capabilities(
         mid_circuit_measurement_flag=get_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=get_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=get_compilation_flag(config, "dynamic_qubit_management"),
+        non_commuting_observables_flag=get_compilation_flag(config, "non_commuting_observables"),
         options=get_options(config),
     )

@@ -28,16 +28,16 @@ using namespace catalyst::quantum;
 
 namespace {
 
-bool isAnnotated(func::FuncOp op, const char *attr)
+bool isAnnotated(FunctionOpInterface op, const char *attr)
 {
     return (bool)(op->getAttrOfType<UnitAttr>(attr));
 }
 
-bool invalidGradientOperation(func::FuncOp op)
+bool invalidGradientOperation(FunctionOpInterface op)
 {
     auto res = op.walk([](Operation *o) {
-        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::PythonCallOp>(o) ||
-            dyn_cast<catalyst::CustomCallOp>(o)) {
+        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::CustomCallOp>(o) ||
+            dyn_cast<catalyst::CallbackCallOp>(o)) {
             return WalkResult::interrupt();
         }
         else {
@@ -47,36 +47,36 @@ bool invalidGradientOperation(func::FuncOp op)
     return res.wasInterrupted();
 }
 
-bool successfulMatchLeaf(func::FuncOp op)
+bool successfulMatchLeaf(FunctionOpInterface op)
 {
     return !isAnnotated(op, hasInvalidGradientOp) && invalidGradientOperation(op);
 }
 
-void annotate(func::FuncOp op, PatternRewriter &rewriter, const char *attr)
+void annotate(FunctionOpInterface op, PatternRewriter &rewriter, const char *attr)
 {
     op->setAttr(attr, rewriter.getUnitAttr());
 }
 
-struct AnnotateFunctionPattern : public OpRewritePattern<func::FuncOp> {
-    using OpRewritePattern<func::FuncOp>::OpRewritePattern;
+struct AnnotateFunctionPattern : public OpInterfaceRewritePattern<FunctionOpInterface> {
+    using OpInterfaceRewritePattern<FunctionOpInterface>::OpInterfaceRewritePattern;
 
-    LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(FunctionOpInterface op) const override;
+    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AnnotateFunctionPattern::match(func::FuncOp op) const
+LogicalResult AnnotateFunctionPattern::match(FunctionOpInterface op) const
 {
     return successfulMatchLeaf(op) ? success() : failure();
 }
 
-void AnnotateFunctionPattern::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
+void AnnotateFunctionPattern::rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
 {
     annotate(op, rewriter, hasInvalidGradientOp);
 }
 
-std::optional<func::FuncOp> getFuncOp(const CallGraphNode *node, CallGraph &cg)
+std::optional<FunctionOpInterface> getFuncOp(const CallGraphNode *node, CallGraph &cg)
 {
-    std::optional<func::FuncOp> funcOp = std::nullopt;
+    std::optional<FunctionOpInterface> funcOp = std::nullopt;
     if (node == cg.getExternalCallerNode())
         // if we don't know who called us, return nullopt
         return funcOp;
@@ -84,23 +84,23 @@ std::optional<func::FuncOp> getFuncOp(const CallGraphNode *node, CallGraph &cg)
         // if we don't know the callee, return nullopt
         return funcOp;
     auto *callableRegion = node->getCallableRegion();
-    funcOp = cast<func::FuncOp>(callableRegion->getParentOp());
+    funcOp = cast<FunctionOpInterface>(callableRegion->getParentOp());
     return funcOp;
 }
 
-std::optional<func::FuncOp> getCallee(CallGraphNode::Edge edge, CallGraph &cg)
+std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph &cg)
 {
     CallGraphNode *callee = edge.getTarget();
     return getFuncOp(callee, cg);
 }
 
-bool anyCalleeIsAnnotated(func::FuncOp op, const char *attr, CallGraph &cg)
+bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg)
 {
-    Region &region = op.getRegion();
+    Region &region = op->getRegion(0);
     CallGraphNode *node = cg.lookupNode(&region);
     assert(node && "An incorrect region was used to look up a node in the callgraph.");
     for (auto i = node->begin(), e = node->end(); i != e; ++i) {
-        std::optional<func::FuncOp> maybeCallee = getCallee(*i, cg);
+        std::optional<FunctionOpInterface> maybeCallee = getCallee(*i, cg);
         // An indirect call.
         // This will not happen in the current version of Catalyst as all calls are direct.
         // Which calls would be indirect?
@@ -115,37 +115,37 @@ bool anyCalleeIsAnnotated(func::FuncOp op, const char *attr, CallGraph &cg)
         if (!maybeCallee)
             return true;
 
-        func::FuncOp calleeOp = maybeCallee.value();
+        FunctionOpInterface calleeOp = maybeCallee.value();
         if (isAnnotated(calleeOp, attr))
             return true;
     }
     return false;
 }
 
-bool successfulMatchNode(func::FuncOp op, const char *attr, CallGraph &cg)
+bool successfulMatchNode(FunctionOpInterface op, const char *attr, CallGraph &cg)
 {
     return !isAnnotated(op, attr) && anyCalleeIsAnnotated(op, attr, cg);
 }
 
-struct PropagateAnnotationPattern : public OpRewritePattern<func::FuncOp> {
+struct PropagateAnnotationPattern : public OpInterfaceRewritePattern<FunctionOpInterface> {
     PropagateAnnotationPattern(MLIRContext *ctx, CallGraph &cg)
-        : OpRewritePattern<func::FuncOp>(ctx), callgraph(cg)
+        : OpInterfaceRewritePattern<FunctionOpInterface>(ctx), callgraph(cg)
     {
     }
 
-    LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(FunctionOpInterface op) const override;
+    void rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
 
   private:
     CallGraph &callgraph;
 };
 
-LogicalResult PropagateAnnotationPattern::match(func::FuncOp op) const
+LogicalResult PropagateAnnotationPattern::match(FunctionOpInterface op) const
 {
     return successfulMatchNode(op, hasInvalidGradientOp, callgraph) ? success() : failure();
 }
 
-void PropagateAnnotationPattern::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
+void PropagateAnnotationPattern::rewrite(FunctionOpInterface op, PatternRewriter &rewriter) const
 {
     annotate(op, rewriter, hasInvalidGradientOp);
 }

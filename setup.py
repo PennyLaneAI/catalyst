@@ -65,12 +65,15 @@ else:
     pennylane_dep = f"pennylane>={pl_min_release}"
 if lq_version is not None:
     lightning_dep = f"pennylane-lightning=={lq_version}"  # use TestPyPI wheels to avoid rebuild
+    kokkos_dep = f"pennylane-lightning-kokkos=={lq_version}"
 else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
+    kokkos_dep = ""
 
 requirements = [
     pennylane_dep,
     lightning_dep,
+    kokkos_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit; python_version < '3.11'",

@@ -18,7 +18,9 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import CompileError, measure, qjit
+import catalyst
+from catalyst import CompileError, grad, measure, qjit
+from catalyst.device.qjit_device import QJITDeviceNewAPI
 
 
 @pytest.mark.parametrize("_in,_out", [(0, False), (1, True)])
@@ -116,6 +118,45 @@ def test_qfunc_output_shape_list():
         assert len(res) == 1
 
         return res[0] * 1j
+
+
+@pytest.mark.parametrize("grad_method", ["adjoint", "parameter-shift"])
+def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
+    """Test that the grad_method specified on the qnode is updated on the ExecutionConfig
+    that is passed to the preprocess method"""
+
+    spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=grad_method)
+    def circ(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliX(0))
+
+    qml.qjit(circ)(1.2)
+
+    assert spy.call_count == 1
+    _, config = spy.spy_return
+    assert config.gradient_method == None
+
+    def grad_circ(x: float):
+        return grad(circ)(x)
+
+    qml.qjit(grad_circ)(1.2)
+
+    assert spy.call_count == 2
+    _, config = spy.spy_return
+    assert config.gradient_method == grad_method
+
+
+# pylint: disable=protected_access
+def test_execution_config_grad_method_with_no_qnode():
+    """Test that if qnode is None (default value on ``trace_quantum_function``) when
+    ``_make_execution_config`` is called, an appropriate ExecutionConfig is returned"""
+
+    config = catalyst.jax_tracer._make_execution_config(None)
+
+    assert isinstance(config, qml.devices.ExecutionConfig)
+    assert config.gradient_method is None
 
 
 if __name__ == "__main__":
