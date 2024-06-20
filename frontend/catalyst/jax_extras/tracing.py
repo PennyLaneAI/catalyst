@@ -830,11 +830,14 @@ def expand_args(
     s = expansion_strategy
     if s.input_unshare_variables is True:
         assert s.axes_specs is None
+        # Treat dimensions as arguments, no shared references (e.g. in loop body programs)
         in_type = infer_input_type_unshared(args)
     else:
         if s.axes_specs is not None:
+            # Top-level programs support `abstracted_axes` for which we use the default inference
             in_type = infer_lambda_input_type(s.axes_specs, args)
         else:
+            # Treat dimensions as constants, all shared references (e.g. in loop body programs)
             in_type = infer_input_type_constshapes(args)
 
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
