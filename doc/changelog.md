@@ -222,6 +222,9 @@
 * A new GitHub workflow makes available a binary distribution for Linux Arm64.
   [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a pennylane-variant jaxpr into a 
+  catalyst variant jaxpr.
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
