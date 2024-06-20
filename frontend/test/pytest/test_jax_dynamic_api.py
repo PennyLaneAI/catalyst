@@ -417,6 +417,25 @@ def test_qjit_forloop_identity():
     assert_array_and_dtype_equal(result, expected)
 
 
+def test_qjit_forloop_capture():
+    """Test simple for-loop primitive vs dynamic dimensions"""
+
+    @qjit()
+    def f(sz):
+        x = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 3, 1)
+        def loop(_, a):
+            return a + x
+
+        a2 = loop(x)
+        return a2
+
+    result = f(3)
+    expected = 4 * jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
 def test_qjit_forloop_shared_indbidx():
     """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
 
@@ -536,6 +555,26 @@ def test_qnode_forloop_identity():
 
     result = f(3)
     expected = jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qnode_forloop_capture():
+    """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        x = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 3, 1)
+        def loop(_, a):
+            return a + x
+
+        a2 = loop(x)
+        return a2
+
+    result = f(3)
+    expected = 4 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 

@@ -536,7 +536,7 @@ def make_jaxpr2(
 def input_type_to_tracers(
     in_type: InputType,
     arg_maker: Callable[[AbstractValue], DynamicJaxprTracer],
-    const_maker: Callable[[DynamicJaxprTracer], DynamicJaxprTracer]
+    const_maker: Callable[[DynamicJaxprTracer], DynamicJaxprTracer],
 ) -> List[DynamicJaxprTracer]:
     """Creates an expanded list of tracers representing an input values of a Jaxpr program"""
     in_tracers: list[Tracer] = []
@@ -554,7 +554,7 @@ def input_type_to_tracers(
             return a.update(shape=tuple(shape2))
         return a
 
-    for a,_ in in_type:
+    for a, _ in in_type:
         in_tracers.append(arg_maker(_substitute_tracers_in_aval(a)))
     return in_tracers
 
@@ -585,6 +585,7 @@ def output_type_to_tracers(
 
 
 TracerLike = TypeVar("TracerLike")
+
 
 def _is_tracer_like(x):
     return hasattr(x, "aval")
@@ -832,7 +833,7 @@ def expand_results(
     results: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
-    consts = []
+    consts=[],
 ) -> Tuple[List[TracerLike], OutputType]:
     """Calculate the expanded list of results of a Python function, based on its input and output
     tracers/variables.
@@ -849,7 +850,9 @@ def expand_results(
         OutputType describing the expanded result
 
     """
-    return infer_output_type(consts, expanded_inputs, results, expansion_strategy, num_implicit_inputs)
+    return infer_output_type(
+        consts, expanded_inputs, results, expansion_strategy, num_implicit_inputs
+    )
 
 
 def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:

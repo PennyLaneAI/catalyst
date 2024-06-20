@@ -696,9 +696,9 @@ class ForLoopCallable:
         in_type = in_sig.in_type
 
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            arg_classical_tracers = input_type_to_tracers(in_type,
-                                                          inner_trace.new_arg,
-                                                          inner_trace.full_raise)
+            arg_classical_tracers = input_type_to_tracers(
+                in_type, inner_trace.new_arg, inner_trace.full_raise
+            )
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
                     inner_trace.full_raise(t) for t in wfun.call_wrapped(*arg_classical_tracers)
@@ -864,9 +864,9 @@ class WhileLoopCallable:
         in_expanded_classical_tracers = in_sig.in_expanded_args
 
         with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-            arg_classical_tracers = input_type_to_tracers(in_type,
-                                                          cond_trace.new_arg,
-                                                          cond_trace.full_raise)
+            arg_classical_tracers = input_type_to_tracers(
+                in_type, cond_trace.new_arg, cond_trace.full_raise
+            )
             res_classical_tracers = [
                 cond_trace.full_raise(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
             ]
@@ -885,9 +885,9 @@ class WhileLoopCallable:
             _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
         with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-            arg_classical_tracers = input_type_to_tracers(in_type,
-                                                          body_trace.new_arg,
-                                                          body_trace.full_raise)
+            arg_classical_tracers = input_type_to_tracers(
+                in_type, body_trace.new_arg, body_trace.full_raise
+            )
 
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
@@ -1054,7 +1054,7 @@ class ForLoop(HybridOp):
                 res_tracers,
                 expansion_strategy=expansion_strategy,
                 num_implicit_inputs=nimplicit,
-                consts=[inner_trace.full_raise(t) for t in consts]
+                consts=[inner_trace.full_raise(t) for t in consts],
             )
             jaxpr, _, _ = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
 
@@ -1071,7 +1071,7 @@ class ForLoop(HybridOp):
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
             num_implicit_inputs=nimplicit,
-            consts=consts
+            consts=consts,
         )
 
         qrp2 = QRegPromise(
