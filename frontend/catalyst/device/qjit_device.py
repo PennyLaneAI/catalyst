@@ -109,7 +109,7 @@ RUNTIME_OBSERVABLES = [
     "Prod",
     "SProd",
     "Sum",
-    "Tensor"
+    "Tensor",
 ]
 
 # The runtime interface does not care about specific gate properties, so set them all to True.
