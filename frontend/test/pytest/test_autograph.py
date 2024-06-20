@@ -40,6 +40,7 @@ from catalyst import (
     measure,
     qjit,
     vjp,
+    vmap,
 )
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
@@ -156,9 +157,8 @@ class TestSourceCodeInfo:
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
-    def test_unsupported_object(self):
-        """Check the error produced when attempting to convert an unsupported object (neither of
-        QNode, function, or method)."""
+    def test_callable_object(self):
+        """Test qjit applied to a callable object."""
 
         class FN:
             """Test object."""
@@ -170,8 +170,7 @@ class TestIntegration:
 
         fn = FN()
 
-        with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
-            qjit(autograph=True)(fn)
+        assert qjit(autograph=True)(fn)(3) == 9
 
     def test_lambda(self):
         """Test autograph on a lambda function."""
@@ -1986,6 +1985,23 @@ class TestJaxIndexAssignment:
             return result
 
         assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 0, 3, 0, 4, 0]))
+
+
+class TestDecorators:
+    """Test if Autograph works when applied to a decorated function"""
+
+    def test_vmap(self):
+        """Test if Autograph works when applied to a decorated function with vmap"""
+
+        def workflow(axes_dct):
+            return axes_dct["x"] + axes_dct["y"]
+
+        expected = jnp.array([1, 2, 3, 4, 5])
+
+        result = qjit(vmap(workflow, in_axes=({"x": None, "y": 0},)), autograph=True)(
+            {"x": 1, "y": jnp.arange(5)}
+        )
+        assert jnp.allclose(result, expected)
 
 
 if __name__ == "__main__":
