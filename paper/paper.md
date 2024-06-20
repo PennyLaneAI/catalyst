@@ -142,23 +142,23 @@ dev = qml.device("lightning.qubit", wires=2)
 @qjit(autograph=True)
 def hybrid_function(x):
 
-	@qml.qnode(dev, diff_method="parameter-shift")
-	def circuit(x):
-    	qml.RX(x, wires=0)
-    	qml.RY(x ** 2, wires=1)
-    	qml.CNOT(wires=[0, 1])
+    @qml.qnode(dev, diff_method="parameter-shift")
+    def circuit(x):
+        qml.RX(x, wires=0)
+        qml.RY(x ** 2, wires=1)
+        qml.CNOT(wires=[0, 1])
 
-    	for i in range(0, 10):
-        	m = measure(wires=0)
+        for i in range(0, 10):
+            m = measure(wires=0)
 
-        	if m == 1:
-            	qml.CRX(x * jnp.exp(- x ** 2), wires=[0, 1])
+            if m == 1:
+                qml.CRX(x * jnp.exp(- x ** 2), wires=[0, 1])
 
-        	x = x * 0.2
+            x = x * 0.2
 
-    	return qml.expval(qml.PauliZ(0))
+        return qml.expval(qml.PauliZ(0))
 
-	return jnp.sin(circuit(x)) ** 2
+    return jnp.sin(circuit(x)) ** 2
 ```
 
 ```pycon
