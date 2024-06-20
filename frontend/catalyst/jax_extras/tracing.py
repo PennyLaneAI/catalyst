@@ -463,7 +463,7 @@ def trace_to_jaxpr(
     trace: DynamicJaxprTrace, inputs: List[DynamicJaxprTracer], outputs: List[DynamicJaxprTracer]
 ) -> Tuple[Jaxpr, List[DynamicJaxprTracer], List[Any]]:
     """Get Jaxpr from a Jax trace applying a workaround.  The workaround makes it possible to trace
-    the following program `lambda i, a: i<3`. Where `a` is an unused dynamically-shaped array.
+    e.g. the following program: `lambda i, a: i<3`. Where `a` is an unused dynamically-shaped array.
     """
     jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))
     del jaxpr._outvars[len(outputs) :]
