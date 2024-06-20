@@ -593,7 +593,10 @@ def set_item(target, i, x):
     # Apply the 'at...set' transformation only to Jax arrays.
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].set(x)
+        if isinstance(i, slice):
+            target = jax.lax.dynamic_update_slice(target, x, (i.start, ))
+        else:
+            target = target.at[i].set(x)
     else:
         target[i] = x
 
