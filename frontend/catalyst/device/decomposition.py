@@ -146,12 +146,30 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if alternative_decomp is not None:
         return alternative_decomp
 
-    if capabilities.to_matrix_ops.get(op.name) or (
-        op.has_matrix and isinstance(op, qml.ops.Controlled)
-    ):
+    if capabilities.to_matrix_ops.get(op.name):
         return _decompose_to_matrix(op)
+    elif type(op) in (qml.ops.Controlled, qml.ops.ControlledOp) and capabilities.to_matrix_ops.get(
+        op.base.name
+    ):
+        return qml.ops.Controlled(
+            _decompose_to_matrix(op.base)[0],
+            control_wires=op.control_wires,
+            control_values=op.control_values,
+            work_wires=op.work_wires,
+        )
 
-    return op.decomposition()
+    try:
+        return op.decomposition()
+    except:
+        pass
+
+    try:
+        return _decompose_to_matrix(op)
+    except Exception as e:
+        raise CompileError(
+            f"Operation {op} could not be decomposed or converted to matrix,"
+            " it might be unsupported."
+        ) from e
 
 
 @transform
