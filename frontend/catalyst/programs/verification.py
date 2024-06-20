@@ -195,7 +195,6 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         return True
 
     def _op_checker(op, state):
-
         # Don't check PennyLane Adjoint / Controlled instances directly since the compound name
         # (e.g. "Adjoint(Hadamard)") will not show up in the device capabilities. Instead the check
         # is handled in _inv_op_checker and _ctrl_op_checker.
