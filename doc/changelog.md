@@ -5,9 +5,13 @@
 * `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
   [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
 
+* `MidCiruitMeasure` now inherits `MidMeasureMP` instead of `HybridOp`, allowing much better integration with PennyLane for
+  workflows with mid-circuit measurements.
+  [(#832)](https://github.com/PennyLaneAI/catalyst/pull/832)
+
 * The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
   The loop over shots is executed with `catalyst.vmap`.
-  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+  [(#773)](https://github.com/PennyLaneAI/catalyst/pull/773)
 
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
