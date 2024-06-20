@@ -73,6 +73,9 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     both that the overall observable is supported, and that its component
     parts are supported."""
 
+    # ToDo: currently we don't check that Tensor itself is supported, only its obs
+    # The TOML files have followed the convention of dev.observables from PL and not
+    # included Tensor, but this could be updated to validate
     if isinstance(obs, Tensor):
         for o in obs.obs:
             _verify_observable(o, _obs_checker)
