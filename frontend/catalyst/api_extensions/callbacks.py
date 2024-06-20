@@ -22,7 +22,6 @@ import copy
 import ctypes
 import functools
 import inspect
-from operator import not_
 from typing import Any, Callable
 
 import jax
@@ -72,13 +71,13 @@ class CallbackWithCustomGrad:
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
         # Once we have the types, we can call this self.func with the absargs and abskwargs.
         # We don't need the jaxpr representation but the output is the shape of the cotangents.
-        _, cotangents = jax.make_jaxpr(self, return_shape=True)(*absargs, **abskwargs)
+        _jaxpr, cotangents = jax.make_jaxpr(self, return_shape=True)(*absargs, **abskwargs)
 
         # The forward pass must have the same input types as the original function
         self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
 
         # But its output is always going to be two pairs.
-        primal, residuals = shape
+        _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
         self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
@@ -100,9 +99,11 @@ class CallbackWithPotentialCustomGrad:
         self.callback = None
 
     def fwd(self, func):
+        """Save forward pass as implemented by the user"""
         self._fwd = func
 
     def bwd(self, func):
+        """Save reverse pass as implemented by the user"""
         self._bwd = func
 
     def __call__(self, *args, **kwargs):

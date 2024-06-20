@@ -92,7 +92,7 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-arguments
+# pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-arguments,protected-access
 
 #########
 # Types #
@@ -340,7 +340,7 @@ def _python_callback_lowering(
         reverse = ReverseOp(sym_rev, rev_fn_ty_attr, rev_callee_attr, argc, resc, len_tape)
         fwd_sym_attr = ir.FlatSymbolRefAttr.get(forward.sym_name.value)
         rev_sym_attr = ir.FlatSymbolRefAttr.get(reverse.sym_name.value)
-        customGrad = CustomGradOp(symbol_attr, fwd_sym_attr, rev_sym_attr)
+        CustomGradOp(symbol_attr, fwd_sym_attr, rev_sym_attr)
 
     return retval
 
