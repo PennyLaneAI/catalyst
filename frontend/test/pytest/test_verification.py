@@ -34,7 +34,7 @@ from catalyst import (
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
-from catalyst.device.qjit_device import RUNTIME_OPERATIONS
+from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.programs.verification import validate_observables
 from catalyst.utils.toml import (
     OperationProperties,
@@ -594,7 +594,8 @@ class TestObservableValidation:
         type is supported/unsupported."""
 
         dev = qml.device(backend, wires=1)
-        qjit_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev)
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
@@ -603,6 +604,28 @@ class TestObservableValidation:
 
         del qjit_capabilities.native_obs[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
+            validate_observables(tape, qjit_capabilities, dev.name)
+
+    def test_non_qjit_observables_raise_error(self, backend):
+        """Test that an observable that is supported by the backend according to the
+        TOML file, but is not supported by Catalyst, raises an error in validation"""
+
+        dev = qml.device(backend, wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+
+        dev_capabilities.native_obs.update(
+            {
+                "PauliX2": OperationProperties(
+                    invertible=True, controllable=True, differentiable=True
+                )
+            }
+        )
+
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
+
+        with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
             validate_observables(tape, qjit_capabilities, dev.name)
 
 

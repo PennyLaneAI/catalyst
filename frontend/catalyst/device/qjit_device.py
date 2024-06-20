@@ -96,10 +96,33 @@ RUNTIME_OPERATIONS = [
     "Toffoli",
     "GlobalPhase",
 ]
+
+RUNTIME_OBSERVABLES = [
+    "Identity",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "Hadamard",
+    "Hermitian",
+    "Hamiltonian",
+    "Projector",
+    "SparseHamiltonian",
+    "Exp",
+    "LinearCombination",
+    "Prod",
+    "SProd",
+    "Sum",
+]
+
 # The runtime interface does not care about specific gate properties, so set them all to True.
 RUNTIME_OPERATIONS = {
     op: OperationProperties(invertible=True, controllable=True, differentiable=True)
     for op in RUNTIME_OPERATIONS
+}
+
+RUNTIME_OBSERVABLES = {
+    obs: OperationProperties(invertible=True, controllable=True, differentiable=True)
+    for obs in RUNTIME_OBSERVABLES
 }
 
 # TODO: This should be removed after implementing `get_c_interface`
@@ -194,11 +217,15 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     # Supported gates of the target PennyLane's device
     qjit_capabilities = deepcopy(target_capabilities)
 
-    # Gates that Catalyst runtime supports
+    # Gates and observables that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
+    qir_observables = RUNTIME_OBSERVABLES
 
     # Intersection of the above
     qjit_capabilities.native_ops = intersect_operations(target_capabilities.native_ops, qir_gates)
+    qjit_capabilities.native_obs = intersect_operations(
+        target_capabilities.native_obs, qir_observables
+    )
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
     qjit_capabilities.native_ops.update(
