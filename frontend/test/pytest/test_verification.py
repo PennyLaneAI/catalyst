@@ -17,7 +17,6 @@
 from copy import deepcopy
 from unittest.mock import patch
 
-import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.ops import Adjoint, Controlled
