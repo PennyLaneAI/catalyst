@@ -308,7 +308,6 @@ def test_quantum_tracing_2():
         return a2
 
     result = f(2, 3)
-    print(result)
     expected = jnp.ones((2, 4))
     assert_array_and_dtype_equal(result, expected)
 
