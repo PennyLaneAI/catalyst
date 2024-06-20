@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 
 #include "Gradient/IR/GradientInterfaces.h"
+
+#include "Gradient/IR/GradientDialect.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.h.inc"

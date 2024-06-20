@@ -15,7 +15,9 @@
 #include "iostream"
 #include "llvm/Support/raw_ostream.h"
 
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
@@ -166,6 +168,189 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
     }
 };
 
+struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(ForwardOp op) const override
+    {
+        // Only match with functions that are empty (i.e., just declarations, not definitions)
+        if (!op.empty()) {
+            return failure();
+        }
+
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+
+        return success();
+    }
+
+    void rewrite(ForwardOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        SmallVector<Value> inputs;
+        SmallVector<Value> differentials;
+        SmallVector<Value> outputs;
+        SmallVector<Value> cotangents;
+
+        Block *block;
+        rewriter.updateRootInPlace(op, [&] { block = op.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto params = op.getArguments();
+
+        for (auto i = 0; i < argc * 2; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? differentials.push_back(val) : inputs.push_back(val);
+        }
+
+        auto upperLimit = (argc * 2) + (resc * 2);
+        for (auto i = argc * 2; i < upperLimit; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        }
+
+        auto implAttr = adaptor.getImplementationAttr();
+        auto impl = adaptor.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = op.getLoc();
+
+        SmallVector<Value> tensorInputs;
+        for (auto input : inputs) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, input);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
+        SmallVector<Value> tensorOutputs(callOp.getResults());
+
+        for (auto [memrefOutput, tensorOutput] : llvm::zip(outputs, tensorOutputs)) {
+            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, memrefOutput.getType(),
+                                                                       tensorOutput);
+            rewriter.create<memref::CopyOp>(loc, castVal, memrefOutput);
+        }
+
+        auto tapeCount = op.getTape();
+        SmallVector<Value> tapeOutputs;
+        tapeOutputs.insert(tapeOutputs.begin(), tensorOutputs.end() - tapeCount,
+                           tensorOutputs.end());
+
+        SmallVector<Value> tapeMemrefOutputs;
+        for (auto [tapeTensorOutput, memrefTapeOutput] :
+             llvm::zip(tapeOutputs, op.getResultTypes())) {
+            Value castVal =
+                rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput, tapeTensorOutput);
+            tapeMemrefOutputs.push_back(castVal);
+        }
+
+        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeMemrefOutputs, F);
+    }
+};
+
+struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(ReverseOp op) const override
+    {
+        // Only match with functions that are empty (i.e., just declarations, not definitions)
+        if (!op.empty()) {
+            return failure();
+        }
+
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+
+        return success();
+    }
+
+    void rewrite(ReverseOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        SmallVector<Value> inputs;
+        SmallVector<Value> differentials;
+        SmallVector<Value> outputs;
+        SmallVector<Value> cotangents;
+        SmallVector<Value> tapeElements;
+
+        Block *block;
+        rewriter.updateRootInPlace(op, [&] { block = op.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto params = op.getArguments();
+
+        for (auto i = 0; i < argc * 2; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? differentials.push_back(val) : inputs.push_back(val);
+        }
+
+        auto upperLimit = (argc * 2) + (resc * 2);
+        for (auto i = argc * 2; i < upperLimit; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        }
+
+        auto tapeCount = op.getTape();
+        auto uppestLimit = upperLimit + tapeCount;
+        for (auto i = upperLimit; i < uppestLimit; i++) {
+            tapeElements.push_back(params[i]);
+        }
+
+        auto implAttr = adaptor.getImplementationAttr();
+        auto impl = adaptor.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = op.getLoc();
+
+        SmallVector<Value> tensorInputs;
+        for (auto tapeElement : tapeElements) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        for (auto cotangent : cotangents) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
+        SmallVector<Value> tensorOutputs(callOp.getResults());
+
+        for (auto [differential, tensorOutput] : llvm::zip(differentials, tensorOutputs)) {
+            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, differential.getType(),
+                                                                       tensorOutput);
+            rewriter.create<memref::CopyOp>(loc, castVal, differential);
+        }
+
+        auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{}, T);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -175,6 +360,8 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeForwardOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeReverseOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient

@@ -132,6 +132,44 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
     }
 }
 
+LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp, Location loc,
+                                          func::FuncOp originalFunc, func::FuncOp augmentedPrimal,
+                                          func::FuncOp gradient)
+{
+    MLIRContext *context = moduleOp.getContext();
+    OpBuilder::InsertionGuard insertGuard(builder);
+    builder.setInsertionPointToStart(moduleOp.getBody());
+
+    std::string key = (enzyme_custom_gradient_key + originalFunc.getName()).str();
+    auto customGradient = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+    if (customGradient) {
+        return customGradient;
+    }
+
+    auto ptrType = LLVM::LLVMPointerType::get(context);
+    auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
+    customGradient = builder.create<LLVM::GlobalOp>(loc, resultType,
+                                                    /*isConstant=*/false, LLVM::Linkage::External,
+                                                    key, /*address space=*/nullptr);
+    builder.createBlock(&customGradient.getInitializerRegion());
+    Value origFnPtr = builder.create<func::ConstantOp>(loc, originalFunc.getFunctionType(),
+                                                       originalFunc.getName());
+    Value augFnPtr = builder.create<func::ConstantOp>(loc, augmentedPrimal.getFunctionType(),
+                                                      augmentedPrimal.getName());
+    Value gradFnPtr =
+        builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
+    SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
+    Value result = builder.create<LLVM::UndefOp>(loc, resultType);
+    for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
+        Value casted = builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
+        result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
+    }
+
+    builder.create<LLVM::ReturnOp>(loc, result);
+
+    return customGradient;
+}
+
 /// Enzyme custom gradients appear to exhibit better stability when they are registered for
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
@@ -803,45 +841,222 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
         return glb;
     }
+};
 
-    static LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
-                                                     Location loc, func::FuncOp originalFunc,
-                                                     func::FuncOp augmentedPrimal,
-                                                     func::FuncOp gradient)
+struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+    LogicalResult match(ForwardOp op) const override { return success(); }
+
+    void rewrite(ForwardOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
     {
-        MLIRContext *context = moduleOp.getContext();
-        OpBuilder::InsertionGuard insertGuard(builder);
-        builder.setInsertionPointToStart(moduleOp.getBody());
+        // convert all arguments to pointers...
+        auto typeConverter = getTypeConverter();
 
-        std::string key = (enzyme_custom_gradient_key + originalFunc.getName()).str();
-        auto customGradient = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
-        if (customGradient) {
-            return customGradient;
+        SmallVector<Type> memrefTapeTys(op.getResultTypes());
+
+        SmallVector<Type> structTapeTys;
+        auto converter = getTypeConverter();
+        for (auto memrefTapeTy : memrefTapeTys) {
+            auto structTapeTy = converter->convertType(memrefTapeTy);
+            structTapeTys.push_back(structTapeTy);
         }
 
-        auto ptrType = LLVM::LLVMPointerType::get(context);
-        auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
-        customGradient = builder.create<LLVM::GlobalOp>(
-            loc, resultType,
-            /*isConstant=*/false, LLVM::Linkage::External, key, /*address space=*/nullptr);
-        builder.createBlock(&customGradient.getInitializerRegion());
-        Value origFnPtr = builder.create<func::ConstantOp>(loc, originalFunc.getFunctionType(),
-                                                           originalFunc.getName());
-        Value augFnPtr = builder.create<func::ConstantOp>(loc, augmentedPrimal.getFunctionType(),
-                                                          augmentedPrimal.getName());
-        Value gradFnPtr =
-            builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
-        SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
-        Value result = builder.create<LLVM::UndefOp>(loc, resultType);
-        for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
-            Value casted =
-                builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
-            result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
+        MLIRContext *ctx = rewriter.getContext();
+        auto tapeStructs = LLVM::LLVMStructType::getLiteral(ctx, structTapeTys);
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeStructs});
+
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto ptrType = LLVM::LLVMPointerType::get(ctx);
+        Type retTy = structTapeTys.empty() ? dyn_cast<Type>(ptrType)
+                                           : dyn_cast<Type>(wrappedFlatTapeStructTy);
+
+        auto oldFuncTy = op.getFunctionType();
+        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {retTy});
+
+        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
+        func.setPrivate();
+
+        auto noinline = rewriter.getStringAttr("noinline");
+        SmallVector<Attribute> passthrough = {noinline};
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
+
+        rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        rewriter.eraseOp(op);
+    }
+};
+
+struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+    LogicalResult match(ReverseOp op) const override { return success(); }
+
+    void rewrite(ReverseOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        SmallVector<Value> inputs;
+        SmallVector<Value> differentials;
+        SmallVector<Value> outputs;
+        SmallVector<Value> cotangents;
+        SmallVector<Value> tapeElements;
+        auto params = op.getArguments();
+
+        for (auto i = 0; i < argc * 2; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? differentials.push_back(val) : inputs.push_back(val);
         }
 
-        builder.create<LLVM::ReturnOp>(loc, result);
+        auto upperLimit = (argc * 2) + (resc * 2);
+        for (auto i = argc * 2; i < upperLimit; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        }
 
-        return customGradient;
+        auto tapeCount = op.getTape();
+        auto uppestLimit = upperLimit + tapeCount;
+        for (auto i = upperLimit; i < uppestLimit; i++) {
+            tapeElements.push_back(params[i]);
+        }
+
+        SmallVector<Type> newFuncInputTys;
+
+        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
+            newFuncInputTys.push_back(in.getType());
+            newFuncInputTys.push_back(diff.getType());
+        }
+
+        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
+            newFuncInputTys.push_back(out.getType());
+            newFuncInputTys.push_back(cotan.getType());
+        }
+
+        SmallVector<Type> tapeStructs;
+        auto converter = getTypeConverter();
+        for (auto tapeMemref : tapeElements) {
+            auto tapeMemrefTy = tapeMemref.getType();
+            auto tapeStructTy = converter->convertType(tapeMemrefTy);
+            tapeStructs.push_back(tapeStructTy);
+        }
+
+        auto ctx = rewriter.getContext();
+        // This gives me a struct of the following type
+        // { memref0, memref1, memref2, ... memrefN }
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructs);
+        // This gives me { { memref, ..., memrefn } }
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
+        auto ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type inputTapeTy =
+            tapeCount > 0 ? dyn_cast<Type>(wrappedFlatTapeStructTy) : dyn_cast<Type>(ptrTy);
+        newFuncInputTys.push_back(inputTapeTy);
+
+        auto newFuncTy = FunctionType::get(ctx, newFuncInputTys, TypeRange{});
+
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), newFuncTy);
+        func.setPrivate();
+
+        Block *entry = func.addEntryBlock();
+        rewriter.setInsertionPointToStart(entry);
+
+        IRMapping map;
+
+        if (tapeCount > 0) {
+            auto loc = op.getLoc();
+            auto lastIdx = newFuncInputTys.size() - 1;
+            Value wrappedStructValAgg = func.getArgument(lastIdx);
+
+            SmallVector<Value> tapestructs;
+            for (auto i = 0; i < tapeCount; i++) {
+                SmallVector<int64_t> pos = {0, static_cast<int64_t>(i)};
+                Value tapeStructIth =
+                    rewriter.create<LLVM::ExtractValueOp>(loc, wrappedStructValAgg, pos);
+                tapestructs.push_back(tapeStructIth);
+            }
+
+            SmallVector<Value> tapememrefs;
+            for (auto [_struct, memref] : llvm::zip(tapestructs, tapeElements)) {
+                auto memrefTy = memref.getType();
+                auto castOp = rewriter.create<UnrealizedConversionCastOp>(loc, memrefTy, _struct);
+                tapememrefs.push_back(castOp.getResult(0));
+            }
+
+            for (auto [newmemref, oldmemref] : llvm::zip(tapememrefs, tapeElements)) {
+                map.map(oldmemref, newmemref);
+            }
+        }
+
+        for (auto i = 0; i < upperLimit; i++) {
+            Value oldval = params[i];
+            Value newval = func.getArgument(i);
+            map.map(oldval, newval);
+        }
+
+        auto noinline = rewriter.getStringAttr("noinline");
+        SmallVector<Attribute> passthrough = {noinline};
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
+
+        rewriter.cloneRegionBefore(op.getRegion(), func.getRegion(), func.getRegion().end(), map);
+        Block &firstBlock = func.getRegion().getBlocks().front();
+        Block &lastBlock = func.getRegion().getBlocks().back();
+        rewriter.mergeBlocks(&lastBlock, &firstBlock);
+        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+
+        rewriter.eraseOp(op);
+    }
+};
+
+struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+    LogicalResult match(ReturnOp op) const override { return success(); }
+
+    void rewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
+    {
+        auto loc = op.getLoc();
+        if (op.getEmpty()) {
+            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, ValueRange{});
+            rewriter.replaceOp(op, returnOp);
+            return;
+        }
+
+        auto tape = adaptor.getTape();
+        auto ctx = rewriter.getContext();
+        if (tape.empty()) {
+            // Just return an empty pointer
+            auto ptrType = LLVM::LLVMPointerType::get(ctx);
+            Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
+            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, nullPtr);
+            rewriter.replaceOp(op, returnOp);
+            return;
+        }
+
+        SmallVector<Value> tapeStructVals(tape);
+
+        SmallVector<Type> tapeStructTys(tape.getTypes());
+        // This gives me { memref0, ... memrefN }
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
+        // This gives me { { memref, ..., memrefn } }
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
+
+        Value result = rewriter.create<LLVM::UndefOp>(loc, wrappedFlatTapeStructTy);
+        for (auto [idx, elem] : llvm::enumerate(tapeStructVals)) {
+            SmallVector<int64_t> pos = {0, static_cast<int64_t>(idx)};
+            result = rewriter.create<LLVM::InsertValueOp>(loc, result, elem, pos);
+        }
+
+        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, result);
+        rewriter.replaceOp(op, returnOp);
     }
 };
 
@@ -854,6 +1069,9 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
 {
     patterns.add<AdjointOpPattern>(typeConverter);
     patterns.add<BackpropOpPattern>(typeConverter);
+    patterns.add<ForwardOpPattern>(typeConverter);
+    patterns.add<ReverseOpPattern>(typeConverter);
+    patterns.add<ReturnOpPattern>(typeConverter);
 }
 
 } // namespace gradient

@@ -499,10 +499,28 @@ class TestCatalystControlled:
         assert result.control_values == expected.control_values
         assert result.work_wires == expected.work_wires
 
+    def test_control_decomp_trotter(self):
+        """Test that the Catalyst control can safelt decompose TrotterProduct."""
+
+        coeffs = [0.25, 0.75]
+        ops = [qml.X(0), qml.Z(0)]
+        H = qml.dot(coeffs, ops)
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            qml.ControlledSequence(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
+            return qml.expval(qml.PauliZ(0))
+
+        assert qml.math.allclose(qml.qjit(circuit)(), circuit())
+
     def test_distribute_controlled_with_adj(self):
         """Test that the distribute_controlled function with a PennyLane Adjoint,
         creates the equivalent Adjoint(Ctrl(base)) instead of Ctrl(Adj(base))"""
 
+        # pylint: disable=import-outside-toplevel
         from catalyst.api_extensions.quantum_operators import ctrl_distribute
 
         tape = qml.tape.QuantumScript([qml.ops.Adjoint(qml.RX(1.2, 0)), qml.Hadamard(1)])
