@@ -702,13 +702,13 @@ def infer_output_type(
     impl_outs = []
     if s.output_include_indbidx_vars:
         if s.input_unshare_variables:
-            # Create implicit result for InDBIdx referring to constants and variables
+            # Create implicit results for dimensions in either constants or variables
             seen = set()
         else:
-            # Create implicit result for InDBIdx referring to variables
+            # Create implicit results for dimensions in variables
             seen = set(map(id, [*constants]))
     else:
-        # Suppress any InDBIdx dimensions from showing in the implicit results
+        # Suppress input dimensions from showing in the implicit results
         seen = set(map(id, [*constants, *expanded_inputs]))
 
     for o in expl_outs:
