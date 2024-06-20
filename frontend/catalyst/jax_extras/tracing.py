@@ -806,7 +806,6 @@ def infer_output_type_python(
 
     # Calculate the jaxpr representing the full outputs.
     jaxpr, _, _ = trace_to_jaxpr(trace, expanded_inputs, expanded_outputs)
-    del jaxpr._outvars[len(expanded_outputs) :]
 
     # Return the final results
     return expanded_outputs, (jaxpr, out_type, consts)
