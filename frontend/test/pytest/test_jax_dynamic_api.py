@@ -800,7 +800,7 @@ def test_qjit_whileloop_1():
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3)
+        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -821,7 +821,7 @@ def test_qjit_whileloop_2():
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3)
+        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -928,11 +928,11 @@ def test_qjit_whileloop_capture():
         x = jnp.ones([sz], dtype=float)
 
         # FIXME: `a` must be mentioned in the while-condition due to a Jax bug
-        @while_loop(lambda i, a: jnp.logical_and(i < 3, a[0] < 3))
+        @while_loop(lambda i, _: i < 3)
         def loop(i, a):
             return i + 1, a + x
 
-        _, a2 = loop(0, x)
+        _, a2 = loop(1, x)
         return a2
 
     result = f(3)

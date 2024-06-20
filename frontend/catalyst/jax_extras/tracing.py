@@ -783,7 +783,7 @@ def infer_output_type_python(
     outputs = [trace.full_raise(t) for t in outputs]
 
     # Calculate the constants. We need it to set InDBIdx correctly
-    _, _, consts = trace.frame.to_jaxpr2(outputs)
+    _, _, consts = trace.frame.to_jaxpr2((*outputs, *expanded_inputs))
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs, out_type = infer_output_type(
@@ -794,8 +794,9 @@ def infer_output_type_python(
         num_implicit_inputs,
     )
 
-    # Calculate the jaxpr representing the full outputs
-    jaxpr, _, _ = trace.frame.to_jaxpr2(expanded_outputs)
+    # Calculate the jaxpr representing the full outputs.
+    jaxpr, _, _ = trace.frame.to_jaxpr2((*expanded_outputs, *expanded_inputs))
+    del jaxpr._outvars[len(expanded_outputs) :]
 
     # Return the final results
     return expanded_outputs, (jaxpr, out_type, consts)
