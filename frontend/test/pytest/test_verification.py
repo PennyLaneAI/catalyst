@@ -17,7 +17,6 @@
 from copy import deepcopy
 from unittest.mock import patch
 
-import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.ops import Adjoint, Controlled
@@ -34,7 +33,8 @@ from catalyst import (
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
-from catalyst.device.qjit_device import RUNTIME_OPERATIONS
+from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
+from catalyst.programs.verification import validate_observables
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
@@ -118,6 +118,16 @@ def null_transform(tape, *args, **kwargs):
     skip them for testing purproses"""
 
     return (tape,), lambda x: x[0]
+
+
+class PauliX2(qml.PauliX):
+    """Test operation without the analytic gradient"""
+
+    name = "PauliX2"
+    grad_method = "F"
+
+    def __repr__(self):
+        return "PauliX2"
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
@@ -350,7 +360,8 @@ class TestHybridOpVerification:
                 return grad(f)(x)
 
     def test_pennylane_adj_of_hybridop_raises_error(self):
-        """Test that a PennyLane Controlled op with a HybridOp as its base is caught in verification"""
+        """Test that a PennyLane Controlled op with a HybridOp as its base is caught
+        in verification"""
 
         @qml.qnode(get_custom_device(wires=4))
         def f(x: float):
@@ -497,6 +508,126 @@ class TestHybridOpVerification:
                 return grad(f)(x)
 
 
+class TestObservableValidation:
+    """Tests the general validation of observables (independent of gradient method)"""
+
+    def test_unsupported_observable_raises_error(self):
+        """Test that including an unsupported observable in a measurement raises an
+        error when jitting the circuit"""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def f():
+            qml.RX(1.23, 0)
+            return qml.expval(qml.RX(1.2, 0))
+
+        with pytest.raises(CompileError, match="RX.*not supported as an observable"):
+            qml.qjit(f)()
+
+    @pytest.mark.parametrize(
+        "measurements, invalid_op",
+        [
+            ([qml.expval(qml.X(0))], None),  # single obs
+            ([qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qml.var(qml.X(0) @ qml.Y(2))], None),  # prod
+            ([qml.var(qml.X(0) @ qml.RY(1.23, 2))], "RY"),
+            (
+                [qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1))],
+                None,
+            ),  # nested prod+sprod
+            ([qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.RY(1.2, 3)) @ qml.Y(1))], "RY"),
+            ([qml.var((2 * qml.X(0) @ qml.RY(1.2, 2)) @ (2 * qml.X(3)) @ qml.Y(1))], "RY"),
+            ([qml.var(qml.operation.Tensor(qml.X(0), qml.Y(2)))], None),  # tensor
+            ([qml.var(qml.operation.Tensor(qml.X(0), PauliX2(2)))], "PauliX2"),
+            ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
+            ([qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
+            ([qml.expval(2 * qml.Z(1))], None),  # sprod
+            ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
+            ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
+            ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
+            (
+                [qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))],
+                None,
+            ),  # legacy hamiltonian
+            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
+            ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
+            ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  # with sample with observable
+            ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
+            ([qml.probs(wires=0), qml.var(qml.X(1) + qml.Y(2))], None),  # with probs
+            ([qml.probs(wires=0), qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
+            ([qml.counts(), qml.expval(qml.X(0))], None),  # with empty counts
+            ([qml.counts(), qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
+            ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
+        ],
+    )
+    def test_validate_observables_transform(self, backend, measurements, invalid_op):
+        """Test that the validate_observables transform raises an error (or not) as expected
+        for different base observables."""
+
+        dev = qml.device(backend, wires=3)
+        qjit_capabilities = get_device_capabilities(dev)
+
+        tape = qml.tape.QuantumScript([], measurements=measurements)
+
+        if invalid_op:
+            with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
+                validate_observables(tape, qjit_capabilities, dev.name)
+        else:
+            validate_observables(tape, qjit_capabilities, dev.name)
+
+    @pytest.mark.parametrize(
+        "obs, obs_type",
+        [
+            (qml.X(0) @ qml.Y(1), "Prod"),
+            (2 * qml.Y(1), "SProd"),
+            (qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]), "LinearCombination"),
+            (qml.X(0) + 2 * qml.Y(1), "Sum"),
+        ],
+    )
+    def test_arithmetic_ops_validation(self, obs, obs_type, backend):
+        """Test that the validate_observables transform raises an error (or not) as expected
+        for different observables composed of other base observables, when the overall observable
+        type is supported/unsupported."""
+
+        dev = qml.device(backend, wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
+
+        # all good
+        validate_observables(tape, qjit_capabilities, dev.name)
+
+        del qjit_capabilities.native_obs[obs_type]
+        with pytest.raises(CompileError, match="not supported as an observable"):
+            validate_observables(tape, qjit_capabilities, dev.name)
+
+    def test_non_qjit_observables_raise_error(self, backend):
+        """Test that an observable that is supported by the backend according to the
+        TOML file, but is not supported by Catalyst, raises an error in validation"""
+
+        dev = qml.device(backend, wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+
+        dev_capabilities.native_obs.update(
+            {
+                "PauliX2": OperationProperties(
+                    invertible=True, controllable=True, differentiable=True
+                )
+            }
+        )
+
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
+
+        with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
+            validate_observables(tape, qjit_capabilities, dev.name)
+
+
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestAdjointMethodVerification:
     """Test the verification of operators and observables when the adjoint diff method
@@ -521,10 +652,14 @@ class TestAdjointMethodVerification:
     @pytest.mark.parametrize(
         "observable",
         [
-            qml.PauliX(0),
-            # qml.PauliX(0) @ qml.PauliZ(1),
-            qml.operation.Tensor(qml.X(0), qml.Z(1)),
-            # qml.PauliX(0)+qml.PauliY(1)
+            qml.PauliX(0),  # single observable
+            qml.PauliX(0) @ qml.PauliZ(1),  # prod
+            qml.operation.Tensor(qml.X(0), qml.Z(1)),  # tensor
+            qml.PauliX(0) + qml.PauliY(1),  # sum
+            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # hamiltonian
+            qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]),  # legacy hamiltonian
+            2 * qml.PauliX(0),  # sprod
+            (2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1),  # nested prod+sprod
         ],
     )
     def test_non_differentiable_observable(self, observable):
@@ -628,9 +763,6 @@ class TestParameterShiftMethodVerification:
         def f(x):
             qml.PauliY(wires=1)
             qml.RX(x, wires=0)
-            A = np.array(
-                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
-            )
             return qml.expval(observable)
 
         with pytest.raises(

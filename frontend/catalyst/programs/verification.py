@@ -14,12 +14,20 @@
 """This module contains for program verification.
 """
 
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 from pennylane import transform
 from pennylane.measurements import MutualInfoMP, StateMP, VarianceMP, VnEntropyMP
 from pennylane.operation import Operation, Tensor
-from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import (
+    Adjoint,
+    CompositeOp,
+    Controlled,
+    ControlledOp,
+    ControlledQubitUnitary,
+    Hamiltonian,
+    SymbolicOp,
+)
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
@@ -49,6 +57,42 @@ def _verify_nested(
     return state
 
 
+def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
+    """Validates whether or not an observable is accepted by QJITDevice.
+
+    Args:
+        obs(Operator): the observable to be validated
+        _obs_checker(Callable): a callable that takes an observable
+            and raises an error if the observable is unsupported.
+
+    Raises:
+        DifferentiableCompileError: gradient-related error
+        CompileError: compilation error
+
+    If the observable is built on one or multiple other observables, check
+    both that the overall observable is supported, and that its component
+    parts are supported."""
+
+    # ToDo: currently we don't check that Tensor itself is supported, only its obs
+    # The TOML files have followed the convention of dev.observables from PL and not
+    # included Tensor, but this could be updated to validate
+    if isinstance(obs, Tensor):
+        for o in obs.obs:
+            _verify_observable(o, _obs_checker)
+
+    else:
+        _obs_checker(obs)
+
+        if isinstance(obs, CompositeOp):
+            for o in obs.operands:
+                _verify_observable(o, _obs_checker)
+        elif isinstance(obs, Hamiltonian):
+            for o in obs.ops:
+                _verify_observable(o, _obs_checker)
+        elif isinstance(obs, SymbolicOp):
+            _verify_observable(obs.base, _obs_checker)
+
+
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
 
 
@@ -65,6 +109,7 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     return (tape,), lambda x: x[0]
 
 
+# pylint: disable=too-many-statements
 @transform
 def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """verify the quantum program against Catalyst requirements. This transform makes no
@@ -186,6 +231,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 def validate_observables_parameter_shift(tape: QuantumTape):
     """Validate that the observables on the tape support parameter shift"""
 
+    # ToDo: add verification support for Composite and Symbolic op
+    # observables with parameter shift
+
     def _obs_checker(obs):
         if obs and obs.grad_method not in {"A", None}:
             raise DifferentiableCompileError(
@@ -217,9 +265,40 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
     for m in tape.measurements:
         if m.obs:
-            if isinstance(m.obs, Tensor):
-                _ = [_obs_checker(o) for o in m.obs.obs]
-            else:
-                _obs_checker(m.obs)
+            _verify_observable(m.obs, _obs_checker)
+
+    return (tape,), lambda x: x[0]
+
+
+@transform
+def validate_observables(
+    tape: QuantumTape, qjit_capabilities: dict, name: str
+) -> (Sequence[QuantumTape], Callable):
+    """Validates the observables and measurements for a circuit against the capabilites
+    from the TOML file.
+
+    Args:
+        tape (QuantumTape or QNode or Callable): a quantum circuit.
+        qjit_capabilities (dict): specifies the capabilities of the qjitted device
+        name (str): the name of the device to use in error messages.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[.QuantumTape], function]:
+        The unaltered input circuit.
+
+    Raises:
+        CompileError: if an observable is not supported by the device with Catalyst
+
+    """
+
+    def _obs_checker(obs):
+        if not qjit_capabilities.native_obs.get(obs.name):
+            raise CompileError(
+                f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
+            )
+
+    for m in tape.measurements:
+        if m.obs:
+            _verify_observable(m.obs, _obs_checker)
 
     return (tape,), lambda x: x[0]

@@ -37,8 +37,8 @@ func.func @backprop(%arg0: f64, %arg1: tensor<?xf64>) {
 
     // CHECK:   [[dim:%.+]] = memref.dim
     // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
-    // CHECK:   gradient.backprop @circuit2({{%.+}}) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (f64) -> f64
-    %grad = gradient.backprop @circuit2(%arg0) cotangents(%arg1: tensor<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (f64) -> f64
+    // CHECK:   gradient.backprop @circuit2({{%.+}}) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>, resultSegmentSizes = array<i32: 0, 1>} : (f64) -> f64
+    %grad = gradient.backprop @circuit2(%arg0) cotangents(%arg1: tensor<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>, resultSegmentSizes = array<i32: 0, 1>}: (f64) -> f64
     return
 }
 
@@ -52,8 +52,8 @@ func.func @backprop2(%arg0: tensor<?x2xf64>, %arg1: tensor<?xf64>) {
     // CHECK:   [[argShadow:%.+]] = memref.alloc(%dim) : memref<?x2xf64>
     // CHECK:   [[dim:%.+]] = memref.dim
     // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
-    // CHECK:   gradient.backprop @circuit3({{%.+}}) grad_out([[argShadow]] : memref<?x2xf64>) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (memref<?x2xf64>) -> ()
-    %grad = gradient.backprop @circuit3(%arg0) cotangents(%arg1: tensor<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<?x2xf64>) -> tensor<?x2xf64>
+    // CHECK:   gradient.backprop @circuit3({{%.+}}) grad_out([[argShadow]] : memref<?x2xf64>) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>, resultSegmentSizes = array<i32: 0, 0>} : (memref<?x2xf64>) -> ()
+    %grad = gradient.backprop @circuit3(%arg0) cotangents(%arg1: tensor<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>, resultSegmentSizes = array<i32: 0, 1>}: (tensor<?x2xf64>) -> tensor<?x2xf64>
     return
 }
 
@@ -68,8 +68,8 @@ func.func @backprop3(%arg0: tensor<10xf64>, %arg1: tensor<2xf64>, %arg2: tensor<
     // CHECK:   [[argShadow2:%.+]] = memref.alloc() : memref<2xf64>
     // CHECK:   [[dim:%.+]] = memref.dim
     // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
-    // CHECK:   gradient.backprop @circuit4({{%.+}}, {{%.+}}) grad_out([[argShadow1]], [[argShadow2]] : memref<10xf64>, memref<2xf64>) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (memref<10xf64>, memref<2xf64>) -> ()
-    %grad:2 = gradient.backprop @circuit4(%arg0, %arg1) cotangents(%arg2: tensor<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>}: (tensor<10xf64>, tensor<2xf64>) -> (tensor<10xf64>, tensor<2xf64>)
+    // CHECK:   gradient.backprop @circuit4({{%.+}}, {{%.+}}) grad_out([[argShadow1]], [[argShadow2]] : memref<10xf64>, memref<2xf64>) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, resultSegmentSizes = array<i32: 0, 0>} : (memref<10xf64>, memref<2xf64>) -> ()
+    %grad:2 = gradient.backprop @circuit4(%arg0, %arg1) cotangents(%arg2: tensor<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, resultSegmentSizes = array<i32: 0, 2>}: (tensor<10xf64>, tensor<2xf64>) -> (tensor<10xf64>, tensor<2xf64>)
     return
 }
 

@@ -142,15 +142,28 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
-            loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
-            calleeResults, resShadows, diffArgIndicesAttr);
+            loc, TypeRange{}, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
+            calleeResults, resShadows, diffArgIndicesAttr, op.getKeepValueResultsAttr());
 
         // Fill in the null placeholders.
-        for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
+        for (const auto &[idx, scalarResult] :
+             llvm::enumerate(bufferizedBackpropOp.getGradients())) {
             gradients[scalarIndices[idx]] = scalarResult;
         }
 
-        rewriter.replaceOp(op, gradients);
+        // BackpropOp can return two results for value_and_grad: values and gradients
+        // or only one for grad: gradients
+        SmallVector<Value> results;
+        {
+            // If we are lowering a value_and_grad operation, then take values from the
+            // calleeResults
+            if (!op.getVals().empty()) {
+                results.insert(results.end(), calleeResults.begin(), calleeResults.end());
+            }
+            results.insert(results.end(), gradients.begin(), gradients.end());
+        }
+
+        rewriter.replaceOp(op, results);
         return success();
     }
 };
@@ -195,14 +208,14 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
         rewriter.setInsertionPointToStart(block);
         auto params = op.getArguments();
 
-        for (auto i = 0; i < argc * 2; i++) {
+        for (size_t i = 0; i < argc * 2; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? differentials.push_back(val) : inputs.push_back(val);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
-        for (auto i = argc * 2; i < upperLimit; i++) {
+        for (size_t i = argc * 2; i < upperLimit; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? cotangents.push_back(val) : outputs.push_back(val);
@@ -288,14 +301,14 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         rewriter.setInsertionPointToStart(block);
         auto params = op.getArguments();
 
-        for (auto i = 0; i < argc * 2; i++) {
+        for (size_t i = 0; i < argc * 2; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? differentials.push_back(val) : inputs.push_back(val);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
-        for (auto i = argc * 2; i < upperLimit; i++) {
+        for (size_t i = argc * 2; i < upperLimit; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? cotangents.push_back(val) : outputs.push_back(val);
@@ -303,7 +316,7 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
 
         auto tapeCount = op.getTape();
         auto uppestLimit = upperLimit + tapeCount;
-        for (auto i = upperLimit; i < uppestLimit; i++) {
+        for (size_t i = upperLimit; i < uppestLimit; i++) {
             tapeElements.push_back(params[i]);
         }
 

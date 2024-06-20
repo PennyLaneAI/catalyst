@@ -233,6 +233,57 @@ def test_grad_on_qjit():
     assert np.allclose(result, expected)
 
 
+def test_value_and_grad_on_qjit_classical():
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode."""
+
+    @qjit
+    def f(x: float):
+        return x * x
+
+    result = qjit(value_and_grad(f))(3.0)
+    expected = (9.0, 6.0)
+
+    assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum():
+    """Check that value_and_grad works when called on an qjit object that does wrap a QNode."""
+
+    @qjit
+    def workflow(x: float):
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.CNOT(wires=[0, 1])
+            qml.RX(0, wires=[2])
+            return qml.probs()  # This is [1, 0, 0, ...]
+
+        return x * (circuit()[0])
+
+    result = qjit(value_and_grad(workflow))(3.0)
+    expected = (3.0, 1.0)
+    assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum_variant():
+    """
+    Check that value_and_grad works when called on an qjit object that does wrap a QNode
+    with trainable parameters.
+    """
+
+    def workflow_variant(x: float):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(xx):
+            qml.PauliX(wires=0)
+            qml.RX(xx, wires=0)
+            return qml.probs()
+
+        return circuit(x)[0]
+
+    result = qjit(value_and_grad(qjit(workflow_variant)))(1.1)
+    expected = value_and_grad(workflow_variant)(1.1)
+    assert np.allclose(result, expected)
+
+
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff(inp, backend):
     """Test finite diff."""
