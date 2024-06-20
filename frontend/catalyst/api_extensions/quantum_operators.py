@@ -16,8 +16,8 @@
 This module contains public API functions for quantum operators which are not
 included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 """
-import logging
 import copy
+import logging
 import sys
 from collections.abc import Sized
 from contextlib import nullcontext
