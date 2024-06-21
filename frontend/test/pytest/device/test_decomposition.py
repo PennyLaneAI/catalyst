@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit test module for catalyst/device/decomposition.py"""
+
 from copy import deepcopy
 
 import pennylane as qml
 import pytest
-from jax import numpy as jnp
 
-from catalyst import CompileError, ctrl, measure, qjit
+from catalyst import CompileError, ctrl, qjit
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import ProgramFeatures, pennylane_operation_set
+from catalyst.device.decomposition import catalyst_decomposer
+from catalyst.utils.toml import (
+    DeviceCapabilities,
+    OperationProperties,
+    ProgramFeatures,
+    pennylane_operation_set,
+)
 
 
 class CustomDevice(qml.QubitDevice):
@@ -67,24 +74,56 @@ class CustomDevice(qml.QubitDevice):
         return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
 
-@pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
-def test_decomposition(param, expected):
-    dev = CustomDevice(wires=2)
+class TestGateAliases:
+    """Test the decomposition of gates wich are in fact supported via aliased or equivalent
+    op definitions."""
 
-    @qjit
-    @qml.qnode(dev)
-    def mid_circuit(x: float):
-        qml.Hadamard(wires=0)
-        qml.Rot(0, 0, x, wires=0)
-        qml.Hadamard(wires=0)
-        m = measure(wires=0)
-        b = m ^ 0x1
-        qml.Hadamard(wires=1)
-        qml.Rot(0, 0, b * jnp.pi, wires=1)
-        qml.Hadamard(wires=1)
-        return measure(wires=1)
+    special_control_ops = (
+        qml.CNOT([0, 1]),
+        qml.Toffoli([0, 1, 2]),
+        qml.MultiControlledX([1, 2], 0, [True, False]),
+        qml.CZ([0, 1]),
+        qml.CCZ([0, 1, 2]),
+        qml.CY([0, 1]),
+        qml.CSWAP([0, 1, 2]),
+        qml.CH([0, 1]),
+        qml.CRX(0.1, [0, 1]),
+        qml.CRY(0.1, [0, 1]),
+        qml.CRZ(0.1, [0, 1]),
+        qml.CRot(0.1, 0.2, 0.3, [0, 1]),
+        qml.ControlledPhaseShift(0.1, [0, 1]),
+        qml.ControlledQubitUnitary([[1, 0], [0, 1j]], 1, 0),
+    )
+    control_base_ops = (
+        qml.PauliX,
+        qml.PauliX,
+        qml.PauliX,
+        qml.PauliZ,
+        qml.PauliZ,
+        qml.PauliY,
+        qml.SWAP,
+        qml.Hadamard,
+        qml.RX,
+        qml.RY,
+        qml.RZ,
+        qml.Rot,
+        qml.PhaseShift,
+        qml.QubitUnitary,
+    )
+    assert len(special_control_ops) == len(control_base_ops)
 
-    assert mid_circuit(param) == expected
+    @pytest.mark.parametrize("gate, base", zip(special_control_ops, control_base_ops))
+    def test_control_aliases(self, gate, base):
+        """Test the decomposition of specialized control operations."""
+
+        capabilities = DeviceCapabilities(
+            native_ops={base.__name__: OperationProperties(controllable=True)}
+        )
+        decomp = catalyst_decomposer(gate, capabilities)
+
+        assert len(decomp) == 1
+        assert type(decomp[0]) is qml.ops.ControlledOp
+        assert type(decomp[0].base) is base
 
 
 class TestControlledDecomposition:

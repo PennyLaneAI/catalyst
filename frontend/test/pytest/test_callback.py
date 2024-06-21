@@ -1176,7 +1176,7 @@ def test_different_shapes():
     def fun_bwd(_res, cot):
         return fun_bwd_callback(cot)
 
-    @qml.qjit(keep_intermediate=True)
+    @qml.qjit
     @jacobian
     def wrapper(x):
         return fun_callback(x)
@@ -1190,13 +1190,117 @@ def test_different_shapes():
     assert np.allclose(wrapper(arg), wrapper_jax(arg))
 
 
-@pytest.mark.skip(reason="I'm not sure, but need to look into this one!")
 def test_multiply_two_matrices_to_get_something_with_different_dimensions():
-    """Failing?"""
+    """matrix multiplication with constant"""
+
+    A = jax.numpy.array([[1.0, 2.0], [1.0, 3.0], [3.0, 2.0]])
+
+    B = jax.numpy.array([[1.0], [2.0]])
+
+    # Just for the type
+    C = A @ B
+
+    def matrix_multiply(X):
+        return X @ B
+
+    f_vjp = None
+
+    def matrix_multiply_keep_state(X):
+        nonlocal f_vjp
+        primals, f_vjp = jax.vjp(matrix_multiply, X)
+        return primals
+
+    @pure_callback
+    def matrix_multiply_vjp(cotangents) -> A:
+        nonlocal f_vjp
+        retval = f_vjp(cotangents)
+        return retval
+
+    @pure_callback
+    def matrix_multiply_callback(X) -> C:
+        return matrix_multiply_keep_state(X)
+
+    @matrix_multiply_callback.fwd
+    def matrix_multiply_fwd(X):
+        return matrix_multiply_callback(X), None
+
+    @matrix_multiply_callback.bwd
+    def matrix_multiply_bwd(_residuals, cotangents):
+        return matrix_multiply_vjp(cotangents)
+
+    @qml.qjit
+    @jacobian
+    def mul(X):
+        return matrix_multiply_callback(X)
+
+    @jax.jit
+    @jacobian
+    def mul_jax(A):
+        return A @ B
+
+    assert np.allclose(mul(A), mul_jax(A))
+
+
+def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
+    """Matrix multiply argnum=0"""
 
     A = jax.numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
 
-    B = jax.numpy.array([[1.0], [2.0]])
+    B = jax.numpy.array([[7.0], [8.0]])
+
+    # Just for the type
+    C = A @ B
+
+    def matrix_multiply(X, Y):
+        return X @ Y
+
+    f_vjp = None
+
+    def matrix_multiply_keep_state(X, Y):
+        nonlocal f_vjp
+        primals, f_vjp = jax.vjp(matrix_multiply, X, Y)
+        return primals
+
+    @pure_callback
+    def matrix_multiply_vjp(cotangents) -> A:
+        nonlocal f_vjp
+        nonlocal A, B
+        retval = f_vjp(cotangents)
+        return retval[0]
+
+    @pure_callback
+    def matrix_multiply_callback(X, Y) -> C:
+        return matrix_multiply_keep_state(X, Y)
+
+    @matrix_multiply_callback.fwd
+    def matrix_multiply_fwd(X, Y):
+        return matrix_multiply_callback(X, Y), None
+
+    @matrix_multiply_callback.bwd
+    def matrix_multiply_bwd(_residuals, cotangents):
+        return matrix_multiply_vjp(cotangents)
+
+    @qml.qjit
+    @jacobian
+    def mul(X, Y):
+        return matrix_multiply_callback(X, Y)
+
+    @jax.jit
+    @jacobian
+    def mul_jax(A, B):
+        return A @ B
+
+    assert np.allclose(mul(A, B), mul_jax(A, B))
+
+
+@pytest.mark.xfail(reason="error in gradient frontend verification")
+def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
+    """I want to run this test but I can't. I get an error saying that grad
+    is for scalars only but I am using jacobian"""
+
+    A = jax.numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+    B = jax.numpy.array([[7.0], [8.0]])
 
     # Just for the type
     C = A @ B
@@ -1214,7 +1318,9 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     @pure_callback
     def matrix_multiply_vjp(cotangents) -> (A, B):
         nonlocal f_vjp
-        return f_vjp(cotangents)
+        nonlocal A, B
+        retval = f_vjp(cotangents)
+        return retval
 
     @pure_callback
     def matrix_multiply_callback(X, Y) -> C:
@@ -1229,14 +1335,13 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
         return matrix_multiply_vjp(cotangents)
 
     @qml.qjit
-    @jacobian
-    def mul(A, B):
-        return matrix_multiply_callback(A, B)
+    @jacobian(argnum=[0, 1])
+    def mul(X, Y):
+        return matrix_multiply_callback(X, Y)
 
     @jax.jit
-    @jacobian
     def mul_jax(A, B):
-        return A @ B
+        return jax.jacobian(A @ B, argnums=[0, 1])(A, B)
 
     assert np.allclose(mul(A, B), mul_jax(A, B))
 
