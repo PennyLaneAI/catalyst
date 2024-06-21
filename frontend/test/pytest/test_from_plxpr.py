@@ -29,6 +29,7 @@ from catalyst.from_plxpr import from_plxpr
 
 def catalyst_execute_jaxpr(jaxpr):
     """Create a function capable of executing the provided catalyst-variant jaxpr."""
+
     # pylint: disable=too-few-public-methods
     class JAXPRRunner(catalyst.QJIT):
         """A variant of catalyst.QJIT with a pre-constructed jaxpr."""
@@ -99,7 +100,7 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(f)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError, match="catalyst does not yet support dynamic shots"):
             from_plxpr(jaxpr)()
 
     def test_operator_without_n_wires(self):
@@ -116,7 +117,7 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError, match="not yet supported for catalyst"):
             from_plxpr(jaxpr)()
 
     def test_observable_without_n_wires(self):
@@ -132,7 +133,7 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError, match="can not yet interpret"):
             from_plxpr(jaxpr)()
 
     def test_measuring_eigvals_not_supported(self):
@@ -151,7 +152,7 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError, match="does not yet support measurements with"):
             from_plxpr(jaxpr)()
 
     def test_measuring_measurement_values(self):
@@ -169,7 +170,7 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError, match=r"not yet supported"):
             from_plxpr(jaxpr)()
 
     def test_unsupported_measurement(self):
@@ -186,7 +187,7 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
 
 
@@ -451,3 +452,29 @@ class TestHybridPrograms:
         compare_eqns(call_jaxpr_pl.eqns[4], call_jaxpr_c.eqns[5], skip_counts=True)
         compare_eqns(call_jaxpr_pl.eqns[5], call_jaxpr_c.eqns[6], skip_counts=True)
         compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4], skip_counts=True)
+
+    def test_multiple_qnodes(self):
+
+        @qml.qnode(qml.device('lightning.qubit', wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.Y(0))
+
+        @qml.qnode(qml.device('lightning.qubit', wires=2))
+        def g(y):
+            qml.Hadamard(0)
+            qml.IsingXX(y, wires=(0,1))
+            return qml.expval(qml.PauliZ(1))
+
+        def workflow(x, y):
+            return f(x) + g(y)
+
+        qml.capture.enable()
+        jaxpr = jax.make_jaxpr(workflow)(0.5, 1.2)
+        qml.capture.disable()
+        catalxpr = from_plxpr(jaxpr)(0.5, 1.2)
+        results = catalyst_execute_jaxpr(catalxpr)(0.5, 1.2)
+
+        expected = -np.sin(0.5) + np.cos(1.2)
+
+        assert qml.math.allclose(results, expected)

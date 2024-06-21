@@ -51,6 +51,7 @@ measurement_map = {
     "state_wires": state_p,
 }
 
+
 def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
     if jax.config.jax_enable_x64:
         dtype_map = {
@@ -74,6 +75,7 @@ def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
             shape, dtype = m.abstract_eval(shots=s, num_device_wires=num_device_wires)
             shapes.append(jax.core.ShapedArray(shape, dtype_map.get(dtype, dtype)))
     return shapes
+
 
 # pylint: disable=unidiomatic-typecheck
 def _read(var, env: dict):
@@ -239,19 +241,13 @@ class _InterpreterState:
         """Extract the value corresponding to a variable."""
         return var.val if type(var) is jax.core.Literal else self.env[var]
 
-
-def _get_wires(wire_values, state: _InterpreterState):
-    """Convert wire values into ``AbstractQbit`` instances."""
-    wires = []
-    for w in wire_values:
-        if w in state.wire_map:
-            wires.append(state.wire_map[w])
-        else:
-            wires.append(qextract_p.bind(state.qreg, w))
-    return wires
+    def get_wire(self, wire_value):
+        if wire_value in self.wire_map:
+            return self.wire_map[wire_value]
+        return qextract_p.bind(self.qreg, wire_value)
 
 
-def _return_wires(state: _InterpreterState) -> None:
+def _deallocate(state: _InterpreterState) -> None:
     """Reinsert all active wires into the quantum register and deallocate the register."""
     for orig_wire, wire in state.wire_map.items():
         state.qreg = qinsert_p.bind(state.qreg, orig_wire, wire)
@@ -270,8 +266,8 @@ def _operator_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState) -> None:
         )
     n_wires = eqn.params["n_wires"]
 
-    wire_values = [state.read(v) for v in eqn.invars[-n_wires:]]
-    wires = _get_wires(wire_values, state)
+    wire_values = [state.read(w) for w in eqn.invars[-n_wires:]]
+    wires = [state.get_wire(w) for w in wire_values]
 
     invals = [state.read(invar) for invar in eqn.invars[:-n_wires]]
     outvals = qinst_p.bind(
@@ -297,8 +293,7 @@ def _obs(eqn: jax.core.JaxprEqn, state: _InterpreterState):
         )
 
     n_wires = obs_eqn.params["n_wires"]
-    wire_values = [state.read(v) for v in obs_eqn.invars[-n_wires:]]
-    wires = _get_wires(wire_values, state)
+    wires = [state.get_wire(state.read(w)) for w in obs_eqn.invars[-n_wires:]]
     invals = [state.read(invar) for invar in obs_eqn.invars[:-n_wires]]
     return namedobs_p.bind(*wires, *invals, kind=obs_eqn.primitive.name)
 
@@ -309,7 +304,7 @@ def _compbasis_obs(eqn: jax.core.JaxprEqn, state: _InterpreterState, device: "qm
         w_vals = [state.read(w_var) for w_var in eqn.invars]
     else:
         w_vals = device.wires  # broadcast across all wires
-    wires = _get_wires(w_vals, state)
+    wires = [state.get_wire(w) for w in w_vals]
     return compbasis_p.bind(*wires)
 
 
@@ -319,16 +314,13 @@ def _measurement_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState, device):
             f"measurement {eqn.primitive.name} not yet supported for conversion."
         )
     if eqn.params.get("has_eigvals", False):
-        raise NotImplementedError
+        raise NotImplementedError("from_plxpr does not yet support measurements with eigenvalues.")
 
     if "_wires" in eqn.primitive.name:
         obs = _compbasis_obs(eqn, state, device)
     elif "_obs" in eqn.primitive.name:
         obs = _obs(eqn, state)
-    else:
-        raise NotImplementedError(
-            "Only wire-based and observable-based measurements are supported by from_plxpr."
-        )
+    # mcm based measurements wont be in measurement map yet
 
     shaped_array = _get_shapes_for(
         eqn.outvars[0].aval, shots=device.shots, num_device_wires=len(device.wires)
@@ -336,6 +328,8 @@ def _measurement_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState, device):
 
     primitive = measurement_map[eqn.primitive.name]
     mval = primitive.bind(obs, shape=shaped_array.shape, shots=device.shots.total_shots)
+
+    # sample_p returns floats, so we need to converted it back to the expected integers here
     if shaped_array.dtype != mval.dtype:
         return jax.lax.convert_element_type(mval, shaped_array.dtype)
     return mval
@@ -370,6 +364,6 @@ def _bind_catalxpr(jaxpr: jax.core.Jaxpr, consts, device, *args) -> list:
             for outvar, outval in zip(eqn.outvars, outvals):
                 state.env[outvar] = outval
 
-    _return_wires(state)
+    _deallocate(state)
     # Read the final result of the Jaxpr from the environment
     return [state.read(outvar) for outvar in measurements]
