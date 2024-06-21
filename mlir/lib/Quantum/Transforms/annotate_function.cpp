@@ -16,9 +16,11 @@
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/annotate_function.h"
@@ -35,14 +37,34 @@ bool isAnnotated(FunctionOpInterface op, const char *attr)
 
 bool invalidGradientOperation(FunctionOpInterface op)
 {
-    auto res = op.walk([](Operation *o) {
-        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::CustomCallOp>(o) ||
-            dyn_cast<catalyst::CallbackCallOp>(o)) {
+    ModuleOp mod = op->getParentOfType<ModuleOp>();
+    auto res = op.walk([&](Operation *o) {
+        if (isa<MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
-        else {
-            return WalkResult::advance();
+        else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
+            bool hasCustomDerivative = false;
+            auto callee = callbackCall.getCalleeAttr();
+            auto callback =
+                SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(callbackCall, callee);
+            bool inactive = callback.getResultTypes().empty();
+            if (inactive) {
+                return WalkResult::advance();
+            }
+            auto uses = *SymbolTable::getSymbolUses(callback, mod);
+            for (SymbolTable::SymbolUse use : uses) {
+                Operation *user = use.getUser();
+                if (auto customGrad = dyn_cast<catalyst::gradient::CustomGradOp>(user)) {
+                    hasCustomDerivative |= customGrad.getCalleeAttr() == callee;
+                }
+                if (hasCustomDerivative)
+                    break;
+            }
+            if (!hasCustomDerivative) {
+                return WalkResult::interrupt();
+            }
         }
+        return WalkResult::advance();
     });
     return res.wasInterrupted();
 }

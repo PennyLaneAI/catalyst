@@ -462,9 +462,6 @@ class TestCatalystControlled:
             )
             return qml.state()
 
-        # The code will be lowered to `QubitUnitary` of an updated
-        # matrix that represents the `ControlledQubitUnitary`.
-
         compiled = qjit()(native_controlled)
         result = compiled()
         expected = native_controlled()
