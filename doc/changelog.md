@@ -5,10 +5,6 @@
 * `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
   [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
 
-* `MidCiruitMeasure` now inherits `MidMeasureMP` instead of `HybridOp`, allowing much better integration with PennyLane for
-  workflows with mid-circuit measurements.
-  [(#832)](https://github.com/PennyLaneAI/catalyst/pull/832)
-
 * The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
   The loop over shots is executed with `catalyst.vmap`.
   [(#773)](https://github.com/PennyLaneAI/catalyst/pull/773)
@@ -259,6 +255,10 @@
   [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
 
 <h3>Internal changes</h3>
+
+* `MidCiruitMeasure` now inherits `MidMeasureMP` instead of `HybridOp`, allowing much better integration with PennyLane for
+  workflows with mid-circuit measurements.
+  [(#832)](https://github.com/PennyLaneAI/catalyst/pull/832)
 
 * Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
   [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
