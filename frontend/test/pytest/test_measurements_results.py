@@ -766,9 +766,6 @@ class TestNewArithmeticOps:
         """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
         with integer coefficients."""
 
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
-
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
@@ -780,8 +777,6 @@ class TestNewArithmeticOps:
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
-
-        qml.operation.disable_new_opmath()
 
     @pytest.mark.parametrize(
         "meas, expected",
@@ -823,9 +818,6 @@ class TestNewArithmeticOps:
     def test_sum_sprod_xyz(self, meas, expected, backend):
         """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
 
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
-
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
@@ -838,13 +830,8 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_mix_dunder(self, backend):
         """Test ``*`` and ``@`` dunder methods."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -858,13 +845,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.25)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_sum_hermitian(self, backend):
         """Test ``+`` with Hermitian observables."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
@@ -881,13 +863,8 @@ class TestNewArithmeticOps:
         expected = np.array(2.0)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_prod_hermitian(self, backend):
         """Test ``@`` with Hermitian observables."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
@@ -911,13 +888,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.20710678)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_sprod_hermitian(self, backend):
         """Test ``*`` and ``@`` with Hermitian observable."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -934,13 +906,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.14142136)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_sum_sprod_prod_hermitian(self, backend):
         """Test ``+`` of ``@`` with Hermitian observable."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -957,13 +924,8 @@ class TestNewArithmeticOps:
         expected = np.array(1.0)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_dunder_hermitian_1(self, backend):
         """Test dunder methods with Hermitian observable to a HamiltonianObs."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
@@ -989,13 +951,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.34142136)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_dunder_hermitian_2(self, backend):
         """Test dunder methods with Hermitian observable to a TensorObs."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
@@ -1020,8 +977,6 @@ class TestNewArithmeticOps:
         result = circuit(np.pi, np.pi)
         expected = np.array(1.0)
         assert np.allclose(expected, result)
-
-        qml.operation.disable_new_opmath()
 
 
 if __name__ == "__main__":
