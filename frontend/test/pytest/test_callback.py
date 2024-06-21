@@ -1141,6 +1141,106 @@ def test_callback_backwards_function():
         assert np.allclose(obs, exp)
 
 
+def test_different_shapes():
+    """Different input output shape"""
+
+    def fun(x):
+        y = jnp.array([3.0, 4.0, 5.0])
+        return y * x[0] + x[1]
+
+    # hack for the type
+    ty = jnp.array([2.0, 2.0, 2.0])
+
+    @pure_callback
+    def fun_callback(x) -> ty:
+        return fun(x)
+
+    f_vjp = None
+
+    @pure_callback
+    def fun_fwd_callback(x) -> ty:
+        nonlocal f_vjp
+        primals, f_vjp = jax.vjp(fun, x)
+        return primals
+
+    @fun_callback.fwd
+    def fun_fwd(x):
+        return fun_fwd_callback(x), None
+
+    @pure_callback
+    def fun_bwd_callback(cot) -> jnp.array([1.0, 1.0]):
+        nonlocal f_vjp
+        return f_vjp(cot)
+
+    @fun_callback.bwd
+    def fun_bwd(res, cot):
+        return fun_bwd_callback(cot)
+
+    @qml.qjit(keep_intermediate=True)
+    @jacobian
+    def wrapper(x):
+        return fun_callback(x)
+
+    @jax.jit
+    @jacobian
+    def wrapper_jax(x):
+        return fun(x)
+
+    arg = jax.numpy.array([3.14, 0.001519])
+    assert np.allclose(wrapper(arg), wrapper_jax(arg))
+
+
+@pytest.mark.skip(reason="I'm not sure, but need to look into this one!")
+def test_multiply_two_matrices_to_get_something_with_different_dimensions():
+    """Failing?"""
+
+    A = jax.numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+    B = jax.numpy.array([[1.0], [2.0]])
+
+    # Just for the type
+    C = A @ B
+
+    def matrix_multiply(X, Y):
+        return X @ Y
+
+    f_vjp = None
+
+    def matrix_multiply_keep_state(X, Y):
+        nonlocal f_vjp
+        primals, f_vjp = jax.vjp(matrix_multiply, X, Y)
+        return primals
+
+    @pure_callback
+    def matrix_multiply_vjp(cotangents) -> (A, B):
+        nonlocal f_vjp
+        return f_vjp(cotangents)
+
+    @pure_callback
+    def matrix_multiply_callback(X, Y) -> C:
+        return matrix_multiply_keep_state(X, Y)
+
+    @matrix_multiply_callback.fwd
+    def matrix_multiply_fwd(X, Y):
+        return matrix_multiply_callback(X, Y), None
+
+    @matrix_multiply_callback.bwd
+    def matrix_multiply_bwd(residuals, cotangents):
+        return matrix_multiply_vjp(cotangents)
+
+    @qml.qjit
+    @jacobian
+    def mul(A, B):
+        return matrix_multiply_callback(A, B)
+
+    @jax.jit
+    @jacobian
+    def mul_jax(A, B):
+        return A @ B
+
+    assert np.allclose(mul(A, B), mul_jax(A, B))
+
+
 def test_error_incomplete_grad_only_forward():
     """Test error about missing reverse pass"""
 
