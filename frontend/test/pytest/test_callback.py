@@ -1029,8 +1029,9 @@ def test_tuple_array_in_tuple_array_out():
 
     x = jnp.array([[1.0, 0.5], [0.12, -1.2]])
     y = jnp.array([-0.6, 0.2])
-    flat_results_obs, _ = jax._src.tree_util.tree_flatten(result(x, y))
-    flat_results_exp, _ = jax._src.tree_util.tree_flatten(expected(x, y))
+    flat_results_obs, obs_shape = jax._src.tree_util.tree_flatten(result(x, y))
+    flat_results_exp, exp_shape = jax._src.tree_util.tree_flatten(expected(x, y))
+    assert obs_shape == exp_shape
     for obs, exp in zip(flat_results_obs, flat_results_exp):
         assert np.allclose(obs, exp)
 
@@ -1076,8 +1077,9 @@ def test_pytree_in_pytree_out():
         return jnp.dot(jnp.sin(x) @ y**2, y**4)
 
     weights = {"x": jnp.array([[1.0, 0.5], [0.12, -1.2]]), "y": jnp.array([-0.6, 0.2])}
-    flat_results_obs, _ = jax._src.tree_util.tree_flatten(result(weights))
-    flat_results_exp, _ = jax._src.tree_util.tree_flatten(expected(weights))
+    flat_results_obs, obs_shape = jax._src.tree_util.tree_flatten(result(weights))
+    flat_results_exp, exp_shape = jax._src.tree_util.tree_flatten(expected(weights))
+    assert obs_shape == exp_shape
     for obs, exp in zip(flat_results_obs, flat_results_exp):
         assert np.allclose(obs, exp)
 
@@ -1132,8 +1134,9 @@ def test_callback_backwards_function():
         return jnp.dot(jnp.sin(x) @ y**2, y**4)
 
     weights = {"x": jnp.array([[1.0, 0.5], [0.12, -1.2]]), "y": jnp.array([-0.6, 0.2])}
-    flat_results_obs, _ = jax._src.tree_util.tree_flatten(result(weights))
-    flat_results_exp, _ = jax._src.tree_util.tree_flatten(expected(weights))
+    flat_results_obs, obs_shape = jax._src.tree_util.tree_flatten(result(weights))
+    flat_results_exp, exp_shape = jax._src.tree_util.tree_flatten(expected(weights))
+    assert obs_shape == exp_shape
     for obs, exp in zip(flat_results_obs, flat_results_exp):
         assert np.allclose(obs, exp)
 
