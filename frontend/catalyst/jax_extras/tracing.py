@@ -638,8 +638,6 @@ class ExpansionStrategy:
         axes_specs: Axes specification used to convert static dimensions to the dynamic ones
         input_unshare_variables: Treat each dynamic dimension as a distinct dimension, even if some
                                  of them are described by the same dimension variables.
-        output_include_indbidx_vars: Include variables corresponding to the InDBIdx references in
-                                     the result
         output_force_arg0_outdbidx: Force all references pointing to the first arguments to be
                                     OutDBIdx. This is typically required to avoid input references
                                     to the loop iteration variable.
@@ -647,23 +645,22 @@ class ExpansionStrategy:
 
     axes_specs: Sequence[AbstractedAxesSpec] | None
     input_unshare_variables: bool
-    output_include_indbidx_vars: bool
     output_force_arg0_outdbidx: bool
 
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, False)
+    return ExpansionStrategy(None, not preserve_dimensions, False)
 
 
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, True)
+    return ExpansionStrategy(None, not preserve_dimensions, True)
 
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
-    return ExpansionStrategy(None, True, True, False)
+    return ExpansionStrategy(None, True, False)
 
 
 def infer_output_type(
@@ -700,16 +697,12 @@ def infer_output_type(
 
     expl_outs = outputs
     impl_outs = []
-    if s.output_include_indbidx_vars:
-        if s.input_unshare_variables:
-            # Create implicit results for dimensions in either constants or variables
-            seen = set()
-        else:
-            # Create implicit results for dimensions in variables
-            seen = set(map(id, [*constants]))
+    if s.input_unshare_variables:
+        # Create implicit results for dimensions in either constants or variables
+        seen = set()
     else:
-        # Suppress input dimensions from showing in the implicit results
-        seen = set(map(id, [*constants, *expanded_inputs]))
+        # Create implicit results for dimensions in variables
+        seen = set(map(id, [*constants]))
 
     for o in expl_outs:
         assert _is_tracer_like(o)
