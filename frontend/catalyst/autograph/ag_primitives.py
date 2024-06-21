@@ -598,7 +598,7 @@ def set_item(target, i, x):
             if (
                 isinstance(x, jnp.ndarray)
                 and target.ndim == x.ndim
-                and target.__len__() > x.__len__()
+                and target.shape[0] > x.shape[0]
             ):
                 target = jax.lax.dynamic_update_slice(target, x, (i.start,))
             elif jnp.isscalar(x) or (isinstance(x, jnp.ndarray) and x.ndim == 0):
