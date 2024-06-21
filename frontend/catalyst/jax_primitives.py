@@ -569,11 +569,13 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
+    func_op = mlir_fn_cache[fn]
+    symbol_name = func_op.name.value
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
+        ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
