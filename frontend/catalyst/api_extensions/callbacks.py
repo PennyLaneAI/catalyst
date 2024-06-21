@@ -40,93 +40,6 @@ from catalyst.utils.jnp_to_memref import (
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
-class CallbackWithCustomGrad:
-    """A callback with a custom grad"""
-
-    def __init__(self, func, restype, forward, reverse):
-        assert func and forward and reverse
-        self.func = func
-        self.restype = restype
-        self._fwd = forward
-        self._fwd_jaxpr = None
-        self._bwd = reverse
-        self._bwd_jaxpr = None
-        self.callback = None
-
-    def __call__(self, *args, **kwargs):
-        if self.callback:
-            return self.callback(*args, **kwargs)
-
-        def closure(*args, **kwargs) -> self.restype:
-            return self.func(*args, **kwargs)
-
-        # We need this here to avoid infinite recursion
-        # Where does the infinite recursion happen?
-        # It happens if the fwd or bwd passes have a call to
-        # the pure_callback implementation.
-        self.callback = base_callback(closure, custom_grad=self)
-
-        # The arguments here are tracers.
-        # And we want to just get the abstraction of the tracers (i.e., the types)
-        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-        cotangents = tree_map(shaped_abstractify, self.restype)
-
-        # The forward pass must have the same input types as the original function
-        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
-
-        # But its output is always going to be two pairs.
-        _primal, residuals = shape
-
-        # The input for the bwd pass is the residuals and the cotangents.
-        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
-
-        return self.callback(*args, **kwargs)
-
-
-class CallbackWithPotentialCustomGrad:
-    """A callback which is not guaranteed to have a custom grad,
-    but the user may define one. E.g., a pure_callback is not required
-    to have a custom grad if it is never differentiated, but a user
-    may register one. A debug.callback will never have a custom grad."""
-
-    def __init__(self, func, restype):
-        self.func = func
-        self.restype = restype
-        self._fwd = None
-        self._bwd = None
-        self.callback = None
-
-    def fwd(self, func):
-        """Save forward pass as implemented by the user"""
-        self._fwd = func
-
-    def bwd(self, func):
-        """Save reverse pass as implemented by the user"""
-        self._bwd = func
-
-    def __call__(self, *args, **kwargs):
-        incomplete_grad = bool(self._fwd) != bool(self._bwd)
-        if incomplete_grad:
-            # If we are here, then we have either _fwd and _bwd but not both
-            msg = f"Function {self.func} differentiated but missing "
-            msg += "forward" if not self._fwd else "reverse"
-            msg += " pass"
-            raise DifferentiableCompileError(msg)
-
-        if self.callback:
-            return self.callback(*args, **kwargs)
-
-        if self._fwd and self._bwd:
-            self.callback = CallbackWithCustomGrad(self.func, self.restype, self._fwd, self._bwd)
-            return self.callback(*args, **kwargs)
-
-        def closure(*args, **kwargs) -> self.restype:
-            return self.func(*args, **kwargs)
-
-        self.callback = base_callback(closure)
-        return self.callback(*args, **kwargs)
-
-
 ## API ##
 def accelerate(func=None, *, dev=None):
     """Execute a ``jax.jit`` accelerated function on classical
@@ -302,6 +215,93 @@ def pure_callback(callback_fn, result_type=None):
 
 
 ## IMPL ##
+class CallbackWithCustomGrad:
+    """A callback with a custom grad"""
+
+    def __init__(self, func, restype, forward, reverse):
+        assert func and forward and reverse
+        self.func = func
+        self.restype = restype
+        self._fwd = forward
+        self._fwd_jaxpr = None
+        self._bwd = reverse
+        self._bwd_jaxpr = None
+        self.callback = None
+
+    def __call__(self, *args, **kwargs):
+        if self.callback:
+            return self.callback(*args, **kwargs)
+
+        def closure(*args, **kwargs) -> self.restype:
+            return self.func(*args, **kwargs)
+
+        # We need this here to avoid infinite recursion
+        # Where does the infinite recursion happen?
+        # It happens if the fwd or bwd passes have a call to
+        # the pure_callback implementation.
+        self.callback = base_callback(closure, custom_grad=self)
+
+        # The arguments here are tracers.
+        # And we want to just get the abstraction of the tracers (i.e., the types)
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        cotangents = tree_map(shaped_abstractify, self.restype)
+
+        # The forward pass must have the same input types as the original function
+        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+
+        # But its output is always going to be two pairs.
+        _primal, residuals = shape
+
+        # The input for the bwd pass is the residuals and the cotangents.
+        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+
+        return self.callback(*args, **kwargs)
+
+
+class CallbackWithPotentialCustomGrad:
+    """A callback which is not guaranteed to have a custom grad,
+    but the user may define one. E.g., a pure_callback is not required
+    to have a custom grad if it is never differentiated, but a user
+    may register one. A debug.callback will never have a custom grad."""
+
+    def __init__(self, func, restype):
+        self.func = func
+        self.restype = restype
+        self._fwd = None
+        self._bwd = None
+        self.callback = None
+
+    def fwd(self, func):
+        """Save forward pass as implemented by the user"""
+        self._fwd = func
+
+    def bwd(self, func):
+        """Save reverse pass as implemented by the user"""
+        self._bwd = func
+
+    def __call__(self, *args, **kwargs):
+        incomplete_grad = bool(self._fwd) != bool(self._bwd)
+        if incomplete_grad:
+            # If we are here, then we have either _fwd and _bwd but not both
+            msg = f"Function {self.func} differentiated but missing "
+            msg += "forward" if not self._fwd else "reverse"
+            msg += " pass"
+            raise DifferentiableCompileError(msg)
+
+        if self.callback:
+            return self.callback(*args, **kwargs)
+
+        if self._fwd and self._bwd:
+            self.callback = CallbackWithCustomGrad(self.func, self.restype, self._fwd, self._bwd)
+            return self.callback(*args, **kwargs)
+
+        def closure(*args, **kwargs) -> self.restype:
+            return self.func(*args, **kwargs)
+
+        self.callback = base_callback(closure)
+        return self.callback(*args, **kwargs)
+
+
 def jax_jit_callback(callback_fn, result_type, device=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
