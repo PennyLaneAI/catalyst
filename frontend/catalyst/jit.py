@@ -175,21 +175,6 @@ def qjit(
 
     For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
 
-    .. important::
-
-        Most decomposition logic will be equivalent to PennyLane's decomposition.
-        However, decomposition logic will differ in the following cases:
-
-        1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose
-            to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-
-        2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations will
-            decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-
-        3. The list of device-supported gates employed by Catalyst is currently different than that
-            of the ``lightning.qubit`` device, as defined by the
-            :class:`~.qjit_device.QJITDevice`.
-
     .. details::
         :title: AutoGraph and Python control flow
 
