@@ -14,12 +14,64 @@
 
 """Unit test module for catalyst/device/decomposition.py"""
 
+from copy import deepcopy
+
 import pennylane as qml
 import pytest
-from pennylane.ops.op_math.controlled import _get_pauli_x_based_ops, _get_special_ops
 
+from catalyst import CompileError, ctrl, qjit
+from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import catalyst_decomposer
-from catalyst.utils.toml import DeviceCapabilities, OperationProperties
+from catalyst.utils.toml import (
+    DeviceCapabilities,
+    OperationProperties,
+    ProgramFeatures,
+    pennylane_operation_set,
+)
+
+
+class CustomDevice(qml.QubitDevice):
+    """Custom Gate Set Device"""
+
+    name = "Custom Device"
+    short_name = "lightning.qubit"
+    pennylane_requires = "0.35.0"
+    version = "0.0.2"
+    author = "Tester"
+
+    lightning_device = qml.device("lightning.qubit", wires=0)
+
+    backend_name = "default"
+    backend_lib = "default"
+    backend_kwargs = {}
+
+    def __init__(self, shots=None, wires=None):
+        super().__init__(wires=wires, shots=shots)
+        program_features = ProgramFeatures(shots_present=self.shots is not None)
+        lightning_capabilities = get_device_capabilities(self.lightning_device, program_features)
+        custom_capabilities = deepcopy(lightning_capabilities)
+        custom_capabilities.native_ops.pop("Rot")
+        custom_capabilities.native_ops.pop("S")
+        custom_capabilities.to_decomp_ops.pop("MultiControlledX")
+        self.qjit_capabilities = custom_capabilities
+
+    def apply(self, operations, **kwargs):
+        """Unused"""
+        raise RuntimeError("Only C/C++ interface is defined")
+
+    @property
+    def operations(self):
+        """Get PennyLane operations."""
+        return (
+            pennylane_operation_set(self.qjit_capabilities.native_ops)
+            | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
+            | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
+        )
+
+    @property
+    def observables(self):
+        """Get PennyLane observables."""
+        return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
 
 class TestGateAliases:
@@ -72,6 +124,28 @@ class TestGateAliases:
         assert len(decomp) == 1
         assert type(decomp[0]) is qml.ops.ControlledOp
         assert type(decomp[0].base) is base
+
+
+class TestControlledDecomposition:
+    """Test behaviour around the decomposition of the `Controlled` class."""
+
+    def test_no_matrix(self, backend):
+        """Test that controlling an operation without a matrix method raises an error."""
+        dev = qml.device(backend, wires=4)
+
+        class OpWithNoMatrix(qml.operation.Operation):
+            num_wires = qml.operation.AnyWires
+
+            def matrix(self):
+                raise NotImplementedError()
+
+        @qml.qnode(dev)
+        def f():
+            ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
+            return qml.probs()
+
+        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
+            qjit(f, target="jaxpr")
 
 
 if __name__ == "__main__":
