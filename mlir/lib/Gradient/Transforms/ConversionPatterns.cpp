@@ -410,9 +410,18 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
+        // Check to see if we need to keep the value results alongside the gradients.
+        // There is no need to duplicate if there's no need to keep the results.
+        // Note that when this attribute is not set, we are then not coming from ValueAndGrad
+        // so there's no need to duplicate
+        bool dupNoNeed = (op.getKeepValueResultsAttr() == nullptr)
+                             ? true
+                             : (!op.getKeepValueResultsAttr().getValue());
+
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc,
+                                  {.dupNoNeed = dupNoNeed});
         }
 
         // The results of backprop are in argShadows, except scalar derivatives which are in the
@@ -898,14 +907,14 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         SmallVector<Value> tapeElements;
         auto params = op.getArguments();
 
-        for (auto i = 0; i < argc * 2; i++) {
+        for (size_t i = 0; i < argc * 2; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? differentials.push_back(val) : inputs.push_back(val);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
-        for (auto i = argc * 2; i < upperLimit; i++) {
+        for (size_t i = argc * 2; i < upperLimit; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? cotangents.push_back(val) : outputs.push_back(val);
@@ -913,7 +922,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
 
         auto tapeCount = op.getTape();
         auto uppestLimit = upperLimit + tapeCount;
-        for (auto i = upperLimit; i < uppestLimit; i++) {
+        for (size_t i = upperLimit; i < uppestLimit; i++) {
             tapeElements.push_back(params[i]);
         }
 
@@ -968,7 +977,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
             Value wrappedStructValAgg = func.getArgument(lastIdx);
 
             SmallVector<Value> tapestructs;
-            for (auto i = 0; i < tapeCount; i++) {
+            for (size_t i = 0; i < tapeCount; i++) {
                 SmallVector<int64_t> pos = {0, static_cast<int64_t>(i)};
                 Value tapeStructIth =
                     rewriter.create<LLVM::ExtractValueOp>(loc, wrappedStructValAgg, pos);
@@ -987,7 +996,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
             }
         }
 
-        for (auto i = 0; i < upperLimit; i++) {
+        for (size_t i = 0; i < upperLimit; i++) {
             Value oldval = params[i];
             Value newval = func.getArgument(i);
             map.map(oldval, newval);
