@@ -28,6 +28,8 @@ from catalyst.api_extensions.callbacks import base_callback
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 
+# pylint: disable=protected-access
+
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):
