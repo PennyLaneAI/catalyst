@@ -49,6 +49,7 @@ from mlir_quantum.dialects.gradient import (
     GradOp,
     JVPOp,
     ReverseOp,
+    ValueAndGradOp,
     VJPOp,
 )
 from mlir_quantum.dialects.mitigation import ZneOp
@@ -242,6 +243,8 @@ print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
 python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
+value_and_grad_p = core.Primitive("value_and_grad")
+value_and_grad_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -517,6 +520,63 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         mlir.flatten_lowering_ir_args(args_and_consts),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
+    ).results
+
+
+# value_and_grad
+#
+@value_and_grad_p.def_impl
+def _value_and_grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@value_and_grad_p.def_abstract_eval
+def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=unused-argument
+    """This function is called with abstract arguments for tracing.
+    Note: argument names must match these of `_value_and_grad_lowering`."""
+    return jaxpr.out_avals + jaxpr.out_avals
+
+
+def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
+    """
+    Returns:
+        MLIR results
+    """
+    args = list(args)
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    mlir_ctx = ctx.module_context.context
+    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    constants = [
+        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+    ]
+    consts_and_args = constants + args
+    func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    func_args = consts_and_args[: len(func_call_jaxpr.invars)]
+    val_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
+    gradient_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
+
+    _func_lowering(
+        ctx,
+        *func_args,
+        call_jaxpr=func_call_jaxpr,
+        fn=fn,
+        call=False,
+    )
+
+    assert (
+        len(flat_output_types) % 2 == 0
+    ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
+    return ValueAndGradOp(
+        val_result_types,
+        gradient_result_types,
+        ir.StringAttr.get(method),
+        ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
+        mlir.flatten_lowering_ir_args(func_args),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
 
@@ -1858,6 +1918,7 @@ mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
+mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
 
 
 def _scalar_abstractify(t):

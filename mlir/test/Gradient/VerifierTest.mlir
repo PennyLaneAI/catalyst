@@ -122,7 +122,7 @@ func.func private @foo(%arg0: tensor<f64>)
 %m0 = memref.alloc() : memref<f64>
 
 // expected-error@+1 {{cannot have both tensor results and memref output arguments}}
-%grad = gradient.backprop @foo(%t0) grad_out(%m0 : memref<f64>) cotangents(%t0: tensor<f64>) : (tensor<f64>) -> tensor<f64>
+%grad = gradient.backprop @foo(%t0) grad_out(%m0 : memref<f64>) cotangents(%t0: tensor<f64>) {resultSegmentSizes = array<i32: 0, 1>} : (tensor<f64>) -> tensor<f64>
 
 // -----
 
@@ -133,7 +133,7 @@ func.func private @foo(%arg0: tensor<f64>)
 %m0 = memref.alloc() : memref<f64>
 
 // expected-error@+1 {{cannot have callee result buffers before bufferization}}
-%grad = gradient.backprop @foo(%t0) callee_out(%m0 : memref<f64>) cotangents(%t0: tensor<f64>) : (tensor<f64>) -> tensor<f64>
+%grad = gradient.backprop @foo(%t0) callee_out(%m0 : memref<f64>) cotangents(%t0: tensor<f64>) {resultSegmentSizes = array<i32: 0, 1>}: (tensor<f64>) -> tensor<f64>
 
 // -----
 
@@ -152,7 +152,7 @@ func.func private @multiple_args(%arg0: tensor<f64>, %arg1: tensor<f64>)
 %t0 = tensor.from_elements %f0 : tensor<f64>
 
 // expected-error@+1 {{number of gradient results did not match number of differentiable arguments, expected 1 but got 2}}
-%grad:2 = gradient.backprop @multiple_args(%t0, %t0) cotangents(%t0: tensor<f64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>)
+%grad:2 = gradient.backprop @multiple_args(%t0, %t0) cotangents(%t0: tensor<f64>) {diffArgIndices = dense<0> : tensor<1xindex>, resultSegmentSizes = array<i32: 0, 2>}: (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>)
 
 // -----
 
@@ -328,4 +328,37 @@ module @grad.wrapper {
   gradient.reverse @bwd.rev(tensor<i64>, tensor<2xf64>) -> tensor<2xf64> attributes {argc = 1 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 1 : i64}
   gradient.custom_grad @callback_139793003716976 @fwd.fwd @bwd.rev {llvm.linkage = #llvm.linkage<internal>}
 }
+
+// -----
+
+func.func @measure(%arg0: f64) -> f64 {
+
+    %c0 = arith.constant 0 : i64
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[%c0] : !quantum.reg -> !quantum.bit
+    %res, %new_q = quantum.measure %1 : i1, !quantum.bit
+    %c1 = arith.constant 1.0 : f64
+
+    return %c1 : f64
+}
+
+%f0 = arith.constant 0.0 : f64
+// expected-error@+1 {{An operation without a valid gradient was found}}
+gradient.value_and_grad "auto" @measure(%f0) : (f64) -> (f64, f64)
+
+// -----
+
+func.func @measure(%arg0: f64) -> f64 {
+
+    %c0 = arith.constant 0 : i64
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[%c0] : !quantum.reg -> !quantum.bit
+    %res, %new_q = quantum.measure %1 : i1, !quantum.bit
+    %c1 = arith.constant 1.0 : f64
+
+    return %c1 : f64
+}
+
+%f0 = arith.constant 0.0 : f64
+gradient.value_and_grad "fd" @measure(%f0) : (f64) -> (f64, f64)
 
