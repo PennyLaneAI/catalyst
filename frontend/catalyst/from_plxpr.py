@@ -20,8 +20,7 @@ from typing import Callable
 
 import jax
 from jax.extend.linear_util import wrap_init
-from pennylane.capture import AbstractOperator, AbstractMeasurement, qnode_prim
-
+from pennylane.capture import AbstractMeasurement, AbstractOperator, qnode_prim
 
 from .device import extract_backend_info, get_device_capabilities
 from .jax_primitives import (
