@@ -39,7 +39,7 @@ bool invalidGradientOperation(FunctionOpInterface op)
 {
     ModuleOp mod = op->getParentOfType<ModuleOp>();
     auto res = op.walk([&](Operation *o) {
-        if (is_a<MeasureOp>(o) || is_a<catalyst::CustomCallOp>(o)) {
+        if (isa<MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
         else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
