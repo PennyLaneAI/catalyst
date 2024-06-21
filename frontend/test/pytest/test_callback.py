@@ -28,7 +28,7 @@ from catalyst.api_extensions.callbacks import base_callback
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -1173,7 +1173,7 @@ def test_different_shapes():
         return f_vjp(cot)
 
     @fun_callback.bwd
-    def fun_bwd(res, cot):
+    def fun_bwd(_res, cot):
         return fun_bwd_callback(cot)
 
     @qml.qjit(keep_intermediate=True)
@@ -1225,7 +1225,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
         return matrix_multiply_callback(X, Y), None
 
     @matrix_multiply_callback.bwd
-    def matrix_multiply_bwd(residuals, cotangents):
+    def matrix_multiply_bwd(_residuals, cotangents):
         return matrix_multiply_vjp(cotangents)
 
     @qml.qjit
