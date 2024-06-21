@@ -7,6 +7,7 @@ add_mlir_library(MLIRCatalyst
 
     DEPENDS
     MLIRCatalystOpsIncGen
+    MLIRCatalystEnumsIncGen
 
     LINK_LIBS PRIVATE
 )

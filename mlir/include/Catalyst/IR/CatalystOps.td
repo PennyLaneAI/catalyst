@@ -26,6 +26,18 @@ include "mlir/IR/OpBase.td"
 
 include "Catalyst/IR/CatalystDialect.td"
 
+//===----------------------------------------------------------------------===//
+// Catalyst dialect enums.
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Catalyst dialect attributes.
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Catalyst dialect operations.
+//===----------------------------------------------------------------------===//
+
 def ListInitOp : Catalyst_Op<"list_init"> {
     let summary = "Initialize a dynamically resizable arraylist.";
     let results = (outs ArrayListType:$list);
@@ -172,4 +184,4 @@ def CallbackCallOp : Catalyst_Op<"callback_call",
 
 }
 
-#endif // GRADIENT_OPS
+#endif // CATALYST_OPS
