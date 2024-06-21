@@ -28,7 +28,6 @@ from typing import (
     Generator,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
@@ -40,7 +39,6 @@ from jax import ShapeDtypeStruct
 from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
-    AbstractedAxesSpec,
     _input_type_to_tracers,
     infer_lambda_input_type,
     trace_to_jaxpr_dynamic2,
