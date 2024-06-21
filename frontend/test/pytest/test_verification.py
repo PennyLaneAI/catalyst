@@ -34,7 +34,7 @@ from catalyst import (
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
-from catalyst.programs.verification import validate_observables
+from catalyst.device.verification import validate_observables
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
