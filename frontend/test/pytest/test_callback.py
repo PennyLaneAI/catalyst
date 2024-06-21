@@ -1109,8 +1109,8 @@ def test_callback_backwards_function():
 
     @pure_callback
     def some_func_bwd_vjp(res, dy) -> vjp_shape:
-        vjp0 = res["y"] * jnp.cos(res["x"]) * jnp.reshape(dy["one"], (-1, 1))
-        vjp1 = dy["one"] @ jnp.sin(res["x"]) + 2 * res["y"] * dy["two"]
+        vjp0 = res["y"] * np.cos(res["x"]) * np.reshape(dy["one"], (-1, 1))
+        vjp1 = dy["one"] @ np.sin(res["x"]) + 2 * res["y"] * dy["two"]
         return ({"x": vjp0, "y": vjp1},)
 
     @some_func.bwd
