@@ -85,7 +85,6 @@ RUNTIME_OPERATIONS = [
     "PhaseShift",
     "PSWAP",
     "QubitUnitary",
-    "ControlledQubitUnitary",
     "Rot",
     "RX",
     "RY",
@@ -341,11 +340,9 @@ class QJITDevice(qml.QubitDevice):
         Most decomposition logic will be equivalent to PennyLane's decomposition.
         However, decomposition logic will differ in the following cases:
 
-        1. All :class:`qml.QubitUnitary <pennylane.ops.op_math.Controlled>` operations
+        1. All unsupported :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` instances
             will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-        2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations
-            will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-        3. The list of device-supported gates employed by Catalyst is currently different than
+        2. The list of device-supported gates employed by Catalyst is currently different than
             that of the ``lightning.qubit`` device, as defined by the
             :class:`~.qjit_device.QJITDevice`.
 

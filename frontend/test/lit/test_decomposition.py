@@ -21,7 +21,7 @@ from copy import deepcopy
 import jax
 import pennylane as qml
 
-from catalyst import cond, for_loop, measure, qjit, while_loop
+from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.utils.toml import (
@@ -103,7 +103,7 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
 
 
 def test_decompose_multicontrolledx():
-    """Test decomposition of MultiControlledX."""
+    """Test decomposition of MultiControlledX as an aliased gate."""
     dev = get_custom_device_without(5, discards={"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -112,94 +112,15 @@ def test_decompose_multicontrolledx():
     def decompose_multicontrolled_x1(theta: float):
         qml.RX(theta, wires=[0])
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK:     quantum.unitary
+        # CHECK:     quantum.custom "PauliX"() {{%[a-zA-Z0-9_]+}} ctrls({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
         # CHECK-NOT: name = "MultiControlledX"
-        qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
+        qml.MultiControlledX(wires=[0, 1, 2, 3])
         return qml.state()
 
     print(decompose_multicontrolled_x1.mlir)
 
 
 test_decompose_multicontrolledx()
-
-
-def test_decompose_multicontrolledx_in_conditional():
-    """Test decomposition of MultiControlledX in conditional."""
-    dev = get_custom_device_without(5, discards={"MultiControlledX"})
-
-    @qjit(target="mlir")
-    @qml.qnode(dev)
-    # CHECK-LABEL: @jit_decompose_multicontrolled_x2
-    def decompose_multicontrolled_x2(theta: float, n: int):
-        qml.RX(theta, wires=[0])
-
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK:     quantum.unitary
-        # CHECK-NOT: name = "MultiControlledX"
-        @cond(n > 1)
-        def cond_fn():
-            qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-
-        cond_fn()
-        return qml.state()
-
-    print(decompose_multicontrolled_x2.mlir)
-
-
-test_decompose_multicontrolledx_in_conditional()
-
-
-def test_decompose_multicontrolledx_in_while_loop():
-    """Test decomposition of MultiControlledX in while loop."""
-    dev = get_custom_device_without(5, discards={"MultiControlledX"})
-
-    @qjit(target="mlir")
-    @qml.qnode(dev)
-    # CHECK-LABEL: @jit_decompose_multicontrolled_x3
-    def decompose_multicontrolled_x3(theta: float, n: int):
-        qml.RX(theta, wires=[0])
-
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK:     quantum.unitary
-        # CHECK-NOT: name = "MultiControlledX"
-        @while_loop(lambda v: v[0] < 10)
-        def loop(v):
-            qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-            return v[0] + 1, v[1]
-
-        loop((0, n))
-        return qml.state()
-
-    print(decompose_multicontrolled_x3.mlir)
-
-
-test_decompose_multicontrolledx_in_while_loop()
-
-
-def test_decompose_multicontrolledx_in_for_loop():
-    """Test decomposition of MultiControlledX in for loop."""
-    dev = get_custom_device_without(5, discards={"MultiControlledX"})
-
-    @qjit(target="mlir")
-    @qml.qnode(dev)
-    # CHECK-LABEL: @jit_decompose_multicontrolled_x4
-    def decompose_multicontrolled_x4(theta: float, n: int):
-        qml.RX(theta, wires=[0])
-
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK:     quantum.unitary
-        # CHECK-NOT: name = "MultiControlledX"
-        @for_loop(0, n, 1)
-        def loop(_):
-            qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-
-        loop()
-        return qml.state()
-
-    print(decompose_multicontrolled_x4.mlir)
-
-
-test_decompose_multicontrolledx_in_for_loop()
 
 
 def test_decompose_rot():

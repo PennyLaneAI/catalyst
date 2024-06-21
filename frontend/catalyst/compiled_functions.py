@@ -36,7 +36,7 @@ from catalyst.tracing.type_signatures import (
     get_decomposed_signature,
     typecheck_signatures,
 )
-from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
+from catalyst.utils import wrapper
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
