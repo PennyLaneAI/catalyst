@@ -31,6 +31,7 @@ from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatt
 
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
     get_unranked_memref_descriptor,
@@ -210,13 +211,97 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    def closure(*args, **kwargs) -> result_type:
-        return callback_fn(*args, **kwargs)
-
-    return base_callback(closure)
+    return CallbackWithPotentialCustomGrad(callback_fn, result_type)
 
 
 ## IMPL ##
+class CallbackWithCustomGrad:
+    """A callback with a custom grad"""
+
+    def __init__(self, func, restype, forward, reverse):
+        assert func and forward and reverse
+        self.func = func
+        self.restype = restype
+        self._fwd = forward
+        self._fwd_jaxpr = None
+        self._bwd = reverse
+        self._bwd_jaxpr = None
+        self.callback = None
+
+    def __call__(self, *args, **kwargs):
+        if self.callback:
+            return self.callback(*args, **kwargs)
+
+        def closure(*args, **kwargs) -> self.restype:
+            return self.func(*args, **kwargs)
+
+        # We need this here to avoid infinite recursion
+        # Where does the infinite recursion happen?
+        # It happens if the fwd or bwd passes have a call to
+        # the pure_callback implementation.
+        self.callback = base_callback(closure, custom_grad=self)
+
+        # The arguments here are tracers.
+        # And we want to just get the abstraction of the tracers (i.e., the types)
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        cotangents = tree_map(shaped_abstractify, self.restype)
+
+        # The forward pass must have the same input types as the original function
+        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+
+        # But its output is always going to be two pairs.
+        _primal, residuals = shape
+
+        # The input for the bwd pass is the residuals and the cotangents.
+        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+
+        return self.callback(*args, **kwargs)
+
+
+class CallbackWithPotentialCustomGrad:
+    """A callback which is not guaranteed to have a custom grad,
+    but the user may define one. E.g., a pure_callback is not required
+    to have a custom grad if it is never differentiated, but a user
+    may register one. A debug.callback will never have a custom grad."""
+
+    def __init__(self, func, restype):
+        self.func = func
+        self.restype = restype
+        self._fwd = None
+        self._bwd = None
+        self.callback = None
+
+    def fwd(self, func):
+        """Save forward pass as implemented by the user"""
+        self._fwd = func
+
+    def bwd(self, func):
+        """Save reverse pass as implemented by the user"""
+        self._bwd = func
+
+    def __call__(self, *args, **kwargs):
+        incomplete_grad = bool(self._fwd) != bool(self._bwd)
+        if incomplete_grad:
+            # If we are here, then we have either _fwd and _bwd but not both
+            msg = f"Function {self.func} differentiated but missing "
+            msg += "forward" if not self._fwd else "reverse"
+            msg += " pass"
+            raise DifferentiableCompileError(msg)
+
+        if self.callback:
+            return self.callback(*args, **kwargs)
+
+        if self._fwd and self._bwd:
+            self.callback = CallbackWithCustomGrad(self.func, self.restype, self._fwd, self._bwd)
+            return self.callback(*args, **kwargs)
+
+        def closure(*args, **kwargs) -> self.restype:
+            return self.func(*args, **kwargs)
+
+        self.callback = base_callback(closure)
+        return self.callback(*args, **kwargs)
+
+
 def jax_jit_callback(callback_fn, result_type, device=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
@@ -228,7 +313,8 @@ def jax_jit_callback(callback_fn, result_type, device=None):
     return base_callback(closure, device=device)
 
 
-def base_callback(func, device=None):
+## IMPL ##
+def base_callback(func, device=None, custom_grad=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -243,7 +329,9 @@ def base_callback(func, device=None):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        return callback_implementation(func, retty, *args, **kwargs, device=device)
+        return callback_implementation(
+            func, retty, *args, device=device, custom_grad=custom_grad, **kwargs
+        )
 
     return bind_callback
 
@@ -379,7 +467,12 @@ class JaxJitCallable(MemrefCallable):
 
 
 def callback_implementation(
-    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, device=None, **kwargs: Any
+    cb: Callable[..., Any],
+    result_shape_dtypes: Any,
+    *args: Any,
+    device=None,
+    custom_grad=None,
+    **kwargs: Any,
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -399,6 +492,9 @@ def callback_implementation(
         memref_callable = JaxJitCallable(cb, device, results_aval, *args, **kwargs)
 
     out_flat = python_callback_p.bind(
-        *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)
+        *flat_args,
+        callback=memref_callable,
+        custom_grad=custom_grad,
+        results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)
