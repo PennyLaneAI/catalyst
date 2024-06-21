@@ -1293,7 +1293,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     assert np.allclose(mul(A, B), mul_jax(A, B))
 
 
-@pytest.xmark.fail(reason="error in gradient frontend verification")
+@pytest.mark.fail(reason="error in gradient frontend verification")
 def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     """I want to run this test but I can't. I get an error saying that grad
     is for scalars only but I am using jacobian"""
