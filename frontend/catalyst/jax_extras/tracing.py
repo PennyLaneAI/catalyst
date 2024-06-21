@@ -635,7 +635,6 @@ def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
 class ExpansionStrategy:
     """Describe the settings affecting the Jax dyanmic API tracing of the nested programs.
     Args:
-        axes_specs: Axes specification used to convert static dimensions to the dynamic ones
         input_unshare_variables: Treat each dynamic dimension as a distinct dimension, even if some
                                  of them are described by the same dimension variables.
         output_force_arg0_outdbidx: Force all references pointing to the first arguments to be
@@ -643,24 +642,23 @@ class ExpansionStrategy:
                                     to the loop iteration variable.
     """
 
-    axes_specs: Sequence[AbstractedAxesSpec] | None
     input_unshare_variables: bool
     output_force_arg0_outdbidx: bool
 
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, False)
+    return ExpansionStrategy(not preserve_dimensions, False)
 
 
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True)
+    return ExpansionStrategy(not preserve_dimensions, True)
 
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
-    return ExpansionStrategy(None, True, False)
+    return ExpansionStrategy(True, False)
 
 
 def infer_output_type(
@@ -824,16 +822,11 @@ def expand_args(
     """
     s = expansion_strategy
     if s.input_unshare_variables is True:
-        assert s.axes_specs is None
         # Treat dimensions as arguments, no shared references (e.g. in loop body programs)
         in_type = infer_input_type_unshared(args)
     else:
-        if s.axes_specs is not None:
-            # Top-level programs support `abstracted_axes` for which we use the default inference
-            in_type = infer_lambda_input_type(s.axes_specs, args)
-        else:
-            # Treat dimensions as constants, all shared references (e.g. in loop body programs)
-            in_type = infer_input_type_constshapes(args)
+        # Treat dimensions as constants, all shared references (e.g. in loop body programs)
+        in_type = infer_input_type_constshapes(args)
 
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
