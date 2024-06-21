@@ -411,11 +411,20 @@
   foo(op);  // this works!  
   ```
 
+* Validation is now performed for observables and operations as a final step of the device preprocess.
+  [(#626)](https://github.com/PennyLaneAI/catalyst/pull/626)
+  [(#783)](https://github.com/PennyLaneAI/catalyst/pull/783)
+
+* A `non_commuting_observables` flag is added to the TOML file, indicating whether or not the device
+  supports measuring non-commuting observables. If `false`, non-commuting measurements will be split into multiple executions.
+  [(#821)](https://github.com/PennyLaneAI/catalyst/pull/821)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Lillian M.A. Frederiksen,
 David Ittah,
 Christina Lee,
 Erick Ochoa,
