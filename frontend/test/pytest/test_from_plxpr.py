@@ -295,7 +295,7 @@ class TestCatalystCompareJaxpr:
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_variance(self):
-        """Test comparison and execution of a jaxpr containing a probability measurement."""
+        """Test comparison and execution of a jaxpr containing a variance measurement."""
 
         dev = qml.device("lightning.qubit", wires=2)
 
@@ -329,7 +329,7 @@ class TestCatalystCompareJaxpr:
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_sample(self):
-        """Test comparison and execution of a jaxpr containing a probability measurement."""
+        """Test comparison and execution of a jaxpr returning samples."""
 
         dev = qml.device("lightning.qubit", wires=2, shots=50)
 

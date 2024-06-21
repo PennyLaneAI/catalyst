@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This submodule defines a utility for converting plxpr into catalyst jaxpr.
+This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 from dataclasses import dataclass, field
 from functools import partial
@@ -97,10 +97,10 @@ def _get_device_kwargs(device: "pennylane.devices.Device") -> dict:
 # code example has long lines
 # pylint: disable=line-too-long
 def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
-    """Convert pennylane variant jaxpr to catalyst variant jaxpr.
+    """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
-        jaxpr (jax.core.Jaxpr): pennylane variant jaxpr
+        jaxpr (jax.core.Jaxpr): PennyLane variant jaxpr
 
     Returns:
         Callable: a function that accepts the same arguments as the plxpr and returns catalyst
@@ -123,9 +123,9 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
         def f(x):
             return circuit(2 * x) ** 2
 
-        jaxpr = jax.make_jaxpr(circuit)(0.5)
+        plxpr = jax.make_jaxpr(circuit)(0.5)
 
-        print(qml.capture.to_catalyst(jaxpr)(0.5))
+        print(from_plxpr(plxpr)(0.5))
 
     .. code-block:: none
 
@@ -157,20 +157,20 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(to_catalyst_interpreter, plxpr.jaxpr, plxpr.consts))
+    return jax.make_jaxpr(partial(from_plxpr_interpreter, plxpr.jaxpr, plxpr.consts))
 
 
 # docstring link too long
 # pylint: disable=line-too-long
-def to_catalyst_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
-    """Convert pennylane variant jaxpr to catalyst variant jaxpr.
+def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
+    """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     See the documentation on
     `Writing custom interpreters in JAX <https://jax.readthedocs.io/en/latest/notebooks/Writing_custom_interpreters_in_Jax.html>`_
     for a walkthrough on the general architecture and behavior of this function.
 
     Given that ``catalyst.jax_primitives.func_p`` does not define a concrete implementation, this
-    function will fail outside of a abstract evaluation call.
+    function will fail outside of an abstract evaluation call.
 
     """
     env = {}  # dict mapping var "variables" to val "values"
@@ -201,7 +201,7 @@ def to_catalyst_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
             outvals = func_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
         else:
             outvals = eqn.primitive.bind(*invals, **eqn.params)
-            # Primitives may return multiple outputs or not
+        # Primitives may return multiple outputs or not
         if not eqn.primitive.multiple_results:
             outvals = [outvals]
         # Write the results of the primitive into the environment
@@ -213,14 +213,13 @@ def to_catalyst_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
 @dataclass
 class _InterpreterState:
     """This dataclass stores the mutable variables modified
-    over the course of the interpretting plxpr as catalxpr."""
+    over the course of interpreting the plxpr as catalxpr."""
 
     qreg: AbstractQreg
-    """The current quantum register.
-    """
+    """The current quantum register."""
 
     env: dict = field(default_factory=dict)
-    """A dictionary mapping variable to values."""
+    """A dictionary mapping variables to values."""
 
     wire_map: dict = field(default_factory=dict)
     """A map from wire values to ``AbstractQbit`` instances.
@@ -232,7 +231,7 @@ class _InterpreterState:
     op_math_cache: dict = field(default_factory=dict)
     """A cache of operations that will be consumed by later operations.
     This is a map from the ``AbstractOperator`` variables to the corresponding
-    equation. The equation will be need to be intrepretted when the abstract
+    equation. The equation will need to be interpreted when the abstract
     operator is consumed.
     """
 
@@ -294,7 +293,7 @@ def _obs(eqn: jax.core.JaxprEqn, state: _InterpreterState):
     obs_eqn = state.op_math_cache[eqn.invars[0]]
     if "n_wires" not in obs_eqn.params:
         raise NotImplementedError(
-            f"to_catalyst can not yet interpret observables of type {obs_eqn.primitive}"
+            f"from_plxpr can not yet interpret observables of type {obs_eqn.primitive}"
         )
 
     n_wires = obs_eqn.params["n_wires"]
@@ -305,7 +304,7 @@ def _obs(eqn: jax.core.JaxprEqn, state: _InterpreterState):
 
 
 def _compbasis_obs(eqn: jax.core.JaxprEqn, state: _InterpreterState, device: "qml.devices.Device"):
-    """Add a computational basis samling observable."""
+    """Add a computational basis sampling observable."""
     if eqn.invars:
         w_vals = [state.read(w_var) for w_var in eqn.invars]
     else:
@@ -327,7 +326,9 @@ def _measurement_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState, device):
     elif "_obs" in eqn.primitive.name:
         obs = _obs(eqn, state)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(
+            "Only wire-based and observable-based measurements are supported by from_plxpr."
+        )
 
     shaped_array = _get_shapes_for(
         eqn.outvars[0].aval, shots=device.shots, num_device_wires=len(device.wires)
