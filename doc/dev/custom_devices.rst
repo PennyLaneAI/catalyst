@@ -262,7 +262,7 @@ headers and fields are generally required, unless stated otherwise.
         CY = { properties = [ "invertible" ] }
         CZ = { properties = [ "invertible" ] }
         PhaseShift = { properties = [ "controllable", "invertible" ] }
-        ControlledPhaseShift = { properties = [ "controllable", "invertible" ] }
+        ControlledPhaseShift = { properties = [ "invertible" ] }
         RX = { properties = [ "controllable", "invertible" ] }
         RY = { properties = [ "controllable", "invertible" ] }
         RZ = { properties = [ "controllable", "invertible" ] }
@@ -294,7 +294,7 @@ headers and fields are generally required, unless stated otherwise.
         QubitStateVector = {}
         StatePrep = {}
         ControlledQubitUnitary = {}
-        DiagonalQubitUnitary = {}
+        MultiControlledX = {}
         SingleExcitation = {}
         SingleExcitationPlus = {}
         SingleExcitationMinus = {}
@@ -310,7 +310,7 @@ headers and fields are generally required, unless stated otherwise.
         # Gates which should be translated to QubitUnitary
         [operators.gates.matrix]
 
-        MultiControlledX = {}
+        DiagonalQubitUnitary = {}
 
         # Observables supported by the device
         [operators.observables]
