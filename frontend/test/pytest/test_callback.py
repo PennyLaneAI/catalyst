@@ -816,6 +816,7 @@ def test_active_grad_inside_qjit(backend, scale):
     "arg", [jnp.array([0.1, 0.2]), jnp.array([0.2, 0.3]), jnp.array([0.3, 0.4])]
 )
 def test_array_input(arg):
+    """Test array input"""
 
     @pure_callback
     def some_func(x) -> float:
@@ -849,6 +850,7 @@ def test_array_input(arg):
 
 
 def test_array_in_scalar_out():
+    """Test array in scalar out"""
 
     @pure_callback
     def some_func(x) -> float:
@@ -882,6 +884,7 @@ def test_array_in_scalar_out():
 
 
 def test_scalar_in_array_out():
+    """Test scalar in array out"""
 
     @pure_callback
     def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float64):
@@ -914,6 +917,7 @@ def test_scalar_in_array_out():
 
 
 def test_scalar_in_tuple_scalar_array_out():
+    """Test scalar in tuple scalar array out"""
 
     @pure_callback
     def some_func(
@@ -952,6 +956,7 @@ def test_scalar_in_tuple_scalar_array_out():
 
 
 def test_array_in_tuple_array_out():
+    """Test array in tuple array out"""
 
     def _some_func(x):
         return np.sin(x), x**2
@@ -991,6 +996,7 @@ def test_array_in_tuple_array_out():
 
 
 def test_tuple_array_in_tuple_array_out():
+    """Test tuple array in tuple array out"""
 
     @pure_callback
     def some_func(
@@ -1032,6 +1038,7 @@ def test_tuple_array_in_tuple_array_out():
 
 
 def test_pytree_in_pytree_out():
+    """Test pytree in pytree out"""
 
     shape = {
         "one": jax.ShapeDtypeStruct((2,), jnp.float64),
