@@ -27,7 +27,6 @@ from pennylane.ops import (
     CompositeOp,
     Controlled,
     ControlledOp,
-    ControlledQubitUnitary,
     Hamiltonian,
     SymbolicOp,
 )
@@ -112,7 +111,6 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     return (tape,), lambda x: x[0]
 
 
-# pylint: disable=too-many-statements
 @transform
 def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """verify the quantum program against Catalyst requirements. This transform makes no
@@ -182,8 +180,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             return in_inverse
         # If its a PL Controlled we also want to check its base to catch C(Adjoint(base)).
         # PL simplification should mean pure PL operators will not be more nested than this.
-        # TODO: remove ControlledQubitUnitary to treat it as independant gate everywhere
-        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+        if type(op) in (Controlled, ControlledOp):
             _inv_op_checker(op.base, in_inverse)
             return in_inverse
         # Early exit when not in inverse, only determine the inverse status for recursing later.
