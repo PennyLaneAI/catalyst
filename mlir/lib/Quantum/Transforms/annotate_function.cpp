@@ -39,11 +39,11 @@ bool invalidGradientOperation(FunctionOpInterface op)
 {
     ModuleOp mod = op->getParentOfType<ModuleOp>();
     auto res = op.walk([&](Operation *o) {
-        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::CustomCallOp>(o)) {
+        if (is_a<MeasureOp>(o) || is_a<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
         else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
-            bool isDifferentiated = false;
+            bool hasCustomDerivative = false;
             auto callee = callbackCall.getCalleeAttr();
             auto callback =
                 SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(callbackCall, callee);
@@ -55,12 +55,12 @@ bool invalidGradientOperation(FunctionOpInterface op)
             for (SymbolTable::SymbolUse use : uses) {
                 Operation *user = use.getUser();
                 if (auto customGrad = dyn_cast<catalyst::gradient::CustomGradOp>(user)) {
-                    isDifferentiated |= customGrad.getCalleeAttr() == callee;
+                    hasCustomDerivative |= customGrad.getCalleeAttr() == callee;
                 }
-                if (isDifferentiated)
+                if (hasCustomDerivative)
                     break;
             }
-            if (!isDifferentiated) {
+            if (!hasCustomDerivative) {
                 return WalkResult::interrupt();
             }
         }
