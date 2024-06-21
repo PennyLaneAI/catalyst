@@ -134,7 +134,7 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
             call_jaxpr={ lambda ; c:f64[]. let
                 qdevice[
                     rtd_kwargs={'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}
-                    rtd_lib=/Users/christina/Prog/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.dylib
+                    rtd_lib=***
                     rtd_name=LightningSimulator
                 ]
                 d:AbstractQreg() = qalloc 2
