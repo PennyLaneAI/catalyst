@@ -811,6 +811,42 @@ def test_active_grad_inside_qjit(backend, scale):
     assert np.allclose(wrapper_jit(42.0), wrapper(42.0))
 
 
+@pytest.mark.parametrize(
+    "arg", [jnp.array([0.1, 0.2]), jnp.array([0.2, 0.3]), jnp.array([0.3, 0.4])]
+)
+def test_array_input(arg):
+
+    @pure_callback
+    def some_func(x) -> float:
+        return np.sin(x[0]) * x[1]
+
+    @some_func.fwd
+    def some_func_fwd(x):
+        return some_func(x), (jnp.cos(x[0]), jnp.sin(x[0]), x[1])
+
+    @some_func.bwd
+    def some_func_bwd(res, dy):
+        cos_x0, sin_x0, x1 = res  # Gets residuals computed in f_fwd
+        # since there is a single array parameter, we return
+        # a VJP which is a tuple of length 1 containing an array
+        # parameter of the same shape
+        return (jnp.array([cos_x0 * dy * x1, sin_x0 * dy]),)
+
+    @qml.qjit
+    @grad
+    def cost(x):
+        y = jnp.array([jnp.cos(x[0]), x[1]])
+        return jnp.sin(some_func(y))
+
+    @jax.jit
+    @jax.grad
+    def cost_jax(x):
+        y = jnp.array([jnp.cos(x[0]), x[1]])
+        return jnp.sin(jnp.sin(y[0]) * y[1])
+
+    assert np.allclose(cost(arg), cost_jax(arg))
+
+
 def test_error_incomplete_grad_only_forward():
     """Test error about missing reverse pass"""
 
