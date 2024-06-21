@@ -18,7 +18,7 @@ of quantum operations, measurements, and observables to JAXPR.
 import sys
 from dataclasses import dataclass
 from itertools import chain
-from typing import Dict, Iterable, List, Union
+from typing import Any, Dict, Iterable, List, Union
 
 import jax
 import numpy as np
@@ -43,7 +43,15 @@ from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
-from mlir_quantum.dialects.gradient import GradOp, JVPOp, ValueAndGradOp, VJPOp
+from mlir_quantum.dialects.gradient import (
+    CustomGradOp,
+    ForwardOp,
+    GradOp,
+    JVPOp,
+    ReverseOp,
+    ValueAndGradOp,
+    VJPOp,
+)
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -85,7 +93,7 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-function-args
+# pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-function-args,protected-access
 
 #########
 # Types #
@@ -247,13 +255,13 @@ def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
 
 
 @python_callback_p.def_abstract_eval
-def _python_callback_abstract_eval(*avals, callback, results_aval):
+def _python_callback_abstract_eval(*avals, callback, custom_grad, results_aval):
     """Abstract evaluation"""
     return results_aval
 
 
 @python_callback_p.def_impl
-def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cover
+def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # pragma: no cover
     """Concrete evaluation"""
     raise NotImplementedError()
 
@@ -261,7 +269,9 @@ def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cov
 CALLBACK_OP_CACHE = {}
 
 
-def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
+def _python_callback_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *args, callback, custom_grad, results_aval
+):
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
@@ -274,19 +284,68 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
     fn_ty_attr = ir.TypeAttr.get(fn_ty)
     cache_key = (callback_id, *params_ty, *results_ty)
-    if cache_key not in CALLBACK_OP_CACHE:
-        module = jax_ctx.module_context.module
-        ip = module.body
-        attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
-        with ir.InsertionPoint(ip):
-            callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
-        CALLBACK_OP_CACHE[cache_key] = callbackOp
+    if cache_key in CALLBACK_OP_CACHE:
+        callbackOp = CALLBACK_OP_CACHE[cache_key]
+        symbol = callbackOp.sym_name.value
+        symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
+        return CallbackCallOp(results_ty, symbol_attr, args).results
 
+    module = jax_ctx.module_context.module
+    ip = module.body
+    attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
+    with ir.InsertionPoint(ip):
+        callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
+    CALLBACK_OP_CACHE[cache_key] = callbackOp
     callbackOp = CALLBACK_OP_CACHE[cache_key]
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
+    retval = CallbackCallOp(results_ty, symbol_attr, args).results
 
-    return CallbackCallOp(results_ty, symbol_attr, args).results
+    if not custom_grad:
+        return retval
+
+    assert custom_grad._fwd and custom_grad._bwd
+    fwd = custom_grad._fwd
+    rev = custom_grad._bwd
+    fwd_jaxpr = custom_grad._fwd_jaxpr
+    rev_jaxpr = custom_grad._bwd_jaxpr
+    ctx = jax_ctx.module_context
+    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd)
+    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev)
+    sym_fwd = mlir_fwd.sym_name.value + ".fwd"
+
+    argc = len(args)
+    resc = len(results_ty)
+    len_tape = len(mlir_fwd.type.results) - resc
+
+    # args_ty = inputs and cotangents since they are shadows
+    args_ty = [arg.type for arg in args]
+    # results_ty = output and cotangent
+    output_ty = results_ty
+    # the tape is found in the mlir_fwd.type
+    tape_ty = mlir_fwd.type.results[-len_tape:] if len_tape > 0 else []
+
+    args_zip = list(sum(zip(args_ty, args_ty), ()))
+    rets_zip = list(sum(zip(output_ty, output_ty), ()))
+
+    s = args_zip + rets_zip
+    fn_fwd_ty = FunctionType.get(inputs=s, results=tape_ty)
+    fn_rev_ty = FunctionType.get(inputs=s + tape_ty, results=[])
+
+    fwd_fn_ty_attr = ir.TypeAttr.get(fn_fwd_ty)
+    fwd_callee_attr = ir.FlatSymbolRefAttr.get(mlir_fwd.sym_name.value)
+    sym_rev = mlir_rev.sym_name.value + ".rev"
+    rev_fn_ty_attr = ir.TypeAttr.get(fn_rev_ty)
+    rev_callee_attr = ir.FlatSymbolRefAttr.get(mlir_rev.sym_name.value)
+
+    with ir.InsertionPoint(ip):
+        forward = ForwardOp(sym_fwd, fwd_fn_ty_attr, fwd_callee_attr, argc, resc, len_tape)
+        reverse = ReverseOp(sym_rev, rev_fn_ty_attr, rev_callee_attr, argc, resc, len_tape)
+        fwd_sym_attr = ir.FlatSymbolRefAttr.get(forward.sym_name.value)
+        rev_sym_attr = ir.FlatSymbolRefAttr.get(reverse.sym_name.value)
+        CustomGradOp(symbol_attr, fwd_sym_attr, rev_sym_attr)
+
+    return retval
 
 
 #
@@ -310,7 +369,7 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 #
 # func
 #
-mlir_fn_cache: Dict["catalyst.jax_tracer.Function", str] = {}
+mlir_fn_cache: Dict["catalyst.jax_tracer.Function", Any] = {}
 
 
 @func_p.def_impl
@@ -333,7 +392,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
-    return func_op.name.value
+    return func_op
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
@@ -362,10 +421,12 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       fn: the function being compiled
     """
     if fn in mlir_fn_cache:
-        symbol_name = mlir_fn_cache[fn]
+        func_op = mlir_fn_cache[fn]
     else:
-        symbol_name = _func_def_lowering(ctx.module_context, fn, call_jaxpr)
-        mlir_fn_cache[fn] = symbol_name
+        func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr)
+        mlir_fn_cache[fn] = func_op
+
+    symbol_name = func_op.name.value
 
     if not call:
         return None
@@ -434,7 +495,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
 
     _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
-    symbol_name = mlir_fn_cache[fn]
+    func_op = mlir_fn_cache[fn]
+    symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
@@ -507,11 +569,13 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
+    func_op = mlir_fn_cache[fn]
+    symbol_name = func_op.name.value
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
+        ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
@@ -565,11 +629,13 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
+    func_op = mlir_fn_cache[fn]
+    symbol_name = func_op.name.value
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
         flat_output_types[len(flat_output_types) // 2 :],
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
+        ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
@@ -620,11 +686,13 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
+    func_op = mlir_fn_cache[fn]
+    symbol_name = func_op.name.value
     return VJPOp(
         func_result_types,
         vjp_result_types,
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
+        ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
@@ -659,7 +727,8 @@ def _zne_lowering(ctx, *args, jaxpr, fn):
         fn: the function to be mitigated
     """
     _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
-    symbol_name = mlir_fn_cache[fn]
+    func_op = mlir_fn_cache[fn]
+    symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     return ZneOp(

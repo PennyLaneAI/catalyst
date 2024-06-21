@@ -303,6 +303,34 @@ gradient.vjp "fd" @measure(%cst0) cotangents(%cst1) {resultSegmentSizes = array<
 
 // -----
 
+module @grad.wrapper {
+  func.func public @jit_grad.wrapper(%arg0: tensor<2xf64>) -> tensor<2xf64> attributes {llvm.emit_c_interface} {
+    %0 = gradient.grad "auto" @wrapper(%arg0) {diffArgIndices = dense<0> : tensor<1xi64>} : (tensor<2xf64>) -> tensor<2xf64>
+    return %0 : tensor<2xf64>
+  }
+  func.func private @wrapper(%arg0: tensor<2xf64>) -> tensor<f64> attributes {llvm.linkage = #llvm.linkage<internal>} {
+    %0 = catalyst.callback_call @callback_139793003716976(%arg0) : (tensor<2xf64>) -> tensor<f64>
+    return %0 : tensor<f64>
+  }
+  catalyst.callback @callback_139793003716976(tensor<2xf64>) -> tensor<f64> attributes {argc = 1 : i64, id = 139793003716976 : i64, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64}
+  func.func private @fwd(%arg0: tensor<2xf64>) -> (tensor<f64>, tensor<i64>) attributes {llvm.linkage = #llvm.linkage<internal>} {
+    %0 = catalyst.callback_call @callback_139793003716976(%arg0) : (tensor<2xf64>) -> tensor<f64>
+    %1 = stablehlo.constant dense<1> : tensor<i64>
+    return %0, %1 : tensor<f64>, tensor<i64>
+  }
+  func.func private @bwd(%arg0: tensor<i64>, %arg1: tensor<2xf64>) -> tensor<2xf64> attributes {llvm.linkage = #llvm.linkage<internal>} {
+    %0 = stablehlo.convert %arg0 : (tensor<i64>) -> tensor<f64>
+    %1 = stablehlo.broadcast_in_dim %0, dims = [] : (tensor<f64>) -> tensor<2xf64>
+    %2 = stablehlo.multiply %1, %arg1 : tensor<2xf64>
+    return %2 : tensor<2xf64>
+  }
+  gradient.forward @fwd.fwd(tensor<2xf64>) -> (tensor<f64>, tensor<i64>) attributes {argc = 1 : i64, implementation = @fwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 1 : i64}
+  gradient.reverse @bwd.rev(tensor<i64>, tensor<2xf64>) -> tensor<2xf64> attributes {argc = 1 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 1 : i64}
+  gradient.custom_grad @callback_139793003716976 @fwd.fwd @bwd.rev {llvm.linkage = #llvm.linkage<internal>}
+}
+
+// -----
+
 func.func @measure(%arg0: f64) -> f64 {
 
     %c0 = arith.constant 0 : i64

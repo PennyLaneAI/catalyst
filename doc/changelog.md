@@ -157,19 +157,64 @@
   [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
   [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
 
-* Differentiation support for callbacks. (Not yet enabled on the frontend)
+* Differentiation support for callbacks.
   [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
   [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
   [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
+  [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
 
   Parameters to `debug.callback`s are marked as inactive. This means that the
   This means that the partial derivative of `debug.callback`s does not need to
   be computed.
 
+  There are no changes to the syntax of inactive callbacks, including
+  `debug.print`. See the following example:
+
+  ```python
+  @qml.qjit
+  @grad
+  def identity(x: float):
+    debug.print(x)
+    return x
+  ```
+
   Parameters to `pure_callback`s are active variables. This means the
   partial derivative of `pure_callback`s needs to be computed.
   Since callbacks are opaque to the compiler, the user needs to register
   custom gradients with Enzyme.
+
+  In order to differentiate `pure_callback`s please use the following syntax:
+
+  ```python
+  @pure_callback
+  def identity(x) -> float:
+    return x
+
+  @identity.fwd
+  def fwd(x):
+    return identity(x), 1.0
+
+  @identity.bwd
+  def bwd(res, cot):
+    return cot * res
+
+  @qml.qjit
+  @grad
+  def wrapper(x):
+    return scale * identity(x)
+  ```
+
+  The forward pass must always return a tuple where the first element of the tuple
+  is the result of the function being differentiated and the second element of the tuple
+  are the residuals that may be used in the reverse pass. There may be multiple residuals
+  and also no residuals. In the case of no residuals, please return `None` like so:
+
+  ```python
+  @identity.fwd
+  def fwd(x):
+     # Still needs to return a tuple.
+     return identity(x), None
+  ```
 
 * Support controlled operations without matrices via applying PennyLane's decomposition.
   [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
