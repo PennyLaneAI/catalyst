@@ -5,7 +5,8 @@
 * `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
   [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
 
-* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated
+  `n_shots` times to simulate hardware-like results.
   The loop over shots is executed with `catalyst.vmap`.
   [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
 
@@ -91,7 +92,7 @@
 
   ```
 
-* Support for using `catalyst.value_and_grad` with a `qjit`-ted function. 
+* Support for using `catalyst.value_and_grad` with a `qjit`-ted function.
   [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
 
   ```py
@@ -156,19 +157,64 @@
   [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
   [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
 
-* Differentiation support for callbacks. (Not yet enabled on the frontend)
+* Differentiation support for callbacks.
   [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
   [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
   [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
+  [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
 
   Parameters to `debug.callback`s are marked as inactive. This means that the
   This means that the partial derivative of `debug.callback`s does not need to
   be computed.
 
+  There are no changes to the syntax of inactive callbacks, including
+  `debug.print`. See the following example:
+
+  ```python
+  @qml.qjit
+  @grad
+  def identity(x: float):
+    debug.print(x)
+    return x
+  ```
+
   Parameters to `pure_callback`s are active variables. This means the
   partial derivative of `pure_callback`s needs to be computed.
   Since callbacks are opaque to the compiler, the user needs to register
   custom gradients with Enzyme.
+
+  In order to differentiate `pure_callback`s please use the following syntax:
+
+  ```python
+  @pure_callback
+  def identity(x) -> float:
+    return x
+
+  @identity.fwd
+  def fwd(x):
+    return identity(x), 1.0
+
+  @identity.bwd
+  def bwd(res, cot):
+    return cot * res
+
+  @qml.qjit
+  @grad
+  def wrapper(x):
+    return scale * identity(x)
+  ```
+
+  The forward pass must always return a tuple where the first element of the tuple
+  is the result of the function being differentiated and the second element of the tuple
+  are the residuals that may be used in the reverse pass. There may be multiple residuals
+  and also no residuals. In the case of no residuals, please return `None` like so:
+
+  ```python
+  @identity.fwd
+  def fwd(x):
+     # Still needs to return a tuple.
+     return identity(x), None
+  ```
 
 * Support controlled operations without matrices via applying PennyLane's decomposition.
   [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
@@ -213,10 +259,15 @@
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
 * Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
-  applied to a single Operator. This should lead to improved compatibility with PennyLane library code,
-  as well when reusing quantum functions with both Catalyst and PennyLane.
+  applied to a single Operator. This should lead to improved compatibility with PennyLane library
+  code, as well when reusing quantum functions with both Catalyst and PennyLane.
   [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
   [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+
+* Controlled operations defined via specialized classes (like `Toffoli` or `ControlledQubitUnitary`)
+  are now implemented as controlled versions of their base operation if the device supports it.
+  In particular, `MultiControlledX` is no longer executed as a `QubitUnitary` with Lightning.
+  [(#792)](https://github.com/PennyLaneAI/catalyst/pull/792)
 
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
   measurement. For now the feature is equivalent to returning `m` directly from a quantum
@@ -256,7 +307,8 @@
   both be provided as keyword arguments.
   [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
 
-* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not.
+* Finite difference is now always possible regardless of whether the differentiated function has a
+  valid gradient for autodiff or not.
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
 * A new GitHub workflow makes available a binary distribution for Linux Arm64.
@@ -271,7 +323,9 @@
 
 <h3>Bug fixes</h3>
 
-* `device_shots` is modified to `0` on the fly in `Measure` (and set back to its original value after the call to `PartialProbs`) to compute mid-circuit probabilities analytically, even when the device has finite shots.
+* `device_shots` is modified to `0` on the fly in `Measure` (and set back to its original value
+  after the call to `PartialProbs`) to compute mid-circuit probabilities analytically, even when the
+  device has finite shots.
   [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
 * The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
@@ -282,7 +336,9 @@
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
 
 * Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
-  In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
+  In this bug fix, four openblas routines were newly linked and are now discoverable by
+  `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`,
+  `lapack_zgetrf`.
   [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
 * Correctly recording types of constant array when lowering `catalyst.grad` to mlir
@@ -296,7 +352,8 @@
 
 <h3>Internal changes</h3>
 
-* Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
+* Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector
+  branch and normalize.
   [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
 * The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
@@ -389,48 +446,56 @@
   interface and allows for multiple `MemrefCallable` to be defined for a single
   callback, which is necessary for custom gradient of `pure_callbacks`.
 
-* A new `catalyst::gradient::GradientOpInterface` is available when querying the gradient method in the mlir c++ api.
+* A new `catalyst::gradient::GradientOpInterface` is available when querying the gradient method in
+  the mlir c++ api.
   [(#800)](https://github.com/PennyLaneAI/catalyst/pull/800)
 
-  `catalyst::gradient::GradOp`, `ValueAndGradOp`, `JVPOp`, and `VJPOp` now inherits traits in this new `GradientOpInterface`. The supported attributes are now `getMethod()`, `getCallee()`, `getDiffArgIndices()`, `getDiffArgIndicesAttr()`, `getFiniteDiffParam()`, and `getFiniteDiffParamAttr()`. 
+  `catalyst::gradient::GradOp`, `ValueAndGradOp`, `JVPOp`, and `VJPOp` now inherits traits in this
+  new `GradientOpInterface`. The supported attributes are now `getMethod()`, `getCallee()`,
+  `getDiffArgIndices()`, `getDiffArgIndicesAttr()`, `getFiniteDiffParam()`, and
+  `getFiniteDiffParamAttr()`.
 
-  - There are operations that could potentially be used as `GradOp`, `ValueAndGradOp`, `JVPOp` or `VJPOp`. When trying to get the gradient method, instead of doing 
-  ```C++
-        auto gradOp = dyn_cast<GradOp>(op);
-        auto jvpOp = dyn_cast<JVPOp>(op);
-        auto vjpOp = dyn_cast<VJPOp>(op);
+  - There are operations that could potentially be used as `GradOp`, `ValueAndGradOp`, `JVPOp` or
+    `VJPOp`. When trying to get the gradient method, instead of doing
+    ```C++
+          auto gradOp = dyn_cast<GradOp>(op);
+          auto jvpOp = dyn_cast<JVPOp>(op);
+          auto vjpOp = dyn_cast<VJPOp>(op);
 
-        llvm::StringRef MethodName;
-        if (gradOp)
-            MethodName = gradOp.getMethod();
-        else if (jvpOp)
-            MethodName = jvpOp.getMethod();
-        else if (vjpOp)
-            MethodName = vjpOp.getMethod();
-  ```
-  to identify which op it actually is and protect against segfaults (calling `nullptr.getMethod()`), in the new interface we just do 
-  ```C++
-        auto gradOpInterface = cast<GradientOpInterface>(op);
-        llvm::StringRef MethodName = gradOpInterface.getMethod();
-  ```
+          llvm::StringRef MethodName;
+          if (gradOp)
+              MethodName = gradOp.getMethod();
+          else if (jvpOp)
+              MethodName = jvpOp.getMethod();
+          else if (vjpOp)
+              MethodName = vjpOp.getMethod();
+    ```
+    to identify which op it actually is and protect against segfaults (calling
+    `nullptr.getMethod()`), in the new interface we just do
+    ```C++
+          auto gradOpInterface = cast<GradientOpInterface>(op);
+          llvm::StringRef MethodName = gradOpInterface.getMethod();
+    ```
 
-  - Another advantage is that any concrete gradient operation object can behave like a `GradientOpInterface` :
-  ```C++
-  GradOp op; // or ValueAndGradOp op, ...
-  auto foo = [](GradientOpInterface op){
-    llvm::errs() << op.getCallee();
-  };
-  foo(op);  // this works!
-  ```
+  - Another advantage is that any concrete gradient operation object can behave like a
+    `GradientOpInterface`:
+    ```C++
+    GradOp op; // or ValueAndGradOp op, ...
+    auto foo = [](GradientOpInterface op){
+      llvm::errs() << op.getCallee();
+    };
+    foo(op);  // this works!
+    ```
 
-  - Finally, concrete op specific methods can still be called by "reinterpret"-casting the interface back to a concrete op (provided the concrete op type is correct):
-  ```C++
-  auto foo = [](GradientOpInterface op){
-    size_t numGradients = cast<ValueAndGradOp>(&op)->getGradients().size();
-  };
-  ValueAndGradOp op;
-  foo(op);  // this works!  
-  ```
+  - Finally, concrete op specific methods can still be called by "reinterpret"-casting the interface
+    back to a concrete op (provided the concrete op type is correct):
+    ```C++
+    auto foo = [](GradientOpInterface op){
+      size_t numGradients = cast<ValueAndGradOp>(&op)->getGradients().size();
+    };
+    ValueAndGradOp op;
+    foo(op);  // this works!
+    ```
 
 <h3>Contributors</h3>
 

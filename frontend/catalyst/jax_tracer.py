@@ -28,7 +28,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -62,6 +62,7 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
+    CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
     cond_p,
@@ -551,6 +552,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     # single python function multiple times with different options.
     mlir_fn_cache.clear()
     MemrefCallable.clearcache()
+    CALLBACK_OP_CACHE.clear()
 
     with transient_jax_config():
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
@@ -595,7 +597,7 @@ def trace_quantum_operations(
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
-        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+        if type(op) in (Controlled, ControlledOp):
             return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
         elif isinstance(op, Adjoint):
             return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
