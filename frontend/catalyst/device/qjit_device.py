@@ -85,7 +85,6 @@ RUNTIME_OPERATIONS = [
     "PhaseShift",
     "PSWAP",
     "QubitUnitary",
-    "ControlledQubitUnitary",
     "Rot",
     "RX",
     "RY",
