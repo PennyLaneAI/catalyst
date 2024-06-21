@@ -100,7 +100,9 @@ class TestErorrs:
         jaxpr = jax.make_jaxpr(f)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError, match="catalyst does not yet support dynamic shots"):
+        with pytest.raises(
+            NotImplementedError, match="catalyst does not yet support dynamic shots"
+        ):
             from_plxpr(jaxpr)()
 
     def test_operator_without_n_wires(self):
@@ -455,15 +457,15 @@ class TestHybridPrograms:
 
     def test_multiple_qnodes(self):
 
-        @qml.qnode(qml.device('lightning.qubit', wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x):
             qml.RX(x, wires=0)
             return qml.expval(qml.Y(0))
 
-        @qml.qnode(qml.device('lightning.qubit', wires=2))
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def g(y):
             qml.Hadamard(0)
-            qml.IsingXX(y, wires=(0,1))
+            qml.IsingXX(y, wires=(0, 1))
             return qml.expval(qml.PauliZ(1))
 
         def workflow(x, y):
