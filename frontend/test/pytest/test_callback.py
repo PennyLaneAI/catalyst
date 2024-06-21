@@ -847,6 +847,7 @@ def test_array_input(arg):
 
     assert np.allclose(cost(arg), cost_jax(arg))
 
+
 def test_array_in_scalar_out():
 
     @pure_callback
@@ -874,7 +875,7 @@ def test_array_in_scalar_out():
         y = jnp.array([jnp.cos(x[0]), x[1]])
         return jnp.sin(jnp.sin(y[0]) * y[1])
 
-    x = jnp.array([1., 0.5])
+    x = jnp.array([1.0, 0.5])
     assert np.allclose(result(x), expected(x))
 
     # Array([-0.34893507,  0.49747506], dtype=float64)
@@ -915,8 +916,10 @@ def test_scalar_in_array_out():
 def test_scalar_in_tuple_scalar_array_out():
 
     @pure_callback
-    def some_func(x) -> (jax.ShapeDtypeStruct(tuple(), jnp.float64), jax.ShapeDtypeStruct((2,), jnp.float64)):
-        y = x ** 2, np.array([np.sin(x), np.cos(x)])
+    def some_func(
+        x,
+    ) -> (jax.ShapeDtypeStruct(tuple(), jnp.float64), jax.ShapeDtypeStruct((2,), jnp.float64)):
+        y = x**2, np.array([np.sin(x), np.cos(x)])
         return y
 
     @some_func.fwd
@@ -940,7 +943,7 @@ def test_scalar_in_tuple_scalar_array_out():
     @jax.grad
     def expected(x):
         x = jnp.sin(x)
-        return jnp.sin(x) + jnp.cos(x) + x ** 2
+        return jnp.sin(x) + jnp.cos(x) + x**2
 
     x = 0.435
     assert np.allclose(result(x), expected(x))
@@ -951,11 +954,13 @@ def test_scalar_in_tuple_scalar_array_out():
 def test_array_in_tuple_array_out():
 
     def _some_func(x):
-        return np.sin(x), x ** 2
+        return np.sin(x), x**2
 
     @pure_callback
-    def some_func(x) -> (jax.ShapeDtypeStruct((2,), jnp.float64), jax.ShapeDtypeStruct((2,), jnp.float64)):
-        return np.sin(x), x ** 2
+    def some_func(
+        x,
+    ) -> (jax.ShapeDtypeStruct((2,), jnp.float64), jax.ShapeDtypeStruct((2,), jnp.float64)):
+        return np.sin(x), x**2
 
     @some_func.fwd
     def some_func_fwd(x):
@@ -977,9 +982,9 @@ def test_array_in_tuple_array_out():
     @jax.grad
     def expected(x):
         x = jnp.sin(x)
-        return jnp.dot(jnp.sin(x), x ** 2)
+        return jnp.dot(jnp.sin(x), x**2)
 
-    x = jnp.array([1., 0.5])
+    x = jnp.array([1.0, 0.5])
     assert np.allclose(result(x), expected(x))
 
     # Array([0.9329284 , 0.56711537], dtype=float64)
@@ -988,8 +993,10 @@ def test_array_in_tuple_array_out():
 def test_tuple_array_in_tuple_array_out():
 
     @pure_callback
-    def some_func(x, y) -> (jax.ShapeDtypeStruct((2,), jnp.float64), jax.ShapeDtypeStruct((2,), jnp.float64)):
-        return np.sin(x) @ y, y ** 2
+    def some_func(
+        x, y
+    ) -> (jax.ShapeDtypeStruct((2,), jnp.float64), jax.ShapeDtypeStruct((2,), jnp.float64)):
+        return np.sin(x) @ y, y**2
 
     @some_func.fwd
     def some_func_fwd(x, y):
@@ -1003,16 +1010,16 @@ def test_tuple_array_in_tuple_array_out():
         return (vjp0, vjp1)
 
     @qml.qjit
-    @partial(grad, argnum=[0, 1]) # We just use argnum instead of argnums?
+    @partial(grad, argnum=[0, 1])  # We just use argnum instead of argnums?
     def result(x, y):
-        return jnp.dot(*some_func(x, y ** 2))
+        return jnp.dot(*some_func(x, y**2))
 
     @jax.jit
     @partial(jax.grad, argnums=[0, 1])
     def expected(x, y):
-        return jnp.dot(jnp.sin(x) @ y ** 2, (y ** 2) ** 2)
+        return jnp.dot(jnp.sin(x) @ y**2, (y**2) ** 2)
 
-    x = jnp.array([[1., 0.5], [0.12, -1.2]])
+    x = jnp.array([[1.0, 0.5], [0.12, -1.2]])
     y = jnp.array([-0.6, 0.2])
     flat_results_obs, _ = jax._src.tree_util.tree_flatten(result(x, y))
     flat_results_exp, _ = jax._src.tree_util.tree_flatten(expected(x, y))
@@ -1026,7 +1033,10 @@ def test_tuple_array_in_tuple_array_out():
 
 def test_pytree_in_pytree_out():
 
-    shape = {"one": jax.ShapeDtypeStruct((2,), jnp.float64), "two": jax.ShapeDtypeStruct((2,), jnp.float64)}
+    shape = {
+        "one": jax.ShapeDtypeStruct((2,), jnp.float64),
+        "two": jax.ShapeDtypeStruct((2,), jnp.float64),
+    }
 
     @pure_callback
     def some_func(weights) -> shape:
@@ -1054,12 +1064,9 @@ def test_pytree_in_pytree_out():
     def expected(weights):
         x = weights["x"]
         y = weights["y"]
-        return jnp.dot(jnp.sin(x) @ y ** 2, y ** 4)
+        return jnp.dot(jnp.sin(x) @ y**2, y**4)
 
-    weights = {
-        "x": jnp.array([[1., 0.5], [0.12, -1.2]]),
-        "y": jnp.array([-0.6, 0.2])
-    }
+    weights = {"x": jnp.array([[1.0, 0.5], [0.12, -1.2]]), "y": jnp.array([-0.6, 0.2])}
     flat_results_obs, _ = jax._src.tree_util.tree_flatten(result(weights))
     flat_results_exp, _ = jax._src.tree_util.tree_flatten(expected(weights))
     for obs, exp in zip(flat_results_obs, flat_results_exp):
@@ -1074,8 +1081,14 @@ def test_callback_backwards_function():
     """Test a workflow where the bwd function is also using
     a callback to compute the VJP"""
 
-    shape = {"one": jax.ShapeDtypeStruct((2,), jnp.float64), "two": jax.ShapeDtypeStruct((2,), jnp.float64)}
-    vjp_shape = {"x": jax.ShapeDtypeStruct((2, 2), jnp.float64), "y": jax.ShapeDtypeStruct((2,), jnp.float64)}
+    shape = {
+        "one": jax.ShapeDtypeStruct((2,), jnp.float64),
+        "two": jax.ShapeDtypeStruct((2,), jnp.float64),
+    }
+    vjp_shape = {
+        "x": jax.ShapeDtypeStruct((2, 2), jnp.float64),
+        "y": jax.ShapeDtypeStruct((2,), jnp.float64),
+    }
 
     @pure_callback
     def some_func(weights) -> shape:
@@ -1107,12 +1120,9 @@ def test_callback_backwards_function():
     def expected(weights):
         x = weights["x"]
         y = weights["y"]
-        return jnp.dot(jnp.sin(x) @ y ** 2, y ** 4)
+        return jnp.dot(jnp.sin(x) @ y**2, y**4)
 
-    weights = {
-        "x": jnp.array([[1., 0.5], [0.12, -1.2]]),
-        "y": jnp.array([-0.6, 0.2])
-    }
+    weights = {"x": jnp.array([[1.0, 0.5], [0.12, -1.2]]), "y": jnp.array([-0.6, 0.2])}
     flat_results_obs, _ = jax._src.tree_util.tree_flatten(result(weights))
     flat_results_exp, _ = jax._src.tree_util.tree_flatten(expected(weights))
     for obs, exp in zip(flat_results_obs, flat_results_exp):
