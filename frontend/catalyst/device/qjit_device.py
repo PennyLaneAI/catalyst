@@ -31,6 +31,7 @@ from pennylane.measurements import MidMeasureMP
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
+from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
@@ -354,7 +355,10 @@ class QJITDevice(qml.QubitDevice):
             max_expansion: the maximum number of expansion steps if no fixed-point is reached.
         """
         # Ensure catalyst.measure is used instead of qml.measure.
-        if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
+        if any(
+            isinstance(op, MidMeasureMP) and not isinstance(op, MidCircuitMeasure)
+            for op in circuit.operations
+        ):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
