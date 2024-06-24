@@ -246,6 +246,46 @@ def test_value_and_grad_on_qjit_classical():
     assert np.allclose(result, expected)
 
 
+def test_value_and_grad_on_qjit_classical_vector():
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
+    and takes in a vector.
+    """
+
+    @qjit
+    def f(vec):
+        # Takes in a 2D vector (x,y) and computes 30x+40y
+        prod = jnp.array([30, 40]) * vec
+        return prod[0] + prod[1]
+
+    x = jnp.array([1.0, 1.0])
+    result = qjit(value_and_grad(f))(x)
+    expected = (70.0, [30.0, 40.0])
+
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1], expected[1])
+
+
+def test_value_and_grad_on_qjit_classical_dict():
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
+    and takes in a dictionary.
+    """
+
+    @qjit
+    def f(tree):
+        # Takes in two 2D vectors (x1, x2) and (y1, y2) and computes x1y1+x2y2
+        hello = tree["hello"]  # (x1, x2)
+        world = tree["world"]  # (y1, y2)
+        return (hello * world).sum()
+
+    x = {"hello": jnp.array([1.0, 2.0]), "world": jnp.array([3.0, 4.0])}
+    result = qjit(value_and_grad(f))(x)
+    expected = (11.0, {"hello": jnp.array([3.0, 4.0]), "world": jnp.array([1.0, 2.0])})
+
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1]["hello"], expected[1]["hello"])
+    assert np.allclose(result[1]["world"], expected[1]["world"])
+
+
 def test_value_and_grad_on_qjit_quantum():
     """Check that value_and_grad works when called on an qjit object that does wrap a QNode."""
 
