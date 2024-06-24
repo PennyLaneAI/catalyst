@@ -857,55 +857,62 @@ documentation.
 Disabling AutoGraph for a specific function or for calls inside a context
 -------------------------------------------------------------------------
 
-As mentioned before, Autograph support in Catalyst is still experimental, 
-reason for which certain functions could produce errors when converted. 
-We can avoid this by disabling Autograph conversion for a specific
-function via the ``disable_autograph`` function decorator: 
+The decorator :func:`~.disable_autograph` allows one to disable Autograph
+from auto-converting specific external functions when called within a qjit-compiled
+function with ``autograph=True``:
 
->>> @disable_autograph
-... def f():
-...     x = 6
-...     if x > 5:
-...         y = x ** 2
-...     else:
-...         y = x ** 3
-...     return y
-...
-... @qjit(autograph=True)
-... def g(x: float, n: int):
-...     for _ in range(n):
-...         x = x + f()
-...     return x
+.. code-block:: python
 
-It is also possible to disable Autograph for all the function calls 
-inside a determined scope by using ``disable_autograph`` as a context
-decorator. However, take into account that the bare code inside 
-the context will be converted anyways:
+    def approximate_e(n):
+      num = 1.
+      fac = 1.
+      for i in range(1, n + 1):
+          fac *= i
+          num += 1. / fac
+      return num
 
->>> def f():
-...     x = 6
-...     if x > 5:
-...         y = x ** 2
-...     else:
-...         y = x ** 3
-...     return y
-...
-... @qjit(autograph=True)
-... def g():
-...     x = 0.4
-...     with disable_autograph:
-...         x += f()
-...     return x
+    @qml.qjit(autograph=True, static_argnums=1)
+    def g(x: float, N: int):
 
+      for i in range(N):
+          x = x + catalyst.disable_autograph(approximate_e)(N) / x ** i
+
+      return x
+
+>>> g(0.1, 10)
+array(4.02997319)
+
+Note that for Autograph to be disabled, the decorated function must be
+defined **outside** the qjit-compiled function. If it is defined within
+the qjit-compiled function, it will continue to be converted with Autograph.
+
+In addition, Autograph can also be disabled for all externally defined functions
+within a qjit-compiled function via the context manager syntax:
+
+.. code-block:: python
+
+    @qml.qjit(autograph=True, static_argnums=1)
+    def g(x: float, N: int):
+
+      for i in range(N):
+          with catalyst.disable_autograph:
+            x = x + approximate_e(N) / x ** i
+
+      return x
+
+As before, note that any local code defined **within** the context
+manager, including calls to functions defined **within** the context
+manager, will continue to be converted. *Only calls made within the context manager
+to external functions will avoid conversion*.
 
 Adding modules for Autograph conversion
 ---------------------------------------
 
-Library code is not meant to be targeted by Autograph conversion, hence 
+Library code is not meant to be targeted by Autograph conversion, hence
 ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
-But sometimes it might make sense enabling specific submodules from the 
-excluded modules for which conversion may be appropriate. For these cases 
-one can use the ``autograph_include`` parameter, which provides a list 
+But sometimes it might make sense enabling specific submodules from the
+excluded modules for which conversion may be appropriate. For these cases
+one can use the ``autograph_include`` parameter, which provides a list
 of modules/submodules that will always be enabled for conversion no matter
 if the default conversion rules were excluding them before.
 
@@ -917,7 +924,7 @@ This example shows how you can enable a previously excluded submodule:
 ... def g(x: int):
 ...     return excluded_module.submodule.f(x)
 
-Notice that ``autograph=True`` must be set in order to process the 
+Notice that ``autograph=True`` must be set in order to process the
 ``autograph_include`` list. Otherwise an error will be reported.
 
 
@@ -936,9 +943,9 @@ To update array values when using JAX, the `JAX syntax for array assignment
 ...     for i in range(first_dim):
 ...         result = result.at[i].set(x[i]* 2)
 ...
-...     return result 
-    
-However, if updating a single index of the array, Autograph supports conversion of 
+...     return result
+
+However, if updating a single index of the array, Autograph supports conversion of
 standard Python array assignment syntax:
 
 >>> @qjit(autograph=True)

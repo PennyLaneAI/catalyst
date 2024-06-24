@@ -155,69 +155,75 @@
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
 
-* Support for disabling Autograph for a specific function or
-  only for the function calls inside a specific context,
-  without affecting the bare code inside such context.
+* Support has been added for disabling Autograph for specific functions.
   [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
   [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
 
-  Using `disable_autograph` as a decorator is now possible:
+  The decorator `catalyst.disable_autograph` allows one to disable Autograph
+  from auto-converting specific external functions when called within a qjit-compiled
+  function with `autograph=True`:
 
-  ```py
-  @disable_autograph
-  def f():
-    x = 6
-    if x > 5:
-      y = x ** 2
-    else:
-      y = x ** 3
-    return y
+  ```python
+  def approximate_e(n):
+      num = 1.
+      fac = 1.
+      for i in range(1, n + 1):
+          fac *= i
+          num += 1. / fac
+      return num
+  
+  @qml.qjit(autograph=True, static_argnums=1)
+  def g(x: float, N: int):
+  
+      for i in range(N):
+          x = x + catalyst.disable_autograph(approximate_e)(N) / x ** i
+  
+      return x
+  ````
 
-  @qjit(autograph=True)
-  def g(x: float, n: int):
-    for _ in range(n):
-      x = x + f()
-    return x
-
+  ```pycon
+  >>> g(0.1, 10)
+  array(4.02997319)
   ```
 
-  Applying `disable_autograph` to a context is now possible:
+  Note that for Autograph to be disabled, the decorated function must be
+  defined **outside** the qjit-compiled function. If it is defined within
+  the qjit-compiled function, it will continue to be converted with Autograph.
+
+  In addition, Autograph can also be disabled for all externally defined functions
+  within a qjit-compiled function via the context manager syntax:
 
   ```py
-  def f():
-    x = 6
-    if x > 5:
-      y = x ** 2
-    else:
-      y = x ** 3
-    return y
-
-  @qjit(autograph=True)
-  def g():
-    x = 0.4
-    with disable_autograph:
-      x += f()
-    return x
-
+  @qml.qjit(autograph=True, static_argnums=1)
+  def g(x: float, N: int):
+  
+      for i in range(N):
+          with catalyst.disable_autograph:
+            x = x + approximate_e(N) / x ** i
+  
+      return x
   ```
 
-* Support for usage of single index JAX array assignments
-  inside Autograph annotated functions.
+* Autograph now supports single index JAX array assignments
   [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
 
-  Using `x[i] = y` in favor of `x = x.at(i).set(y)` is now possible:
+  When using Autograph, syntax of the form `x[i] = y` where `i` is a single integer
+  will now be automatically converted to the JAX equivalent of `x = x.at(i).set(y)`:
 
-  ```py
-  @qjit(autograph=True)
-  def f(x):
-    first_dim = x.shape[0]
-    result = jnp.empty((first_dim,), dtype=x.dtype)
+  ```python
+  @qml.qjit(autograph=True)
+  def f(array):
+      result = jnp.ones(array.shape, dtype=array.dtype)
 
-    for i in range(first_dim):
-      result[i] = x[i] * 2
+      for i, x in enumerate(array):
+          result[i] = result[i] + x * 3
 
-    return result
+      return result
+  ```
 
+  ```pycon
+  >>> f(jnp.array([-0.1, 0.12, 0.43, 0.54]))
+  array([0.7 , 1.36, 2.29, 2.62])
   ```
 
 * Support for including a list of (sub)modules to be allow-listed for autograph conversion.
