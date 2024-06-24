@@ -585,17 +585,25 @@ a qjit-compiled function, as long as the return shape and type is known:
 array([[0.39385058, 0.99369752],
        [0.97097762, 0.74283208]])
 
-Catalyst provides two callback functions:
+Catalyst provides several callback functions:
 
 - :func:`~.pure_callback` supports callbacks of **pure** functions. That is, functions with no
   side-effects that accept parameters and return values. However, the return type and shape of the
   function must be known in advance, and is provided as a type signature.
 
+- :func:`~.accelerate` is similar to :func:`~.pure_callback` above, but is designed to
+  work only with functions that are ``jax.jit`` compatible. As a result of this restriction,
+  return types do not have to be provided upfront, and support is provided for executing
+  these callbacks directly on classical accelerators such as GPUs and TPUs.
+
 - :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
   an easy entry point for debugging, for example via printing or logging at runtime.
 
-Note that callbacks do not currently support differentiation, and cannot be used inside
-functions that :func:`~.grad` is applied to.
+Note that to use :func:`~.pure_callback` within functions that are being differentiated,
+a custom VJP rule **must** be defined so that the Catalyst compiler knows how to
+differentiate the callback. This can be done via the ``pure_callback.fwd`` and
+``pure_callback.bwd`` methods. See the :func:`~.pure_callback` documentation for
+more details.
 
 JAX integration
 ---------------

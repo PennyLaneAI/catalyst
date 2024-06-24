@@ -1,6 +1,148 @@
-# Release 0.7.0-dev
+# Release 0.7.0
 
 <h3>New features</h3>
+
+* Add support for accelerating classical processing via JAX with `catalyst.accelerate`.
+  [(#805)](https://github.com/PennyLaneAI/catalyst/pull/805)
+
+  Classical code that can be just-in-time compiled with JAX can now be seamlessly just
+  in time compiled with `catalyst.accelerate` and included within QJIT-compiled functions.
+  `catalyst.accelerate` can be used as a
+  decorator without specifying a device:
+
+  ```python
+  @accelerate(dev=jax.devices("gpu")[0])
+  def classical_fn(x):
+      return jnp.sin(x) ** 2
+
+  @qjit
+  def hybrid_fn(x):
+      y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
+      return jnp.cos(y)
+  ```
+
+  Available devices can be retrieved via
+  `jax.devices()`. If not provided, the default value of
+  `jax.devices()[0]` as determined by JAX will be used.
+
+* Catalyst callback functions, such as `pure_callback`, `debug.callback`, and `debug.print`, now
+  all support autodifferentiation.
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
+  [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
+  [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
+  [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
+
+  - When using callbacks that do not return any values, such as `catalyst.debug.callback` and
+    `catalyst.debug.print`, these functions are marked as 'inactive' and do not contribute to or
+    affect the gradient of the function:
+
+    ```python
+    import logging
+  
+    log = logging.getLogger(__name__)
+    log.setLevel(logging.INFO)
+  
+    @qml.qjit
+    @catalyst.grad
+    def f(x):
+        y = jnp.cos(x)
+        catalyst.debug.print("Debug print: y = {0:.4f}", y)
+        catalyst.debug.callback(lambda _: log.info("Value of y = %s", _))(y)
+        return y ** 2
+    ```
+  
+    ```pycon
+    >>> f(0.54)
+    INFO:__main__:Value of y = 0.8577086813638242
+    Debug print: y = 0.8577
+    array(-0.88195781)
+    ```
+
+  - Callbacks that *do* return values and may affect the qjit-compiled functions
+    computation, such as `pure_callback`, must have custom gradients manually
+    registered with the Catalyst compiler in order to support differentiation.
+
+    This can be done via the `pure_callback.fwd` and `pure_callback.bwd` methods, to specify how the
+    forwards and backwards pass (the vector-Jacobian product) of the callback should be computed:
+
+    ```python
+    @catalyst.pure_callback
+    def callback_fn(x) -> float:
+        return np.sin(x[0]) * x[1]
+
+    @callback_fn.fwd
+    def callback_fn_fwd(x):
+        # returns the evaluated function as well as residual
+        # values that may be useful for the backwards pass
+        return callback_fn(x), x
+
+    @callback_fn.bwd
+    def callback_fn_vjp(res, dy):
+        # Accepts residuals from the forward pass, as well
+        # as (one or more) cotangent vectors dy, and returns
+        # a tuple of VJPs corresponding to each input parameter.
+
+        def vjp(x, dy) -> (jax.ShapeDtypeStruct((2,), jnp.float64),):
+            return (np.array([np.cos(x[0]) * dy * x[1], np.sin(x[0]) * dy]),)
+
+        # The VJP function can also be a pure callback
+        return catalyst.pure_callback(vjp)(res, dy)
+
+    @qml.qjit
+    @catalyst.grad
+    def f(x):
+        y = jnp.array([jnp.cos(x[0]), x[1]])
+        return jnp.sin(callback_fn(y))
+    ```
+
+    ```pycon
+    >>> x = jnp.array([0.1, 0.2])
+    >>> f(x)
+    array([-0.01071923,  0.82698717])
+    ```
+
+    Note that `@callback_fn.bwd` is compatible with the return type of `jax.vjp`,
+    allowing for functions with `jax.vjp`-computable vector-Jacobian products
+    to be easily supported:
+
+    ```python
+    @catalyst.pure_callback
+    def expm(x) -> jax.ShapeDtypeStruct((2, 2), jnp.float64):
+        return jax.scipy.linalg.expm(x)
+
+    @expm.fwd
+    def expm_fwd(x):
+        return jax.scipy.linalg.expm(x), x
+
+    @expm.bwd
+    def expm_bwd(res, dy):
+
+        @catalyst.accelerate
+        def vjp(x, dy):
+            _, vjp_func = jax.vjp(jax.scipy.linalg.expm, x)
+            return vjp_func(dy)
+
+        return vjp(res, dy)
+
+    @qml.qjit
+    @catalyst.jacobian
+    def f(x):
+        return expm(x)
+    ```
+
+    ```pycon
+    >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+    >>> f(x)
+    array([[[[1.12914705, 0.18555319],
+         [0.12370212, 0.0129465 ]],
+        [[0.12370212, 1.31470024],
+         [0.008631  , 0.13664862]]],
+       [[[0.18555319, 0.01941975],
+         [1.31470024, 0.20497293]],
+        [[0.0129465 , 0.20497293],
+         [0.13664862, 1.51967317]]]])
+    ```
+
 
 * `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
   [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
@@ -111,29 +253,6 @@
   >>> (3.0, 1.0)
   ```
 
-* Add support for accelerating classical processing via JAX with `catalyst.accelerate`.
-  [(#805)](https://github.com/PennyLaneAI/catalyst/pull/805)
-
-  Classical code that can be just-in-time compiled with JAX can now be seamlessly just
-  in time compiled with `catalyst.accelerate` and included within QJIT-compiled functions.
-  `catalyst.accelerate` can be used as a
-  decorator without specifying a device:
-
-  ```python
-  @accelerate(dev=jax.devices("gpu")[0])
-  def classical_fn(x):
-      return jnp.sin(x) ** 2
-
-  @qjit
-  def hybrid_fn(x):
-      y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
-      return jnp.cos(y)
-  ```
-
-  Available devices can be retrieved via
-  `jax.devices()`. If not provided, the default value of
-  `jax.devices()[0]` as determined by JAX will be used.
-
 * Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
   shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
   ``` python
@@ -156,65 +275,6 @@
   outer scopes of a Python program. These limitations are yet to be addressed.
   [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
   [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
-
-* Differentiation support for callbacks.
-  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
-  [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
-  [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
-  [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
-
-  Parameters to `debug.callback`s are marked as inactive. This means that the
-  This means that the partial derivative of `debug.callback`s does not need to
-  be computed.
-
-  There are no changes to the syntax of inactive callbacks, including
-  `debug.print`. See the following example:
-
-  ```python
-  @qml.qjit
-  @grad
-  def identity(x: float):
-    debug.print(x)
-    return x
-  ```
-
-  Parameters to `pure_callback`s are active variables. This means the
-  partial derivative of `pure_callback`s needs to be computed.
-  Since callbacks are opaque to the compiler, the user needs to register
-  custom gradients with Enzyme.
-
-  In order to differentiate `pure_callback`s please use the following syntax:
-
-  ```python
-  @pure_callback
-  def identity(x) -> float:
-    return x
-
-  @identity.fwd
-  def fwd(x):
-    return identity(x), 1.0
-
-  @identity.bwd
-  def bwd(res, cot):
-    return cot * res
-
-  @qml.qjit
-  @grad
-  def wrapper(x):
-    return scale * identity(x)
-  ```
-
-  The forward pass must always return a tuple where the first element of the tuple
-  is the result of the function being differentiated and the second element of the tuple
-  are the residuals that may be used in the reverse pass. There may be multiple residuals
-  and also no residuals. In the case of no residuals, please return `None` like so:
-
-  ```python
-  @identity.fwd
-  def fwd(x):
-     # Still needs to return a tuple.
-     return identity(x), None
-  ```
 
 * Support controlled operations without matrices via applying PennyLane's decomposition.
   [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
