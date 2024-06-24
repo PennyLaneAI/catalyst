@@ -25,6 +25,7 @@ from pennylane.capture import AbstractMeasurement, AbstractOperator, qnode_prim
 from .device import extract_backend_info, get_device_capabilities
 from .jax_primitives import (
     AbstractQreg,
+    AbstractQbit,
     compbasis_p,
     expval_p,
     func_p,
@@ -240,7 +241,8 @@ class _InterpreterState:
         """Extract the value corresponding to a variable."""
         return var.val if type(var) is jax.core.Literal else self.env[var]
 
-    def get_wire(self, wire_value):
+    def get_wire(self, wire_value) -> AbstractQbit:
+        """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
         return qextract_p.bind(self.qreg, wire_value)
@@ -317,9 +319,10 @@ def _measurement_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState, device):
 
     if "_wires" in eqn.primitive.name:
         obs = _compbasis_obs(eqn, state, device)
-    elif "_obs" in eqn.primitive.name:
+    else:
         obs = _obs(eqn, state)
     # mcm based measurements wont be in measurement map yet
+    # so we can assume observable based
 
     shaped_array = _get_shapes_for(
         eqn.outvars[0].aval, shots=device.shots, num_device_wires=len(device.wires)
