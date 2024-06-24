@@ -905,6 +905,27 @@ manager, including calls to functions defined **within** the context
 manager, will continue to be converted. *Only calls made within the context manager
 to external functions will avoid conversion*.
 
+For example, the function ``approximate_e`` **will** be converted with Autograph
+if defined within function ``g``:
+
+.. code-block:: python
+
+    @qml.qjit(autograph=True, static_argnums=1)
+    def g(x: float, N: int):
+
+        def approximate_e(n):
+          num = 1.
+          fac = 1.
+          for i in range(1, n + 1):
+              fac *= i
+              num += 1. / fac
+          return num
+
+      for i in range(N):
+          x = x + catalyst.disable_autograph(approximate_e)(N) / x ** i
+
+      return x
+
 Adding modules for Autograph conversion
 ---------------------------------------
 
