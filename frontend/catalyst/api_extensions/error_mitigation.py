@@ -20,7 +20,7 @@ reliability of noisy quantum computers without relying on error correction.
 
 import copy
 import functools
-from typing import Callable, Optional, Sequence
+from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -30,13 +30,8 @@ from jax._src.tree_util import tree_flatten
 from catalyst.jax_primitives import zne_p
 
 
-def polynomial_extrapolation(degree):
-    """utility to generate polynomial fitting functions of arbitrary degree"""
-    return functools.partial(qml.transforms.poly_extrapolate, order=degree)
-
-
 ## API ##
-def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None):
+def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -51,8 +46,9 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None):
     Args:
         fn (qml.QNode): the circuit to be mitigated.
         scale_factors (array[int]): the range of noise scale factors used.
-        extrapolate (Callable): A function taking two sequences as arguments (scale factors, and
-            results), and returning a float by performing a fitting procedure.
+        extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
+            factors, and results), and returning a float by performing a fitting procedure.
+            By default, perfect polynomial fitting will be used.
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
@@ -96,6 +92,8 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None):
 
     if extrapolate is None:
         extrapolate = polynomial_extrapolation(len(scale_factors) - 1)
+    elif extrapolate_kwargs is not None:
+        extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
     return ZNE(fn, scale_factors, extrapolate)
 
@@ -145,3 +143,8 @@ class ZNE:
             return results
         # Multiple measurements
         return tuple(res for res in results)
+
+
+def polynomial_extrapolation(degree):
+    """utility to generate polynomial fitting functions of arbitrary degree"""
+    return functools.partial(qml.transforms.poly_extrapolate, order=degree)

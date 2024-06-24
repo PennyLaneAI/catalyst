@@ -250,5 +250,30 @@ def test_zne_with_jax_polyfit():
     assert np.allclose(mitigated_qnode(), circuit())
 
 
+def test_zne_with_extrap_kwargs():
+    """test mitigate_with_zne with keyword arguments for extrapolation function"""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.Hadamard(wires=0)
+        qml.RZ(0.1, wires=0)
+        qml.RZ(0.2, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @catalyst.qjit
+    def mitigated_qnode():
+        return catalyst.mitigate_with_zne(
+            circuit,
+            scale_factors=jax.numpy.array([1, 2, 3]),
+            extrapolate=qml.transforms.poly_extrapolate,
+            extrapolate_kwargs={"order": 2},
+        )()
+
+    assert np.allclose(mitigated_qnode(), circuit())
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
