@@ -165,7 +165,6 @@ jobs:
       fail-fast: false
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39",   alternative: "39"},
-                         {official: "3.10", subversion: "14", package: "python3.10", alternative: "310"},
                          {official: "3.11", subversion: "9",  package: "python3.11", alternative: "311"},
                          {official: "3.12", subversion: "3",  package: "python3.12", alternative: "312"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
@@ -259,7 +258,6 @@ jobs:
       fail-fast: false
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39"},
-                         {official: "3.10", subversion: "14", package: "python3.10"},
                          {official: "3.11", subversion: "9",  package: "python3.11"},
                          {official: "3.12", subversion: "3",  package: "python3.12"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
