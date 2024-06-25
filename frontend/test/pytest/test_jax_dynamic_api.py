@@ -24,6 +24,13 @@ from numpy import array_equal
 from numpy.testing import assert_allclose
 
 from catalyst import cond, for_loop, qjit, while_loop
+from catalyst.jax_extras import DShapedArray, ShapedArray
+from catalyst.jax_extras.tracing import trace_to_jaxpr
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
+)
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -1104,6 +1111,36 @@ def test_qjit_cond_capture():
 
     assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
     assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
+
+
+def test_trace_to_jaxpr():
+    """Checks our Jax workaround. The idiomatic Jax would call trace_to_jaxpr `jaxpr, tracers,
+    consts = trace.frame.to_jaxpr2([r])` in place of  our `trace_to_jaxpr` which fails with
+    `KeyError`
+    """
+    # pylint: disable=protected-access
+
+    @qjit
+    def circuit(sz):
+        mode, ctx = EvaluationContext.get_evaluation_mode()
+
+        def f(i, _):
+            return i < 3
+
+        with EvaluationContext.frame_tracing_context(ctx) as trace:
+            sz2 = trace.full_raise(sz)
+            i = trace.new_arg(ShapedArray(shape=[], dtype=jnp.dtype("int64")))
+            a = trace.new_arg(DShapedArray(shape=[sz2], dtype=jnp.dtype("float64")))
+            r = f(i, a)
+
+            jaxpr, _, _ = trace_to_jaxpr(trace, [i, a], [r])
+            assert len(jaxpr._invars) == 2
+            assert len(jaxpr._outvars) == 1
+
+        return sz
+
+    r = circuit(3)
+    assert r == 3
 
 
 if __name__ == "__main__":
