@@ -354,7 +354,6 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
     }
     else if (isa<ValueAndGradOp>(op)) {
         // one of the results is the value; the remaining ones are grad
-        // numGradients = cast<ValueAndGradOp>(&op)->getGradients().size();
         numGradients = op->getNumResults() - 1;
 
         // Collect value types
