@@ -12,6 +12,17 @@ on:
       lightning:
         required: true
         type: string
+  workflow_dispatch:
+    inputs:
+      catalyst:
+        required: true
+        type: string
+      pennylane:
+        required: true
+        type: string
+      lightning:
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
