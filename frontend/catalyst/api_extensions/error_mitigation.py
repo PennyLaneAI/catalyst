@@ -49,6 +49,8 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapol
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
             By default, perfect polynomial fitting will be used.
+        extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
+            function.
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
