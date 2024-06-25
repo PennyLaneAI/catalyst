@@ -993,7 +993,7 @@ class Cond(HybridOp):
                     expansion_strategy=self.expansion_strategy,
                 )
 
-                jaxpr, out_type, const = ctx.frames[region.trace].to_jaxpr2(res_expanded_tracers)
+                jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
 
                 jaxprs.append(jaxpr)
                 consts.append(const)
@@ -1051,7 +1051,7 @@ class ForLoop(HybridOp):
 
             res_classical_tracers = region.res_classical_tracers
             res_tracers = res_classical_tracers + [qreg_out]
-            _, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_tracers)
+            _, _, consts = trace_to_jaxpr(inner_trace, [], res_tracers)
             res_expanded_tracers, _ = expand_results(
                 [inner_trace.full_raise(t) for t in consts],
                 arg_expanded_tracers,
@@ -1108,8 +1108,8 @@ class WhileLoop(HybridOp):
                 arg_classical_tracers, expansion_strategy=expansion_strategy
             )
             res_classical_tracers = region.res_classical_tracers
-            _, _, consts = ctx.frames[cond_trace].to_jaxpr2(
-                (*res_classical_tracers, *arg_expanded_classical_tracers)
+            _, _, consts = trace_to_jaxpr(
+                cond_trace, arg_expanded_classical_tracers, res_classical_tracers
             )
             res_expanded_classical_tracers, _ = expand_results(
                 [cond_trace.full_raise(t) for t in consts],
@@ -1135,8 +1135,8 @@ class WhileLoop(HybridOp):
                 region.arg_classical_tracers + [qreg_in],
                 expansion_strategy=expansion_strategy,
             )[0]
-            _, _, consts = ctx.frames[body_trace].to_jaxpr2(
-                (*res_classical_tracers, qreg_out, *arg_expanded_tracers)
+            _, _, consts = trace_to_jaxpr(
+                body_trace, arg_expanded_tracers, res_classical_tracers + [qreg_out]
             )
             res_expanded_tracers, _ = expand_results(
                 [body_trace.full_raise(t) for t in consts],
