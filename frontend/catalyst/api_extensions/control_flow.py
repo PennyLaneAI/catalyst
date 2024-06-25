@@ -975,7 +975,7 @@ class Cond(HybridOp):
     binder = cond_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts, nouts = [], [], []
+        jaxprs, consts, nimplouts = [], [], []
         op = self
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
@@ -984,9 +984,10 @@ class Cond(HybridOp):
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 ).actualize()
 
+                constants = []
                 arg_expanded_classical_tracers = []
-                res_expanded_tracers, out_type = expand_results(
-                    [],
+                res_expanded_tracers, _ = expand_results(
+                    constants,
                     arg_expanded_classical_tracers,
                     region.res_classical_tracers + [qreg_out],
                     expansion_strategy=self.expansion_strategy,
@@ -996,10 +997,10 @@ class Cond(HybridOp):
 
                 jaxprs.append(jaxpr)
                 consts.append(const)
-                nouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
+                nimplouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
-        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nouts)
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nimplouts)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
         in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
