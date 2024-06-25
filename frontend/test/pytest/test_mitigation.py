@@ -239,7 +239,8 @@ def test_zne_with_jax_polyfit():
         qml.Hadamard(wires=1)
         return qml.expval(qml.PauliY(wires=0))
 
-    jax_extrap = lambda scale_factors, results: jax.numpy.polyfit(scale_factors, results, 2)[-1]
+    def jax_extrap(scale_factors, results):
+        return jax.numpy.polyfit(scale_factors, results, 2)[-1]
 
     @catalyst.qjit
     def mitigated_qnode():
