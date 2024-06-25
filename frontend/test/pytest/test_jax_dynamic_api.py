@@ -1114,9 +1114,8 @@ def test_qjit_cond_capture():
 
 
 def test_trace_to_jaxpr():
-    """Checks our Jax workaround. The idiomatic Jax would call trace_to_jaxpr `jaxpr, tracers,
-    consts = trace.frame.to_jaxpr2([r])` in place of  our `trace_to_jaxpr` which fails with
-    `KeyError`
+    """Test our Jax tracing workaround. The idiomatic Jax would do `jaxpr, tracers, consts =
+    trace.frame.to_jaxpr2([r])` which fails with `KeyError` for the below case.
     """
     # pylint: disable=protected-access
 
