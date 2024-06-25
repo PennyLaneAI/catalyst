@@ -1019,7 +1019,7 @@ class Cond(HybridOp):
                 in_expanded_tracers=in_expanded_classical_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
                 branch_jaxprs=branch_jaxprs,
-                nimplicit_outputs=nouts[0],
+                nimplicit_outputs=nimplouts[0],
             )
         )
         return qrp2
