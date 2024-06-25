@@ -578,7 +578,8 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     )
 
     # This assertion should be removed:
-    # the arguments being differentiated against can have any pytree shape, hence any number of inputs
+    # the arguments being differentiated against can have any pytree shape, 
+    # and hence can have any number of inputs
     # assert (
     #    len(flat_output_types) % 2 == 0
     # ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
