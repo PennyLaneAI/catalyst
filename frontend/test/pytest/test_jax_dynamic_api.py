@@ -1028,14 +1028,14 @@ def test_qnode_cond_capture():
 
         @case.otherwise
         def case():
-            b = jnp.ones([sz, 3], dtype=float)
+            b = jnp.zeros([sz, 3], dtype=float)
             return a + b
 
         c = case()
         return c + a
 
     assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), 3 * jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
 
 
 def test_qjit_cond_identity():
@@ -1103,7 +1103,7 @@ def test_qjit_cond_capture():
         return c + a
 
     assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), 3 * jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
 
 
 if __name__ == "__main__":
