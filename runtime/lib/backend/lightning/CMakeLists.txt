@@ -46,13 +46,7 @@ else()
 endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
-if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
-    set(PL_BACKEND "lightning_qubit;lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
-elseif(ENABLE_LIGHTNING)
-    set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
-elseif(ENABLE_LIGHTNING_KOKKOS)
-    set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
-endif()
+set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 
 FetchContent_MakeAvailable(pennylane_lightning)
@@ -64,11 +58,6 @@ if(ENABLE_LIGHTNING)
         lightning_dynamic/StateVectorLQubitDynamic.cpp
         lightning_dynamic/LightningSimulator.cpp
         )
-endif()
-if(ENABLE_LIGHTNING_KOKKOS)
-    list(APPEND src_files
-        lightning_kokkos/LightningKokkosSimulator.cpp
-    )
 endif()
 
 add_library(rtd_lightning SHARED ${src_files})

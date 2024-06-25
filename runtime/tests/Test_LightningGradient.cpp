@@ -225,57 +225,6 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     delete[] buffer_tp;
 }
 
-#ifndef __device_lightning_kokkos
-TEST_CASE("Test __catalyst__qis__Gradient_params and __catalyst__qis__Gradient "
-          "Op=RY, Obs=X [lightning.qubit]",
-          "[Gradient]")
-{
-    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-
-    std::vector<int64_t> trainParams{0};
-    size_t J = trainParams.size();
-    double *buffer = new double[J];
-    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
-    double *buffer_tp = new double[J];
-    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
-    int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
-
-    const std::string device("lightning.qubit");
-
-    for (const auto &p : param) {
-        __catalyst__rt__initialize();
-        __catalyst__rt__device_init((int8_t *)device.c_str(), nullptr, nullptr);
-
-        QUBIT *q = __catalyst__rt__qubit_allocate();
-
-        __catalyst__rt__toggle_recorder(/* activate_cm */ true);
-
-        __catalyst__qis__RY(p, q, NO_MODIFIERS);
-
-        auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliX, q);
-
-        __catalyst__qis__Expval(obs_idx_0);
-
-        __catalyst__qis__Gradient_params(&tp_memref, 1, &result_tp);
-
-        __catalyst__qis__Gradient(1, &result);
-
-        __catalyst__rt__toggle_recorder(/* activate_cm */ false);
-
-        CHECK(cos(p) == Approx(result_tp.data_aligned[0]).margin(1e-5));
-        CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
-
-        __catalyst__rt__qubit_release(q);
-        __catalyst__rt__device_release();
-        __catalyst__rt__finalize();
-    }
-
-    delete[] buffer;
-    delete[] buffer_tp;
-}
-#endif
-
 TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
           "Obs=[X]",
           "[Gradient]")

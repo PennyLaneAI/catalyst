@@ -85,17 +85,3 @@ TEST_CASE("Test __catalyst__rt__device_init registering a custom device with sho
     REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)dev1, nullptr, nullptr),
                         Catch::Contains("Invalid use of the global driver before initialization"));
 }
-
-#ifdef __device_lightning_kokkos
-TEST_CASE("Test __catalyst__rt__device_init registering device=lightning.kokkos", "[CoreQIS]")
-{
-    __catalyst__rt__initialize();
-
-    char rtd_name[18] = "lightning.kokkos";
-    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr);
-
-    __catalyst__rt__device_release();
-
-    __catalyst__rt__finalize();
-}
-#endif
