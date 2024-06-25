@@ -1096,7 +1096,7 @@ def test_qjit_cond_capture():
 
         @case.otherwise
         def case():
-            b = jnp.ones([sz, 3], dtype=float)
+            b = jnp.zeros([sz, 3], dtype=float)
             return a + b
 
         c = case()
