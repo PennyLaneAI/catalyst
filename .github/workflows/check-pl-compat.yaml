@@ -1,6 +1,7 @@
 name: Check PennyLane/Lightning Compatibility
 
 on:
+  pull_request:
   workflow_call:
     inputs:
       catalyst:
