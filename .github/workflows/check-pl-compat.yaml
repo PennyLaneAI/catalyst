@@ -191,7 +191,7 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        OMP_PROC_BIND=false OMP_NUM_THREADS=2 make pytest TEST_BACKEND="lightning.kokkos"
 
     - name: Run Frontend Tests (Braket)
       run: |
