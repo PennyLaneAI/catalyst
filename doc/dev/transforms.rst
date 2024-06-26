@@ -180,7 +180,13 @@ And in ``mlir/lib/Catalyst/Transforms/RegisterAllPasses.cpp``, register the pass
         ...
     }
 
-Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and ``make dialects``. The tool to run passes is built as ``mlir/build/bin/quantum-opt``.
+Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and 
+
+.. code-block::
+
+    make dialects
+
+The tool to run passes is built as ``mlir/build/bin/quantum-opt``.
 
 We can inspect by all the available passes by running ``quantum-opt --help``:
 
@@ -194,7 +200,7 @@ We can inspect by all the available passes by running ``quantum-opt --help``:
         ...
         --my-hello-world                   -   An empty pass boilerplate that prints out hello world.
 
-Here the displaced ``--help`` message will be the ``summary`` we wrote in the tablegen file. The command line option to run our new pass is the string in the ``def MyHelloWorldPass : Pass<"my-hello-world"> `` line we defined in the tablegen file. 
+Here the displayed ``--help`` message will be the ``summary`` we wrote in the tablegen file. The command line option to run our new pass is the template string in the def line in the tablegen file. 
 
 To run the pass, simply do 
 
