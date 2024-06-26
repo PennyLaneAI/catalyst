@@ -183,7 +183,7 @@ jobs:
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: [3.10]
+        python_version: ["3.10"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: ${{ matrix.os }}
@@ -339,7 +339,7 @@ jobs:
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: [3.10]
+        python_version: ["3.10"]
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
