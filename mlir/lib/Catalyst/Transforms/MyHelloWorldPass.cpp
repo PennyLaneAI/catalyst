@@ -14,9 +14,9 @@
 
 #define DEBUG_TYPE "myhelloworld"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/Support/Debug.h"
-#include "Catalyst/IR/CatalystDialect.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -29,10 +29,7 @@ namespace catalyst {
 struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {
     using impl::MyHelloWorldPassBase<MyHelloWorldPass>::MyHelloWorldPassBase;
 
-    void runOnOperation() override
-    {
-        llvm::errs() << "Hello world!\n";
-    }
+    void runOnOperation() override { llvm::errs() << "Hello world!\n"; }
 };
 
 std::unique_ptr<Pass> createMyHelloWorldPass() { return std::make_unique<MyHelloWorldPass>(); }
