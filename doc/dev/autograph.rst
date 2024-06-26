@@ -871,11 +871,11 @@ function with ``autograph=True``:
           num += 1. / fac
       return num
 
-    @qml.qjit(autograph=True, static_argnums=1)
+    @qml.qjit(autograph=True)
     def g(x: float, N: int):
 
       for i in range(N):
-          x = x + catalyst.disable_autograph(approximate_e)(N) / x ** i
+          x = x + catalyst.disable_autograph(approximate_e)(10) / x ** i
 
       return x
 
@@ -891,12 +891,12 @@ within a qjit-compiled function via the context manager syntax:
 
 .. code-block:: python
 
-    @qml.qjit(autograph=True, static_argnums=1)
+    @qml.qjit(autograph=True)
     def g(x: float, N: int):
 
       for i in range(N):
           with catalyst.disable_autograph:
-            x = x + approximate_e(N) / x ** i
+            x = x + approximate_e(10) / x ** i
 
       return x
 
