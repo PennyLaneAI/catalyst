@@ -1595,11 +1595,14 @@ def _cond_lowering(
 # while loop
 #
 @while_p.def_abstract_eval
-def _while_loop_abstract_eval(*in_type, body_jaxpr, nimplicit, preserve_dimensions, **kwargs):
+def _while_loop_abstract_eval(
+    *in_type, body_jaxpr, nimplicit, preserve_dimensions, cond_nconsts, body_nconsts, **kwargs
+):
     _assert_jaxpr_without_constants(body_jaxpr)
+    all_nconsts = cond_nconsts + body_nconsts
     return infer_output_type_jaxpr(
-        [],
-        body_jaxpr.jaxpr.invars,
+        body_jaxpr.jaxpr.invars[:all_nconsts],
+        body_jaxpr.jaxpr.invars[all_nconsts:],
         body_jaxpr.jaxpr.outvars[nimplicit:],
         expansion_strategy=while_loop_expansion_strategy(preserve_dimensions),
     )
@@ -1643,7 +1646,10 @@ def _while_loop_lowering(
 
     # remove const types from abstract parameter types list
     loop_carry_types = loop_carry_types_plus_consts[cond_nconsts + body_nconsts :]
-    assert loop_carry_types == [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
+    assert loop_carry_types == [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out], (
+        loop_carry_types,
+        [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out],
+    )
 
     while_op_scf = WhileOp(loop_carry_types, loop_args)
 
