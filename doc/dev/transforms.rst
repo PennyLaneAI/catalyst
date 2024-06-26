@@ -100,6 +100,111 @@ classical instructions as well as side-effecting operations (e.g., print) can al
 same representation.
 
 
+Writing and running your first Catalyst pass
+============================================
+
+If this is your first time writing MLIR or LLVM passes, the boilerplate can be quite overwhelming. 
+Let's first set up the various boilerplate items required to register and run a new pass. 
+
+We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout. The full codelisting of the pass already exists in Catalyst as ``MyHelloWorldPass`` in the directories ``mlir/include/Catalyst/Transforms`` and ``mlir/lib/Catalyst/Transforms``, and we will go over it here. Note that the ``mlir/include`` (and ``mlir/lib``) directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect. 
+
+The first thing to do is to create the pass object in the tablegen ``mlir/include/Catalyst/Transforms/Passes.td``:
+
+.. code-block::
+
+    def MyHelloWorldPass : Pass<"my-hello-world"> {
+        let summary = "An empty pass boilerplate that prints out hello world.";
+
+        let constructor = "catalyst::createMyHelloWorldPass()";
+    }
+
+When the dialect is built, this tablegen def will be built to a C++ file ``Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPass``, alongside the various necessary boilerplate methods in the MLIR infrastructure. Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
+
+Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/MyHelloWorldPass.cpp`` with the following content:
+
+.. code-block:: cpp
+
+    #define DEBUG_TYPE "myhelloworld"
+
+    #include "Catalyst/IR/CatalystDialect.h"
+    #include "mlir/Pass/Pass.h"
+    #include "llvm/Support/Debug.h"
+
+    using namespace llvm;
+    using namespace mlir;
+    using namespace catalyst;
+
+    namespace catalyst {
+    #define GEN_PASS_DEF_MYHELLOWORLDPASS
+    #include "Catalyst/Transforms/Passes.h.inc"
+
+    struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {
+        using impl::MyHelloWorldPassBase<MyHelloWorldPass>::MyHelloWorldPassBase;
+
+        void runOnOperation() override { llvm::errs() << "Hello world!\n"; }
+    };
+
+    std::unique_ptr<Pass> createMyHelloWorldPass() { return std::make_unique<MyHelloWorldPass>(); }
+
+    } // namespace catalyst
+
+The function that determines what your pass actually does is the ``void runOnOperation()``. Here all the pass does is print out ``"Hello world!\n"``. 
+
+This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file (or the CMakeLists.txt of whichever directory that has your new pass file): 
+
+.. code-block::
+
+    file(GLOB SRC
+        ...
+        MyHelloWorldPass.cpp
+    )
+
+After writing the pass, we need to register it in a few places. In ``mlir/include/Catalyst/Transforms/Passes.h``, add the method 
+
+.. code-block:: cpp
+
+    namespace catalyst {
+        ...
+        std::unique_ptr<mlir::Pass> createMyHelloWorldPass();
+        ...
+    }
+
+And in ``mlir/lib/Catalyst/Transforms/RegisterAllPasses.cpp``, register the pass via 
+
+.. code-block:: cpp
+
+    void catalyst::registerAllCatalystPasses()
+    {
+        ...
+        mlir::registerPass(catalyst::createMyHelloWorldPass);
+        ...
+    }
+
+Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and ``make dialects``. The tool to run passes is built as ``mlir/build/bin/quantum-opt``.
+
+We can inspect by all the available passes by running ``quantum-opt --help``:
+
+.. code-block::
+
+    OVERVIEW: Quantum optimizer driver
+    ...
+    USAGE: quantum-opt [options] <input file>
+
+    OPTIONS:
+        ...
+        --my-hello-world                   -   An empty pass boilerplate that prints out hello world.
+
+Here the displaced ``--help`` message will be the ``summary`` we wrote in the tablegen file. The command line option to run our new pass is the string in the ``def MyHelloWorldPass : Pass<"my-hello-world"> `` line we defined in the tablegen file. 
+
+To run the pass, simply do 
+
+.. code-block::
+
+    quantum-opt -my-hello-world input.mlir
+
+And our new pass will print out ``Hello world!``. 
+
+
 Writing transformations on Catalyst's IR
 ========================================
 
