@@ -1,5 +1,4 @@
-name: Build Catalyst Wheel on macOS (x86_64)
-
+name: Build Catalyst Wheel on macOS (x86_64) (Python 3.9)
 on:
   pull_request:
     types:
@@ -184,7 +183,7 @@ jobs:
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: [3.9]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: ${{ matrix.os }}
@@ -340,7 +339,7 @@ jobs:
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: [3.9]
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
