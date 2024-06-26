@@ -403,7 +403,7 @@ jobs:
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
-        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+        python${{ matrix.python_version }} -m pip install packaging<22 oqc-qcaas-client
 
     - name: Install Catalyst
       run: |
