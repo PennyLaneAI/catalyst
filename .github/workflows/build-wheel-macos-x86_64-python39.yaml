@@ -40,7 +40,7 @@ jobs:
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-12
 
-    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    if: false
 
     steps:
     - name: Checkout Catalyst repo
@@ -177,7 +177,7 @@ jobs:
         cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-macos-wheels-x86-64:
-    needs: [constants, build-dependencies]
+    needs: [constants]
     strategy:
       fail-fast: false
       matrix:
