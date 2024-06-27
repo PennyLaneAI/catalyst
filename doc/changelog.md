@@ -378,16 +378,6 @@
 
 <h3>Improvements</h3>
 
-* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
-  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
-
-* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
-  only integer, continuous wire labels starting at 0 are allowed.
-  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
-
-* Catalyst no longer disallows quantum circuits with 0 qubits.
-  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
-
 * Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
   applied to a single Operator. This should lead to improved compatibility with PennyLane library
   code, as well when reusing quantum functions with both Catalyst and PennyLane.
@@ -405,18 +395,29 @@
   shot in a shots-based execution mode.
   [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
 
+* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
+
+* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
+  only integer, continuous wire labels starting at 0 are allowed.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
+* Catalyst no longer disallows quantum circuits with 0 qubits.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
   simulator supports this gate.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
-* Can now compile functions that have been annotated with return type
-  annotations.
+* Functions that have been annotated with return type
+  annotations will now correctly compile with `@qjit`.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
-* Refactored `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators in order to follow
+* The `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators now follow
   a unified pattern that uses a callable class implementing the decorator's logic. This
-  prevents having to excessively define functions in a nested fashion.
+  prevents having to excessively define functions in a nested fashion, and allows them
+  to be used as decorators.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
   [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
   [(#762)](https://github.com/PennyLaneAI/catalyst/pull/762)
@@ -448,7 +449,7 @@
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
   As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above
-  (e.g. Ubuntu 20.04 and above).
+  (e.g., Ubuntu 20.04 and above).
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
@@ -462,22 +463,22 @@
   register.
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
-* Correctly querying batching rules for `jax.scipy.linalg.expm`
+* `jax.scipy.linalg.expm` is now supported within qjit-compiled functions.
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
+  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
-* Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
+  This required correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
   In this bug fix, four openblas routines were newly linked and are now discoverable by
   `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`,
   `lapack_zgetrf`.
-  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
-* Correctly recording types of constant array when lowering `catalyst.grad` to mlir
+* Correctly recording types of constant array when lowering `catalyst.grad` to mlir.
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 * Callbacks can now return types which can be flattened and unflattened.
   [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
 
-* `catalyst.qjit` and `catalyst.grad` can now get `__name__` from `functools.partial`.
+* `catalyst.qjit` and `catalyst.grad` now get `__name__` from `functools.partial`.
   [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
 
 <h3>Internal changes</h3>
