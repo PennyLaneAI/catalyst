@@ -143,17 +143,72 @@
          [0.13664862, 1.51967317]]]])
     ```
 
-
-* `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
+* Catalyst now supports the 'dynamic one shot' method for simulating circuits with mid-circuit
+  measurements, which compared to other methods, may be advantageous for circuits with many
+  mid-circuit measurements executed for few shots.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
   [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
 
-* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated
-  `n_shots` times to simulate hardware-like results.
-  The loop over shots is executed with `catalyst.vmap`.
-  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+  The dynamic one shot method evaluates dynamic circuits by executing them one shot at a time via
+  `catalyst.vmap`, sampling a dynamic execution path for each shot. This method only works for a
+  QNode executing with finite shots, and it requires the device to support mid-circuit measurements
+  natively.
 
-* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
-  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
+  This new mode can be specified by using the `mcm_method` argument of the QNode:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=5, shots=20)
+
+  @qml.qjit(autograph=True)
+  @qml.qnode(dev, mcm_method="one-shot")
+  def circuit(x):
+
+      for i in range(10):
+          qml.RX(x, 0)
+          m = catalyst.measure(0)
+
+          if m:
+              qml.RY(x ** 2, 1)
+
+          x = jnp.sin(x)
+
+      return qml.expval(qml.Z(1))
+  ```
+
+  Catalyst's existing method for simulating mid-circuit measurements remains
+  available via `mcm_method="single-branch-statistics"`.
+
+  When using `mcm_method="one-shot"`, the `postslect_mode` keyword argument can also
+  be used, to specify whether postselection should continue until `shots`-number of
+  postselected measurements are made (`"fill-shots"`), or whether execution should
+  terminate once `shot` executions have occurred regardless of how many postselected
+  measurements have occurred (`"hw_like"`):
+
+  ```python
+  @qml.qjit
+  @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
+  def func(x):
+      qml.RX(x, wires=0)
+      m_0 = catalyst.measure(0, postselect=1)
+      return qml.sample(wires=0)
+  ```
+
+  ```pycon
+  >>> res = func(0.9)
+  >>> res
+  array([-2147483648, -2147483648,           1, -2147483648, -2147483648,
+         -2147483648, -2147483648,           1, -2147483648, -2147483648,
+         -2147483648, -2147483648,           1, -2147483648, -2147483648,
+         -2147483648, -2147483648, -2147483648, -2147483648, -2147483648])
+  >>> jnp.delete(res, jnp.where(res == np.iinfo(np.int32).min)[0])
+  Array([1, 1, 1], dtype=int64)
+  ```
+
+  Note that invalid shots will not be discarded, but will be replaced by `np.iinfo
+  (np.int32).min`. They will not be used for processing final results (like expectation values), but
+  they will appear in the output of QNodes that return samples directly.
+
+  For more details, see the [dynamic quantum circuit documentation](https://docs.pennylane.ai/en/latest/introduction/dynamic_quantum_circuits.html).
 
 * Support has been added for disabling Autograph for specific functions.
   [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
@@ -295,6 +350,9 @@
   ```
 
 <h3>Improvements</h3>
+
+* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
   only integer, continuous wire labels starting at 0 are allowed.
