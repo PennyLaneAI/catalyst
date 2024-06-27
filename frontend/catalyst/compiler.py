@@ -114,7 +114,7 @@ class CompileOptions:
                 return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
             return DEFAULT_PIPELINES
 
-        else: # if self.quantum_circuit_transforms:
+        else:  # if self.quantum_circuit_transforms:
             _DEFAULT_PIPELINES = DEFAULT_PIPELINES.copy()
             _DEFAULT_PIPELINES.insert(2, QUANTUM_CIRCUIT_TRANSFORMS)
             _DEFAULT_ASYNC_PIPELINES = DEFAULT_ASYNC_PIPELINES.copy()
@@ -123,8 +123,7 @@ class CompileOptions:
                 return self.pipelines
             elif self.async_qnodes:
                 return _DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-            return _DEFAULT_PIPELINES            
-
+            return _DEFAULT_PIPELINES
 
 
 @debug_logger

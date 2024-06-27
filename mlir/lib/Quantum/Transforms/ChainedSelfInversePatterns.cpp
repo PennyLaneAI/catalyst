@@ -27,7 +27,7 @@ using namespace catalyst::quantum;
 
 namespace {
 
-// We check if the operation and it's parent are a pair of self-inverse operations. 
+// We check if the operation and it's parent are a pair of self-inverse operations.
 // If so, replace op with it's "grandparent".
 // e.g.
 //    %1 = (a qubit value produced from somewhere)
@@ -36,7 +36,9 @@ namespace {
 //    %2 = (a user operation that uses %out_qubit_2)
 // The Value %out_qubits_2 can be replaced by the Value %1 (which is its grandparent) in all uses
 
-mlir::LogicalResult matchAndRewriteImpl(CustomOp op, mlir::PatternRewriter &rewriter, StringRef OpName){
+mlir::LogicalResult matchAndRewriteImpl(CustomOp op, mlir::PatternRewriter &rewriter,
+                                        StringRef OpName)
+{
     LLVM_DEBUG(dbgs() << "Simplifying the following " << OpName << " operation:\n" << op << "\n");
     if (op.getGateName().str() != OpName)
         return failure();
@@ -44,22 +46,23 @@ mlir::LogicalResult matchAndRewriteImpl(CustomOp op, mlir::PatternRewriter &rewr
     ValueRange qbs = op.getInQubits();
     auto parentOp = dyn_cast<CustomOp>(qbs[0].getDefiningOp());
 
-    if (parentOp == nullptr){
+    if (parentOp == nullptr) {
         return failure();
     }
 
-    if (parentOp.getGateName().str() != OpName){
+    if (parentOp.getGateName().str() != OpName) {
         return failure();
     }
 
-    // for multiple qubit gates, the wires need to be in order 
+    // for multiple qubit gates, the wires need to be in order
     // since the cancelled inverses need to have matching control/target wires
     // e.g. The following pair of neighbouring CNOTs should NOT be eliminated
     //    %out_qubits:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
-    //    %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits#1, %out_qubits#0 : !quantum.bit, !quantum.bit
-    if (qbs.size() > 1){
-        for (size_t i=0; i<qbs.size() ; i++){
-            if ((parentOp.getOutQubits())[i] != qbs[i]){
+    //    %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits#1, %out_qubits#0 : !quantum.bit,
+    //    !quantum.bit
+    if (qbs.size() > 1) {
+        for (size_t i = 0; i < qbs.size(); i++) {
+            if ((parentOp.getOutQubits())[i] != qbs[i]) {
                 return failure();
             }
         }
@@ -67,7 +70,7 @@ mlir::LogicalResult matchAndRewriteImpl(CustomOp op, mlir::PatternRewriter &rewr
 
     ValueRange simplifiedVal = parentOp.getInQubits();
     rewriter.replaceOp(op, simplifiedVal);
-    return success();        
+    return success();
 }
 
 struct ChainedPauliXOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
