@@ -77,6 +77,12 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
 }
 
+def QubitUnitaryFusionPass : Pass<"qubit-unitary-fusion"> {
+    let summary = "Perform merging of two chained QubitUnitary operators acting on the same wire";
+
+    let constructor = "catalyst::createQubitUnitaryFusionPass()";
+}
+
 def AnnotateFunctionPass : Pass<"annotate-function"> {
     let summary = "Annotate functions that contain a measurement operation.";
 

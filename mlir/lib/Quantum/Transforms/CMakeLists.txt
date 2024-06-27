@@ -12,6 +12,8 @@ file(GLOB SRC
     AdjointPatterns.cpp
     ChainedHadamard.cpp
     remove_chained_self_inverse.cpp
+    qubit_unitary_fusion.cpp
+    QubitUnitaryFusion.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
