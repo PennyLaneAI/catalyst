@@ -210,6 +210,96 @@
 
   For more details, see the [dynamic quantum circuit documentation](https://docs.pennylane.ai/en/latest/introduction/dynamic_quantum_circuits.html).
 
+* A new function, `catalyst.value_and_grad`, returns both the result of a function and
+  its gradient with a single forward and backwards pass.
+  [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
+
+  This can be more efficient, and reduce overall quantum executions, compared to separately
+  executing the function and then computing its gradient.
+
+  For example:
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=3)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      qml.CNOT(wires=[0, 1])
+      qml.RX(x, wires=2)
+      return qml.probs()
+
+  @qml.qjit
+  @catalyst.value_and_grad
+  def cost(x):
+      return jnp.sum(jnp.cos(circuit(x)))
+  ```
+
+  ```pycon
+  >>> cost(0.543)
+  (array(7.64695856), array(0.33413963))
+  ```
+
+* Autograph now supports single index JAX array assignments
+  [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
+
+  When using Autograph, syntax of the form `x[i] = y` where `i` is a single integer
+  will now be automatically converted to the JAX equivalent of `x = x.at(i).set(y)`:
+
+  ```python
+  @qml.qjit(autograph=True)
+  def f(array):
+      result = jnp.ones(array.shape, dtype=array.dtype)
+
+      for i, x in enumerate(array):
+          result[i] = result[i] + x * 3
+
+      return result
+  ```
+
+  ```pycon
+  >>> f(jnp.array([-0.1, 0.12, 0.43, 0.54]))
+  array([0.7 , 1.36, 2.29, 2.62])
+  ```
+
+* Catalyst now supports dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
+  shapes can now be used with `for_loop`, `while_loop`, and `cond` primitives.
+  [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
+  [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+
+  ``` python
+  @qjit
+  def f(shape):
+      a = jnp.ones([shape], dtype=float)
+
+      @for_loop(0, 10, 2)
+      def loop(i, a):
+          return a + i
+
+      return loop(a)
+  ```
+  ``` pycon
+  >>> f(3)
+  array([21., 21., 21.])
+  ```
+  
+  However, capturing dynamic-shaped arrays within control-flow from outer scopes is currently not
+  supported:
+  
+  ```pycon
+  >>> @qjit(abstracted_axes={1: 'n'})
+  ... def g(x, y):
+  ...     @catalyst.for_loop(0, 10, 1)
+  ...     def loop(_, a):
+  ...         # Attempt to capture `x` from the outer scope.
+  ...         return a * x
+  ...     return jnp.sum(loop(y))
+  >>> a = jnp.ones([1,3], dtype=float)
+  >>> b = jnp.ones([1,3], dtype=float)
+  >>> g(a, b)
+  ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
+  ```
+
 * Support has been added for disabling Autograph for specific functions.
   [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
   [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
@@ -259,29 +349,7 @@
       return x
   ```
 
-* Autograph now supports single index JAX array assignments
-  [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
-
-  When using Autograph, syntax of the form `x[i] = y` where `i` is a single integer
-  will now be automatically converted to the JAX equivalent of `x = x.at(i).set(y)`:
-
-  ```python
-  @qml.qjit(autograph=True)
-  def f(array):
-      result = jnp.ones(array.shape, dtype=array.dtype)
-
-      for i, x in enumerate(array):
-          result[i] = result[i] + x * 3
-
-      return result
-  ```
-
-  ```pycon
-  >>> f(jnp.array([-0.1, 0.12, 0.43, 0.54]))
-  array([0.7 , 1.36, 2.29, 2.62])
-  ```
-
-* Support for including a list of (sub)modules to be allow-listed for autograph conversion.
+* Support for including a list of (sub)modules to be whitelisted for autograph conversion.
   [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
 
   Although library code is not meant to be targeted by Autograph conversion,
@@ -295,49 +363,8 @@
 
   ```
 
-* Support for using `catalyst.value_and_grad` with a `qjit`-ted function.
-  [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
-
-  ```py
-  @qjit
-  def workflow(x: float):
-      @qml.qnode(qml.device("lightning.qubit", wires=3))
-      def circuit():
-          qml.CNOT(wires=[0, 1])
-          qml.RX(0, wires=[2])
-          return qml.probs()  # This is [1, 0, 0, ...]
-
-      return x * (circuit()[0])
-
-  result = qjit(value_and_grad(workflow))(3.0)
-
-  >>> (3.0, 1.0)
-  ```
-
-* Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
-  shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
-  ``` python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=4))
-  def f(sz):
-      a = jnp.ones([sz], dtype=float)
-
-      @for_loop(0, 10, 2)
-      def loop(i, a):
-          return a + i
-
-      return loop(a)
-  ```
-  ``` pycon
-  >>> f(3)
-  array([21., 21., 21.])
-  ```
-  There are some limitations regarding the usage of such arrays, notably, the ones captured from the
-  outer scopes of a Python program. These limitations are yet to be addressed.
-  [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
-  [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
-
-* Support controlled operations without matrices via applying PennyLane's decomposition.
+* Controlled operations that do not have a matrix representation defined are now supported via
+  applying PennyLane's decomposition.
   [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
 
   ``` python

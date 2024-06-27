@@ -940,13 +940,12 @@ if the default conversion rules were excluding them before.
 This example shows how you can enable a previously excluded submodule:
 
 >>> import excluded_module
-...
 ... @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
 ... def g(x: int):
 ...     return excluded_module.submodule.f(x)
 
 Notice that ``autograph=True`` must be set in order to process the
-``autograph_include`` list. Otherwise an error will be reported.
+``autograph_include`` list, otherwise an error will be reported.
 
 
 In-place JAX array assignments

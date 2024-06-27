@@ -1149,18 +1149,17 @@ array(2.1)
 For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
 
 Note that using dynamically-shaped arrays within for loops, while loops, and
-conditional statements, is not currently supported:
+conditional statements, are also supported:
 
 >>> @qjit
-... def f(size):
-...     a = jnp.ones([size], dtype=float)
-...     for i in range(10):
-...         a = a
+... def f(shape):
+...     a = jnp.ones([shape], dtype=float)
 ...     @for_loop(0, 10, 2)
-...     def loop(_, a):
-...         return a
+...     def loop(i, a):
+...         return a + i
 ...     return loop(a)
-KeyError: 137774138140016
+>>> f(5)
+array([21., 21., 21., 21., 21.])
 
 Returning multiple measurements
 -------------------------------
