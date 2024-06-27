@@ -84,6 +84,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    quantum_circuit_transforms: Optional[bool] = False
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
@@ -106,11 +107,24 @@ class CompileOptions:
 
     def get_pipelines(self) -> List[Tuple[str, List[str]]]:
         """Get effective pipelines"""
-        if self.pipelines:
-            return self.pipelines
-        elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-        return DEFAULT_PIPELINES
+        if not self.quantum_circuit_transforms:
+            if self.pipelines:
+                return self.pipelines
+            elif self.async_qnodes:
+                return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
+            return DEFAULT_PIPELINES
+
+        else: # if self.quantum_circuit_transforms:
+            _DEFAULT_PIPELINES = DEFAULT_PIPELINES.copy()
+            _DEFAULT_PIPELINES.insert(2, QUANTUM_CIRCUIT_TRANSFORMS)
+            _DEFAULT_ASYNC_PIPELINES = DEFAULT_ASYNC_PIPELINES.copy()
+            _DEFAULT_ASYNC_PIPELINES.insert(2, QUANTUM_CIRCUIT_TRANSFORMS)
+            if self.pipelines:
+                return self.pipelines
+            elif self.async_qnodes:
+                return _DEFAULT_ASYNC_PIPELINES  # pragma: nocover
+            return _DEFAULT_PIPELINES            
+
 
 
 @debug_logger
@@ -152,6 +166,13 @@ QUANTUM_COMPILATION_PASS = (
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
+    ],
+)
+
+QUANTUM_CIRCUIT_TRANSFORMS = (
+    "QuantumCircuitTransforms",
+    [
+        "remove-chained-self-inverse",
     ],
 )
 

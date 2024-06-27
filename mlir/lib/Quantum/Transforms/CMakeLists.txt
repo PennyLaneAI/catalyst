@@ -10,7 +10,7 @@ file(GLOB SRC
     adjoint_lowering.cpp
     annotate_function.cpp
     AdjointPatterns.cpp
-    ChainedHadamard.cpp
+    ChainedSelfInversePatterns.cpp
     remove_chained_self_inverse.cpp
 )
 
