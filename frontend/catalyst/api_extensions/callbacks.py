@@ -102,30 +102,27 @@ def accelerate(func=None, *, dev=None):
         kwargs.pop("func")
         return functools.partial(accelerate, **kwargs)
 
-    # If this is a partial, we need to move the tracers from here...
-    # to being closed under defer.
-    breakpoint()
-    #jitted_fn = jax.jit(func)
+    # If this is a partial, we need to make the tracers part of the input
+    is_partial = isinstance(func, jax._src.tree_util.Partial)
+    context = []
+    if is_partial:
+        context = tree_leaves(func)
+        func = tree_map(shaped_abstractify, func)
+    
+    def total(context, *args, **kwargs):
+        nonlocal func
+        if is_partial:
+            flat_func, shape = tree_flatten(func)
+            func = tree_unflatten(shape, context)
+            return func(*args, **kwargs)
+        else:
+            return func(*args, **kwargs)
+
+    jitted_fn = jax.jit(total)
 
     @functools.wraps(func)
     def defer(*args, **kwargs):
-        # Make abstract variables from input tracers.
-        # closure
-        extra_args = []
-        if isinstance(func, jax._src.tree_util.Partial):
-            extra_args = tree_leaves(func)
-        
-            func2 = tree_map(shaped_abstractify, func)
-            def total(extra_args, *args, **kwargs):
-                flat_func, shape = tree_flatten(func2)
-                func3 = tree_unflatten(shape, extra_args)
-                return func3(*args, **kwargs)
-
-        else:
-            def total(extra_args, *args, **kwargs):
-                return func(*args, **kwargs)
-
-        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (extra_args, args, kwargs))
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
             # Find the shape of the return value
             _, returnshape = jax.make_jaxpr(total, return_shape=True)(absextra, *absargs, **abskwargs)
@@ -133,7 +130,7 @@ def accelerate(func=None, *, dev=None):
             name = func.__name__
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
-        return jax_jit_callback(jax.jit(total), returnshape, device=dev)(extra_args, *args, **kwargs)
+        return jax_jit_callback(jitted_fn, returnshape, device=dev)(context, *args, **kwargs)
 
     return defer
 
