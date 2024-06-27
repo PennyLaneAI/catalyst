@@ -39,6 +39,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createAddExceptionHandlingPass);
     mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
+    mlir::registerPass(catalyst::createRemoveChainedHadamardsPass);
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
 }

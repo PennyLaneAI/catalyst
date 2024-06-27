@@ -32,6 +32,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
+#include "OpenQASM/OpenQASM.h"  // add me
 
 int main(int argc, char **argv)
 {
@@ -49,6 +50,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
+    registry.insert<catalyst::openqasm::OpenQASMDialect>();  // add me
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

@@ -17,6 +17,7 @@ set(LIBS
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest
+    MLIROpenQASM  # add me
     ${ALL_MHLO_PASSES}
 )
 

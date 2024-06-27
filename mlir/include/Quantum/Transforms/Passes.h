@@ -26,6 +26,7 @@ std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
 std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
 std::unique_ptr<mlir::Pass> createAdjointLoweringPass();
 std::unique_ptr<mlir::Pass> createRemoveChainedSelfInversePass();
+std::unique_ptr<mlir::Pass> createRemoveChainedHadamardsPass();
 std::unique_ptr<mlir::Pass> createAnnotateFunctionPass();
 
 } // namespace catalyst
