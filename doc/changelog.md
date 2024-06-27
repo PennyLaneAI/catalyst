@@ -479,7 +479,8 @@
 * Callbacks can now return types which can be flattened and unflattened.
   [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
 
-* `catalyst.qjit` and `catalyst.grad` now get `__name__` from `functools.partial`.
+* `catalyst.qjit` and `catalyst.grad` now work correctly with
+  functions that have been wrapped with `functools.partial`.
   [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
 
 <h3>Internal changes</h3>

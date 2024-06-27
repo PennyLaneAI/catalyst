@@ -886,7 +886,7 @@ Note that for Autograph to be disabled, the decorated function must be
 defined **outside** the qjit-compiled function. If it is defined within
 the qjit-compiled function, it will continue to be converted with Autograph.
 
-In addition, Autograph can also be disabled for all externally defined functions
+In addition, Autograph can also be disabled for all externally defined functions called
 within a qjit-compiled function via the context manager syntax:
 
 .. code-block:: python
