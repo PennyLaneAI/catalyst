@@ -204,8 +204,8 @@
   Array([1, 1, 1], dtype=int64)
   ```
 
-  Note that invalid shots will not be discarded, but will be replaced by `np.iinfo
-  (np.int32).min`. They will not be used for processing final results (like expectation values), but
+  Note that invalid shots will not be discarded, but will be replaced by `np.iinfo(np.int32).min`.
+  They will not be used for processing final results (like expectation values), but
   they will appear in the output of QNodes that return samples directly.
 
   For more details, see the [dynamic quantum circuit documentation](https://docs.pennylane.ai/en/latest/introduction/dynamic_quantum_circuits.html).
@@ -324,7 +324,7 @@
           x = x + catalyst.disable_autograph(approximate_e)(10) / x ** i
   
       return x
-  ````
+  ```
 
   ```pycon
   >>> g(0.1, 10)

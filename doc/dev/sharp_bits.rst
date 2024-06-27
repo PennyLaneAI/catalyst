@@ -493,7 +493,7 @@ optimization to take place within Catalyst:
             return (cost(x, data), dy)
 
         opt = optax.sgd(learning_rate=0.4)
-    
+
         def update_step(i, params, state):
             (_, gradient) = loss(params)
             (updates, state) = opt.update(gradient, state)
@@ -988,7 +988,7 @@ In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNo
         return qml.state()
 
     # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
-    g = qml.transforms.cancel_inverses(f.original_function)  
+    g = qml.transforms.cancel_inverses(f.original_function)
 
 
 >>> f
@@ -1009,7 +1009,7 @@ Note that some PennyLane functions may be able to extract the QNode automaticall
  [ 0.70710678 -0.70710678]]
 >>> qml.draw(f)()
 0: ──X──X──H─┤  State
->>> g = qjit(g)   # Compile the transformed QNode again with qjit 
+>>> g = qjit(g)   # Compile the transformed QNode again with qjit
 >>> g
 <catalyst.jit.QJIT object at ...>
 >>> qml.draw(g)()
@@ -1160,6 +1160,21 @@ conditional statements, are also supported:
 ...     return loop(a)
 >>> f(5)
 array([21., 21., 21., 21., 21.])
+
+However, capturing dynamic-shaped arrays within control-flow from outer scopes is currently not
+supported:
+
+>>> @qjit(abstracted_axes={1: 'n'})
+... def g(x, y):
+...     @catalyst.for_loop(0, 10, 1)
+...     def loop(_, a):
+...         # Attempt to capture `x` from the outer scope.
+...         return a * x
+...     return jnp.sum(loop(y))
+>>> a = jnp.ones([1,3], dtype=float)
+>>> b = jnp.ones([1,3], dtype=float)
+>>> g(a, b)
+ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
 
 Returning multiple measurements
 -------------------------------
