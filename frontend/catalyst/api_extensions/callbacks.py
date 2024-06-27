@@ -323,11 +323,6 @@ def jax_jit_callback(callback_fn, result_type, device=None):
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
 
     def closure(*args, **kwargs) -> result_type:
-        nonlocal callback_fn
-        if isinstance(callback_fn, jax._src.tree_util.Partial):
-            extra_args = kwargs["closure_args"]
-            bad_args, shape = tree_flatten(callback_fn)
-            callback_fn = tree_unflatten(shape, extra_args)
         return callback_fn(*args, **kwargs)
 
     return base_callback(closure, device=device)
