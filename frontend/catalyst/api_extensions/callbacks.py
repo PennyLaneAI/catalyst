@@ -102,20 +102,38 @@ def accelerate(func=None, *, dev=None):
         kwargs.pop("func")
         return functools.partial(accelerate, **kwargs)
 
-    jitted_fn = jax.jit(func)
+    # If this is a partial, we need to move the tracers from here...
+    # to being closed under defer.
+    breakpoint()
+    #jitted_fn = jax.jit(func)
 
     @functools.wraps(func)
     def defer(*args, **kwargs):
         # Make abstract variables from input tracers.
-        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        # closure
+        extra_args = []
+        if isinstance(func, jax._src.tree_util.Partial):
+            extra_args = tree_leaves(func)
+        
+            func2 = tree_map(shaped_abstractify, func)
+            def total(extra_args, *args, **kwargs):
+                flat_func, shape = tree_flatten(func2)
+                func3 = tree_unflatten(shape, extra_args)
+                return func3(*args, **kwargs)
+
+        else:
+            def total(extra_args, *args, **kwargs):
+                return func(*args, **kwargs)
+
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (extra_args, args, kwargs))
         try:
             # Find the shape of the return value
-            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+            _, returnshape = jax.make_jaxpr(total, return_shape=True)(absextra, *absargs, **abskwargs)
         except Exception as e:
             name = func.__name__
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
-        return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
+        return jax_jit_callback(jax.jit(total), returnshape, device=dev)(extra_args, *args, **kwargs)
 
     return defer
 
@@ -308,6 +326,11 @@ def jax_jit_callback(callback_fn, result_type, device=None):
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
 
     def closure(*args, **kwargs) -> result_type:
+        nonlocal callback_fn
+        if isinstance(callback_fn, jax._src.tree_util.Partial):
+            extra_args = kwargs["closure_args"]
+            bad_args, shape = tree_flatten(callback_fn)
+            callback_fn = tree_unflatten(shape, extra_args)
         return callback_fn(*args, **kwargs)
 
     return base_callback(closure, device=device)
