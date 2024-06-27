@@ -59,7 +59,7 @@
     ```
 
   - Callbacks that *do* return values and may affect the qjit-compiled functions
-    computation, such as `pure_callback`, must have custom gradients manually
+    computation, such as `pure_callback`, may have custom gradients manually
     registered with the Catalyst compiler in order to support differentiation.
 
     This can be done via the `pure_callback.fwd` and `pure_callback.bwd` methods, to specify how the
@@ -472,7 +472,8 @@
   `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`,
   `lapack_zgetrf`.
 
-* Correctly recording types of constant array when lowering `catalyst.grad` to mlir.
+* Fixes a bug where QNodes that contained `QubitUnitary` with a complex matrix
+  would error during gradient computation.
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 * Callbacks can now return types which can be flattened and unflattened.
