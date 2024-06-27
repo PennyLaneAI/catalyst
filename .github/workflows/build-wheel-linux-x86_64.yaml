@@ -48,7 +48,7 @@ jobs:
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     container: ${{ matrix.container_img }}
 
-    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    if: false
 
     steps:
     # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
@@ -223,7 +223,7 @@ jobs:
         cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
-    needs: [constants, build-dependencies, determine_runner]
+    needs: [constants, determine_runner]
     strategy:
       fail-fast: false
       matrix:
