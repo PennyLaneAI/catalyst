@@ -166,11 +166,10 @@ map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
 
 
 @contextmanager
-def transient_jax_config() -> Generator[None, None, None]:
+def transient_jax_config(want_vals) -> Generator[None, None, None]:
     """Context manager which updates transient JAX configuration options,
     yields, and then restores the original configuration values.
     """
-    want_vals = {"jax_dynamic_shapes": True}
     prev_vals = {}
 
     try:
