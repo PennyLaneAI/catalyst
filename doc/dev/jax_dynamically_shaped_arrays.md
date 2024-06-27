@@ -17,7 +17,7 @@ OK
 
 <!-- vim-markdown-toc GFM -->
 
-* [Tracing problem overview](#tracing-problem-overview)
+* [Overview of the tracing problem](#overview-of-the-tracing-problem)
 * [Definitions](#definitions)
   * [Jax](#jax)
   * [Tracer](#tracer)
@@ -41,8 +41,8 @@ OK
 
 <!-- vim-markdown-toc -->
 
-Tracing problem overview
-------------------------
+Overview of the tracing problem
+-------------------------------
 
 Consider the following Python program:
 
