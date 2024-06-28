@@ -32,8 +32,8 @@ OK
 * [Generic algorithm for binding nested primitives](#generic-algorithm-for-binding-nested-primitives)
 * [Input type deduction in loops](#input-type-deduction-in-loops)
   * [Reference Python program](#reference-python-program)
-  * [Example 1: dimension is implicit argument, allows dimension mutations](#example-1-dimension-is-implicit-argument-allows-dimension-mutations)
-  * [Example 2: dimension is constant, allows mixing arguments with constants](#example-2-dimension-is-constant-allows-mixing-arguments-with-constants)
+  * [Example 1: dimension is an implicit argument, dimension mutations are allowed](#example-1-dimension-is-an-implicit-argument-dimension-mutations-are-allowed)
+  * [Example 2: dimension is a constant, mixing arguments with constants is allowed](#example-2-dimension-is-a-constant-mixing-arguments-with-constants-is-allowed)
 
 <!-- vim-markdown-toc -->
 
@@ -474,7 +474,7 @@ b = jnp.ones([3], dtype=float)
 g(a, b)
 ```
 
-### Example 1: dimension is implicit argument, allows dimension mutations
+### Example 1: dimension is an implicit argument, dimension mutations are allowed
 
 Passing dimension variable as an implicit argument
 
@@ -546,7 +546,7 @@ print(g.jaxpr)
   in (j,) }
 ```
 
-### Example 2: dimension is constant, allows mixing arguments with constants
+### Example 2: dimension is a constant, mixing arguments with constants is allowed
 
 Passing dimension variable as a constant
 
