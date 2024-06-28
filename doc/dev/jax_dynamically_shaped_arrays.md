@@ -7,11 +7,12 @@ import pennylane as qml
 from jax import numpy as jnp
 from catalyst import qjit, for_loop, while_loop
 from catalyst.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy
-print("OK")
+import catalyst
+print(catalyst.__revision__)
 ```
 
 ``` result
-OK
+48948061e2d6a9d4ef1fbceb9f0503d2848958fd
 ```
 -->
 
