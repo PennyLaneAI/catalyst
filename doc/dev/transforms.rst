@@ -118,7 +118,7 @@ The first thing to do is to create the pass object in the tablegen ``mlir/includ
         let constructor = "catalyst::createMyHelloWorldPass()";
     }
 
-When the dialect is built, this tablegen def will be built to a C++ file ``Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPass``, alongside the various necessary boilerplate methods in the MLIR infrastructure. Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
+When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPassBase``, alongside the various necessary boilerplate methods in the MLIR infrastructure. Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
 
 Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/MyHelloWorldPass.cpp`` with the following content:
 
@@ -148,7 +148,9 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
 
     } // namespace catalyst
 
-The function that determines what your pass actually does is the ``void runOnOperation()``. Here all the pass does is print out ``"Hello world!\n"``. 
+We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase`` that tablegen will build in the namespace ``impl``. The function that determines what your pass actually does is the ``void runOnOperation()``. Here all the pass does is print out ``"Hello world!\n"``. 
+
+(A sidenote on printing messages in MLIR: there are two major printing options in LLVM. The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``, which only prints when a debug flag is set. The other option is the ``errs()`` used here, which will print no matter what.)
 
 This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file (or the CMakeLists.txt of whichever directory that has your new pass file): 
 
@@ -186,7 +188,7 @@ Now that we have written our shiny new pass, we can build it by going back to th
 
     make dialects
 
-The tool to run passes is built as ``mlir/build/bin/quantum-opt``.
+The tool to run passes is built as ``mlir/build/bin/quantum-opt``. Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
 
 We can inspect by all the available passes by running ``quantum-opt --help``:
 
@@ -206,9 +208,9 @@ To run the pass, simply do
 
 .. code-block::
 
-    quantum-opt -my-hello-world input.mlir
+    ./mlir/build/bin/quantum-opt -my-hello-world input.mlir
 
-And our new pass will print out ``Hello world!``. 
+on any input mlir file ``input.mlir``. And our new pass will print out ``Hello world!``. 
 
 
 Writing transformations on Catalyst's IR
