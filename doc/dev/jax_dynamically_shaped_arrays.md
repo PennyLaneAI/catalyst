@@ -354,7 +354,7 @@ def body(*ARGS):
 
 ```
 
-We call the primitive like this down the program:
+Later we call such a primitive down the program like this:
 
 ``` python
 INPUTS = ...
