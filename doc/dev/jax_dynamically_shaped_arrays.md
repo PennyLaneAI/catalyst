@@ -363,7 +363,7 @@ OUTPUTS = body(*INPUTS)
 
 What we want is to get a Jax-bind-like handler which would:
 
-1. Match the bind interface for regular (non-nested) Jax primitives.
+1. Resemble the bind interface for regular (non-nested) Jax primitives.
 2. Get all the required information from as little attributes as possible. Specifically, we want it
    to trace the `body` function automatically.
 3. Produce the Jaxpr primitive instruction of the following form:
