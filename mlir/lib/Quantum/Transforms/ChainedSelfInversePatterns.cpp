@@ -86,6 +86,7 @@ mlir::LogicalResult SelfInverseGatesMatchAndRewriteImpl(CustomOp op,
         for (size_t i = 0; i < qbs.size(); i++) {
             if ((parentOp.getOutQubits())[i] != qbs[i]) {
                 failed = true;
+                break;
             }
         }
         if (failed) {
