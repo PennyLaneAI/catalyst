@@ -31,6 +31,9 @@ print(catalyst.__revision__)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
   * [Expanded/collapsed arguments or results](#expandedcollapsed-arguments-or-results)
 * [Generic algorithm for binding nested primitives](#generic-algorithm-for-binding-nested-primitives)
+  * [The problem](#the-problem)
+  * [The essence of the Jax tracing API](#the-essence-of-the-jax-tracing-api)
+  * [The algorithm](#the-algorithm)
 * [Input type deduction in loops](#input-type-deduction-in-loops)
   * [Reference Python program](#reference-python-program)
   * [Example 1: dimension is an implicit argument, dimension mutations are allowed](#example-1-dimension-is-an-implicit-argument-dimension-mutations-are-allowed)
@@ -329,9 +332,17 @@ known to be already prepended to them.
 Generic algorithm for binding nested primitives
 -----------------------------------------------
 
-In this section we attempt to generalise the tracing problem for nested primitives, that is, for
-primitives which contain Jaxpr programs as attributes. Consider the following schematic Python
-program representing a body of some primitive, say, the `for_loop`.
+In this section we attempt to generalise the problem of nested primitives tracing. Nested primitives
+are those that contain one or more Jaxpr programs in its attributes.
+
+Examples of the already-implemented binders are:
+- [for_loop](https://github.com/PennyLaneAI/catalyst/blob/4cb6d246315aa0bad6bc143fc9fa1765c7b60e69/frontend/catalyst/api_extensions/control_flow.py#L245)
+- [while_loop](https://github.com/PennyLaneAI/catalyst/blob/4cb6d246315aa0bad6bc143fc9fa1765c7b60e69/frontend/catalyst/api_extensions/control_flow.py#L329)
+- [cond](https://github.com/PennyLaneAI/catalyst/blob/4cb6d246315aa0bad6bc143fc9fa1765c7b60e69/frontend/catalyst/api_extensions/control_flow.py#L68)
+
+### The problem
+
+Consider the following schematic Python program representing a body of some primitive.
 
 ``` python
 CONSTANTS = ...
@@ -350,18 +361,24 @@ INPUTS = ...
 OUTPUTS = body(*INPUTS)
 ```
 
-What we want is to transform this program into the following Jaxpr:
+What we want is to get a Jax-bind-like handler which would:
 
-```
-{ lambda ; ... . let
-  OUTPUTS = primitive[
-    body = { lambda CONSTANT_ARGS ; ARGS . let
-      ...  // calculate RESULTS from ARGS and CONSTANT_ARGS
-    in RESULTS };
-  ] CONSTANTS INPUTS;
-  ...
-  in ... }
-```
+1. Match the bind interface for regular (non-nested) Jax primitives.
+2. Get all the required information from as little attributes as possible. Specifically, we want it
+   to trace the `body` function automatically.
+3. Produce the Jaxpr primitive instruction of the following form:
+   ```
+   { lambda ; ... . let
+     OUTPUTS = primitive[
+       body = { lambda CONSTANT_ARGS ; ARGS . let
+         ...  // calculate RESULTS from ARGS and CONSTANT_ARGS
+       in RESULTS };
+     ] CONSTANTS INPUTS;
+     ...
+     in ... }
+   ```
+
+### The essence of the Jax tracing API
 
 Jax library provides us with roughly the following tracing API, able to handle the tracing of "flat"
 programs (names are different, links show real closest analogs):
@@ -377,7 +394,7 @@ programs (names are different, links show real closest analogs):
   Function.
 - $emitJaxprLine(Context, Prim, Tracers, Tracers, Attrs)$ - updates the context with a new line
   of Jaxpr program. Our
-  [bind_overwrite_classical_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_tracer.py#L445).
+  [bind_overwrite_classical_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_tracer.py#L445)
   does approximately this, also `prim.bind` of every Jax primitive do it. Note: real Jax bind must
   create output tracers and return them. In order to match with this API, we had to make our own
   [DynshapePrimitive](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L924)
@@ -387,8 +404,10 @@ programs (names are different, links show real closest analogs):
 - A number of $bind_{prim}(Tracers, Attributes) \to Tracers$ for primitives. For example, see how
   Catalyst defines [non-nested primitives](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_primitives.py#L197).
 
+### The algorithm
+
 As users, we want to add primitives supporting nested programs encoded as Python functions. Below we
-define how the corresponding $bind$ handler would work.
+define how the corresponding $bind$ algorithm works in Catalyst.
 
 * $bind_{Prim}(ctx, Function, Inputs, S)$:
   1. $ctx \gets findTracingContext()$
@@ -455,14 +474,16 @@ encoding the said selection for all the variables at once.
 
 ### Reference Python program
 
-The following snippet shows a Python program illustrating the problem. Lines 1 and 2 could not be
-compiled into Jaxpr at once.
+The following snippet shows a Python program illustrating the capturing vs mutable dimensions
+problem in loops. Lines 1 and 2 could not be compiled into Jaxpr at once. Setting the
+`experimental_preserve_dimensions` flag to True allows line [1] while setting it to False allows
+line [2].
 
 ``` python
 @qjit(abstracted_axes={0: 'n'})
 def g(x, y):
 
-  @for_loop(0, 10, 1, experimental_preserve_dimensions=True)
+  @for_loop(0, 10, 1, experimental_preserve_dimensions=[True/False])
   def loop(_, a):
     c =  a * x                                  # [1]
     c = jnp.ones([a.shape[0]+1], dtype=float)   # [2]
