@@ -1883,13 +1883,14 @@ class TestJaxIndexAssignment:
             jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
         )
 
-    def test_dynamic_index_from_range(self):
+    def test_dynamic_index_with_range(self):
         """If UserWarning related to __index__ is raised."""
 
         n = 2
         wires = range(n)
 
         with warnings.catch_warnings(record=True) as w:
+
             @qjit(autograph=True)
             @qml.qnode(qml.device("lightning.qubit", wires=n))
             def circuit():
@@ -1897,7 +1898,8 @@ class TestJaxIndexAssignment:
                     qml.Hadamard(wires=wires[i])
                 return qml.expval(qml.PauliZ(wires=wires[1]))
 
-            assert(len(w) == 0)
+            assert len(w) == 0
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

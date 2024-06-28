@@ -578,11 +578,12 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
 def get_item(target, i, opts):
     """If target is not a jax array, TracerIntegerConversionError might be raised. To avoid
-    index a non-jax array with jax index, we convert it into jax array first. """
+    index a non-jax array with jax index, we convert it into jax array first."""
     if isinstance(target, DynamicJaxprTracer):
         return target[i]
     else:
         return jnp.array(target)[i]
+
 
 def set_item(target, i, x):
     """An implementation of the AutoGraph 'set_item' function. The interface is defined by
