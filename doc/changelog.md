@@ -330,6 +330,10 @@ This release contains contributions from (in alphabetical order):
 * A new GitHub workflow makes available a binary distribution for Linux Arm64.
   [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a 
+  Catalyst variant jaxpr.
+  [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
+
 <h3>Breaking changes</h3>
 
 * The `mitigate_with_zne` function no longer accepts a `degree` parameter for polynomial fitting
