@@ -1882,6 +1882,51 @@ class TestJaxIndexAssignment:
             jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
         )
 
+    def test_slice_assignment_array(self):
+        """Test slice assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            for i in range(2):
+                start = i * first_dim
+                stop = start + first_dim
+                result[start:stop] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 3, 4, 5, 3, 4]))
+
+    def test_slice_assignment_array_with_scalar(self):
+        """Test slice assignment with scalar broadcasting for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            for i in range(2):
+                start = i * first_dim
+                stop = start + first_dim
+                result[start:stop] = x[0]
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 0, 0, 5, 0, 0]))
+
+    def test_slice_assignment_array_notfit(self):
+        """Test if dynamic_update_slice adjust starting address if the length does not fir."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            result[5:6] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 0, 0, 5, 3, 4]))
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
