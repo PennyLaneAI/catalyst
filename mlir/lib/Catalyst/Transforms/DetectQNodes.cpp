@@ -35,7 +35,9 @@ void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
 void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions);
 void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &aborts,
                             SmallVector<Block *> &success);
+void collectPutsBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &puts);
 void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls);
+void RemoveCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter);
 void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
                                   SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter);
 void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> abortBlocks,
@@ -259,7 +261,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
  * So, in other words, we will be inspecting the callers of functions annotated with {
  * catalyst.preHandleError }
  */
-struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
+struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
     LogicalResult match(LLVM::CallOp op) const override;
@@ -274,7 +276,7 @@ struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
 //    %results = call @async_execute_fn()
 //
 // These functions return async values or tokens.
-LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
+LogicalResult RemoveAbortAndPutsInsertCallTransform::match(LLVM::CallOp callOp) const
 {
     auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
@@ -289,7 +291,8 @@ LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
     return success();
 }
 
-void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
+                                                    PatternRewriter &rewriter) const
 {
     auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
@@ -381,6 +384,13 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     //
     // newCalls = { llvm.call @__catalyst__host_ ..., ..., ... }
     replaceCallsWithCallToTarget(aborts, unrecoverableError, newCalls, rewriter);
+
+    // Collect blocks with puts calls
+    SmallVector<Block *> putsBlocks;
+    collectPutsBlocks(potentialConditions, putsBlocks);
+
+    // Remove puts calls
+    RemoveCallsToPutsInBlocks(putsBlocks, rewriter);
 
     // This is a subtlety, but it is a very important one!
     // In order for the (liveness) dataflow analysis, the values need to flow from failure block
@@ -620,6 +630,18 @@ void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM:
     }
 }
 
+void RemoveCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter)
+{
+    for (Block *block : blocks) {
+        block->walk([&](LLVM::CallOp op) {
+            if (AsyncUtils::callsPuts(op)) {
+                LLVM::CallOp putsCall = cast<LLVM::CallOp>(op);
+                rewriter.eraseOp(putsCall);
+            }
+        });
+    }
+}
+
 void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
                                   SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter)
 {
@@ -650,6 +672,20 @@ void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *>
                     aborts.push_back(falseDest);
                     success.push_back(trueDest);
                 }
+            }
+        }
+    }
+}
+
+void collectPutsBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &puts)
+{
+    for (auto condition : conditions) {
+        for (Operation *user : condition.getUsers()) {
+            if (isa<LLVM::CondBrOp>(user)) {
+                LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
+                Block *trueDest = brOp.getTrueDest();
+                Block *falseDest = brOp.getFalseDest();
+                puts.push_back(AsyncUtils::hasPutsInBlock(trueDest) ? trueDest : falseDest);
             }
         }
     }
@@ -906,7 +942,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         }
 
         RewritePatternSet patterns3(context);
-        patterns3.add<RemoveAbortInsertCallTransform>(context);
+        patterns3.add<RemoveAbortAndPutsInsertCallTransform>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3)))) {
             signalPassFailure();
         }
