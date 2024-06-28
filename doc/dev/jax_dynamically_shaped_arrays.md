@@ -29,15 +29,11 @@ OK
   * [Primitives and binding](#primitives-and-binding)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
   * [Expanded/collapsed arguments or results](#expandedcollapsed-arguments-or-results)
-* [Generalisation of the tracing problem](#generalisation-of-the-tracing-problem)
-* [TODO](#todo)
-* [Catalyst implementation details](#catalyst-implementation-details)
-  * [Arguments and results transformations](#arguments-and-results-transformations)
-  * [Adding dynamic dimensions](#adding-dynamic-dimensions)
-    * [Loop expansion specifics](#loop-expansion-specifics)
-    * [For-loop expansion specifics](#for-loop-expansion-specifics)
-  * [Adding Jax constants](#adding-jax-constants)
-* [Caveats](#caveats)
+* [Generic algorithm for binding nested primitives](#generic-algorithm-for-binding-nested-primitives)
+* [Input type deduction in loops](#input-type-deduction-in-loops)
+  * [Reference Python program](#reference-python-program)
+  * [Example 1: dimension is implicit argument, allows dimension mutations](#example-1-dimension-is-implicit-argument-allows-dimension-mutations)
+  * [Example 2: dimension is constant, allows mixing arguments with constants](#example-2-dimension-is-constant-allows-mixing-arguments-with-constants)
 
 <!-- vim-markdown-toc -->
 
@@ -329,11 +325,12 @@ In Catalyst sources we name Python lists or tuples as `expanded_` if the implici
 known to be already prepended to them.
 
 
-Generalisation of the tracing problem
--------------------------------------
+Generic algorithm for binding nested primitives
+-----------------------------------------------
 
-In this section we attempt to generalise the tracing problem. Consider the following schematic
-Python program representing a body of some primitive, say, the `for_loop`.
+In this section we attempt to generalise the tracing problem for nested primitives, that is, for
+primitives which contain Jaxpr programs as attributes. Consider the following schematic Python
+program representing a body of some primitive, say, the `for_loop`.
 
 ``` python
 CONSTANTS = ...
@@ -366,204 +363,261 @@ What we want is to transform this program into the following Jaxpr:
 ```
 
 Jax library provides us with roughly the following tracing API, able to handle the tracing of "flat"
-programs:
+programs (names are different, links show real closest analogs):
 
-- $newTracingContext() \to Context$
-- $newArgTracer(Context) \to Tracer$
-- $newConstTracer(Context) \to Tracer$
-- $eval(Function, Tracers) \to (Constants, Tracers)$
-- A number of $bind_{prim}(Tracers, Attributes) \to Tracers$ for pre-defined primitives.
+- $findTracingContext() \to Context$, see [find_top_trace](https://github.com/google/jax/blob/1c68577dcdf70b4c0b42805d279b6a5c04d144fe/jax/_src/core.py#L1351)
+- $newTracingContext(Context) \to Context$, see [new_dynamic_main2](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L192)
+  and [extend_jaxpr_stack](https://github.com/google/jax/blob/1c68577dcdf70b4c0b42805d279b6a5c04d144fe/jax/_src/interpreters/partial_eval.py#L2347)
+- $newArgTracer(Context) \to Tracer$, see [new_arg](https://github.com/google/jax/blob/1c68577dcdf70b4c0b42805d279b6a5c04d144fe/jax/_src/interpreters/partial_eval.py#L1914)
+- $newConstTracer(Context) \to Tracer$, see [new_const](https://github.com/google/jax/blob/1c68577dcdf70b4c0b42805d279b6a5c04d144fe/jax/_src/interpreters/partial_eval.py#L1921)
+- $eval(Function, Tracers) \to (Constants, Tracers)$, see
+  [eval_jaxpr](https://github.com/google/jax/blob/1c68577dcdf70b4c0b42805d279b6a5c04d144fe/jax/_src/core.py#L494)
+  for Jaxpr programs. For Python programs, this method roughly corresponds to just calling the
+  Function.
+- $emitJaxprLine(Context, Prim, Tracers, Tracers, Attrs)$ - updates the context with a new line
+  of Jaxpr program. Our
+  [bind_overwrite_classical_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_tracer.py#L445).
+  does approximately this, also `prim.bind` of every Jax primitive do it. Note: real Jax bind must
+  create output tracers and return them. In order to match with this API, we had to make our own
+  [DynshapePrimitive](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L924)
+  primitive subclass hiding the output type interpretation under the hood.
+- $toJaxpr(Context, Tracers) \to Jaxpr$, see [to_jaxpr2](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L466)
+  and our `trace_to_jaxpr` wrapper.
+- A number of $bind_{prim}(Tracers, Attributes) \to Tracers$ for primitives. For example, see how
+  Catalyst defines [non-nested primitives](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_primitives.py#L197).
 
 As users, we want to add primitives supporting nested programs encoded as Python functions. Below we
-define how the corresponding $bind$ handler works.
+define how the corresponding $bind$ handler would work.
 
-* $bind_{prim}(Function, Inputs, S)$:
+* $bind_{Prim}(ctx, Function, Inputs, S)$:
+  1. $ctx \gets findTracingContext()$
   1. $(ExpandedInputs, InputType) \gets deduceInputType(Inputs, S)$
-  2. $(Constants, OutputType) \gets abstractEval(Function, InputType, S)$ where `abstractEval` is
+  2. $(Constants, OutputType, Jaxpr) \gets abstractEval(Function, InputType)$ where `abstractEval` is
      defined as:
-     1. $ctx \gets newTracingContext()$
-     2. $(Constants1, ExpandedInputs) \gets parseInputType(ctx, InputType, newArgTracer, newConstTracer)$
+     1. $ctx2 \gets newTracingContext(ctx)$
+     2. $(Constants1, ExpandedInputs) \gets parseInputType(ctx2, InputType, newArgTracer, newConstTracer)$
      3. $(Constants2, ExpandedOutputs) \gets eval(Function, ExpandedInputs)$
      4. $Constants \gets Constants1 + Constants2$
      5. $OutputType \gets deduceOutputType(Constants, ExpandedInputs, ExpandedOutputs, S)$
-     6. $return (Constants, OutputType)$
-  3. $ExpandedOutputs \gets parseOutputType(Constants, ExpandedInputs, OutputType, S)$
+     6. $Jaxpr \gets toJaxpr(ctx2, ExpandedOutputs)$
+     7. $return (Constants, OutputType, Jaxpr)$
+  3. $ExpandedOutputs \gets parseOutputType(Constants, ExpandedInputs, OutputType)$
+  4. $emitJaxprLine(ctx, Prim, ExpandedInputs, ExpandedOutputs, {Jaxpr})$
   4. $Outputs \gets collapse(ExpandedOutputs)$
   5. $return(Outputs)$
 
+In this algorithm, we referred the following utility function which we also defined by ourselves:
+- `deduceInputType`, see [expand_args](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L806)
+- `deduceOutputType`, see [expand_results](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L832)
+- `parseInputType`, see [input_type_to_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L546)
+- `parseOutputType`, see [output_type_to_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L572)
 
-TODO
-----
+For some nested primitives, specifically for loops, we need a certain additional information from
+users in order to perform the tracing during a single pass. We encode this information as `S`, see
+the
+[ExpansionStrategy](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L633)
+data class.
 
-Below is the old version of the document. TODO: update these descriptions.
+The particular choice that we have to make within the `parse` functions is explained in the next
+sections.
 
-The variations of this algorithm are implemented in Catalyst binding functions for `for_loop`,
-`while_loop`, `cond`, etc.
+Input type deduction in loops
+-----------------------------
 
-- $Inputs$ are input tracers obtained from the user.
-- $Outputs_s$ represents output tracers of a Python program obtained using the expansion
-  strategy `S`. Any set of tracers might be converted to a Jaxpr program at any time using the core
-  Jax IR printer function `to_jaxpr`. Thus, having output tracers is equivalent to having the Jaxpr
-  program. The expansion strategy captures specifics of the particular binding function.
-- $expandArgs()$ determines the **implicit parameters** using the specified expansion strategy $S$
-  and calculates the **input type signature**.
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L800)
-- $expandResults()$ calculates **implicit output variables** and obtains the final **output type
-  signature**.
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L817)
-- $initialize()$  reads the input type information and creates the required tracers in the inner
-  tracing context. Note that the function interprets **de Brjuin indices** which might exist in
-  inputs.
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L625)
-  (inputs)
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L640)
-  (outputs)
-- $traceNested()$ runs the next recursion step of the tracing. It takes collapsed (not-expanded)
-  **list of input tracers** and calculates the **list of output tracers**.
+The following two programs illustrate the choice we have to make in the `deduceInputType` and
+`parseInputType` functions.
 
+Both example programs below have loops accepting an argument `a` and a constant tensor `x` of the
+same shape (and the loop counter which is not important here). According to the jax dynamic API, in
+order to preserve the information about the shape equality in the loop body, we must use the same
+dimension variable for both tensors.
 
-Catalyst implementation details
--------------------------------
+Unfortunately, this requirement might contradict to the semantic of loop primitives which require
+the same number of arguments and results for their bodies.
 
-### Arguments and results transformations
+As a result, for each dynamic dimension variable which we want to pass as a primitive argument, we
+must choose between the following two options:
 
-As illustrated in the overview, in order to transform Python program into a Jaxpr program, arguments
-and results of functions needs to be adjusted in the following ways:
+- Pass the dimension variable as an implicit argument
+  + Within the loop body, argument shapes will seem different from constant shapes `=>` no mixing
+    operations (like add, mull, etc.) are allowed.
+  + Loops carries dimension variables between iterations `=>` changing dimensions in loops are
+    allowed.
+- Pass the dimension variable as constant
+  + Within the loop body, same argument and constant dimensions will be represented by a same
+    variable, `=>` mixing operations are allowed.
+  + Loop carries only tensors  `=>` changing dimensions is not allowed.
 
-1. Dynamic dimensions must be added as implicit arguments to ensure Jaxpr program types are
-   correct.
-2. Additional "constant" parameters must be added to hoist numeric constants and capture outer-scope
-   variables.
+In order to keep the user-facing API simple, we use the single boolean flag
+[experimental_preserve_dimensions](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L647)
+encoding the said selection for all the variables at once.
 
-### Adding dynamic dimensions
+### Reference Python program
 
-1. We start from the state where the explicit arguments/results mentioned in the source Python
-   program are known.
-2. The expansion algorithm scans the explicit dimensions and prepends variables to the list of
-   explicit arguments.
-   - In the basic case, the variables found in the dimensions are added as-is.
-   - In case when several tensors use same dimension variables, different decisions are possible. In
-     Catalyst, we support the following two cases:
-     + (Default) Add only one implicit argument for shared dimension variable. For example:
-       `a:f64[d], b:f64[d]` becomes `d:i64[], a:f64[d], b:f64[d]`
-     + "Forget" about the sharing and add new variable for every dimension variable separately.
-       For example:
-       `a:f64[d], b:f64[d]` becomes `d1:i64[], d2:i64[], a:f64[d1], b:f64[d2]`
-       This mode is enabled if `experimental_preserve_dimensions` parameter is set to `False`.
-3. Produce types (`in_type` for arguments, `out_type` for results), describing the expansion
-   results.
-   - For arguments, we use `DBIdx` in types to refer to position in the same list. For example:
-     + Arguments: `d:i64[], a:f64[d], b:f64[d]`
-     + Input type: `[(i64, True), (f64[DBIdx(0)], False), (f64[DBIdx(0)], False)]`
-   - For results, we use `InDBIdx` and `OutDBIdx` in type to refer to positions in the argument list
-     and the result list (the current one) correspondingly. For example:
-     + Arguments: `v:i64[], d:i64[], a:f64[d], b:f64[d]`
-     + Results: `e:i64[], a:f64[e], b:f64[d]`
-     + Output type: `[(i64, True), (f64[OutDBIdx(0)], False), (f64[InDBIdx(1)], False)]`
-
-In Catalyst, we usually record the number of implicit variables added using
-`num_implicit_inputs`/`num_implicit_outputs` attributes.
-
-#### Loop expansion specifics
-
-Loop primitives have notable additional requirements. In order to lower loop bodies, types and
-numbers of loop body arguments must match types and numbers of the loop body results.
-
-In the presence of dynamic dimensions, Jax needs determine which dimensions are going to change
-during the loop iterations and which one remain the same. Unfortunately, in a single-pass tracer it
-is hard to communicate this information to the compiler. We only see iteration-0 arguments and
-results and in general we can not extrapolate this information to later iterations.
-
-We developed the following compromise in order to handle this situation:
-
-* By default, we assume that loop results will keep the same dimension sharing pattern as loop
-  arguments. For example:
-
-  ``` python
-  @for_loop(0, 10, 1)
-  def loop(i, a, a_):
-      return a, a_
-  loop(a0,a0)  # CORRECT: one shared dimension in both inputs and outputs
-  ```
-
-  ``` python
-  @for_loop(0, 10, 1)
-  def loop(i, a, a_):
-      b = jnp.ones([sz+1], dtype=float)
-      return b, b
-  loop(a0,a0)  # CORRECT: still one shared dimension
-  ```
-
-  ``` python
-  @for_loop(0, 10, 1)
-  def loop(i, a, a_):
-      b = jnp.ones([sz+1], dtype=float)
-      return a, b  # ERROR: dimensions are not the same any more
-  loop(a0,a0)
-  ```
-
-* With `experimental_preserve_dimensions=False` flag, we treat every same dimension as a 0-iteration
-  conincidense. We create separate dimension during the argument/result expansion.
-
-  ``` python
-  @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
-  def loop(i, a, b, b_):
-      return a, b, b_  # CORRECT
-      # BUT `b + b_` is not possible, because `b` and `b_` now has different dimensions
-
-  b0 = jnp.ones([sz+1], dtype=float)
-  a2, b2, b2_ = loop(a0, b0, b0)
-  ```
-
-#### For-loop expansion specifics
-
-A special for for-loops: loop index variable could not be referred using `InDBIdx` index in output
-types. For example, in the following program
+The following snippet shows a Python program illustrating the problem. Lines 1 and 2 could not be
+compiled into Jaxpr at once.
 
 ``` python
-@for_loop(0, 10, 1)
-def loop(i, a):
-    b = jnp.ones([i], dtype=float)
-    return b
+@qjit(abstracted_axes={0: 'n'})
+def g(x, y):
+
+  @for_loop(0, 10, 1, experimental_preserve_dimensions=True)
+  def loop(_, a):
+    c =  a * x                                  # [1]
+    c = jnp.ones([a.shape[0]+1], dtype=float)   # [2]
+    return c
+
+  return jnp.sum(loop(y))
+
+a = jnp.ones([3], dtype=float)
+b = jnp.ones([3], dtype=float)
+g(a, b)
 ```
 
-Output type will contain `OuDBIdx` in the dimension of `b`.
+### Example 1: dimension is implicit argument, allows dimension mutations
+
+Passing dimension variable as an implicit argument
+
+``` jaxpr
+{ lambda dim:i64[] . let
+  A:f64[dim] = ...
+  B:f64[dim] = ...
+  C:f64[dim] = add A B
+               ^^^^^^^
+               OK
+
+  ... = primitive[body =
+                       CONSTANT                 ARGUMENT
+                       vvvvvvvvvv               vvvvvvvvvv
+              { lambda dim1:i64[] a:f64[dim1] ; dim2:i64[] b:f64[dim2] .
+                let c:f64[dim1] = add a b
+                                  ^^^^^^^
+                                  SHAPE MISMATCH: `dim1` is not `dim2`
+                    dim2' = dim2 + 1
+                    c':f64[dim2'] = ... // jnp.ones([dim2'], float)
+                in (dim2', c')
+                   ^^^^^^^^^^^
+                   MATCHES THE NUMBER OF ARGUMENTS (2)
+
+              }
+        ] dim A dim B
+
+  in (...)
+}
+```
+
+``` python
+@qjit(abstracted_axes={0: 'n'})
+def g(x, y):
+
+  @for_loop(0, 10, 1, experimental_preserve_dimensions=True)
+  def loop(_, a):
+    c =  a * x
+    # c = jnp.ones([a.shape[0]+1], dtype=float) # Not possible
+    return c
+
+  return jnp.sum(loop(y))
+
+a = jnp.ones([3], dtype=float)
+b = jnp.ones([3], dtype=float)
+g(a, b)
+```
+
+``` result
+array(3.)
+```
+
+``` python
+print(g.jaxpr)
+```
+
+``` result
+{ lambda ; a:i64[] b:f64[a] c:f64[a]. let
+    d:f64[a] = for_loop[
+      apply_reverse_transform=False
+      body_jaxpr={ lambda ; e:i64[] f:f64[e] g:i64[] h:f64[e]. let
+          i:f64[e] = mul h f
+        in (i,) }
+      body_nconsts=2
+      nimplicit=0
+      preserve_dimensions=True
+    ] a b 0 10 1 0 c
+    j:f64[] = reduce_sum[axes=(0,)] d
+  in (j,) }
+```
+
+### Example 2: dimension is constant, allows mixing arguments with constants
+
+Passing dimension variable as a constant
+
+``` jaxpr
+{ lambda dim:i64[] . let
+  A:f64[dim] = ...
+  B:f64[dim] = ...
+  C:f64[dim] = add A B
+               ^^^^^^^
+               OK
+
+  ... = primitive[body =
+
+                    CONSTANT
+                    vvvvvvvvvv
+           { lambda dim1:i64[] a:f64[dim1] ; b:f64[dim1] .
+                let c:f64[dim1] = add a b
+                                  ^^^^^^^
+                                  OK
+                    dim1' = dim1 + 1
+                    c':f64[dim1'] = ... // jnp.ones([dim1'], float)
+                in (dim1', c')
+                   ^^^^^^^^^^^
+                   DOES NOT MATCH THE NUMBER OF ARGUMENTS (1 VS 2)
+           }
+        ] dim A B
+
+  in (...)
+}
+```
 
 
-### Adding Jax constants
+``` python
+@qjit(abstracted_axes={0: 'n'})
+def g(x, y):
 
-Deduction of Jax constants happens during the final step of the tracing - at the same time with the
-Jaxpr program generation. Constants are prepended to argument lists. Thus, the program with
-arguments
+  @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
+  def loop(_, a):
+    # c =  a * x # Not possible
+    c = jnp.ones([a.shape[0]+1], dtype=float)
+    return c
 
-`d:i64[], a:f64[d], b:f64[d]`
+  return jnp.sum(loop(y))
 
-that captures a dinamically-dimensioned tensor `o:f64[od]` from the outside scope might get the
-following final list of arguments:
+a = jnp.ones([3], dtype=float)
+b = jnp.ones([3], dtype=float)
+g(a, b)
+```
 
-`od:i64, o:f64[od], d:i64[], a:f64[d], b:f64[d]`
+``` result
+array(13.)
+```
 
-In Catalyst, we usually record the number of constants added using `body_nconsts` attribute. This
-information is used during the StableHLO lowering.
+``` python
+print(g.jaxpr)
+```
 
-Caveats
--------
-
-* Dimension variables obtained from constants never matches dimension variables from regular
-  parameters. Thus, the following program will raise an error:
-
-  ``` python
-  @qjit
-  def circuit(sz:int):
-      a0 = jnp.ones([sz], dtype=float)
-
-      @for_loop(0, 10, 1)
-      def loop(i, a):
-          return a + a0  # a0 is a constant, dimension variable is different
-
-      return loop(a0)
-  ```
-
-
-
+``` result
+{ lambda ; a:i64[] b:f64[a] c:f64[a]. let
+    d:i64[] e:f64[d] = for_loop[
+      apply_reverse_transform=False
+      body_jaxpr={ lambda ; f:i64[] g:i64[] h:f64[f]. let
+          i:i64[] = add f 1
+          j:f64[i] = broadcast_in_dim[broadcast_dimensions=() shape=(None,)] 1.0
+            i
+        in (i, j) }
+      body_nconsts=0
+      nimplicit=1
+      preserve_dimensions=False
+    ] a 0 10 1 0 c
+    k:f64[] = reduce_sum[axes=(0,)] e
+  in (k,) }
+```
 
