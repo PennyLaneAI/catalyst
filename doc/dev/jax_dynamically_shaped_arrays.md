@@ -381,7 +381,7 @@ What we want is to get a Jax-bind-like handler which would:
 ### The essence of the Jax tracing API
 
 Jax library provides us with roughly the following tracing API, able to handle the tracing of "flat"
-programs (names are different, links show real closest analogs):
+programs (names are different, links show the real closest analogs):
 
 - $findTracingContext() \to Context$, see [find_top_trace](https://github.com/google/jax/blob/1c68577dcdf70b4c0b42805d279b6a5c04d144fe/jax/_src/core.py#L1351)
 - $newTracingContext(Context) \to Context$, see [new_dynamic_main2](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L192)
