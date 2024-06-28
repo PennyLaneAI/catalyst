@@ -428,10 +428,11 @@ the same pattern.
   5. $return(Outputs)$
 
 (Remark: the above algorithm describes the pure-qjit tracing. Quantum tracing is more elaborated,
-but the complications are not related to Jax. Basically, in quantum tracing we follow the above
-algorithm twice: first time with Inputs set to classical value tracers only, second time with the
-remaining quantum register tracer. The results of the classical tracing are cached on the quantum
-tape which allows us to apply PennyLane tape transformations in the middle of this process)
+but the complications are not related to Jax. Basically, in quantum tracing we follow the
+re-entrable version of the above algorithm twice: first time with Inputs set to classical value
+tracers only, second time with the remaining quantum register tracer. The results of the classical
+tracing are cached on the quantum tape which allows us to apply PennyLane tape transformations in
+the middle of this process)
 
 In this algorithm, we referred the following utility functions which we defined as Jax extensions:
 - `deduceInputType`, see [expand_args](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L806)
