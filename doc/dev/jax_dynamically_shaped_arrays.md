@@ -407,9 +407,10 @@ programs (names are different, links show the real closest analogs):
 ### The algorithm
 
 As users, we want to add primitives supporting nested programs encoded as Python functions. Below we
-define how the corresponding $bind$ algorithm works in Catalyst.
+define how such an algorithm works in Catalyst: `for_loop`, `while_loop` and `cond` functions follow
+the same pattern.
 
-* $bind_{Prim}(ctx, Function, Inputs, S)$:
+* $bindNested_{Prim}(Function, Inputs, S)$:
   1. $ctx \gets findTracingContext()$
   1. $(ExpandedInputs, InputType) \gets deduceInputType(Inputs, S)$
   2. $(Constants, OutputType, Jaxpr) \gets abstractEval(Function, InputType)$ where `abstractEval` is
@@ -426,20 +427,16 @@ define how the corresponding $bind$ algorithm works in Catalyst.
   4. $Outputs \gets collapse(ExpandedOutputs)$
   5. $return(Outputs)$
 
-In this algorithm, we referred the following utility function which we also defined by ourselves:
+In this algorithm, we referred the following utility functions which we defined as Jax extensions:
 - `deduceInputType`, see [expand_args](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L806)
 - `deduceOutputType`, see [expand_results](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L832)
 - `parseInputType`, see [input_type_to_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L546)
 - `parseOutputType`, see [output_type_to_tracers](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L572)
 
-For some nested primitives, specifically for loops, we need a certain additional information from
-users in order to perform the tracing during a single pass. We encode this information as `S`, see
-the
+Specifically for loop primitives, we need a certain additional information from users in order to
+fit into the one-pass tracing requirement. We encode this information as `S`, see the
 [ExpansionStrategy](https://github.com/PennyLaneAI/catalyst/blob/386149bdf580f7f6364e45d5d7138f3a367add7f/frontend/catalyst/jax_extras/tracing.py#L633)
-data class.
-
-The particular choice that we have to make within the `parse` functions is explained in the next
-sections.
+data class. More on this is explained the next section.
 
 Input type deduction in loops
 -----------------------------
