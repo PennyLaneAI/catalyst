@@ -40,8 +40,9 @@ llvm::SmallVector<StringRef> SelfInverseGates{
 //    %2 = (a user operation that uses %out_qubit_2)
 // The Value %out_qubits_2 can be replaced by the Value %1 (which is its grandparent) in all uses
 
-mlir::LogicalResult matchAndRewriteImpl(CustomOp op, mlir::PatternRewriter &rewriter,
-                                        SmallVector<StringRef> SelfInverseGates)
+mlir::LogicalResult SelfInverseGatesMatchAndRewriteImpl(CustomOp op,
+                                                        mlir::PatternRewriter &rewriter,
+                                                        SmallVector<StringRef> SelfInverseGates)
 {
     for (StringRef OpName : SelfInverseGates) {
         LLVM_DEBUG(dbgs() << "Simplifying the following " << OpName << " operation:\n"
@@ -90,7 +91,7 @@ struct ChainedSelfInverseOpRewritePattern : public mlir::OpRewritePattern<Custom
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        return matchAndRewriteImpl(op, rewriter, SelfInverseGates);
+        return SelfInverseGatesMatchAndRewriteImpl(op, rewriter, SelfInverseGates);
     }
 };
 
