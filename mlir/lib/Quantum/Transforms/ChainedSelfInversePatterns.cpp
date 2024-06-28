@@ -28,7 +28,20 @@ using namespace catalyst::quantum;
 namespace {
 
 llvm::SmallVector<StringRef> SelfInverseGates{
-    "PauliX", "PauliY", "PauliZ", "Hadamard", "CNOT", "CY", "CZ", "SWAP", "Toffoli",
+    // 1-bit gates
+    "Hadamard",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+
+    // 2-bit gates
+    "CNOT",
+    "CY",
+    "CZ",
+    "SWAP",
+
+    // 3-bit gates
+    "Toffoli",
 };
 
 // We check if the operation and its parent are a pair of self-inverse operations.
