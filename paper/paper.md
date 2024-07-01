@@ -90,7 +90,7 @@ a *runtime* that allows the compiled binary to call into quantum devices for exe
 ## Frontend
 
 The Catalyst frontend, built in Python and C++, directly integrates with both PennyLane [@pennylane],
-a Python framework for differentiable quantum programming. and JAX [@jax], a Python framework for
+a Python framework for differentiable quantum programming, and JAX [@jax], a Python framework for
 accelerated auto-differentiation, to capture hybrid quantum programs. As a result, by decorating
 hybrid programs with the `@qjit` decorator, the Catalyst frontend is able to capture and
 ahead-of-time or just-in-time compile (from within Python) the quantum and classical instructions
