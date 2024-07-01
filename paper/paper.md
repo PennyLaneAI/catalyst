@@ -265,9 +265,8 @@ documentation and tutorials are available on our online documentation\footnote
 
 The Catalyst hybrid compilation stack as presented here provides an end-to-end infrastructure
 to explore next-generation dynamic hybrid quantum-classical algorithms, by allowing for workflows
-that support compressed representation of large, highly structured quantum algorithms by intertwining
-classical control flow with quantum operations, as well as mid-circuit measurements with
-arbitrary classical processing and feedforward.
+that support compressed representation of large, highly structured quantum algorithms,
+as well as mid-circuit measurements with arbitrary classical processing and feedforward.
 
 The Catalyst software stack will continue to be developed alongside research, algorith, and hardware
 needs, with potential future work including support for quantum hardware control systems, building
