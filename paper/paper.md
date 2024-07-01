@@ -83,15 +83,15 @@ real-time measurement feedback, qubit reuse, and dynamic quantum memory manageme
 importantly, Catalyst provides a way to transform large scale user workflows from Python into
 low-level binary code for accelerated execution in heterogeneous environments.
 
-Catalyst is divided into three core components: a *frontend* which captures and lowers hybrid Python
-programs, a *compiler* which applies quantum and classical optimizations and transformations, and
-a *runtime*, which allows the compiled binary to call into quantum devices for execution.
+Catalyst is divided into three core components: a *frontend* that captures and lowers hybrid Python
+programs, a *compiler* that applies quantum and classical optimizations and transformations, and
+a *runtime* that allows the compiled binary to call into quantum devices for execution.
 
 ## Frontend
 
-The Catalyst frontend, built in Python and C++, directly integrates with both PennyLane [@pennylane]
-(a Python framework for differentiable quantum programming) and JAX [@jax] (a Python framework for
-accelerated auto-differentiation) to capture hybrid quantum programs. As a result, by decorating
+The Catalyst frontend, built in Python and C++, directly integrates with both PennyLane [@pennylane],
+a Python framework for differentiable quantum programming. and JAX [@jax], a Python framework for
+accelerated auto-differentiation, to capture hybrid quantum programs. As a result, by decorating
 hybrid programs with the `@qjit` decorator, the Catalyst frontend is able to capture and
 ahead-of-time or just-in-time compile (from within Python) the quantum and classical instructions
 provided by PennyLane and JAX. In addition, Catalyst provides high-level functions for compact and
@@ -114,7 +114,7 @@ rule [@schuld2018gradients; @wierichs2021general]) are provided as Catalyst comp
 
 ## Runtime
 
-The Catalyst Runtime is designed to enable Catalyst’s highly dynamic execution model. As such, it
+The Catalyst runtime is designed to enable Catalyst’s highly dynamic execution model. As such, it
 generally assumes direct communication between a quantum device and its classical controller or
 host, although it also supports more restrictive execution models. Execution of the user program
 proceeds on the host’s native architecture, while the runtime provides an abstract communication
