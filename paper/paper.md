@@ -261,6 +261,20 @@ Catalyst --- via feedback, issues, or pull requests on GitHub --- are welcomed. 
 documentation and tutorials are available on our online documentation\footnote
 {https://docs.pennylane.ai/projects/catalyst}.
 
+# Discussion and future work
+
+The Catalyst hybrid compilation stack as presented here provides an end-to-end infrastructure
+to explore next-generation dynamic hybrid quantum-classical algorithms, by allowing for workflows
+that support compressed representation of large, highly structured quantum algorithms by intertwining
+classical control flow with quantum operations, as well as mid-circuit measurements with
+arbitrary classical processing and feedforward.
+
+The Catalyst software stack will continue to be developed alongside research, algorith, and hardware
+needs, with potential future work including support for quantum hardware control systems, building
+out a library of MLIR quantum compilation passes for optimizing quantum circuits (without unrolling
+classical control structure), and explorations of dynamic quantum error mitigation and proof-of-concept
+error correction experiments.
+
 Quantum software is driving many new results and ideas in quantum computing research, and the
 PennyLane framework has already been used in a number of scientific publications [@delgado2021variational; @wierichs2021general]
 and educational materials [@demos]. By enabling researchers to scale up their ideas and
