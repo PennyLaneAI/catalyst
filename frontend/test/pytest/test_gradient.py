@@ -320,8 +320,31 @@ def test_value_and_grad_on_qjit_quantum_variant():
         return circuit(x)[0]
 
     result = qjit(value_and_grad(qjit(workflow_variant)))(1.1)
-    expected = value_and_grad(workflow_variant)(1.1)
+    expected = (workflow_variant(1.1), qjit(grad(workflow_variant))(1.1))
     assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum_variant_tree():
+    """
+    Check that value_and_grad works when called on an qjit object that does wrap a QNode
+    with trainable parameters and a general pytree input.
+    """
+
+    def workflow_variant_tree(params):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(params):
+            qml.RX(params["x"], wires=0)
+            qml.RY(params["y"], wires=0)
+            return qml.probs()
+
+        return circuit(params)[0]
+
+    params = {"x": 0.12, "y": 0.34}
+    result = qjit(value_and_grad(qjit(workflow_variant_tree)))(params)
+    expected = (workflow_variant_tree(params), qjit(grad(workflow_variant_tree))(params))
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1]["x"], expected[1]["x"])
+    assert np.allclose(result[1]["y"], expected[1]["y"])
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
