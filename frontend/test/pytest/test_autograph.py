@@ -834,9 +834,9 @@ class TestForLoops:
                 qml.RY(params[i], wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.warns(None) as record:
+        with warnings.catch_warnings(record=True) as w:
             qjit(autograph=True)(f)
-            assert len(record) == 0
+            assert len(w) == 0
 
     # This case is slightly problematic because there is no way for the user to compile this for
     # loop correctly. Fallback to a Python loop is always necessary, and will result in a warning.
@@ -900,9 +900,9 @@ class TestForLoops:
                 qml.RY(params[i], wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.warns(None) as record:
+        with warnings.catch_warnings(record=True) as w:
             qjit(autograph=True)(f)
-            assert len(record) == 0
+            assert len(w) == 0
 
     # This use case is never possible, regardless of whether AutoGraph is used or not.
     def test_for_in_dynamic_range_indexing_object_list(self):
