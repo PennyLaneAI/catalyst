@@ -20,7 +20,6 @@ This package contains the Catalyst Python interface.
 import sys
 import types
 from os.path import dirname
-from typing import Optional
 
 import jaxlib as _jaxlib
 
@@ -40,7 +39,6 @@ from catalyst._version import __version__
 
 try:
     if INSTALLED:
-        # pylint: disable=no-name-in-module
         from catalyst._revision import __revision__  # pragma: no cover
     else:
         from subprocess import check_output
@@ -83,25 +81,18 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
     "mlir_quantum._mlir_libs._quantumDialects.mitigation"
 )
 
-from catalyst import debug
-from catalyst.autograph import autograph_source
+from catalyst import debug, logging
+from catalyst.api_extensions import *
+from catalyst.api_extensions import __all__ as _api_extension_list
+from catalyst.autograph import *
+from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.jit import QJIT, qjit
-from catalyst.pennylane_extensions import (
-    adjoint,
-    cond,
-    ctrl,
-    for_loop,
-    grad,
-    jacobian,
-    jvp,
-    measure,
-    mitigate_with_zne,
-    vjp,
-    vmap,
-    while_loop,
+from catalyst.utils.exceptions import (
+    AutoGraphError,
+    CompileError,
+    DifferentiableCompileError,
 )
-from catalyst.utils.exceptions import AutoGraphError, CompileError
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -186,23 +177,13 @@ while processing the following with AutoGraph:
 __all__ = (
     "qjit",
     "QJIT",
-    "for_loop",
-    "while_loop",
-    "cond",
-    "ctrl",
-    "measure",
-    "grad",
-    "jacobian",
-    "vjp",
-    "jvp",
-    "adjoint",
-    "vmap",
-    "mitigate_with_zne",
-    "debug",
-    "autograph_source",
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
     "CompileError",
+    "DifferentiableCompileError",
     "CompileOptions",
+    "debug",
+    *_api_extension_list,
+    *_autograph_functions,
 )

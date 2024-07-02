@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.20)
 
 project(lightning_qir_runtime_tests)
 
@@ -15,24 +15,7 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-find_package(pybind11 CONFIG)
-
-if(pybind11_FOUND)
-    message(STATUS "Found pybind11")
-else()
-    message(STATUS "Cound not find existing pybind11-dev package. Building from source.")
-    set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
-
-    # https://cmake.org/cmake/help/latest/module/FindPython.html
-    find_package(Python COMPONENTS Interpreter Development)
-
-    FetchContent_Declare(pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG        v2.10.1
-    )
-
-    FetchContent_MakeAvailable(pybind11)
-endif()
+fetch_pybind11()
 
 # Required for catch_discover_tests().
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
@@ -44,8 +27,6 @@ include(Catch)
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
     add_executable(runner_tests_lightning runner_main.cpp)
     target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
-
-    add_subdirectory(third_party)
 
     # Skip dynamic device loading test when sanitizers are enabled or when building on mac,
     # due to the fact that our current support is not fully compatible on macOS.
@@ -61,7 +42,6 @@ if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
         # runtime (see https://github.com/google/sanitizers/issues/611 for
         # details). If you want to run this-file-does-not-exist.so library under
         # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
-        add_dependencies(runner_tests_lightning dummy_device)
         set(dl_manager_tests 
             Test_DLManager.cpp
             )

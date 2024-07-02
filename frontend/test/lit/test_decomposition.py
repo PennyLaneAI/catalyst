@@ -13,78 +13,108 @@
 # limitations under the License.
 
 # RUN: %PYTHON %s | FileCheck %s
+# pylint: disable=line-too-long
+
+import platform
+from copy import deepcopy
 
 import jax
 import pennylane as qml
 
-from catalyst import cond, for_loop, measure, qjit, while_loop
+from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
+from catalyst.device import get_device_capabilities
+from catalyst.utils.toml import (
+    OperationProperties,
+    ProgramFeatures,
+    pennylane_operation_set,
+)
 
-# This is used just for internal testing
-from catalyst.pennylane_extensions import qfunc
 
-
-def get_custom_device_without(num_wires, discards):
+def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
     """Generate a custom device without gates in discards."""
 
-    lightning = qml.device("lightning.qubit", wires=3)
-    copy = lightning.operations.copy()
-    observables_copy = lightning.observables.copy()
-    for discard in discards:
-        copy.discard(discard)
+    class CustomDevice(qml.devices.Device):
+        """Custom Gate Set Device"""
 
-    class CustomDevice(qml.QubitDevice):
-        """Custom Device"""
+        name = "Custom Device"
+        pennylane_requires = "0.35.0"
+        version = "0.0.2"
+        author = "Tester"
 
-        name = "Device without some operations"
-        short_name = "dummy.device"
-        pennylane_requires = "0.1.0"
-        version = "0.0.1"
-        author = "CV quantum"
+        lightning_device = qml.device("lightning.qubit", wires=0)
 
-        operations = copy
-        observables = observables_copy
+        config = None
+        backend_name = "default"
+        backend_lib = "default"
+        backend_kwargs = {}
 
-        # pylint: disable=too-many-arguments
-        def __init__(
-            self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
-        ):
-            self.backend_name = backend_name if backend_name else "default"
-            self.backend_lib = backend_lib if backend_lib else "default"
-            self.backend_kwargs = backend_kwargs if backend_kwargs else ""
+        def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
+            program_features = ProgramFeatures(shots_present=self.shots is not None)
+            lightning_capabilities = get_device_capabilities(
+                self.lightning_device, program_features
+            )
+            custom_capabilities = deepcopy(lightning_capabilities)
+            for gate in discards:
+                custom_capabilities.native_ops.pop(gate, None)
+                custom_capabilities.to_decomp_ops.pop(gate, None)
+                custom_capabilities.to_matrix_ops.pop(gate, None)
+            for gate in force_matrix:
+                custom_capabilities.native_ops.pop(gate, None)
+                custom_capabilities.to_decomp_ops.pop(gate, None)
+                custom_capabilities.to_matrix_ops[gate] = OperationProperties(False, False, False)
+            self.qjit_capabilities = custom_capabilities
 
         def apply(self, operations, **kwargs):
-            pass
+            """Unused"""
+            raise RuntimeError("Only C/C++ interface is defined")
+
+        @property
+        def operations(self):
+            """Return operations using PennyLane's C(.) syntax"""
+            return (
+                pennylane_operation_set(self.qjit_capabilities.native_ops)
+                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
+                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
+            )
+
+        @property
+        def observables(self):
+            """Return PennyLane observables"""
+            return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         @staticmethod
         def get_c_interface():
-            """Location to shared object with C/C++ implementation"""
-            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+            )
+            return "dummy.remote", lib_path
+
+        def execute(self, circuits, execution_config):
+            """Execution."""
+            return circuits, execution_config
 
     return CustomDevice(wires=num_wires)
 
 
 def test_decompose_multicontrolledx():
-    """Test decomposition of MultiControlledX."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
+    """Test decomposition of MultiControlledX as an aliased gate."""
+    dev = get_custom_device_without(5, discards={"MultiControlledX"})
 
     @qjit(target="mlir")
-    @qfunc(device=dev)
+    @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_multicontrolled_x1
     def decompose_multicontrolled_x1(theta: float):
         qml.RX(theta, wires=[0])
-        # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%.+]]:3 = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
+        # CHECK:     quantum.custom "PauliX"() {{%[a-zA-Z0-9_]+}} ctrls({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%.+]]:3 = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]#1
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%.+]]:3 = quantum.custom "Toffoli"() [[state0]]#0, [[state1]]#2, [[state0]]#2
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%.+]]:3 = quantum.custom "Toffoli"() [[state1]]#0, [[state1]]#1, [[state2]]#1
-        # CHECK-NOT: name = "MultiControlledX"
-        qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
+        qml.MultiControlledX(wires=[0, 1, 2, 3])
         return qml.state()
 
     print(decompose_multicontrolled_x1.mlir)
@@ -93,112 +123,12 @@ def test_decompose_multicontrolledx():
 test_decompose_multicontrolledx()
 
 
-def test_decompose_multicontrolledx_in_conditional():
-    """Test decomposition of MultiControlledX in conditional."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
-
-    @qjit(target="mlir")
-    @qfunc(device=dev)
-    # CHECK-LABEL: @jit_decompose_multicontrolled_x2
-    def decompose_multicontrolled_x2(theta: float, n: int):
-        qml.RX(theta, wires=[0])
-
-        # pylint: disable=line-too-long
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%.+]]:3 = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%.+]]:3 = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]#1
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%.+]]:3 = quantum.custom "Toffoli"() [[state0]]#0, [[state1]]#2, [[state0]]#2
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%.+]]:3 = quantum.custom "Toffoli"() [[state1]]#0, [[state1]]#1, [[state2]]#1
-        # CHECK-NOT: name = "MultiControlledX"
-        @cond(n > 1)
-        def cond_fn():
-            qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-
-        cond_fn()
-        return qml.state()
-
-    print(decompose_multicontrolled_x2.mlir)
-
-
-test_decompose_multicontrolledx_in_conditional()
-
-
-def test_decompose_multicontrolledx_in_while_loop():
-    """Test decomposition of MultiControlledX in while loop."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
-
-    @qjit(target="mlir")
-    @qfunc(device=dev)
-    # CHECK-LABEL: @jit_decompose_multicontrolled_x3
-    def decompose_multicontrolled_x3(theta: float, n: int):
-        qml.RX(theta, wires=[0])
-
-        # pylint: disable=line-too-long
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]{{#1}}
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
-        # CHECK-NOT: name = "MultiControlledX"
-        @while_loop(lambda v: v[0] < 10)
-        def loop(v):
-            qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-            return v[0] + 1, v[1]
-
-        loop((0, n))
-        return qml.state()
-
-    print(decompose_multicontrolled_x3.mlir)
-
-
-test_decompose_multicontrolledx_in_while_loop()
-
-
-def test_decompose_multicontrolledx_in_for_loop():
-    """Test decomposition of MultiControlledX in for loop."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
-
-    @qjit(target="mlir")
-    @qfunc(device=dev)
-    # CHECK-LABEL: @jit_decompose_multicontrolled_x4
-    def decompose_multicontrolled_x4(theta: float, n: int):
-        qml.RX(theta, wires=[0])
-
-        # pylint: disable=line-too-long
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]{{#1}}
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
-        # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
-        # CHECK-NOT: name = "MultiControlledX"
-        @for_loop(0, n, 1)
-        def loop(_):
-            qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-
-        loop()
-        return qml.state()
-
-    print(decompose_multicontrolled_x4.mlir)
-
-
-test_decompose_multicontrolledx_in_for_loop()
-
-
 def test_decompose_rot():
     """Test decomposition of Rot gate."""
-    dev = get_custom_device_without(1, {"Rot"})
+    dev = get_custom_device_without(1, discards={"Rot", "C(Rot)"})
 
     @qjit(target="mlir")
-    @qfunc(device=dev)
+    @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_rot
     def decompose_rot(phi: float, theta: float, omega: float):
         # CHECK-NOT: name = "Rot"
@@ -225,10 +155,10 @@ test_decompose_rot()
 
 def test_decompose_s():
     """Test decomposition of S gate."""
-    dev = get_custom_device_without(1, {"S"})
+    dev = get_custom_device_without(1, discards={"S", "C(S)"})
 
     @qjit(target="mlir")
-    @qfunc(device=dev)
+    @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_s
     def decompose_s():
         # CHECK-NOT: name="S"
@@ -247,10 +177,10 @@ test_decompose_s()
 
 def test_decompose_qubitunitary():
     """Test decomposition of QubitUnitary"""
-    dev = get_custom_device_without(1, {"QubitUnitary"})
+    dev = get_custom_device_without(1, discards={"QubitUnitary"})
 
     @qjit(target="mlir")
-    @qfunc(device=dev)
+    @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_qubit_unitary
     def decompose_qubit_unitary(U: jax.core.ShapedArray([2, 2], float)):
         # CHECK-NOT: name = "QubitUnitary"
@@ -269,13 +199,12 @@ test_decompose_qubitunitary()
 
 def test_decompose_singleexcitationplus():
     """Test decomposition of single excitation plus."""
-    dev = get_custom_device_without(2, {"SingleExcitationPlus"})
+    dev = get_custom_device_without(2, discards={"SingleExcitationPlus", "C(SingleExcitationPlus)"})
 
     @qjit(target="mlir")
-    @qfunc(device=dev)
+    @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
-        # pylint: disable=line-too-long
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
@@ -314,3 +243,25 @@ def test_decompose_singleexcitationplus():
 
 
 test_decompose_singleexcitationplus()
+
+
+def test_decompose_to_matrix():
+    """Test decomposition of QubitUnitary"""
+    dev = get_custom_device_without(1, force_matrix={"PauliY"})
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_decompose_to_matrix
+    def decompose_to_matrix():
+        # CHECK: quantum.custom "PauliX"
+        qml.PauliX(wires=0)
+        # CHECK: quantum.unitary
+        qml.PauliY(wires=0)
+        # CHECK: quantum.custom "PauliZ"
+        qml.PauliZ(wires=0)
+        return measure(wires=0)
+
+    print(decompose_to_matrix.mlir)
+
+
+test_decompose_to_matrix()

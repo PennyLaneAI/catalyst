@@ -23,6 +23,18 @@ from catalyst import qjit
 class TestSample:
     """Test sample."""
 
+    def test_sample_on_0qbits(self):
+        """Test sample on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+        def sample_0qbit():
+            return qml.sample()
+
+        expected = np.empty(shape=(10, 0), dtype=int)
+        observed = sample_0qbit()
+        assert np.array_equal(observed, expected)
+
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
@@ -32,11 +44,11 @@ class TestSample:
             qml.RX(x, wires=0)
             return qml.sample()
 
-        expected = np.array([[0.0]] * 1000)
+        expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
         assert np.array_equal(observed, expected)
 
-        expected = np.array([[1.0]] * 1000)
+        expected = np.array([[1]] * 1000)
         observed = sample_1qbit(np.pi)
         assert np.array_equal(observed, expected)
 
@@ -50,16 +62,28 @@ class TestSample:
             qml.RY(x, wires=1)
             return qml.sample()
 
-        expected = np.array([[0.0, 0.0]] * 1000)
+        expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
         assert np.array_equal(observed, expected)
-        expected = np.array([[1.0, 1.0]] * 1000)
+        expected = np.array([[1, 1]] * 1000)
         observed = sample_2qbits(np.pi)
         assert np.array_equal(observed, expected)
 
 
 class TestCounts:
     """Test counts."""
+
+    def test_counts_on_0qbits(self):
+        """Test counts on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
+        def counts_0qbit():
+            return qml.counts()
+
+        expected = [np.array([0]), np.array([10])]
+        observed = counts_0qbit()
+        assert np.array_equal(observed, expected)
 
     def test_count_on_1qbit(self, backend):
         """Test counts on 1 qubits."""
@@ -625,11 +649,23 @@ class TestVar:
         )
 
 
-class TestOtherMeasurements:
-    """Test other measurement processes."""
+class TestState:
+    """Test state measurement processes."""
 
-    def test_state(self, backend):
-        """Test state."""
+    def test_state_on_0qbits(self):
+        """Test state on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        def state_0qbit():
+            return qml.state()
+
+        expected = np.array([complex(1.0, 0.0)])
+        observed = state_0qbit()
+        assert np.array_equal(observed, expected)
+
+    def test_state_on_1qubit(self, backend):
+        """Test state on 1 qubit."""
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -637,9 +673,38 @@ class TestOtherMeasurements:
             qml.RX(x, wires=0)
             return qml.state()
 
-        expected = np.array([complex(1.0, 0.0), complex(0.0, 0.0)])
-        observed = state(0.0)
+        expected = np.array([complex(1.0, 0.0), complex(0.0, -1.0)]) / np.sqrt(2)
+        observed = state(np.pi / 2)
+        assert np.allclose(observed, expected)
+
+
+class TestProbs:
+    """Test probabilities measurement processes."""
+
+    def test_probs_on_0qbits(self):
+        """Test probs on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        def probs_0qbit():
+            return qml.probs()
+
+        expected = np.array([1.0])
+        observed = probs_0qbit()
         assert np.array_equal(observed, expected)
+
+    def test_probs_on_1qubit(self, backend):
+        """Test probs on 1 qubit."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def probs(x: float):
+            qml.RX(x, wires=0)
+            return qml.probs()
+
+        expected = np.array([0.5, 0.5])
+        observed = probs(np.pi / 2)
+        assert np.allclose(observed, expected)
 
 
 class TestNewArithmeticOps:
@@ -701,9 +766,6 @@ class TestNewArithmeticOps:
         """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
         with integer coefficients."""
 
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
-
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
@@ -715,8 +777,6 @@ class TestNewArithmeticOps:
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
-
-        qml.operation.disable_new_opmath()
 
     @pytest.mark.parametrize(
         "meas, expected",
@@ -758,9 +818,6 @@ class TestNewArithmeticOps:
     def test_sum_sprod_xyz(self, meas, expected, backend):
         """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
 
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
-
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
@@ -773,13 +830,8 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_mix_dunder(self, backend):
         """Test ``*`` and ``@`` dunder methods."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -793,13 +845,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.25)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_sum_hermitian(self, backend):
         """Test ``+`` with Hermitian observables."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
@@ -816,13 +863,8 @@ class TestNewArithmeticOps:
         expected = np.array(2.0)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_prod_hermitian(self, backend):
         """Test ``@`` with Hermitian observables."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
@@ -846,13 +888,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.20710678)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_sprod_hermitian(self, backend):
         """Test ``*`` and ``@`` with Hermitian observable."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -869,13 +906,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.14142136)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_sum_sprod_prod_hermitian(self, backend):
         """Test ``+`` of ``@`` with Hermitian observable."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -892,13 +924,8 @@ class TestNewArithmeticOps:
         expected = np.array(1.0)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_dunder_hermitian_1(self, backend):
         """Test dunder methods with Hermitian observable to a HamiltonianObs."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
@@ -924,13 +951,8 @@ class TestNewArithmeticOps:
         expected = np.array(0.34142136)
         assert np.allclose(expected, result)
 
-        qml.operation.disable_new_opmath()
-
     def test_dunder_hermitian_2(self, backend):
         """Test dunder methods with Hermitian observable to a TensorObs."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
 
         @qjit
         @qml.qnode(qml.device(backend, wires=4))
@@ -955,8 +977,6 @@ class TestNewArithmeticOps:
         result = circuit(np.pi, np.pi)
         expected = np.array(1.0)
         assert np.allclose(expected, result)
-
-        qml.operation.disable_new_opmath()
 
 
 if __name__ == "__main__":

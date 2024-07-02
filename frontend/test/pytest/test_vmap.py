@@ -807,3 +807,33 @@ class TestVectorizeMap:
         assert pytree_enzyme == pytree_fd
         assert jnp.allclose(data_enzyme[0], data_jax[0])
         assert jnp.allclose(data_enzyme[1], data_jax[1], atol=8e-2)
+
+    def test_vmap_usage_patterns(self, backend):
+        """Test usage patterns of catalyst.vmap."""
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def fn(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            res_pattern_fn_as_argument = vmap(fn, in_axes=0)(x)
+            res_pattern_partial = vmap(in_axes=0)(fn)(x)
+
+            return res_pattern_fn_as_argument, res_pattern_partial
+
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+        result = workflow(x)
+        expected = jnp.array([0.93005586, 0.00498127, -0.88789978])
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)

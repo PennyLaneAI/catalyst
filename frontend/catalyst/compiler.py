@@ -16,6 +16,7 @@ MLIR/LLVM representations.
 """
 import glob
 import importlib
+import logging
 import os
 import pathlib
 import platform
@@ -31,9 +32,13 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 package_root = os.path.dirname(__file__)
 
@@ -57,6 +62,8 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
+        autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
+        for autograph conversion.
         async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
             of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
@@ -72,10 +79,11 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
+    autograph_include: Optional[Iterable[str]] = ()
     async_qnodes: Optional[bool] = False
-    lower_to_llvm: Optional[bool] = True
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+    lower_to_llvm: Optional[bool] = True
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
@@ -105,6 +113,7 @@ class CompileOptions:
         return DEFAULT_PIPELINES
 
 
+@debug_logger
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
     """Run the command after optionally announcing this fact to the user.
 
@@ -139,6 +148,7 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
@@ -164,6 +174,7 @@ BUFFERIZATION_PASS = (
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
+        "canonicalize",
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
@@ -209,6 +220,7 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "add-exception-handling",
+        "register-inactive-callback",
     ],
 )
 
@@ -253,6 +265,7 @@ class LinkerDriver:
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
     @staticmethod
+    @debug_logger
     def get_default_flags(options):
         """Re-compute the path where the libraries exist.
 
@@ -263,6 +276,16 @@ class LinkerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+
+        # Adds RUNTIME_LIB_DIR to the Python system path to allow the catalyst_callback_registry
+        # to be importable.
+        sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+
+        # We use MLIR's C runner utils library in the registry.
+        # In order to be able to dlopen that library we need to know the path
+        # So we set the path here.
+        registry.set_mlir_lib_path(mlir_lib_path)
 
         lib_path_flags = [
             f"-Wl,-rpath,{mlir_lib_path}",
@@ -289,7 +312,9 @@ class LinkerDriver:
         if platform.system() == "Linux":
             file_path_within_package = "../scipy.libs/"
             file_extension = ".so"
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            msg = "Attempting to use catalyst on an unsupported system"
+            assert platform.system() == "Darwin", msg
             file_path_within_package = ".dylibs/"
             file_extension = ".dylib"
 
@@ -300,7 +325,13 @@ class LinkerDriver:
 
         file_prefix = "libopenblas"
         search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-        openblas_so_file = glob.glob(search_pattern)[0]
+        search_result = glob.glob(search_pattern)
+        if not search_result:
+            raise CompileError(
+                f'Unable to find OpenBLAS library at "{search_pattern}". '
+                "Please ensure that SciPy is installed and available via pip."
+            )
+        openblas_so_file = search_result[0]
         openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
 
         lib_path_flags += [
@@ -377,6 +408,7 @@ class LinkerDriver:
             return False
 
     @staticmethod
+    @debug_logger
     def get_output_filename(infile):
         """Rename object file to shared object
 
@@ -390,6 +422,7 @@ class LinkerDriver:
         return str(infile_path.with_suffix(".so"))
 
     @staticmethod
+    @debug_logger
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
@@ -423,10 +456,12 @@ class LinkerDriver:
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
+    @debug_logger_init
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
 
+    @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -487,6 +522,7 @@ class Compiler:
         self.last_compiler_output = compiler_output
         return output_filename, out_IR, [func_name, ret_type_name]
 
+    @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
@@ -511,6 +547,7 @@ class Compiler:
             **kwargs,
         )
 
+    @debug_logger
     def get_output_of(self, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
@@ -520,9 +557,9 @@ class Compiler:
             (Optional[str]): output IR
         """
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
-            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
-
-        if not self.last_compiler_output:
-            return None
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no file was found.\n"
+            msg += "Are you sure the file exists?"
+            raise CompileError(msg)
 
         return self.last_compiler_output.get_pipeline_output(pipeline)

@@ -16,7 +16,7 @@
 
 """Test for the device API.
 """
-import pathlib
+import platform
 
 import pennylane as qml
 from pennylane.devices import Device
@@ -30,9 +30,7 @@ from catalyst.compiler import get_lib_path
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
@@ -42,8 +40,12 @@ class DummyDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lightning_lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_lightning" + system_extension
+        )
 
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_lightning.so"
+        return "dummy.remote", lightning_lib_path
 
     def execute(self, circuits, execution_config):
         """Execute"""
@@ -59,7 +61,7 @@ class DummyDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.so", "dummy.remote", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -81,9 +83,10 @@ test_circuit()
 
 def test_preprocess():
     """Test a circuit (with preprocessing transforms) compilation to MLIR when
-    using the new device API."""
+    using the new device API.
+    TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.so", "dummy.remote", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -94,8 +97,8 @@ def test_preprocess():
         # CHECK:   quantum.custom "Hadamard"
         # CHECK:   quantum.custom "CNOT"
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
-        # CHECK:   quantum.custom "Hadamard"
-        # CHECK:   quantum.custom "CNOT"
+        # CHECK-NOT:   quantum.custom "Hadamard"
+        # CHECK-NOT:   quantum.custom "CNOT"
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliY]
         # CHECK:    return [[RETURN:.*]]: tensor<f64>, tensor<f64>
         return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliY(wires=0))

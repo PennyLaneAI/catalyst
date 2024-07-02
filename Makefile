@@ -11,6 +11,7 @@ LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
 MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
+OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
@@ -64,12 +65,14 @@ help:
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
+	@echo "  oqc                to build Catalyst-OQC Runtime"
 	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
+	@echo "  clean-oqc          to clean build files of OQC Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
@@ -77,16 +80,20 @@ help:
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 
-.PHONY: all
-all: runtime mlir frontend
+.PHONY: all catalyst
+all: runtime oqc mlir frontend
+catalyst: runtime dialects frontend
 
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
+	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
+	# versions of a package with the same version tag (e.g. 0.37-dev0).
+	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime
+.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
@@ -108,8 +115,11 @@ runtime:
 dummy_device:
 	$(MAKE) -C runtime dummy_device
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos
-test: test-runtime test-frontend test-demos test-toml-spec
+oqc:
+	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
+
+.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+test: test-runtime test-frontend test-demos
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
@@ -121,6 +131,9 @@ test-mlir:
 	$(MAKE) -C mlir test
 
 test-frontend: lit pytest
+
+test-oqc:
+	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
 lit:
 ifeq ($(ENABLE_ASAN),ON)
@@ -141,6 +154,7 @@ endif
 endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
@@ -160,8 +174,11 @@ wheel:
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/catalyst_callback_registry*.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
+	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
+	cp $(OQC_BUILD_DIR)/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
@@ -175,11 +192,11 @@ wheel:
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver.so $(MK_DIR)/frontend/mlir_quantum/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
-	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
+	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-mlir clean-runtime clean-all
+.PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -187,17 +204,34 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-mlir:
-	$(MAKE) -C mlir clean
-
-clean-runtime:
-	$(MAKE) -C runtime clean
-
-clean-all: clean-mlir clean-runtime
+clean-all: clean-mlir clean-runtime clean-oqc
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
+
+.PHONY: clean-mlir clean-dialects clean-llvm clean-mhlo clean-enzyme
+clean-mlir:
+	$(MAKE) -C mlir clean
+
+clean-dialects:
+	$(MAKE) -C mlir clean-dialects
+
+clean-llvm:
+	$(MAKE) -C mlir clean-llvm
+
+clean-mhlo:
+	$(MAKE) -C mlir clean-mhlo
+
+clean-enzyme:
+	$(MAKE) -C mlir clean-enzyme
+
+.PHONY: clean-runtime clean-oqc
+clean-runtime:
+	$(MAKE) -C runtime clean
+
+clean-oqc:
+	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
@@ -205,6 +239,7 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif
@@ -226,6 +261,10 @@ ifeq ($(shell test $(BLACKVERSIONMAJOR) -eq 22 -a $(BLACKVERSIONMINOR) -lt 10; e
 endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
+	$(MAKE) format-frontend
+
+.PHONY: format-frontend
+format-frontend:
 ifdef check
 	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
@@ -235,7 +274,6 @@ else
 	black .
 	isort .
 endif
-	pylint frontend
 
 .PHONY: docs clean-docs
 docs:

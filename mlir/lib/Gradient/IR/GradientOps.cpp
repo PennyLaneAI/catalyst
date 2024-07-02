@@ -20,6 +20,8 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/annotate_function.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -53,6 +55,25 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
     if (fnType.getNumInputs() != fnArgs.size())
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
+
+    if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
+        // Check that the method is not finite difference, as finite difference should always be
+        // available
+        auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
+        llvm::StringRef MethodName = gradOpInterface.getMethod();
+
+        if (MethodName != "fd") {
+            return op_state->emitOpError(
+                "An operation without a valid gradient was found in code "
+                "reachable from the gradient operation.\n"
+                "Example of operations not allowed:\n"
+                " * mid circuit measurements\n"
+                " * callbacks\n"
+                " * ZNE mitigation.\n"
+                " Try setting method=\"fd\" to directly compute the gradient with finite "
+                "difference.");
+        }
+    }
 
     for (unsigned i = 0; i < fnArgs.size(); ++i)
         if (!shapeEqual(fnArgs[i].getType(), fnType.getInput(i)))
@@ -139,6 +160,11 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     return success(succeeded(r1) && succeeded(r2));
 }
 
+LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // GradOp Extra methods
 //===----------------------------------------------------------------------===//
@@ -152,6 +178,81 @@ LogicalResult GradOp::verify()
 }
 
 MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable ValueAndGradOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
+Operation::operand_range ValueAndGradOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp callee = ({
+        auto cattr = this->getCalleeAttr();
+        auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << cattr;
+        fn;
+    });
+
+    auto diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
+    auto r1 = ::verifyGradInputs(this, callee, this->getOperands(), diffArgIndices);
+    if (r1.failed()) {
+        return r1;
+    }
+
+    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
+        return this->emitOpError(
+                   "invalid number of results: must be twice the number of callee results")
+               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
+               << this->getNumResults();
+    }
+
+    std::vector<Type> grad_types;
+    {
+        for (auto s : this->getGradients()) {
+            grad_types.push_back(s.getType());
+        }
+    }
+
+    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
+        auto calleeRtype = callee.getFunctionType().getResult(i);
+        auto gradRtype = grad_types[i];
+        if (calleeRtype != gradRtype) {
+            return this->emitOpError("result types do not match")
+                   << " result " << i << " should match "
+                   << " was expected to match the type " << gradRtype << " but got " << calleeRtype;
+        }
+    }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verify()
+{
+    StringRef method = this->getMethod();
+    if (method != "fd" && method != "auto")
+        return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
+MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getOperandsMutable(); }
 
 //===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
@@ -346,18 +447,22 @@ LogicalResult BackpropOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     if (hasTensorSemantics(getOperandTypes(), getResultTypes())) {
         // Verify the types of the outputs
         std::vector<Type> backpropTypes = computeBackpropTypes(fn, diffArgIndices);
-        TypeRange resultTypes = this->getResultTypes();
-        if (backpropTypes.size() != resultTypes.size()) {
-            return emitOpError("incorrect number of results in the backprop of the callee, ")
-                   << "expected " << backpropTypes.size() << " results "
-                   << "but got " << resultTypes.size();
+        std::vector<Type> gradientTypes;
+        for (auto &&grad : this->getGradients()) {
+            gradientTypes.push_back(grad.getType());
+        }
+
+        if (backpropTypes.size() != gradientTypes.size()) {
+            return emitOpError("incorrect number of gradients in the backprop of the callee, ")
+                   << "expected " << backpropTypes.size() << " gradients "
+                   << "but got " << gradientTypes.size();
         }
 
         for (unsigned i = 0; i < backpropTypes.size(); ++i) {
-            if (backpropTypes[i] != resultTypes[i]) {
-                return emitOpError("result type mismatch: expected operand type ")
-                       << backpropTypes[i] << ", but provided " << resultTypes[i]
-                       << " for result number " << i;
+            if (backpropTypes[i] != gradientTypes[i]) {
+                return emitOpError("gradient type mismatch: expected operand type ")
+                       << backpropTypes[i] << ", but provided " << gradientTypes[i]
+                       << " for gradient number " << i;
             }
         }
     }
@@ -386,10 +491,10 @@ LogicalResult BackpropOp::verify()
                << ", expected " << this->getCotangents().size() << " but got "
                << this->getCalleeResults().size();
 
-    if (this->getDiffArgShadows().size() + this->getNumResults() != numDiffArgs)
+    if (this->getDiffArgShadows().size() + this->getGradients().size() != numDiffArgs)
         return emitOpError("number of gradient results did not match number of differentiable")
                << " arguments, expected " << numDiffArgs << " but got "
-               << this->getDiffArgShadows().size() + this->getNumResults();
+               << this->getDiffArgShadows().size() + this->getGradients().size();
 
     return success();
 }

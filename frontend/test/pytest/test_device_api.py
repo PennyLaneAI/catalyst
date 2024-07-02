@@ -14,6 +14,7 @@
 """Test for the device API.
 """
 import pathlib
+import platform
 
 import pennylane as qml
 import pytest
@@ -24,16 +25,21 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.qjit_device import QJITDeviceNewAPI
-from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
+from catalyst.device import (
+    QJITDeviceNewAPI,
+    extract_backend_info,
+    get_device_capabilities,
+)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.utils.toml import ProgramFeatures
+
+# pylint:disable = protected-access,attribute-defined-outside-init
 
 
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -44,8 +50,9 @@ class DummyDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
-
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -58,34 +65,57 @@ class DummyDevice(Device):
         return transform_program, execution_config
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
+class DummyDeviceNoWires(Device):
+    """A dummy device from the device API without wires."""
+
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+
+    def __init__(self, shots=1024):
+        super().__init__(shots=shots)
+
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
+
+    def execute(self, circuits, execution_config):
+        """Execution."""
+        return circuits, execution_config
+
+
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
-    device_qjit = QJITDeviceNewAPI(device, config, backend_info)
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+    device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
 
     # Check attributes of the new device
-    assert isinstance(device_qjit.target_config, dict)
     assert device_qjit.shots == qml.measurements.Shots(2032)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
-    transform_program, _ = device_qjit.preprocess()
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
-    assert len(transform_program) == 2
+    assert len(transform_program) == 3
+    assert transform_program[-2]._transform.__name__ == "verify_operations"
+    assert transform_program[-1]._transform.__name__ == "validate_observables"
+
+    # TODO: readd when we do not discard device preprocessing
+    # t = transform_program[0].transform.__name__
+    # assert t == "split_non_commuting"
 
     t = transform_program[0].transform.__name__
-    assert t == "split_non_commuting"
+    assert t == "catalyst_decompose"
 
-    t = transform_program[1].transform.__name__
-    assert t == "decompose_ops_to_unitary"
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
         device_qjit.execute(10, 2)
@@ -96,10 +126,43 @@ def test_qjit_device():
     assert len(device_qjit.observables) > 0
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
+def test_qjit_device_no_wires():
+    """Test the qjit device from a device using the new api without wires set."""
+    device = DummyDeviceNoWires(shots=2032)
+
+    # Create qjit device
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+
+    with pytest.raises(
+        AttributeError, match="Catalyst does not support device instances without set wires."
+    ):
+        QJITDeviceNewAPI(device, capabilities, backend_info)
+
+
+@pytest.mark.parametrize(
+    "wires",
+    (
+        qml.wires.Wires(["a", "b"]),
+        qml.wires.Wires([0, 2, 4]),
+        qml.wires.Wires([1, 2, 3]),
+    ),
 )
+def test_qjit_device_invalid_wires(wires):
+    """Test the qjit device from a device using the new api without wires set."""
+    device = DummyDeviceNoWires(shots=2032)
+    device._wires = wires
+
+    # Create qjit device
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+
+    with pytest.raises(
+        AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
+    ):
+        QJITDeviceNewAPI(device, capabilities, backend_info)
+
+
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
     dev = DummyDevice(wires=2, shots=2048)

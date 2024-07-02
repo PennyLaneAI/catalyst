@@ -27,6 +27,9 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Gradient/IR/GradientDialect.h"
+#include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/Utils.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -319,7 +322,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
             mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
-
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
@@ -420,6 +422,148 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
+struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(CallbackOp op) const override
+    {
+        // Only match with ops without an entry block
+        return !op.empty() ? failure() : success();
+    }
+
+    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        Block *entry;
+        rewriter.updateRootInPlace(op, [&] { entry = op.addEntryBlock(); });
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(entry);
+
+        auto ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto one = rewriter.getI64IntegerAttr(1);
+        auto loc = op.getLoc();
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, one);
+        auto idAttr = op.getIdAttr();
+        auto constantId = rewriter.create<LLVM::ConstantOp>(loc, idAttr);
+        auto argcAttr = op.getArgcAttr();
+        auto constantArgc = rewriter.create<LLVM::ConstantOp>(loc, argcAttr);
+        auto rescAttr = op.getRescAttr();
+        auto constantResc = rewriter.create<LLVM::ConstantOp>(loc, rescAttr);
+
+        SmallVector<Value> callArgs = {constantId, constantArgc, constantResc};
+
+        Type i64 = rewriter.getI64Type();
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        bool isVarArg = true;
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto typeConverter = getTypeConverter();
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
+                                         /*ret_type=*/voidType, isVarArg);
+
+        // TODO: remove redundant alloca+store since ultimately we'll receive struct*
+        for (auto arg : op.getArguments()) {
+            Type structTy = typeConverter->convertType(arg.getType());
+            auto structVal =
+                rewriter.create<UnrealizedConversionCastOp>(loc, structTy, arg).getResult(0);
+            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structTy, c1);
+            rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
+            callArgs.push_back(ptr);
+        }
+        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.create<func::ReturnOp>(loc, TypeRange{}, ValueRange{});
+    }
+};
+
+struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(CallbackOp op) const override
+    {
+        // Only match with ops with an entry block
+        return !op.empty() ? success() : failure();
+    }
+    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto func =
+            rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
+        func.setPrivate();
+        auto noinline = rewriter.getStringAttr("noinline");
+        rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+        SmallVector<Attribute> passthrough = {noinline};
+        auto ctx = rewriter.getContext();
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
+        auto typeConverter = getTypeConverter();
+        gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        rewriter.eraseOp(op);
+    }
+};
+
+struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CallbackCallOp op, CallbackCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        // Just change the calling convention from scalar replacement of aggregates
+        // to pointer to struct.
+        auto loc = op.getLoc();
+        auto ctx = rewriter.getContext();
+        SmallVector<Value> callArgs;
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        for (auto structVal : adaptor.getInputs()) {
+            Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+            // allocate a memref descriptor on the stack
+            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structVal.getType(), c1);
+            // store the memref descriptor on the pointer
+            rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
+            // add the ptr to the arguments
+            callArgs.push_back(ptr);
+        }
+        rewriter.create<func::CallOp>(loc, adaptor.getCallee(), TypeRange{}, callArgs);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(gradient::CustomGradOp op) const override
+    {
+        // only match after all three are func.func
+        auto callee = op.getCalleeAttr();
+        auto forward = op.getForwardAttr();
+        auto reverse = op.getReverseAttr();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto calleeOp = mod.lookupSymbol<func::FuncOp>(callee);
+        auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
+        auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
+        auto ready = calleeOp && forwardOp && reverseOp;
+        return ready ? success() : failure();
+    }
+
+    void rewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto loc = op.getLoc();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto callee = op.getCalleeAttr();
+        auto forward = op.getForwardAttr();
+        auto reverse = op.getReverseAttr();
+        auto calleeOp = mod.lookupSymbol<func::FuncOp>(callee);
+        auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
+        auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
+        gradient::insertEnzymeCustomGradient(rewriter, mod, loc, calleeOp, forwardOp, reverseOp);
+        rewriter.eraseOp(op);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -438,9 +582,15 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
+        patterns.add<DefineCallbackOpPattern>(typeConverter, context);
+        patterns.add<ReplaceCallbackOpWithFuncOp>(typeConverter, context);
+        patterns.add<CallbackCallOpPattern>(typeConverter, context);
+        patterns.add<CustomGradOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
+        target.addLegalDialect<func::FuncDialect>();
         target.addIllegalDialect<CatalystDialect>();
+        target.addIllegalDialect<catalyst::gradient::GradientDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

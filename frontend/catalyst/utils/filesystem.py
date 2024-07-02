@@ -17,6 +17,7 @@ Functions to interface with the filesystem.
 
 import pathlib
 import shutil
+import sys
 import tempfile
 
 
@@ -52,6 +53,26 @@ class Directory:
             # after itself...
             return
         shutil.rmtree(str(self))
+
+
+class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
+    """Derived class from tempfile.TemporaryDirectory
+
+    This overrides the _cleanup method which would normally emit a warning
+    after removing the directory. This warning is unconditional and it is emitted
+    because it is not called explicitly.
+    """
+
+    @classmethod
+    def _cleanup(cls, name, warn_message, **kwargs):  # pylint: disable=arguments-differ
+        """Ignore ResourceWarning during cleanup."""
+        del warn_message
+        minor_version = sys.version_info[1]
+        if kwargs.get("delete") and minor_version >= 12:
+            # Changed in version 3.12: Removed the "delete" kwargs
+            del kwargs["delete"]  # pragma: nocover
+        # pylint: disable-next=protected-access
+        tempfile.TemporaryDirectory._rmtree(name, **kwargs)
 
 
 class WorkspaceManager:
@@ -93,7 +114,7 @@ class WorkspaceManager:
             # TODO: Once Python 3.12 becomes the least supported version of python, consider
             # setting the fields: delete and delete_on_close.
             # This can likely avoid having all the code below.
-            return tempfile.TemporaryDirectory(dir=path.resolve(), prefix=name.name)
+            return TemporaryDirectorySilent(dir=path.resolve(), prefix=name.name)
 
         count = 1
         curr_preferred_abspath = path / name

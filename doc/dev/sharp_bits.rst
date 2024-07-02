@@ -89,7 +89,7 @@ and those that happen at **runtime** (step 3).
 
     As a general rule of thumb, things that happen at compile-time
     are slow (or lead to slowdowns), while things that happen at
-    runtime are fast (or lead to speadups).
+    runtime are fast (or lead to speedups).
 
     However, if the same computation is repeated every time the
     compiled function is run (where the results are the same no
@@ -206,10 +206,10 @@ If we wish to print the value of variables at *runtime*, we can instead use the
 >>> from catalyst import debug
 >>> @qjit
 ... def g(x):
-...     debug.print(x)
+...     debug.print("Value of x = {x}", x=x)
 ...     return x ** 2
 >>> g(2.)
-[2.]
+Value of x = 2.0
 array(4.)
 
 Avoiding recompilation
@@ -223,20 +223,20 @@ For example, consider the following:
 
 >>> @qjit
 ... def f(x, y):
-...     print("Tracing occuring")
+...     print("Tracing occurring")
 ...     return x ** 2 + y
 >>> f(0.4, 1)
-Tracing occuring
+Tracing occurring
 array(1.16)
 >>> f(0.2, 3)
 array(3.04)
 
 However, if we change the argument types in a way where Catalyst can't perform
-auto-type promotion before passing the argument to the comppiled function
+auto-type promotion before passing the argument to the compiled function
 (e.g., passing a float instead of an integer), recompilation will occur:
 
 >>> f(0.15, 0.65)
-Tracing occuring
+Tracing occurring
 array(0.6725)
 
 However, changing a float to an integer will not cause recompilation:
@@ -247,12 +247,12 @@ array(8.65)
 Similarly, changing the shape of an array will also trigger recompilation:
 
 >>> f(jnp.array([0.2]), jnp.array([0.6]))
-Tracing occuring
+Tracing occurring
 array([0.64])
 >>> f(jnp.array([0.8]), jnp.array([1.6]))
 array([2.24])
 >>> f(jnp.array([0.8, 0.1]), jnp.array([1.6, -2.0]))
-Tracing occuring
+Tracing occurring
 array([ 2.24, -1.99])
 
 This is something to be aware of, especially when porting existing PennyLane
@@ -381,6 +381,9 @@ circuit, are measuring an expectation value, and are optimizing the result:
 
 .. code-block:: python
 
+    import numpy as np
+    import jax
+
     dev = qml.device("default.qubit", wires=4)
 
     @qml.qnode(dev)
@@ -404,19 +407,21 @@ circuit, are measuring an expectation value, and are optimizing the result:
     weights = jnp.array(2 * np.random.random([5, 4]) - 1)
     data = jnp.array(np.random.random([4]))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4, jit=False)
+    opt = optax.sgd(learning_rate=0.4)
 
     params = weights
-    state = opt.init_state(params)
+    state = opt.init(params)
 
     for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
+        params = optax.apply_updates(params, updates)
 
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
 
 Let's switch over to `Lightning <https://docs.pennylane.ai/projects/lightning>`__,
-our high-performance statevector simulator,
+our high-performance state-vector simulator,
 alongside the adjoint differentiation method. To do so, we change the first
 two lines of the above code-block to set the device as ``"lightning.qubit"``,
 and specify ``diff_method="adjoint"`` in the QNode decorator. With this
@@ -458,20 +463,22 @@ it using Catalyst:
         for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
         return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+    opt = optax.sgd(learning_rate=0.4)
 
     params = weights
-    state = opt.init_state(params)
+    state = opt.init(params)
 
     for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
+        params = optax.apply_updates(params, updates)
 
 With the quantum function qjit-compiled, the optimization loop
 now takes 16.4s ± 1.51s.
 
 However, while the quantum function is now compiled, and the compiled function
 is called to compute cost and gradient values, the optimization loop is still
-occuring in Python.
+occurring in Python.
 
 Instead, we can write the optimization loop itself as a function and decorate
 it with ``@qjit``; this will compile the optimization loop, and allow the full
@@ -485,11 +492,16 @@ optimization to take place within Catalyst:
             dy = grad(cost, argnum=0)(x, data)
             return (cost(x, data), dy)
 
-        opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
-        update_step = lambda i, *args: tuple(opt.update(*args))
+        opt = optax.sgd(learning_rate=0.4)
+    
+        def update_step(i, params, state):
+            (_, gradient) = loss(params)
+            (updates, state) = opt.update(gradient, state)
+            params = optax.apply_updates(params, updates)
+            return (params, state)
 
         params = init_weights
-        state = opt.init_state(params)
+        state = opt.init(params)
 
         return for_loop(0, steps, 1)(update_step)(params, state)
 
@@ -510,7 +522,9 @@ that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
+- ``jax.numpy.argsort``
 - ``jax.debug``
+- ``jax.scipy.linalg.expm``
 - ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
   indices.
 
@@ -544,6 +558,44 @@ This includes:
 
 For more details, please see the `JAX documentation
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
+
+Callbacks
+---------
+
+When coming across functionality that is not yet supported by Catalyst, such as functions like
+``jax.scipy.linalg.expm``, Python callbacks can be used to call arbitrary Python code within
+a qjit-compiled function, as long as the return shape and type is known:
+
+.. code-block:: python
+
+    @qjit
+    def fn(x):
+
+        A = jnp.sin(x) * jnp.array([0.23, 0.2], [0.43, -0.54.])
+
+        @catalyst.pure_callback
+        @jax.jit # since the callback function is pure JAX, we can jit it
+        def callback_fn(A) -> jax.ShapeDtypeStruct(A.shape, A.dtype):
+            # here we call non-Catalyst compatible code
+            return jax.scipy.linalg.expm(A)
+
+        return jnp.cos(callback_fn(A))
+
+>>> fn(0.654)
+array([[0.39385058, 0.99369752],
+       [0.97097762, 0.74283208]])
+
+Catalyst provides two callback functions:
+
+- :func:`~.pure_callback` supports callbacks of **pure** functions. That is, functions with no
+  side-effects that accept parameters and return values. However, the return type and shape of the
+  function must be known in advance, and is provided as a type signature.
+
+- :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
+  an easy entry point for debugging, for example via printing or logging at runtime.
+
+Note that callbacks do not currently support differentiation, and cannot be used inside
+functions that :func:`~.grad` is applied to.
 
 JAX integration
 ---------------
@@ -695,7 +747,7 @@ when working with classical control in Catalyst.
   array(6.)
 
 - There may be some cases where automatic type promotion cannot be applied; for example,
-  ommitting a return value in one branch (e.g., which by default in Python is equivalent
+  omitting a return value in one branch (e.g., which by default in Python is equivalent
   to returning ``None``) but not in others. This will result in an error ---
   if other branches do return values, the else branch must be specified.
 
@@ -888,7 +940,7 @@ the decomposition as follows:
 
 .. code-block:: python
 
-    from catalyst.autograph import autograph
+    from catalyst import run_autograph
 
     class RXX(qml.operation.Operation):
         num_params = 1
@@ -897,7 +949,7 @@ the decomposition as follows:
         def compute_decomposition(self, *params, wires=None):
             theta = params[0]
 
-            @autograph
+            @run_autograph
             def f(params):
                 if params[0] == 0.3:
                     qml.PauliRot(theta, 'XX', wires=wires)
@@ -908,6 +960,54 @@ the decomposition as follows:
                 f(params)
 
             return tape.operations
+
+
+Directly accessing QNode for PennyLane
+--------------------------------------
+
+In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNode object, it can be useful to retrieve the wrapped entity when interacting with PennyLane functions. Note that the :func:`@qjit <~.qjit>` decorator changes the type of the wrapped object, for example from ``function`` to :class:`QJIT <~.QJIT>`, or in this case from ``QNode`` to :class:`QJIT <~.QJIT>`. The original entity is accessible via the ``.original_function`` attribute on the compiled function, and can be used as follows:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qjit
+    @qml.qnode(dev)
+    def f():
+        qml.PauliX(0)
+        qml.PauliX(0)
+        qml.Hadamard(0)
+        return qml.state()
+
+    # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
+    g = qml.transforms.cancel_inverses(f.original_function)  
+
+
+>>> f
+<catalyst.jit.QJIT object at ...>
+>>> f.original_function
+<QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
+>>> g
+<QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
+>>> qml.matrix(f.original_function)()
+[[ 0.70710678  0.70710678]
+ [ 0.70710678 -0.70710678]]
+
+
+Note that some PennyLane functions may be able to extract the QNode automatically, like ``qml.draw`` and ``qml.matrix``:
+
+>>> qml.matrix(f)()
+[[ 0.70710678  0.70710678]
+ [ 0.70710678 -0.70710678]]
+>>> qml.draw(f)()
+0: ──X──X──H─┤  State
+>>> g = qjit(g)   # Compile the transformed QNode again with qjit 
+>>> g
+<catalyst.jit.QJIT object at ...>
+>>> qml.draw(g)()
+0: ──H─┤  State
+
+But in general, you will need to pass in the QNode explicitly.
 
 Function argument restrictions
 ------------------------------
@@ -945,7 +1045,7 @@ are registered as Pytrees with compatible data types.
 >>> f(obj)
 TypeError: Unsupported argument type: <class '__main__.MyObject'>
 
-By registring it as a Pytree (that is, specifying to JAX the dynamic and
+By registering it as a Pytree (that is, specifying to JAX the dynamic and
 static compile-time information, we make this object compatible with
 Catalyst:
 

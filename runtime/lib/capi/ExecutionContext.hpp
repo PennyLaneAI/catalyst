@@ -14,6 +14,7 @@
 
 #include <dlfcn.h>
 
+#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -26,8 +27,13 @@
 #include "Exception.hpp"
 #include "Python.hpp"
 #include "QuantumDevice.hpp"
+#include "Types.h"
+
+extern void callbackCall(int64_t, int64_t, int64_t, va_list);
 
 namespace Catalyst::Runtime {
+
+extern "C" void inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
 
 class MemoryManager final {
   private:
@@ -222,7 +228,6 @@ class RTDevice {
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
             f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                   : nullptr);
-
         return rtd_qdevice;
     }
 

@@ -186,21 +186,6 @@ TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with invalid postselect va
     REQUIRE_THROWS_WITH(sim->Measure(q, 2), Catch::Contains("Invalid postselect value"));
 }
 
-TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with postselect value at zero probability",
-                        "[Measures]", SimTypes)
-{
-    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-
-    QubitIdType q;
-
-    q = sim->AllocateQubit();
-
-    sim->NamedOperation("PauliX", {}, {q}, false);
-
-    REQUIRE_THROWS_WITH(sim->Measure(q, 0),
-                        Catch::Contains("Probability of postselect value is 0"));
-}
-
 TEMPLATE_LIST_TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[Measures]",
                         SimTypes)
 {
@@ -309,8 +294,9 @@ TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) shots test", "[Measures]", SimType
     std::vector<std::complex<double>> mat1(16, {0, 0});
 
     ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
-    REQUIRE_THROWS_WITH(sim->Expval(h1),
-                        Catch::Contains("Hermitian observables do not support shot measurement."));
+    REQUIRE_THROWS_WITH(
+        sim->Expval(h1),
+        Catch::Contains("Hermitian observables with shot measurement are not supported"));
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
@@ -334,8 +320,9 @@ TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
     std::vector<std::complex<double>> mat1(16, {0, 0});
 
     ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
-    REQUIRE_THROWS_WITH(sim->Var(h1),
-                        Catch::Contains("Hermitian observables do not support shot measurement."));
+    REQUIRE_THROWS_WITH(
+        sim->Var(h1),
+        Catch::Contains("Hermitian observables with shot measurement are not supported"));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
