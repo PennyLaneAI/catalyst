@@ -1,7 +1,19 @@
 name: Check PennyLane/Lightning Compatibility
 
 on:
+  pull_request:
   workflow_call:
+    inputs:
+      catalyst:
+        required: true
+        type: string
+      pennylane:
+        required: true
+        type: string
+      lightning:
+        required: true
+        type: string
+  workflow_dispatch:
     inputs:
       catalyst:
         required: true
@@ -191,7 +203,7 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        OMP_PROC_BIND=false OMP_NUM_THREADS=2 make pytest TEST_BACKEND="lightning.kokkos"
 
     - name: Run Frontend Tests (Braket)
       run: |
