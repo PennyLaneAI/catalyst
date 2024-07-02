@@ -220,7 +220,6 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         }
     }
 
-    // TODO: this assertion needs to be more sophisticated
     for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
         // callee (function to be differentiated) always returns a single float
         // grad type and shape should match the callee's argument's type and shape
