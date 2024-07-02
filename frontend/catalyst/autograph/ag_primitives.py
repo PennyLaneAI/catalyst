@@ -28,6 +28,7 @@ from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
 from malt.operators import py_builtins as ag_py_builtins
+from malt.operators.slices import GetItemOpts
 from malt.operators.variables import Undefined
 from malt.pyct.origin_info import LineLocation
 from pennylane.queuing import AnnotatedQueue
@@ -47,6 +48,7 @@ __all__ = [
     "or_",
     "not_",
     "set_item",
+    "get_item",
 ]
 
 
@@ -573,6 +575,25 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             return new_qnode()
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
+
+
+def get_item(target, i, opts):
+    """If target is not a jax array, TracerIntegerConversionError might be raised. To avoid
+    index a non-jax array with jax index, we convert it into jax array first."""
+    assert isinstance(opts, GetItemOpts)
+
+    if (
+        isinstance(target, DynamicJaxprTracer)
+        or isinstance(target, tuple)
+        and all(isinstance(item, DynamicJaxprTracer) for item in target)
+    ):
+        return target[i]
+    else:
+        try:
+            return jnp.array(target)[i]
+        except TypeError as e:
+            print(str(target) + " cannot be converted into jax type.", e)
+            return target[i]
 
 
 def set_item(target, i, x):
