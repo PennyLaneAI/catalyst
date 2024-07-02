@@ -2,115 +2,6 @@
 
 <h3>New features</h3>
 
-* `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
-  [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
-
-* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated
-  `n_shots` times to simulate hardware-like results.
-  The loop over shots is executed with `catalyst.vmap`.
-  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
-
-* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
-  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
-
-* Support for disabling Autograph for a specific function or
-  only for the function calls inside a specific context,
-  without affecting the bare code inside such context.
-  [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
-  [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
-
-  Using `disable_autograph` as a decorator is now possible:
-
-  ```py
-  @disable_autograph
-  def f():
-    x = 6
-    if x > 5:
-      y = x ** 2
-    else:
-      y = x ** 3
-    return y
-
-  @qjit(autograph=True)
-  def g(x: float, n: int):
-    for _ in range(n):
-      x = x + f()
-    return x
-
-  ```
-
-  Applying `disable_autograph` to a context is now possible:
-
-  ```py
-  def f():
-    x = 6
-    if x > 5:
-      y = x ** 2
-    else:
-      y = x ** 3
-    return y
-
-  @qjit(autograph=True)
-  def g():
-    x = 0.4
-    with disable_autograph:
-      x += f()
-    return x
-
-  ```
-
-* Support for usage of single index JAX array assignments
-  inside Autograph annotated functions.
-  [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
-
-  Using `x[i] = y` in favor of `x = x.at(i).set(y)` is now possible:
-
-  ```py
-  @qjit(autograph=True)
-  def f(x):
-    first_dim = x.shape[0]
-    result = jnp.empty((first_dim,), dtype=x.dtype)
-
-    for i in range(first_dim):
-      result[i] = x[i] * 2
-
-    return result
-
-  ```
-
-* Support for including a list of (sub)modules to be allow-listed for autograph conversion.
-  [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
-
-  Although library code is not meant to be targeted by Autograph conversion,
-  it sometimes make sense to enable it for specific submodules that might
-  benefit from such conversion:
-
-  ```py
-  @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
-  def f(x):
-    return excluded_module.submodule.func(x)
-
-  ```
-
-* Support for using `catalyst.value_and_grad` with a `qjit`-ted function.
-  [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
-
-  ```py
-  @qjit
-  def workflow(x: float):
-      @qml.qnode(qml.device("lightning.qubit", wires=3))
-      def circuit():
-          qml.CNOT(wires=[0, 1])
-          qml.RX(0, wires=[2])
-          return qml.probs()  # This is [1, 0, 0, ...]
-
-      return x * (circuit()[0])
-
-  result = qjit(value_and_grad(workflow))(3.0)
-
-  >>> (3.0, 1.0)
-  ```
-
 * Add support for accelerating classical processing via JAX with `catalyst.accelerate`.
   [(#805)](https://github.com/PennyLaneAI/catalyst/pull/805)
 
@@ -134,13 +25,252 @@
   `jax.devices()`. If not provided, the default value of
   `jax.devices()[0]` as determined by JAX will be used.
 
-* Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
-  shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
+* Catalyst callback functions, such as `pure_callback`, `debug.callback`, and `debug.print`, now
+  all support autodifferentiation.
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
+  [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
+  [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
+  [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
+
+  - When using callbacks that do not return any values, such as `catalyst.debug.callback` and
+    `catalyst.debug.print`, these functions are marked as 'inactive' and do not contribute to or
+    affect the gradient of the function:
+
+    ```python
+    import logging
+  
+    log = logging.getLogger(__name__)
+    log.setLevel(logging.INFO)
+  
+    @qml.qjit
+    @catalyst.grad
+    def f(x):
+        y = jnp.cos(x)
+        catalyst.debug.print("Debug print: y = {0:.4f}", y)
+        catalyst.debug.callback(lambda _: log.info("Value of y = %s", _))(y)
+        return y ** 2
+    ```
+  
+    ```pycon
+    >>> f(0.54)
+    INFO:__main__:Value of y = 0.8577086813638242
+    Debug print: y = 0.8577
+    array(-0.88195781)
+    ```
+
+  - Callbacks that *do* return values and may affect the qjit-compiled functions
+    computation, such as `pure_callback`, may have custom gradients manually
+    registered with the Catalyst compiler in order to support differentiation.
+
+    This can be done via the `pure_callback.fwd` and `pure_callback.bwd` methods, to specify how the
+    forwards and backwards pass (the vector-Jacobian product) of the callback should be computed:
+
+    ```python
+    @catalyst.pure_callback
+    def callback_fn(x) -> float:
+        return np.sin(x[0]) * x[1]
+
+    @callback_fn.fwd
+    def callback_fn_fwd(x):
+        # returns the evaluated function as well as residual
+        # values that may be useful for the backwards pass
+        return callback_fn(x), x
+
+    @callback_fn.bwd
+    def callback_fn_vjp(res, dy):
+        # Accepts residuals from the forward pass, as well
+        # as (one or more) cotangent vectors dy, and returns
+        # a tuple of VJPs corresponding to each input parameter.
+
+        def vjp(x, dy) -> (jax.ShapeDtypeStruct((2,), jnp.float64),):
+            return (np.array([np.cos(x[0]) * dy * x[1], np.sin(x[0]) * dy]),)
+
+        # The VJP function can also be a pure callback
+        return catalyst.pure_callback(vjp)(res, dy)
+
+    @qml.qjit
+    @catalyst.grad
+    def f(x):
+        y = jnp.array([jnp.cos(x[0]), x[1]])
+        return jnp.sin(callback_fn(y))
+    ```
+
+    ```pycon
+    >>> x = jnp.array([0.1, 0.2])
+    >>> f(x)
+    array([-0.01071923,  0.82698717])
+    ```
+
+    Note that `@callback_fn.bwd` is compatible with the return type of `jax.vjp`,
+    allowing for functions with `jax.vjp`-computable vector-Jacobian products
+    to be easily supported:
+
+    ```python
+    @catalyst.pure_callback
+    def expm(x) -> jax.ShapeDtypeStruct((2, 2), jnp.float64):
+        return jax.scipy.linalg.expm(x)
+
+    @expm.fwd
+    def expm_fwd(x):
+        return jax.scipy.linalg.expm(x), x
+
+    @expm.bwd
+    def expm_bwd(res, dy):
+
+        @catalyst.accelerate
+        def vjp(x, dy):
+            _, vjp_func = jax.vjp(jax.scipy.linalg.expm, x)
+            return vjp_func(dy)
+
+        return vjp(res, dy)
+
+    @qml.qjit
+    @catalyst.jacobian
+    def f(x):
+        return expm(x)
+    ```
+
+    ```pycon
+    >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+    >>> f(x)
+    array([[[[1.12914705, 0.18555319],
+         [0.12370212, 0.0129465 ]],
+        [[0.12370212, 1.31470024],
+         [0.008631  , 0.13664862]]],
+       [[[0.18555319, 0.01941975],
+         [1.31470024, 0.20497293]],
+        [[0.0129465 , 0.20497293],
+         [0.13664862, 1.51967317]]]])
+    ```
+
+* Catalyst now supports the 'dynamic one shot' method for simulating circuits with mid-circuit
+  measurements, which compared to other methods, may be advantageous for circuits with many
+  mid-circuit measurements executed for few shots.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+  [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
+
+  The dynamic one shot method evaluates dynamic circuits by executing them one shot at a time via
+  `catalyst.vmap`, sampling a dynamic execution path for each shot. This method only works for a
+  QNode executing with finite shots, and it requires the device to support mid-circuit measurements
+  natively.
+
+  This new mode can be specified by using the `mcm_method` argument of the QNode:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=5, shots=20)
+
+  @qml.qjit(autograph=True)
+  @qml.qnode(dev, mcm_method="one-shot")
+  def circuit(x):
+
+      for i in range(10):
+          qml.RX(x, 0)
+          m = catalyst.measure(0)
+
+          if m:
+              qml.RY(x ** 2, 1)
+
+          x = jnp.sin(x)
+
+      return qml.expval(qml.Z(1))
+  ```
+
+  Catalyst's existing method for simulating mid-circuit measurements remains
+  available via `mcm_method="single-branch-statistics"`.
+
+  When using `mcm_method="one-shot"`, the `postslect_mode` keyword argument can also
+  be used, to specify whether postselection should continue until `shots`-number of
+  postselected measurements are made (`"fill-shots"`), or whether execution should
+  terminate once `shot` executions have occurred regardless of how many postselected
+  measurements have occurred (`"hw_like"`):
+
+  ```python
+  @qml.qjit
+  @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
+  def func(x):
+      qml.RX(x, wires=0)
+      m_0 = catalyst.measure(0, postselect=1)
+      return qml.sample(wires=0)
+  ```
+
+  ```pycon
+  >>> res = func(0.9)
+  >>> res
+  array([-2147483648, -2147483648,           1, -2147483648, -2147483648,
+         -2147483648, -2147483648,           1, -2147483648, -2147483648,
+         -2147483648, -2147483648,           1, -2147483648, -2147483648,
+         -2147483648, -2147483648, -2147483648, -2147483648, -2147483648])
+  >>> jnp.delete(res, jnp.where(res == np.iinfo(np.int32).min)[0])
+  Array([1, 1, 1], dtype=int64)
+  ```
+
+  Note that invalid shots will not be discarded, but will be replaced by `np.iinfo(np.int32).min`.
+  They will not be used for processing final results (like expectation values), but
+  they will appear in the output of QNodes that return samples directly.
+
+  For more details, see the [dynamic quantum circuit documentation](https://docs.pennylane.ai/en/latest/introduction/dynamic_quantum_circuits.html).
+
+* A new function, `catalyst.value_and_grad`, returns both the result of a function and
+  its gradient with a single forward and backwards pass.
+  [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
+
+  This can be more efficient, and reduce overall quantum executions, compared to separately
+  executing the function and then computing its gradient.
+
+  For example:
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=3)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      qml.CNOT(wires=[0, 1])
+      qml.RX(x, wires=2)
+      return qml.probs()
+
+  @qml.qjit
+  @catalyst.value_and_grad
+  def cost(x):
+      return jnp.sum(jnp.cos(circuit(x)))
+  ```
+
+  ```pycon
+  >>> cost(0.543)
+  (array(7.64695856), array(0.33413963))
+  ```
+
+* Autograph now supports single index JAX array assignments
+  [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
+
+  When using Autograph, syntax of the form `x[i] = y` where `i` is a single integer
+  will now be automatically converted to the JAX equivalent of `x = x.at(i).set(y)`:
+
+  ```python
+  @qml.qjit(autograph=True)
+  def f(array):
+      result = jnp.ones(array.shape, dtype=array.dtype)
+
+      for i, x in enumerate(array):
+          result[i] = result[i] + x * 3
+
+      return result
+  ```
+
+  ```pycon
+  >>> f(jnp.array([-0.1, 0.12, 0.43, 0.54]))
+  array([0.7 , 1.36, 2.29, 2.62])
+  ```
+
+* Catalyst now supports dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
+  shapes can now be used with `for_loop`, `while_loop`, and `cond` primitives.
+  [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
+  [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+
   ``` python
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=4))
-  def f(sz):
-      a = jnp.ones([sz], dtype=float)
+  def f(shape):
+      a = jnp.ones([shape], dtype=float)
 
       @for_loop(0, 10, 2)
       def loop(i, a):
@@ -152,71 +282,89 @@
   >>> f(3)
   array([21., 21., 21.])
   ```
-  There are some limitations regarding the usage of such arrays, notably, the ones captured from the
-  outer scopes of a Python program. These limitations are yet to be addressed.
-  [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
-  [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
-
-* Differentiation support for callbacks.
-  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
-  [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
-  [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
-  [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
-
-  Parameters to `debug.callback`s are marked as inactive. This means that the
-  This means that the partial derivative of `debug.callback`s does not need to
-  be computed.
-
-  There are no changes to the syntax of inactive callbacks, including
-  `debug.print`. See the following example:
-
-  ```python
-  @qml.qjit
-  @grad
-  def identity(x: float):
-    debug.print(x)
-    return x
+  
+  However, capturing dynamic-shaped arrays within control-flow from outer scopes is currently not
+  supported:
+  
+  ```pycon
+  >>> @qjit(abstracted_axes={1: 'n'})
+  ... def g(x, y):
+  ...     @catalyst.for_loop(0, 10, 1)
+  ...     def loop(_, a):
+  ...         # Attempt to capture `x` from the outer scope.
+  ...         return a * x
+  ...     return jnp.sum(loop(y))
+  >>> a = jnp.ones([1,3], dtype=float)
+  >>> b = jnp.ones([1,3], dtype=float)
+  >>> g(a, b)
+  ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
   ```
 
-  Parameters to `pure_callback`s are active variables. This means the
-  partial derivative of `pure_callback`s needs to be computed.
-  Since callbacks are opaque to the compiler, the user needs to register
-  custom gradients with Enzyme.
+* Support has been added for disabling Autograph for specific functions.
+  [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
+  [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
 
-  In order to differentiate `pure_callback`s please use the following syntax:
-
-  ```python
-  @pure_callback
-  def identity(x) -> float:
-    return x
-
-  @identity.fwd
-  def fwd(x):
-    return identity(x), 1.0
-
-  @identity.bwd
-  def bwd(res, cot):
-    return cot * res
-
-  @qml.qjit
-  @grad
-  def wrapper(x):
-    return scale * identity(x)
-  ```
-
-  The forward pass must always return a tuple where the first element of the tuple
-  is the result of the function being differentiated and the second element of the tuple
-  are the residuals that may be used in the reverse pass. There may be multiple residuals
-  and also no residuals. In the case of no residuals, please return `None` like so:
+  The decorator `catalyst.disable_autograph` allows one to disable Autograph
+  from auto-converting specific external functions when called within a qjit-compiled
+  function with `autograph=True`:
 
   ```python
-  @identity.fwd
-  def fwd(x):
-     # Still needs to return a tuple.
-     return identity(x), None
+  def approximate_e(n):
+      num = 1.
+      fac = 1.
+      for i in range(1, n + 1):
+          fac *= i
+          num += 1. / fac
+      return num
+  
+  @qml.qjit(autograph=True)
+  def g(x: float, N: int):
+  
+      for i in range(N):
+          x = x + catalyst.disable_autograph(approximate_e)(10) / x ** i
+  
+      return x
   ```
 
-* Support controlled operations without matrices via applying PennyLane's decomposition.
+  ```pycon
+  >>> g(0.1, 10)
+  array(4.02997319)
+  ```
+
+  Note that for Autograph to be disabled, the decorated function must be
+  defined **outside** the qjit-compiled function. If it is defined within
+  the qjit-compiled function, it will continue to be converted with Autograph.
+
+  In addition, Autograph can also be disabled for all externally defined functions
+  within a qjit-compiled function via the context manager syntax:
+
+  ```python
+  @qml.qjit(autograph=True)
+  def g(x: float, N: int):
+  
+      for i in range(N):
+          with catalyst.disable_autograph:
+            x = x + approximate_e(10) / x ** i
+  
+      return x
+  ```
+
+* Support for including a list of (sub)modules to be whitelisted for autograph conversion.
+  [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
+
+  Although library code is not meant to be targeted by Autograph conversion,
+  it sometimes make sense to enable it for specific submodules that might
+  benefit from such conversion:
+
+  ```py
+  @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
+  def f(x):
+    return excluded_module.submodule.func(x)
+
+  ```
+
+* Controlled operations that do not have a matrix representation defined are now supported via
+  applying PennyLane's decomposition.
   [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
 
   ``` python
@@ -229,13 +377,6 @@
   ```
 
 <h3>Improvements</h3>
-
-* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
-  only integer, continuous wire labels starting at 0 are allowed.
-  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
-
-* Catalyst no longer disallows quantum circuits with 0 qubits.
-  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
 * Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
   applied to a single Operator. This should lead to improved compatibility with PennyLane library
@@ -254,18 +395,29 @@
   shot in a shots-based execution mode.
   [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
 
+* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
+
+* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
+  only integer, continuous wire labels starting at 0 are allowed.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
+* Catalyst no longer disallows quantum circuits with 0 qubits.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
   simulator supports this gate.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
-* Can now compile functions that have been annotated with return type
-  annotations.
+* Functions that have been annotated with return type
+  annotations will now correctly compile with `@qjit`.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
-* Refactored `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators in order to follow
+* The `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators now follow
   a unified pattern that uses a callable class implementing the decorator's logic. This
-  prevents having to excessively define functions in a nested fashion.
+  prevents having to excessively define functions in a nested fashion, and allows them
+  to be used as decorators.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
   [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
   [(#762)](https://github.com/PennyLaneAI/catalyst/pull/762)
@@ -297,7 +449,7 @@
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
   As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above
-  (e.g. Ubuntu 20.04 and above).
+  (e.g., Ubuntu 20.04 and above).
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
@@ -311,22 +463,24 @@
   register.
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
-* Correctly querying batching rules for `jax.scipy.linalg.expm`
+* `jax.scipy.linalg.expm` is now supported within qjit-compiled functions.
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
+  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
-* Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
+  This required correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
   In this bug fix, four openblas routines were newly linked and are now discoverable by
   `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`,
   `lapack_zgetrf`.
-  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
-* Correctly recording types of constant array when lowering `catalyst.grad` to mlir
+* Fixes a bug where QNodes that contained `QubitUnitary` with a complex matrix
+  would error during gradient computation.
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 * Callbacks can now return types which can be flattened and unflattened.
   [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
 
-* `catalyst.qjit` and `catalyst.grad` can now get `__name__` from `functools.partial`.
+* `catalyst.qjit` and `catalyst.grad` now work correctly with
+  functions that have been wrapped with `functools.partial`.
   [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
 
 <h3>Internal changes</h3>

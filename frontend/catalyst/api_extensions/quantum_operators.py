@@ -79,6 +79,14 @@ def measure(
     Raises:
         ValueError: Called outside the tape context.
 
+    .. note::
+
+        To configure the mid-circuit measurement simulation method and postselection
+        mode, please see the relevant keyword arguments of the :func:`~.QNode`.
+
+        For more details, check out our
+        :doc:`dynamic quantum circuit guide <introduction/dynamic_quantum_circuits>`.
+
     **Example**
 
     .. code-block:: python

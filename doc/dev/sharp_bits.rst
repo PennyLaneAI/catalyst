@@ -493,7 +493,7 @@ optimization to take place within Catalyst:
             return (cost(x, data), dy)
 
         opt = optax.sgd(learning_rate=0.4)
-    
+
         def update_step(i, params, state):
             (_, gradient) = loss(params)
             (updates, state) = opt.update(gradient, state)
@@ -585,17 +585,25 @@ a qjit-compiled function, as long as the return shape and type is known:
 array([[0.39385058, 0.99369752],
        [0.97097762, 0.74283208]])
 
-Catalyst provides two callback functions:
+Catalyst provides several callback functions:
 
 - :func:`~.pure_callback` supports callbacks of **pure** functions. That is, functions with no
   side-effects that accept parameters and return values. However, the return type and shape of the
   function must be known in advance, and is provided as a type signature.
 
+- :func:`~.accelerate` is similar to :func:`~.pure_callback` above, but is designed to
+  work only with functions that are ``jax.jit`` compatible. As a result of this restriction,
+  return types do not have to be provided upfront, and support is provided for executing
+  these callbacks directly on classical accelerators such as GPUs and TPUs.
+
 - :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
   an easy entry point for debugging, for example via printing or logging at runtime.
 
-Note that callbacks do not currently support differentiation, and cannot be used inside
-functions that :func:`~.grad` is applied to.
+Note that to use :func:`~.pure_callback` within functions that are being differentiated,
+a custom VJP rule **must** be defined so that the Catalyst compiler knows how to
+differentiate the callback. This can be done via the ``pure_callback.fwd`` and
+``pure_callback.bwd`` methods. See the :func:`~.pure_callback` documentation for
+more details.
 
 JAX integration
 ---------------
@@ -980,7 +988,7 @@ In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNo
         return qml.state()
 
     # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
-    g = qml.transforms.cancel_inverses(f.original_function)  
+    g = qml.transforms.cancel_inverses(f.original_function)
 
 
 >>> f
@@ -1001,7 +1009,7 @@ Note that some PennyLane functions may be able to extract the QNode automaticall
  [ 0.70710678 -0.70710678]]
 >>> qml.draw(f)()
 0: ──X──X──H─┤  State
->>> g = qjit(g)   # Compile the transformed QNode again with qjit 
+>>> g = qjit(g)   # Compile the transformed QNode again with qjit
 >>> g
 <catalyst.jit.QJIT object at ...>
 >>> qml.draw(g)()
@@ -1141,18 +1149,32 @@ array(2.1)
 For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
 
 Note that using dynamically-shaped arrays within for loops, while loops, and
-conditional statements, is not currently supported:
+conditional statements, are also supported:
 
 >>> @qjit
-... def f(size):
-...     a = jnp.ones([size], dtype=float)
-...     for i in range(10):
-...         a = a
+... def f(shape):
+...     a = jnp.ones([shape], dtype=float)
 ...     @for_loop(0, 10, 2)
-...     def loop(_, a):
-...         return a
+...     def loop(i, a):
+...         return a + i
 ...     return loop(a)
-KeyError: 137774138140016
+>>> f(5)
+array([21., 21., 21., 21., 21.])
+
+However, capturing dynamic-shaped arrays within control-flow from outer scopes is currently not
+supported:
+
+>>> @qjit(abstracted_axes={1: 'n'})
+... def g(x, y):
+...     @catalyst.for_loop(0, 10, 1)
+...     def loop(_, a):
+...         # Attempt to capture `x` from the outer scope.
+...         return a * x
+...     return jnp.sum(loop(y))
+>>> a = jnp.ones([1,3], dtype=float)
+>>> b = jnp.ones([1,3], dtype=float)
+>>> g(a, b)
+ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
 
 Returning multiple measurements
 -------------------------------

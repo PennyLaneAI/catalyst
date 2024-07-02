@@ -546,6 +546,7 @@ Calculating Quantum Gradients
 
     ~catalyst.grad
     ~catalyst.jacobian
+    ~catalyst.value_and_grad
     ~catalyst.vjp
     ~catalyst.jvp
 
