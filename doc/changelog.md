@@ -330,6 +330,9 @@ This release contains contributions from (in alphabetical order):
 * A new GitHub workflow makes available a binary distribution for Linux Arm64.
   [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
+* Autograph works when `qjit` is applied to a function decorated with `vmap`.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+
 <h3>Breaking changes</h3>
 
 * The `mitigate_with_zne` function no longer accepts a `degree` parameter for polynomial fitting
