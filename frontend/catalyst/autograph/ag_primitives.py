@@ -591,7 +591,7 @@ def get_item(target, i, opts):
     else:
         try:
             return jnp.array(target)[i]
-        except Exception as e:
+        except TypeError as e:
             print(str(target) + " cannot be converted into jax type.", e)
             return target[i]
 
