@@ -18,12 +18,14 @@ functions. The purpose is to convert imperative style code to functional or grap
 """
 
 import functools
+import operator
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.tree_util import tree_map, tree_reduce
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
@@ -582,10 +584,13 @@ def get_item(target, i, opts):
     index a non-jax array with jax index, we convert it into jax array first."""
     assert isinstance(opts, GetItemOpts)
 
+    def convertToDynamicJaxprTracer(obj):
+        return isinstance(obj, DynamicJaxprTracer)
+
     if (
         isinstance(target, DynamicJaxprTracer)
         or isinstance(target, tuple)
-        and all(isinstance(item, DynamicJaxprTracer) for item in target)
+        and tree_reduce(operator.and_, tree_map(convertToDynamicJaxprTracer, target))
     ):
         return target[i]
     else:
