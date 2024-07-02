@@ -232,13 +232,13 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         // callee (function to be differentiated) always returns a single float
         // grad type and shape should match the callee's argument's type and shape
         // match from the tail because constant inputs will have types in the front
-        auto calleeRtype =
+        auto calleeInputType =
             callee.getFunctionType().getInput(callee.getFunctionType().getNumInputs() - 1 - i);
         auto gradRtype = grad_types[grad_types.size() - 1 - i];
-        if (calleeRtype != gradRtype) {
+        if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got " << calleeRtype;
+                   << " was expected to match the type " << gradRtype << " but got " << calleeInputType;
         }
     }
 
