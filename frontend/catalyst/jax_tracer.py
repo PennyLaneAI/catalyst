@@ -1051,8 +1051,11 @@ def trace_function(
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
+
     with EvaluationContext.frame_tracing_context(ctx) as trace:
-        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        arg_expanded_tracers = input_type_to_tracers(
+            in_sig.in_type, trace.new_arg, trace.full_raise
+        )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
         return res_expanded_tracers, in_sig, out_sig
