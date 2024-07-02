@@ -1347,8 +1347,12 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
 
 
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
-def test_vjp_as_residual(arg):
+@pytest.mark.parametrize("order", ["good", "bad"])
+def test_vjp_as_residual(arg, order):
     """See https://github.com/PennyLaneAI/catalyst/issues/852"""
+
+    if order == "bad":
+        pytest.skip("Bug")
 
     def jax_callback(fn, result_type):
 
@@ -1377,12 +1381,12 @@ def test_vjp_as_residual(arg):
     def ground_truth(x):
         return jax.scipy.linalg.expm(x)
 
-    # BAD ORDER
-    # obs = hypothesis(arg)
-    # exp = ground_truth(arg)
-    # GOOD ORDER
-    exp = ground_truth(arg)
-    obs = hypothesis(arg)
+    if order == "bad":
+        obs = hypothesis(arg)
+        exp = ground_truth(arg)
+    else:
+        exp = ground_truth(arg)
+        obs = hypothesis(arg)
     assert np.allclose(obs, exp)
 
 
