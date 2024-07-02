@@ -230,7 +230,8 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got " << calleeInputType;
+                   << " was expected to match the type " << gradRtype << " but got "
+                   << calleeInputType;
         }
     }
 

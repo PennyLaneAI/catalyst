@@ -242,8 +242,24 @@ def test_value_and_grad_on_qjit_classical():
 
     result = qjit(value_and_grad(f))(3.0)
     expected = (9.0, 6.0)
-
     assert np.allclose(result, expected)
+
+    @qjit
+    def f(x: float):
+        return [x * x]
+
+    result = qjit(value_and_grad(f))(3.0)
+    expected = ([9.0], [6.0])
+    assert np.allclose(result, expected)
+
+    @qjit
+    def f(x: float):
+        return {"helloworld": x * x}
+
+    result = qjit(value_and_grad(f))(3.0)
+    expected = ({"helloworld": 9.0}, {"helloworld": 6.0})
+    assert np.allclose(result[0]["helloworld"], expected[0]["helloworld"])
+    assert np.allclose(result[1]["helloworld"], expected[1]["helloworld"])
 
 
 def test_value_and_grad_on_qjit_classical_vector():
