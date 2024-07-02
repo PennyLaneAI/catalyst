@@ -1244,6 +1244,23 @@ class TestForLoops:
 
         assert f() == 9
 
+    def test_dynamic_index_with_range(self):
+        """If UserWarning related to __index__ is raised."""
+
+        n = 2
+        wires = range(n)
+
+        with warnings.catch_warnings(record=True) as w:
+
+            @qjit(autograph=True)
+            @qml.qnode(qml.device("lightning.qubit", wires=n))
+            def circuit():
+                for i in range(n):
+                    qml.Hadamard(wires=wires[i])
+                return qml.expval(qml.PauliZ(wires=wires[1]))
+
+            assert len(w) == 0
+
 
 class TestWhileLoops:
     """Test that the autograph transformations produce correct results on while loops."""
@@ -1882,23 +1899,6 @@ class TestJaxIndexAssignment:
         assert jnp.allclose(
             jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
         )
-
-    def test_dynamic_index_with_range(self):
-        """If UserWarning related to __index__ is raised."""
-
-        n = 2
-        wires = range(n)
-
-        with warnings.catch_warnings(record=True) as w:
-
-            @qjit(autograph=True)
-            @qml.qnode(qml.device("lightning.qubit", wires=n))
-            def circuit():
-                for i in range(n):
-                    qml.Hadamard(wires=wires[i])
-                return qml.expval(qml.PauliZ(wires=wires[1]))
-
-            assert len(w) == 0
 
 
 if __name__ == "__main__":
