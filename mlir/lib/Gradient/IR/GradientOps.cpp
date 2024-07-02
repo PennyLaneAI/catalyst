@@ -213,13 +213,6 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         return r1;
     }
 
-    // if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
-    //     return this->emitOpError(
-    //                "invalid number of results: must be twice the number of callee results")
-    //            << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
-    //            << this->getNumResults();
-    // }
-
     std::vector<Type> grad_types;
     {
         for (auto s : this->getGradients()) {
