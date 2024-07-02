@@ -42,6 +42,7 @@ from catalyst.api_extensions.quantum_operators import (
     ctrl,
     measure,
 )
+from catalyst.api_extensions.assertion import catalyst_assert
 
 __all__ = (
     "accelerate",
@@ -60,4 +61,5 @@ __all__ = (
     "measure",
     "adjoint",
     "ctrl",
+    "catalyst_assert",
 )
