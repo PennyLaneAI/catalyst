@@ -162,6 +162,7 @@
   [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
   [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
   [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
+  [(#882)](https://github.com/PennyLaneAI/catalyst/pull/882)
 
   Parameters to `debug.callback`s are marked as inactive. This means that the
   This means that the partial derivative of `debug.callback`s does not need to
