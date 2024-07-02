@@ -94,6 +94,7 @@
 
 * Support for using `catalyst.value_and_grad` with a `qjit`-ted function.
   [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
+  [(#859)](https://github.com/PennyLaneAI/catalyst/pull/859)
 
   ```py
   @qjit

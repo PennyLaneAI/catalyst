@@ -534,7 +534,12 @@ def _value_and_grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no 
 def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=unused-argument
     """This function is called with abstract arguments for tracing.
     Note: argument names must match these of `_value_and_grad_lowering`."""
-    return jaxpr.out_avals + jaxpr.out_avals
+
+    signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
+    offset = len(jaxpr.consts)
+    new_argnum = [num + offset for num in grad_params.expanded_argnum]
+    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    return tuple(jaxpr.out_avals + transformed_signature.get_results())
 
 
 def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -549,9 +554,15 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [
-        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
-    ]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        nparray = np.asarray(const)
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
+
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
@@ -566,9 +577,6 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    assert (
-        len(flat_output_types) % 2 == 0
-    ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
     func_op = mlir_fn_cache[fn]
     symbol_name = func_op.name.value
     return ValueAndGradOp(
