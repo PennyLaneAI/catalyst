@@ -581,8 +581,12 @@ def get_item(target, i, opts):
     """If target is not a jax array, TracerIntegerConversionError might be raised. To avoid
     index a non-jax array with jax index, we convert it into jax array first."""
     assert isinstance(opts, GetItemOpts)
-    print(target)
-    if isinstance(target, DynamicJaxprTracer):
+
+    if (
+        isinstance(target, DynamicJaxprTracer)
+        or isinstance(target, tuple)
+        and all(isinstance(item, DynamicJaxprTracer) for item in target)
+    ):
         return target[i]
     else:
         try:
