@@ -189,6 +189,11 @@ QUANTUM_CIRCUIT_TRANSFORMS = (
 
 
 def fill_quantum_circuit_transforms_pipeline(pass_table):
+    """
+    Fill the QUANTUM_CIRCUIT_TRANSFORMS pipeline according to the
+    pass_table. The pass table contains the list of passes to run
+    on each qnode.
+    """
     for qnode in pass_table.getTable().keys():
         for pass_ in pass_table.query(qnode):
             # note that "pass" is a python keyword, so "pass_"
@@ -536,7 +541,7 @@ class Compiler:
 
         try:
             fill_quantum_circuit_transforms_pipeline(send_pass_table_to_compiler())
-            self.options.quantum_circuit_transforms = QUANTUM_CIRCUIT_TRANSFORMS[1] != []
+            self.options.quantum_circuit_transforms = bool(QUANTUM_CIRCUIT_TRANSFORMS[1])
             compiler_output = run_compiler_driver(
                 ir,
                 str(workspace),

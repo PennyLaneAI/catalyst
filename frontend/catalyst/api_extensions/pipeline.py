@@ -25,8 +25,6 @@ run on each qnode, and let send this information to
 frontend/catalyst/compiler.py to handle the actual running of the passes. 
 """
 
-from typing import Callable
-
 import pennylane as qml
 
 
@@ -44,6 +42,9 @@ class ACTIVE_PASSES:
         return str(self.table)
 
     def getTable(self):
+        """
+        Return the table object.
+        """
         return self.table
 
     def add_pass_on_qnode(self, qnode, pass_):
@@ -60,6 +61,9 @@ class ACTIVE_PASSES:
             self.table[qnode].append(pass_)
 
     def query(self, qnode):
+        """
+        Look up a qnode from the table and return the list of passes to run on it.
+        """
         return self.table[qnode]
 
 
@@ -75,6 +79,9 @@ def send_pass_table_to_compiler():
 
 ## API ##
 def cancel_inverses(fn=None):
+    """
+    The top-level `catalyst.cancel_inverses` decorator.
+    """
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
     active_passes.add_pass_on_qnode(fn, "remove-chained-self-inverse")
