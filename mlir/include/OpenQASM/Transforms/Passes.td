@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef OPENQASM_PASSES
+#define OPENQASM_PASSES
 
-#include "mlir/CAPI/Registration.h"
+include "mlir/Pass/PassBase.td"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+def OpenQASMTranslationPass : Pass<"translate-to-openqasm"> {
+    let summary = "Translate input IR to OpenQASM";
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(OpenQASM, openqasm);
-
-#ifdef __cplusplus
+    let constructor = "catalyst::createTranslateToOpenQASMPass()";
 }
-#endif
+
+#endif // OPENQASM_PASSES

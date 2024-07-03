@@ -10,4 +10,6 @@ add_mlir_public_c_api_library(QuantumCAPI
     MLIRCatalyst
     gradient-transforms
     MLIRMitigation
+    MLIROpenQASM
+    openqasm-transforms
 )

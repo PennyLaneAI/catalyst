@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,18 +14,15 @@
 
 #pragma once
 
-#include "mlir/CAPI/Registration.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "OpenQASM/IR/OpenQASMDialect.h"
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(OpenQASM, openqasm);
-
-#ifdef __cplusplus
-}
-#endif
+#define GET_OP_CLASSES
+#include "OpenQASM/IR/OpenQASMOps.h.inc"
