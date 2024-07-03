@@ -5,10 +5,8 @@
 * Add support for accelerating classical processing via JAX with `catalyst.accelerate`.
   [(#805)](https://github.com/PennyLaneAI/catalyst/pull/805)
 
-  Classical code that can be just-in-time compiled with JAX can now be seamlessly just
-  in time compiled with `catalyst.accelerate` and included within QJIT-compiled functions.
-  `catalyst.accelerate` can be used as a
-  decorator without specifying a device:
+  Classical code that can be just-in-time compiled with JAX can now be seamlessly executed
+  on GPUs or other accelerators with `catalyst.accelerate`, right inside of QJIT-compiled functions.
 
   ```python
   @accelerate(dev=jax.devices("gpu")[0])
@@ -26,7 +24,7 @@
   `jax.devices()[0]` as determined by JAX will be used.
 
 * Catalyst callback functions, such as `pure_callback`, `debug.callback`, and `debug.print`, now
-  all support autodifferentiation.
+  all support auto-differentiation.
   [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
   [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
   [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
@@ -34,7 +32,7 @@
 
   - When using callbacks that do not return any values, such as `catalyst.debug.callback` and
     `catalyst.debug.print`, these functions are marked as 'inactive' and do not contribute to or
-    affect the gradient of the function:
+    affect the derivative of the function:
 
     ```python
     import logging
@@ -59,7 +57,7 @@
     ```
 
   - Callbacks that *do* return values and may affect the qjit-compiled functions
-    computation, such as `pure_callback`, may have custom gradients manually
+    computation, such as `pure_callback`, may have custom derivatives manually
     registered with the Catalyst compiler in order to support differentiation.
 
     This can be done via the `pure_callback.fwd` and `pure_callback.bwd` methods, to specify how the
@@ -178,7 +176,7 @@
   Catalyst's existing method for simulating mid-circuit measurements remains
   available via `mcm_method="single-branch-statistics"`.
 
-  When using `mcm_method="one-shot"`, the `postslect_mode` keyword argument can also
+  When using `mcm_method="one-shot"`, the `postselect_mode` keyword argument can also
   be used, to specify whether postselection should continue until `shots`-number of
   postselected measurements are made (`"fill-shots"`), or whether execution should
   terminate once `shot` executions have occurred regardless of how many postselected
@@ -350,7 +348,7 @@
       return x
   ```
 
-* Support for including a list of (sub)modules to be whitelisted for autograph conversion.
+* Support for including a list of (sub)modules to be allowlisted for autograph conversion.
   [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
 
   Although library code is not meant to be targeted by Autograph conversion,
@@ -406,9 +404,8 @@
 * Catalyst no longer disallows quantum circuits with 0 qubits.
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
-* Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
-  decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
-  simulator supports this gate.
+* Added support for `IsingZZ` as a native gate in Catalyst. Previously, the IsingZZ gate would be
+  decomposed into a CNOT and RZ gates, even if a device supported it.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 * Functions that have been annotated with return type
@@ -480,7 +477,7 @@
 * Callbacks can now return types which can be flattened and unflattened.
   [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
 
-* `catalyst.qjit` and `catalyst.grad` now work correctly with
+* `catalyst.qjit` and `catalyst.grad` now work correctly on
   functions that have been wrapped with `functools.partial`.
   [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
 
