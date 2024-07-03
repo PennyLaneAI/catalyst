@@ -171,7 +171,8 @@ QUANTUM_COMPILATION_PASS = (
 QUANTUM_CIRCUIT_TRANSFORMS = (
     "QuantumCircuitTransforms",
     [
-        "remove-chained-self-inverse",
+        "func.func(remove-chained-self-inverse{func-name=circuit})",
+        "func.func(remove-chained-self-inverse{func-name=toy})",
     ],
 )
 

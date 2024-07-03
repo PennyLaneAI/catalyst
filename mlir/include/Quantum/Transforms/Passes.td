@@ -75,6 +75,13 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+
+    let options = [
+    Option<"FuncNameOpt", "func-name",
+           "std::string", /*default=*/"\"\"",
+           "The name of the function (or qnode) to run the remove-chained-self-inverse pass on.">,
+    ];
+
 }
 
 def AnnotateFunctionPass : Pass<"annotate-function"> {
