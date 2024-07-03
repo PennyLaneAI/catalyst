@@ -229,6 +229,27 @@
       return qml.state()
   ```
 
+* Catalyst now supports capturing dynamically-shaped arrays from the outer scopes of a Python
+  program into control-flow primitives. In the following illustration, the `x` variable is captured.
+
+  ``` python
+  @qjit(abstracted_axes={1: 'n'})
+  def g(x, y):
+
+      @catalyst.for_loop(0, 10, 1)
+      def loop(_, a):
+          return a * x
+
+      return jnp.sum(loop(y))
+  ```
+  ``` pycon
+  >>> a = jnp.ones([1,3], dtype=float)
+  >>> b = jnp.ones([1,3], dtype=float)
+  >>> g(a, b)
+  array(3.)
+  ```
+  [(#830)](https://github.com/PennyLaneAI/catalyst/pull/830)
+
 <h3>Improvements</h3>
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,

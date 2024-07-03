@@ -28,7 +28,6 @@ from typing import (
     Generator,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
@@ -40,7 +39,6 @@ from jax import ShapeDtypeStruct
 from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
-    AbstractedAxesSpec,
     _input_type_to_tracers,
     infer_lambda_input_type,
     trace_to_jaxpr_dynamic2,
@@ -145,7 +143,6 @@ __all__ = (
     "convert_element_type",
     "eval_jaxpr",
     "_abstractify",
-    "_input_type_to_tracers",
     "_module_name_regex",
     "make_jaxpr_effects",
     "make_jaxpr2",
@@ -157,6 +154,7 @@ __all__ = (
     "tree_flatten",
     "tree_structure",
     "tree_unflatten",
+    "trace_to_jaxpr",
     "unzip2",
     "wrap_init",
 )
@@ -430,7 +428,6 @@ def deduce_signatures(
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun(wf, (in_type, expansion_strategy))
-    wf = annotate(wf, in_type)
     return (
         wf,
         InputSignature(in_type, in_tree, in_expanded_args),
@@ -458,6 +455,19 @@ def deduce_avals(f: Callable, args, kwargs):
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
     return wffa, in_avals, keep_inputs, out_tree_promise
+
+
+def trace_to_jaxpr(
+    trace: DynamicJaxprTrace, inputs: List[DynamicJaxprTracer], outputs: List[DynamicJaxprTracer]
+) -> Tuple[Jaxpr, List[DynamicJaxprTracer], List[Any]]:
+    """Get Jaxpr from a Jax trace applying a workaround.  The workaround makes it possible to trace
+    e.g. the following program: `lambda i, a: i<3`. Where `a` is an unused dynamically-shaped array.
+    This method would remove return values related to sizes of tensors when compiling with 
+    dynamically sized tensors.
+    """
+    jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))
+    del jaxpr._outvars[len(outputs) :]
+    return jaxpr, tracers, consts
 
 
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
@@ -536,11 +546,29 @@ def make_jaxpr2(
 
 
 def input_type_to_tracers(
-    in_type: InputType, maker: Callable[[AbstractValue], DynamicJaxprTracer]
+    in_type: InputType,
+    arg_maker: Callable[[AbstractValue], DynamicJaxprTracer],
+    const_maker: Callable[[DynamicJaxprTracer], DynamicJaxprTracer],
 ) -> List[DynamicJaxprTracer]:
     """Creates an expanded list of tracers representing an input values of a Jaxpr program"""
-    in_aval, _ = unzip2(in_type)
-    return _input_type_to_tracers(maker, in_aval)
+    in_tracers: list[DynamicJaxprTracer] = []
+
+    def _substitute_tracers_in_aval(a: AbstractValue) -> AbstractValue:
+        if isinstance(a, DShapedArray):
+            shape2 = []
+            for d in a.shape:
+                if isinstance(d, DBIdx):
+                    shape2.append(in_tracers[d.val])
+                elif _is_tracer_like(d):
+                    shape2.append(const_maker(d))
+                else:
+                    shape2.append(d)
+            return a.update(shape=tuple(shape2))
+        return a
+
+    for a, _ in in_type:
+        in_tracers.append(arg_maker(_substitute_tracers_in_aval(a)))
+    return in_tracers
 
 
 def output_type_to_tracers(
@@ -571,11 +599,18 @@ def output_type_to_tracers(
 TracerLike = TypeVar("TracerLike")
 
 
-def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
+def _is_tracer_like(x):
+    return hasattr(x, "aval")
+
+
+def infer_input_type_constshapes(inputs: List[TracerLike]) -> InputType:
     """Infer the input type of a function having `inputs` Jax tracers."""
 
-    def _is_tracer_like(x):
-        return hasattr(x, "aval")
+    return tuple((i.aval if _is_tracer_like(i) else i, True) for i in inputs)
+
+
+def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
+    """Infer the input type of a function having `inputs` Jax tracers."""
 
     expl_ins = inputs
     impl_avals = []
@@ -600,35 +635,30 @@ def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
 class ExpansionStrategy:
     """Describe the settings affecting the Jax dyanmic API tracing of the nested programs.
     Args:
-        axes_specs: Axes specification used to convert static dimensions to the dynamic ones
         input_unshare_variables: Treat each dynamic dimension as a distinct dimension, even if some
                                  of them are described by the same dimension variables.
-        output_include_indbidx_vars: Include variables corresponding to the InDBIdx references in
-                                     the result
         output_force_arg0_outdbidx: Force all references pointing to the first arguments to be
                                     OutDBIdx. This is typically required to avoid input references
                                     to the loop iteration variable.
     """
 
-    axes_specs: Sequence[AbstractedAxesSpec] | None
     input_unshare_variables: bool
-    output_include_indbidx_vars: bool
     output_force_arg0_outdbidx: bool
 
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, False)
+    return ExpansionStrategy(not preserve_dimensions, False)
 
 
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, True)
+    return ExpansionStrategy(not preserve_dimensions, True)
 
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
-    return ExpansionStrategy(None, False, True, False)
+    return ExpansionStrategy(True, False)
 
 
 def infer_output_type(
@@ -663,12 +693,14 @@ def infer_output_type(
     """
     s = expansion_strategy
 
-    def _is_tracer_like(x):
-        return hasattr(x, "aval")
-
     expl_outs = outputs
     impl_outs = []
-    seen = set() if s.output_include_indbidx_vars else set(map(id, [*constants, *expanded_inputs]))
+    if s.input_unshare_variables:
+        # Create implicit results for dimensions in either constants or variables
+        seen = set()
+    else:
+        # Create implicit results for dimensions in variables
+        seen = set(map(id, [*constants]))
 
     for o in expl_outs:
         assert _is_tracer_like(o)
@@ -705,7 +737,6 @@ def infer_output_type(
     out_type = tuple(zip(out_avals, kept_outs))
 
     if s.output_force_arg0_outdbidx:
-        assert s.output_include_indbidx_vars
         assert num_implicit_inputs is not None
         out_type = out_type_force_outdbidx(
             out_type,
@@ -755,16 +786,11 @@ def infer_output_type_python(
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
-    # Infer output type assuming the empty list of constants
-    expanded_outputs, out_type1 = infer_output_type(
-        [], expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
-    )
-
-    # Calculate constants using the expanded outputs
-    jaxpr, _, consts = trace.frame.to_jaxpr2(expanded_outputs)
+    # Calculate the constants. We need it to set InDBIdx correctly
+    _, _, consts = trace_to_jaxpr(trace, expanded_inputs, outputs)
 
     # Calculate output type containing the correct De Brjuin indices
-    expanded_outputs2, out_type2 = infer_output_type(
+    expanded_outputs, out_type = infer_output_type(
         [trace.full_raise(t) for t in consts],
         expanded_inputs,
         outputs,
@@ -772,14 +798,11 @@ def infer_output_type_python(
         num_implicit_inputs,
     )
 
-    # Combine the explicitness information with the correct De Brjuin indices
-    assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
-    _, out_keep1 = unzip2(out_type1)
-    out_aval2, _ = unzip2(out_type2)
-    out_type3 = tuple(zip(out_aval2, out_keep1))
+    # Calculate the jaxpr representing the full outputs.
+    jaxpr, _, _ = trace_to_jaxpr(trace, expanded_inputs, expanded_outputs)
 
     # Return the final results
-    return expanded_outputs2, (jaxpr, out_type3, consts)
+    return expanded_outputs, (jaxpr, out_type, consts)
 
 
 def expand_args(
@@ -799,14 +822,17 @@ def expand_args(
     """
     s = expansion_strategy
     if s.input_unshare_variables is True:
-        assert s.axes_specs is None
+        # Treat dimensions as arguments, no shared references (e.g. in loop body programs)
         in_type = infer_input_type_unshared(args)
     else:
-        in_type = infer_lambda_input_type(s.axes_specs, args)
+        # Treat dimensions as constants, all shared references (e.g. in loop body programs)
+        in_type = infer_input_type_constshapes(args)
+
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
 
 def expand_results(
+    constants: List[Any],
     expanded_inputs: List[TracerLike],
     results: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
@@ -827,7 +853,9 @@ def expand_results(
         OutputType describing the expanded result
 
     """
-    return infer_output_type([], expanded_inputs, results, expansion_strategy, num_implicit_inputs)
+    return infer_output_type(
+        constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs
+    )
 
 
 def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:
