@@ -36,14 +36,14 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
 )
-from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.programs.verification import (
+from catalyst.device.verification import (
     validate_observables,
     validate_observables_adjoint_diff,
     validate_observables_parameter_shift,
     verify_no_state_variance_returns,
     verify_operations,
 )
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path

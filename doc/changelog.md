@@ -1,4 +1,20 @@
-# Release 0.7.0-dev
+# Release 0.8.0-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Internal changes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.7.0
 
 <h3>New features</h3>
 
@@ -228,6 +244,27 @@
       return qml.state()
   ```
 
+* Catalyst now supports capturing dynamically-shaped arrays from the outer scopes of a Python
+  program into control-flow primitives. In the following illustration, the `x` variable is captured.
+
+  ``` python
+  @qjit(abstracted_axes={1: 'n'})
+  def g(x, y):
+
+      @catalyst.for_loop(0, 10, 1)
+      def loop(_, a):
+          return a * x
+
+      return jnp.sum(loop(y))
+  ```
+  ``` pycon
+  >>> a = jnp.ones([1,3], dtype=float)
+  >>> b = jnp.ones([1,3], dtype=float)
+  >>> g(a, b)
+  array(3.)
+  ```
+  [(#830)](https://github.com/PennyLaneAI/catalyst/pull/830)
+
 <h3>Improvements</h3>
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
@@ -294,6 +331,12 @@
   [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
 <h3>Breaking changes</h3>
+
+* The `mitigate_with_zne` function no longer accepts a `degree` parameter for polynomial fitting
+  and instead accepts a callable to perform extrapolation. Any qjit-compatible extrapolation
+  function is valid. Keyword arguments can be passed to this function using the
+  `extrapolate_kwargs` keyword argument in `mitigate_with_zne`.
+  [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
   As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above
@@ -476,11 +519,20 @@
     foo(op);  // this works!
     ```
 
+* Validation is now performed for observables and operations as a final step of the device preprocess.
+  [(#626)](https://github.com/PennyLaneAI/catalyst/pull/626)
+  [(#783)](https://github.com/PennyLaneAI/catalyst/pull/783)
+
+* A `non_commuting_observables` flag is added to the TOML file, indicating whether or not the device
+  supports measuring non-commuting observables. If `false`, non-commuting measurements will be split into multiple executions.
+  [(#821)](https://github.com/PennyLaneAI/catalyst/pull/821)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Lillian M.A. Frederiksen,
 David Ittah,
 Christina Lee,
 Erick Ochoa,
