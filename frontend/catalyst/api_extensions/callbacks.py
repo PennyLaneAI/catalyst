@@ -108,12 +108,11 @@ def accelerate(func=None, *, dev=None):
     context = []
     if is_partial:
         context = tree_leaves(func)
-        func = tree_map(shaped_abstractify, func)
 
     def total(context, *args, **kwargs):
         nonlocal func
         if is_partial:
-            _tracers, shape = tree_flatten(func)
+            shape = tree_structure(func)
             func = tree_unflatten(shape, context)
             return func(*args, **kwargs)
         else:
