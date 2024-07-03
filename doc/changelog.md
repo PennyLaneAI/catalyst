@@ -213,6 +213,7 @@
 * A new function, `catalyst.value_and_grad`, returns both the result of a function and
   its gradient with a single forward and backwards pass.
   [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
+  [(#859)](https://github.com/PennyLaneAI/catalyst/pull/859)
 
   This can be more efficient, and reduce overall quantum executions, compared to separately
   executing the function and then computing its gradient.

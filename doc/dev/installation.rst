@@ -411,6 +411,6 @@ To generate html files for the documentation for Catalyst:
 
 .. code-block:: console
 
-  pip install -r doc/requirements.txt
+  make docs
 
 The generated files are located in ``doc/_build/html``

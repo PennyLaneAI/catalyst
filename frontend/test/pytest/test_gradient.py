@@ -242,8 +242,64 @@ def test_value_and_grad_on_qjit_classical():
 
     result = qjit(value_and_grad(f))(3.0)
     expected = (9.0, 6.0)
-
     assert np.allclose(result, expected)
+
+    @qjit
+    def f(x: float):
+        return [x * x]
+
+    result = qjit(value_and_grad(f))(3.0)
+    expected = ([9.0], [6.0])
+    assert np.allclose(result, expected)
+
+    @qjit
+    def f(x: float):
+        return {"helloworld": x * x}
+
+    result = qjit(value_and_grad(f))(3.0)
+    expected = ({"helloworld": 9.0}, {"helloworld": 6.0})
+    assert np.allclose(result[0]["helloworld"], expected[0]["helloworld"])
+    assert np.allclose(result[1]["helloworld"], expected[1]["helloworld"])
+
+
+def test_value_and_grad_on_qjit_classical_vector():
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
+    and takes in a vector.
+    """
+
+    @qjit
+    def f(vec):
+        # Takes in a 2D vector (x,y) and computes 30x+40y
+        prod = jnp.array([30, 40]) * vec
+        return prod[0] + prod[1]
+
+    x = jnp.array([1.0, 1.0])
+    result = qjit(value_and_grad(f))(x)
+    expected = (70.0, [30.0, 40.0])
+
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1], expected[1])
+
+
+def test_value_and_grad_on_qjit_classical_dict():
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
+    and takes in a dictionary.
+    """
+
+    @qjit
+    def f(tree):
+        # Takes in two 2D vectors (x1, x2) and (y1, y2) and computes x1y1+x2y2
+        hello = tree["hello"]  # (x1, x2)
+        world = tree["world"]  # (y1, y2)
+        return (hello * world).sum()
+
+    x = {"hello": jnp.array([1.0, 2.0]), "world": jnp.array([3.0, 4.0])}
+    result = qjit(value_and_grad(f))(x)
+    expected = (11.0, {"hello": jnp.array([3.0, 4.0]), "world": jnp.array([1.0, 2.0])})
+
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1]["hello"], expected[1]["hello"])
+    assert np.allclose(result[1]["world"], expected[1]["world"])
 
 
 def test_value_and_grad_on_qjit_quantum():
@@ -280,8 +336,31 @@ def test_value_and_grad_on_qjit_quantum_variant():
         return circuit(x)[0]
 
     result = qjit(value_and_grad(qjit(workflow_variant)))(1.1)
-    expected = value_and_grad(workflow_variant)(1.1)
+    expected = (workflow_variant(1.1), qjit(grad(workflow_variant))(1.1))
     assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum_variant_tree():
+    """
+    Check that value_and_grad works when called on an qjit object that does wrap a QNode
+    with trainable parameters and a general pytree input.
+    """
+
+    def workflow_variant_tree(params):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(params):
+            qml.RX(params["x"], wires=0)
+            qml.RY(params["y"], wires=0)
+            return qml.probs()
+
+        return circuit(params)[0]
+
+    params = {"x": 0.12, "y": 0.34}
+    result = qjit(value_and_grad(qjit(workflow_variant_tree)))(params)
+    expected = (workflow_variant_tree(params), qjit(grad(workflow_variant_tree))(params))
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1]["x"], expected[1]["x"])
+    assert np.allclose(result[1]["y"], expected[1]["y"])
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
