@@ -34,43 +34,47 @@ import pennylane as qml
 class ACTIVE_PASSES:
     """
     A class that records the active compilation passes on a qnode.
-    Note that the ordering of passes of course matters. 
+    Note that the ordering of passes of course matters.
     """
+
     def __init__(self):
         self.table = {}
+
     def __repr__(self):
         return str(self.table)
+
     def getTable(self):
         return self.table
+
     def add_pass_on_qnode(self, qnode, pass_):
         """
         qnode (QNODE): the qnode object to compile
-        pass_ (str):   the compiler pass to run on this object. 
+        pass_ (str):   the compiler pass to run on this object.
                        At each call of add_pass, the pass is added to the end
-                       of the current pipeline for that qnode. 
-        
+                       of the current pipeline for that qnode.
+
         """
         if qnode not in self.table:
             self.table[qnode] = [pass_]
         else:
             self.table[qnode].append(pass_)
+
     def query(self, qnode):
         return self.table[qnode]
 
+
 active_passes = ACTIVE_PASSES()
+
 
 def send_pass_table_to_compiler():
     """
-    To be called in compiler.py to retrieve the pipeline table. 
+    To be called in compiler.py to retrieve the pipeline table.
     """
     return active_passes
 
 
-
 ## API ##
 def cancel_inverses(fn=None):
-    """
-    """
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
     active_passes.add_pass_on_qnode(fn, "remove-chained-self-inverse")

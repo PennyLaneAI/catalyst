@@ -34,6 +34,7 @@ from catalyst.api_extensions.differentiation import (
 )
 from catalyst.api_extensions.error_mitigation import mitigate_with_zne
 from catalyst.api_extensions.function_maps import vmap
+from catalyst.api_extensions.pipeline import cancel_inverses
 from catalyst.api_extensions.quantum_operators import (
     HybridAdjoint,
     HybridCtrl,
@@ -41,9 +42,6 @@ from catalyst.api_extensions.quantum_operators import (
     adjoint,
     ctrl,
     measure,
-)
-from catalyst.api_extensions.pipeline import (
-    cancel_inverses,
 )
 
 __all__ = (
