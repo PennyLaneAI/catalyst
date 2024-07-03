@@ -569,7 +569,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             def qnode_call_wrapper():
                 return ag_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
 
-            new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
+            new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method, transform_program=fn.transform_program)
             return new_qnode()
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
