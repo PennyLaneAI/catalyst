@@ -27,8 +27,9 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
+from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten, Partial
 
+from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
@@ -102,20 +103,38 @@ def accelerate(func=None, *, dev=None):
         kwargs.pop("func")
         return functools.partial(accelerate, **kwargs)
 
-    jitted_fn = jax.jit(func)
+    # If this is a partial, we need to make the tracers part of the input
+    is_partial = isinstance(func, Partial)
+    context = []
+    if is_partial:
+        context = tree_leaves(func)
+
+    def total(context, *args, **kwargs):
+        nonlocal func
+        if is_partial:
+            _, shape = tree_flatten(func)
+            func = tree_unflatten(shape, context)
+            return func(*args, **kwargs)
+        else:
+            return func(*args, **kwargs)
+
+    with transient_jax_config({"jax_dynamic_shapes": False}):
+        jitted_fn = jax.jit(total)
 
     @functools.wraps(func)
     def defer(*args, **kwargs):
-        # Make abstract variables from input tracers.
-        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
             # Find the shape of the return value
-            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+            with transient_jax_config({"jax_dynamic_shapes": False}):
+                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                    absextra, *absargs, **abskwargs
+                )
         except Exception as e:
             name = func.__name__
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
-        return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
+        return jax_jit_callback(jitted_fn, returnshape, device=dev)(context, *args, **kwargs)
 
     return defer
 
@@ -290,13 +309,17 @@ class CallbackWithCustomGrad:
         cotangents = tree_map(shaped_abstractify, self.restype)
 
         # The forward pass must have the same input types as the original function
-        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+        with transient_jax_config({"jax_dynamic_shapes": False}):
+            self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(
+                *absargs, **abskwargs
+            )
 
         # But its output is always going to be two pairs.
         _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+        with transient_jax_config({"jax_dynamic_shapes": False}):
+            self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
 

@@ -29,6 +29,7 @@
   [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
   [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
   [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
+  [(#882)](https://github.com/PennyLaneAI/catalyst/pull/882)
 
   - When using callbacks that do not return any values, such as `catalyst.debug.callback` and
     `catalyst.debug.print`, these functions are marked as 'inactive' and do not contribute to or
@@ -374,6 +375,27 @@
       qml.ctrl(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
       return qml.state()
   ```
+
+* Catalyst now supports capturing dynamically-shaped arrays from the outer scopes of a Python
+  program into control-flow primitives. In the following illustration, the `x` variable is captured.
+
+  ``` python
+  @qjit(abstracted_axes={1: 'n'})
+  def g(x, y):
+
+      @catalyst.for_loop(0, 10, 1)
+      def loop(_, a):
+          return a * x
+
+      return jnp.sum(loop(y))
+  ```
+  ``` pycon
+  >>> a = jnp.ones([1,3], dtype=float)
+  >>> b = jnp.ones([1,3], dtype=float)
+  >>> g(a, b)
+  array(3.)
+  ```
+  [(#830)](https://github.com/PennyLaneAI/catalyst/pull/830)
 
 <h3>Improvements</h3>
 
