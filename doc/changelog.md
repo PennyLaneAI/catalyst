@@ -5,6 +5,8 @@
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
+* Return values are `jax.Array` typed instead of `numpy.array`.
+  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
 <h3>Bug fixes</h3>
 
@@ -13,6 +15,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Erick Ochoa,
 
 # Release 0.7.0
 
