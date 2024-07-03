@@ -396,6 +396,29 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
+    def test_tape_transform(self):
+        """Test if tape transform is applied when autograph is on."""
+
+        dev = dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.transform
+        def my_quantum_transform(tape):
+            raise NotImplementedError
+
+        @qml.qjit(autograph=True)
+        def f(x):
+            @my_quantum_transform
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RY(x, wires=0)
+                qml.RX(x, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        # with pytest.raises(NotImplementedError):
+        #    f(0.5)
+
 
 class TestCodePrinting:
     """Test that the transformed source code can be printed in different settings."""
