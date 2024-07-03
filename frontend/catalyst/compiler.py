@@ -37,6 +37,8 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_lib_path
 
+from catalyst.api_extensions.pipeline import send_pass_table_to_compiler
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
@@ -115,6 +117,9 @@ class CompileOptions:
             return DEFAULT_PIPELINES
 
         else:  # if self.quantum_circuit_transforms:
+            # The quantum circuit transform pipeline (performing the peephole optimizations, 
+            # e.g. cancel neighbouring Hadamards) is placed after QuantumCompilation and before
+            # Bufferization. 
             _DEFAULT_PIPELINES = DEFAULT_PIPELINES.copy()
             _DEFAULT_PIPELINES.insert(2, QUANTUM_CIRCUIT_TRANSFORMS)
             _DEFAULT_ASYNC_PIPELINES = DEFAULT_ASYNC_PIPELINES.copy()
@@ -168,6 +173,8 @@ QUANTUM_COMPILATION_PASS = (
     ],
 )
 
+"""
+# We would like the pipeline to look something like the following:
 QUANTUM_CIRCUIT_TRANSFORMS = (
     "QuantumCircuitTransforms",
     [
@@ -175,6 +182,19 @@ QUANTUM_CIRCUIT_TRANSFORMS = (
         "func.func(remove-chained-self-inverse{func-name=toy})",
     ],
 )
+"""
+QUANTUM_CIRCUIT_TRANSFORMS = (
+    "QuantumCircuitTransforms",
+    [],
+)
+def fill_quantum_circuit_transforms_pipeline(pass_table):
+    for qnode in pass_table.getTable().keys():
+        for pass_ in pass_table.query(qnode):  
+            # note that "pass" is a python keyword, so "pass_"
+            # TODO: is there a way to get the pass options (aka the "func-name") here?
+            run_pass = f"func.func({pass_}{{func-name={qnode.__name__}}})"
+            if run_pass not in QUANTUM_CIRCUIT_TRANSFORMS[1]:
+                QUANTUM_CIRCUIT_TRANSFORMS[1].append(run_pass)
 
 BUFFERIZATION_PASS = (
     "BufferizationPass",
@@ -513,6 +533,8 @@ class Compiler:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         try:
+            fill_quantum_circuit_transforms_pipeline(send_pass_table_to_compiler())
+            self.options.quantum_circuit_transforms = (QUANTUM_CIRCUIT_TRANSFORMS[1] != [])
             compiler_output = run_compiler_driver(
                 ir,
                 str(workspace),

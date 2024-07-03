@@ -42,6 +42,9 @@ from catalyst.api_extensions.quantum_operators import (
     ctrl,
     measure,
 )
+from catalyst.api_extensions.pipeline import (
+    cancel_inverses,
+)
 
 __all__ = (
     "accelerate",
@@ -60,4 +63,5 @@ __all__ = (
     "measure",
     "adjoint",
     "ctrl",
+    "cancel_inverses",
 )
