@@ -1346,6 +1346,50 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     assert np.allclose(mul(A, B), mul_jax(A, B))
 
 
+@pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
+@pytest.mark.parametrize("order", ["good", "bad"])
+def test_vjp_as_residual(arg, order):
+    """See https://github.com/PennyLaneAI/catalyst/issues/852"""
+
+    if order == "bad":
+        pytest.skip("Bug")
+
+    def jax_callback(fn, result_type):
+
+        @pure_callback
+        def callback_fn(*args) -> result_type:
+            return fn(*args)
+
+        @callback_fn.fwd
+        def callback_fn_fwd(*args):
+            ans, vjp_func = accelerate(lambda *x: jax.vjp(fn, *x))(*args)
+            return ans, vjp_func
+
+        @callback_fn.bwd
+        def callback_fn_bwd(vjp_func, dy):
+            return accelerate(vjp_func)(dy)
+
+        return callback_fn
+
+    @qml.qjit
+    @jacobian
+    def hypothesis(x):
+        expm = jax_callback(jax.scipy.linalg.expm, jax.ShapeDtypeStruct((2, 2), jnp.float64))
+        return expm(x)
+
+    @jax.jacobian
+    def ground_truth(x):
+        return jax.scipy.linalg.expm(x)
+
+    if order == "bad":
+        obs = hypothesis(arg)
+        exp = ground_truth(arg)
+    else:
+        exp = ground_truth(arg)
+        obs = hypothesis(arg)
+    assert np.allclose(obs, exp)
+
+
 def test_error_incomplete_grad_only_forward():
     """Test error about missing reverse pass"""
 
