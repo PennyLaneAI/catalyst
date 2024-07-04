@@ -53,7 +53,7 @@ struct RemoveChainedSelfInversePass
         // the pipeline table.
         // In other words, compiler.py always uses this pass as a "FunctionPass", not a
         // "ModulePass". If used from command line (./quantum-opt) directly and no value is
-        // supplied, run the pass on all functions in the module
+        // supplied to FuncNameOpt, run the pass on all functions in the module
 
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");

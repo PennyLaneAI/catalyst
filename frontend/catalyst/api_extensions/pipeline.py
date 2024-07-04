@@ -36,16 +36,17 @@ class ACTIVE_PASSES:
     """
 
     def __init__(self):
-        self.table = {}
+        self._table = {}
 
     def __repr__(self):
         return str(self.table)
 
-    def getTable(self):
+    @property
+    def table(self):
         """
         Return the table object.
         """
-        return self.table
+        return self._table
 
     def add_pass_on_qnode(self, qnode, pass_):
         """
@@ -81,6 +82,7 @@ def send_pass_table_to_compiler():
 def cancel_inverses(fn=None):
     """
     The top-level `catalyst.cancel_inverses` decorator.
+    !!! TODO: add documentation here !!!
     """
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")

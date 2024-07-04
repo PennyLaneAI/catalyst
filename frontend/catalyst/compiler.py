@@ -194,10 +194,11 @@ def fill_quantum_circuit_transforms_pipeline(pass_table):
     pass_table. The pass table contains the list of passes to run
     on each qnode.
     """
-    for qnode in pass_table.getTable().keys():
+    for qnode in pass_table.table.keys():
         for pass_ in pass_table.query(qnode):
             # note that "pass" is a python keyword, so "pass_"
-            # TODO: is there a way to get the pass options (aka the "func-name") here?
+            # The command line option to specify the qnode name is "func-name". 
+            # See mlir/include/Quantum/Transforms/Passes.td
             run_pass = f"func.func({pass_}{{func-name={qnode.__name__}}})"
             if run_pass not in QUANTUM_CIRCUIT_TRANSFORMS[1]:
                 QUANTUM_CIRCUIT_TRANSFORMS[1].append(run_pass)
