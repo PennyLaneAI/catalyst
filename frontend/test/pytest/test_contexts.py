@@ -18,7 +18,55 @@ import pennylane as qml
 import pytest
 
 from catalyst import cond, measure, qjit, while_loop
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode, GradContext
+
+
+class TestGradContextUnitTests:
+    """Unit tests for grad context"""
+
+    def test_error_cannot_pop_from_empty_context(self):
+        """Check that impossible state raises an assertion"""
+        msg = GradContext._error_msg
+        with pytest.raises(AssertionError, match=msg):
+            GradContext._pop()
+
+    def test_peek_base_case(self):
+        assert GradContext._peek() == 0
+
+    def test_push_peek_pop(self):
+        GradContext._push()
+        assert GradContext._peek() == 1
+        GradContext._pop()
+
+    def test_context_management_nested_0(self):
+        assert GradContext._peek() == 0
+        with GradContext():
+            assert GradContext._peek() == 1
+        assert GradContext._peek() == 0
+
+    def test_context_management_nested_1(self):
+        assert GradContext._peek() == 0
+        with GradContext():
+            assert GradContext._peek() == 1
+            with GradContext():
+                assert GradContext._peek() == 2
+            assert GradContext._peek() == 1
+        assert GradContext._peek() == 0
+
+    def test_context_manager_user_interface(self):
+        assert not GradContext.am_inside_grad()
+        with GradContext():
+            assert GradContext.am_inside_grad()
+        assert not GradContext.am_inside_grad()
+
+    def test_peel(self):
+        assert not GradContext.am_inside_grad()
+        with GradContext():
+            assert GradContext.am_inside_grad()
+            with GradContext(peel=True):
+                assert not GradContext.am_inside_grad()
+            assert GradContext.am_inside_grad()
+        assert not GradContext.am_inside_grad()
 
 
 class TestEvaluationModes:
