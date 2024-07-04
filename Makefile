@@ -147,8 +147,7 @@ endif
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:
-	OMP_NUM_THREADS := $(PYTEST_NUM_THREADS)
-	export OMP_NUM_THREADS
+	export OMP_NUM_THREADS = $(PYTEST_NUM_THREADS)
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
