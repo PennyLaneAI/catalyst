@@ -42,4 +42,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
     mlir::registerPass(catalyst::createMyHelloWorldPass);
+    mlir::registerPass(catalyst::createMyHelloTorontoPass);
 }

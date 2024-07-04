@@ -184,7 +184,8 @@ BUFFERIZATION_PASS = (
             "buffer-hoisting,"
             "buffer-loop-hoisting,"
             "buffer-deallocation,"
-             "my-hello-world"
+            "my-hello-world,"
+            "my-hello-toronto"
             ")"
         ),
         "convert-arraylist-to-memref",

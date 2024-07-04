@@ -148,4 +148,10 @@ def MyHelloWorldPass : Pass<"my-hello-world"> {
     let constructor = "catalyst::createMyHelloWorldPass()";
 }
 
+def MyHelloTorontoPass : Pass<"my-hello-toronto"> {
+    let summary = "An empty pass boilerplate that prints out hello toronto.";
+
+    let constructor = "catalyst::createMyHelloTorontoPass()";
+}
+
 #endif // CATALYST_PASSES

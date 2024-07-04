@@ -18,6 +18,7 @@ file(GLOB SRC
     GEPInboundsPass.cpp
     RegisterInactiveCallbackPass.cpp
     MyHelloWorldPass.cpp
+    MyHelloTorontoPass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
