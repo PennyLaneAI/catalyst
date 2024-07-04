@@ -12,10 +12,14 @@
 
 <h3>Internal changes</h3>
 
+* The function `inactive_callback` was renamed `__catalyst_inactive_callaback`.
+  [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Romain Moyard,
 Erick Ochoa,
 
 # Release 0.7.0
