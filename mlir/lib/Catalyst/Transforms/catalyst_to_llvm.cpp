@@ -459,7 +459,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
         LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
+            mlir::LLVM::lookupOrCreateFn(mod, "__catalyst_inactive_callback", {/*args=*/i64, i64, i64},
                                          /*ret_type=*/voidType, isVarArg);
 
         // TODO: remove redundant alloca+store since ultimately we'll receive struct*
