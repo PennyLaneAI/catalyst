@@ -170,7 +170,7 @@
   measurement.
   [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
 
-  When used with `mcm_method="one-shot`, this will return an array with one measurement
+  When used with `mcm_method="one-shot"`, this will return an array with one measurement
   result for each shot:
 
   ```python
@@ -190,7 +190,7 @@
   (array([0, 1, 0, 0, 0, 0, 1, 0, 0, 0]), array(0.4))
   ```
 
-  In `mcm_method="single-branch-statistics` mode, it will be equivalent to
+  In `mcm_method="single-branch-statistics"` mode, it will be equivalent to
   returning `m` directly from the quantum function --- that is, it will return
   a single boolean corresponding to the measurement in the branch selected:
 
@@ -565,7 +565,7 @@
 
 * The `Adjoint` class in Catalyst has been renamed to `HybridAdjoint`, indicating its capability
   to contain a nested scope of both quantum and classical operations.
-   Using `adjoint` on a single operation will now directly dispatch to the equivalent PennyLane class.
+  Using `adjoint` on a single operation will now directly dispatch to the equivalent PennyLane class.
   [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
   [(#802)](https://github.com/PennyLaneAI/catalyst/pull/802)
 
