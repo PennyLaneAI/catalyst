@@ -427,7 +427,7 @@ class TestIntegration:
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
         def func(x):
             qml.RX(x, wires=0)
-            m_0 = measure(0, postselect=1)
+            measure(0, postselect=1)
             return qml.sample(wires=0)
 
         # If transforms are missed, the output will be all ones.
