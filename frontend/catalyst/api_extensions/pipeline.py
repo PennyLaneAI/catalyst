@@ -29,7 +29,7 @@ import pennylane as qml
 
 
 ## PASS PIPELINE TABLE ##
-class ACTIVE_PASSES:
+class QUANTUM_CIRCUIT_TRANSFORM_PASS_TABLE:
     """
     A class that records the active compilation passes on a qnode.
     Note that the ordering of passes of course matters.
@@ -68,7 +68,7 @@ class ACTIVE_PASSES:
         return self.table[qnode]
 
 
-active_passes = ACTIVE_PASSES()
+active_passes = QUANTUM_CIRCUIT_TRANSFORM_PASS_TABLE()
 
 
 def get_quantum_circuit_transform_pass_table():
@@ -85,7 +85,7 @@ def cancel_inverses(fn=None):
     !!! TODO: add documentation here !!!
     """
     global active_passes
-    
+
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
     active_passes.add_pass_on_qnode(fn, "remove-chained-self-inverse")
