@@ -92,7 +92,7 @@ class TestArgsortNumerical:
             return jnp.argsort(x)
 
         observed = f(inp)
-        expected = jsp.argsort(inp)
+        expected = jnp.argsort(inp)
 
         assert np.allclose(observed, expected)
 

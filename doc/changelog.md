@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Added support for the jax.numpy.argsort function so it works when compiled with qjit.
+  [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -13,6 +16,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Mehrdad Malekmohammadi
 
 # Release 0.7.0
 
