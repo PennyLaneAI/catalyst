@@ -100,48 +100,6 @@
     array([-0.01071923,  0.82698717])
     ```
 
-    Note that `@callback_fn.bwd` is compatible with the return type of `jax.vjp`,
-    allowing for functions with `jax.vjp`-computable vector-Jacobian products
-    to be easily supported:
-
-    ```python
-    @catalyst.pure_callback
-    def expm(x) -> jax.ShapeDtypeStruct((2, 2), jnp.float64):
-        return jax.scipy.linalg.expm(x)
-
-    @expm.fwd
-    def expm_fwd(x):
-        return jax.scipy.linalg.expm(x), x
-
-    @expm.bwd
-    def expm_bwd(res, dy):
-
-        @catalyst.accelerate
-        def vjp(x, dy):
-            _, vjp_func = jax.vjp(jax.scipy.linalg.expm, x)
-            return vjp_func(dy)
-
-        return vjp(res, dy)
-
-    @qml.qjit
-    @catalyst.jacobian
-    def f(x):
-        return expm(x)
-    ```
-
-    ```pycon
-    >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
-    >>> f(x)
-    array([[[[1.12914705, 0.18555319],
-         [0.12370212, 0.0129465 ]],
-        [[0.12370212, 1.31470024],
-         [0.008631  , 0.13664862]]],
-       [[[0.18555319, 0.01941975],
-         [1.31470024, 0.20497293]],
-        [[0.0129465 , 0.20497293],
-         [0.13664862, 1.51967317]]]])
-    ```
-
 * Catalyst now supports the 'dynamic one shot' method for simulating circuits with mid-circuit
   measurements, which compared to other methods, may be advantageous for circuits with many
   mid-circuit measurements executed for few shots.
@@ -178,10 +136,9 @@
   available via `mcm_method="single-branch-statistics"`.
 
   When using `mcm_method="one-shot"`, the `postselect_mode` keyword argument can also
-  be used, to specify whether postselection should continue until `shots`-number of
-  postselected measurements are made (`"fill-shots"`), or whether execution should
-  terminate once `shot` executions have occurred regardless of how many postselected
-  measurements have occurred (`"hw_like"`):
+  be used to specify whether the returned result should include `shots`-number of
+  postselected measurements (`"fill-shots"`), or whether results should
+  include all results, including invalid postselections (`"hw_like"`):
 
   ```python
   @qml.qjit
@@ -266,6 +223,7 @@
   shapes can now be used with `for_loop`, `while_loop`, and `cond` primitives.
   [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
   [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+  [(#830)](https://github.com/PennyLaneAI/catalyst/pull/830)
 
   ``` python
   @qjit
@@ -281,23 +239,6 @@
   ``` pycon
   >>> f(3)
   array([21., 21., 21.])
-  ```
-  
-  However, capturing dynamic-shaped arrays within control-flow from outer scopes is currently not
-  supported:
-  
-  ```pycon
-  >>> @qjit(abstracted_axes={1: 'n'})
-  ... def g(x, y):
-  ...     @catalyst.for_loop(0, 10, 1)
-  ...     def loop(_, a):
-  ...         # Attempt to capture `x` from the outer scope.
-  ...         return a * x
-  ...     return jnp.sum(loop(y))
-  >>> a = jnp.ones([1,3], dtype=float)
-  >>> b = jnp.ones([1,3], dtype=float)
-  >>> g(a, b)
-  ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
   ```
 
 * Support has been added for disabling Autograph for specific functions.
@@ -376,34 +317,39 @@
       return qml.state()
   ```
 
-* Catalyst now supports capturing dynamically-shaped arrays from the outer scopes of a Python
-  program into control-flow primitives. In the following illustration, the `x` variable is captured.
-
-  ``` python
-  @qjit(abstracted_axes={1: 'n'})
-  def g(x, y):
-
-      @catalyst.for_loop(0, 10, 1)
-      def loop(_, a):
-          return a * x
-
-      return jnp.sum(loop(y))
-  ```
-  ``` pycon
-  >>> a = jnp.ones([1,3], dtype=float)
-  >>> b = jnp.ones([1,3], dtype=float)
-  >>> g(a, b)
-  array(3.)
-  ```
-  [(#830)](https://github.com/PennyLaneAI/catalyst/pull/830)
+* Catalyst is now officially support on Linux aarch64, with pre-built binaries
+  available on PyPI; simply `pip install pennylane-catalyst` on Linux aarch64 systems.
+  [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
 <h3>Improvements</h3>
+
+* Validation is now performed for observables and operations to ensure that provided circuits
+  are compatible with the devices for execution.
+  [(#626)](https://github.com/PennyLaneAI/catalyst/pull/626)
+  [(#783)](https://github.com/PennyLaneAI/catalyst/pull/783)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2, shots=10000)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.Hadamard(wires=0)
+      qml.CRX(x, wires=[0, 1])
+      return qml.var(qml.PauliZ(1))
+  ```
+
+  ```pycon
+  >>> circuit(0.43)
+  DifferentiableCompileError: Variance returns are forbidden in gradients
+  ```
 
 * Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
   applied to a single Operator. This should lead to improved compatibility with PennyLane library
   code, as well when reusing quantum functions with both Catalyst and PennyLane.
   [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
   [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+  [(#802)](https://github.com/PennyLaneAI/catalyst/pull/802)
 
 * Controlled operations defined via specialized classes (like `Toffoli` or `ControlledQubitUnitary`)
   are now implemented as controlled versions of their base operation if the device supports it.
@@ -430,40 +376,93 @@
   decomposed into a CNOT and RZ gates, even if a device supported it.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
-* Functions that have been annotated with return type
-  annotations will now correctly compile with `@qjit`.
-  [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
-
-* The `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators now follow
-  a unified pattern that uses a callable class implementing the decorator's logic. This
-  prevents having to excessively define functions in a nested fashion, and allows them
-  to be used as decorators.
+* All decorators in Catalyst, including `vmap`, `qjit`, `mitigate_with_zne`,
+  as well as gradient decorators `grad`, `jacobian`, jvp`, and `vjp`, can now be used
+  both with and without keyword arguments as a decorator without the need for
+  `functools.partial`:
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
   [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
   [(#762)](https://github.com/PennyLaneAI/catalyst/pull/762)
   [(#763)](https://github.com/PennyLaneAI/catalyst/pull/763)
 
-* Catalyst tests now manipulate device capabilities rather than text configurations files.
-  [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
+  ```python
+  @qjit
+  @grad(method="fd")
+  def fn1(x):
+      return x ** 2
+
+  @qjit(autograph=True)
+  @grad
+  def fn2(x):
+      return jnp.sin(x)
+  ```
+
+  ```pycon
+  >>> fn1(0.43)
+  array(0.8600001)
+  >>> fn2(0.12)
+  array(0.99280864)
+  ```
 
 * The built-in instrumentation with `detailed` output will no longer report the cumulative time for
-  MLIR pipelines, since was being reported as just another step alongside the individual timings for
-  each pipeline.
+  MLIR pipelines, since the cumulative time was being reported as just another step alongside
+  individual timings for each pipeline.
   [(#772)](https://github.com/PennyLaneAI/catalyst/pull/772)
 
 * Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
   [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
 
-* The measurement primitives now have a standardized call signature so that `shots` and `shape` can
-  both be provided as keyword arguments.
-  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
-
-* Finite difference is now always possible regardless of whether the differentiated function has a
-  valid gradient for autodiff or not.
+* The finite difference method for differentiation is now always allowed, even on functions with
+  mid-circuit measurements, callbacks without custom derivates, or other operations that cannot
+  be differentiated via traditional autodiff.
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
-* A new GitHub workflow makes available a binary distribution for Linux Arm64.
-  [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
+* A `non_commuting_observables` flag has been added to the device TOML schema, indicating whether or
+  not the device supports measuring non-commuting observables. If `false`, non-commuting
+  measurements will be split into multiple executions.
+  [(#821)](https://github.com/PennyLaneAI/catalyst/pull/821)
+
+* The underlying PennyLane `Operation` objects for `cond`, `for_loop`, and `while_loop` can now be
+  accessed directly via `body_function.operation`.
+  [(#711)](https://github.com/PennyLaneAI/catalyst/pull/711)
+
+  This can be beneficial when, among other things,
+  writing transforms without using the queuing mechanism:
+
+  ```python
+  @qml.transform
+  def my_quantum_transform(tape):
+      ops = tape.operations.copy()
+
+      @for_loop(0, 4, 1)
+      def f(i, sum):
+          qml.Hadamard(0)
+          return sum+1
+
+      res = f(0)
+      ops.append(f.operation)   # This is now supported!
+
+      def post_processing_fn(results):
+          return results
+      modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+      print(res)
+      print(modified_tape.operations)
+      return [modified_tape], post_processing_fn
+
+  @qml.qjit
+  @my_quantum_transform
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def main():
+      qml.Hadamard(0)
+      return qml.probs()
+  ```
+
+  ```pycon
+  >>> main()
+  Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
+  [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
+  (array([0.5, 0. , 0.5, 0. ]),)
+  ```
 
 <h3>Breaking changes</h3>
 
@@ -474,12 +473,17 @@
 
 <h3>Bug fixes</h3>
 
-* `device_shots` is modified to `0` on the fly in `Measure` (and set back to its original value
-  after the call to `PartialProbs`) to compute mid-circuit probabilities analytically, even when the
-  device has finite shots.
+* Functions that have been annotated with return type
+  annotations will now correctly compile with `@qjit`.
+  [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
+
+* An issue in the Lightning backend for the Catalyst runtime has been fixed that would only compute
+  approximate probabilities when implementing mid-circuit measurements. As a result, low shot numbers 
+  would lead to unexpected behaviours or projections on zero probability states.
+  Probabilities for mid-circuit measurements are now always computed analytically.
   [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
-* The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
+* The Catalyst runtime now raises an error if a qubit is accessed out of bounds from the allocated
   register.
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
@@ -509,17 +513,20 @@
   branch and normalize.
   [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
+* Measurement process primitives for Catalyst's JAXPR representation now have a standardized
+  call signature so that `shots` and `shape` can both be provided as keyword arguments.
+  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
+
 * The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
   to contain a nested scope of both quantum and classical operations.
-  A new `Controlled` class is generated when acting on a single PennyLane operator, which
-  inherits from both the PennyLane `Controlled` class as well the Catalyst `HybridCtrl` class.
+  Using `ctrl` on a single operation will now directly dispatch to the equivalent PennyLane class.
   [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
 
 * The `Adjoint` class in Catalyst has been renamed to `HybridAdjoint`, indicating its capability
   to contain a nested scope of both quantum and classical operations.
-  A new `Adjoint` class is generated when acting on a single PennyLane operator, which inherits from
-  both the PennyLane `Adjoint` class as well the Catalyst `HybridAdjoint` class.
+   Using `adjoint` on a single operation will now directly dispatch to the equivalent PennyLane class.
   [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
+  [(#802)](https://github.com/PennyLaneAI/catalyst/pull/802)
 
 * Add support to use a locally cloned PennyLane Lightning repository with the runtime.
   [(#732)](https://github.com/PennyLaneAI/catalyst/pull/732)
@@ -531,48 +538,6 @@
 * The `ag_autograph.py` and `autograph.py` modules have been refactored into the sub-package
   `catalyst.autograph`.
   [(#722)](https://github.com/PennyLaneAI/catalyst/pull/722)
-
-* Small changes to make pylint==3.2.0 succeed.
-  [(#739)](https://github.com/PennyLaneAI/catalyst/pull/739)
-
-* The underlying PennyLane `Operation` objects for `cond`, `for_loop`, and `while_loop` can now be
-  accessed directly via `body_function.operation`.
-  [(#711)](https://github.com/PennyLaneAI/catalyst/pull/711)
-
-  This can be beneficial when, among other things,
-  writing transforms without using the queuing mechanism:
-  ```py
-        @qml.transform
-        def my_quantum_transform(tape):
-            ops = tape.operations.copy()
-
-            @for_loop(0, 4, 1)
-            def f(i, sum):
-                qml.Hadamard(0)
-                return sum+1
-
-            res = f(0)
-            ops.append(f.operation)   # This is now supported!
-
-            def post_processing_fn(results):
-                return results
-            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
-            print(res)
-            print(modified_tape.operations)
-            return [modified_tape], post_processing_fn
-
-        @qml.qjit
-        @my_quantum_transform
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def main():
-            qml.Hadamard(0)
-            return qml.probs()
-
-        >>> main()
-        Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
-        [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
-        (array([0.5, 0. , 0.5, 0. ]),)
-  ```
 
 * Callback refactoring. This refactoring creates the classes `FlatCallable`
   and `MemrefCallable`.
@@ -649,14 +614,6 @@
     ValueAndGradOp op;
     foo(op);  // this works!
     ```
-
-* Validation is now performed for observables and operations as a final step of the device preprocess.
-  [(#626)](https://github.com/PennyLaneAI/catalyst/pull/626)
-  [(#783)](https://github.com/PennyLaneAI/catalyst/pull/783)
-
-* A `non_commuting_observables` flag is added to the TOML file, indicating whether or not the device
-  supports measuring non-commuting observables. If `false`, non-commuting measurements will be split into multiple executions.
-  [(#821)](https://github.com/PennyLaneAI/catalyst/pull/821)
 
 <h3>Contributors</h3>
 
