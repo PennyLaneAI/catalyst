@@ -420,7 +420,7 @@ class TestIntegration:
             f(0.5)
 
     def test_mcm_one_shot(self):
-        "Test if mcm one-shot miss transformation."
+        """Test if mcm one-shot miss transformation."""
         dev = qml.device("lightning.qubit", wires=5, shots=20)
 
         @qml.qjit(autograph=True)
@@ -430,7 +430,14 @@ class TestIntegration:
             m_0 = measure(0, postselect=1)
             return qml.sample(wires=0)
 
-        print(func(0.9))
+        @qml.qjit
+        @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
+        def func_no_autograph(x):
+            qml.RX(x, wires=0)
+            m_0 = measure(0, postselect=1)
+            return qml.sample(wires=0)
+
+        assert func(0.9) == func_no_autograph(0.9)
 
 
 class TestCodePrinting:
