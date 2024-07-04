@@ -185,6 +185,7 @@ BUFFERIZATION_PASS = (
             "buffer-loop-hoisting,"
             "buffer-deallocation,"
             "my-hello-world,"
+            "my-hello-canada,"
             "my-hello-toronto"
             ")"
         ),

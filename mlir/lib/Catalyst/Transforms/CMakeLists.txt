@@ -18,6 +18,7 @@ file(GLOB SRC
     GEPInboundsPass.cpp
     RegisterInactiveCallbackPass.cpp
     MyHelloWorldPass.cpp
+    MyHelloCanadaPass.cpp
     MyHelloTorontoPass.cpp
 )
 
