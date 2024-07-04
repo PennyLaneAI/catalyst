@@ -17,7 +17,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, measure, qjit, while_loop
+from catalyst import cond, grad, jacobian, measure, qjit, while_loop
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode, GradContext
 
 
@@ -67,6 +67,45 @@ class TestGradContextUnitTests:
                 assert not GradContext.am_inside_grad()
             assert GradContext.am_inside_grad()
         assert not GradContext.am_inside_grad()
+
+
+class TestGradContextIntegration:
+
+    def test_assert_inside_grad(self):
+
+        @qjit
+        @grad
+        def identity(x: float):
+            assert GradContext.am_inside_grad()
+            return x
+
+        identity(1.0)
+
+    def test_assert_inside_jacobian(self):
+
+        arg = jnp.array([[1.0, 1.0], [1.0, 1.0]])
+
+        @qjit
+        @jacobian
+        def identity(x):
+            assert GradContext.am_inside_grad()
+            return x
+
+        identity(arg)
+
+    def test_assert_inside_grad_negative(self):
+
+        msg = "verified fail"
+
+        @qjit
+        @grad
+        def identity(x: float):
+            assert not GradContext.am_inside_grad(), msg
+            return x
+
+        with pytest.raises(AssertionError, match=msg):
+
+            identity(1.0)
 
 
 class TestEvaluationModes:
