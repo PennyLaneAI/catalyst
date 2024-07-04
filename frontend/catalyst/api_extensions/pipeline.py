@@ -71,7 +71,7 @@ class ACTIVE_PASSES:
 active_passes = ACTIVE_PASSES()
 
 
-def send_pass_table_to_compiler():
+def get_quantum_circuit_transform_pass_table():
     """
     To be called in compiler.py to retrieve the pipeline table.
     """

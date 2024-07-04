@@ -32,7 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
-from catalyst.api_extensions.pipeline import send_pass_table_to_compiler
+from catalyst.api_extensions.pipeline import get_quantum_circuit_transform_pass_table
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
@@ -541,7 +541,7 @@ class Compiler:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         try:
-            fill_quantum_circuit_transforms_pipeline(send_pass_table_to_compiler())
+            fill_quantum_circuit_transforms_pipeline(get_quantum_circuit_transform_pass_table())
             self.options.quantum_circuit_transforms = bool(QUANTUM_CIRCUIT_TRANSFORMS[1])
             compiler_output = run_compiler_driver(
                 ir,
