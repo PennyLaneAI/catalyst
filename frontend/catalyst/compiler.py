@@ -181,7 +181,7 @@ def fill_quantum_circuit_transforms_pipeline(pass_table):
     for qnode in pass_table.table.keys():
         for pass_ in pass_table.query(qnode):
             # note that "pass" is a python keyword, so "pass_"
-            # The command line option to specify the qnode name is "func-name". 
+            # The command line option to specify the qnode name is "func-name".
             # See mlir/include/Quantum/Transforms/Passes.td
             run_pass = f"func.func({pass_}{{func-name={qnode.__name__}}})"
             if run_pass not in QUANTUM_CIRCUIT_TRANSFORMS[1]:
@@ -261,7 +261,7 @@ MLIR_TO_LLVM_PASS = (
 DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
-    QUANTUM_CIRCUIT_TRANSFORMS, # note: the position of QUANTUM_CIRCUIT_TRANSFORMS is currently arbitrary
+    QUANTUM_CIRCUIT_TRANSFORMS,  # note: the position of QUANTUM_CIRCUIT_TRANSFORMS is currently arbitrary
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_PASS,
 ]
@@ -277,7 +277,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 DEFAULT_ASYNC_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
-    QUANTUM_CIRCUIT_TRANSFORMS, # note: the position of QUANTUM_CIRCUIT_TRANSFORMS is currently arbitrary
+    QUANTUM_CIRCUIT_TRANSFORMS,  # note: the position of QUANTUM_CIRCUIT_TRANSFORMS is currently arbitrary
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_ASYNC_PASS,
 ]
