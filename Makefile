@@ -19,6 +19,7 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml')
+PYTEST_NUM_THREADS ?= 2
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -146,6 +147,8 @@ endif
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:
+	OMP_NUM_THREADS := $(PYTEST_NUM_THREADS)
+	export OMP_NUM_THREADS
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"

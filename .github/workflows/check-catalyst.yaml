@@ -512,7 +512,7 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        OMP_PROC_BIND=false OMP_NUM_THREADS=2 make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos"
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
