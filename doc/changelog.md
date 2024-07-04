@@ -7,6 +7,9 @@
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
+* Added support for the jax.numpy.argsort function so it works when compiled with qjit.
+  [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
@@ -25,6 +28,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
 

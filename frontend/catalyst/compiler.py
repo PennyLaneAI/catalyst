@@ -137,6 +137,7 @@ HLO_LOWERING_PASS = (
         "func.func(hlo-legalize-shapeops-to-standard)",
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
+        "func.func(hlo-legalize-sort)",
         "convert-to-signless",
         "canonicalize",
         "scatter-lowering",
