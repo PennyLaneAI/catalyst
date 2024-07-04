@@ -31,7 +31,6 @@ from malt.operators import py_builtins as ag_py_builtins
 from malt.operators.variables import Undefined
 from malt.pyct.origin_info import LineLocation
 from pennylane.queuing import AnnotatedQueue
-from pennylane.transforms.core.transform_dispatcher import TransformContainer
 
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
@@ -572,8 +571,8 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
             new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
 
-            if len(fn.transform_program._transform_program) > 0:
-                new_qnode.add_transform(fn.transform_program._transform_program[0])
+            for program in fn.transform_program._transform_program:
+                new_qnode.add_transform(program)
             return new_qnode()
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
