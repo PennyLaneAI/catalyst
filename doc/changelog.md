@@ -166,6 +166,49 @@
 
   For more details, see the [dynamic quantum circuit documentation](https://docs.pennylane.ai/en/latest/introduction/dynamic_quantum_circuits.html).
 
+* Catalyst now has support for returning `qml.sample(m)` where `m` is the result of a mid-circuit
+  measurement.
+  [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
+
+  When used with `mcm_method="one-shot`, this will return an array with one measurement
+  result for each shot:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2, shots=10)
+  
+  @qml.qjit
+  @qml.qnode(dev, mcm_method="one-shot")
+  def func(x):
+      qml.RX(x, wires=0)
+      m = catalyst.measure(0)
+      qml.RX(x ** 2, wires=0)
+      return qml.sample(m), qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> func(0.9)
+  (array([0, 1, 0, 0, 0, 0, 1, 0, 0, 0]), array(0.4))
+  ```
+
+  In `mcm_method="single-branch-statistics` mode, it will be equivalent to
+  returning `m` directly from the quantum function --- that is, it will return
+  a single boolean corresponding to the measurement in the branch selected:
+
+  ```python
+  @qml.qjit
+  @qml.qnode(dev, mcm_method="single-branch-statistics")
+  def func(x):
+      qml.RX(x, wires=0)
+      m = catalyst.measure(0)
+      qml.RX(x ** 2, wires=0)
+      return qml.sample(m), qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> func(0.9)
+  (array(False), array(0.8))
+  ```
+
 * A new function, `catalyst.value_and_grad`, returns both the result of a function and
   its gradient with a single forward and backwards pass.
   [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
@@ -304,6 +347,10 @@
 
   ```
 
+  For example, this might be useful if importing functionality from PennyLane (such as
+  a transform or decomposition), and would like to have Autograph capture and convert
+  associated control flow.
+
 * Controlled operations that do not have a matrix representation defined are now supported via
   applying PennyLane's decomposition.
   [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
@@ -355,12 +402,6 @@
   are now implemented as controlled versions of their base operation if the device supports it.
   In particular, `MultiControlledX` is no longer executed as a `QubitUnitary` with Lightning.
   [(#792)](https://github.com/PennyLaneAI/catalyst/pull/792)
-
-* Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
-  measurement. For now the feature is equivalent to returning `m` directly from a quantum
-  function, but will be improved to return an array with one measurement result for each
-  shot in a shots-based execution mode.
-  [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
 
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
