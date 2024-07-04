@@ -12,7 +12,7 @@
 
 <h3>Internal changes</h3>
 
-* The function `inactive_callback` was renamed `__catalyst_inactive_callaback`.
+* The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
   [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
 
 <h3>Contributors</h3>
