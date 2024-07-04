@@ -85,7 +85,6 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
-    quantum_circuit_transforms: Optional[bool] = False
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
@@ -108,26 +107,11 @@ class CompileOptions:
 
     def get_pipelines(self) -> List[Tuple[str, List[str]]]:
         """Get effective pipelines"""
-        if not self.quantum_circuit_transforms:
-            if self.pipelines:
-                return self.pipelines
-            elif self.async_qnodes:
-                return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-            return DEFAULT_PIPELINES
-
-        else:  # if self.quantum_circuit_transforms:
-            # The quantum circuit transform pipeline (performing the peephole optimizations,
-            # e.g. cancel neighbouring Hadamards) is placed after QuantumCompilation and before
-            # Bufferization.
-            _DEFAULT_PIPELINES = DEFAULT_PIPELINES.copy()
-            _DEFAULT_PIPELINES.insert(2, QUANTUM_CIRCUIT_TRANSFORMS)
-            _DEFAULT_ASYNC_PIPELINES = DEFAULT_ASYNC_PIPELINES.copy()
-            _DEFAULT_ASYNC_PIPELINES.insert(2, QUANTUM_CIRCUIT_TRANSFORMS)
-            if self.pipelines:
-                return self.pipelines
-            elif self.async_qnodes:
-                return _DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-            return _DEFAULT_PIPELINES
+        if self.pipelines:
+            return self.pipelines
+        elif self.async_qnodes:
+            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
+        return DEFAULT_PIPELINES
 
 
 @debug_logger
@@ -277,6 +261,7 @@ MLIR_TO_LLVM_PASS = (
 DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
+    QUANTUM_CIRCUIT_TRANSFORMS, # note: the position of QUANTUM_CIRCUIT_TRANSFORMS is currently arbitrary
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_PASS,
 ]
@@ -292,6 +277,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 DEFAULT_ASYNC_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
+    QUANTUM_CIRCUIT_TRANSFORMS, # note: the position of QUANTUM_CIRCUIT_TRANSFORMS is currently arbitrary
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_ASYNC_PASS,
 ]
@@ -542,7 +528,6 @@ class Compiler:
 
         try:
             fill_quantum_circuit_transforms_pipeline(get_quantum_circuit_transform_pass_table())
-            self.options.quantum_circuit_transforms = bool(QUANTUM_CIRCUIT_TRANSFORMS[1])
             compiler_output = run_compiler_driver(
                 ir,
                 str(workspace),
