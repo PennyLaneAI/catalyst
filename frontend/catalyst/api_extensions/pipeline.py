@@ -84,6 +84,8 @@ def cancel_inverses(fn=None):
     The top-level `catalyst.cancel_inverses` decorator.
     !!! TODO: add documentation here !!!
     """
+    global active_passes
+    
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
     active_passes.add_pass_on_qnode(fn, "remove-chained-self-inverse")
