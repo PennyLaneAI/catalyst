@@ -8,16 +8,23 @@
   [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
 
 <h3>Breaking changes</h3>
+* Return values are `jax.Array` typed instead of `numpy.array`.
+  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
 <h3>Bug fixes</h3>
 
 <h3>Internal changes</h3>
 
+* The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
+  [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
-Mehrdad Malekmohammadi
+Mehrdad Malekmohammadi,
+Romain Moyard,
+Erick Ochoa,
 
 # Release 0.7.0
 
