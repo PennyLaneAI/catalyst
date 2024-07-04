@@ -92,7 +92,7 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
         alongside ``grad`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
-    .. seealso:: :func:`~.jacobian`
+    .. seealso:: :func:`~.jacobian`, :func:`~.value_and_grad`.
 
     **Example 1 (Classical preprocessing)**
 
@@ -186,12 +186,14 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
 
 
 def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
-    """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
+    """A :func:`~.qjit`-compatible transformation for returning the result and gradient of a function.
 
     This function allows the value and the gradient of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will
-    simply dispatch to its JAX counterpart ``jax.value_and_grad``. The function ``f`` can return
-    any pytree-like shape.
+    simply dispatch to its JAX counterpart ``jax.value_and_grad``.
+
+    Note that ``value_and_grad`` can be more efficient, and reduce overall quantum executions,
+    compared to separately executing the function and then computing its gradient.
 
     .. warning::
 
@@ -230,7 +232,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
         alongside ``value_and_grad`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
-    .. seealso:: :func:`~.jacobian`
+    .. seealso:: :func:`~.grad`, :func:`~.jacobian`
 
     **Example 1 (Classical preprocessing)**
 
@@ -335,7 +337,7 @@ def jacobian(fn=None, *, method=None, h=None, argnum=None):
         alongside ``jacobian`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
-    .. seealso:: :func:`~.grad`
+    .. seealso:: :func:`~.grad`, :func:`~.value_and_grad`.
 
     **Example**
 
