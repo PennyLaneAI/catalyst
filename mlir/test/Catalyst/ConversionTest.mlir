@@ -125,7 +125,7 @@ module @test0 {
   // CHECK-DAG: [[argc:%.+]] = llvm.mlir.constant(2
   // CHECK-DAG: [[resc:%.+]] = llvm.mlir.constant(3
 
-  // CHECK: llvm.call @inactive_callback([[id]], [[argc]], [[resc]]
+  // CHECK: llvm.call @__catalyst_inactive_callback([[id]], [[argc]], [[resc]]
   catalyst.callback @callback_4(memref<f64>, memref<f64>) attributes {argc = 2 : i64, id = 4 : i64, resc = 3 : i64}
 }
 

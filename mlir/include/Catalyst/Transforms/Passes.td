@@ -132,7 +132,7 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
 }
 
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
-    let summary = "Register `inactive_callback` as inactive with Enzyme";
+    let summary = "Register `__catalyst_inactive_callback` as inactive with Enzyme";
 
     let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
