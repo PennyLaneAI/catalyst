@@ -404,6 +404,7 @@
   [(#792)](https://github.com/PennyLaneAI/catalyst/pull/792)
 
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  For more details, please see the [logging documentation](https://docs.pennylane.ai/en/stable/introduction/logging.html).
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
