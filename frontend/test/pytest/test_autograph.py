@@ -416,8 +416,21 @@ class TestIntegration:
 
             return circuit(x)
 
-        # with pytest.raises(NotImplementedError):
-        #    f(0.5)
+        with pytest.raises(NotImplementedError):
+            f(0.5)
+
+    def test_mcm_one_shot(self):
+        "Test if mcm one-shot miss transformation."
+        dev = qml.device("lightning.qubit", wires=5, shots=20)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
+        def func(x):
+            qml.RX(x, wires=0)
+            m_0 = measure(0, postselect=1)
+            return qml.sample(wires=0)
+
+        print(func(0.9))
 
 
 class TestCodePrinting:
