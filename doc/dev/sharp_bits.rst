@@ -1051,7 +1051,7 @@ array([21., 21., 21., 21., 21.])
 
 By default, Catalyst for loops and while loops will automatically capture
 dynamically-shaped arrays from outside their scope for use within the loop,
-however loops cannot modify (i.e., return) array shapes and sizes:
+however loops cannot modify array shapes and sizes.
 
 >>> @qjit()
 ... def f(N):
