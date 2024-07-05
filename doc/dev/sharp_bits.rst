@@ -1006,6 +1006,11 @@ array([[1., 1., 1., 1.],
        [1., 1., 1., 1.],
        [1., 1., 1., 1.]])
 
+Dynamic arrays can be created using ``jnp.ones``, ``jnp.zeros``, however note that ``jnp.arange``
+and ``jnp.linspace`` do not currently support generating dynamically-shaped arrays (however, unlike
+``jnp.arange``, ``jnp.linspace`` *does* support dynamic variables for its ``start`` and ``stop``
+arguments).
+
 We can also pass tensors of variable shape directly as arguments to compiled
 functions, however we need to provide the ``abstracted_axes`` argument,
 to specify which axes of the tensors should be considered dynamic during compilation.
@@ -1036,6 +1041,9 @@ array(2.1)
 
 For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
 
+Dynamic-arrays and control flow
+-------------------------------
+
 Note that using dynamically-shaped arrays within for loops, while loops, and
 conditional statements, are also supported:
 
@@ -1049,9 +1057,13 @@ conditional statements, are also supported:
 >>> f(5)
 array([21., 21., 21., 21., 21.])
 
-By default, Catalyst for loops and while loops will automatically capture
-dynamically-shaped arrays from outside their scope for use within the loop,
-however loops cannot modify array shapes and sizes.
+By default, Catalyst for loops and while loops will automatically
+
+- capture dynamically-shaped arrays from outside their scope for use within the loop, and
+- allow binary operations (such as ``a + b``, ``a * b`` ) between arrays of the same shape,
+
+however the input and output type and shape across iterations of a loop need to remain
+the same:
 
 >>> @qjit()
 ... def f(N):
@@ -1065,8 +1077,8 @@ AssertionError:
 result_types=[RankedTensorType(tensor<?xf64>)] doesn't match
 jax_ctx.avals_out=[ShapedArray(int64[], weak_type=True), f64[c]]
 
-In order to support modifying of array shape, size or dimension *within* a loop,
-the ``allow_array_resizing`` argument can be used:
+In order to support modifying of array dimension size across loop
+iterations, the ``allow_array_resizing`` argument can be used:
 
 >>> @qjit()
 ... def f(N):

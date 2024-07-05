@@ -133,6 +133,11 @@ array([[1., 1., 1., 1.],
        [1., 1., 1., 1.],
        [1., 1., 1., 1.]])
 
+Dynamic arrays can be created using ``jnp.ones``, ``jnp.zeros``, however note that ``jnp.arange``
+and ``jnp.linspace`` do not currently support generating dynamically-shaped arrays (however, unlike
+``jnp.arange``, ``jnp.linspace`` *does* support dynamic variables for its ``start`` and ``stop``
+arguments).
+
 For more details, see :ref:`dynamic-arrays`.
 
 JAX transforms on QJIT functions
