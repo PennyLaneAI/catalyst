@@ -516,7 +516,7 @@ JAX functions and transforms
 
     For more details on JAX integrations and support, as well as details on
     'sharp bits' that we inherit from JAX, please see
-    :doc:`dev/jax_integration`.
+    :doc:`jax_integration`.
 
 Inside of a qjit-compiled function, JAX transformations
 (``jax.grad``, ``jax.jacobian``, ``jax.vmap``, etc.)
