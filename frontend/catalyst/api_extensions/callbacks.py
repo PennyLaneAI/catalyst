@@ -434,10 +434,12 @@ class MemrefCallable(FlatCallable):
 
     CACHE = {}
 
-    def __new__(cls, func, results_aval, *_args, **_kwargs):
+    def __new__(cls, func, results_aval, *args, **kwargs):
         # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        flat_params, _ = tree_flatten((absargs, abskwargs))
         flat_results_aval, _ = tree_flatten(results_aval)
-        cache_key = (func, *flat_results_aval)
+        cache_key = (func, *flat_params, *flat_results_aval)
         if cls.CACHE.get(cache_key):
             return cls.CACHE.get(cache_key)
 
