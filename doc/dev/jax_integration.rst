@@ -58,20 +58,26 @@ and only apply outside of QNodes:
     dev = qml.device("lightning.qubit", wires=4, shots=10)
 
     @qml.qnode(dev)
-    def circuit(j, x):
+    def circuit(x):
+        N = x.shape[0]
 
-        @catalyst.for_loop(0, x.shape[0], 1)
+        @catalyst.for_loop(0, N, 1)
         def loop_fn(i):
             qml.RX(x[i], wires=i)
 
         loop_fn()
-        return qml.expval(qml.PauliZ(0))
+        return [qml.expval(qml.PauliZ(i)) for i in range(N)]
 
     @qjit
     def fn(x):
-        return jax.lax.fori_loop(0, 3, circuit, x)
 
->>> fn(0.54)
+        def cost(j, x):
+            return jnp.stack(circuit(x))
+
+        return jax.lax.fori_loop(0, 10, cost, x)
+
+>>> fn(jnp.array([0.1, 0.2, 0.3, 0.5]))
+array([0.6, 0.6, 0.8, 1. ])
 
 Function support
 ----------------
@@ -129,8 +135,8 @@ array([[1., 1., 1., 1.],
 
 For more details, see :ref:`dynamic-arrays`.
 
-Calling JAX transforms on QJIT functions
-----------------------------------------
+JAX transforms on QJIT functions
+--------------------------------
 
 Compiled functions remain JAX compatible, and you can call JAX transformations
 on them, such as ``jax.grad`` and ``jax.vmap``. You can even call ``jax.jit``
@@ -147,16 +153,19 @@ on functions that call qjit-compiled functions:
 ...     return jax.grad(circuit)(jnp.sin(y))
 >>> workflow(0.6)
 Array(-0.53511382, dtype=float64, weak_type=True)
+>>> jax.vmap(circuit)(jnp.array([0.1, 0.2, 0.3]))
+Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
 
 However, a ``jax.jit`` function calling a ``qjit`` function will always result
 in a callback to Python, so will be slower than if the function was purely compiled
 using ``jax.jit`` or ``qjit``.
 
-If you want to compile some functionality that is not currently Catalyst
-compatible, or you want to make use of JAX-supported hardware such as TPUs
-for classical processing, mixing ``jax.jit`` and ``qjit`` will allow this.
-However, if possible, try to always use ``qjit`` to compile your entire
-workflow.
+.. note::
+
+    Best performance will be seen when the Catalyst
+    ``@qjit`` decorator is used to JIT the entire hybrid workflow. However, there
+    may be cases where you may want to delegate only the quantum part of your
+    workflow to Catalyst, and let JAX handle classical components.
 
 
 Internal QJIT JAX transformations
