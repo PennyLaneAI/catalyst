@@ -306,7 +306,7 @@ def test_quantum_tracing_2():
         i = 0
         a = jnp.ones((x, y + 1), dtype=float)
 
-        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
+        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             qml.PauliX(wires=0)
             b = jnp.ones((x, y + 1), dtype=float)
@@ -470,7 +470,7 @@ def test_qjit_forloop_indbidx_outdbidx():
         a = jnp.ones([sz, 3], dtype=float)
         b = jnp.ones([sz, 3], dtype=float)
 
-        @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
+        @for_loop(0, 10, 2, allow_array_resizing=True)
         def loop(_i, a, _b):
             b = jnp.ones([sz + 1, 3], dtype=float)
             return (a, b)
@@ -491,7 +491,7 @@ def test_qjit_forloop_index_indbidx():
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
+        @for_loop(0, 10, 1, allow_array_resizing=True)
         def loop(i, _):
             return jnp.ones([i], dtype=float)
 
@@ -530,7 +530,7 @@ def test_qjit_forloop_shared_dimensions():
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
+        @for_loop(0, 10, 1, allow_array_resizing=True)
         def loop(_i, _a, _b):
             return (input_a, input_a)
 
@@ -614,7 +614,7 @@ def test_qnode_forloop_indbidx_outdbidx():
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
+        @for_loop(0, 10, 2, allow_array_resizing=True)
         def loop(_i, a, _b):
             b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
@@ -634,7 +634,7 @@ def test_qnode_forloop_abstracted_axes():
     @qjit(abstracted_axes={0: "n"})
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(a, b):
-        @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
+        @for_loop(0, 10, 2, allow_array_resizing=True)
         def loop(_i, a, _b):
             b = jnp.ones([a.shape[0] + 1], dtype=float)
             return (a, b)
@@ -657,7 +657,7 @@ def test_qnode_forloop_index_indbidx():
     def f(sz):
         a = jnp.ones([sz, 3], dtype=float)
 
-        @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
+        @for_loop(0, 10, 1, allow_array_resizing=True)
         def loop(i, _):
             b = jnp.ones([i, 3], dtype=float)
             return b
@@ -698,7 +698,7 @@ def test_qnode_whileloop_2():
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
+        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -785,7 +785,7 @@ def test_qnode_whileloop_indbidx_outdbidx():
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3, experimental_preserve_dimensions=False)
+        @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
         def loop(a, _, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -826,7 +826,7 @@ def test_qjit_whileloop_1():
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
+        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -847,7 +847,7 @@ def test_qjit_whileloop_2():
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
+        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -869,7 +869,7 @@ def test_qjit_whileloop_shared_dimensions():
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @while_loop(lambda _a, _b, c: c, experimental_preserve_dimensions=True)
+        @while_loop(lambda _a, _b, c: c, allow_array_resizing=False)
         def loop(_a, _b, _c):
             return (input_a, input_a, False)
 
@@ -912,7 +912,7 @@ def test_qjit_whileloop_indbidx_outdbidx():
         a0 = jnp.ones([sz], dtype=float)
         b0 = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3, experimental_preserve_dimensions=False)
+        @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
         def loop(a, _, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
