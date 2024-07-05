@@ -17,20 +17,25 @@
 import pennylane as qml
 from catalyst import pure_callback
 
+
 def i(x):
     return x
+
 
 # CHECK-LABEL: module @one_callback_cached
 @qml.qjit
 # CHECK-NOT: catalyst.callback @callback
 # CHECK-LABEL: func.func public @jit_one_callback_cached
-def one_callback_cached(x : float):
+def one_callback_cached(x: float):
     """Single callback is created, but called twice"""
     c = pure_callback(i, float)
     return c(x), c(x)
+
+
 # CHECK-LABEL: catalyst.callback @callback
 # CHECK-NOT: catalyst.callback @callback
 print(one_callback_cached.mlir)
+
 
 @pure_callback
 def always_return_float(x) -> float:
@@ -39,15 +44,17 @@ def always_return_float(x) -> float:
     else:
         return x + 0.0
 
+
 # CHECK-LABEL: module @test2
 @qml.qjit
 # CHECK-NOT: catalyst.callback @callback
 # CHECK-LABEL: func.func public @jit_test2
 def test2():
     return always_return_float(0.0), always_return_float(1)
+
+
 # CHECK-LABEL: catalyst.callback @callback
 # CHECK-LABEL: catalyst.callback @callback
 # CHECK-NOT: catalyst.callback @callback
 
 print(test2.mlir)
-
