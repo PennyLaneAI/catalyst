@@ -122,6 +122,7 @@ def run_autograph(fn):
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
 
+    # Pass mcm_config and the other arguments to new function.
     if hasattr(fn, "execute_kwargs"):
         new_fn.execute_kwargs = fn.execute_kwargs
 
