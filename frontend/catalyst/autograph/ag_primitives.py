@@ -584,13 +584,15 @@ def get_item(target, i, opts):
     index a non-jax array with jax index, we convert it into jax array first."""
     assert isinstance(opts, GetItemOpts)
 
-    def convertToDynamicJaxprTracer(obj):
+    def isDynamicJaxprTracer(obj):
         return isinstance(obj, DynamicJaxprTracer)
 
+    # Do not do convert if target is a jax array or a tuple of jax arrays.
+    # There is no way convert a tuple of jax arrays with different sizes.
     if (
         isinstance(target, DynamicJaxprTracer)
         or isinstance(target, tuple)
-        and tree_reduce(operator.and_, tree_map(convertToDynamicJaxprTracer, target))
+        and tree_reduce(operator.and_, tree_map(isDynamicJaxprTracer, target))
     ):
         return target[i]
     else:
