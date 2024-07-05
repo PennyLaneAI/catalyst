@@ -1049,12 +1049,41 @@ conditional statements, are also supported:
 >>> f(5)
 array([21., 21., 21., 21., 21.])
 
-However, capturing dynamic-shaped arrays within control-flow from outer scopes is currently not
-supported:
+By default, Catalyst for loops and while loops will automatically capture
+dynamically-shaped arrays from outside their scope for use within the loop,
+however loops cannot modify (i.e., return) array shapes and sizes:
+
+>>> @qjit()
+... def f(N):
+...     a = jnp.ones([N], dtype=float)
+...     @for_loop(0, 10, 1)
+...     def loop(i, _):
+...         return jnp.ones([i], dtype=float) # return array of new dimensions
+...     return loop(a)
+>>> f(5)
+AssertionError:
+result_types=[RankedTensorType(tensor<?xf64>)] doesn't match
+jax_ctx.avals_out=[ShapedArray(int64[], weak_type=True), f64[c]]
+
+In order to support modifying of array shape, size or dimension *within* a loop,
+the ``allow_array_resizing`` argument can be used:
+
+>>> @qjit()
+... def f(N):
+...     a = jnp.ones([N], dtype=float)
+...     @for_loop(0, 10, 1, allow_array_resizing=True)
+...     def loop(i, _):
+...         return jnp.ones([i], dtype=float) # return array of new dimensions
+...     return loop(a)
+>>> f(5)
+array([1., 1., 1., 1., 1., 1., 1., 1., 1.])
+
+However, outer-scope dynamically-shaped arrays can no longer be captured and used
+within the loop in this mode:
 
 >>> @qjit(abstracted_axes={1: 'n'})
 ... def g(x, y):
-...     @catalyst.for_loop(0, 10, 1)
+...     @catalyst.for_loop(0, 10, 1, allow_array_resizing=True)
 ...     def loop(_, a):
 ...         # Attempt to capture `x` from the outer scope.
 ...         return a * x
@@ -1063,6 +1092,9 @@ supported:
 >>> b = jnp.ones([1,3], dtype=float)
 >>> g(a, b)
 ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
+
+For more details, please see the :func:`~.for_loop`
+and :func:`~.while_loop` documentation.
 
 Returning multiple measurements
 -------------------------------

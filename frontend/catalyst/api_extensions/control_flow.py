@@ -242,7 +242,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=True):
+def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -283,6 +283,11 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=Tr
         lower_bound (int): starting value of the iteration index
         upper_bound (int): (exclusive) upper bound of the iteration index
         step (int): increment applied to the iteration index at the end of each iteration
+        allow_array_resizing (bool): Whether to allow arrays to change shape/size within
+            the for loop. By default this is ``False``; this will allow out-of-scope
+            dynamical-shaped arrays to be captured by the for loop. Set this to ``True``
+            to modify array shape/size within the for loop, however outer-scope
+            dynamical-shaped arrays will no longer be captured.
 
     Returns:
         Callable[[int, ...], ...]: A wrapper around the loop body function.
@@ -316,17 +321,62 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=Tr
 
     >>> circuit(7, 1.6)
     [array(0.97926626), array(0.55395718)]
+
+    Note that using dynamically-shaped arrays within for loops, while loops, and
+    conditional statements, are also supported:
+
+    >>> @qjit
+    ... def f(shape):
+    ...     a = jnp.ones([shape], dtype=float)
+    ...     @for_loop(0, 10, 2)
+    ...     def loop(i, a):
+    ...         return a + i
+    ...     return loop(a)
+    >>> f(5)
+    array([21., 21., 21., 21., 21.])
+
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamical-shaped
+    arrays from outside the for loop to be correctly captured:
+
+    >>> @qjit(abstracted_axes={1: 'n'})
+    ... def g(x, y):
+    ...     @catalyst.for_loop(0, 10, 1)
+    ...     def loop(_, a):
+    ...         # Attempt to capture `x` from the outer scope.
+    ...         return a * x
+    ...     return jnp.sum(loop(y))
+    >>> a = jnp.ones([1,3], dtype=float)
+    >>> b = jnp.ones([1,3], dtype=float)
+    >>> g(a, b)
+    array(3.)
+
+    However, if you wish to have the for loop return differently sized/shaped arrays
+    at each iteration, set ``allow_array_resizing`` to ``True``:
+
+    >>> @qjit()
+    ... def f(N):
+    ...     a = jnp.ones([N], dtype=float)
+    ...     @for_loop(0, 10, 1, allow_array_resizing=True)
+    ...     def loop(i, _):
+    ...         return jnp.ones([i], dtype=float) # return array of new dimensions
+    ...     return loop(a)
+    >>> f(5)
+    array([1., 1., 1., 1., 1., 1., 1., 1., 1.])
+
+    Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
+    can no longer be captured from outer-scopes by the for loop. For more details
+    on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
 
     def _decorator(body_fn):
         return ForLoopCallable(
-            lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
+            lower_bound, upper_bound, step, body_fn, not allow_array_resizing
         )
 
     return _decorator
 
 
-def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
+def while_loop(cond_fn, allow_array_resizing: bool = False):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
     This decorator provides a functional version of the traditional while
@@ -357,6 +407,11 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
 
     Args:
         cond_fn (Callable): the condition function in the while loop
+        allow_array_resizing (bool): Whether to allow arrays to change shape/size within
+            the while loop. By default this is ``False``; this will allow out-of-scope
+            dynamical-shaped arrays to be captured by the while loop. Set this to ``True``
+            to modify array shape/size within the while loop, however outer-scope
+            dynamical-shaped arrays will no longer be captured.
 
     Returns:
         Callable: A wrapper around the while-loop function.
@@ -387,10 +442,45 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
 
     >>> circuit(1.6)
     [array(-0.02919952), array(2.56)]
+
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamical-shaped
+    arrays from outside the for loop to be correctly captured:
+
+    >>> @qjit(abstracted_axes={0: 'n'})
+    ... def g(x, y):
+    ...     @catalyst.while_loop(lambda i: jnp.sum(i) > 2., allow_array_resizing=False)
+    ...     def loop(a):
+    ...         # Attempt to capture `x` from the outer scope.
+    ...         return a * x
+    ...     return loop(y)
+    >>> x = jnp.array([0.1, 0.2, 0.3])
+    >>> y = jnp.array([5.2, 10.3, 2.4])
+    >>> g(x, y)
+    array([0.052, 0.412, 0.216])
+
+    However, if you wish to have the for loop return differently sized/shaped arrays
+    at each iteration, set ``allow_array_resizing`` to ``True``:
+
+    >>> @qjit
+    ... def f(N):
+    ...     a0 = jnp.ones([N])
+    ...     b0 = jnp.ones([N])
+    ...     @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+    ...     def loop(a, _, i):
+    ...         i += 1
+    ...         b = jnp.ones([i + 1])
+    ...         return (a, b, i) # return array of new dimensions
+    ...     return loop(a0, b0, 0)
+    >>> f(2)
+    (array([1., 1.]), array([1., 1., 1., 1.]), array(3))
+
+    Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
+    can no longer be captured from outer-scopes by the for loop. For more details
+    on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
 
     def _decorator(body_fn):
-        return WhileLoopCallable(cond_fn, body_fn, experimental_preserve_dimensions)
+        return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)
 
     return _decorator
 
