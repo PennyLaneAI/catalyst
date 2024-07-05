@@ -286,9 +286,9 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
         allow_array_resizing (bool): Whether to allow arrays to change shape/size within
             the for loop. By default this is ``False``; this will allow out-of-scope
             dynamical-shaped arrays to be captured by the for loop, and binary operations
-            to be applied to operations of the same shape. Set this to ``True``
-            to modify array shape/size within the for loop, however outer-scope
-            dynamical-shaped arrays will no longer be captured, and arrays of the same shape
+            to be applied to arrays of the same shape. Set this to ``True``
+            to modify dimension sizes within the for loop, however outer-scope
+            dynamically-shaped arrays will no longer be captured, and arrays of the same shape
             cannot be used in binary operations.
 
     Returns:
@@ -337,7 +337,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     >>> f(5)
     array([21., 21., 21., 21., 21.])
 
-    By default, ``allow_array_resizing`` is ``False``, allowing dynamical-shaped
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
     arrays from outside the for loop to be correctly captured, and arrays of the
     same shape to be used in binary operations:
 
@@ -354,7 +354,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     >>> g(a, b)
     array(3.)
 
-    However, if you wish to have the for loop return differently sized/shaped arrays
+    However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
 
     >>> @qjit()
@@ -369,7 +369,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
 
     Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
     can no longer be captured from outer-scopes by the for loop, and binary operations
-    between arrays of the same shape are not supported.
+    between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
@@ -415,10 +415,10 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
         cond_fn (Callable): the condition function in the while loop
         allow_array_resizing (bool): Whether to allow arrays to change shape/size within
             the loop. By default this is ``False``; this will allow out-of-scope
-            dynamical-shaped arrays to be captured by the loop, and binary operations
-            to be applied to operations of the same shape. Set this to ``True``
-            to modify array shape/size within the loop, however outer-scope
-            dynamical-shaped arrays will no longer be captured, and arrays of the same shape
+            dynamically-shaped arrays to be captured by the loop, and binary operations
+            to be applied to arrays of the same shape. Set this to ``True``
+            to modify dimension sizes within the loop, however outer-scope
+            dynamically-shaped arrays will no longer be captured, and arrays of the same shape
             cannot be used in binary operations.
 
     Returns:
@@ -451,7 +451,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     >>> circuit(1.6)
     [array(-0.02919952), array(2.56)]
 
-    By default, ``allow_array_resizing`` is ``False``, allowing dynamical-shaped
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
     arrays from outside the for loop to be correctly captured, and arrays of the
     same shape to be used in binary operations:
 
@@ -468,7 +468,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     >>> g(x, y)
     array([0.052, 0.412, 0.216])
 
-    However, if you wish to have the for loop return differently sized/shaped arrays
+    However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
 
     >>> @qjit
@@ -486,7 +486,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
     Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
     can no longer be captured from outer-scopes by the for loop, and binary operations
-    between arrays of the same shape are not supported.
+    between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
