@@ -289,7 +289,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG=476cac2e39f79c122b8751a77aad8139b39296db \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
@@ -405,6 +405,11 @@ jobs:
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install 'oqc-qcaas-client<3.6.0'
+    
+    # TODO: remove workaround before merging to main
+    - name: Install PennyLane RC
+      run: |
+        python${{ matrix.python_version }} -m pip install git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
 
     - name: Install Catalyst
       run: |

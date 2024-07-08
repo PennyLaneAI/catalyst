@@ -41,6 +41,10 @@ if [ "$PYTHON_VERSION" == "3.9" ] || [ "$PYTHON_VERSION" == "3.10" ]; then
     /usr/bin/python3 -m pip install oqc-qcaas-client
 fi
 
+# TODO: remove workaround before merging to main
+# Install PennyLane RC
+/usr/bin/python3 -m pip install git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
+
 # Install Catalyst wheel
 /usr/bin/python3 -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple
 
