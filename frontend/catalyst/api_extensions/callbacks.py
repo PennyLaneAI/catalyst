@@ -448,6 +448,7 @@ class FlatCallable:
 
     def __init__(self, func, *params, **kwparams):
         self.func = func
+        functools.update_wrapper(self, func)
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
