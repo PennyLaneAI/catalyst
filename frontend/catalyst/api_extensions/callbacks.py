@@ -331,11 +331,11 @@ def pure_callback_impl(callback_fn: AnnotatedFunction):
 class CallbackWithCustomGrad:
     """A callback with a custom grad"""
 
-    def __init__(self, func, restype, forward, reverse):
+    def __init__(self, func, forward, reverse):
         assert isinstance(func, AnnotatedFunction)
         assert func and forward and reverse
         self.func = func
-        self.restype = restype
+        self.restype = func.getResultTypes()
         self._fwd = forward
         self._fwd_jaxpr = None
         self._bwd = reverse
@@ -410,7 +410,7 @@ class CallbackWithPotentialCustomGrad:
             return self.callback(*args, **kwargs)
 
         if self._fwd and self._bwd:
-            self.callback = CallbackWithCustomGrad(self.func, self.restype, self._fwd, self._bwd)
+            self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd)
             return self.callback(*args, **kwargs)
 
         def closure(*args, **kwargs) -> self.restype:
