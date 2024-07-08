@@ -571,7 +571,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
             new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
 
-            for program in fn.transform_program._transform_program:
+            for program in fn._transform_program:
                 new_qnode.add_transform(program)
             return new_qnode()
 

@@ -63,6 +63,10 @@ class CatalystTransformer(PyToPy):
         if isinstance(obj, qml.QNode):
             new_obj = qml.QNode(new_fn, device=obj.device, diff_method=obj.diff_method)
 
+        # Pass mcm_config and the other arguments to new function.
+        if hasattr(obj, "execute_kwargs"):
+            new_obj.execute_kwargs = obj.execute_kwargs
+
         return new_obj, module, source_map
 
     def get_extra_locals(self):
@@ -121,10 +125,6 @@ def run_autograph(fn):
     new_fn.ag_module = module
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
-
-    # Pass mcm_config and the other arguments to new function.
-    if hasattr(fn, "execute_kwargs"):
-        new_fn.execute_kwargs = fn.execute_kwargs
 
     return new_fn
 
