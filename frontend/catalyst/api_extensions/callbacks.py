@@ -279,7 +279,11 @@ def base_callback(func):
     If it is empty or None, then there are no return values.
     Otherwise, it is whatever it says in the annotations.
     """
-    return base_callback_impl(func, device=None, custom_grad=None)
+    signature = inspect.signature(func)
+    result_type = signature.return_annotation
+    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+    wrapper = AnnotatedFunction(func, result_type)
+    return base_callback_impl(wrapper, device=None, custom_grad=None)
 
 
 def accelerate_impl(users_func=None, *, dev=None):
@@ -346,14 +350,11 @@ class CallbackWithCustomGrad:
         if self.callback:
             return self.callback(*args, **kwargs)
 
-        def closure(*args, **kwargs) -> self.restype:
-            return self.func(*args, **kwargs)
-
         # We need this here to avoid infinite recursion
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = base_callback_impl(closure, custom_grad=self)
+        self.callback = base_callback_impl(self.func, custom_grad=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
@@ -413,27 +414,18 @@ class CallbackWithPotentialCustomGrad:
             self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd)
             return self.callback(*args, **kwargs)
 
-        def closure(*args, **kwargs) -> self.restype:
-            return self.func(*args, **kwargs)
-
-        self.callback = base_callback_impl(closure)
+        self.callback = base_callback_impl(self.func)
         return self.callback(*args, **kwargs)
 
 
 def jax_jit_callback(callback_fn: AnnotatedFunction, result_type, device=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
-    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
-
-    def closure(*args, **kwargs) -> result_type:
-        return callback_fn(*args, **kwargs)
-
-    return base_callback_impl(closure, device=device)
+    return base_callback_impl(callback_fn, device=device)
 
 
-def base_callback_impl(func, device=None, custom_grad=None):
-    signature = inspect.signature(func)
-    retty = signature.return_annotation
+def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
+    retty = func.getResultTypes()
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
