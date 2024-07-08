@@ -37,7 +37,7 @@ from jax._src.tree_util import (
 
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
-from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
@@ -366,6 +366,10 @@ class CallbackWithCustomGrad:
         self.callback = None
 
     def __call__(self, *args, **kwargs):
+        if not EvaluationContext.is_tracing():
+            # If we are not in the tracing context, just evaluate the function.
+            return self.func(*args, **kwargs)
+
         if self.callback:
             return self.callback(*args, **kwargs)
 
@@ -381,7 +385,8 @@ class CallbackWithCustomGrad:
         cotangents = tree_map(shaped_abstractify, self.restype)
 
         # The forward pass must have the same input types as the original function
-        with transient_jax_config({"jax_dynamic_shapes": False}):
+        no_dyn_shapes = {"jax_dynamic_shapes": False}
+        with transient_jax_config(no_dyn_shapes) as jc, GradContext(peel=True) as gc:
             self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(
                 *absargs, **abskwargs
             )
@@ -390,7 +395,7 @@ class CallbackWithCustomGrad:
         _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        with transient_jax_config({"jax_dynamic_shapes": False}):
+        with transient_jax_config(no_dyn_shapes) as jc, GradContext(peel=True) as gc:
             self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
@@ -418,6 +423,10 @@ class CallbackWithPotentialCustomGrad:
         self._bwd = func
 
     def __call__(self, *args, **kwargs):
+        if not EvaluationContext.is_tracing():
+            # If we are not in the tracing context, just evaluate the function.
+            return self.func(*args, **kwargs)
+
         incomplete_grad = bool(self._fwd) != bool(self._bwd)
         if incomplete_grad:
             # If we are here, then we have either _fwd and _bwd but not both
