@@ -12,45 +12,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This file performs the frontend lit tests that the peephole transformations are correctly applied.
+Each test has two components:
+  1. A qnode with a peephole optimization applied, usually called "f"
+  2. The SAME qnode without a peephole optimization applied, usually called "g"
+
+We need to check that:
+  1. For "f", the peephole transform is correctly applied in mlir
+  2. For "g", the peephole transform is correctly not applied in mlir
+  3. "f" and "g" returns the same results.
+"""
+
 # RUN: %PYTHON %s | FileCheck %s
 
 # pylint: disable=line-too-long
 
 import shutil
 
-import jax
 import numpy as np
 import pennylane as qml
 
 from catalyst import cancel_inverses, qjit
 
-"""
-This file performs the frontend lit tests that the peephole transformations are correctly applied. 
-Each test has two components:
-   1. A qnode with a peephole optimization applied, usually called "f"
-   2. The SAME qnode without a peephole optimization applied, usually called "g"
 
-We need to check that:
-   1. For "f", the peephole transform is correctly applied in mlir
-   2. For "g", the peephole transform is correctly not applied in mlir
-   3. "f" and "g" returns the same results. 
-"""
-
-
-# The QJIT compiler does not offer an interface to access an intermediate mlir in the pipeline.
-# The `QJIT.mlir` is the mlir before any passes are run, i.e. the "0_<qnode_name>.mlir".
-# Since the QUANTUM_COMPILATION_PASS is located in the middle of the pipeline, we need
-# to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
-# Then we delete the kept intermediates to avoid pollution of the workspace
 def flush_peephole_opted_mlir_to_iostream(filename):
-    with open(filename + "/2_QuantumCompilationPass.mlir") as file:
+    """
+    The QJIT compiler does not offer an interface to access an intermediate mlir in the pipeline.
+    The `QJIT.mlir` is the mlir before any passes are run, i.e. the "0_<qnode_name>.mlir".
+    Since the QUANTUM_COMPILATION_PASS is located in the middle of the pipeline, we need
+    to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
+    Then we delete the kept intermediates to avoid pollution of the workspace
+    """
+    with open(filename + "/2_QuantumCompilationPass.mlir", encoding="utf-8") as file:
         print(file.read())
     shutil.rmtree(filename)
 
 
 # CHECK-LABEL: public @jit_cancel_inverses_not_applied
 @qjit(keep_intermediate=True)
-def cancel_inverses_not_applied(x: float):
+def cancel_inverses_not_applied(xx: float):
+    """
+    Test that a qnode without catalyst.cancel_inverses produces the expected gates in the mlir.
+    """
+
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def f(x: float):
         qml.RX(x, wires=0)
@@ -61,9 +66,9 @@ def cancel_inverses_not_applied(x: float):
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    ff = f(42.42)
+    _ff = f(xx)
 
-    return ff
+    return _ff
 
 
 flush_peephole_opted_mlir_to_iostream("cancel_inverses_not_applied")
@@ -72,6 +77,10 @@ flush_peephole_opted_mlir_to_iostream("cancel_inverses_not_applied")
 # CHECK-LABEL: public @jit_cancel_inverses_workflow
 @qjit(keep_intermediate=True)
 def cancel_inverses_workflow(xx: float):
+    """
+    Test catalyst.cancel_inverses
+    """
+
     @cancel_inverses
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -90,14 +99,14 @@ def cancel_inverses_workflow(xx: float):
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    ff = f(xx)
+    _ff = f(xx)
 
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    gg = g(xx)
+    _gg = g(xx)
 
-    return ff, gg
+    return _ff, _gg
 
 
 ff, gg = cancel_inverses_workflow(42.42)
