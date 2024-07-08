@@ -323,7 +323,7 @@ def accelerate_impl(users_func=None, *, dev=None):
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
         annotated = AnnotatedFunction(jitted_fn, returnshape)
-        return jax_jit_callback(annotated, returnshape, device=dev)(context, *args, **kwargs)
+        return jax_jit_callback(annotated, device=dev)(context, *args, **kwargs)
 
     return back_to_user
 
@@ -418,7 +418,7 @@ class CallbackWithPotentialCustomGrad:
         return self.callback(*args, **kwargs)
 
 
-def jax_jit_callback(callback_fn: AnnotatedFunction, result_type, device=None):
+def jax_jit_callback(callback_fn: AnnotatedFunction, device=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
     return base_callback_impl(callback_fn, device=device)
@@ -436,7 +436,7 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
             return func(*args, **kwargs)
 
         return callback_implementation(
-            func, retty, *args, device=device, custom_grad=custom_grad, **kwargs
+            func, *args, device=device, custom_grad=custom_grad, **kwargs
         )
 
     return bind_callback
@@ -576,7 +576,6 @@ class JaxJitCallable(MemrefCallable):
 
 def callback_implementation(
     cb: Callable[..., Any],
-    result_shape_dtypes: Any,
     *args: Any,
     device=None,
     custom_grad=None,
@@ -592,6 +591,7 @@ def callback_implementation(
 
     flat_args = tree_leaves((args, kwargs))
 
+    result_shape_dtypes = cb.getResultTypes()
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
     if device is None:
