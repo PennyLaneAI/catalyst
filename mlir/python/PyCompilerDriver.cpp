@@ -128,5 +128,5 @@ PYBIND11_MODULE(compiler_driver, m)
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("keep_intermediate") = false, py::arg("verbose") = false,
         py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true,
-        py::arg("multi_threaded_compilation") = false);
+        py::arg("multi_threaded_compilation") = true);
 }

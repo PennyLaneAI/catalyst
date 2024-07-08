@@ -444,7 +444,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
-    multi_threaded_compilation=False,
+    multi_threaded_compilation=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
