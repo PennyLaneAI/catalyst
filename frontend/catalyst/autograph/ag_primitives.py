@@ -569,10 +569,9 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             def qnode_call_wrapper():
                 return ag_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
 
-            new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
-
-            for program in fn._transform_program:  # pylint: disable=protected-access
-                new_qnode.add_transform(program)
+            # Copy the original qnode but replace its function.
+            new_qnode = fn.__copy__()
+            new_qnode.func = qnode_call_wrapper
             return new_qnode()
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
