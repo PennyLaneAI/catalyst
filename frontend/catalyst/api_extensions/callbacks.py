@@ -282,6 +282,13 @@ def pure_callback(callback_fn, result_type=None):
     return CallbackWithPotentialCustomGrad(callback_fn, result_type)
 
 
+def base_callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+    """
+    return _base_callback(func, device=None, custom_grad=None)
+
+
 ## IMPL ##
 class CallbackWithCustomGrad:
     """A callback with a custom grad"""
@@ -307,7 +314,7 @@ class CallbackWithCustomGrad:
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = base_callback(closure, custom_grad=self)
+        self.callback = _base_callback(closure, custom_grad=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
@@ -370,7 +377,7 @@ class CallbackWithPotentialCustomGrad:
         def closure(*args, **kwargs) -> self.restype:
             return self.func(*args, **kwargs)
 
-        self.callback = base_callback(closure)
+        self.callback = _base_callback(closure)
         return self.callback(*args, **kwargs)
 
 
@@ -382,14 +389,10 @@ def jax_jit_callback(callback_fn, result_type, device=None):
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
 
-    return base_callback(closure, device=device)
+    return _base_callback(closure, device=device)
 
 
-## IMPL ##
-def base_callback(func, device=None, custom_grad=None):
-    """Decorator that will correctly pass the signature as arguments to the callback
-    implementation.
-    """
+def _base_callback(func, device=None, custom_grad=None):
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
