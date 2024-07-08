@@ -100,49 +100,7 @@ def accelerate(func=None, *, dev=None):
             y = accelerate(classical_fn)(x) # will be executed on a GPU
             return jnp.cos(y)
     """
-
-    if dev is None:
-        dev = jax.devices()[0]
-
-    if not isinstance(func, Callable):
-        kwargs = copy.copy(locals())
-        kwargs.pop("func")
-        return functools.partial(accelerate, **kwargs)
-
-    # If this is a partial, we need to make the tracers part of the input
-    is_partial = isinstance(func, Partial)
-    context = []
-    if is_partial:
-        context = tree_leaves(func)
-
-    def total(context, *args, **kwargs):
-        nonlocal func
-        if is_partial:
-            _, shape = tree_flatten(func)
-            func = tree_unflatten(shape, context)
-            return func(*args, **kwargs)
-        else:
-            return func(*args, **kwargs)
-
-    with transient_jax_config({"jax_dynamic_shapes": False}):
-        jitted_fn = jax.jit(total)
-
-    @functools.wraps(func)
-    def defer(*args, **kwargs):
-        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
-        try:
-            # Find the shape of the return value
-            with transient_jax_config({"jax_dynamic_shapes": False}):
-                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
-                    absextra, *absargs, **abskwargs
-                )
-        except Exception as e:
-            name = func.__name__
-            msg = f"Function {name} must be jax.jit-able."
-            raise ValueError(msg) from e
-        return jax_jit_callback(jitted_fn, returnshape, device=dev)(context, *args, **kwargs)
-
-    return defer
+    return accelerate_impl(func, dev=dev)
 
 
 def pure_callback(callback_fn, result_type=None):
@@ -268,6 +226,64 @@ def pure_callback(callback_fn, result_type=None):
         >>> f(jnp.array([0.1, 0.2]))
         array([-0.01071923,  0.82698717])
     """
+    return pure_callback_impl(callback_fn, result_type=result_type)
+
+
+def base_callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+    """
+    return base_callback_impl(func, device=None, custom_grad=None)
+
+
+## IMPL ##
+def accelerate_impl(func=None, *, dev=None):
+
+    if dev is None:
+        dev = jax.devices()[0]
+
+    if not isinstance(func, Callable):
+        kwargs = copy.copy(locals())
+        kwargs.pop("func")
+        return functools.partial(accelerate, **kwargs)
+
+    # If this is a partial, we need to make the tracers part of the input
+    is_partial = isinstance(func, Partial)
+    context = []
+    if is_partial:
+        context = tree_leaves(func)
+
+    def total(context, *args, **kwargs):
+        nonlocal func
+        if is_partial:
+            _, shape = tree_flatten(func)
+            func = tree_unflatten(shape, context)
+            return func(*args, **kwargs)
+        else:
+            return func(*args, **kwargs)
+
+    with transient_jax_config({"jax_dynamic_shapes": False}):
+        jitted_fn = jax.jit(total)
+
+    @functools.wraps(func)
+    def defer(*args, **kwargs):
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
+        try:
+            # Find the shape of the return value
+            with transient_jax_config({"jax_dynamic_shapes": False}):
+                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                    absextra, *absargs, **abskwargs
+                )
+        except Exception as e:
+            name = func.__name__
+            msg = f"Function {name} must be jax.jit-able."
+            raise ValueError(msg) from e
+        return jax_jit_callback(jitted_fn, returnshape, device=dev)(context, *args, **kwargs)
+
+    return defer
+
+
+def pure_callback_impl(callback_fn, result_type=None):
 
     if result_type is None:
         signature = inspect.signature(callback_fn)
@@ -282,14 +298,6 @@ def pure_callback(callback_fn, result_type=None):
     return CallbackWithPotentialCustomGrad(callback_fn, result_type)
 
 
-def base_callback(func):
-    """Decorator that will correctly pass the signature as arguments to the callback
-    implementation.
-    """
-    return _base_callback(func, device=None, custom_grad=None)
-
-
-## IMPL ##
 class CallbackWithCustomGrad:
     """A callback with a custom grad"""
 
@@ -314,7 +322,7 @@ class CallbackWithCustomGrad:
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = _base_callback(closure, custom_grad=self)
+        self.callback = base_callback_impl(closure, custom_grad=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
@@ -377,7 +385,7 @@ class CallbackWithPotentialCustomGrad:
         def closure(*args, **kwargs) -> self.restype:
             return self.func(*args, **kwargs)
 
-        self.callback = _base_callback(closure)
+        self.callback = base_callback_impl(closure)
         return self.callback(*args, **kwargs)
 
 
@@ -389,10 +397,10 @@ def jax_jit_callback(callback_fn, result_type, device=None):
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
 
-    return _base_callback(closure, device=device)
+    return base_callback_impl(closure, device=device)
 
 
-def _base_callback(func, device=None, custom_grad=None):
+def base_callback_impl(func, device=None, custom_grad=None):
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
