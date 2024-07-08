@@ -20,7 +20,7 @@ Here, we integrate AutoGraph into Catalyst to improve the UX and allow programme
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst.
 """
-
+import copy
 import inspect
 from contextlib import ContextDecorator
 
@@ -61,11 +61,8 @@ class CatalystTransformer(PyToPy):
         new_obj = new_fn
 
         if isinstance(obj, qml.QNode):
-            new_obj = qml.QNode(new_fn, device=obj.device, diff_method=obj.diff_method)
-
-        # Pass mcm_config and the other arguments to new function.
-        if hasattr(obj, "execute_kwargs"):
-            new_obj.execute_kwargs = obj.execute_kwargs
+            new_obj = copy.copy(obj)
+            new_obj.func = new_fn
 
         return new_obj, module, source_map
 
