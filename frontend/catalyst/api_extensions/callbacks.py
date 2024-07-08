@@ -100,6 +100,16 @@ def accelerate(func=None, *, dev=None):
             y = accelerate(classical_fn)(x) # will be executed on a GPU
             return jnp.cos(y)
     """
+    # Setting default parameters
+    if dev is None:
+        dev = jax.devices()[0]
+
+    # Just for convenience
+    if func is None:
+        kwargs = copy.copy(locals())
+        kwargs.pop("func")
+        return functools.partial(accelerate, **kwargs)
+
     return accelerate_impl(func, dev=dev)
 
 
@@ -226,65 +236,8 @@ def pure_callback(callback_fn, result_type=None):
         >>> f(jnp.array([0.1, 0.2]))
         array([-0.01071923,  0.82698717])
     """
-    return pure_callback_impl(callback_fn, result_type=result_type)
 
-
-def base_callback(func):
-    """Decorator that will correctly pass the signature as arguments to the callback
-    implementation.
-    """
-    return base_callback_impl(func, device=None, custom_grad=None)
-
-
-## IMPL ##
-def accelerate_impl(func=None, *, dev=None):
-
-    if dev is None:
-        dev = jax.devices()[0]
-
-    if not isinstance(func, Callable):
-        kwargs = copy.copy(locals())
-        kwargs.pop("func")
-        return functools.partial(accelerate, **kwargs)
-
-    # If this is a partial, we need to make the tracers part of the input
-    is_partial = isinstance(func, Partial)
-    context = []
-    if is_partial:
-        context = tree_leaves(func)
-
-    def total(context, *args, **kwargs):
-        nonlocal func
-        if is_partial:
-            _, shape = tree_flatten(func)
-            func = tree_unflatten(shape, context)
-            return func(*args, **kwargs)
-        else:
-            return func(*args, **kwargs)
-
-    with transient_jax_config({"jax_dynamic_shapes": False}):
-        jitted_fn = jax.jit(total)
-
-    @functools.wraps(func)
-    def defer(*args, **kwargs):
-        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
-        try:
-            # Find the shape of the return value
-            with transient_jax_config({"jax_dynamic_shapes": False}):
-                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
-                    absextra, *absargs, **abskwargs
-                )
-        except Exception as e:
-            name = func.__name__
-            msg = f"Function {name} must be jax.jit-able."
-            raise ValueError(msg) from e
-        return jax_jit_callback(jitted_fn, returnshape, device=dev)(context, *args, **kwargs)
-
-    return defer
-
-
-def pure_callback_impl(callback_fn, result_type=None):
-
+    # Verify inputs
     if result_type is None:
         signature = inspect.signature(callback_fn)
         result_type = signature.return_annotation
@@ -294,6 +247,84 @@ def pure_callback_impl(callback_fn, result_type=None):
         msg = "A function using pure_callback requires return types "
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
+
+    # Nicer inputs for the implementation.
+    # The implementation expects a function
+    # to be annotated with the correct result types
+    annotated = AnnotatedFunction(callback_fn, result_type)
+
+    return pure_callback_impl(annotated, result_type=result_type)
+
+
+## IMPL ##
+class AnnotatedFunction:
+
+    def __init__(self, func, result_type):
+        self.func = func
+        self.result_type = result_type
+        functools.update_wrapper(self, func)
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    def getResultTypes(self):
+        return self.result_type
+
+
+def base_callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+
+    For base callback, the type is found by the annotation of the result.
+    If it is empty or None, then there are no return values.
+    Otherwise, it is whatever it says in the annotations.
+    """
+    return base_callback_impl(func, device=None, custom_grad=None)
+
+
+def accelerate_impl(users_func=None, *, dev=None):
+
+    # If this is a partial, we need to make the tracers part of the input
+    is_partial = isinstance(users_func, Partial)
+    context = []
+    if is_partial:
+        context = tree_leaves(users_func)
+
+    @functools.wraps(users_func)
+    def total(context, *args, **kwargs):
+        nonlocal users_func
+        if is_partial:
+            _, shape = tree_flatten(users_func)
+            users_func = tree_unflatten(shape, context)
+            return users_func(*args, **kwargs)
+        else:
+            return users_func(*args, **kwargs)
+
+    with transient_jax_config({"jax_dynamic_shapes": False}):
+        # jax.jit will wrap total which
+        jitted_fn = jax.jit(total)
+
+    # wraps total which wraps user
+    @functools.wraps(total)
+    def back_to_user(*args, **kwargs):
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
+        try:
+            # Find the shape of the return value
+            with transient_jax_config({"jax_dynamic_shapes": False}):
+                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                    absextra, *absargs, **abskwargs
+                )
+        except Exception as e:
+            name = users_func.__name__
+            msg = f"Function {name} must be jax.jit-able."
+            raise ValueError(msg) from e
+        annotated = AnnotatedFunction(jitted_fn, returnshape)
+        return jax_jit_callback(annotated, returnshape, device=dev)(context, *args, **kwargs)
+
+    return back_to_user
+
+
+def pure_callback_impl(callback_fn: AnnotatedFunction, result_type=None):
 
     return CallbackWithPotentialCustomGrad(callback_fn, result_type)
 
@@ -389,7 +420,7 @@ class CallbackWithPotentialCustomGrad:
         return self.callback(*args, **kwargs)
 
 
-def jax_jit_callback(callback_fn, result_type, device=None):
+def jax_jit_callback(callback_fn: AnnotatedFunction, result_type, device=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
