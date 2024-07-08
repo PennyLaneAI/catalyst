@@ -16,7 +16,7 @@
 This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code.
 """
-
+import copy
 import functools
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
@@ -570,7 +570,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 return ag_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
 
             # Copy the original qnode but replace its function.
-            new_qnode = fn.__copy__()
+            new_qnode = copy.copy(fn)
             new_qnode.func = qnode_call_wrapper
             return new_qnode()
 
