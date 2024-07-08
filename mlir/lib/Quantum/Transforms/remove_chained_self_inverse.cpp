@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
@@ -37,6 +38,7 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_REMOVECHAINEDSELFINVERSEPASS
+#define GEN_PASS_DECL_REMOVECHAINEDSELFINVERSEPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct RemoveChainedSelfInversePass
@@ -45,8 +47,24 @@ struct RemoveChainedSelfInversePass
 
     void runOnOperation() final
     {
+        // Run the pass on a qnode whose name is "FuncNameOpt" from command line
+        // This option should only be used internally in frontend/catalyst/compiler.py
+        // when registering the pipelines and specifying what functions (qnodes) to run on from
+        // the pipeline table.
+        // In other words, compiler.py always uses this pass as a "FunctionPass", not a
+        // "ModulePass". If used from command line (./quantum-opt) directly and no value is
+        // supplied to FuncNameOpt, run the pass on all functions in the module
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
+
+        Operation *op = getOperation();
+        if (isa<func::FuncOp>(op)) {
+            StringRef funcName = cast<func::FuncOp>(op).getSymName();
+
+            if (funcName != FuncNameOpt) {
+                return; // not the function to run the pass on, so do nothing and exit
+            }
+        }
 
         RewritePatternSet patterns(&getContext());
         populateSelfInversePatterns(patterns);
