@@ -30,7 +30,6 @@
   [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
   [(#834)](https://github.com/PennyLaneAI/catalyst/pull/834)
   [(#882)](https://github.com/PennyLaneAI/catalyst/pull/882)
-  [(#907)](https://github.com/PennyLaneAI/catalyst/pull/907)
 
   - When using callbacks that do not return any values, such as `catalyst.debug.callback` and
     `catalyst.debug.print`, these functions are marked as 'inactive' and do not contribute to or
