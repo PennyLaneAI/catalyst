@@ -46,6 +46,9 @@ from catalyst.utils.jnp_to_memref import (
 )
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
+# THIS IS NEEDED TO AVOID AUTOGRAPH CONVERSION
+assigned = list(filter(lambda x: x != "__module__", functools.WRAPPER_ASSIGNMENTS))
+
 
 ## API ##
 def accelerate(func=None, *, dev=None):
@@ -263,7 +266,7 @@ class AnnotatedFunction:
     def __init__(self, func, result_type):
         self.func = func
         self.result_type = result_type
-        functools.update_wrapper(self, func)
+        functools.update_wrapper(self, func, assigned=assigned)
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -312,7 +315,7 @@ def accelerate_impl(users_func=None, *, dev=None):
     if is_partial:
         context = tree_leaves(users_func)
 
-    @functools.wraps(users_func)
+    @functools.wraps(users_func, assigned=assigned)
     def total(context, *args, **kwargs):
         nonlocal users_func
         if is_partial:
@@ -327,7 +330,7 @@ def accelerate_impl(users_func=None, *, dev=None):
         jitted_fn = jax.jit(total)
 
     # wraps total which wraps user
-    @functools.wraps(total)
+    @functools.wraps(total, assigned=assigned)
     def back_to_user(*args, **kwargs):
         absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
@@ -341,6 +344,27 @@ def accelerate_impl(users_func=None, *, dev=None):
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
         annotated = AnnotatedFunction(jitted_fn, returnshape)
+        with_custom_grad = CallbackWithPotentialCustomGrad(annotated)
+
+        fwd = None
+        rev = None
+        if GradContext.am_inside_grad():
+
+            def vjp_wrapper(*args, **kwargs):
+                return jax.vjp(jitted_fn)(*args, **kwargs)
+
+            with GradContext(peel=True):
+                fwd = accelerate(vjp_wrapper, device=dev)
+
+            def reverse(vjp_func, dy):
+                return vjp_func(dy)
+
+            with GradContext(peel=True):
+                rev = accelerate(reverse, device=dev)
+
+        with_custom_grad.fwd(fwd)
+        with_custom_grad.bwd(rev)
+
         return jax_jit_callback(annotated, device=dev)(context, *args, **kwargs)
 
     return back_to_user
@@ -446,10 +470,10 @@ class CallbackWithPotentialCustomGrad:
         return self.callback(*args, **kwargs)
 
 
-def jax_jit_callback(callback_fn: AnnotatedFunction, device=None):
+def jax_jit_callback(callback_fn: AnnotatedFunction, device=None, custom_grad=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
-    return base_callback_impl(callback_fn, device=device)
+    return base_callback_impl(callback_fn, device=device, custom_grad=custom_grad)
 
 
 def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
@@ -457,7 +481,7 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
-    @functools.wraps(func)
+    @functools.wraps(func, assigned=assigned)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
@@ -476,7 +500,7 @@ class FlatCallable:
 
     def __init__(self, func, *params, **kwparams):
         self.func = func
-        functools.update_wrapper(self, func)
+        functools.update_wrapper(self, func, assigned=assigned)
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
