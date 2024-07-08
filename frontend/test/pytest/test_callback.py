@@ -1389,6 +1389,15 @@ def test_vjp_as_residual(arg, order):
         obs = hypothesis(arg)
     assert np.allclose(obs, exp)
 
+def test_automatic_differentiation_of_accelerate():
+
+    @qml.qjit
+    @grad
+    def identity(x : float):
+        return x
+
+    assert identity(4.0) == 1.0
+
 
 def test_error_incomplete_grad_only_forward():
     """Test error about missing reverse pass"""
