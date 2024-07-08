@@ -253,7 +253,7 @@ def pure_callback(callback_fn, result_type=None):
     # to be annotated with the correct result types
     annotated = AnnotatedFunction(callback_fn, result_type)
 
-    return pure_callback_impl(annotated, result_type=result_type)
+    return pure_callback_impl(annotated)
 
 
 ## IMPL ##
@@ -324,15 +324,15 @@ def accelerate_impl(users_func=None, *, dev=None):
     return back_to_user
 
 
-def pure_callback_impl(callback_fn: AnnotatedFunction, result_type=None):
-
-    return CallbackWithPotentialCustomGrad(callback_fn, result_type)
+def pure_callback_impl(callback_fn: AnnotatedFunction):
+    return CallbackWithPotentialCustomGrad(callback_fn)
 
 
 class CallbackWithCustomGrad:
     """A callback with a custom grad"""
 
     def __init__(self, func, restype, forward, reverse):
+        assert isinstance(func, AnnotatedFunction)
         assert func and forward and reverse
         self.func = func
         self.restype = restype
@@ -382,9 +382,9 @@ class CallbackWithPotentialCustomGrad:
     to have a custom grad if it is never differentiated, but a user
     may register one. A debug.callback will never have a custom grad."""
 
-    def __init__(self, func, restype):
+    def __init__(self, func):
         self.func = func
-        self.restype = restype
+        self.restype = func.getResultTypes()
         self._fwd = None
         self._bwd = None
         self.callback = None
