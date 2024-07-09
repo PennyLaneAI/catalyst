@@ -258,6 +258,7 @@ def pure_callback(callback_fn, result_type=None):
 
 ## IMPL ##
 class AnnotatedFunction:
+    """Callable with result_type field."""
 
     def __init__(self, func, result_type):
         self.func = func
@@ -268,6 +269,7 @@ class AnnotatedFunction:
         return self.func(*args, **kwargs)
 
     def getResultTypes(self):
+        """Get the result types."""
         return self.result_type
 
 
@@ -287,6 +289,22 @@ def base_callback(func):
 
 
 def accelerate_impl(users_func=None, *, dev=None):
+    """Logic for handling jax.Partial
+    obtaining the result type from a user provided function
+    and creating a jax_jit_callback.
+
+
+    Args:
+        users_func (Callable or PjitFunction): The user provided function
+
+        dev (jax.Device): the classical accelerator device the JIT-compiled
+            function will run on.
+
+    Returns:
+        Callable: a function that when trace, will bind the arguments
+             to a callback primitive. When it is not traced, it will
+             just called the wrapped function.
+    """
 
     # If this is a partial, we need to make the tracers part of the input
     is_partial = isinstance(users_func, Partial)
@@ -329,6 +347,7 @@ def accelerate_impl(users_func=None, *, dev=None):
 
 
 def pure_callback_impl(callback_fn: AnnotatedFunction):
+    """Wrapper around CallbackWithPotentialCustomGrad"""
     return CallbackWithPotentialCustomGrad(callback_fn)
 
 
@@ -425,7 +444,7 @@ def jax_jit_callback(callback_fn: AnnotatedFunction, device=None):
 
 
 def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
-    retty = func.getResultTypes()
+    """The most general way to obtain a callback"""
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
