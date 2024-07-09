@@ -10,11 +10,16 @@
 * Added support for the jax.numpy.argsort function so it works when compiled with qjit.
   [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
 
+* Callbacks now have nicer identifiers. The identifiers include the name of
+  the python function being called back into.
+  [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
 <h3>Bug fixes</h3>
+* Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
 
 <h3>Internal changes</h3>
 
@@ -31,6 +36,7 @@ This release contains contributions from (in alphabetical order):
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Tzung-Han Juang,
 
 # Release 0.7.0
 
