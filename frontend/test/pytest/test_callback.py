@@ -918,7 +918,7 @@ def test_scalar_in_array_out():
     # Array(0.4565774, dtype=float64)
 
 def test_scalar_in_array_out_float32_correct():
-    """Test scalar in array out"""
+    """Test float32 support in pure callbacks"""
 
     @pure_callback
     def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
@@ -950,7 +950,7 @@ def test_scalar_in_array_out_float32_correct():
     # Array(0.4565774, dtype=float32)
 
 def test_scalar_in_array_out_float32_wrong():
-    """Test float32 support in pure callbacks"""
+    """Test float32 support in pure callbacks, result in type mismatch"""
 
     @pure_callback
     def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
