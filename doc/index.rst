@@ -56,6 +56,10 @@ Catalyst
   :start-line: 19
   :end-line: 72
 
+.. mdinclude:: ../README.md
+  :start-line: 143
+  :end-line: 163
+
 .. toctree::
    :maxdepth: 2
    :titlesonly:
