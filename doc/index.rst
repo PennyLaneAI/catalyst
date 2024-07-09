@@ -65,6 +65,8 @@ Catalyst
    dev/quick_start
    dev/autograph
    dev/sharp_bits
+   dev/jax_integration
+   dev/callbacks
    dev/release_notes
 
 .. toctree::

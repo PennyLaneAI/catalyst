@@ -27,8 +27,15 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
+from jax._src.tree_util import (
+    Partial,
+    tree_flatten,
+    tree_leaves,
+    tree_map,
+    tree_unflatten,
+)
 
+from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
@@ -102,20 +109,38 @@ def accelerate(func=None, *, dev=None):
         kwargs.pop("func")
         return functools.partial(accelerate, **kwargs)
 
-    jitted_fn = jax.jit(func)
+    # If this is a partial, we need to make the tracers part of the input
+    is_partial = isinstance(func, Partial)
+    context = []
+    if is_partial:
+        context = tree_leaves(func)
+
+    def total(context, *args, **kwargs):
+        nonlocal func
+        if is_partial:
+            _, shape = tree_flatten(func)
+            func = tree_unflatten(shape, context)
+            return func(*args, **kwargs)
+        else:
+            return func(*args, **kwargs)
+
+    with transient_jax_config({"jax_dynamic_shapes": False}):
+        jitted_fn = jax.jit(total)
 
     @functools.wraps(func)
     def defer(*args, **kwargs):
-        # Make abstract variables from input tracers.
-        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
             # Find the shape of the return value
-            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+            with transient_jax_config({"jax_dynamic_shapes": False}):
+                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                    absextra, *absargs, **abskwargs
+                )
         except Exception as e:
             name = func.__name__
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
-        return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
+        return jax_jit_callback(jitted_fn, returnshape, device=dev)(context, *args, **kwargs)
 
     return defer
 
@@ -131,8 +156,9 @@ def pure_callback(callback_fn, result_type=None):
 
     .. note::
 
-        Callbacks do not currently support differentiation, and cannot be used inside
-        functions that :func:`.catalyst.grad` is applied to.
+        Callbacks do not automatically support differentiation. To use them
+        within functions that are being differentiated, please define their
+        vector-Jacobian product (see below for more details).
 
     Args:
         callback_fn (callable): The pure function to be used as a callback.
@@ -149,7 +175,7 @@ def pure_callback(callback_fn, result_type=None):
             * the return type and shape is deterministic and known ahead of time.
         result_type (type): The type returned by the function.
 
-    .. seealso:: :func:`.debug.print`, :func:`.debug.callback`.
+    .. seealso:: :func:`accelerate`, :func:`.debug.print`, :func:`.debug.callback`.
 
     **Example**
 
@@ -199,6 +225,48 @@ def pure_callback(callback_fn, result_type=None):
 
     >>> fn(jnp.array([0.1, 0.2]))
     array([1.97507074+0.j, 0.01493759+0.j])
+
+    .. details::
+        :title: Differentiating callbacks with custom VJP rules
+
+        Pure callbacks must have custom gradients manually
+        registered with the Catalyst compiler in order to support differentiation.
+
+        This can be done via the ``pure_callback.fwd`` and ``pure_callback.bwd`` methods,
+        to specify how the forwards and backwards pass (the vector-Jacobian product)
+        of the callback should be computed:
+
+        .. code-block:: python
+
+            @catalyst.pure_callback
+            def callback_fn(x) -> float:
+                return np.sin(x[0]) * x[1]
+
+            @callback_fn.fwd
+            def callback_fn_fwd(x):
+                # returns the evaluated function as well as residual
+                # values that may be useful for the backwards pass
+                return callback_fn(x), x
+
+            @callback_fn.bwd
+            def callback_fn_vjp(res, dy):
+                # Accepts residuals from the forward pass, as well
+                # as (one or more) cotangent vectors dy, and returns
+                # a tuple of VJPs corresponding to each input parameter.
+
+                def vjp(x, dy) -> (jax.ShapeDtypeStruct((2,), jnp.float64),):
+                    return (np.array([np.cos(x[0]) * dy * x[1], np.sin(x[0]) * dy]),)
+
+                # The VJP function can also be a pure callback
+                return catalyst.pure_callback(vjp)(res, dy)
+
+        >>> @qml.qjit
+        ... @catalyst.grad
+        ... def f(x):
+        ...     y = jnp.array([jnp.cos(x[0]), x[1]])
+        ...     return jnp.sin(callback_fn(y))
+        >>> f(jnp.array([0.1, 0.2]))
+        array([-0.01071923,  0.82698717])
     """
 
     if result_type is None:
@@ -247,13 +315,17 @@ class CallbackWithCustomGrad:
         cotangents = tree_map(shaped_abstractify, self.restype)
 
         # The forward pass must have the same input types as the original function
-        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+        with transient_jax_config({"jax_dynamic_shapes": False}):
+            self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(
+                *absargs, **abskwargs
+            )
 
         # But its output is always going to be two pairs.
         _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+        with transient_jax_config({"jax_dynamic_shapes": False}):
+            self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
 
@@ -368,10 +440,12 @@ class MemrefCallable(FlatCallable):
 
     CACHE = {}
 
-    def __new__(cls, func, results_aval, *_args, **_kwargs):
+    def __new__(cls, func, results_aval, *args, **kwargs):
         # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        flat_params, _ = tree_flatten((absargs, abskwargs))
         flat_results_aval, _ = tree_flatten(results_aval)
-        cache_key = (func, *flat_results_aval)
+        cache_key = (func, *flat_params, *flat_results_aval)
         if cls.CACHE.get(cache_key):
             return cls.CACHE.get(cache_key)
 
