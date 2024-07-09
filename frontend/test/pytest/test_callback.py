@@ -917,6 +917,63 @@ def test_scalar_in_array_out():
 
     # Array(0.4565774, dtype=float64)
 
+def test_scalar_in_array_out_float32_correct():
+    """Test scalar in array out"""
+
+    @pure_callback
+    def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
+        return np.array([np.sin(x), np.cos(x)], dtype=jnp.float32)
+
+    @some_func.fwd
+    def some_func_fwd(x):
+        return some_func(x), x
+
+    @some_func.bwd
+    def some_func_bws(res, dy):
+        x = res
+        return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
+
+    @qml.qjit
+    @grad
+    def result(x):
+        return jnp.sum(some_func(jnp.sin(x)))
+
+    @jax.jit
+    @jax.grad
+    def expected(x):
+        x = jnp.sin(x)
+        return jnp.sin(x) + jnp.cos(x)
+
+    x = 0.435
+    assert np.allclose(result(x), expected(x))
+
+    # Array(0.4565774, dtype=float32)
+
+def test_scalar_in_array_out_float32_wrong():
+    """Test float32 support in pure callbacks"""
+
+    @pure_callback
+    def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
+        return np.array([np.sin(x), np.cos(x)])
+
+    @some_func.fwd
+    def some_func_fwd(x):
+        return some_func(x), x
+
+    @some_func.bwd
+    def some_func_bws(res, dy):
+        x = res
+        return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
+
+    @qml.qjit
+    @grad
+    def result(x):
+        return jnp.sum(some_func(jnp.sin(x)))
+
+    x = 0.435
+    with pytest.raises(TypeError, match="Callback closure expected type"):
+        result(x)
+
 
 def test_scalar_in_tuple_scalar_array_out():
     """Test scalar in tuple scalar array out"""
