@@ -191,10 +191,10 @@ BUFFERIZATION_PASS = (
             "finalizing-bufferize,"
             "buffer-hoisting,"
             "buffer-loop-hoisting,"
-            "buffer-deallocation,"
-            "my-hello-world,"
-            "my-hello-canada,"
-            "my-hello-toronto"
+            "buffer-deallocation"
+            #"my-hello-world,"
+            #"my-hello-canada,"
+            #"my-hello-toronto"
             ")"
         ),
         "convert-arraylist-to-memref",
