@@ -16,10 +16,14 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
+import copy
+import logging
+from functools import partial
 
 import jax
 import pennylane as qml
 from pennylane import transform
+from pennylane.devices.preprocess import decompose
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -32,91 +36,164 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
-from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
+from catalyst.api_extensions import HybridCtrl
+from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
+from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.toml import DeviceCapabilities
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
-def _operator_decomposition_gen(
-    op: qml.operation.Operator,
-    acceptance_function,
-    decomposer,
-    max_expansion=None,
-    current_depth=0,
-):
-    """A generator that yields the next operation that is accepted."""
-    max_depth_reached = False
-    if max_expansion is not None and max_expansion <= current_depth:  # pragma: no cover
-        max_depth_reached = True
-    if acceptance_function(op) or max_depth_reached:
-        yield op
+def check_alternative_control_support(op, capabilities):
+    """Verify that aliased controlled operations aren't supported via alternative definitions."""
+
+    if (
+        isinstance(op, qml.ControlledQubitUnitary)
+        and capabilities.native_ops.get("QubitUnitary")
+        and capabilities.native_ops.get("QubitUnitary").controllable
+    ):
+        decomp = qml.ops.Controlled(
+            qml.QubitUnitary(*op.data, wires=op.target_wires), op.control_wires, op.control_values
+        )
+    elif (
+        isinstance(op, qml.ControlledPhaseShift)
+        and capabilities.native_ops.get("PhaseShift")
+        and capabilities.native_ops.get("PhaseShift").controllable
+    ):
+        decomp = qml.ops.Controlled(
+            qml.PhaseShift(*op.data, wires=op.target_wires), op.control_wires
+        )
+    elif (
+        isinstance(op, (qml.CNOT, qml.Toffoli, qml.MultiControlledX))
+        and capabilities.native_ops.get("PauliX")
+        and capabilities.native_ops.get("PauliX").controllable
+    ):
+        decomp = qml.ops.Controlled(
+            qml.PauliX(wires=op.target_wires), op.control_wires, op.control_values, op.work_wires
+        )
+    elif (
+        isinstance(op, qml.CY)
+        and capabilities.native_ops.get("PauliY")
+        and capabilities.native_ops.get("PauliY").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.PauliY(wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, (qml.CZ, qml.CCZ))
+        and capabilities.native_ops.get("PauliZ")
+        and capabilities.native_ops.get("PauliZ").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.PauliZ(wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, qml.CRX)
+        and capabilities.native_ops.get("RX")
+        and capabilities.native_ops.get("RX").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.RX(*op.data, wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, qml.CRY)
+        and capabilities.native_ops.get("RY")
+        and capabilities.native_ops.get("RY").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.RY(*op.data, wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, qml.CRZ)
+        and capabilities.native_ops.get("RZ")
+        and capabilities.native_ops.get("RZ").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.RZ(*op.data, wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, qml.CRot)
+        and capabilities.native_ops.get("Rot")
+        and capabilities.native_ops.get("Rot").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.Rot(*op.data, wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, qml.CH)
+        and capabilities.native_ops.get("Hadamard")
+        and capabilities.native_ops.get("Hadamard").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.Hadamard(wires=op.target_wires), op.control_wires)
+    elif (
+        isinstance(op, qml.CSWAP)
+        and capabilities.native_ops.get("SWAP")
+        and capabilities.native_ops.get("SWAP").controllable
+    ):
+        decomp = qml.ops.Controlled(qml.SWAP(wires=op.target_wires), op.control_wires)
     else:
-        try:
-            decomp = decomposer(op)
-            current_depth += 1
-        except qml.operation.DecompositionUndefinedError as e:  # pragma: no cover
-            raise CompileError(
-                f"Operator {op} not supported on device and does not provide a decomposition."
-            ) from e
+        decomp = None
 
-        for sub_op in decomp:
-            yield from _operator_decomposition_gen(
-                sub_op,
-                acceptance_function,
-                decomposer=decomposer,
-                max_expansion=max_expansion,
-                current_depth=current_depth,
-            )
+    return [decomp] if decomp else decomp
+
+
+def check_alternative_support(op, capabilities):
+    """Verify that aliased operations aren't supported via alternative definitions."""
+
+    if isinstance(op, qml.ops.Controlled):
+        return check_alternative_control_support(op, capabilities)
+
+    return None
+
+
+def catalyst_decomposer(op, capabilities: DeviceCapabilities):
+    """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
+    returns the default decomposition, unless the operator should decompose to a QubitUnitary.
+    Raises a CompileError for MidMeasureMP"""
+    if isinstance(op, MidMeasureMP):
+        raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+
+    alternative_decomp = check_alternative_support(op, capabilities)
+    if alternative_decomp is not None:
+        return alternative_decomp
+
+    if capabilities.to_matrix_ops.get(op.name) or (
+        op.has_matrix and isinstance(op, qml.ops.Controlled)
+    ):
+        return _decompose_to_matrix(op)
+
+    return op.decomposition()
 
 
 @transform
-def decompose(
+@debug_logger
+def catalyst_decompose(
     tape: qml.tape.QuantumTape,
     ctx,
     stopping_condition,
+    capabilities,
     max_expansion=None,
 ):
     """Decompose operations until the stopping condition is met.
 
-    PennyLane operations are decomposed in the same manner as in PennyLane. For
-    HybridOp (not QCtrl) we recurse and call the decompose function on each region tape. After
-    finishing the decomposition on a HybridOp we mark it as visited such that it meets
-    the acceptance criteria and is not decomposed further,
+    In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
+    in the same manner as in PennyLane (for each operator on the tape, checking if the operator
+    passes the stopping_condition, and using its `decompostion` method if not, called recursively
+    until a supported operation is found or an error is hit, then moving on to the next operator
+    on the tape.)
+
+    Once all operators on the tape are supported operators, the resulting tape is iterated over,
+    and for each HybridOp, the catalyst_decompose function is called on each of it's regions.
+    This continues to call catalyst_decompose recursively until the tapes on all
+    the HybridOps have been passed to the decompose function.
     """
 
-    def decomposer(op):
-        if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
-            return _decompose_to_matrix(op)
-        elif isinstance(
-            op,
-            (
-                Adjoint,
-                MidCircuitMeasure,
-                ForLoop,
-                WhileLoop,
-                Cond,
-            ),
-        ):
-            return _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion)
-        return op.decomposition()
-
-    if len(tape) == 0:
-        return (tape,), lambda x: x[0]
+    (toplevel_tape,), _ = decompose(
+        tape,
+        stopping_condition,
+        skip_initial_state_prep=False,
+        decomposer=partial(catalyst_decomposer, capabilities=capabilities),
+        max_expansion=max_expansion,
+        name="catalyst on this device",
+        error=CompileError,
+    )
 
     new_ops = []
-    for op in tape.operations:
-        if isinstance(op, MidMeasureMP):
-            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-        new_ops.extend(
-            op
-            for op in _operator_decomposition_gen(
-                op,
-                stopping_condition,
-                decomposer=decomposer,
-                max_expansion=max_expansion,
-            )
-        )
+    for op in toplevel_tape.operations:
+        if has_nested_tapes(op):
+            op = _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion)
+        new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
@@ -133,22 +210,36 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion):
+def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion):
+    new_regions = []
     for region in op.regions:
-        if region.quantum_tape:
+        if region.quantum_tape is None:
+            new_tape = None
+        else:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                tapes, _ = decompose(
+                tapes, _ = catalyst_decompose(
                     region.quantum_tape,
                     ctx=ctx,
                     stopping_condition=stopping_condition,
+                    capabilities=capabilities,
                     max_expansion=max_expansion,
                 )
-                region.quantum_tape = tapes[0]
-    op.visited = True
-    return [op]
+                new_tape = tapes[0]
+        new_regions.append(
+            HybridOpRegion(
+                region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers
+            )
+        )
+
+    new_op = copy.copy(op)
+    new_op.regions = new_regions
+    # new_op.apply_reverse_transform=op.apply_reverse_transform,
+    # new_op.expansion_strategy=op.expansion_strategy,
+    return new_op
 
 
 @transform
+@debug_logger
 def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     r"""Quantum transform that decomposes operations to unitary given a list of operations name.
 
@@ -163,7 +254,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, HybridCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -186,22 +277,11 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
-    if isinstance(
-        op,
-        (
-            Adjoint,
-            MidCircuitMeasure,
-            ForLoop,
-            WhileLoop,
-            Cond,
-        ),
-    ):
-        return op.name in operations and op.visited
-
     return op.name in operations
 
 
 @transform
+@debug_logger
 def measurements_from_counts(tape):
     r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
     functions for each original measurement.

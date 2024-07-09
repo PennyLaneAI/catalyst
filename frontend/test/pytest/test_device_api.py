@@ -25,9 +25,15 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDeviceNewAPI
+from catalyst.device import (
+    QJITDeviceNewAPI,
+    extract_backend_info,
+    get_device_capabilities,
+)
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
+from catalyst.utils.toml import ProgramFeatures
+
+# pylint:disable = protected-access,attribute-defined-outside-init
 
 
 class DummyDevice(Device):
@@ -87,9 +93,9 @@ def test_qjit_device():
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
-    device_qjit = QJITDeviceNewAPI(device, backend_info)
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+    device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
 
     # Check attributes of the new device
     assert device_qjit.shots == qml.measurements.Shots(2032)
@@ -99,14 +105,16 @@ def test_qjit_device():
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
-    assert len(transform_program) == 1
+    assert len(transform_program) == 3
+    assert transform_program[-2]._transform.__name__ == "verify_operations"
+    assert transform_program[-1]._transform.__name__ == "validate_observables"
 
     # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
     # assert t == "split_non_commuting"
 
     t = transform_program[0].transform.__name__
-    assert t == "decompose"
+    assert t == "catalyst_decompose"
 
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
@@ -123,13 +131,36 @@ def test_qjit_device_no_wires():
     device = DummyDeviceNoWires(shots=2032)
 
     # Create qjit device
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
 
     with pytest.raises(
-        AttributeError, match="Catalyst does not support devices without set wires."
+        AttributeError, match="Catalyst does not support device instances without set wires."
     ):
-        QJITDeviceNewAPI(device, backend_info)
+        QJITDeviceNewAPI(device, capabilities, backend_info)
+
+
+@pytest.mark.parametrize(
+    "wires",
+    (
+        qml.wires.Wires(["a", "b"]),
+        qml.wires.Wires([0, 2, 4]),
+        qml.wires.Wires([1, 2, 3]),
+    ),
+)
+def test_qjit_device_invalid_wires(wires):
+    """Test the qjit device from a device using the new api without wires set."""
+    device = DummyDeviceNoWires(shots=2032)
+    device._wires = wires
+
+    # Create qjit device
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+
+    with pytest.raises(
+        AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
+    ):
+        QJITDeviceNewAPI(device, capabilities, backend_info)
 
 
 def test_simple_circuit():

@@ -127,6 +127,7 @@ extensions = [
     "sphinxext.opengraph",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
+    "sphinx_tabs.tabs",
     "m2r2",
 ]
 
@@ -200,9 +201,8 @@ exhale_args = {
 }
 
 # Add any paths that contain templates here, relative to this directory.
-from pennylane_sphinx_theme import templates_dir
 
-templates_path = [templates_dir(), "_templates"]
+templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:

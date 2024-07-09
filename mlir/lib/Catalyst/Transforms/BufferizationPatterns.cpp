@@ -82,39 +82,79 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     }
 };
 
-struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
+struct BufferizeCallbackOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(PythonCallOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
+    LogicalResult match(CallbackOp op) const override
     {
-        // Add bufferized arguments
-        SmallVector<Value> bufferArgs(adaptor.getOperands().begin(), adaptor.getOperands().end());
-
-        // Add bufferized return values to the arguments
-        auto results = op.getResults();
-
-        for (Value result : results) {
-            Type resultType = result.getType();
-            RankedTensorType tensorType = resultType.dyn_cast<RankedTensorType>();
-            if (!tensorType) {
-                return failure();
-            }
-            auto options = bufferization::BufferizationOptions();
-            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
-                rewriter, op->getLoc(), result, options, false);
-            MemRefType memrefType =
-                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-            auto newBuffer =
-                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
-            bufferArgs.push_back(newBuffer);
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
         }
 
-        rewriter.create<PythonCallOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(),
-                                      op.getOperands().size());
-        size_t startIndex = bufferArgs.size() - op.getNumResults();
-        SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
-        rewriter.replaceOp(op, bufferResults);
+        // Only match if we have result types.
+        return op.getResultTypes().empty() ? failure() : success();
+    }
+
+    void rewrite(CallbackOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto argTys = op.getArgumentTypes();
+        auto retTys = op.getResultTypes();
+        SmallVector<Type> emptyRets;
+        SmallVector<Type> args(argTys.begin(), argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end());
+        auto callbackTy = rewriter.getFunctionType(args, emptyRets);
+        rewriter.updateRootInPlace(op, [&] { op.setFunctionType(callbackTy); });
+    }
+};
+
+struct BufferizeCallbackCallOp : public OpConversionPattern<CallbackCallOp> {
+    using OpConversionPattern<CallbackCallOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CallbackCallOp callOp, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        SmallVector<Type> convertedResults;
+        if (failed(typeConverter->convertTypes(callOp.getResultTypes(), convertedResults)))
+            return failure();
+
+        if (callOp->getNumResults() != convertedResults.size())
+            return failure();
+
+        auto operands = adaptor.getOperands();
+        SmallVector<Value> newInputs(operands.begin(), operands.end());
+        auto results = callOp.getResults();
+
+        auto loc = callOp->getLoc();
+        auto options = bufferization::BufferizationOptions();
+        SmallVector<Value> outmemrefs;
+        for (auto result : results) {
+            FailureOr<Value> tensorAlloc =
+                bufferization::allocateTensorForShapedValue(rewriter, loc, result, options, false);
+            if (failed(tensorAlloc))
+                return failure();
+
+            auto tensor = *tensorAlloc;
+            RankedTensorType tensorTy = cast<RankedTensorType>(tensor.getType());
+            auto shape = tensorTy.getShape();
+            auto elementTy = tensorTy.getElementType();
+            auto memrefType = MemRefType::get(shape, elementTy);
+            auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, tensor);
+            auto memref = toMemrefOp.getResult();
+            outmemrefs.push_back(memref);
+            newInputs.push_back(memref);
+        }
+
+        SmallVector<Type> emptyRets;
+        auto newCallOp =
+            rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
+        rewriter.replaceOp(callOp, outmemrefs);
         return success();
     }
 };
@@ -126,8 +166,9 @@ namespace catalyst {
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
-    patterns.add<BufferizePythonCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeCallbackOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeCallbackCallOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace catalyst

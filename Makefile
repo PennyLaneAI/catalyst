@@ -80,16 +80,20 @@ help:
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 
-.PHONY: all
-all: runtime mlir oqc frontend
+.PHONY: all catalyst
+all: runtime oqc mlir frontend
+catalyst: runtime dialects frontend
 
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
+	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
+	# versions of a package with the same version tag (e.g. 0.37-dev0).
+	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime
+.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
@@ -114,8 +118,8 @@ dummy_device:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos
-test: test-runtime test-frontend test-demos test-toml-spec
+.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+test: test-runtime test-frontend test-demos
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
@@ -258,6 +262,10 @@ ifeq ($(shell test $(BLACKVERSIONMAJOR) -eq 22 -a $(BLACKVERSIONMINOR) -lt 10; e
 endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
+	$(MAKE) format-frontend
+
+.PHONY: format-frontend
+format-frontend:
 ifdef check
 	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
@@ -267,7 +275,6 @@ else
 	black .
 	isort .
 endif
-	pylint frontend
 
 .PHONY: docs clean-docs
 docs:

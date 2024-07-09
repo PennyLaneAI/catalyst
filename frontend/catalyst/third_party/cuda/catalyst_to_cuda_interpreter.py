@@ -39,6 +39,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
+from catalyst.device import BackendInfo
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
@@ -75,7 +76,6 @@ from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.qfunc import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import BackendInfo
 
 from .primitives import (
     cuda_inst,
@@ -820,11 +820,13 @@ class QJIT_CUDAQ:
             an MLIR module
         """
 
-        def cudaq_backend_info(device, _config) -> BackendInfo:
+        def cudaq_backend_info(device, _capabilities) -> BackendInfo:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
-            device_name = device.short_name if isinstance(device, qml.Device) else device.name
+            device_name = (
+                device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+            )
             return BackendInfo(device_name, device.name, "", {})
 
         with Patcher(
@@ -837,7 +839,7 @@ class QJIT_CUDAQ:
             # We could also pass abstract arguments here in *args
             # the same way we do so in Catalyst.
             # But I think that is redundant now given make_jaxpr2
-            jaxpr, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
 
         # TODO(@erick-xanadu):
         # What about static_args?

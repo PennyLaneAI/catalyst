@@ -39,7 +39,6 @@ from catalyst._version import __version__
 
 try:
     if INSTALLED:
-        # pylint: disable=no-name-in-module
         from catalyst._revision import __revision__  # pragma: no cover
     else:
         from subprocess import check_output
@@ -82,7 +81,7 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
     "mlir_quantum._mlir_libs._quantumDialects.mitigation"
 )
 
-from catalyst import debug
+from catalyst import debug, logging
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *

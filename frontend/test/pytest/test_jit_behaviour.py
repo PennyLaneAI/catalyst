@@ -14,6 +14,7 @@
 
 import random
 import warnings
+from functools import partial
 from timeit import default_timer as timer
 
 import jax
@@ -37,7 +38,7 @@ def f_aot_builder(backend, wires=1, shots=1000):
 
     @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
-    def f(x: float):
+    def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
 
@@ -939,6 +940,43 @@ class TestTwoQJITsOneName:
         assert foo_2() == 2
         foo_1.workspace.cleanup()
         foo_2.workspace.cleanup()
+
+
+class TestQJITUsagePatterns:
+    """Test usage patterns of catalyst.qjit."""
+
+    def test_usage_patterns(self):
+        """Test two usage patterns of catalyst.qjit."""
+
+        def fn(x, y):
+            return x * y
+
+        res_pattern_fn_as_argument = qjit(fn, autograph=False)(5, 6)
+        res_pattern_partial = qjit(autograph=False)(fn)(5, 6)
+
+        expected = 30
+        assert res_pattern_fn_as_argument == expected
+        assert res_pattern_partial == expected
+
+
+class TestGradPartial:
+    """Test functools.partial with catalyst.qjit and catalyst.qjit."""
+
+    def test_partial_func_grad(self):
+        """Test if partial triggers function name error with gjit and grad."""
+
+        def fn(x, y):
+            return x * y
+
+        partial_fn = partial(fn, y=1)
+
+        @qjit
+        def grad_partial_fn(x):
+            return grad(partial_fn)(x)
+
+        expected = jax.grad(partial_fn)(0.3)
+
+        assert np.allclose(grad_partial_fn(0.3), expected)
 
 
 if __name__ == "__main__":

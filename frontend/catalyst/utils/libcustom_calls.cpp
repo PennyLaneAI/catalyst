@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -24,6 +25,7 @@
 namespace {
 
 typedef int lapack_int;
+typedef std::complex<double> dComplex;
 
 static char GesddJobz(bool job_opt_compute_uv, bool job_opt_full_matrices)
 {
@@ -54,7 +56,23 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
 void dsyevd_(char *jobz, char *uplo, lapack_int *n, double *a, int *lda, double *w, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *liwork, lapack_int *info);
 
-// Wrapper to call the SVD solver `dgesdd_` and the eigen vectors/values computation `dsyevd_`
+void dtrsm_(char *side, char *uplo, char *transa, char *diag, lapack_int *m, lapack_int *n,
+            double *alpha, double *a, lapack_int *lda, double *b, lapack_int *ldb);
+
+void ztrsm_(char *side, char *uplo, char *transa, char *diag, lapack_int *m, lapack_int *n,
+            dComplex *alpha, dComplex *a, lapack_int *lda, dComplex *b, lapack_int *ldb);
+
+void dgetrf_(lapack_int *m, lapack_int *n, double *a, lapack_int *lda, lapack_int *ipiv,
+             lapack_int *info);
+
+void zgetrf_(lapack_int *m, lapack_int *n, dComplex *a, lapack_int *lda, lapack_int *ipiv,
+             lapack_int *info);
+
+// Wrapper to call various blas core routine. Currently includes:
+// - the SVD solver `dgesdd_`
+// - the eigen vectors/values computation `dsyevd_`
+// - the double (complex) triangular matrix equation solver `dtrsm_` (`ztrsm_`)
+// - the double (complex) LU factorization `dgetrf_` (`zgetrf_`)
 // from Lapack:
 // https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc released under the Apache
 // License, Version 2.0, with the following copyright notice:
@@ -157,6 +175,190 @@ void lapack_dsyevd(void **dataEncoded, void **resultsEncoded)
         a_out += static_cast<int64_t>(n) * n;
         w_out += n;
         ++info_out;
+    }
+}
+
+// Copyright 2021 The JAX Authors.
+void blas_dtrsm(void **dataEncoded, void **resultsEncoded)
+{
+    std::vector<void *> data;
+    for (size_t i = 0; i < 10; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
+        data.push_back(encodedMemref.data_aligned);
+    }
+
+    std::vector<void *> out;
+    for (size_t i = 0; i < 1; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
+        out.push_back(encodedMemref.data_aligned);
+    }
+
+    int32_t left_side = *reinterpret_cast<int32_t *>(data[0]);
+    int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
+    int32_t trans_a = *reinterpret_cast<int32_t *>(data[2]);
+    int32_t diag = *reinterpret_cast<int32_t *>(data[3]);
+    int m = *reinterpret_cast<int32_t *>(data[4]);
+    int n = *reinterpret_cast<int32_t *>(data[5]);
+    int batch = *reinterpret_cast<int32_t *>(data[6]);
+    double *alpha = reinterpret_cast<double *>(data[7]);
+    double *a = reinterpret_cast<double *>(data[8]);
+    double *b = reinterpret_cast<double *>(data[9]);
+
+    double *x = reinterpret_cast<double *>(out[0]);
+    if (x != b) {
+        std::memcpy(x, b,
+                    static_cast<int64_t>(batch) * static_cast<int64_t>(m) *
+                        static_cast<int64_t>(n) * sizeof(double));
+    }
+
+    char cside = left_side ? 'L' : 'R';
+    char cuplo = lower ? 'L' : 'U';
+    char ctransa = 'N';
+    if (trans_a == 1) {
+        ctransa = 'T';
+    }
+    else if (trans_a == 2) {
+        ctransa = 'C';
+    }
+    char cdiag = diag ? 'U' : 'N';
+    int lda = left_side ? m : n;
+    int ldb = m;
+
+    int64_t x_plus = static_cast<int64_t>(m) * static_cast<int64_t>(n);
+    int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(lda);
+
+    for (int i = 0; i < batch; ++i) {
+        dtrsm_(&cside, &cuplo, &ctransa, &cdiag, &m, &n, alpha, a, &lda, x, &ldb);
+        x += x_plus;
+        a += a_plus;
+    }
+}
+
+// Copyright 2021 The JAX Authors.
+void blas_ztrsm(void **dataEncoded, void **resultsEncoded)
+{
+    std::vector<void *> data;
+    for (size_t i = 0; i < 10; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
+        data.push_back(encodedMemref.data_aligned);
+    }
+
+    std::vector<void *> out;
+    for (size_t i = 0; i < 1; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
+        out.push_back(encodedMemref.data_aligned);
+    }
+
+    int32_t left_side = *reinterpret_cast<int32_t *>(data[0]);
+    int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
+    int32_t trans_a = *reinterpret_cast<int32_t *>(data[2]);
+    int32_t diag = *reinterpret_cast<int32_t *>(data[3]);
+    int m = *reinterpret_cast<int32_t *>(data[4]);
+    int n = *reinterpret_cast<int32_t *>(data[5]);
+    int batch = *reinterpret_cast<int32_t *>(data[6]);
+    dComplex *alpha = reinterpret_cast<dComplex *>(data[7]);
+    dComplex *a = reinterpret_cast<dComplex *>(data[8]);
+    dComplex *b = reinterpret_cast<dComplex *>(data[9]);
+
+    dComplex *x = reinterpret_cast<dComplex *>(out[0]);
+    if (x != b) {
+        std::memcpy(x, b,
+                    static_cast<int64_t>(batch) * static_cast<int64_t>(m) *
+                        static_cast<int64_t>(n) * sizeof(dComplex));
+    }
+
+    char cside = left_side ? 'L' : 'R';
+    char cuplo = lower ? 'L' : 'U';
+    char ctransa = 'N';
+    if (trans_a == 1) {
+        ctransa = 'T';
+    }
+    else if (trans_a == 2) {
+        ctransa = 'C';
+    }
+    char cdiag = diag ? 'U' : 'N';
+    int lda = left_side ? m : n;
+    int ldb = m;
+
+    int64_t x_plus = static_cast<int64_t>(m) * static_cast<int64_t>(n);
+    int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(lda);
+
+    for (int i = 0; i < batch; ++i) {
+        ztrsm_(&cside, &cuplo, &ctransa, &cdiag, &m, &n, alpha, a, &lda, x, &ldb);
+        x += x_plus;
+        a += a_plus;
+    }
+}
+
+// Copyright 2021 The JAX Authors.
+void lapack_dgetrf(void **dataEncoded, void **resultsEncoded)
+{
+    std::vector<void *> data;
+    for (size_t i = 0; i < 4; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
+        data.push_back(encodedMemref.data_aligned);
+    }
+
+    std::vector<void *> out;
+    for (size_t i = 0; i < 3; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
+        out.push_back(encodedMemref.data_aligned);
+    }
+
+    int b = *(reinterpret_cast<int32_t *>(data[0]));
+    int m = *(reinterpret_cast<int32_t *>(data[1]));
+    int n = *(reinterpret_cast<int32_t *>(data[2]));
+    const double *a_in = reinterpret_cast<double *>(data[3]);
+
+    double *a_out = reinterpret_cast<double *>(out[0]);
+    int *ipiv = reinterpret_cast<int *>(out[1]);
+    int *info = reinterpret_cast<int *>(out[2]);
+    if (a_out != a_in) {
+        std::memcpy(a_out, a_in,
+                    static_cast<int64_t>(b) * static_cast<int64_t>(m) * static_cast<int64_t>(n) *
+                        sizeof(double));
+    }
+    for (int i = 0; i < b; ++i) {
+        dgetrf_(&m, &n, a_out, &m, ipiv, info);
+        a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
+        ipiv += std::min(m, n);
+        ++info;
+    }
+}
+
+// Copyright 2021 The JAX Authors.
+void lapack_zgetrf(void **dataEncoded, void **resultsEncoded)
+{
+    std::vector<void *> data;
+    for (size_t i = 0; i < 4; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
+        data.push_back(encodedMemref.data_aligned);
+    }
+
+    std::vector<void *> out;
+    for (size_t i = 0; i < 3; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
+        out.push_back(encodedMemref.data_aligned);
+    }
+
+    int b = *(reinterpret_cast<int32_t *>(data[0]));
+    int m = *(reinterpret_cast<int32_t *>(data[1]));
+    int n = *(reinterpret_cast<int32_t *>(data[2]));
+    const dComplex *a_in = reinterpret_cast<dComplex *>(data[3]);
+
+    dComplex *a_out = reinterpret_cast<dComplex *>(out[0]);
+    int *ipiv = reinterpret_cast<int *>(out[1]);
+    int *info = reinterpret_cast<int *>(out[2]);
+    if (a_out != a_in) {
+        std::memcpy(a_out, a_in,
+                    static_cast<int64_t>(b) * static_cast<int64_t>(m) * static_cast<int64_t>(n) *
+                        sizeof(dComplex));
+    }
+    for (int i = 0; i < b; ++i) {
+        zgetrf_(&m, &n, a_out, &m, ipiv, info);
+        a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
+        ipiv += std::min(m, n);
+        ++info;
     }
 }
 }

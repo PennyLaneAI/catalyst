@@ -42,6 +42,7 @@ struct CatalystBufferizationPass : impl::CatalystBufferizationPassBase<CatalystB
 
         RewritePatternSet patterns(context);
         populateBufferizationPatterns(typeConverter, patterns);
+        populateFunctionOpInterfaceTypeConversionPattern<CallbackOp>(patterns, typeConverter);
 
         ConversionTarget target(*context);
         bufferization::populateBufferizeMaterializationLegality(target);
@@ -50,8 +51,12 @@ struct CatalystBufferizationPass : impl::CatalystBufferizationPassBase<CatalystB
             [&](PrintOp op) { return typeConverter.isLegal(op); });
         target.addDynamicallyLegalOp<CustomCallOp>(
             [&](CustomCallOp op) { return typeConverter.isLegal(op); });
-        target.addDynamicallyLegalOp<PythonCallOp>(
-            [&](PythonCallOp op) { return typeConverter.isLegal(op); });
+        target.addDynamicallyLegalOp<CallbackOp>([&](CallbackOp op) {
+            return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+                   typeConverter.isLegal(&op.getBody()) && op.getResultTypes().empty();
+        });
+        target.addDynamicallyLegalOp<CallbackCallOp>(
+            [&](CallbackCallOp op) { return typeConverter.isLegal(op); });
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

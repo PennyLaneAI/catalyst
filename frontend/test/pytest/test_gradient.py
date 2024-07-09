@@ -233,6 +233,57 @@ def test_grad_on_qjit():
     assert np.allclose(result, expected)
 
 
+def test_value_and_grad_on_qjit_classical():
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode."""
+
+    @qjit
+    def f(x: float):
+        return x * x
+
+    result = qjit(value_and_grad(f))(3.0)
+    expected = (9.0, 6.0)
+
+    assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum():
+    """Check that value_and_grad works when called on an qjit object that does wrap a QNode."""
+
+    @qjit
+    def workflow(x: float):
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.CNOT(wires=[0, 1])
+            qml.RX(0, wires=[2])
+            return qml.probs()  # This is [1, 0, 0, ...]
+
+        return x * (circuit()[0])
+
+    result = qjit(value_and_grad(workflow))(3.0)
+    expected = (3.0, 1.0)
+    assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum_variant():
+    """
+    Check that value_and_grad works when called on an qjit object that does wrap a QNode
+    with trainable parameters.
+    """
+
+    def workflow_variant(x: float):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(xx):
+            qml.PauliX(wires=0)
+            qml.RX(xx, wires=0)
+            return qml.probs()
+
+        return circuit(x)[0]
+
+    result = qjit(value_and_grad(qjit(workflow_variant)))(1.1)
+    expected = value_and_grad(workflow_variant)(1.1)
+    assert np.allclose(result, expected)
+
+
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff(inp, backend):
     """Test finite diff."""
@@ -1151,14 +1202,14 @@ def test_pytrees_args_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
-@pytest.mark.xfail(reason="QubitUnitrary is not support with catalyst.grad")
+@pytest.mark.xfail(reason="The verifier currently doesn't distinguish between active/inactive ops")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
     """Test the adjoint method."""
 
     def f(x):
         qml.RX(x, wires=0)
-        U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
+        U1 = np.array([[0.5 + 0.5j, -0.5 - 0.5j], [0.5 - 0.5j, 0.5 - 0.5j]], dtype=complex)
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
@@ -1191,7 +1242,7 @@ class TestGradientErrors:
             qml.RX(_bool + 1, wires=0)
             return qml.expval(qml.PauliX(0))
 
-        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
             @qml.qjit
             def cir(x: float):
@@ -1221,13 +1272,64 @@ class TestGradientErrors:
             return qml.expval(qml.PauliX(0))
 
         def g(x):
-            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(x)
+            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]))(x)
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
             @qml.qjit
             def cir(x: float):
                 return grad(g)(x)
+
+
+class TestGradientUsagePatterns:
+    """Test usage patterns of Gradient functions"""
+
+    def test_grad_usage_patterns(self):
+        """Test usage patterns of catalyst.grad."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        res_pattern_fn_as_argument = grad(fn, method="fd")(x)
+        res_pattern_partial = grad(method="fd")(fn)(x)
+        expected = jax.grad(fn)(x)
+
+        assert np.allclose(res_pattern_fn_as_argument, expected)
+        assert np.allclose(res_pattern_partial, expected)
+
+    def test_value_and_grad_usage_patterns(self):
+        """Test usage patterns of catalyst.value_and_grad."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        fn_as_argument_val, fn_as_argument_grad = value_and_grad(fn, method="fd")(x)
+        partial_val, partial_grad = value_and_grad(method="fd")(fn)(x)
+        expected_val, expected_grad = jax.value_and_grad(fn)(x)
+
+        assert np.allclose(fn_as_argument_val, expected_val)
+        assert np.allclose(partial_val, expected_val)
+        assert np.allclose(fn_as_argument_grad, expected_grad)
+        assert np.allclose(partial_grad, expected_grad)
+
+    def test_jacobian_usage_patterns(self):
+        """Test usage patterns of catalyst.jacobian."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        res_pattern_fn_as_argument = jacobian(fn, method="fd")(x)
+        res_pattern_partial = jacobian(method="fd")(fn)(x)
+        expected = jax.jacobian(fn)(x)
+
+        assert np.allclose(res_pattern_fn_as_argument, expected)
+        assert np.allclose(res_pattern_partial, expected)
 
 
 if __name__ == "__main__":

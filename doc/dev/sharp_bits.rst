@@ -381,6 +381,9 @@ circuit, are measuring an expectation value, and are optimizing the result:
 
 .. code-block:: python
 
+    import numpy as np
+    import jax
+
     dev = qml.device("default.qubit", wires=4)
 
     @qml.qnode(dev)
@@ -404,13 +407,15 @@ circuit, are measuring an expectation value, and are optimizing the result:
     weights = jnp.array(2 * np.random.random([5, 4]) - 1)
     data = jnp.array(np.random.random([4]))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4, jit=False)
+    opt = optax.sgd(learning_rate=0.4)
 
     params = weights
-    state = opt.init_state(params)
+    state = opt.init(params)
 
     for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
+        params = optax.apply_updates(params, updates)
 
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
@@ -458,13 +463,15 @@ it using Catalyst:
         for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
         return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+    opt = optax.sgd(learning_rate=0.4)
 
     params = weights
-    state = opt.init_state(params)
+    state = opt.init(params)
 
     for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
+        params = optax.apply_updates(params, updates)
 
 With the quantum function qjit-compiled, the optimization loop
 now takes 16.4s ± 1.51s.
@@ -485,11 +492,16 @@ optimization to take place within Catalyst:
             dy = grad(cost, argnum=0)(x, data)
             return (cost(x, data), dy)
 
-        opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
-        update_step = lambda i, *args: tuple(opt.update(*args))
+        opt = optax.sgd(learning_rate=0.4)
+    
+        def update_step(i, params, state):
+            (_, gradient) = loss(params)
+            (updates, state) = opt.update(gradient, state)
+            params = optax.apply_updates(params, updates)
+            return (params, state)
 
         params = init_weights
-        state = opt.init_state(params)
+        state = opt.init(params)
 
         return for_loop(0, steps, 1)(update_step)(params, state)
 
@@ -947,6 +959,54 @@ the decomposition as follows:
                 f(params)
 
             return tape.operations
+
+
+Directly accessing QNode for PennyLane
+--------------------------------------
+
+In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNode object, it can be useful to retrieve the wrapped entity when interacting with PennyLane functions. Note that the :func:`@qjit <~.qjit>` decorator changes the type of the wrapped object, for example from ``function`` to :class:`QJIT <~.QJIT>`, or in this case from ``QNode`` to :class:`QJIT <~.QJIT>`. The original entity is accessible via the ``.original_function`` attribute on the compiled function, and can be used as follows:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qjit
+    @qml.qnode(dev)
+    def f():
+        qml.PauliX(0)
+        qml.PauliX(0)
+        qml.Hadamard(0)
+        return qml.state()
+
+    # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
+    g = qml.transforms.cancel_inverses(f.original_function)  
+
+
+>>> f
+<catalyst.jit.QJIT object at ...>
+>>> f.original_function
+<QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
+>>> g
+<QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
+>>> qml.matrix(f.original_function)()
+[[ 0.70710678  0.70710678]
+ [ 0.70710678 -0.70710678]]
+
+
+Note that some PennyLane functions may be able to extract the QNode automatically, like ``qml.draw`` and ``qml.matrix``:
+
+>>> qml.matrix(f)()
+[[ 0.70710678  0.70710678]
+ [ 0.70710678 -0.70710678]]
+>>> qml.draw(f)()
+0: ──X──X──H─┤  State
+>>> g = qjit(g)   # Compile the transformed QNode again with qjit 
+>>> g
+<catalyst.jit.QJIT object at ...>
+>>> qml.draw(g)()
+0: ──H─┤  State
+
+But in general, you will need to pass in the QNode explicitly.
 
 Function argument restrictions
 ------------------------------

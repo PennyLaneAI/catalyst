@@ -16,7 +16,7 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import reduce
 from itertools import repeat
 from typing import Any, Dict, List, Set
@@ -33,8 +33,7 @@ tomllib = importlib.util.find_spec("tomllib")
 tomlkit = importlib.util.find_spec("tomlkit")
 # We need at least one of these to make sure we can read toml files.
 if tomllib is None and tomlkit is None:  # pragma: nocover
-    msg = "Either tomllib or tomlkit need to be installed."
-    raise ImportError(msg)
+    raise ImportError("Either tomllib or tomlkit need to be installed.")
 
 # Give preference to tomllib
 if tomllib:  # pragma: nocover
@@ -59,9 +58,9 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
 class OperationProperties:
     """Capabilities of a single operation"""
 
-    invertible: bool
-    controllable: bool
-    differentiable: bool
+    invertible: bool = False
+    controllable: bool = False
+    differentiable: bool = False
 
 
 def intersect_properties(a: OperationProperties, b: OperationProperties) -> OperationProperties:
@@ -77,14 +76,17 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     """Quantum device capabilities"""
 
-    native_ops: Dict[str, OperationProperties]
-    to_decomp_ops: Dict[str, OperationProperties]
-    to_matrix_ops: Dict[str, OperationProperties]
-    native_obs: Dict[str, OperationProperties]
-    measurement_processes: Set[str]
-    mid_circuit_measurement_flag: bool
-    runtime_code_generation_flag: bool
-    dynamic_qubit_management_flag: bool
+    native_ops: Dict[str, OperationProperties] = field(default_factory=dict)
+    to_decomp_ops: Dict[str, OperationProperties] = field(default_factory=dict)
+    to_matrix_ops: Dict[str, OperationProperties] = field(default_factory=dict)
+    native_obs: Dict[str, OperationProperties] = field(default_factory=dict)
+    measurement_processes: Set[str] = field(default_factory=dict)
+    qjit_compatible_flag: bool = False
+    mid_circuit_measurement_flag: bool = False
+    runtime_code_generation_flag: bool = False
+    dynamic_qubit_management_flag: bool = False
+    non_commuting_observables_flag: bool = False
+    options: Dict[str, bool] = field(default_factory=dict)
 
 
 def intersect_operations(
@@ -102,6 +104,11 @@ def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[s
         ops.update({g})
         if props.controllable:
             ops.update({f"C({g})"})
+        if props.invertible:
+            ops.update({f"Adjoint({g})"})
+        if props.controllable and props.invertible:
+            ops.update({f"Adjoint(C({g}))"})
+            ops.update({f"C(Adjoint({g}))"})
     return ops
 
 
@@ -112,9 +119,14 @@ class ProgramFeatures:
     shots_present: bool
 
 
-def check_compilation_flag(config: TOMLDocument, flag_name: str) -> bool:
-    """Checks the flag in the toml document 'compilation' section."""
+def get_compilation_flag(config: TOMLDocument, flag_name: str) -> bool:
+    """Get the flag in the toml document 'compilation' section."""
     return bool(config.get("compilation", {}).get(flag_name, False))
+
+
+def get_options(config: TOMLDocument) -> Dict[str, str]:
+    """Get custom options sections"""
+    return {str(k): str(v) for k, v in config.get("options", {}).items()}
 
 
 def check_quantum_control_flag(config: TOMLDocument) -> bool:
@@ -250,23 +262,9 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
 
 
 def patch_schema1_collections(
-    config, device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
-):  # pylint: disable=too-many-arguments, too-many-branches
+    config, _device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
+):  # pylint: disable=too-many-branches
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
-
-    # TODO: remove after PR #642 is merged in lightning
-    # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
-    # is what actual device reports.
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        native_gate_props["GlobalPhase"] = OperationProperties(
-            invertible=False, controllable=True, differentiable=True
-        )
-
-    # TODO: remove after PR #642 is merged in lightning
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        observable_props["Projector"] = OperationProperties(
-            invertible=False, controllable=False, differentiable=False
-        )
 
     # The deduction logic is the following:
     # * Most of the gates have their `C(Gate)` controlled counterparts.
@@ -300,11 +298,18 @@ def patch_schema1_collections(
         for op, props in native_gate_props.items():
             props.controllable = op not in gates_to_be_decomposed_if_controlled
 
-    supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
+    supports_adjoint = get_compilation_flag(config, "quantum_adjoint")
     if supports_adjoint:
         # Makr all gates as invertibles
         for props in native_gate_props.values():
             props.invertible = True
+
+    # Mark all gates as differentiable
+    for props in native_gate_props.values():
+        props.differentiable = True
+    # Mark all observables as differentiable
+    for props in observable_props.values():
+        props.differentiable = True
 
     # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
     # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
@@ -326,10 +331,10 @@ def patch_schema1_collections(
             decomp_props.pop("ControlledPhaseShift")
 
 
-def get_device_capabilities(
+def load_device_capabilities(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceCapabilities:
-    """Load TOML document into the DeviceCapabilities structure"""
+    """Load device capabilities from device config"""
 
     schema = int(config["schema"])
 
@@ -369,7 +374,10 @@ def get_device_capabilities(
         to_matrix_ops=matrix_decomp_props,
         native_obs=observable_props,
         measurement_processes=measurements_props,
-        mid_circuit_measurement_flag=check_compilation_flag(config, "mid_circuit_measurement"),
-        runtime_code_generation_flag=check_compilation_flag(config, "runtime_code_generation"),
-        dynamic_qubit_management_flag=check_compilation_flag(config, "dynamic_qubit_management"),
+        qjit_compatible_flag=get_compilation_flag(config, "qjit_compatible"),
+        mid_circuit_measurement_flag=get_compilation_flag(config, "mid_circuit_measurement"),
+        runtime_code_generation_flag=get_compilation_flag(config, "runtime_code_generation"),
+        dynamic_qubit_management_flag=get_compilation_flag(config, "dynamic_qubit_management"),
+        non_commuting_observables_flag=get_compilation_flag(config, "non_commuting_observables"),
+        options=get_options(config),
     )

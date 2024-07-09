@@ -199,5 +199,48 @@ def test_hybrid_op_repr(backend):
     qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
 
 
+@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+def test_qubitunitary_complex(inp, backend):
+    """Test qubitunitary with complex matrix."""
+
+    def f(x):
+        qml.RX(x, wires=0)
+        U1 = np.array([[0.5 + 0.5j, -0.5 - 0.5j], [0.5 - 0.5j, 0.5 - 0.5j]], dtype=complex)
+        qml.QubitUnitary(U1, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    @qjit()
+    def compiled(x: float):
+        g = qml.qnode(qml.device(backend, wires=1))(f)
+        return g(x)
+
+    def interpreted(x):
+        device = qml.device("default.qubit", wires=1)
+        g = qml.QNode(f, device)
+        return g(x)
+
+    assert np.allclose(compiled(inp), interpreted(inp))
+
+
+def test_multicontrolledx_via_paulix():
+    """Test that lightning executes multicontrolled x via paulix rather than qubit unitary."""
+
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit():
+        qml.Hadamard(0)
+        qml.Hadamard(1)
+        qml.Hadamard(2)
+        qml.MultiControlledX(control_wires=[0, 1, 2], wires=[3], control_values=[True, False, True])
+        return qml.state()
+
+    assert "QubitUnitary" not in str(circuit.jaxpr)
+    assert "PauliX" in str(circuit.jaxpr)
+
+    assert np.allclose(circuit(), circuit.original_function())
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

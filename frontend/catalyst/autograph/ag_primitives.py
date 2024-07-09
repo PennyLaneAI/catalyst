@@ -238,6 +238,7 @@ def _call_python_for(body_fn, get_state, non_array_iterable):
     return get_state()
 
 
+# pylint: disable=too-many-statements
 def for_stmt(
     iteration_target: Any,
     _extra_test: Union[Callable[[], bool], None],
@@ -269,6 +270,11 @@ def for_stmt(
     # - an exception is raised during the tracing of the loop body after conversion
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
+
+    # pylint: disable=missing-class-docstring
+    class EmptyResult: ...
+
+    results = EmptyResult()
     fallback = False
     init_state = get_state()
     assert len(init_state) == len(symbol_names)
@@ -361,6 +367,7 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
+    assert not isinstance(results, EmptyResult), "results variable must be assigned to"
     set_state(results)
 
 
@@ -508,6 +515,7 @@ def get_source_code_info(tb_frame):
 module_allowlist = (
     ag_config.DoNotConvert("pennylane"),
     ag_config.DoNotConvert("catalyst"),
+    ag_config.DoNotConvert("optax"),
     ag_config.DoNotConvert("jax"),
     *ag_config.CONVERSION_RULES,
 )

@@ -18,6 +18,8 @@ capabilities for hybrid quantum programs. This includes the computation
 of gradients, jacobians, jacobian-vector products, and more.
 """
 
+import copy
+import functools
 import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
@@ -34,9 +36,10 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
+    value_and_grad_p,
     vjp_p,
 )
-from catalyst.jax_tracer import Function
+from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 
@@ -45,7 +48,7 @@ DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 ## API ##
-def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+def grad(fn=None, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function to be computed within
@@ -58,7 +61,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         method.
 
     Args:
-        f (Callable): a function or a function object to differentiate
+        fn (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
@@ -84,8 +87,8 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. note::
 
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        Any JAX-compatible optimization library, such as `Optax
+        <https://optax.readthedocs.io/en/stable/index.html>`_, can be used
         alongside ``grad`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
@@ -171,11 +174,18 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     >>> dsquare(2.3)
     array(4.6)
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(grad, **kwargs)
+
     scalar_out = True
-    return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+    return Grad(fn, GradParams(method, scalar_out, h, argnum))
 
 
-def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the value and the gradient of a hybrid quantum-classical function to be
@@ -189,7 +199,7 @@ def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         method.
 
     Args:
-        f (Callable): a function or a function object to differentiate
+        fn (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
@@ -215,8 +225,8 @@ def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. note::
 
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        Any JAX-compatible optimization library, such as `Optax
+        <https://optax.readthedocs.io/en/stable/index.html>`_, can be used
         alongside ``value_and_grad`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
@@ -276,11 +286,18 @@ def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     >>> dsquare(2.3)
     (array(5.29), array(4.6))
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(value_and_grad, **kwargs)
+
     scalar_out = True
-    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
+
+    return Grad(fn, GradParams(method, scalar_out, h, argnum, with_value=True))
 
 
-def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+def jacobian(fn=None, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
     This function allows the Jacobian of a hybrid quantum-classical function to be computed within
@@ -288,7 +305,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     JAX counterpart ``jax.jacobian``. The function ``f`` can return any pytree-like shape.
 
     Args:
-        f (Callable): a function or a function object to differentiate
+        fn (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
@@ -313,8 +330,8 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. note::
 
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        Any JAX-compatible optimization library, such as `Optax
+        <https://optax.readthedocs.io/en/stable/index.html>`_, can be used
         alongside ``jacobian`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
@@ -341,8 +358,15 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     array([[ 3.48786850e-16 -4.20735492e-01]
            [-8.71967125e-17  4.20735492e-01]])
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(grad, **kwargs)
+
     scalar_out = False
-    return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+    return Grad(fn, GradParams(method, scalar_out, h, argnum))
 
 
 # pylint: disable=too-many-arguments
@@ -566,10 +590,6 @@ class Grad:
         """
 
         if EvaluationContext.is_tracing():
-            assert (
-                not self.grad_params.with_value
-            ), "Tracing of value_and_grad is not implemented yet"
-
             fn = _ensure_differentiable(self.fn)
 
             args_data, in_tree = tree_flatten(args)
@@ -583,15 +603,33 @@ class Grad:
                 self.grad_params.with_value,
             )
             jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
-            args_argnum = tuple(args[i] for i in grad_params.argnum)
-            _, in_tree = tree_flatten(args_argnum)
+            if self.grad_params.with_value:  # use value_and_grad
+                # It always returns list as required by catalyst control-flows
+                results = value_and_grad_p.bind(
+                    *args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                )
 
-            # It always returns list as required by catalyst control-flows
-            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+                # value_and_grad returns two results: the values and the gradients,
+                # hence we have to split the obtained results
+                vals = results[: len(jaxpr.out_avals)]
+                gradients = results[len(jaxpr.out_avals) :]
 
-            results = _unflatten_derivatives(
-                results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
-            )
+                vals = tree_unflatten(out_tree, vals)
+                gradients = tree_unflatten(out_tree, gradients)
+                results = (vals, gradients)
+            else:  # use grad
+                args_argnum = tuple(args[i] for i in grad_params.argnum)
+                _, in_tree = tree_flatten(args_argnum)
+
+                # It always returns list as required by catalyst control-flows
+                results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+                # grad returns only the gradients,
+                # so there is no need to split the results.
+
+                results = _unflatten_derivatives(
+                    results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
+                )
         else:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
@@ -693,7 +731,8 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     """Gets the jaxpr of a differentiable function. Perform the required additional checks and
     return the output tree."""
     method = grad_params.method
-    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    with mark_gradient_tracing(method):
+        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
     _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
@@ -719,7 +758,6 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
             )
 
     _verify_differentiable_child_qnodes(jaxpr, method)
-
     return jaxpr, out_tree
 
 

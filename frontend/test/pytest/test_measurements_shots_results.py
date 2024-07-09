@@ -498,6 +498,17 @@ class TestProbs:
 class TestOtherMeasurements:
     """Test other measurement processes."""
 
+    @pytest.mark.parametrize("meas_fun", (qml.sample, qml.counts))
+    def test_missing_shots_value(self, backend, meas_fun):
+        """Test error for missing shots value."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            return meas_fun(wires=0)
+
+        with pytest.raises(ValueError, match="cannot work with shots=None"):
+            qjit(circuit)
+
     def test_multiple_return_values(self, backend, tol_stochastic):
         """Test multiple return values."""
 

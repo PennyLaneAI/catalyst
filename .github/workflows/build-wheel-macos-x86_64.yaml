@@ -261,7 +261,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG= dd3bafb \
+              -DLIGHTNING_GIT_TAG=476cac2e39f79c122b8751a77aad8139b39296db \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=OFF \
@@ -284,7 +284,7 @@ jobs:
 
     - name: Test Catalyst-Runtime
       run: |
-        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
@@ -362,12 +362,12 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
 
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}

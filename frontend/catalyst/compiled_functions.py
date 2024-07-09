@@ -15,9 +15,11 @@
 """This module contains classes to manage compiled functions and their underlying resources."""
 
 import ctypes
+import logging
 from dataclasses import dataclass
 from typing import Tuple
 
+import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
@@ -28,16 +30,20 @@ from mlir_quantum.runtime import (
 )
 
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
+from catalyst.logging import debug_logger_init
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     filter_static_args,
     get_decomposed_signature,
     typecheck_signatures,
 )
-from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
+from catalyst.utils import wrapper
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class SharedObjectManager:
@@ -50,6 +56,7 @@ class SharedObjectManager:
         func_name (str): name of compiled function
     """
 
+    @debug_logger_init
     def __init__(self, shared_object_file, func_name):
         self.shared_object_file = shared_object_file
         self.shared_object = None
@@ -128,20 +135,25 @@ class CompiledFunction:
         compile_options (CompileOptions): compilation options used
     """
 
-    def __init__(self, shared_object_file, func_name, restype, compile_options):
+    @debug_logger_init
+    def __init__(
+        self, shared_object_file, func_name, restype, out_type, compile_options
+    ):  # pylint: disable=too-many-arguments
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.compile_options = compile_options
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
+        self.out_type = out_type
 
     @staticmethod
-    def _exec(shared_object, has_return, numpy_dict, *args):
+    def _exec(shared_object, has_return, out_type, numpy_dict, *args):
         """Execute the compiled function with arguments ``*args``.
 
         Args:
             lib: Shared object
             has_return: whether the function returns a value or not
+            out_type: Jaxpr output type holding information about implicit outputs
             numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
 
@@ -153,6 +165,11 @@ class CompiledFunction:
             result_desc = type(args[0].contents) if has_return else None
             retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
 
+        if out_type is not None:
+            keep_outputs = [k for _, k in out_type]
+            retval = [r for (k, r) in zip(keep_outputs, retval) if k]
+
+        retval = [jnp.asarray(arr) for arr in retval]
         return retval
 
     @staticmethod
@@ -328,6 +345,7 @@ class CompiledFunction:
         result = CompiledFunction._exec(
             self.shared_object,
             self.restype,
+            self.out_type,
             numpy_dict,
             *abi_args,
         )
@@ -386,6 +404,7 @@ class CompilationCache:
     combination of PyTreeDefs and static arguments.
     """
 
+    @debug_logger_init
     def __init__(self, static_argnums, abstracted_axes):
         self.static_argnums = static_argnums
         self.abstracted_axes = abstracted_axes

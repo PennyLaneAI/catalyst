@@ -2,8 +2,7 @@ schema = 2
 
 [operators.gates.native]
 
-QubitUnitary = { properties = [ "invertible", "differentiable" ]  }
-ControlledQubitUnitary = { properties = [ "invertible", "differentiable" ]  }
+QubitUnitary = { properties = [ "invertible", "controllable", "differentiable" ]  }
 PauliX = { properties = [ "controllable", "invertible", "differentiable" ] }
 PauliY = { properties = [ "controllable", "invertible", "differentiable" ] }
 PauliZ = { properties = [ "controllable", "invertible", "differentiable" ] }
@@ -19,7 +18,6 @@ CY = { properties = [ "invertible", "differentiable" ] }
 CZ = { properties = [ "invertible", "differentiable" ] }
 PhaseShift = { properties = [ "controllable", "invertible", "differentiable" ] }
 ControlledPhaseShift = { properties = [ "invertible", "differentiable" ] }
-CPhase = { properties = [ "invertible", "differentiable" ] }
 RX = { properties = [ "controllable", "invertible", "differentiable" ] }
 RY = { properties = [ "controllable", "invertible", "differentiable" ] }
 RZ = { properties = [ "controllable", "invertible", "differentiable" ] }
@@ -57,7 +55,8 @@ SQISW = {}
 BasisState = {}
 QubitStateVector = {}
 StatePrep = {}
-DiagonalQubitUnitary = {}
+ControlledQubitUnitary = {}
+MultiControlledX = {}
 QubitCarry = {}
 QubitSum = {}
 OrbitalRotation = {}
@@ -67,7 +66,7 @@ ECR = {}
 # Gates which should be translated to QubitUnitary
 [operators.gates.matrix]
 
-MultiControlledX = {}
+DiagonalQubitUnitary = {}
 
 
 # Observables supported by the device
@@ -108,8 +107,11 @@ mid_circuit_measurement = true
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
 
+# whether the device can support non-commuting measurements together
+# in a single execution
+non_commuting_observables = true
+
 [options]
 
 option1 = "_option1"
 option2 = "_option2"
-

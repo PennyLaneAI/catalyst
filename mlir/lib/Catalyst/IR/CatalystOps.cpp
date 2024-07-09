@@ -36,7 +36,7 @@ void CustomCallOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Read::get());
 }
 
-void PythonCallOp::getEffects(
+void CallbackCallOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
     // Assume all effects
@@ -44,4 +44,16 @@ void PythonCallOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Free::get());
     effects.emplace_back(mlir::MemoryEffects::Write::get());
     effects.emplace_back(mlir::MemoryEffects::Read::get());
+}
+
+LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    auto callee = this->getCalleeAttr();
+    auto sym = symbolTable.lookupNearestSymbolFrom(this->getOperation(), callee);
+    if (!sym) {
+        this->emitOpError("invalid function:") << callee;
+        return failure();
+    }
+
+    return success();
 }

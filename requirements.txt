@@ -16,12 +16,14 @@ pylint
 isort
 
 # testing
+flaky
 lit
 pytest
 pytest-xdist
 pytest-cov
+pytest-mock
 nbmake
 
 # optional rt/test dependencies
-pennylane-lightning[kokkos]
-amazon-braket-pennylane-plugin>=1.25,<=1.27.0
+pennylane-lightning-kokkos
+amazon-braket-pennylane-plugin>1.27.1

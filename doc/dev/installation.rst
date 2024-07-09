@@ -2,9 +2,9 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64) and macOS (aarch64, x86_64) platforms, and
-pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions
-3.9 and higher. To install it, simply run the following ``pip`` command:
+Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) 
+platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
+Python versions 3.9 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -24,7 +24,7 @@ untested and cannot be guaranteed. If you are using one of these platforms, plea
 try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-building from source are also included `further down <#building-from-source>`_.
+building from source are also included `further down <#minimal-building-from-source-guide>`_.
 
 Dev Containers
 --------------
@@ -63,12 +63,84 @@ from within the root of the running container.
   first, open it as a VS Code Workspace, and then reopen the Workspace in a Dev Container via the
   ``Reopen in Container`` command.
 
-Building from source
---------------------
+
+
+Minimal Building From Source Guide
+----------------------------------
+
+
+Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. 
+
+The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
+
+
+The essential steps are:
+
+
+.. tabs::
+
+   .. group-tab:: Linux Debian/Ubuntu
+
+      .. warning::
+        | If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng`` via:
+        | ``conda install -c conda-forge libstdcxx-ng``
+        | If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
+
+
+      .. code-block:: console
+
+        # Install common requirements
+        sudo apt install clang lld ccache libomp-dev ninja-build make cmake 
+
+        # Clone the Catalyst repository  
+        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+        # Install specific requirements for Catalyst
+        cd catalyst
+        pip install -r requirements.txt
+
+        # Build Catalyst
+        make all
+
+        # Test that everything is built properly
+        make test
+
+   .. group-tab:: macOS
+
+      .. code-block:: console
+
+        # Install XCode Command Line Tools and common requirements
+        xcode-select --install
+        pip install cmake ninja
+        brew install libomp
+
+        # Clone the Catalyst repository  
+        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+        # Install specific requirements for Catalyst
+        cd catalyst
+        pip install -r requirements.txt 
+
+        # Build Catalyst
+        make all
+
+        # Test that everything is built properly
+        make test
+
+These steps should give you the full functionality of Catalyst. 
+
+
+Detailed Building From Source Guide
+-----------------------------------
+
+
+.. note::
+  This section is a detailed building-from-source guide. Some commands in this section has already been included in the minimal guide. 
 
 
 To build Catalyst from source, developers should follow the instructions provided below for building
 all three modules: the Python frontend, the MLIR compiler, and the runtime library.
+
 
 Requirements
 ^^^^^^^^^^^^
@@ -88,36 +160,50 @@ installed and available on the path (depending on the platform):
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
-They can be installed on **Debian/Ubuntu** via:
+They can be installed via:
 
-.. code-block:: console
 
-  sudo apt install clang lld ccache libomp-dev ninja-build make cmake
+.. tabs::
 
-.. Note::
+   .. group-tab:: Linux Debian/Ubuntu
 
-  If the CMake version available in your system is too old, you can also install up-to-date
-  versions of it via ``pip install cmake``.
+      .. code-block:: console
 
-On **macOS**, it is strongly recommended to install the official XCode Command Line Tools
-(for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and ``brew``:
+        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
-.. code-block:: console
+      .. note::
 
-  pip install cmake ninja
-  brew install libomp
+        If the CMake version available in your system is too old, you can also install up-to-date
+        versions of it via ``pip install cmake``.
 
-All additional build and developer dependencies are managed via the repository's
-``requirements.txt`` and can be installed as follows:
+      .. tabs::
 
-.. code-block:: console
+      .. warning::
 
-  pip install -r requirements.txt
+        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
 
-.. Note::
+        .. code-block:: console
 
-  Please ensure that your local site-packages for Python are available on the ``PATH`` - watch out
-  for the corresponding warning that ``pip`` may give you during installation.
+          conda install -c conda-forge libstdcxx-ng
+
+        If not, you may receive the following error when running ``make test`` because the conda
+        environment is using old versions of ``libstdcxx-ng``.
+
+        .. code-block:: console
+
+          'GLIBCXX_3.4.x' not found
+
+   .. group-tab:: macOS
+
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and ``brew``:
+
+      .. code-block:: console
+
+        xcode-select --install
+        pip install cmake ninja
+        brew install libomp
+
+
 
 Once the pre-requisites are installed, start by cloning the project repository including all its
 submodules:
@@ -131,6 +217,20 @@ For an existing copy of the repository without its submodules, they can also be 
 .. code-block:: console
 
   git submodule update --init --depth=1
+
+
+All additional build and developer dependencies are managed via the repository's
+``requirements.txt`` and can be installed as follows once the repository is cloned:
+
+.. code-block:: console
+
+  pip install -r requirements.txt
+
+
+.. note::
+
+  Please ensure that your local site-packages for Python are available on the ``PATH`` - watch out
+  for the corresponding warning that ``pip`` may give you during installation.
 
 Catalyst
 ^^^^^^^^
@@ -204,7 +304,6 @@ To make the MLIR bindings from the Catalyst dialects discoverable to the compile
 .. code-block:: console
 
   export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
-
 To make runtime libraries discoverable to the compiler:
 
 .. code-block:: console
@@ -253,7 +352,7 @@ them, but using the ``test-runtime`` target instead:
 
   make test-runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
-.. Note::
+.. note::
 
   The ``test-runtime`` targets rebuilds the runtime with the specified flags. Therefore,
   running ``make runtime OPENQASM=ON`` and ``make test-runtime`` in succession will leave you
@@ -288,14 +387,30 @@ To build and test documentation for Catalyst, you will need to install
 Additionally, `doxygen <https://www.doxygen.nl>`_ is required to build C++ documentation, and
 `pandoc <https://pandoc.org>`_ to render Jupyter Notebooks.
 
-On **Debian/Ubuntu**, they can be installed via:
+They can be installed via 
+
+
+.. tabs::
+
+   .. group-tab:: Linux Debian/Ubuntu
+
+      .. code-block:: console
+
+        sudo apt install doxygen pandoc
+
+
+   .. group-tab:: macOS
+
+      On **macOS**, `homebrew <https://brew.sh>`_ is the easiest way to install these packages:
+
+      .. code-block:: console
+
+        brew install doxygen pandoc
+
+To generate html files for the documentation for Catalyst:
 
 .. code-block:: console
 
-  sudo apt install doxygen pandoc
+  pip install -r doc/requirements.txt
 
-On **macOS**, `homebrew <https://brew.sh>`_ is the easiest way to install these packages:
-
-.. code-block:: console
-
-  brew install doxygen pandoc
+The generated files are located in ``doc/_build/html``

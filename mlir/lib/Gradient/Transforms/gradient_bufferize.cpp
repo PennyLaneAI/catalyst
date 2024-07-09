@@ -14,6 +14,7 @@
 
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -43,6 +44,8 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
 
         RewritePatternSet patterns(context);
         populateBufferizationPatterns(typeConverter, patterns);
+        populateFunctionOpInterfaceTypeConversionPattern<ForwardOp>(patterns, typeConverter);
+        populateFunctionOpInterfaceTypeConversionPattern<ReverseOp>(patterns, typeConverter);
 
         ConversionTarget target(*context);
         bufferization::populateBufferizeMaterializationLegality(target);
@@ -52,8 +55,22 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
         target.addDynamicallyLegalOp<AdjointOp>(
             [&](AdjointOp op) { return typeConverter.isLegal(op); });
 
+        target.addDynamicallyLegalOp<ForwardOp>([&](ForwardOp op) {
+            return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+                   typeConverter.isLegal(&op.getBody()) && !op.empty();
+        });
+
+        target.addDynamicallyLegalOp<ReverseOp>([&](ReverseOp op) {
+            return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+                   typeConverter.isLegal(&op.getBody()) && !op.empty();
+        });
+
         target.addDynamicallyLegalOp<BackpropOp>(
             [&](BackpropOp op) { return typeConverter.isLegal(op); });
+
+        target.addLegalOp<catalyst::gradient::ReturnOp>();
+
+        target.addLegalDialect<func::FuncDialect, memref::MemRefDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

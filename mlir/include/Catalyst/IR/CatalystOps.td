@@ -16,8 +16,11 @@
 #ifndef CATALYST_OPS
 #define CATALYST_OPS
 
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
 
@@ -103,41 +106,70 @@ def CustomCallOp: Catalyst_Op<"custom_call",
   }];
 }
 
-def PythonCallOp: Catalyst_Op<"pycallback",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
-  let summary = "CustomCall specialized for python callbacks.";
+def CallbackOp : Catalyst_Op<"callback",
+    [FunctionOpInterface, IsolatedFromAbove]> {
+
+  let summary = "Operation denoting a symbol to refer to user callbacks.";
 
   let description = [{
-    A custom call invokes code external to Catalyst. The `inputs` are passed to the
-    external code, and the external code is expected to produce a result of the
-    given type.
+     This is an operation that is intended to be placed at the module level.
+     It corresponds to function bodies that are not yet constructed.
   }];
 
   let arguments = (ins
-        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
-        I64Attr: $identifier,
-        OptionalAttr<I64Attr>: $number_original_arg
+     SymbolNameAttr: $sym_name,
+     TypeAttrOf<FunctionType>: $function_type,
+     I64Attr: $id,
+     I64Attr: $argc,
+     I64Attr: $resc,
+     OptionalAttr<DictArrayAttr>: $arg_attrs,
+     OptionalAttr<DictArrayAttr>: $res_attrs
+  );
+
+  let regions = (region AnyRegion: $body);
+
+  let builders = [OpBuilder<(ins
+    "mlir::StringRef":$name, "mlir::FunctionType":$type,
+    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
+  >];
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // FunctionOpInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Returns the argument types of this function.
+    mlir::ArrayRef<mlir::Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+    /// Returns the result types of this function.
+    mlir::ArrayRef<mlir::Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    mlir::Region *getCallableRegion() { return &getBody(); }
+  }];
+
+
+  let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
+
+}
+
+def CallbackCallOp : Catalyst_Op<"callback_call",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<CallOpInterface>,
+     DeclareOpInterfaceMethods<SymbolUserOpInterface>
+    ]> {
+
+  let arguments = (ins
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs
   );
 
   let results = (outs Variadic<AnyType>);
 
-  let builders = [
-        OpBuilder<(ins "mlir::TypeRange":$resultTypes, "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier), [{
-            auto id = $_builder.getI64IntegerAttr(identifier);
-            auto argc = $_builder.getI64IntegerAttr(inputs.size());
-            return build($_builder, $_state, resultTypes, inputs, id, argc);
-        }]>,
-
-        OpBuilder<(ins "mlir::TypeRange":$resultTypes, "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier, "int64_t": $size), [{
-            auto id = $_builder.getI64IntegerAttr(identifier);
-            auto argc = $_builder.getI64IntegerAttr(size);
-            return build($_builder, $_state, resultTypes, inputs, id, argc);
-        }]>
-    ];
-
   let assemblyFormat = [{
-    `(` $inputs `)` attr-dict `:` functional-type(operands, results)
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
+
 }
 
 #endif // GRADIENT_OPS

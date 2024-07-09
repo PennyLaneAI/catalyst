@@ -567,6 +567,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install device dependencies (OpenQasm device)
+      run: |
+        pip install amazon-braket-pennylane-plugin
+        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+
     - name: Install Deps
       run: |
         sudo apt-get update
@@ -593,11 +598,6 @@ jobs:
       with:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
-
-    - name: Install additional dependencies (OpenQasm device)
-      run: |
-        pip install amazon-braket-pennylane-plugin
-        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Add Frontend Dependencies to PATH
       run: |

@@ -20,8 +20,8 @@ import pytest
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
+from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -59,7 +59,6 @@ OPERATIONS = [
     "PSWAP",
     "SISWAP",
     "SQISW",
-    "CPhase",
     "BasisState",
     "QubitStateVector",
     "StatePrep",
@@ -84,6 +83,7 @@ OPERATIONS = [
     "MultiControlledX",
     "SISWAP",
     "ControlledPhaseShift",
+    "C(QubitUnitary)",
     "C(PauliY)",
     "C(RY)",
     "C(PauliX)",
@@ -165,8 +165,8 @@ def test_custom_device_load():
             return "DummyDevice", lib_path
 
     device = DummyDevice(wires=1)
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
+    capabilities = get_device_capabilities(device)
+    backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
     assert "option2" not in backend_info.kwargs
 
