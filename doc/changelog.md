@@ -4,6 +4,12 @@
 
 <h3>Improvements</h3>
 
+* Catalyst is now compatible with Enzyme `v0.0.130`
+  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
+
+* Added support for the jax.numpy.argsort function so it works when compiled with qjit.
+  [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
@@ -15,10 +21,14 @@
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
   [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
 
+* The function `__catalyst_inactive_callback` has the nofree attribute.
+  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
 
