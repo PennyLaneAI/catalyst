@@ -19,7 +19,12 @@
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
 <h3>Bug fixes</h3>
+
 * Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
+  
+* Using float32 in callback functions would not crash in compilation phase anymore,
+  but rather raise an assertion error.
+  [(#916)]https://github.com/PennyLaneAI/catalyst/pull/916
 
 <h3>Internal changes</h3>
 
