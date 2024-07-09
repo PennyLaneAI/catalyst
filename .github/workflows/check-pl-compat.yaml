@@ -104,9 +104,6 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_LLD=ON \
         make dialects
-        # TODO: remove workaround before merging to main
-        python3 -m pip install pennylane-lightning==0.37
-        python3 -m pip install git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
         make frontend
 
     - name: Build Catalyst Runtime (latest)

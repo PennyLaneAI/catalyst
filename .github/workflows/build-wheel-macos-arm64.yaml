@@ -405,11 +405,6 @@ jobs:
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install 'oqc-qcaas-client<3.6.0'
-    
-    # TODO: remove workaround before merging to main
-    - name: Install PennyLane RC
-      run: |
-        python${{ matrix.python_version }} -m pip install git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
 
     - name: Install Catalyst
       run: |
