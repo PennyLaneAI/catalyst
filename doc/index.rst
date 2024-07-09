@@ -57,7 +57,7 @@ Catalyst
   :end-line: 73
 
 .. mdinclude:: ../README.md
-  :start-line: 143
+  :start-line: 142
   :end-line: 163
 
 .. toctree::
