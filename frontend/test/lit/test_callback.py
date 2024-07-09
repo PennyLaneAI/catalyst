@@ -17,6 +17,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
+
 from catalyst import pure_callback
 
 
