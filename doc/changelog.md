@@ -1,3 +1,37 @@
+# Release 0.8.0-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+* Catalyst is now compatible with Enzyme `v0.0.130`
+  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
+
+* Added support for the jax.numpy.argsort function so it works when compiled with qjit.
+  [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
+
+<h3>Breaking changes</h3>
+* Return values are `jax.Array` typed instead of `numpy.array`.
+  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
+
+<h3>Bug fixes</h3>
+
+<h3>Internal changes</h3>
+
+* The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
+  [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
+
+* The function `__catalyst_inactive_callback` has the nofree attribute.
+  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Mehrdad Malekmohammadi,
+Romain Moyard,
+Erick Ochoa,
+
 # Release 0.7.0
 
 <h3>New features</h3>
@@ -365,7 +399,7 @@
       return qml.state()
   ```
 
-* Catalyst is now officially support on Linux aarch64, with pre-built binaries
+* Catalyst has now officially support on Linux aarch64, with pre-built binaries
   available on PyPI; simply `pip install pennylane-catalyst` on Linux aarch64 systems.
   [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
@@ -508,6 +542,12 @@
   ```
 
 <h3>Breaking changes</h3>
+
+* The `mitigate_with_zne` function no longer accepts a `degree` parameter for polynomial fitting
+  and instead accepts a callable to perform extrapolation. Any qjit-compatible extrapolation
+  function is valid. Keyword arguments can be passed to this function using the
+  `extrapolate_kwargs` keyword argument in `mitigate_with_zne`.
+  [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
   As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above
