@@ -19,8 +19,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include <iostream>
-
 using namespace mlir;
 using namespace catalyst;
 
@@ -33,14 +31,12 @@ struct MemrefCopyToLinalgCopyRewritePattern : public mlir::OpRewritePattern<memr
     {
         auto srcType = cast<BaseMemRefType>(op.getSource().getType());
         auto srcMemRefType = dyn_cast<MemRefType>(srcType);
-        srcMemRefType.dump();
         bool layoutIsIdentity = srcMemRefType.getLayout().isIdentity();
-        std::cout << layoutIsIdentity << std::endl;
         if (!layoutIsIdentity) {
             rewriter.replaceOpWithNewOp<linalg::CopyOp>(op, op.getSource(), op.getTarget());
+            return success();
         }
-
-        return success();
+        return failure();
     }
 };
 
