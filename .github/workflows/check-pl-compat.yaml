@@ -1,7 +1,19 @@
 name: Check PennyLane/Lightning Compatibility
 
 on:
+  pull_request:
   workflow_call:
+    inputs:
+      catalyst:
+        required: true
+        type: string
+      pennylane:
+        required: true
+        type: string
+      lightning:
+        required: true
+        type: string
+  workflow_dispatch:
     inputs:
       catalyst:
         required: true
