@@ -69,11 +69,13 @@ print(test2.mlir)
 @pure_callback
 # CHECK-LABEL func.func private @callback_custom_name
 def custom_name(x) -> float:
+    """A function with a custom name"""
     return x
 
 
 @qml.qjit
 def test3(x: float) -> float:
+    """Tests that custom_name will be in the IR"""
     return custom_name(x)
 
 
