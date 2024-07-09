@@ -9,6 +9,7 @@
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
 <h3>Bug fixes</h3>
+* Make `autograph` copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
 
 <h3>Internal changes</h3>
 
@@ -17,6 +18,7 @@
 This release contains contributions from (in alphabetical order):
 
 Erick Ochoa,
+Tzung-Han Juang,
 
 # Release 0.7.0
 
