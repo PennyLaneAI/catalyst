@@ -10,6 +10,10 @@
 * Added support for the jax.numpy.argsort function so it works when compiled with qjit.
   [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
 
+* Callbacks now have nicer identifiers. The identifiers include the name of
+  the python function being called back into.
+  [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
