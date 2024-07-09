@@ -10,7 +10,7 @@ def repeat(n):
         agg += [identity]
     return agg
 
-@qml.qjit
+@qml.qjit(keep_intermediate=True, multi_threaded_compilation=True)
 def foo(x : float):
     old = x
     for func in repeat(100):
@@ -19,4 +19,4 @@ def foo(x : float):
     return new
 
 
-print(foo.mlir)
+foo.mlir
