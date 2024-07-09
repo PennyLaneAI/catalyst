@@ -29,4 +29,6 @@ void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
 void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
 
+void populateMemrefCopyToLinalgCopyPatterns(mlir::RewritePatternSet &);
+
 } // namespace catalyst
