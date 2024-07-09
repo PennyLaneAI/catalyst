@@ -20,12 +20,14 @@ Currently, each pass has its own user-facing decorator. In the future,
 a unified user interface for all the passes is necessary. 
 
 Note that the pass pipeline table does not need to modify the qnode in 
-any way. Its only purpose it to mark down the passes the user wants to 
+any way. Its only purpose is to mark down the passes the user wants to 
 run on each qnode, and then send this information to
 frontend/catalyst/compiler.py to handle the actual running of the passes. 
 """
 
 import pennylane as qml
+
+from catalyst.tracing.contexts import EvaluationContext
 
 
 ## PASS PIPELINE TABLE ##
@@ -36,7 +38,7 @@ class QUANTUM_PASSES_TABLE:
     """
 
     def __init__(self):
-        self._table = {}
+        self.table = {}
 
     def __repr__(self):
         return str(self.table)
@@ -44,9 +46,16 @@ class QUANTUM_PASSES_TABLE:
     @property
     def table(self):
         """
-        Return the table object.
+        Getter for the table object.
         """
         return self._table
+
+    @table.setter
+    def table(self, val):
+        """
+        Setter for the table object.
+        """
+        self._table = val
 
     def add_pass_on_qnode(self, qnode, pass_):
         """
@@ -67,14 +76,23 @@ class QUANTUM_PASSES_TABLE:
         """
         return self.table[qnode]
 
+    def reset(self):
+        """
+        Reset the table to empty.
+        """
+        self.table = {}
+
 
 active_passes = QUANTUM_PASSES_TABLE()
 
 
 def get_quantum_pass_table():
     """
-    To be called in compiler.py to retrieve the quantum pass table.
+    To be called in other files to retrieve the quantum pass table.
     """
+
+    global active_passes  # pylint: disable=global-statement, global-variable-not-assigned
+
     return active_passes
 
 
@@ -88,5 +106,12 @@ def cancel_inverses(fn=None):
 
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
-    active_passes.add_pass_on_qnode(fn, "remove-chained-self-inverse")
-    return fn
+
+    if EvaluationContext.is_tracing():
+        active_passes.add_pass_on_qnode(fn, "remove-chained-self-inverse")
+        return fn
+
+    else:
+        raise RuntimeError(
+            "catalyst.cancel_inverses can only be used on a qnode inside a qjit context!"
+        )

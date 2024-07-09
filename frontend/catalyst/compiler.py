@@ -156,6 +156,7 @@ QUANTUM_COMPILATION_PASS = (
         "adjoint-lowering",
     ],
 )
+QUANTUM_COMPILATION_PASS_deafult_len = len(QUANTUM_COMPILATION_PASS[1])
 
 """
 # We would like the quantum passes pipeline to look something like the following:
@@ -196,6 +197,13 @@ def fill_quantum_peephole_passes_pipeline(pass_table):
             ):
                 quantum_passes_pipeline.append(run_pass)
     QUANTUM_COMPILATION_PASS[1][:0] = quantum_passes_pipeline
+
+
+def clear_quantum_peephole_passes_pipeline():
+    """
+    Clear the peephole passes in the QUANTUM_COMPILATION_PASS pipeline.
+    """
+    del QUANTUM_COMPILATION_PASS[1][: -1 * QUANTUM_COMPILATION_PASS_deafult_len]
 
 
 BUFFERIZATION_PASS = (
@@ -545,6 +553,7 @@ class Compiler:
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
             )
+            clear_quantum_peephole_passes_pipeline()
         except RuntimeError as e:
             raise CompileError(*e.args) from e
 
