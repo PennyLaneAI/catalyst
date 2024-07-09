@@ -336,7 +336,7 @@ def accelerate_impl(users_func=None, *, dev=None):
         try:
             # Find the shape of the return value
             with transient_jax_config({"jax_dynamic_shapes": False}):
-                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                _, returnshape = jax.make_jaxpr(jitted_fn, return_shape=True)(
                     absextra, *absargs, **abskwargs
                 )
         except Exception as e:
@@ -344,28 +344,23 @@ def accelerate_impl(users_func=None, *, dev=None):
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
         annotated = AnnotatedFunction(jitted_fn, returnshape)
-        with_custom_grad = CallbackWithPotentialCustomGrad(annotated)
+        with_custom_grad = CallbackWithPotentialCustomGrad(annotated, dev)
 
         fwd = None
         rev = None
         if GradContext.am_inside_grad():
 
-            def vjp_wrapper(*args, **kwargs):
-                return jax.vjp(jitted_fn)(*args, **kwargs)
+            @with_custom_grad.fwd
+            @accelerate(dev=dev)
+            def vjp_wrapper(context, *args, **kwargs):
+                return jax.vjp(jitted_fn, context, *args, **kwargs)
 
-            with GradContext(peel=True):
-                fwd = accelerate(vjp_wrapper, device=dev)
-
+            @with_custom_grad.bwd
+            @accelerate(dev=dev)
             def reverse(vjp_func, dy):
                 return vjp_func(dy)
 
-            with GradContext(peel=True):
-                rev = accelerate(reverse, device=dev)
-
-        with_custom_grad.fwd(fwd)
-        with_custom_grad.bwd(rev)
-
-        return jax_jit_callback(annotated, device=dev)(context, *args, **kwargs)
+        return with_custom_grad(context, *args, **kwargs)
 
     return back_to_user
 
@@ -375,19 +370,21 @@ def pure_callback_impl(callback_fn: AnnotatedFunction):
     return CallbackWithPotentialCustomGrad(callback_fn)
 
 
-class CallbackWithCustomGrad:
+class CallbackWithCustomGrad(AnnotatedFunction):
     """A callback with a custom grad"""
 
-    def __init__(self, func, forward, reverse):
-        assert isinstance(func, AnnotatedFunction)
+    def __init__(self, func, forward, reverse, device):
         assert func and forward and reverse
+        functools.update_wrapper(self, func, assigned=assigned)
         self.func = func
+        assert isinstance(func, AnnotatedFunction)
         self.restype = func.getResultTypes()
         self._fwd = forward
         self._fwd_jaxpr = None
         self._bwd = reverse
         self._bwd_jaxpr = None
         self.callback = None
+        self.device = device
 
     def __call__(self, *args, **kwargs):
         if not EvaluationContext.is_tracing():
@@ -401,7 +398,7 @@ class CallbackWithCustomGrad:
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = base_callback_impl(self.func, custom_grad=self)
+        self.callback = base_callback_impl(self.func, device=self.device, custom_grad=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
@@ -431,12 +428,14 @@ class CallbackWithPotentialCustomGrad:
     to have a custom grad if it is never differentiated, but a user
     may register one. A debug.callback will never have a custom grad."""
 
-    def __init__(self, func):
+    def __init__(self, func, device=None):
         self.func = func
+        #functools.update_wrapper(self, func, assigned=assigned)
         self.restype = func.getResultTypes()
         self._fwd = None
         self._bwd = None
         self.callback = None
+        self.device = device
 
     def fwd(self, func):
         """Save forward pass as implemented by the user"""
@@ -445,6 +444,9 @@ class CallbackWithPotentialCustomGrad:
     def bwd(self, func):
         """Save reverse pass as implemented by the user"""
         self._bwd = func
+
+    def getResultTypes(self):
+        return self.restype
 
     def __call__(self, *args, **kwargs):
         if not EvaluationContext.is_tracing():
@@ -463,10 +465,10 @@ class CallbackWithPotentialCustomGrad:
             return self.callback(*args, **kwargs)
 
         if self._fwd and self._bwd:
-            self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd)
+            self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd, self.device)
             return self.callback(*args, **kwargs)
 
-        self.callback = base_callback_impl(self.func)
+        self.callback = base_callback_impl(self.func, device=self.device)
         return self.callback(*args, **kwargs)
 
 
