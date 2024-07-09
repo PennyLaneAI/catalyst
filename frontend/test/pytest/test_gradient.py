@@ -237,26 +237,26 @@ def test_value_and_grad_on_qjit_classical():
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode."""
 
     @qjit
-    def f(x: float):
+    def f1(x: float):
         return x * x
 
-    result = qjit(value_and_grad(f))(3.0)
+    result = qjit(value_and_grad(f1))(3.0)
     expected = (9.0, 6.0)
     assert np.allclose(result, expected)
 
     @qjit
-    def f(x: float):
+    def f2(x: float):
         return [x * x]
 
-    result = qjit(value_and_grad(f))(3.0)
+    result = qjit(value_and_grad(f2))(3.0)
     expected = ([9.0], [6.0])
     assert np.allclose(result, expected)
 
     @qjit
-    def f(x: float):
+    def f3(x: float):
         return {"helloworld": x * x}
 
-    result = qjit(value_and_grad(f))(3.0)
+    result = qjit(value_and_grad(f3))(3.0)
     expected = ({"helloworld": 9.0}, {"helloworld": 6.0})
     assert np.allclose(result[0]["helloworld"], expected[0]["helloworld"])
     assert np.allclose(result[1]["helloworld"], expected[1]["helloworld"])
