@@ -461,7 +461,7 @@ def trace_to_jaxpr(
 ) -> Tuple[Jaxpr, List[DynamicJaxprTracer], List[Any]]:
     """Get Jaxpr from a Jax trace applying a workaround.  The workaround makes it possible to trace
     e.g. the following program: `lambda i, a: i<3`. Where `a` is an unused dynamically-shaped array.
-    This method would remove return values related to sizes of tensors when compiling with 
+    This method would remove return values related to sizes of tensors when compiling with
     dynamically sized tensors.
     """
     jaxpr, tracers, consts = trace.frame.to_jaxpr2((*outputs, *inputs))
@@ -586,7 +586,9 @@ def output_type_to_tracers(
                 (
                     [*out_consts, *in_tracers][d.val]
                     if isinstance(d, InDBIdx)
-                    else out_tracers[d.val] if isinstance(d, OutDBIdx) else d
+                    else out_tracers[d.val]
+                    if isinstance(d, OutDBIdx)
+                    else d
                 )
                 for d in aval.shape
             ]

@@ -375,9 +375,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     """
 
     def _decorator(body_fn):
-        return ForLoopCallable(
-            lower_bound, upper_bound, step, body_fn, not allow_array_resizing
-        )
+        return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
 
     return _decorator
 

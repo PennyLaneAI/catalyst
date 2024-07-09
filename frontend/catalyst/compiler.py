@@ -175,15 +175,15 @@ BUFFERIZATION_PASS = (
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
-        "canonicalize",    # Remove dead memrefToTensorOp's
-                           # introduced during gradient-bufferize of callbacks
+        "canonicalize",  # Remove dead memrefToTensorOp's
+        # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
-        "canonicalize", # Must be after convert-bufferization-to-memref
-                        # otherwise there are issues in lowering of dynamic tensors.
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
         # "cse",
         "cp-global-memref",
     ],
