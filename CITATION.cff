@@ -5,8 +5,8 @@ authors:
   orcid: "https://orcid.org/0000-0003-0975-6448"
 - family-names: Asadi
   given-names: Ali
-- family-names: Lopez
-  given-names: Erick Ochoa
+- family-names: Ochoa Lopez
+  given-names: Erick
 - family-names: Mironov
   given-names: Sergei
 - family-names: Banning
@@ -34,8 +34,8 @@ preferred-citation:
     orcid: "https://orcid.org/0000-0003-0975-6448"
   - family-names: Asadi
     given-names: Ali
-  - family-names: Lopez
-    given-names: Erick Ochoa
+  - family-names: Ochoa Lopez
+    given-names: Erick
   - family-names: Mironov
     given-names: Sergei
   - family-names: Banning
