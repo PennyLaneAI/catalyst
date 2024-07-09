@@ -586,9 +586,7 @@ def output_type_to_tracers(
                 (
                     [*out_consts, *in_tracers][d.val]
                     if isinstance(d, InDBIdx)
-                    else out_tracers[d.val]
-                    if isinstance(d, OutDBIdx)
-                    else d
+                    else out_tracers[d.val] if isinstance(d, OutDBIdx) else d
                 )
                 for d in aval.shape
             ]
