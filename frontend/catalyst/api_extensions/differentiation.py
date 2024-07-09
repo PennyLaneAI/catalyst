@@ -186,7 +186,8 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
 
 
 def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
-    """A :func:`~.qjit`-compatible transformation for returning the result and gradient of a function.
+    """A :func:`~.qjit`-compatible transformation for returning the result and gradient of a 
+    function.
 
     This function allows the value and the gradient of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will
