@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for the callback feature."""
+
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
@@ -19,6 +21,7 @@ from catalyst import pure_callback
 
 
 def i(x):
+    """Identity function"""
     return x
 
 
@@ -39,6 +42,7 @@ print(one_callback_cached.mlir)
 
 @pure_callback
 def always_return_float(x) -> float:
+    """Function that always returns float"""
     if x == 0.0:
         return x
     else:

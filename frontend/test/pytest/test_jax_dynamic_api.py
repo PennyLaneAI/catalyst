@@ -28,8 +28,6 @@ from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import (
     EvaluationContext,
-    EvaluationMode,
-    JaxTracingContext,
 )
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
@@ -1117,7 +1115,7 @@ def test_trace_to_jaxpr():
     """Test our Jax tracing workaround. The idiomatic Jax would do `jaxpr, tracers, consts =
     trace.frame.to_jaxpr2([r])` which fails with `KeyError` for the below case.
     """
-    # pylint: disable=protected-access
+    # pylint: disable=protected-access,unused-variable
 
     @qjit
     def circuit(sz):
