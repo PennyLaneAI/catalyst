@@ -22,7 +22,7 @@ import copy
 import ctypes
 import functools
 import inspect
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any, Callable
 
 import jax
@@ -267,8 +267,9 @@ def pure_callback(callback_fn, result_type=None):
 
 ## IMPL ##
 class AnnotatedFunction(ABC):
-    """Defining an interface"""
+    """Defining an interface for methods with result types."""
 
+    @abstractmethod
     def getResultTypes(self):
         """Get result type of function"""
         ...  # pragma: nocover
