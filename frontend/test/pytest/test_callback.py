@@ -24,7 +24,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import accelerate, debug, grad, jacobian, pure_callback
-from catalyst.api_extensions.callbacks import base_callback
+from catalyst.api_extensions.callbacks import base_callback, CallbackWithCustomGrad
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 
@@ -52,27 +52,7 @@ def test_purecallback_no_tracing(arg):
     def identity(x) -> int:
         return x
 
-    assert identity(arg) == arg
-
-
-@pytest.mark.parametrize("arg", [(0.1), (0.2), (0.3)])
-def test_active_grad_no_tracing(arg):
-    """Test that pure callback can be differentiated no tape"""
-
-    @pure_callback
-    def identity(x) -> float:
-        return x
-
-    @identity.fwd
-    def fwd(x):
-        # Still needs to return a tuple.
-        return identity(x), None
-
-    @identity.bwd
-    def bwd(_res, cot):
-        return cot
-
-    assert identity(arg) == arg
+    assert pure_Callback(arg) == arg
 
 
 def test_callback_no_returns_no_params(capsys):

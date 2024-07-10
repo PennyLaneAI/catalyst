@@ -266,8 +266,7 @@ class AnnotatedFunction(ABC):
 
     def getResultTypes(self):
         """Get result type of function"""
-        # pragma: nocover
-        ...
+        ...  # pragma: nocover
 
 
 class AnnotatedFunctionImpl(AnnotatedFunction):
@@ -399,10 +398,6 @@ class CallbackWithCustomGrad(AnnotatedFunction):
         return self.restype
 
     def __call__(self, *args, **kwargs):
-        if not EvaluationContext.is_tracing():
-            # If we are not in the tracing context, just evaluate the function.
-            return self.func(*args, **kwargs)
-
         if self.callback:
             return self.callback(*args, **kwargs)
 
