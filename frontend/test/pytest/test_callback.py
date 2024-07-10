@@ -1389,6 +1389,7 @@ def test_vjp_as_residual(arg, order):
         obs = hypothesis(arg)
     assert np.allclose(obs, exp)
 
+
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 @pytest.mark.parametrize("order", ["good", "bad"])
 def test_vjp_as_residual_automatic(arg, order):
@@ -1397,7 +1398,6 @@ def test_vjp_as_residual_automatic(arg, order):
     @jacobian
     def hypothesis(x):
         return accelerate(jax.scipy.linalg.expm)(x)
-
 
     @jax.jacobian
     def ground_truth(x):
@@ -1411,13 +1411,13 @@ def test_vjp_as_residual_automatic(arg, order):
         obs = hypothesis(arg)
     assert np.allclose(obs, exp)
 
-def test_automatic_differentiation_of_accelerate():
 
+def test_automatic_differentiation_of_accelerate():
 
     @qml.qjit
     @grad
     @accelerate
-    def identity(x : float):
+    def identity(x: float):
         return x
 
     assert identity(4.0) == 1.0
