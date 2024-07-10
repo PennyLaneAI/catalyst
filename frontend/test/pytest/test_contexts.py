@@ -21,6 +21,7 @@ from catalyst import cond, grad, jacobian, measure, qjit, while_loop
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode, GradContext
 
 
+# pylint: disable=protected-access
 class TestGradContextUnitTests:
     """Unit tests for grad context"""
 
@@ -72,6 +73,7 @@ class TestGradContextUnitTests:
 class TestGradContextIntegration:
 
     def test_assert_inside_grad(self):
+        """Test assertion of grad context with grad"""
 
         @qjit
         @grad
@@ -82,6 +84,7 @@ class TestGradContextIntegration:
         identity(1.0)
 
     def test_assert_inside_jacobian(self):
+        """Test assertion of grad context with jacobian"""
 
         arg = jnp.array([[1.0, 1.0], [1.0, 1.0]])
 
@@ -94,6 +97,7 @@ class TestGradContextIntegration:
         identity(arg)
 
     def test_assert_inside_grad_negative(self):
+        """Test negative"""
 
         msg = "verified fail"
 

@@ -266,6 +266,7 @@ class AnnotatedFunction(ABC):
 
     def getResultTypes(self):
         """Get result type of function"""
+        # pragma: nocover
         ...
 
 
@@ -461,10 +462,6 @@ class CallbackWithPotentialCustomGrad:
         """Save reverse pass as implemented by the user"""
         self._bwd = func
 
-    def getResultTypes(self):
-        """Get result types"""
-        return self.restype
-
     def __call__(self, *args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
@@ -487,12 +484,6 @@ class CallbackWithPotentialCustomGrad:
 
         self.callback = base_callback_impl(self.func, device=self.device)
         return self.callback(*args, **kwargs)
-
-
-def jax_jit_callback(callback_fn: AnnotatedFunction, device=None, custom_grad=None):
-    """Wrapper around base callback that can accept a device as a parameter"""
-
-    return base_callback_impl(callback_fn, device=device, custom_grad=custom_grad)
 
 
 def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):

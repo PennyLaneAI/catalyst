@@ -43,6 +43,38 @@ def test_callback_no_tracing(arg):
     assert identity(arg) == arg
 
 
+@pytest.mark.parametrize("arg", [1, 2, 3])
+def test_purecallback_no_tracing(arg):
+    """Test that when there's no tracing the behaviour of identity
+    stays the same."""
+
+    @pure_callback
+    def identity(x) -> int:
+        return x
+
+    assert identity(arg) == arg
+
+
+@pytest.mark.parametrize("arg", [(0.1), (0.2), (0.3)])
+def test_active_grad_no_tracing(arg):
+    """Test that pure callback can be differentiated no tape"""
+
+    @pure_callback
+    def identity(x) -> float:
+        return x
+
+    @identity.fwd
+    def fwd(x):
+        # Still needs to return a tuple.
+        return identity(x), None
+
+    @identity.bwd
+    def bwd(_res, cot):
+        return cot
+
+    assert identity(arg) == arg
+
+
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
@@ -1393,6 +1425,7 @@ def test_vjp_as_residual(arg, order):
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 @pytest.mark.parametrize("order", ["good", "bad"])
 def test_vjp_as_residual_automatic(arg, order):
+    """Test automatic differentiation of accelerated function"""
 
     @qml.qjit
     @jacobian
@@ -1413,6 +1446,7 @@ def test_vjp_as_residual_automatic(arg, order):
 
 
 def test_automatic_differentiation_of_accelerate():
+    """Same but easier"""
 
     @qml.qjit
     @grad
