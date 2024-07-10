@@ -351,6 +351,7 @@ def accelerate_impl(users_func=None, *, dev=None):
         except Exception as e:
             name = users_func.__name__
             msg = f"Function {name} must be jax.jit-able."
+            msg += f"But failed with error message {str(e)}."
             raise ValueError(msg) from e
         annotated = AnnotatedFunctionImpl(jitted_fn, returnshape)
         with_custom_grad = CallbackWithPotentialCustomGrad(annotated, dev)
