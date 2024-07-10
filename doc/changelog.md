@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Automatic differentiation of `catalyst.accerate`-ed functions.
+  [(#920)](https://github.com/PennyLaneAI/catalyst/pull/920)
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
