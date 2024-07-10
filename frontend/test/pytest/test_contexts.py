@@ -27,7 +27,7 @@ class TestGradContextUnitTests:
 
     def test_error_cannot_pop_from_empty_context(self):
         """Check that impossible state raises an assertion"""
-        msg = GradContext._error_msg
+        msg = "This is an impossible state."
         with pytest.raises(AssertionError, match=msg):
             GradContext._pop()
 
