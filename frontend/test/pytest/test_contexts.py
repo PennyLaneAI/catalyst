@@ -32,20 +32,24 @@ class TestGradContextUnitTests:
             GradContext._pop()
 
     def test_peek_base_case(self):
+        """Test peek"""
         assert GradContext._peek() == 0
 
     def test_push_peek_pop(self):
+        """Test push"""
         GradContext._push()
         assert GradContext._peek() == 1
         GradContext._pop()
 
     def test_context_management_nested_0(self):
+        """Test nested"""
         assert GradContext._peek() == 0
         with GradContext():
             assert GradContext._peek() == 1
         assert GradContext._peek() == 0
 
     def test_context_management_nested_1(self):
+        """Test nested twice"""
         assert GradContext._peek() == 0
         with GradContext():
             assert GradContext._peek() == 1
@@ -55,12 +59,14 @@ class TestGradContextUnitTests:
         assert GradContext._peek() == 0
 
     def test_context_manager_user_interface(self):
+        """Test all"""
         assert not GradContext.am_inside_grad()
         with GradContext():
             assert GradContext.am_inside_grad()
         assert not GradContext.am_inside_grad()
 
     def test_peel(self):
+        """Test peel"""
         assert not GradContext.am_inside_grad()
         with GradContext():
             assert GradContext.am_inside_grad()
