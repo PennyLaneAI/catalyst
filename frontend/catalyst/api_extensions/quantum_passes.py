@@ -40,9 +40,6 @@ class QUANTUM_PASSES_TABLE:
     def __init__(self):
         self.table = {}
 
-    def __repr__(self):
-        return str(self.table)
-
     @property
     def table(self):
         """
