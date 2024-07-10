@@ -1424,6 +1424,25 @@ def test_vjp_as_residual_automatic(arg, order):
         obs = hypothesis(arg)
     assert np.allclose(obs, exp)
 
+@pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
+def test_example_from_epic(arg):
+
+    @qml.qjit
+    @grad
+    def hypothesis(x):
+        expm = accelerate(jax.scipy.linalg.expm)
+        return jnp.sum(expm(jnp.sin(x) ** 2))
+
+    @jax.jit
+    @jax.grad
+    def ground_truth(x):
+        expm = jax.scipy.linalg.expm
+        return jnp.sum(expm(jnp.sin(x) ** 2))
+
+    obs = hypothesis(arg)
+    exp = ground_truth(arg)
+    assert np.allclose(obs, exp)
+
 
 def test_automatic_differentiation_of_accelerate():
     """Same but easier"""
