@@ -262,7 +262,11 @@ def pure_callback(callback_fn, result_type=None):
 
 ## IMPL ##
 class AnnotatedFunction(ABC):
-    def getResultTypes(self): ...
+    """Defining an interface"""
+
+    def getResultTypes(self):
+        """Get result type of function"""
+        ...
 
 
 class AnnotatedFunctionImpl(AnnotatedFunction):
