@@ -430,7 +430,12 @@ class CallbackWithPotentialCustomGrad:
 
     def __init__(self, func, device=None):
         self.func = func
-        #functools.update_wrapper(self, func, assigned=assigned)
+        # TODO: Investigate why we can't just use update_wrapper here
+        # It doesn't matter too much since we just use it for the name.
+        # But having update_wrapper here would change the type
+        # of self (or of self.func?) to just a function
+        # as opposed to an AnnotatedFunction
+        self.__name__ = func.__name__
         self.restype = func.getResultTypes()
         self._fwd = None
         self._bwd = None
