@@ -58,9 +58,10 @@ def accelerate(func=None, *, dev=None):
 
     .. note::
 
-        ``catalyst.accelerate`` doses not currently support
-        differentiation, and cannot be used inside functions that
-        :func:`catalyst.grad` is applied to.
+        ``catalyst.accelerate`` currently supports
+        differentiation, and can be used inside 
+        :func:`catalyst.grad` and :func:`catalyst.jacobian` without one having
+        to define its gradient.
 
     Args:
         func (Callable or PjitFunction): The function to be classically
@@ -103,6 +104,16 @@ def accelerate(func=None, *, dev=None):
         def hybrid_fn(x):
             y = accelerate(classical_fn)(x) # will be executed on a GPU
             return jnp.cos(y)
+
+    With gradients:
+
+    .. code-block:: python
+
+        @qjit
+        @grad
+        def f(x):
+            expm = catalyst.accelerate(jax.scipy.linalg.expm)
+            return jnp.sum(expm(jnp.sin(x)) ** 2)
     """
     # Setting default parameters
     if dev is None:
