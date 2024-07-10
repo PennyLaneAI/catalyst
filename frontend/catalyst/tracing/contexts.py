@@ -79,8 +79,6 @@ class GradContext:
     _grad_stack: int = 0
     # This message will be used in an assertion because it is not expected
     # to be a user facing error ever.
-    _error_msg: str = """This is an impossible state. One cannot derive to
-derive to a negative order / integrate"""
 
     def __init__(self, peel=False):
         """Peel is useful when we want to temporarily create a context
@@ -101,7 +99,9 @@ derive to a negative order / integrate"""
     @staticmethod
     def _pop():
         retval = GradContext._peek()
-        assert retval > 0, GradContext._error_msg
+        msg = "This is an impossible state. "
+        msg += "One cannot derive to derive to a negative order / integrate"
+        assert retval > 0, msg
         GradContext._grad_stack -= 1
         return retval
 
