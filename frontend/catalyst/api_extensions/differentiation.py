@@ -619,7 +619,7 @@ class Grad:
                     gradients = results[len(jaxpr.out_avals) :]
 
                     vals = tree_unflatten(out_tree, vals)
-                    gradients = unflatten_derivatives(
+                    gradients = _unflatten_derivatives(
                         gradients, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
                     )
                     results = (vals, gradients)
