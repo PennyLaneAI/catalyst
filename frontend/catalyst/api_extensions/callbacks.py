@@ -18,11 +18,11 @@ a compiled program. Host callbacks are able to run non-jittable code at runtime
 but require a Python interpreter instance.
 """
 
-from abc import ABC
 import copy
 import ctypes
 import functools
 import inspect
+from abc import ABC
 from typing import Any, Callable
 
 import jax
@@ -263,6 +263,7 @@ def pure_callback(callback_fn, result_type=None):
 ## IMPL ##
 class AnnotatedFunction(ABC):
     def getResultTypes(self): ...
+
 
 class AnnotatedFunctionImpl(AnnotatedFunction):
     """Callable with result_type field."""

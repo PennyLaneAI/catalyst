@@ -88,10 +88,10 @@ derive to a negative order / integrate"""
         self.peel = peel
 
     def __enter__(self, peel=False):
-        GradContext._pop() if self.peel else GradContext._push()
+        _ = GradContext._pop() if self.peel else GradContext._push()
 
     def __exit__(self, _exc_type, _exc, _exc_tb):
-        GradContext._push() if self.peel else GradContext._pop()
+        _ = GradContext._push() if self.peel else GradContext._pop()
 
     @staticmethod
     def am_inside_grad():
