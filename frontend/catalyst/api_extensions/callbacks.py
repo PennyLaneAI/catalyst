@@ -377,6 +377,7 @@ def pure_callback_impl(callback_fn: AnnotatedFunction):
     return CallbackWithPotentialCustomGrad(callback_fn)
 
 
+# pylint: disable-next=too-many-instance-attributes)
 class CallbackWithCustomGrad(AnnotatedFunction):
     """A callback with a custom grad"""
 
