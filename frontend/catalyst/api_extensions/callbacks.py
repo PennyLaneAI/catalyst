@@ -18,6 +18,7 @@ a compiled program. Host callbacks are able to run non-jittable code at runtime
 but require a Python interpreter instance.
 """
 
+from abc import ABC
 import copy
 import ctypes
 import functools
@@ -254,13 +255,16 @@ def pure_callback(callback_fn, result_type=None):
     # Nicer inputs for the implementation.
     # The implementation expects a function
     # to be annotated with the correct result types
-    annotated = AnnotatedFunction(callback_fn, result_type)
+    annotated = AnnotatedFunctionImpl(callback_fn, result_type)
 
     return pure_callback_impl(annotated)
 
 
 ## IMPL ##
-class AnnotatedFunction:
+class AnnotatedFunction(ABC):
+    def getResultTypes(self): ...
+
+class AnnotatedFunctionImpl(AnnotatedFunction):
     """Callable with result_type field."""
 
     def __init__(self, func, result_type):
@@ -287,7 +291,7 @@ def base_callback(func):
     signature = inspect.signature(func)
     result_type = signature.return_annotation
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
-    wrapper = AnnotatedFunction(func, result_type)
+    wrapper = AnnotatedFunctionImpl(func, result_type)
     return base_callback_impl(wrapper, device=None, custom_grad=None)
 
 
@@ -343,11 +347,9 @@ def accelerate_impl(users_func=None, *, dev=None):
             name = users_func.__name__
             msg = f"Function {name} must be jax.jit-able."
             raise ValueError(msg) from e
-        annotated = AnnotatedFunction(jitted_fn, returnshape)
+        annotated = AnnotatedFunctionImpl(jitted_fn, returnshape)
         with_custom_grad = CallbackWithPotentialCustomGrad(annotated, dev)
 
-        fwd = None
-        rev = None
         if GradContext.am_inside_grad():
 
             @with_custom_grad.fwd
@@ -386,6 +388,9 @@ class CallbackWithCustomGrad(AnnotatedFunction):
         self.callback = None
         self.device = device
 
+    def getResultTypes(self):
+        return self.restype
+
     def __call__(self, *args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
@@ -403,11 +408,11 @@ class CallbackWithCustomGrad(AnnotatedFunction):
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-        cotangents = tree_map(shaped_abstractify, self.restype)
+        cotangents = tree_map(shaped_abstractify, self.getResultTypes())
 
         # The forward pass must have the same input types as the original function
         no_dyn_shapes = {"jax_dynamic_shapes": False}
-        with transient_jax_config(no_dyn_shapes) as jc, GradContext(peel=True) as gc:
+        with transient_jax_config(no_dyn_shapes), GradContext(peel=True):
             self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(
                 *absargs, **abskwargs
             )
@@ -416,7 +421,7 @@ class CallbackWithCustomGrad(AnnotatedFunction):
         _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        with transient_jax_config(no_dyn_shapes) as jc, GradContext(peel=True) as gc:
+        with transient_jax_config(no_dyn_shapes), GradContext(peel=True):
             self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
@@ -451,6 +456,7 @@ class CallbackWithPotentialCustomGrad:
         self._bwd = func
 
     def getResultTypes(self):
+        """Get result types"""
         return self.restype
 
     def __call__(self, *args, **kwargs):
