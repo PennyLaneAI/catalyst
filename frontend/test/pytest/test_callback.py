@@ -1392,7 +1392,7 @@ def test_vjp_as_residual(arg, order):
 def test_automatic_differentiation_of_accelerate():
 
 
-    @qml.qjit(keep_intermediate=True)
+    @qml.qjit
     @grad
     @accelerate
     def identity(x : float):
