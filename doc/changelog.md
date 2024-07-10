@@ -2,8 +2,25 @@
 
 <h3>New features</h3>
 
-* Automatic differentiation of `catalyst.accerate`-ed functions.
+* JAX-compatible functions which run on classical accelerators such as GPUs via catalyst.accelerate now support autodifferentiation.
   [(#920)](https://github.com/PennyLaneAI/catalyst/pull/920)
+
+  For example,
+
+  ```python
+  @qjit
+  @grad
+  def f(x):
+    expm = catalyst.accelerate(jax.scipy.linalg.expm)
+    return jnp.sum(expm(jnp.sin(x)) ** 2)
+  ```
+
+  ```pycon
+  >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+  >>> f(x)
+  >>> array([[2.80120452, 1.67518663],
+      [1.61605839, 4.42856163]])
+  ```
 
 <h3>Improvements</h3>
 
