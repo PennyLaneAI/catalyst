@@ -1424,8 +1424,10 @@ def test_vjp_as_residual_automatic(arg, order):
         obs = hypothesis(arg)
     assert np.allclose(obs, exp)
 
+
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 def test_example_from_epic(arg):
+    """Test example from epic"""
 
     @qml.qjit
     @grad

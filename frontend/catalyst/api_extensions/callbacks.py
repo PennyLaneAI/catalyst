@@ -59,7 +59,7 @@ def accelerate(func=None, *, dev=None):
     .. note::
 
         ``catalyst.accelerate`` currently supports
-        differentiation, and can be used inside 
+        differentiation, and can be used inside
         :func:`catalyst.grad` and :func:`catalyst.jacobian` without one having
         to define its gradient.
 
