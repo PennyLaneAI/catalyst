@@ -47,8 +47,17 @@ from catalyst.utils.jnp_to_memref import (
 )
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
-# THIS IS NEEDED TO AVOID AUTOGRAPH CONVERSION
-assigned = list(filter(lambda x: x != "__module__", functools.WRAPPER_ASSIGNMENTS))
+# This is needed to avoid autograph conversion.
+# Autograph uses the __module__ field to decide what to transform and what not
+# to transform. If __module__ is something catalyst related, it won't transform
+# it by default. There are some other ones.
+# However, by using wraps and update_wrapper, __module__ is copied over
+# from the wrapped function to the wrapper. This means that if a user
+# provides a function from their module, here, we wrap some Catalyst
+# functions here and copy over the __module__ field, then autograph
+# will attempt to transform it. To avoid this, we just remove
+# the __module__ string from the original functools.WRAPPER_ASSIGNMENTS.
+WRAPPER_ASSIGNMENTS = list(filter(lambda x: x != "__module__", functools.WRAPPER_ASSIGNMENTS))
 
 
 ## API ##
@@ -281,7 +290,7 @@ class AnnotatedFunctionImpl(AnnotatedFunction):
     def __init__(self, func, result_type):
         self.func = func
         self.result_type = result_type
-        functools.update_wrapper(self, func, assigned=assigned)
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -330,7 +339,7 @@ def accelerate_impl(users_func=None, *, dev=None):
     if is_partial:
         context = tree_leaves(users_func)
 
-    @functools.wraps(users_func, assigned=assigned)
+    @functools.wraps(users_func, assigned=WRAPPER_ASSIGNMENTS)
     def total(context, *args, **kwargs):
         nonlocal users_func
         if is_partial:
@@ -341,11 +350,12 @@ def accelerate_impl(users_func=None, *, dev=None):
             return users_func(*args, **kwargs)
 
     with transient_jax_config({"jax_dynamic_shapes": False}):
-        # jax.jit will wrap total which
+        # jax.jit will wrap total and total wraps the user_function
+        # which means jitted_fn has the user_function's identifier
         jitted_fn = jax.jit(total)
 
     # wraps total which wraps user
-    @functools.wraps(total, assigned=assigned)
+    @functools.wraps(total, assigned=WRAPPER_ASSIGNMENTS)
     def back_to_user(*args, **kwargs):
         absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
@@ -390,7 +400,7 @@ class CallbackWithCustomGrad(AnnotatedFunction):
 
     def __init__(self, func, forward, reverse, device):
         assert func and forward and reverse
-        functools.update_wrapper(self, func, assigned=assigned)
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.func = func
         assert isinstance(func, AnnotatedFunction)
         self.restype = func.getResultTypes()
@@ -493,7 +503,7 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
-    @functools.wraps(func, assigned=assigned)
+    @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
@@ -512,7 +522,7 @@ class FlatCallable:
 
     def __init__(self, func, *params, **kwparams):
         self.func = func
-        functools.update_wrapper(self, func, assigned=assigned)
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
