@@ -3,10 +3,10 @@ import pennylane as qml
 
 def repeat(n):
     agg = []
-    for x in range(n):
+    for i in range(n):
         @jax.jit
         def identity(x):
-            return x
+            return x + i
         agg += [identity]
     return agg
 
@@ -19,4 +19,4 @@ def foo(x : float):
     return new
 
 
-foo.mlir
+print(foo.mlir)
