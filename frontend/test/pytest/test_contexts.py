@@ -77,6 +77,7 @@ class TestGradContextUnitTests:
 
 
 class TestGradContextIntegration:
+    """Test integration with qjit"""
 
     def test_assert_inside_grad(self):
         """Test assertion of grad context with grad"""
