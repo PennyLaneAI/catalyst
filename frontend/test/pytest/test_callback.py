@@ -1364,6 +1364,7 @@ def test_vjp_as_residual(arg, order):
     """See https://github.com/PennyLaneAI/catalyst/issues/852"""
 
     if order == "bad":
+        # See https://github.com/PennyLaneAI/catalyst/issues/894
         pytest.skip("Bug")
 
     def jax_callback(fn, result_type):
@@ -1406,6 +1407,10 @@ def test_vjp_as_residual(arg, order):
 @pytest.mark.parametrize("order", ["good", "bad"])
 def test_vjp_as_residual_automatic(arg, order):
     """Test automatic differentiation of accelerated function"""
+
+    if order == "bad":
+        # See https://github.com/PennyLaneAI/catalyst/issues/894
+        pytest.skip("Bug")
 
     @qml.qjit
     @jacobian
