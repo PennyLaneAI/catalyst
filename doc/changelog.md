@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* JAX-compatible functions which run on classical accelerators such as GPUs via catalyst.accelerate now support autodifferentiation.
+* JAX-compatible functions which run on classical accelerators such as GPUs via `catalyst.accelerate` now support autodifferentiation.
   [(#920)](https://github.com/PennyLaneAI/catalyst/pull/920)
 
   For example,

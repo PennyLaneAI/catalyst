@@ -56,12 +56,6 @@ def accelerate(func=None, *, dev=None):
     """Execute a ``jax.jit`` accelerated function on classical
     accelerators such as GPUs from within a qjit-compiled function.
 
-    .. note::
-
-        ``catalyst.accelerate`` currently supports
-        differentiation, and can be used inside
-        :func:`catalyst.grad` and :func:`catalyst.jacobian` without one having
-        to define its gradient.
 
     Args:
         func (Callable or PjitFunction): The function to be classically
