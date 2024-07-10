@@ -51,6 +51,8 @@ jobs:
     name: Prepare & Upload wheels to TestPyPI
     needs: [linux-x86, linux-aarch, macos-arm, macos-x86]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
 
     steps:
     - name: Download wheels
@@ -72,7 +74,5 @@ jobs:
     # - name: Upload wheels
     #   uses: pypa/gh-action-pypi-publish@release/v1
     #   with:
-    #     user: __token__
-    #     password: ${{ secrets.TEST_PYPI_API_TOKEN }}
     #     repository-url: https://test.pypi.org/legacy/
     #     packages-dir: dist
