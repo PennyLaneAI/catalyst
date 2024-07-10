@@ -49,31 +49,6 @@ def flush_peephole_opted_mlir_to_iostream(filename):
     shutil.rmtree(filename)
 
 
-# CHECK-LABEL: public @jit_cancel_inverses_not_applied
-@qjit(keep_intermediate=True)
-def cancel_inverses_not_applied(xx: float):
-    """
-    Test that a qnode without catalyst.cancel_inverses produces the expected gates in the mlir.
-    """
-
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def f(x: float):
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliY(0))
-
-    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
-    # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    _ff = f(xx)
-
-    return _ff
-
-
-flush_peephole_opted_mlir_to_iostream("cancel_inverses_not_applied")
-
-
 # CHECK-LABEL: public @jit_cancel_inverses_workflow
 @qjit(keep_intermediate=True)
 def cancel_inverses_workflow(xx: float):

@@ -21,6 +21,8 @@ import pytest
 from catalyst import cancel_inverses, qjit
 from catalyst.api_extensions.quantum_passes import QUANTUM_PASSES_TABLE
 
+# pylint: disable=missing-function-docstring
+
 ### Test passes are correctly added to and queried from the quantum pass table ###
 
 ### SETUP ###
@@ -82,19 +84,18 @@ def test_reset_table():
 
 ### Test pass decorators preserve functionality of circuits ###
 def test_cancel_inverses_functionality():
-    dev = qml.device("lightning.qubit", wires=10)
 
     @qjit
     def workflow():
         @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit(x):
+        def f(x):
             qml.RX(x, wires=0)
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=0)
             return qml.probs()
 
-        circuit_opted = cancel_inverses(circuit)
-        return circuit(42.42), circuit_opted(42.42)
+        f_opted = cancel_inverses(f)
+        return f(42.42), f_opted(42.42)
 
     assert np.allclose(workflow()[0], workflow()[1])
 
@@ -119,7 +120,7 @@ def test_cancel_inverses_bad_usages():
 
     def test_cancel_inverses_not_in_qjit():
         @qml.qnode(qml.device("lightning.qubit", wires=10))
-        def circuit():
+        def f():
             qml.Identity(wires=np.arange(10))
             return qml.probs()
 
@@ -127,7 +128,7 @@ def test_cancel_inverses_bad_usages():
             RuntimeError,
             match="catalyst.cancel_inverses can only be used on a qnode inside a qjit context!",
         ):
-            cancel_inverses(circuit)
+            cancel_inverses(f)
 
     test_cancel_inverses_not_in_qjit()
 
