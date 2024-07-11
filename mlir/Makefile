@@ -69,7 +69,8 @@ llvm:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
-		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
+		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY) \
+		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter
@@ -135,7 +136,8 @@ dialects:
 		-DLLVM_USE_SANITIZER=$(USE_SANITIZER_NAMES) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
-		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
+		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
 
