@@ -375,7 +375,7 @@ jobs:
         auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: wheel/
