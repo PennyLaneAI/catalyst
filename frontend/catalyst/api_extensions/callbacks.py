@@ -27,8 +27,15 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
+from jax._src.tree_util import (
+    Partial,
+    tree_flatten,
+    tree_leaves,
+    tree_map,
+    tree_unflatten,
+)
 
+from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
@@ -93,31 +100,17 @@ def accelerate(func=None, *, dev=None):
             y = accelerate(classical_fn)(x) # will be executed on a GPU
             return jnp.cos(y)
     """
-
+    # Setting default parameters
     if dev is None:
         dev = jax.devices()[0]
 
-    if not isinstance(func, Callable):
+    # Just for convenience
+    if func is None:
         kwargs = copy.copy(locals())
         kwargs.pop("func")
         return functools.partial(accelerate, **kwargs)
 
-    jitted_fn = jax.jit(func)
-
-    @functools.wraps(func)
-    def defer(*args, **kwargs):
-        # Make abstract variables from input tracers.
-        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-        try:
-            # Find the shape of the return value
-            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
-        except Exception as e:
-            name = func.__name__
-            msg = f"Function {name} must be jax.jit-able."
-            raise ValueError(msg) from e
-        return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
-
-    return defer
+    return accelerate_impl(func, dev=dev)
 
 
 def pure_callback(callback_fn, result_type=None):
@@ -131,8 +124,9 @@ def pure_callback(callback_fn, result_type=None):
 
     .. note::
 
-        Callbacks do not currently support differentiation, and cannot be used inside
-        functions that :func:`.catalyst.grad` is applied to.
+        Callbacks do not automatically support differentiation. To use them
+        within functions that are being differentiated, please define their
+        vector-Jacobian product (see below for more details).
 
     Args:
         callback_fn (callable): The pure function to be used as a callback.
@@ -149,7 +143,7 @@ def pure_callback(callback_fn, result_type=None):
             * the return type and shape is deterministic and known ahead of time.
         result_type (type): The type returned by the function.
 
-    .. seealso:: :func:`.debug.print`, :func:`.debug.callback`.
+    .. seealso:: :func:`accelerate`, :func:`.debug.print`, :func:`.debug.callback`.
 
     **Example**
 
@@ -199,8 +193,51 @@ def pure_callback(callback_fn, result_type=None):
 
     >>> fn(jnp.array([0.1, 0.2]))
     array([1.97507074+0.j, 0.01493759+0.j])
+
+    .. details::
+        :title: Differentiating callbacks with custom VJP rules
+
+        Pure callbacks must have custom gradients manually
+        registered with the Catalyst compiler in order to support differentiation.
+
+        This can be done via the ``pure_callback.fwd`` and ``pure_callback.bwd`` methods,
+        to specify how the forwards and backwards pass (the vector-Jacobian product)
+        of the callback should be computed:
+
+        .. code-block:: python
+
+            @catalyst.pure_callback
+            def callback_fn(x) -> float:
+                return np.sin(x[0]) * x[1]
+
+            @callback_fn.fwd
+            def callback_fn_fwd(x):
+                # returns the evaluated function as well as residual
+                # values that may be useful for the backwards pass
+                return callback_fn(x), x
+
+            @callback_fn.bwd
+            def callback_fn_vjp(res, dy):
+                # Accepts residuals from the forward pass, as well
+                # as (one or more) cotangent vectors dy, and returns
+                # a tuple of VJPs corresponding to each input parameter.
+
+                def vjp(x, dy) -> (jax.ShapeDtypeStruct((2,), jnp.float64),):
+                    return (np.array([np.cos(x[0]) * dy * x[1], np.sin(x[0]) * dy]),)
+
+                # The VJP function can also be a pure callback
+                return catalyst.pure_callback(vjp)(res, dy)
+
+        >>> @qml.qjit
+        ... @catalyst.grad
+        ... def f(x):
+        ...     y = jnp.array([jnp.cos(x[0]), x[1]])
+        ...     return jnp.sin(callback_fn(y))
+        >>> f(jnp.array([0.1, 0.2]))
+        array([-0.01071923,  0.82698717])
     """
 
+    # Verify inputs
     if result_type is None:
         signature = inspect.signature(callback_fn)
         result_type = signature.return_annotation
@@ -211,17 +248,117 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    return CallbackWithPotentialCustomGrad(callback_fn, result_type)
+    # Nicer inputs for the implementation.
+    # The implementation expects a function
+    # to be annotated with the correct result types
+    annotated = AnnotatedFunction(callback_fn, result_type)
+
+    return pure_callback_impl(annotated)
 
 
 ## IMPL ##
+class AnnotatedFunction:
+    """Callable with result_type field."""
+
+    def __init__(self, func, result_type):
+        self.func = func
+        self.result_type = result_type
+        functools.update_wrapper(self, func)
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    def getResultTypes(self):
+        """Get the result types."""
+        return self.result_type
+
+
+def base_callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+
+    For base callback, the type is found by the annotation of the result.
+    If it is empty or None, then there are no return values.
+    Otherwise, it is whatever it says in the annotations.
+    """
+    signature = inspect.signature(func)
+    result_type = signature.return_annotation
+    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+    wrapper = AnnotatedFunction(func, result_type)
+    return base_callback_impl(wrapper, device=None, custom_grad=None)
+
+
+def accelerate_impl(users_func=None, *, dev=None):
+    """Logic for handling jax.Partial
+    obtaining the result type from a user provided function
+    and creating a jax_jit_callback.
+
+
+    Args:
+        users_func (Callable or PjitFunction): The user provided function
+
+        dev (jax.Device): the classical accelerator device the JIT-compiled
+            function will run on.
+
+    Returns:
+        Callable: a function that when trace, will bind the arguments
+             to a callback primitive. When it is not traced, it will
+             just called the wrapped function.
+    """
+
+    # If this is a partial, we need to make the tracers part of the input
+    is_partial = isinstance(users_func, Partial)
+    context = []
+    if is_partial:
+        context = tree_leaves(users_func)
+
+    @functools.wraps(users_func)
+    def total(context, *args, **kwargs):
+        nonlocal users_func
+        if is_partial:
+            _, shape = tree_flatten(users_func)
+            users_func = tree_unflatten(shape, context)
+            return users_func(*args, **kwargs)
+        else:
+            return users_func(*args, **kwargs)
+
+    with transient_jax_config({"jax_dynamic_shapes": False}):
+        # jax.jit will wrap total which
+        jitted_fn = jax.jit(total)
+
+    # wraps total which wraps user
+    @functools.wraps(total)
+    def back_to_user(*args, **kwargs):
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
+        try:
+            # Find the shape of the return value
+            with transient_jax_config({"jax_dynamic_shapes": False}):
+                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                    absextra, *absargs, **abskwargs
+                )
+        except Exception as e:
+            name = users_func.__name__
+            msg = f"Function {name} must be jax.jit-able."
+            raise ValueError(msg) from e
+        annotated = AnnotatedFunction(jitted_fn, returnshape)
+        return jax_jit_callback(annotated, device=dev)(context, *args, **kwargs)
+
+    return back_to_user
+
+
+def pure_callback_impl(callback_fn: AnnotatedFunction):
+    """Wrapper around CallbackWithPotentialCustomGrad"""
+    return CallbackWithPotentialCustomGrad(callback_fn)
+
+
 class CallbackWithCustomGrad:
     """A callback with a custom grad"""
 
-    def __init__(self, func, restype, forward, reverse):
+    def __init__(self, func, forward, reverse):
+        assert isinstance(func, AnnotatedFunction)
         assert func and forward and reverse
         self.func = func
-        self.restype = restype
+        self.restype = func.getResultTypes()
         self._fwd = forward
         self._fwd_jaxpr = None
         self._bwd = reverse
@@ -232,14 +369,11 @@ class CallbackWithCustomGrad:
         if self.callback:
             return self.callback(*args, **kwargs)
 
-        def closure(*args, **kwargs) -> self.restype:
-            return self.func(*args, **kwargs)
-
         # We need this here to avoid infinite recursion
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = base_callback(closure, custom_grad=self)
+        self.callback = base_callback_impl(self.func, custom_grad=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
@@ -247,13 +381,17 @@ class CallbackWithCustomGrad:
         cotangents = tree_map(shaped_abstractify, self.restype)
 
         # The forward pass must have the same input types as the original function
-        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+        with transient_jax_config({"jax_dynamic_shapes": False}):
+            self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(
+                *absargs, **abskwargs
+            )
 
         # But its output is always going to be two pairs.
         _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+        with transient_jax_config({"jax_dynamic_shapes": False}):
+            self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
 
@@ -264,9 +402,9 @@ class CallbackWithPotentialCustomGrad:
     to have a custom grad if it is never differentiated, but a user
     may register one. A debug.callback will never have a custom grad."""
 
-    def __init__(self, func, restype):
+    def __init__(self, func):
         self.func = func
-        self.restype = restype
+        self.restype = func.getResultTypes()
         self._fwd = None
         self._bwd = None
         self.callback = None
@@ -292,34 +430,21 @@ class CallbackWithPotentialCustomGrad:
             return self.callback(*args, **kwargs)
 
         if self._fwd and self._bwd:
-            self.callback = CallbackWithCustomGrad(self.func, self.restype, self._fwd, self._bwd)
+            self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd)
             return self.callback(*args, **kwargs)
 
-        def closure(*args, **kwargs) -> self.restype:
-            return self.func(*args, **kwargs)
-
-        self.callback = base_callback(closure)
+        self.callback = base_callback_impl(self.func)
         return self.callback(*args, **kwargs)
 
 
-def jax_jit_callback(callback_fn, result_type, device=None):
+def jax_jit_callback(callback_fn: AnnotatedFunction, device=None):
     """Wrapper around base callback that can accept a device as a parameter"""
 
-    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
-
-    def closure(*args, **kwargs) -> result_type:
-        return callback_fn(*args, **kwargs)
-
-    return base_callback(closure, device=device)
+    return base_callback_impl(callback_fn, device=device)
 
 
-## IMPL ##
-def base_callback(func, device=None, custom_grad=None):
-    """Decorator that will correctly pass the signature as arguments to the callback
-    implementation.
-    """
-    signature = inspect.signature(func)
-    retty = signature.return_annotation
+def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
+    """The most general way to obtain a callback"""
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
@@ -330,7 +455,7 @@ def base_callback(func, device=None, custom_grad=None):
             return func(*args, **kwargs)
 
         return callback_implementation(
-            func, retty, *args, device=device, custom_grad=custom_grad, **kwargs
+            func, *args, device=device, custom_grad=custom_grad, **kwargs
         )
 
     return bind_callback
@@ -342,6 +467,7 @@ class FlatCallable:
 
     def __init__(self, func, *params, **kwparams):
         self.func = func
+        functools.update_wrapper(self, func)
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
@@ -368,10 +494,12 @@ class MemrefCallable(FlatCallable):
 
     CACHE = {}
 
-    def __new__(cls, func, results_aval, *_args, **_kwargs):
+    def __new__(cls, func, results_aval, *args, **kwargs):
         # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        flat_params, _ = tree_flatten((absargs, abskwargs))
         flat_results_aval, _ = tree_flatten(results_aval)
-        cache_key = (func, *flat_results_aval)
+        cache_key = (func, *flat_params, *flat_results_aval)
         if cls.CACHE.get(cache_key):
             return cls.CACHE.get(cache_key)
 
@@ -468,7 +596,6 @@ class JaxJitCallable(MemrefCallable):
 
 def callback_implementation(
     cb: Callable[..., Any],
-    result_shape_dtypes: Any,
     *args: Any,
     device=None,
     custom_grad=None,
@@ -484,6 +611,7 @@ def callback_implementation(
 
     flat_args = tree_leaves((args, kwargs))
 
+    result_shape_dtypes = cb.getResultTypes()
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
     if device is None:

@@ -885,12 +885,13 @@ def test_array_in_scalar_out():
     # Array([-0.34893507,  0.49747506], dtype=float64)
 
 
-def test_scalar_in_array_out():
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+def test_scalar_in_array_out(dtype):
     """Test scalar in array out"""
 
     @pure_callback
-    def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float64):
-        return np.array([np.sin(x), np.cos(x)])
+    def some_func(x) -> jax.ShapeDtypeStruct((2,), dtype):
+        return np.array([np.sin(x), np.cos(x)], dtype=dtype)
 
     @some_func.fwd
     def some_func_fwd(x):
@@ -916,6 +917,32 @@ def test_scalar_in_array_out():
     assert np.allclose(result(x), expected(x))
 
     # Array(0.4565774, dtype=float64)
+
+
+def test_scalar_in_array_out_float32_wrong():
+    """Test float32 support in pure callbacks, result in type mismatch"""
+
+    @pure_callback
+    def some_func(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
+        return np.array([np.sin(x), np.cos(x)])
+
+    @some_func.fwd
+    def some_func_fwd(x):
+        return some_func(x), x
+
+    @some_func.bwd
+    def some_func_bws(res, dy):
+        x = res
+        return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
+
+    @qml.qjit
+    @grad
+    def result(x):
+        return jnp.sum(some_func(jnp.sin(x)))
+
+    x = 0.435
+    with pytest.raises(TypeError, match="Callback some_func expected type"):
+        result(x)
 
 
 def test_scalar_in_tuple_scalar_array_out():
@@ -1344,6 +1371,50 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
         return jax.jacobian(A @ B, argnums=[0, 1])(A, B)
 
     assert np.allclose(mul(A, B), mul_jax(A, B))
+
+
+@pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
+@pytest.mark.parametrize("order", ["good", "bad"])
+def test_vjp_as_residual(arg, order):
+    """See https://github.com/PennyLaneAI/catalyst/issues/852"""
+
+    if order == "bad":
+        pytest.skip("Bug")
+
+    def jax_callback(fn, result_type):
+
+        @pure_callback
+        def callback_fn(*args) -> result_type:
+            return fn(*args)
+
+        @callback_fn.fwd
+        def callback_fn_fwd(*args):
+            ans, vjp_func = accelerate(lambda *x: jax.vjp(fn, *x))(*args)
+            return ans, vjp_func
+
+        @callback_fn.bwd
+        def callback_fn_bwd(vjp_func, dy):
+            return accelerate(vjp_func)(dy)
+
+        return callback_fn
+
+    @qml.qjit
+    @jacobian
+    def hypothesis(x):
+        expm = jax_callback(jax.scipy.linalg.expm, jax.ShapeDtypeStruct((2, 2), jnp.float64))
+        return expm(x)
+
+    @jax.jacobian
+    def ground_truth(x):
+        return jax.scipy.linalg.expm(x)
+
+    if order == "bad":
+        obs = hypothesis(arg)
+        exp = ground_truth(arg)
+    else:
+        exp = ground_truth(arg)
+        obs = hypothesis(arg)
+    assert np.allclose(obs, exp)
 
 
 def test_error_incomplete_grad_only_forward():
