@@ -14,17 +14,20 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/IR/MitigationOps.h"
 
+using namespace mlir;
+using namespace catalyst::mitigation;
+
+#include "Mitigation/IR/MitigationEnums.cpp.inc"
 #define GET_OP_CLASSES
 #include "Mitigation/IR/MitigationOps.cpp.inc"
 
-using namespace mlir;
-using namespace catalyst::mitigation;
 
 //===----------------------------------------------------------------------===//
 // SymbolUserOpInterface

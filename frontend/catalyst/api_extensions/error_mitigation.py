@@ -29,9 +29,13 @@ from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import zne_p
 
+from enum import IntEnum
+
+class Folding(IntEnum):
+    GLOBAL = "global"
 
 ## API ##
-def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None):
+def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding=Folding.GLOBAL):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -97,7 +101,7 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapol
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    return ZNE(fn, scale_factors, extrapolate)
+    return ZNE(fn, scale_factors, extrapolate, folding)
 
 
 ## IMPL ##
@@ -118,6 +122,7 @@ class ZNE:
         fn: Callable,
         scale_factors: jnp.ndarray,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
+        folding: Folding
     ):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
@@ -125,6 +130,7 @@ class ZNE:
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.scale_factors = scale_factors
         self.extrapolate = extrapolate
+        self.folding = folding
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
@@ -137,7 +143,7 @@ class ZNE:
         if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
             raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
-        results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
+        results = zne_p.bind(*args_data, self.folding, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
         results = self.extrapolate(float_scale_factors, results[0])
         # Single measurement
