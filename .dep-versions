@@ -1,4 +1,4 @@
 jax=0.4.30
 mhlo=f61ea8f15f36a026a23f7fd1c71d617bcda6468e
 llvm=93ffe1792fd9a985b96fee1105b399b5196a15bc
-enzyme=b53704d21839b1e1e0af54d65471afc11cb6b9ee
+enzyme=v0.0.130
