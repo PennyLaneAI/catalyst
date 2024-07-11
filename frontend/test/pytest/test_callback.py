@@ -43,6 +43,18 @@ def test_callback_no_tracing(arg):
     assert identity(arg) == arg
 
 
+@pytest.mark.parametrize("arg", [1, 2, 3])
+def test_purecallback_no_tracing(arg):
+    """Test that when there's no tracing the behaviour of identity
+    stays the same."""
+
+    @pure_callback
+    def identity(x) -> int:
+        return x
+
+    assert identity(arg) == arg
+
+
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
@@ -1379,6 +1391,7 @@ def test_vjp_as_residual(arg, order):
     """See https://github.com/PennyLaneAI/catalyst/issues/852"""
 
     if order == "bad":
+        # See https://github.com/PennyLaneAI/catalyst/issues/894
         pytest.skip("Bug")
 
     def jax_callback(fn, result_type):
@@ -1415,6 +1428,66 @@ def test_vjp_as_residual(arg, order):
         exp = ground_truth(arg)
         obs = hypothesis(arg)
     assert np.allclose(obs, exp)
+
+
+@pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
+@pytest.mark.parametrize("order", ["good", "bad"])
+def test_vjp_as_residual_automatic(arg, order):
+    """Test automatic differentiation of accelerated function"""
+
+    if order == "bad":
+        # See https://github.com/PennyLaneAI/catalyst/issues/894
+        pytest.skip("Bug")
+
+    @qml.qjit
+    @jacobian
+    def hypothesis(x):
+        return accelerate(jax.scipy.linalg.expm)(x)
+
+    @jax.jacobian
+    def ground_truth(x):
+        return jax.scipy.linalg.expm(x)
+
+    if order == "bad":
+        obs = hypothesis(arg)
+        exp = ground_truth(arg)
+    else:
+        exp = ground_truth(arg)
+        obs = hypothesis(arg)
+    assert np.allclose(obs, exp)
+
+
+@pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
+def test_example_from_epic(arg):
+    """Test example from epic"""
+
+    @qml.qjit
+    @grad
+    def hypothesis(x):
+        expm = accelerate(jax.scipy.linalg.expm)
+        return jnp.sum(expm(jnp.sin(x) ** 2))
+
+    @jax.jit
+    @jax.grad
+    def ground_truth(x):
+        expm = jax.scipy.linalg.expm
+        return jnp.sum(expm(jnp.sin(x) ** 2))
+
+    obs = hypothesis(arg)
+    exp = ground_truth(arg)
+    assert np.allclose(obs, exp)
+
+
+def test_automatic_differentiation_of_accelerate():
+    """Same but easier"""
+
+    @qml.qjit
+    @grad
+    @accelerate
+    def identity(x: float):
+        return x
+
+    assert identity(4.0) == 1.0
 
 
 def test_error_incomplete_grad_only_forward():

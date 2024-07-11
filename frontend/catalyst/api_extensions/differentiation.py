@@ -40,7 +40,7 @@ from catalyst.jax_primitives import (
     vjp_p,
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
-from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 Differentiable = Union[Function, QNode]
@@ -592,64 +592,65 @@ class Grad:
             args: the arguments to the differentiated function
         """
 
-        if EvaluationContext.is_tracing():
-            fn = _ensure_differentiable(self.fn)
+        with GradContext():
+            if EvaluationContext.is_tracing():
+                fn = _ensure_differentiable(self.fn)
 
-            args_data, in_tree = tree_flatten(args)
-            grad_params = _check_grad_params(
-                self.grad_params.method,
-                self.grad_params.scalar_out,
-                self.grad_params.h,
-                self.grad_params.argnum,
-                len(args_data),
-                in_tree,
-                self.grad_params.with_value,
-            )
-            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
-            if self.grad_params.with_value:  # use value_and_grad
-                # It always returns list as required by catalyst control-flows
-                results = value_and_grad_p.bind(
-                    *args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                args_data, in_tree = tree_flatten(args)
+                grad_params = _check_grad_params(
+                    self.grad_params.method,
+                    self.grad_params.scalar_out,
+                    self.grad_params.h,
+                    self.grad_params.argnum,
+                    len(args_data),
+                    in_tree,
+                    self.grad_params.with_value,
                 )
+                jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+                if self.grad_params.with_value:  # use value_and_grad
+                    # It always returns list as required by catalyst control-flows
+                    results = value_and_grad_p.bind(
+                        *args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                    )
 
-                # value_and_grad returns two results: the values and the gradients,
-                # hence we have to split the obtained results
-                vals = results[: len(jaxpr.out_avals)]
-                gradients = results[len(jaxpr.out_avals) :]
+                    # value_and_grad returns two results: the values and the gradients,
+                    # hence we have to split the obtained results
+                    vals = results[: len(jaxpr.out_avals)]
+                    gradients = results[len(jaxpr.out_avals) :]
 
-                vals = tree_unflatten(out_tree, vals)
-                gradients = _unflatten_derivatives(
-                    gradients, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
-                )
-                results = (vals, gradients)
-            else:  # use grad
-                args_argnum = tuple(args[i] for i in grad_params.argnum)
-                _, in_tree = tree_flatten(args_argnum)
+                    vals = tree_unflatten(out_tree, vals)
+                    gradients = _unflatten_derivatives(
+                        gradients, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
+                    )
+                    results = (vals, gradients)
+                else:  # use grad
+                    args_argnum = tuple(args[i] for i in grad_params.argnum)
+                    _, in_tree = tree_flatten(args_argnum)
 
-                # It always returns list as required by catalyst control-flows
-                results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+                    # It always returns list as required by catalyst control-flows
+                    results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
-                # grad returns only the gradients,
-                # so there is no need to split the results.
+                    # grad returns only the gradients,
+                    # so there is no need to split the results.
 
-                results = _unflatten_derivatives(
-                    results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
-                )
-        else:
-            if argnums := self.grad_params.argnum is None:
-                argnums = 0
-            if self.grad_params.scalar_out:
-                if self.grad_params.with_value:
-                    results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
-                else:
-                    results = jax.grad(self.fn, argnums=argnums)(*args)
+                    results = _unflatten_derivatives(
+                        results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
+                    )
             else:
-                assert (
-                    not self.grad_params.with_value
-                ), "value_and_grad cannot be used with a Jacobian"
-                results = jax.jacobian(self.fn, argnums=argnums)(*args)
+                if argnums := self.grad_params.argnum is None:
+                    argnums = 0
+                if self.grad_params.scalar_out:
+                    if self.grad_params.with_value:
+                        results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
+                    else:
+                        results = jax.grad(self.fn, argnums=argnums)(*args)
+                else:
+                    assert (
+                        not self.grad_params.with_value
+                    ), "value_and_grad cannot be used with a Jacobian"
+                    results = jax.jacobian(self.fn, argnums=argnums)(*args)
 
-        return results
+            return results
 
 
 ## PRIVATE ##
