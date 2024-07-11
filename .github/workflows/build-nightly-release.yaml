@@ -26,7 +26,7 @@ jobs:
         git config --global user.name "ringo-but-quantum"
         git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
         git commit -m "bump nightly version"
-        # git push
+        git push
 
   linux-x86:
     name: Build on Linux x86-64
