@@ -10,9 +10,10 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
