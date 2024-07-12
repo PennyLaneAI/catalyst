@@ -66,6 +66,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Josh Izaac,
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
