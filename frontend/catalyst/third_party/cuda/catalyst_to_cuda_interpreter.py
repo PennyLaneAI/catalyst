@@ -73,7 +73,6 @@ from catalyst.jax_primitives import (
     while_p,
     zne_p,
 )
-from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.qfunc import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
