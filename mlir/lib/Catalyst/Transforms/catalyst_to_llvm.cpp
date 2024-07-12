@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <unordered_map>
 #include <iostream>
+#include <unordered_map>
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
@@ -265,8 +265,9 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AssertionOp op, AssertionOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override {
-                                
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         StringRef qirName = "__catalyst__rt__assert_bool";
@@ -296,7 +297,6 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
         return success();
     }
 };
-
 
 // Encodes memref as LLVM struct value:
 //

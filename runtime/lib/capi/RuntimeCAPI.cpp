@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
-#include <cassert>
 
 #include <bitset>
 #include <stdexcept>
@@ -194,10 +194,7 @@ void __catalyst__rt__print_string(char *string)
     std::cout << string << std::endl;
 }
 
-void __catalyst__rt__assert_bool(bool p, char * s)
-{
-    RT_FAIL_IF(!p, s);
-}
+void __catalyst__rt__assert_bool(bool p, char *s) { RT_FAIL_IF(!p, s); }
 
 void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 {

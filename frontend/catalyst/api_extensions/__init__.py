@@ -16,6 +16,7 @@
 This module is a collection of public API extensions for pragramming with Catalyst frontends.
 """
 
+from catalyst.api_extensions.assertion import catalyst_assert
 from catalyst.api_extensions.callbacks import accelerate, pure_callback
 from catalyst.api_extensions.control_flow import (
     Cond,
@@ -42,7 +43,6 @@ from catalyst.api_extensions.quantum_operators import (
     ctrl,
     measure,
 )
-from catalyst.api_extensions.assertion import catalyst_assert
 
 __all__ = (
     "accelerate",

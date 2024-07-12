@@ -14,6 +14,24 @@
 
 // RUN: quantum-opt --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
+//////////////////////////
+// Catalyst AssertionOp //
+//////////////////////////
+
+// CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Test Message")
+// CHECK-DAG: llvm.func @__catalyst__rt__assert_bool(i1, !llvm.ptr)
+
+func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
+    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
+    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr inbounds [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<12 x i8>
+    // CHECK: llvm.call @__catalyst__rt__assert_bool(%arg0, [[char_ptr]])
+    "catalyst.assert"(%arg0) <{error = "Test Message"}> : (i1) -> ()
+    
+    return
+}
+
+// -----
+
 //////////////////////
 // Catalyst PrintOp //
 //////////////////////

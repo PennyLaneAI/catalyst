@@ -2,6 +2,7 @@
 This module provides the catalyst.assert function for runtime assertions
 in Catalyst JIT-compiled functions.
 """
+
 from catalyst.jax_primitives import assert_p
 
 

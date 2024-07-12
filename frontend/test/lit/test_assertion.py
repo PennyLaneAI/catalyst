@@ -16,7 +16,7 @@
 
 import pennylane as qml
 
-from catalyst import measure, qjit, catalyst_assert
+from catalyst import catalyst_assert, measure, qjit
 
 
 @qjit(target="mlir")
@@ -24,7 +24,7 @@ from catalyst import measure, qjit, catalyst_assert
 def circuit(x: float):
     qml.RX(x, wires=0)
     # CHECK: tensor.extract {{%.+}}[] : tensor<i1>
-    # CHECK: "catalyst.assert"({{%.+}}) <{error = "x less than 5.0"}> : (i1) -> ()    
+    # CHECK: "catalyst.assert"({{%.+}}) <{error = "x less than 5.0"}> : (i1) -> ()
     catalyst_assert(x > 5.0, "x less than 5.0")
     m = measure(wires=0)
     return m
