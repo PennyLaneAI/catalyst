@@ -63,16 +63,16 @@ The following table shows the available devices along with supported features:
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, and Tensor Product of Observables
    * - Expectation Value
-     - All observables; Finite-shots supported except for ``Hermitian``
-     - All observables; Finite-shots supported except for ``Hermitian``
+     - All observables; Finite-shots supported
+     - All observables; Finite-shots supported
      - All observables; Finite-shots supported
    * - Variance
-     - All observables; Finite-shots supported except for ``Hermitian``
-     - All observables; Finite-shots supported except for ``Hermitian``
+     - All observables; Finite-shots supported
+     - All observables; Finite-shots supported
      - All observables; Finite-shots supported
    * - Probability
-     - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
-     - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
+     - Only for the computational basis on the supplied qubits; Finite-shots supported
+     - Only for the computational basis on the supplied qubits; Finite-shots supported
      - The computational basis on all active qubits; Finite-shots supported
    * - Sampling
      - Only for the computational basis on the supplied qubits

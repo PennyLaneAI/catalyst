@@ -124,11 +124,13 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hermitian(self, backend):
+    def test_hermitian(self, backend, tol_stochastic):
         """Test expval Hermitian observables with shots."""
+        n_wires = 3
+        n_shots = 10000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=3, shots=10000))
+        @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -136,13 +138,12 @@ class TestExpval:
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qml.expval(qml.Hermitian(A, wires=2))
 
-        with pytest.raises(
-            RuntimeError,
-            match="Hermitian observables with shot measurement are not supported",
-        ):
-            circuit(np.pi / 4, np.pi / 4)
+        expected = circuit(np.pi / 4, np.pi / 4)
+        result = qjit(circuit)(np.pi / 4, np.pi / 4)
+
+        assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_paulix_pauliy(self, backend, tol_stochastic):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
@@ -332,11 +333,13 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hermitian_shots(self, backend):
+    def test_hermitian_shots(self, backend, tol_stochastic):
         """Test var Hermitian observables with shots."""
+        n_wires = 3
+        n_shots = 10000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=3, shots=10000))
+        @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -344,13 +347,12 @@ class TestVar:
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.var(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qml.var(qml.Hermitian(A, wires=2))
 
-        with pytest.raises(
-            RuntimeError,
-            match="Hermitian observables with shot measurement are not supported",
-        ):
-            circuit(np.pi / 4, np.pi / 4)
+        expected = circuit(np.pi / 4, np.pi / 4)
+        result = qjit(circuit)(np.pi / 4, np.pi / 4)
+
+        assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_paulix_pauliy(self, backend, tol_stochastic):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
@@ -473,6 +475,24 @@ class TestProbs:
         expected = circuit(0.432)
         result = qjit(circuit)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
+
+    # TODO: Support probs with observables
+    def test_probs_obs(self, backend):
+        """Test probs with an observable"""
+
+        n_wires = 1
+        n_shots = 10000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+
+        matrix = 1 / np.sqrt(2) * np.array([[1, 1], [1, -1]])
+
+        @qml.qnode(dev)
+        def circuit(theta):
+            qml.RX(theta, wires=[0])
+            return qml.probs(op=qml.Hermitian(matrix, wires=0))
+
+        with pytest.raises(AssertionError):
+            qjit(circuit)(0.432)
 
 
 class TestOtherMeasurements:
