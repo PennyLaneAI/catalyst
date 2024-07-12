@@ -142,7 +142,8 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         /*cconv*/ LLVM::CConv::C);
 
     OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(wrapperFuncOp.addEntryBlock());
+    auto entryBlock = wrapperFuncOp.addEntryBlock(rewriter);
+    rewriter.setInsertionPointToStart(entryBlock);
 
     auto type = op.getFunctionType();
     auto params = type.getParams();
