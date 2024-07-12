@@ -152,8 +152,7 @@ struct BufferizeCallbackCallOp : public OpConversionPattern<CallbackCallOp> {
         }
 
         SmallVector<Type> emptyRets;
-        auto newCallOp =
-            rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
+        rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
         rewriter.replaceOp(callOp, outmemrefs);
         return success();
     }
