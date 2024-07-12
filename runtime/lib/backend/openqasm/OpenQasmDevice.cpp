@@ -16,10 +16,6 @@
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
-std::mutex runner_mu;
-
-std::mutex &getOpenQasmRunnerMutex() { return runner_mu; }
-
 } // namespace Catalyst::Runtime::Device::OpenQasm
 
 namespace Catalyst::Runtime::Device {
@@ -440,9 +436,9 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
 
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
-        size_t idx = 0;
+        size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -483,9 +479,9 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
 
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
-        size_t idx = 0;
+        size_t idx = dev_wires.size();
         for (auto wire : dev_wires) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }

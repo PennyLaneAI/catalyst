@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from textwrap import dedent
+
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, measure, qjit
+from catalyst import api_extensions, cond, measure, qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -27,14 +29,20 @@ class TestCondToJaxpr:
 
     def test_basic_cond_to_jaxpr(self):
         """Check the JAXPR of simple conditional function."""
+        # pylint: disable=line-too-long
 
-        expected = """{ lambda ; a:i64[]. let
-    b:bool[] = eq a 5
-    c:i64[] = cond[
-      branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                     { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-    ] b a a
-  in (c,) }"""
+        expected = dedent(
+            """
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5
+                c:i64[] = cond[
+                  branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                 { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                  nimplicit_outputs=0
+                ] b a a
+              in (c,) }
+            """
+        )
 
         @qjit
         def circuit(n: int):
@@ -50,7 +58,7 @@ class TestCondToJaxpr:
             return out
 
         def asline(text):
-            return " ".join(map(lambda x: x.strip(), str(text).split("\n")))
+            return " ".join(map(lambda x: x.strip(), str(text).split("\n"))).strip()
 
         assert asline(expected) == asline(circuit.jaxpr)
 
@@ -260,7 +268,7 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_type_unification(self, backend):
+    def test_branch_multi_return_type_unification_qnode_1(self, backend):
         """Test that an exception is not raised when the return types of all branches do not match
         but could be unified."""
 
@@ -280,6 +288,50 @@ class TestCond:
                 return measure(wires=0)
 
             return cond_fn()
+
+        assert 0 == circuit()
+
+    def test_branch_multi_return_type_unification_qjit(self):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
+                return True
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype("int")
+            return r
+
+        assert 0 == circuit()
+
+    @pytest.mark.xfail(
+        reason="Inability to apply Jax transformations before the quantum traing is complete"
+    )
+    def test_branch_multi_return_type_unification_qnode_2(self, backend):
+        """Test that unification happens before the results of the cond primitve is available.
+        See the FIXME in the ``CondCallable._call_with_quantum_ctx`` function.
+        """
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
+                return True
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype("int")
+            return r
 
         assert 0 == circuit()
 
@@ -515,6 +567,101 @@ class TestClassicalCompilation:
 
         with pytest.raises(TypeError, match="Conditional 'False'"):
             qjit(arithc1)
+
+
+class TestCondOperatorAccess:
+    """Test suite for accessing the Cond operation in quantum contexts in Catalyst."""
+
+    def test_cond_access_quantum(self, backend):
+        """Test Cond operation access in quantum context."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n):
+            @cond(n > 4)
+            def cond_fn():
+                qml.PauliZ(0)
+                return 1
+
+            @cond_fn.otherwise
+            def else_fn():
+                qml.PauliX(0)
+                return 0
+
+            cond_fn()
+            assert isinstance(cond_fn.operation, api_extensions.control_flow.Cond)
+
+            return qml.probs()
+
+        assert circuit(2)[0] == 0
+        assert circuit(2)[1] == 1
+        assert circuit(5)[0] == 1
+        assert circuit(5)[1] == 0
+
+    def test_cond_access_classical(self):
+        """Test Cond operation access in classical context."""
+
+        @qjit
+        def circuit(x):
+            @cond(x > 4.8)
+            def cond_fn():
+                return x * 16
+
+            @cond_fn.else_if(x > 2.7)
+            def cond_elif():
+                return x * 8
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif2():
+                return x * 4
+
+            @cond_fn.otherwise
+            def cond_else():
+                return x
+
+            cond_fn()
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The cond\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(cond_fn.operation, api_extensions.control_flow.Cond)
+
+            return cond_fn()
+
+        assert circuit(5) == 80
+        assert circuit(3) == 24
+        assert circuit(2) == 8
+        assert circuit(-3) == -3
+
+    def test_cond_access_interpreted(self):
+        """Test Cond operation access in interpreted context."""
+
+        def func(flag: bool):
+            @cond(flag)
+            def branch_t():
+                return 1
+
+            @branch_t.otherwise
+            def branch_f():
+                return 0
+
+            branch_t()
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The cond\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(branch_t.operation, api_extensions.control_flow.Cond)
+
+            return branch_t()
+
+        assert func(True) == 1
+        assert func(False) == 0
 
 
 if __name__ == "__main__":

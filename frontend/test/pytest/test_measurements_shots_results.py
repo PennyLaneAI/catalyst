@@ -140,7 +140,7 @@ class TestExpval:
 
         with pytest.raises(
             RuntimeError,
-            match="Hermitian observables do not support shot measurement",
+            match="Hermitian observables with shot measurement are not supported",
         ):
             circuit(np.pi / 4, np.pi / 4)
 
@@ -348,7 +348,7 @@ class TestVar:
 
         with pytest.raises(
             RuntimeError,
-            match="Hermitian observables do not support shot measurement",
+            match="Hermitian observables with shot measurement are not supported",
         ):
             circuit(np.pi / 4, np.pi / 4)
 
@@ -428,11 +428,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1))
 
-        with pytest.raises(
-            ValueError,
-            match="Can only return the expectation of a single Hamiltonian observable",
-        ):
-            circuit(0.432, 0.123, -0.543)
+        if isinstance(dev, qml.devices.Device):
+            # TODO: only raises with the new API, Kokkos should also raise an error.
+            with pytest.raises(
+                TypeError,
+                match=r"VarianceMP\(Hamiltonian\/Sum\) cannot be computed with samples",
+            ):
+                circuit(0.432, 0.123, -0.543)
 
 
 class TestProbs:
@@ -476,6 +478,17 @@ class TestProbs:
 class TestOtherMeasurements:
     """Test other measurement processes."""
 
+    @pytest.mark.parametrize("meas_fun", (qml.sample, qml.counts))
+    def test_missing_shots_value(self, backend, meas_fun):
+        """Test error for missing shots value."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            return meas_fun(wires=0)
+
+        with pytest.raises(ValueError, match="cannot work with shots=None"):
+            qjit(circuit)
+
     def test_multiple_return_values(self, backend, tol_stochastic):
         """Test multiple return values."""
 
@@ -489,7 +502,6 @@ class TestOtherMeasurements:
                 qml.expval(qml.PauliZ(0)),
                 qml.var(qml.PauliZ(0)),
                 qml.probs(wires=[0, 1]),
-                qml.state(),
             )
 
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10000))
@@ -502,6 +514,7 @@ class TestOtherMeasurements:
 
         # qml.sample
         assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=10000).shape
+        assert result[0].dtype == np.int64
 
         # qml.counts
         for r, e in zip(
@@ -509,6 +522,7 @@ class TestOtherMeasurements:
         ):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
+        assert result[1][0].dtype == np.int64
 
         # qml.expval
         assert np.allclose(
@@ -530,9 +544,6 @@ class TestOtherMeasurements:
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )
-
-        # qml.state
-        assert np.allclose(result[5], expected(x, qml.state()))
 
 
 if __name__ == "__main__":

@@ -189,7 +189,7 @@ With the old device API, you can simply build a QJIT compatible device:
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "CustomDevice", "absolute/path/to/libdummy_device.so"
+            return "CustomDevice", "absolute/path/to/librtd_dummy.so"
 
     @qjit
     @qml.qnode(CustomDevice(wires=1))
@@ -211,7 +211,7 @@ or with the new device API:
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "CustomDevice", "absolute/path/to/libdummy_device.so"
+            return "CustomDevice", "absolute/path/to/librtd_dummy.so"
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -262,7 +262,7 @@ headers and fields are generally required, unless stated otherwise.
         CY = { properties = [ "invertible" ] }
         CZ = { properties = [ "invertible" ] }
         PhaseShift = { properties = [ "controllable", "invertible" ] }
-        ControlledPhaseShift = { properties = [ "controllable", "invertible" ] }
+        ControlledPhaseShift = { properties = [ "invertible" ] }
         RX = { properties = [ "controllable", "invertible" ] }
         RY = { properties = [ "controllable", "invertible" ] }
         RZ = { properties = [ "controllable", "invertible" ] }
@@ -294,7 +294,7 @@ headers and fields are generally required, unless stated otherwise.
         QubitStateVector = {}
         StatePrep = {}
         ControlledQubitUnitary = {}
-        DiagonalQubitUnitary = {}
+        MultiControlledX = {}
         SingleExcitation = {}
         SingleExcitationPlus = {}
         SingleExcitationMinus = {}
@@ -310,7 +310,7 @@ headers and fields are generally required, unless stated otherwise.
         # Gates which should be translated to QubitUnitary
         [operators.gates.matrix]
 
-        MultiControlledX = {}
+        DiagonalQubitUnitary = {}
 
         # Observables supported by the device
         [operators.observables]
@@ -335,7 +335,7 @@ headers and fields are generally required, unless stated otherwise.
         Var = {}
         Probs = {}
         Sample = {}
-        Count = { condition = [ "finiteshots" ] }
+        Counts = { condition = [ "finiteshots" ] }
 
         [compilation]
 

@@ -8,7 +8,10 @@ file(GLOB SRC
     emit_catalyst_pyface.cpp
     cp_global_buffers.cpp
     adjoint_lowering.cpp
+    annotate_function.cpp
     AdjointPatterns.cpp
+    ChainedHadamard.cpp
+    remove_chained_self_inverse.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

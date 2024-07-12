@@ -12,8 +12,9 @@ extend-exclude = '''
 '''
 
 [tool.isort]
+py_version=311
 profile = "black"
-skip = ["frontend/test/conftest.py"]
+skip = ["frontend/test/conftest.py", "frontend/catalyst/test/test_oqc/conftest.py"]
 extend_skip_glob = [
   "mlir/llvm-project/*",
   "mlir/mlir-hlo/*",
@@ -21,19 +22,23 @@ extend_skip_glob = [
   "mlir/build/*",
   "runtime/build/*",
   ".git/*",
-  ".vscode/*"
+  ".vscode/*",
+  "*venv*/*",
+  "_deps/*",
 ]
+known_first_party = ["catalyst"]
+known_third_party = ["diastatic-malt", "jax", "jaxlib", "pennylane"]
 
 [tool.bandit]
 skips = ["B607"]
 
 [build-system]
-requires = ["setuptools>=62", "wheel", "pybind11>=2.7.0", "numpy>=1.22"]
+requires = ["setuptools>=62", "wheel", "pybind11>=2.7.0", "numpy>=1.22,<2"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 cache_dir='/tmp/.pytest_cache'
-testpaths='frontend/tests/pytest'
+testpaths=["frontend/test/pytest", "frontend/test/test_oqc/oqc"]
 
 [tool.coverage.run]
 branch = true

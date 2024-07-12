@@ -1,7 +1,9 @@
-# build dependencies
-pip>=22.3 # Due to a bug in `pip install -e .` vs read-only system-wide site-packages
+# Due to a bug in `pip install -e .` vs read-only system-wide site-packages.
+# Cannot be handled in pyproject.toml since it's too late at that point.
+pip>=22.3
 
-numpy
+# Build dependencies for non-Python components
+numpy<2
 pybind11>=2.8.0
 PyYAML
 
@@ -13,13 +15,14 @@ pylint
 isort
 
 # testing
+flaky
 lit
 pytest
 pytest-xdist
 pytest-cov
+pytest-mock
 nbmake
 
 # optional rt/test dependencies
-pennylane-lightning[kokkos]
-amazon-braket-pennylane-plugin>=1.23.0
-lark
+pennylane-lightning-kokkos
+amazon-braket-pennylane-plugin>1.27.1

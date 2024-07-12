@@ -50,6 +50,7 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
     let summary = "Lower catalyst utility operations to the LLVM dialect.";
 
     let dependentDialects = [
+        "mlir::func::FuncDialect",
         "mlir::LLVM::LLVMDialect",
     ];
 
@@ -128,6 +129,17 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let summary = "Mark GEPOp inbounds.";
 
     let constructor = "catalyst::GEPInboundsPass()";
+}
+
+def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
+    let summary = "Register `__catalyst_inactive_callback` as inactive with Enzyme";
+
+    let dependentDialects = [
+        "mlir::LLVM::LLVMDialect"
+    ];
+
+    let constructor = "catalyst::createRegisterInactiveCallbackPass()";
+
 }
 
 #endif // CATALYST_PASSES

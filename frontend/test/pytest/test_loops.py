@@ -13,13 +13,15 @@
 # limitations under the License.
 """Test suite for loop operations in Catalyst."""
 
+from textwrap import dedent
+
 import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import for_loop, measure, qjit, while_loop
+from catalyst import api_extensions, for_loop, measure, qjit, while_loop
 
-# pylint: disable=no-value-for-parameter
+# pylint: disable=no-value-for-parameter,unused-argument
 
 
 class TestLoopToJaxpr:
@@ -28,16 +30,20 @@ class TestLoopToJaxpr:
     def test_while_loop(self):
         """Check the while loop JAXPR."""
 
-        expected = """\
-{ lambda ; a:f64[]. let
-    b:i64[] c:f64[] = while_loop[
-      body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
-      body_nconsts=0
-      cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
-      cond_nconsts=0
-    ] 0 a
-  in (b, c) }\
-"""
+        expected = dedent(
+            """
+            { lambda ; a:f64[]. let
+                b:i64[] c:f64[] = while_loop[
+                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+                  body_nconsts=0
+                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+                  cond_nconsts=0
+                  nimplicit=0
+                  preserve_dimensions=True
+                ] 0 a
+              in (b, c) }
+            """
+        )
 
         @qjit
         def circuit(x: float):
@@ -47,22 +53,26 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected == str(circuit.jaxpr)
+        assert expected.strip() == str(circuit.jaxpr).strip()
 
     def test_for_loop(self):
         """Check the for loop JAXPR."""
 
-        expected = """\
-{ lambda ; a:f64[] b:i64[]. let
-    c:i64[] d:f64[] = for_loop[
-      apply_reverse_transform=False
-      body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
-          h:i64[] = add f 1
-        in (h, g) }
-      body_nconsts=0
-    ] 0 b 1 0 0 a
-  in (c, d) }\
-"""
+        expected = dedent(
+            """
+            { lambda ; a:f64[] b:i64[]. let
+                c:i64[] d:f64[] = for_loop[
+                  apply_reverse_transform=False
+                  body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
+                      h:i64[] = add f 1
+                    in (h, g) }
+                  body_nconsts=0
+                  nimplicit=0
+                  preserve_dimensions=True
+                ] 0 b 1 0 0 a
+              in (c, d) }
+        """
+        )
 
         @qjit
         def circuit(x: float, n: int):
@@ -72,7 +82,7 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected == str(circuit.jaxpr)
+        assert expected.strip() == str(circuit.jaxpr).strip()
 
 
 class TestWhileLoops:
@@ -227,12 +237,12 @@ class TestWhileLoops:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, m):
             @while_loop(lambda i, _: i < n)
-            def outer(i, sum):
+            def outer(i, accum):
                 @while_loop(lambda j: j < m)
                 def inner(j):
                     return j + 1
 
-                return i + 1, sum + inner(0)
+                return i + 1, accum + inner(0)
 
             return outer(0, 0)[1]
 
@@ -404,12 +414,12 @@ class TestClassicalCompilation:
         @qjit
         def mulc(x: int, n: int):
             @while_loop(lambda i, _: i < x)
-            def loop(i, sum):
+            def loop(i, accum):
                 @while_loop(lambda j: j < n)
                 def loop2(j):
                     return j + 1
 
-                return i + 1, sum + loop2(0)
+                return i + 1, accum + loop2(0)
 
             _, x_times_n = loop(0, 0)
             return x_times_n
@@ -687,6 +697,148 @@ class TestResultStructureInterpreted:
         assert while_loop(lambda _, y: y[0] < 1)(loop)(x, y) == (x, (y[0] + 0,) + y[1:])
         assert while_loop(lambda _, y: y[0] < 2)(loop)(x, y) == (x, (y[0] + 1,) + y[1:])
         assert while_loop(lambda _, y: y[0] < 3)(loop)(x, y) == (x, (y[0] + 2,) + y[1:])
+
+
+class TestForLoopOperatorAccess:
+    """Test suite for accessing the ForLoop operation in quantum contexts in Catalyst."""
+
+    def test_for_loop_access_quantum(self, backend):
+        """Test ForLoop operation access in quantum context."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            @for_loop(0, 4, 1)
+            def body(i, accum):
+                qml.PauliZ(0)
+                return accum + 1
+
+            body(0)
+            assert isinstance(body.operation, api_extensions.control_flow.ForLoop)
+
+            return qml.probs()
+
+        assert circuit()[0] == 1
+        assert circuit()[1] == 0
+
+    def test_for_loop_access_classical(self):
+        """Test ForLoop operation access in classical context."""
+
+        @qjit
+        def circuit(x):
+            @for_loop(0, 10, 1)
+            def body(i, accum):
+                return accum + x
+
+            x_times_10 = body(0)
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The for_loop\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(body.operation, api_extensions.control_flow.ForLoop)
+
+            return x_times_10
+
+        assert circuit(5) == 50
+        assert circuit(3) == 30
+
+    def test_for_loop_access_interpreted(self):
+        """Test ForLoop operation access in interpreted context."""
+
+        def func(n):
+            @for_loop(0, n, 1)
+            def body(i, prod):
+                return prod * 2
+
+            two_to_the_n = body(1)
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The for_loop\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(body.operation, api_extensions.control_flow.ForLoop)
+
+            return two_to_the_n
+
+        assert func(10) == 1024
+        assert func(5) == 32
+        assert func(0) == 1
+
+
+class TestWhileLoopOperatorAccess:
+    """Test suite for accessing the WhileLoop operation in quantum contexts in Catalyst."""
+
+    def test_while_loop_access_quantum(self, backend):
+        """Test WhileLoop operation access in quantum context."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            @while_loop(lambda i: i < 5)
+            def body(i):
+                qml.PauliX(0)
+                return i + 1
+
+            body(0)
+            assert isinstance(body.operation, api_extensions.control_flow.WhileLoop)
+
+            return qml.probs()
+
+        assert circuit()[0] == 0
+        assert circuit()[1] == 1
+
+    def test_while_loop_access_classical(self):
+        """Test WhileLoop operation access in classical context."""
+
+        @qjit
+        def circuit(x):
+            @while_loop(lambda i, _: i < 10)
+            def body(i, accum):
+                return i + 1, accum + x
+
+            _, x_times_10 = body(0, 0)
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The while_loop\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(body.operation, api_extensions.control_flow.WhileLoop)
+
+            return x_times_10
+
+        assert circuit(5) == 50
+        assert circuit(3) == 30
+
+    def test_while_loop_access_interpreted(self):
+        """Test WhileLoop operation access in interpreted context."""
+
+        def func(n):
+            @while_loop(lambda i, _: i < n)
+            def body(i, prod):
+                return i + 1, prod * 2
+
+            _, two_to_the_n = body(0, 1)
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The while_loop\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(body.operation, api_extensions.control_flow.WhileLoop)
+
+            return two_to_the_n
+
+        assert func(10) == 1024
+        assert func(5) == 32
+        assert func(0) == 1
 
 
 if __name__ == "__main__":

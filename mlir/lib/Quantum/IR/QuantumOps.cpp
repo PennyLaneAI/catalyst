@@ -121,10 +121,10 @@ LogicalResult InsertOp::verify()
     return success();
 }
 
-static LogicalResult verifyObservable(Value obs, size_t *numQubits)
+static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubits)
 {
     if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
-        *numQubits = compOp.getQubits().size();
+        numQubits = compOp.getQubits().size();
         return success();
     }
     else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
@@ -182,8 +182,8 @@ LogicalResult HermitianOp::verify()
 
 LogicalResult SampleOp::verify()
 {
-    size_t numQubits;
-    if (failed(verifyObservable(getObs(), &numQubits))) {
+    std::optional<size_t> numQubits = 0;
+    if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
 
@@ -193,7 +193,7 @@ LogicalResult SampleOp::verify()
 
     Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (getObs().getDefiningOp<ComputationalBasisOp>() &&
-        failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
+        failed(verifyTensorResult(toVerify, getShots(), numQubits.value()))) {
         // In the computational basis, Pennylane adds a second dimension for the number of qubits.
         return emitOpError("return tensor must have 2D static shape equal to "
                            "(number of shots, number of qubits in observable)");
@@ -209,8 +209,8 @@ LogicalResult SampleOp::verify()
 
 LogicalResult CountsOp::verify()
 {
-    size_t numQubits = 0;
-    if (failed(verifyObservable(getObs(), &numQubits))) {
+    std::optional<size_t> numQubits = 0;
+    if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
 
@@ -221,7 +221,7 @@ LogicalResult CountsOp::verify()
     }
     else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
-        numEigvals = std::pow(2, numQubits);
+        numEigvals = std::pow(2, numQubits.value());
     }
     else {
         return emitOpError("cannot determine the number of eigenvalues for general observable");
@@ -248,12 +248,12 @@ LogicalResult CountsOp::verify()
 
 LogicalResult ProbsOp::verify()
 {
-    size_t numQubits = 0;
-    if (failed(verifyObservable(getObs(), &numQubits))) {
+    std::optional<size_t> numQubits;
+    if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
 
-    if (!numQubits) {
+    if (!numQubits.has_value()) {
         return emitOpError("only computational basis observables are supported");
     }
 
@@ -263,7 +263,7 @@ LogicalResult ProbsOp::verify()
 
     Type toVerify =
         getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
-    size_t dim = std::pow(2, numQubits);
+    size_t dim = std::pow(2, numQubits.value());
     if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
@@ -273,12 +273,12 @@ LogicalResult ProbsOp::verify()
 
 LogicalResult StateOp::verify()
 {
-    size_t numQubits = 0;
-    if (failed(verifyObservable(getObs(), &numQubits))) {
+    std::optional<size_t> numQubits;
+    if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
 
-    if (!numQubits) {
+    if (!numQubits.has_value()) {
         return emitOpError("only computational basis observables are supported");
     }
 
@@ -287,7 +287,7 @@ LogicalResult StateOp::verify()
     }
 
     Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
-    size_t dim = std::pow(2, numQubits);
+    size_t dim = std::pow(2, numQubits.value());
     if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }

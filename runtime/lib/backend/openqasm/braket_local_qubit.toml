@@ -4,6 +4,7 @@ schema = 2
 # the device considers "supported" through PennyLane's device API.
 [operators.gates.native]
 
+PRx = { }
 ISWAP = { }
 PSWAP = { }
 Hadamard = { }
@@ -58,7 +59,7 @@ Hadamard = {}
 Hermitian = {}
 # Tensor,
 Projector = {}
-Sprod = {}
+SProd = {}
 Hamiltonian = { condition = [ "analytic" ] }
 Sum = {}
 Prod = {}
@@ -70,7 +71,7 @@ Var = {}
 Probs = {}
 State = { condition = [ "analytic" ] }
 Sample = { condition = [ "finiteshots" ] }
-Count = { condition = [ "finiteshots" ] }
+Counts = { condition = [ "finiteshots" ] }
 
 [compilation]
 # If the device is compatible with qjit

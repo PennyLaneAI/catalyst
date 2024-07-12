@@ -71,4 +71,21 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let constructor = "catalyst::createAdjointLoweringPass()";
 }
 
+def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
+    let summary = "Perform removal of chained operations that are self inverses.";
+
+    let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+}
+
+def AnnotateFunctionPass : Pass<"annotate-function"> {
+    let summary = "Annotate functions that contain a measurement operation.";
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "func::FuncDialect"
+    ];
+
+    let constructor = "catalyst::createAnnotateFunctionPass()";
+}
+
 #endif // QUANTUM_PASSES

@@ -16,37 +16,35 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 
 
 class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
     @pytest.mark.parametrize(
-        ("arg", "expected"),
+        ("arg"),
         [
-            (True, "1\n"),  # TODO: True/False would be nice
-            (3, "3\n"),
-            (3.5, "3.5\n"),
-            (3 + 4j, "(3,4)\n"),
-            (np.array(3), "3\n"),
-            (jnp.array(3), "3\n"),
-            (jnp.array(3.000001), "3\n"),  # TODO: show more precision
-            (jnp.array(3.1 + 4j), "(3.1,4)\n"),
-            (jnp.array([3]), "[3]\n"),
-            (jnp.array([3, 4, 5]), "[3,  4,  5]\n"),
-            (
-                jnp.array([[3, 4], [5, 6], [7, 8]]),
-                "[[3,   4], \n [5,   6], \n [7,   8]]\n",
-            ),
+            True,
+            3,
+            3.5,
+            3 + 4j,
+            np.array(3),
+            jnp.array(3),
+            jnp.array(3.000001),
+            jnp.array(3.1 + 4j),
+            jnp.array([3]),
+            jnp.array([3, 4, 5]),
+            jnp.array([[3, 4], [5, 6], [7, 8]]),
         ],
     )
-    def test_function_arguments(self, capfd, arg, expected):
+    def test_function_arguments(self, capfd, arg):
         """Test printing of arbitrary JAX tracer values."""
 
         @qjit
@@ -61,14 +59,15 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert expected == out
+        expected = str(arg)
+        assert expected == out.strip()
 
     def test_optional_descriptor(self, capfd):
         """Test the optional memref descriptor functionality."""
 
         @qjit
         def test(x):
-            debug.print(x, memref=True)
+            debug.print_memref(x)
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -87,6 +86,17 @@ class TestDebugPrint:
         out, err = capfd.readouterr()
         assert err == ""
         assert regex.match(out)
+
+    def test_bad_argument(self):
+        """Test bad argument."""
+
+        @qjit
+        def test(_x):
+            debug.print_memref("foo")
+
+        msg = "Arguments to print_memref must be of type jax.core.Tracer"
+        with pytest.raises(TypeError, match=msg):
+            test(3.14)
 
     @pytest.mark.parametrize(
         ("arg", "expected"),
@@ -117,6 +127,7 @@ class TestDebugPrint:
         assert err == ""
         assert expected == out
 
+    @register_pytree_node_class
     class MyObject:
         def __init__(self, string):
             self.string = string
@@ -124,11 +135,20 @@ class TestDebugPrint:
         def __str__(self):
             return f"MyObject({self.string})"
 
-    @pytest.mark.parametrize(
-        ("arg", "expected"), [(3, "3\n"), ("hi", "hi\n"), (MyObject("hello"), "MyObject(hello)\n")]
-    )
-    def test_compile_time_values(self, capfd, arg, expected):
+        def tree_flatten(self):
+            """tree flatten"""
+            return ([], [self.string])
+
+        @classmethod
+        def tree_unflatten(cls, aux_data, _children):
+            """unflatten"""
+            return cls(*aux_data)
+
+    @pytest.mark.parametrize(("arg"), [3, "hi", MyObject("hello")])
+    def test_compile_time_values(self, capfd, arg):
         """Test printing of arbitrary Python objects, including strings."""
+
+        expected = str(arg)
 
         @qjit
         def test():
@@ -142,7 +162,7 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert out == expected
+        assert out.strip() == expected
 
     @pytest.mark.parametrize(
         ("arg", "expected"),
@@ -188,6 +208,18 @@ class TestDebugPrint:
         assert err == ""
         assert out == "hello\ngoodbye\n"
 
+    def test_fstring_print(self, capsys):
+        """Test fstring like function."""
+
+        @qjit
+        def cir(a, b, c):
+            debug.print("{c} {b} {a}", a=a, b=b, c=c)
+
+        cir(1, 2, 3)
+        out, err = capsys.readouterr()
+        expected = "3 2 1"
+        assert expected == out.strip()
+
 
 class TestPrintStage:
     """Test that compilation pipeline results can be printed."""
@@ -201,7 +233,7 @@ class TestPrintStage:
 
         print_compilation_stage(func, "HLOLoweringPass")
 
-        out, err = capsys.readouterr()
+        out, _ = capsys.readouterr()
         assert "@jit_func() -> tensor<i64>" in out
         assert "stablehlo.constant" not in out
 

@@ -82,6 +82,7 @@ mhlo:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
@@ -118,8 +119,8 @@ dialects:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
-		-DPython3_EXECUTABLE=$$(which $(PYTHON)) \
-		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
@@ -143,10 +144,24 @@ test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean
-clean:
-	@echo "clean build files"
-	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR) $(ENZYME_BUILD_DIR)
+.PHONY: clean clean-dialects clean-enzyme clean-mhlo
+clean: clean-dialects clean-llvm clean-mhlo clean-enzyme
+
+clean-dialects:
+	@echo "clean catalyst dialect build files"
+	rm -rf $(DIALECTS_BUILD_DIR)
+
+clean-llvm:
+	@echo "clean llvm/mlir build files"
+	rm -rf $(LLVM_BUILD_DIR)
+
+clean-mhlo:
+	@echo "clean HLO dialect build files"
+	rm -rf $(MHLO_BUILD_DIR)
+
+clean-enzyme:
+	@echo "clean enzyme build files"
+	rm -rf $(ENZYME_BUILD_DIR)
 
 .PHONY: format
 format:
