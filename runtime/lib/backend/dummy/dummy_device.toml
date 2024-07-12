@@ -111,6 +111,9 @@ dynamic_qubit_management = false
 # in a single execution
 non_commuting_observables = true
 
+# whether the device can natively support measuring a sum of observables
+sum_observables = true
+
 [options]
 
 option1 = "_option1"

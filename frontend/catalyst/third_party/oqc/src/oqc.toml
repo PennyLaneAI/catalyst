@@ -67,3 +67,6 @@ dynamic_qubit_management = false
 # whether the device can support non-commuting measurements together 
 # in a single execution
 non_commuting_observables = false
+
+# whether the device can natively support measuring a sum of observables
+sum_observables = false
