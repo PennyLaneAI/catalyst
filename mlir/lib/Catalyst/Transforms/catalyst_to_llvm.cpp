@@ -266,7 +266,6 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
     LogicalResult matchAndRewrite(AssertionOp op, AssertionOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         StringRef qirName = "__catalyst__rt__assert_bool";
