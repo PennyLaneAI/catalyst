@@ -81,7 +81,7 @@ bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
 bool functionHasReturns(LLVM::LLVMFuncOp op)
 {
     auto functionType = op.getFunctionType();
-    return !functionType.getReturnType().isa<LLVM::LLVMVoidType>();
+    return !mlir::isa<LLVM::LLVMVoidType>(functionType.getReturnType());
 }
 
 bool functionHasInputs(LLVM::LLVMFuncOp op)
