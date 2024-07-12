@@ -468,11 +468,15 @@ class QJITDeviceNewAPI(qml.devices.Device):
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
 
+        supports_sum_observables = any(
+            [obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")]
+        )
+
         # measurement transforms (these may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition)
         if self.qjit_capabilities.non_commuting_observables_flag is False:
             program.add_transform(split_non_commuting)
-        elif self.qjit_capabilities.sum_observables_flag is False:
+        elif not supports_sum_observables:
             program.add_transform(split_to_single_terms)
 
         if self.measurement_processes == {"Counts"}:

@@ -342,18 +342,19 @@ class TestPreprocess:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        # dummy device supports non_commuting observables by default
         dev = DummyDevice(wires=4, shots=1000)
         dev_capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert dev_capabilities.sum_observables_flag is True
+        assert "Sum" in dev_capabilities.native_obs
+        assert "Hamiltonian" in dev_capabilities.native_obs
         assert dev_capabilities.non_commuting_observables_flag is True
         backend_info = extract_backend_info(dev, dev_capabilities)
         qjit_dev1 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
-        dev_capabilities = replace(dev_capabilities, sum_observables_flag=False)
+        del dev_capabilities.native_obs["Sum"]
+        del dev_capabilities.native_obs["Hamiltonian"]
         backend_info = extract_backend_info(dev, dev_capabilities)
         qjit_dev2 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
@@ -378,7 +379,7 @@ class TestPreprocess:
         assert split_non_commuting not in transform_program1
 
         assert split_to_single_terms in transform_program2
-        assert split_non_commuting not in transform_program1
+        assert split_non_commuting not in transform_program2
 
         assert split_non_commuting in transform_program3
         assert split_to_single_terms not in transform_program3
@@ -446,7 +447,7 @@ class TestPreprocess:
         # split_non_commuting instead of split_to_single_terms
         assert config["compilation"]["non_commuting_observables"] is True
         # make sure the testing device does in fact support sum observables
-        assert config["compilation"]["sum_observables"] is True
+        assert "Sum" in config["operators"]["observables"]
 
         # test case where transform should not be applied
         jitted_circuit = qml.qjit(unjitted_circuit)
@@ -457,7 +458,8 @@ class TestPreprocess:
         assert split_to_single_terms not in transform_program
 
         # mock TOML file output to indicate non-commuting observables are NOT supported
-        config["compilation"]["sum_observables"] = False
+        del config["operators"]["observables"]["Sum"]
+        del config["operators"]["observables"]["Hamiltonian"]
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
             jitted_circuit = qml.qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
