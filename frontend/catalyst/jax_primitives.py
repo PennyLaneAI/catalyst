@@ -79,6 +79,11 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+from mlir_quantum.dialects._transform_ops_gen import (
+    NamedSequenceOp, 
+    ApplyRegisteredPassOp
+)
+from mlir_quantum.dialects._transform_ops_gen import YieldOp as TransformYieldOp
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -245,7 +250,9 @@ python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
 value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
-
+apply_registered_pass_p = core.Primitive("apply_registered_pass")
+transform_named_sequence_p = core.Primitive("transform_named_sequence")
+transform_named_sequence_p.multiple_results = True
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
     assert len(jaxpr.consts) == 0, (
@@ -364,6 +371,121 @@ def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
     return PrintOp(val=val, const_val=None, print_descriptor=memref).results
+
+
+#
+# transform dialect lowering
+#
+
+# Note: we currently only support peephole passes on function ops 
+
+transform_func_type = ir.OpaqueType.get("transform", "op<\"func.func\">", ir.Context())
+
+#
+# ???
+#
+class AbstractTransformFunc(AbstractValue):
+    """Abstract transform func type."""
+
+    hash_value = hash("AbstractTransformFunc")
+
+    def __eq__(self, other):
+        return isinstance(other, AbstractTransformFunc)
+
+    def __hash__(self):
+        return self.hash_value
+
+
+class ConcreteTransformFunc(AbstractTransformFunc):
+    """Concrete transform func type."""
+
+
+def _transform_func_lowering(aval):
+    assert isinstance(aval, AbstractTransformFunc)
+    return (transform_func_type,)
+
+core.raise_to_shaped_mappings[AbstractTransformFunc] = lambda aval, _: aval
+mlir.ir_type_handlers[AbstractTransformFunc] = _transform_func_lowering
+
+#
+# transform_named_sequence
+#
+@transform_named_sequence_p.def_abstract_eval
+def _transform_named_sequence_p_abstract_eval(*args):
+    return ()
+
+
+@transform_named_sequence_p.def_impl
+def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
+    functype = ir.FunctionType.get(inputs=[transform_func_type], results=[])
+    functype_attr = ir.TypeAttr.get(functype)
+
+    # add the transform.with_named_sequence unit attr to the parent module
+    module = jax_ctx.module_context.module
+    with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
+    module.operation.attributes["transform.with_named_sequence"] = with_named_sequence_attr
+
+    # Insert the transform.named_sequence op into the module to be transformed
+    with ir.InsertionPoint(module.body):
+        named_sequence_op = NamedSequenceOp(sym_name="__transform_main",
+        function_type=functype_attr, 
+        )
+
+        # transform.named_sequence op is the "main function" of the transform dialect
+        # and thus needs an entry block
+        # The argument of the block is the target function to run the transform sequence on
+        bb = ir.Block.create_at_start(named_sequence_op.body, 
+        arg_types = [transform_func_type])
+
+        # The transform.named_sequence needs a terminator called "transform.yield"
+        with ir.InsertionPoint(bb):
+            transform_yield_op = TransformYieldOp(operands_=[])
+
+    return named_sequence_op.results
+
+
+#
+# apply_registered_pass
+#
+@apply_registered_pass_p.def_abstract_eval
+def _apply_registered_pass_abstract_eval(*args, pass_name, options=None):
+    return AbstractTransformFunc()
+
+@apply_registered_pass_p.def_impl
+def _apply_registered_pass_def_impl(*args, pass_name, options=None):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _apply_registered_pass_lowering(jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None):
+    module = jax_ctx.module_context.module
+    named_sequence_op = None
+    for i in range(len(module.body.operations)):
+        if module.body.operations[i].operation.name == "transform.named_sequence":
+            named_sequence_op = module.body.operations[i].operation
+    if named_sequence_op is None:
+        raise RuntimeError("transform.apply_registered_pass must be placed in a transform.named_sequence!")
+
+    functype = ir.FunctionType.get(inputs=[transform_func_type], results=[transform_func_type])
+    functype_attr = ir.TypeAttr.get(functype)
+
+    # Insert right before the yield op
+    # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
+    ip = named_sequence_op.regions[0].blocks[0]
+    with ir.InsertionPoint(ip.operations[len(ip.operations)-1]):
+        apply_registered_pass_op = ApplyRegisteredPassOp(
+        result=transform_func_type, 
+        target=ip.arguments[0], # TODO: chain multiple passes, i.e. use one pass' result as the next one's target
+        pass_name=pass_name, 
+        options=options)
+
+    return apply_registered_pass_op.results
+
+
+
 
 
 #
@@ -1935,6 +2057,8 @@ mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
+mlir.register_lowering(apply_registered_pass_p, _apply_registered_pass_lowering)
+mlir.register_lowering(transform_named_sequence_p, _transform_named_sequence_lowering)
 
 
 def _scalar_abstractify(t):
