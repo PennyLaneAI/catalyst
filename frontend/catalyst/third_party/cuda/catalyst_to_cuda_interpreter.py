@@ -39,6 +39,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
+import catalyst
 from catalyst.device import BackendInfo
 from catalyst.jax_primitives import (
     AbstractObs,
@@ -820,13 +821,13 @@ class QJIT_CUDAQ(catalyst.QJIT):
             (QFunc, "extract_backend_info", cudaq_backend_info),
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            jaxpr, treedef, dynamic_sig = super().capture(args)
+            jaxpr, out_type, treedef, dynamic_sig = super().capture(args)
 
         # required because the CUDAQ interpretor requires host removed
         jaxpr = remove_host_context(jaxpr)
         jaxpr = jax._src.core.ClosedJaxpr(jaxpr, jaxpr.constvars)
 
-        return jaxpr, treedef, dynamic_sig
+        return jaxpr, out_type, treedef, dynamic_sig
 
     def jit_compile(self, args):
         # JIT compile needs to be overridden from the base class, for a couple of reasons:
@@ -841,7 +842,7 @@ class QJIT_CUDAQ(catalyst.QJIT):
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
-            self.jaxpr, self.out_treedef, self.c_sig = self.capture(args)
+            self.jaxpr, _, self.out_treedef, self.c_sig = self.capture(args)
 
         # Not entirely sure how to determine if 'type promotion' is needed, or if the default
         # type promotion value should be True or False.

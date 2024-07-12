@@ -16,12 +16,14 @@ This module contains a CudaQDevice and the qjit
 entry point.
 """
 
+import copy
+
 from importlib.metadata import version
 from pathlib import Path
 
 import pennylane as qml
 
-from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
+from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
 from catalyst.jit import CompileOptions
 
 def _check_version_compatibility():
@@ -93,39 +95,14 @@ def cudaqjit(fn=None, *, autograph=False, static_argnums=None):
     statistics (such as probabilities and variance) are not yet supported.
     """
     _check_version_compatibility()
-    argnums = static_argnums
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
 
     if fn is not None:
-        return QJIT_CUDAQ(
-            fn,
-            CompileOptions(
-                False,
-                None,
-                "binary",
-                False,
-                None,
-                autograph,
-                False,
-                static_argnums=argnums,
-                abstracted_axes=None,
-            ),
-        )
+        return QJIT_CUDAQ(fn, CompileOptions(**kwargs))
 
     def wrap_fn(fn):
-        return QJIT_CUDAQ(
-            fn,
-            CompileOptions(
-                False,
-                None,
-                "binary",
-                False,
-                None,
-                autograph,
-                False,
-                static_argnums=argnums,
-                abstracted_axes=None,
-            ),
-        )
+        return QJIT_CUDAQ(fn, CompileOptions(**kwargs))
 
     return wrap_fn
 

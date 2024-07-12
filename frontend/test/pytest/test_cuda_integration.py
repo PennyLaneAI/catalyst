@@ -50,7 +50,7 @@ class TestCudaQ:
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit_foo():
             return qml.state()
@@ -62,7 +62,7 @@ class TestCudaQ:
         """Test the measurement code is added."""
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
-            @catalyst.cuda.cudaqjit
+            @catalyst.third_party.cuda.cudaqjit
             @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
@@ -73,7 +73,7 @@ class TestCudaQ:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
@@ -493,7 +493,7 @@ class TestCudaQ:
             qml.RX(y[0], wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit1 = catalyst.third_party.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
         spy = mocker.spy(circuit1, "capture")
 
@@ -518,7 +518,7 @@ class TestCudaQ:
             qml.RX(y, wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit1 = catalyst.third_party.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
 
         x, y = 0.1, 0.2
@@ -545,10 +545,10 @@ class TestCudaQ:
             qml.RX(y, wires=[0])
             return qml.state()
 
-        circuit1 = catalyst.cuda.cudaqjit(circuit, autograph=True)
+        circuit1 = catalyst.third_party.cuda.cudaqjit(circuit, autograph=True)
         assert "for_loop" in str(circuit1.jaxpr)
 
-        circuit2 = catalyst.cuda.cudaqjit(circuit, autograph=False)
+        circuit2 = catalyst.third_party.cuda.cudaqjit(circuit, autograph=False)
         assert "for_loop" not in str(circuit2.jaxpr)
 
     @pytest.mark.skip(reason="kwargs currently not supported")
@@ -562,7 +562,7 @@ class TestCudaQ:
             qml.RX(y, wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit1 = catalyst.third_party.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
 
         # test using default values
