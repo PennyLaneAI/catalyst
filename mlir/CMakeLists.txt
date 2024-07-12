@@ -32,12 +32,12 @@ endif()
 set(ALL_MHLO_PASSES
   ChloPasses
   MhloPasses
+  StablehloPasses
   MhloToArithmeticConversion
   MhloToMemrefConversion
   MhloToStandard
   HloToLinalgUtils
   MhloToLinalg
-  MhloShapeOpsToStandard
   MhloToStablehlo
   StablehloToMhlo
 )
