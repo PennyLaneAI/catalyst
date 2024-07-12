@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
-from pennylane.transforms import split_non_commuting
+from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -469,9 +469,12 @@ class QJITDeviceNewAPI(qml.devices.Device):
         program = TransformProgram()
 
         # measurement transforms (these may change operations on the tape to accommodate
-        # measurement transformations, so must occur before decomposition of measurements)
+        # measurement transformations, so must occur before decomposition)
         if self.qjit_capabilities.non_commuting_observables_flag is False:
             program.add_transform(split_non_commuting)
+        elif self.qjit_capabilities.supports_sum_observables_flag is False:
+            program.add_transform(split_to_single_terms)
+
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
 
