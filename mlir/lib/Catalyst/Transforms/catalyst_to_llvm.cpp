@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
 #include <unordered_map>
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
