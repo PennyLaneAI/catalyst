@@ -469,7 +469,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         program = TransformProgram()
 
         supports_sum_observables = any(
-            [obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")]
+            obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
         )
 
         # measurement transforms (these may change operations on the tape to accommodate
