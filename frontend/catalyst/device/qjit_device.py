@@ -472,7 +472,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # measurement transformations, so must occur before decomposition)
         if self.qjit_capabilities.non_commuting_observables_flag is False:
             program.add_transform(split_non_commuting)
-        elif self.qjit_capabilities.supports_sum_observables_flag is False:
+        elif self.qjit_capabilities.sum_observables_flag is False:
             program.add_transform(split_to_single_terms)
 
         if self.measurement_processes == {"Counts"}:

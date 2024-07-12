@@ -338,14 +338,13 @@ class TestPreprocess:
         assert "counts" in mlir
 
     def test_measurements_are_split(self, mocker):
-        """Test that the split_to_single_terms or split_non_commuting transform 
+        """Test that the split_to_single_terms or split_non_commuting transform
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
         # dummy device supports non_commuting observables by default
         dev = DummyDevice(wires=4, shots=1000)
         dev_capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
-
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         assert dev_capabilities.sum_observables_flag is True
@@ -370,10 +369,10 @@ class TestPreprocess:
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program1, _ = qjit_dev1.preprocess(ctx) # no splitting
-            transform_program2, _ = qjit_dev2.preprocess(ctx) # split_to_single_terms
-            transform_program3, _ = qjit_dev3.preprocess(ctx) # split_non_commuting
-            transform_program4, _ = qjit_dev4.preprocess(ctx) # split_non_commuting
+            transform_program1, _ = qjit_dev1.preprocess(ctx)  # no splitting
+            transform_program2, _ = qjit_dev2.preprocess(ctx)  # split_to_single_terms
+            transform_program3, _ = qjit_dev3.preprocess(ctx)  # split_non_commuting
+            transform_program4, _ = qjit_dev4.preprocess(ctx)  # split_non_commuting
 
         assert split_to_single_terms not in transform_program1
         assert split_non_commuting not in transform_program1
@@ -443,7 +442,7 @@ class TestPreprocess:
         config = get_device_toml_config(dev)
         spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
 
-        # make sure non_commuting_observables_flag is True - otherwise we use 
+        # make sure non_commuting_observables_flag is True - otherwise we use
         # split_non_commuting instead of split_to_single_terms
         assert config["compilation"]["non_commuting_observables"] is True
         # make sure the testing device does in fact support sum observables
@@ -466,8 +465,6 @@ class TestPreprocess:
 
         transform_program, _ = spy.spy_return
         assert split_to_single_terms in transform_program
-
-
 
 
 # tapes and regions for generating HybridOps
