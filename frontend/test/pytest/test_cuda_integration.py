@@ -238,7 +238,6 @@ class TestCudaQ:
         observed = cuda_compiled(jax.numpy.array([3.14, 0.0]))
         assert_allclose(expected, observed)
 
-    @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point(self):
         """Test the entry point for SoftwareQQPP"""
 
@@ -258,7 +257,6 @@ class TestCudaQ:
         observed = cuda_compiled(3.14)
         assert_allclose(expected["a"], observed["a"])
 
-    @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point_compiler(self):
         """Test the entry point for cudaq.qjit"""
 
