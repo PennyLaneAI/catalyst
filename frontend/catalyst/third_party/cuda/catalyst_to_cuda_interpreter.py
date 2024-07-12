@@ -94,7 +94,7 @@ from .primitives import (
 
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
-# pylint: disable=protected-access
+# pylint: disable=protected-access,access-member-before-definition,attribute-defined-outside-init
 
 
 def remove_host_context(jaxpr):
@@ -803,9 +803,11 @@ class QJIT_CUDAQ(catalyst.QJIT):
     """
 
     def capture(self, args):
-        # Need to override the capture method for two reasons:
-        # - We need to patch the allowed devices.
-        # - the CUDAQ JAXPR interpreter requires the host context removed.
+        """
+        Need to override the capture method for two reasons:
+        - We need to patch the allowed devices.
+        - the CUDAQ JAXPR interpreter requires the host context removed.
+        """
 
         def cudaq_backend_info(device, _capabilities) -> BackendInfo:
             """The extract_backend_info should not be run by the cuda compiler as it is
@@ -829,12 +831,14 @@ class QJIT_CUDAQ(catalyst.QJIT):
         return jaxpr, out_type, treedef, dynamic_sig
 
     def jit_compile(self, args):
-        # JIT compile needs to be overridden from the base class, for a couple of reasons:
-        #
-        # - It calls self.generate_ir() and self.compile(), none of which are applicable here
-        #   (for now).
-        # - It tries to create a function cache and a CompiledFunction object, which will fail in
-        #   this case, because we have no compiled binary nor shared library.
+        """
+        JIT compile needs to be overridden from the base class, for a couple of reasons:
+
+        - It calls self.generate_ir() and self.compile(), none of which are applicable here
+          (for now).
+        - It tries to create a function cache and a CompiledFunction object, which will fail in
+          this case, because we have no compiled binary nor shared library.
+        """
 
         if self.jaxpr is None:
             if self.user_sig and not self.compile_options.static_argnums:
@@ -847,9 +851,11 @@ class QJIT_CUDAQ(catalyst.QJIT):
         # type promotion value should be True or False.
         return False  # no type promotion
 
-    def run(self, args, kwargs):
-        # We need to override run, because it currently tries to call self.compiled_function,
-        # which does not exist here.
+    def run(self, args, _kwargs):
+        """
+        We need to override run, because it currently tries to call self.compiled_function,
+        which does not exist here.
+        """
 
         ctx = InterpreterContext(self.jaxpr.jaxpr, self.jaxpr.literals, *args)
         results = interpret_impl(ctx, self.jaxpr.jaxpr)
