@@ -35,7 +35,7 @@ def _check_version_compatibility():
         raise ModuleNotFoundError(msg)
 
 
-def cudaqjit(fn=None):
+def cudaqjit(fn=None, **kwargs):
     """A decorator for compiling PennyLane and JAX programs using CUDA Quantum.
 
     .. important::
