@@ -337,30 +337,54 @@ class TestPreprocess:
         assert "expval" not in mlir
         assert "counts" in mlir
 
-    def test_non_commuting_measurements_are_split(self, mocker):
-        """Test that the split_non_commuting transform is added to the transform
-        program from preprocess when non_commuting_observables_flag is False"""
+    def test_measurements_are_split(self, mocker):
+        """Test that the split_to_single_terms or split_non_commuting transform 
+        are added to the transform program from preprocess as expected, based on the
+        sum_observables_flag and the non_commuting_observables_flag"""
 
         # dummy device supports non_commuting observables by default
         dev = DummyDevice(wires=4, shots=1000)
 
-        # Create a qjit device that supports non-commuting observables
+        # dev1 supports non-commuting observables and sum observables - no splitting
+        assert dev_capabilities.sum_observables_flag is True
+        assert dev_capabilities.non_commuting_observables_flag is True
         dev_capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
         backend_info = extract_backend_info(dev, dev_capabilities)
         qjit_dev1 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
-        # Create a qjit device that does NOT support non-commuting observables
-        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
+        # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
+        dev_capabilities = replace(dev_capabilities, sum_observables_flag=False)
         backend_info = extract_backend_info(dev, dev_capabilities)
         qjit_dev2 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
+        # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
+        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
+        backend_info = extract_backend_info(dev, dev_capabilities)
+        qjit_dev3 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+        # dev4 supports sums but NOT non-commuting observables - split_non_commuting
+        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
+        backend_info = extract_backend_info(dev, dev_capabilities)
+        qjit_dev4 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program1, _ = qjit_dev1.preprocess(ctx)
-            transform_program2, _ = qjit_dev2.preprocess(ctx)
+            transform_program1, _ = qjit_dev1.preprocess(ctx) # no splitting
+            transform_program2, _ = qjit_dev2.preprocess(ctx) # split_to_single_terms
+            transform_program3, _ = qjit_dev3.preprocess(ctx) # split_non_commuting
+            transform_program4, _ = qjit_dev4.preprocess(ctx) # split_non_commuting
 
-        assert split_non_commuting not in transform_program1
-        assert split_non_commuting in transform_program2
+        assert split_to_single_terms not in transform_program1
+        assert split_non_commuting not in transform_program 1
+
+        assert split_to_single_terms in transform_program2
+        assert split_non_commuting not in transform_program 1
+
+        assert split_non_commuting in transform_program3
+        assert split_to_single_terms not in transform_program3
+
+        assert split_non_commuting in transform_program3
+        assert split_to_single_terms not in transform_program3
 
     def test_split_non_commuting_execution(self, mocker):
         """Test that the results of the execution for a tape with non-commuting observables is
@@ -399,6 +423,50 @@ class TestPreprocess:
 
         transform_program, _ = spy.spy_return
         assert split_non_commuting in transform_program
+
+    def test_split_to_single_terms_execution(self, mocker):
+        """Test that the results of the execution for a tape with multi-term observables is
+        consistent (on a backend that does, in fact, support multi-term observables) regardless
+        of whether split_to_single_terms is applied or not"""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def unjitted_circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RY(0.89, 1)
+            return qml.expval(qml.X(0) + qml.X(1)), qml.expval(qml.Y(0))
+
+        expected_result = unjitted_circuit(1.2)
+
+        config = get_device_toml_config(dev)
+        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+
+        # make sure non_commuting_observables_flag is True - otherwise we use 
+        # split_non_commuting instead of split_to_single_terms
+        assert config["compilation"]["non_commuting_observables"] is True
+        # make sure the testing device does in fact support sum observables
+        assert config["compilation"]["sum_observables"] is True
+
+        # test case where transform should not be applied
+        jitted_circuit = qml.qjit(unjitted_circuit)
+        assert len(jitted_circuit(1.2)) == len(expected_result) == 2
+        assert np.allclose(jitted_circuit(1.2), expected_result)
+
+        transform_program, _ = spy.spy_return
+        assert split_to_single_terms not in transform_program
+
+        # mock TOML file output to indicate non-commuting observables are NOT supported
+        config["compilation"]["sum_observables"] = False
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            jitted_circuit = qml.qjit(unjitted_circuit)
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 2
+            assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
+
+        transform_program, _ = spy.spy_return
+        assert split_to_single_terms in transform_program
+
+
 
 
 # tapes and regions for generating HybridOps
