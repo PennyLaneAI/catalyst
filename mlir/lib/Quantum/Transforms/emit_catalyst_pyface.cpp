@@ -191,7 +191,7 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
     const char *functionNameWithoutPrefix = symNameStr + _mlir_ciface_len;
     auto newName = llvm::formatv("_catalyst_ciface_{0}", functionNameWithoutPrefix).str();
 
-    rewriter.updateRootInPlace(op, [&] { op.setSymName(newName); });
+    rewriter.modifyOpInPlace(op, [&] { op.setSymName(newName); });
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
 }
 

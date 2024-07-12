@@ -435,7 +435,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
                  ConversionPatternRewriter &rewriter) const override
     {
         Block *entry;
-        rewriter.updateRootInPlace(op, [&] { entry = op.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { entry = op.addEntryBlock(); });
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(entry);
 
