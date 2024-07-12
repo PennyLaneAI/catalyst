@@ -44,7 +44,7 @@
   `catalyst.QJIT` class. This enables the functionality provided by the `QJIT` class to be
   supported by the CUDA quantum QJIT, while reducing code duplication. Longer term, this will help
   enable autograph support for `catalyst.cuda.cudaqjit`.
-  [(#602)](https://github.com/PennyLaneAI/catalyst/pull/602)
+  [(#926)](https://github.com/PennyLaneAI/catalyst/pull/926)
 
 <h3>Bug fixes</h3>
 
