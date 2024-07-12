@@ -17,14 +17,14 @@ entry point.
 """
 
 import copy
-
 from importlib.metadata import version
 from pathlib import Path
 
 import pennylane as qml
 
-from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
 from catalyst.jit import CompileOptions
+from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
+
 
 def _check_version_compatibility():
     installed_version = version("cuda_quantum")
@@ -33,7 +33,6 @@ def _check_version_compatibility():
         msg = f"Compiling with incompatible version cuda_quantum=={installed_version}. "
         msg += f"Please install compatible version cuda_quantum=={compatible_version}."
         raise ModuleNotFoundError(msg)
-
 
 
 def cudaqjit(fn=None, *, autograph=False, static_argnums=None):
