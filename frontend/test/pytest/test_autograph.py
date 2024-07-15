@@ -1919,6 +1919,74 @@ class TestJaxIndexAssignment:
             jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
         )
 
+    def test_slice_assignment_start_stop(self):
+        """Test slice (start, stop, None) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            result[1:4] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 5, 3, 4, 0, 0]))
+
+    def test_slice_assignment_start_stop_step(self):
+        """Test slice (start, stop, step) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            result[1:5:2] = x[0:2]
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 5, 0, 3, 0, 0]))
+
+    def test_slice_assignment_start_only(self):
+        """Test slice (start, None, None) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            # Size (starting from 3) must match with x.
+            result[3::] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 0, 0, 5, 3, 4]))
+
+    def test_slice_assignment_stop_only(self):
+        """Test slice (None, stop, None) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            # Size (ending before 3) must match with x.
+            result[:3] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 3, 4, 0, 0, 0]))
+
+    def test_slice_assignment_step_only(self):
+        """Test slice (None, None, step) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            # Size (len(result) / 2) must match with x.
+            result[::2] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 0, 3, 0, 4, 0]))
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
