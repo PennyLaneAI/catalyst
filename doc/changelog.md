@@ -53,6 +53,22 @@
   >>> circuit(0.5, 0.5)
   >>> "Inside QNode: 0.5"
 
+* Autograph now supports in-place array assignments with static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
+
+  For example,
+
+  ```python
+  @qjit(autograph=True)
+  def f(x, y):
+    y[1:10:2] = x
+    return y
+  ```
+
+  ```pycon
+  >>> f(jnp.ones(5), jnp.zeros(10))
+  >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
+  ```
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)

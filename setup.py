@@ -79,7 +79,7 @@ requirements = [
     "tomlkit; python_version < '3.11'",
     "scipy<1.13",
     "numpy<2",
-    "diastatic-malt>=2.15.1",
+    "diastatic-malt>=2.15.2",
 ]
 
 entry_points = {
