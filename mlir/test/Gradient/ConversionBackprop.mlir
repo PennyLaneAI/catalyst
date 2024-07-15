@@ -35,18 +35,18 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<
     // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : index) : i64
 
     // Cast the arg shadow
-    // CHECK:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg1
+    // CHECK-DAG:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg1
 
     // More casting
     // CHECK-DAG: [[argmapCasted:%.+]] = builtin.unrealized_conversion_cast [[argmapPtr]] : (memref<f64>, memref<?xf64>) -> () to !llvm.ptr
     // CHECK-DAG: [[enzymeConst:%.+]] = llvm.mlir.addressof @enzyme_const
 
     // Unpack the MemRef and zero out the shadow
-    // CHECK: [[arg0Casted:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[arg0Allocated:%.+]] = llvm.extractvalue [[arg0Casted]][0]
-    // CHECK: [[arg0Aligned:%.+]] = llvm.extractvalue [[arg0Casted]][1]
-    // CHECK: [[shadowAligned:%.+]] = llvm.extractvalue [[shadowCasted]][1]
-    // CHECK: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
+    // CHECK-DAG: [[arg0Casted:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
+    // CHECK-DAG: [[arg0Allocated:%.+]] = llvm.extractvalue [[arg0Casted]][0]
+    // CHECK-DAG: [[arg0Aligned:%.+]] = llvm.extractvalue [[arg0Casted]][1]
+    // CHECK-DAG: [[shadowAligned:%.+]] = llvm.extractvalue [[shadowCasted]][1]
+    // CHECK-DAG: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
     // CHECK-DAG: "llvm.intr.memset"([[shadowAligned]], [[memsetVal]], [[memsetSize]]) <{isVolatile = false}>
     // CHECK-DAG: [[arg0Offset:%.+]] = llvm.extractvalue [[arg0Casted]][2]
 
@@ -89,18 +89,18 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<
     // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : index) : i64
 
     // Cast the arg shadow
-    // CHECK:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg1
+    // CHECK-DAG:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg1
 
     // More casting
     // CHECK-DAG: [[argmapCasted:%.+]] = builtin.unrealized_conversion_cast [[argmapPtr]] : (memref<f64>, memref<?xf64>) -> () to !llvm.ptr
     // CHECK-DAG: [[enzymeConst:%.+]] = llvm.mlir.addressof @enzyme_const
 
     // Unpack the MemRef and zero out the shadow
-    // CHECK: [[arg0Casted:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[arg0Allocated:%.+]] = llvm.extractvalue [[arg0Casted]][0]
-    // CHECK: [[arg0Aligned:%.+]] = llvm.extractvalue [[arg0Casted]][1]
-    // CHECK: [[shadowAligned:%.+]] = llvm.extractvalue [[shadowCasted]][1]
-    // CHECK: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
+    // CHECK-DAG: [[arg0Casted:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
+    // CHECK-DAG: [[arg0Allocated:%.+]] = llvm.extractvalue [[arg0Casted]][0]
+    // CHECK-DAG: [[arg0Aligned:%.+]] = llvm.extractvalue [[arg0Casted]][1]
+    // CHECK-DAG: [[shadowAligned:%.+]] = llvm.extractvalue [[shadowCasted]][1]
+    // CHECK-DAG: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
     // CHECK-DAG: "llvm.intr.memset"([[shadowAligned]], [[memsetVal]], [[memsetSize]]) <{isVolatile = false}>
     // CHECK-DAG: [[arg0Offset:%.+]] = llvm.extractvalue [[arg0Casted]][2]
 
@@ -145,18 +145,18 @@ func.func @backpropArgmap2(%arg0: memref<f64>, %arg1: f64, %arg2: memref<f64>, %
     // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : index) : i64
 
     // Cast the arg shadow
-    // CHECK:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg2
+    // CHECK-DAG:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg2
 
     // More casting
     // CHECK-DAG: [[argmapCasted:%.+]] = builtin.unrealized_conversion_cast [[argmapPtr]] : (memref<f64>, f64, memref<?xf64>, memref<?xf64>) -> () to !llvm.ptr
     // CHECK-DAG: [[enzymeConst:%.+]] = llvm.mlir.addressof @enzyme_const
 
     // Unpack the MemRef and zero out the shadow
-    // CHECK: [[arg0Casted:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[arg0Allocated:%.+]] = llvm.extractvalue [[arg0Casted]][0]
-    // CHECK: [[arg0Aligned:%.+]] = llvm.extractvalue [[arg0Casted]][1]
-    // CHECK: [[shadowAligned:%.+]] = llvm.extractvalue [[shadowCasted]][1]
-    // CHECK: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
+    // CHECK-DAG: [[arg0Casted:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
+    // CHECK-DAG: [[arg0Allocated:%.+]] = llvm.extractvalue [[arg0Casted]][0]
+    // CHECK-DAG: [[arg0Aligned:%.+]] = llvm.extractvalue [[arg0Casted]][1]
+    // CHECK-DAG: [[shadowAligned:%.+]] = llvm.extractvalue [[shadowCasted]][1]
+    // CHECK-DAG: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
     // CHECK-DAG: "llvm.intr.memset"([[shadowAligned]], [[memsetVal]], [[memsetSize]]) <{isVolatile = false}>
     // CHECK-DAG: [[arg0Offset:%.+]] = llvm.extractvalue [[arg0Casted]][2]
 
@@ -214,7 +214,7 @@ func.func @backpropArgmap3(%arg0: memref<f64>, %arg1: f64, %arg2: memref<f64>, %
     // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : index) : i64
 
     // Cast the arg shadow
-    // CHECK:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg2
+    // CHECK-DAG:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg2
 
     // More casting
     // CHECK-DAG: [[argmapCasted:%.+]] = builtin.unrealized_conversion_cast [[argmapPtr]] : (memref<f64>, f64, memref<?xf64>, memref<?xf64>) -> () to !llvm.ptr
