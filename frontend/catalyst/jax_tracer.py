@@ -28,7 +28,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -62,6 +62,7 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
+    CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
     cond_p,
@@ -521,7 +522,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    with transient_jax_config():
+    with transient_jax_config({"jax_dynamic_shapes": True}):
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             make_jaxpr_kwargs = {
                 "static_argnums": static_argnums,
@@ -551,8 +552,9 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     # single python function multiple times with different options.
     mlir_fn_cache.clear()
     MemrefCallable.clearcache()
+    CALLBACK_OP_CACHE.clear()
 
-    with transient_jax_config():
+    with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
 
     return mlir_module, ctx
@@ -595,7 +597,7 @@ def trace_quantum_operations(
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
-        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+        if type(op) in (Controlled, ControlledOp):
             return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
         elif isinstance(op, Adjoint):
             return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
@@ -1049,8 +1051,11 @@ def trace_function(
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
+
     with EvaluationContext.frame_tracing_context(ctx) as trace:
-        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        arg_expanded_tracers = input_type_to_tracers(
+            in_sig.in_type, trace.new_arg, trace.full_raise
+        )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
         return res_expanded_tracers, in_sig, out_sig

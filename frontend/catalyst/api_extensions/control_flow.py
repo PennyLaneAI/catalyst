@@ -44,6 +44,7 @@ from catalyst.jax_extras import (
     jaxpr_pad_consts,
     new_inner_tracer,
     output_type_to_tracers,
+    trace_to_jaxpr,
     unzip2,
     while_loop_expansion_strategy,
 )
@@ -241,7 +242,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=True):
+def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -282,6 +283,13 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=Tr
         lower_bound (int): starting value of the iteration index
         upper_bound (int): (exclusive) upper bound of the iteration index
         step (int): increment applied to the iteration index at the end of each iteration
+        allow_array_resizing (bool): Whether to allow arrays to change shape/size within
+            the for loop. By default this is ``False``; this will allow out-of-scope
+            dynamical-shaped arrays to be captured by the for loop, and binary operations
+            to be applied to arrays of the same shape. Set this to ``True``
+            to modify dimension sizes within the for loop, however outer-scope
+            dynamically-shaped arrays will no longer be captured, and arrays of the same shape
+            cannot be used in binary operations.
 
     Returns:
         Callable[[int, ...], ...]: A wrapper around the loop body function.
@@ -315,17 +323,64 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=Tr
 
     >>> circuit(7, 1.6)
     [array(0.97926626), array(0.55395718)]
+
+    Note that using dynamically-shaped arrays within for loops, while loops, and
+    conditional statements, are also supported:
+
+    >>> @qjit
+    ... def f(shape):
+    ...     a = jnp.ones([shape], dtype=float)
+    ...     @for_loop(0, 10, 2)
+    ...     def loop(i, a):
+    ...         return a + i
+    ...     return loop(a)
+    >>> f(5)
+    array([21., 21., 21., 21., 21.])
+
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
+    arrays from outside the for loop to be correctly captured, and arrays of the
+    same shape to be used in binary operations:
+
+    >>> @qjit(abstracted_axes={1: 'n'})
+    ... def g(x, y):
+    ...     @catalyst.for_loop(0, 10, 1)
+    ...     def loop(_, a):
+    ...         # Attempt to capture `x` from the outer scope,
+    ...         # and apply a binary operation '*' between the two arrays.
+    ...         return a * x
+    ...     return jnp.sum(loop(y))
+    >>> a = jnp.ones([1,3], dtype=float)
+    >>> b = jnp.ones([1,3], dtype=float)
+    >>> g(a, b)
+    array(3.)
+
+    However, if you wish to have the for loop return differently sized arrays
+    at each iteration, set ``allow_array_resizing`` to ``True``:
+
+    >>> @qjit()
+    ... def f(N):
+    ...     a = jnp.ones([N], dtype=float)
+    ...     @for_loop(0, 10, 1, allow_array_resizing=True)
+    ...     def loop(i, _):
+    ...         return jnp.ones([i], dtype=float) # return array of new dimensions
+    ...     return loop(a)
+    >>> f(5)
+    array([1., 1., 1., 1., 1., 1., 1., 1., 1.])
+
+    Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
+    can no longer be captured from outer-scopes by the for loop, and binary operations
+    between arrays of the same size are not supported.
+
+    For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
 
     def _decorator(body_fn):
-        return ForLoopCallable(
-            lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
-        )
+        return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
 
     return _decorator
 
 
-def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
+def while_loop(cond_fn, allow_array_resizing: bool = False):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
     This decorator provides a functional version of the traditional while
@@ -356,6 +411,13 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
 
     Args:
         cond_fn (Callable): the condition function in the while loop
+        allow_array_resizing (bool): Whether to allow arrays to change shape/size within
+            the loop. By default this is ``False``; this will allow out-of-scope
+            dynamically-shaped arrays to be captured by the loop, and binary operations
+            to be applied to arrays of the same shape. Set this to ``True``
+            to modify dimension sizes within the loop, however outer-scope
+            dynamically-shaped arrays will no longer be captured, and arrays of the same shape
+            cannot be used in binary operations.
 
     Returns:
         Callable: A wrapper around the while-loop function.
@@ -386,10 +448,49 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
 
     >>> circuit(1.6)
     [array(-0.02919952), array(2.56)]
+
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
+    arrays from outside the for loop to be correctly captured, and arrays of the
+    same shape to be used in binary operations:
+
+    >>> @qjit(abstracted_axes={0: 'n'})
+    ... def g(x, y):
+    ...     @catalyst.while_loop(lambda i: jnp.sum(i) > 2., allow_array_resizing=False)
+    ...     def loop(a):
+    ...         # Attempt to capture `x` from the outer scope,
+    ...         # and apply a binary operation '*' between the two arrays.
+    ...         return a * x
+    ...     return loop(y)
+    >>> x = jnp.array([0.1, 0.2, 0.3])
+    >>> y = jnp.array([5.2, 10.3, 2.4])
+    >>> g(x, y)
+    array([0.052, 0.412, 0.216])
+
+    However, if you wish to have the for loop return differently sized arrays
+    at each iteration, set ``allow_array_resizing`` to ``True``:
+
+    >>> @qjit
+    ... def f(N):
+    ...     a0 = jnp.ones([N])
+    ...     b0 = jnp.ones([N])
+    ...     @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+    ...     def loop(a, _, i):
+    ...         i += 1
+    ...         b = jnp.ones([i + 1])
+    ...         return (a, b, i) # return array of new dimensions
+    ...     return loop(a0, b0, 0)
+    >>> f(2)
+    (array([1., 1.]), array([1., 1., 1., 1.]), array(3))
+
+    Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
+    can no longer be captured from outer-scopes by the for loop, and binary operations
+    between arrays of the same size are not supported.
+
+    For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
 
     def _decorator(body_fn):
-        return WhileLoopCallable(cond_fn, body_fn, experimental_preserve_dimensions)
+        return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)
 
     return _decorator
 
@@ -695,7 +796,9 @@ class ForLoopCallable:
         in_type = in_sig.in_type
 
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            arg_classical_tracers = input_type_to_tracers(in_type, inner_trace.new_arg)
+            arg_classical_tracers = input_type_to_tracers(
+                in_type, inner_trace.new_arg, inner_trace.full_raise
+            )
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
                     inner_trace.full_raise(t) for t in wfun.call_wrapped(*arg_classical_tracers)
@@ -861,7 +964,9 @@ class WhileLoopCallable:
         in_expanded_classical_tracers = in_sig.in_expanded_args
 
         with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-            arg_classical_tracers = input_type_to_tracers(in_type, cond_trace.new_arg)
+            arg_classical_tracers = input_type_to_tracers(
+                in_type, cond_trace.new_arg, cond_trace.full_raise
+            )
             res_classical_tracers = [
                 cond_trace.full_raise(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
             ]
@@ -880,7 +985,9 @@ class WhileLoopCallable:
             _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
         with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-            arg_classical_tracers = input_type_to_tracers(in_type, body_trace.new_arg)
+            arg_classical_tracers = input_type_to_tracers(
+                in_type, body_trace.new_arg, body_trace.full_raise
+            )
 
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
@@ -968,7 +1075,7 @@ class Cond(HybridOp):
     binder = cond_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts, nouts = [], [], []
+        jaxprs, consts, nimplouts = [], [], []
         op = self
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
@@ -977,26 +1084,29 @@ class Cond(HybridOp):
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 ).actualize()
 
+                constants = []
                 arg_expanded_classical_tracers = []
-                res_expanded_tracers, out_type = expand_results(
+                res_expanded_tracers, _ = expand_results(
+                    constants,
                     arg_expanded_classical_tracers,
                     region.res_classical_tracers + [qreg_out],
                     expansion_strategy=self.expansion_strategy,
                 )
 
-                jaxpr, out_type, const = ctx.frames[region.trace].to_jaxpr2(res_expanded_tracers)
+                jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
 
                 jaxprs.append(jaxpr)
                 consts.append(const)
-                nouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
+                nimplouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
-        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nouts)
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nimplouts)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
         in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
 
         out_expanded_classical_tracers = expand_results(
+            [],
             in_expanded_classical_tracers,
             self.out_classical_tracers,
             expansion_strategy=self.expansion_strategy,
@@ -1009,7 +1119,7 @@ class Cond(HybridOp):
                 in_expanded_tracers=in_expanded_classical_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
                 branch_jaxprs=branch_jaxprs,
-                nimplicit_outputs=nouts[0],
+                nimplicit_outputs=nimplouts[0],
             )
         )
         return qrp2
@@ -1041,13 +1151,15 @@ class ForLoop(HybridOp):
 
             res_classical_tracers = region.res_classical_tracers
             res_tracers = res_classical_tracers + [qreg_out]
+            _, _, consts = trace_to_jaxpr(inner_trace, [], res_tracers)
             res_expanded_tracers, _ = expand_results(
+                [inner_trace.full_raise(t) for t in consts],
                 arg_expanded_tracers,
                 res_tracers,
                 expansion_strategy=expansion_strategy,
                 num_implicit_inputs=nimplicit,
             )
-            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
+            jaxpr, _, _ = trace_to_jaxpr(inner_trace, arg_expanded_tracers, res_expanded_tracers)
 
         operand_tracers = op.in_classical_tracers
         const_tracers = [trace.full_raise(c) for c in consts]
@@ -1058,7 +1170,8 @@ class ForLoop(HybridOp):
         in_expanded_tracers = [*const_tracers, *operand_expanded_tracers, qreg_tracer]
 
         out_expanded_classical_tracers, _ = expand_results(
-            in_expanded_tracers,
+            consts,
+            [*operand_expanded_tracers, qreg_tracer],
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
             num_implicit_inputs=nimplicit,
@@ -1095,35 +1208,44 @@ class WhileLoop(HybridOp):
                 arg_classical_tracers, expansion_strategy=expansion_strategy
             )
             res_classical_tracers = region.res_classical_tracers
-            res_expanded_classical_tracers, out_type = expand_results(
+            _, _, consts = trace_to_jaxpr(
+                cond_trace, arg_expanded_classical_tracers, res_classical_tracers
+            )
+            res_expanded_classical_tracers, _ = expand_results(
+                [cond_trace.full_raise(t) for t in consts],
                 arg_expanded_classical_tracers,
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
-            cond_jaxpr, out_type2, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
-                res_expanded_classical_tracers
+            cond_jaxpr, _, cond_consts = trace_to_jaxpr(
+                cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
-            assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
 
         nimplicit = len(arg_expanded_classical_tracers) - len(self.regions[0].arg_classical_tracers)
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
+            region = self.regions[1]
+            res_classical_tracers = region.res_classical_tracers
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
-                self.regions[1].arg_classical_tracers + [qreg_in],
+                region.arg_classical_tracers + [qreg_in],
                 expansion_strategy=expansion_strategy,
             )[0]
-            res_expanded_tracers, out_type = expand_results(
+            _, _, consts = trace_to_jaxpr(
+                body_trace, arg_expanded_tracers, res_classical_tracers + [qreg_out]
+            )
+            res_expanded_tracers, _ = expand_results(
+                [body_trace.full_raise(t) for t in consts],
                 arg_expanded_tracers,
-                self.regions[1].res_classical_tracers + [qreg_out],
+                res_classical_tracers + [qreg_out],
                 expansion_strategy=expansion_strategy,
             )
-            body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_expanded_tracers
+            body_jaxpr, _, body_consts = trace_to_jaxpr(
+                body_trace, arg_expanded_tracers, res_expanded_tracers
             )
 
         in_expanded_tracers = [
@@ -1133,6 +1255,7 @@ class WhileLoop(HybridOp):
         ]
 
         out_expanded_classical_tracers = expand_results(
+            [trace.full_raise(c) for c in (cond_consts + body_consts)],
             in_expanded_tracers,
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,

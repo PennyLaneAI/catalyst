@@ -2,7 +2,7 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) 
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) 
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
 Python versions 3.9 and higher. To install it, simply run the following ``pip`` command:
 
@@ -411,6 +411,6 @@ To generate html files for the documentation for Catalyst:
 
 .. code-block:: console
 
-  pip install -r doc/requirements.txt
+  make docs
 
 The generated files are located in ``doc/_build/html``

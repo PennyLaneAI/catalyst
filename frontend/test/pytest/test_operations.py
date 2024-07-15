@@ -222,5 +222,25 @@ def test_qubitunitary_complex(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+def test_multicontrolledx_via_paulix():
+    """Test that lightning executes multicontrolled x via paulix rather than qubit unitary."""
+
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit():
+        qml.Hadamard(0)
+        qml.Hadamard(1)
+        qml.Hadamard(2)
+        qml.MultiControlledX(control_wires=[0, 1, 2], wires=[3], control_values=[True, False, True])
+        return qml.state()
+
+    assert "QubitUnitary" not in str(circuit.jaxpr)
+    assert "PauliX" in str(circuit.jaxpr)
+
+    assert np.allclose(circuit(), circuit.original_function())
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

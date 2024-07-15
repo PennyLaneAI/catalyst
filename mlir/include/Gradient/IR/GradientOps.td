@@ -400,7 +400,8 @@ def ReturnOp : Gradient_Op<"return",
   let assemblyFormat = [{ attr-dict ($tape^ `:` type($tape))? }];
 }
 
-def CustomGradOp : Gradient_Op<"custom_grad", []> {
+def CustomGradOp : Gradient_Op<"custom_grad",
+        [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 
   let summary = "Operation denoting the registration of the custom gradient with Enzyme.";
 

@@ -16,7 +16,7 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import reduce
 from itertools import repeat
 from typing import Any, Dict, List, Set
@@ -58,9 +58,9 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
 class OperationProperties:
     """Capabilities of a single operation"""
 
-    invertible: bool
-    controllable: bool
-    differentiable: bool
+    invertible: bool = False
+    controllable: bool = False
+    differentiable: bool = False
 
 
 def intersect_properties(a: OperationProperties, b: OperationProperties) -> OperationProperties:
@@ -76,17 +76,17 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     """Quantum device capabilities"""
 
-    native_ops: Dict[str, OperationProperties]
-    to_decomp_ops: Dict[str, OperationProperties]
-    to_matrix_ops: Dict[str, OperationProperties]
-    native_obs: Dict[str, OperationProperties]
-    measurement_processes: Set[str]
-    qjit_compatible_flag: bool
-    mid_circuit_measurement_flag: bool
-    runtime_code_generation_flag: bool
-    dynamic_qubit_management_flag: bool
-    non_commuting_observables_flag: bool
-    options: Dict[str, bool]
+    native_ops: Dict[str, OperationProperties] = field(default_factory=dict)
+    to_decomp_ops: Dict[str, OperationProperties] = field(default_factory=dict)
+    to_matrix_ops: Dict[str, OperationProperties] = field(default_factory=dict)
+    native_obs: Dict[str, OperationProperties] = field(default_factory=dict)
+    measurement_processes: Set[str] = field(default_factory=dict)
+    qjit_compatible_flag: bool = False
+    mid_circuit_measurement_flag: bool = False
+    runtime_code_generation_flag: bool = False
+    dynamic_qubit_management_flag: bool = False
+    non_commuting_observables_flag: bool = False
+    options: Dict[str, bool] = field(default_factory=dict)
 
 
 def intersect_operations(

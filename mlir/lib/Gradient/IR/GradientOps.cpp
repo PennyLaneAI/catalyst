@@ -160,6 +160,11 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     return success(succeeded(r1) && succeeded(r2));
 }
 
+LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // GradOp Extra methods
 //===----------------------------------------------------------------------===//
@@ -208,13 +213,6 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         return r1;
     }
 
-    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
-        return this->emitOpError(
-                   "invalid number of results: must be twice the number of callee results")
-               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
-               << this->getNumResults();
-    }
-
     std::vector<Type> grad_types;
     {
         for (auto s : this->getGradients()) {
@@ -223,12 +221,17 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
     }
 
     for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
-        auto calleeRtype = callee.getFunctionType().getResult(i);
-        auto gradRtype = grad_types[i];
-        if (calleeRtype != gradRtype) {
+        // callee (function to be differentiated) always returns a single float
+        // grad type and shape should match the callee's argument's type and shape
+        // match from the tail because constant inputs will have types in the front
+        auto calleeInputType =
+            callee.getFunctionType().getInput(callee.getFunctionType().getNumInputs() - 1 - i);
+        auto gradRtype = grad_types[grad_types.size() - 1 - i];
+        if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got " << calleeRtype;
+                   << " was expected to match the type " << gradRtype << " but got "
+                   << calleeInputType;
         }
     }
 

@@ -83,6 +83,7 @@ OPERATIONS = [
     "MultiControlledX",
     "SISWAP",
     "ControlledPhaseShift",
+    "C(QubitUnitary)",
     "C(PauliY)",
     "C(RY)",
     "C(PauliX)",

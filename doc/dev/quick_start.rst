@@ -106,12 +106,13 @@ more complex quantum circuits; see below for the list of currently supported ope
 
 .. important::
 
-   Most decomposition logic will be equivalent to PennyLane's decomposition.
-   However, decomposition logic will differ in the following cases:
+   Decomposition will generally happen in accordance with the specification provided by devices,
+   which can vary from device to device (e.g. ``default.qubit`` and ``lightning.qubit`` might
+   decompose quite differently.)
+   However, Catalyst's decomposition logic will differ in the following cases:
 
    1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-   2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-   3. The list of device-supported gates employed by Catalyst is currently different than that of the ``lightning.qubit`` device, as defined by the :class:`~.qjit_device.QJITDevice`.
+   2. The set of operations supported by Catalyst itself can in some instances lead to additional decompositions compared to the device itself.
 
 .. raw:: html
 
@@ -545,6 +546,7 @@ Calculating Quantum Gradients
 
     ~catalyst.grad
     ~catalyst.jacobian
+    ~catalyst.value_and_grad
     ~catalyst.vjp
     ~catalyst.jvp
 

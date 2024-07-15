@@ -19,6 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Tuple
 
+import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
@@ -36,7 +37,7 @@ from catalyst.tracing.type_signatures import (
     get_decomposed_signature,
     typecheck_signatures,
 )
-from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
+from catalyst.utils import wrapper
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
@@ -167,6 +168,8 @@ class CompiledFunction:
         if out_type is not None:
             keep_outputs = [k for _, k in out_type]
             retval = [r for (k, r) in zip(keep_outputs, retval) if k]
+
+        retval = [jnp.asarray(arr) for arr in retval]
         return retval
 
     @staticmethod

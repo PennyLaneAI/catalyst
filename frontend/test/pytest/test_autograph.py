@@ -396,6 +396,43 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
+    def test_tape_transform(self):
+        """Test if tape transform is applied when autograph is on."""
+
+        dev = dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.transform
+        def my_quantum_transform(tape):
+            raise NotImplementedError
+
+        @qml.qjit(autograph=True)
+        def f(x):
+            @my_quantum_transform
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RY(x, wires=0)
+                qml.RX(x, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit(x)
+
+        with pytest.raises(NotImplementedError):
+            f(0.5)
+
+    def test_mcm_one_shot(self):
+        """Test if mcm one-shot miss transforms."""
+        dev = qml.device("lightning.qubit", wires=5, shots=20)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
+        def func(x):
+            qml.RX(x, wires=0)
+            measure(0, postselect=1)
+            return qml.sample(wires=0)
+
+        # If transforms are missed, the output will be all ones.
+        assert not np.all(func(0.9) == 1)
+
 
 class TestCodePrinting:
     """Test that the transformed source code can be printed in different settings."""
