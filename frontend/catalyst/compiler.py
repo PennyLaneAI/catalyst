@@ -137,6 +137,7 @@ HLO_LOWERING_PASS = (
         "func.func(hlo-legalize-shapeops-to-standard)",
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
+        "func.func(hlo-legalize-sort)",
         "convert-to-signless",
         "canonicalize",
         "scatter-lowering",
@@ -174,12 +175,15 @@ BUFFERIZATION_PASS = (
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
+        "canonicalize",  # Remove dead memrefToTensorOp's
+        # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
-        "canonicalize",
         "convert-bufferization-to-memref",
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
         # "cse",
         "cp-global-memref",
     ],

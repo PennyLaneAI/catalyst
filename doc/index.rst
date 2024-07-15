@@ -53,8 +53,12 @@ Catalyst
    <br>
 
 .. mdinclude:: ../README.md
-  :start-line: 19
-  :end-line: 72
+  :start-line: 20
+  :end-line: 73
+
+.. mdinclude:: ../README.md
+  :start-line: 142
+  :end-line: 163
 
 .. toctree::
    :maxdepth: 2
@@ -65,6 +69,8 @@ Catalyst
    dev/quick_start
    dev/autograph
    dev/sharp_bits
+   dev/jax_integration
+   dev/callbacks
    dev/release_notes
 
 .. toctree::
