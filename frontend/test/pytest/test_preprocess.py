@@ -387,7 +387,14 @@ class TestPreprocess:
         assert split_non_commuting in transform_program4
         assert split_to_single_terms not in transform_program4
 
-    def test_split_non_commuting_execution(self, mocker):
+    @pytest.mark.parametrize(
+        "observables",
+        [
+            (qml.X(0) @ qml.X(1), qml.Y(0)), # distributed to separate tapes, but no sum splitting
+            (qml.X(0) + qml.X(1), qml.Y(0)), # split into 3 seperate terms and distributed
+            ],
+    )
+    def test_split_non_commuting_execution(self, observables, mocker):
         """Test that the results of the execution for a tape with non-commuting observables is
         consistent (on a backend that does, in fact, support non-commuting observables) regardless
         of whether split_non_commuting is applied or not as expected"""
@@ -398,7 +405,7 @@ class TestPreprocess:
         def unjitted_circuit(theta: float):
             qml.RX(theta, 0)
             qml.RY(0.89, 1)
-            return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
+            return [qml.expval(o) for o in observables]
 
         expected_result = unjitted_circuit(1.2)
 
