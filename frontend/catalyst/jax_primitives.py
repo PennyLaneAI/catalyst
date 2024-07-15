@@ -444,13 +444,13 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
         )
 
         # transform.named_sequence op is the "main function" of the transform dialect
-        # and thus needs an entry block
+        # and thus needs an entry block (which also should be its only block)
         # The argument of the block is the target function to run the transform sequence on
         bb = ir.Block.create_at_start(named_sequence_op.body, arg_types=[transform_func_type])
 
         # The transform.named_sequence needs a terminator called "transform.yield"
         with ir.InsertionPoint(bb):
-            transform_yield_op = TransformYieldOp(operands_=[])
+            transform_yield_op = TransformYieldOp(operands_=[])  # pylint: disable=unused-variable
 
     return named_sequence_op.results
 
@@ -483,17 +483,41 @@ def _apply_registered_pass_lowering(
             "transform.apply_registered_pass must be placed in a transform.named_sequence!"
         )
 
-    # Insert right before the yield op
+    # If there already is a apply_registered_pass, insert after the existing one
     # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
-    ip = named_sequence_op.regions[0].blocks[0]
-    with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
-        apply_registered_pass_op = ApplyRegisteredPassOp(
-            result=transform_func_type,
-            target=ip.arguments[
-                0
-            ],  # TODO: chain multiple passes, i.e. use one pass' result as the next one's target
-            pass_name=pass_name,
-            options=options,
+    named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
+    first_op_in_block = named_sequence_op_block.operations[0].operation
+
+    if first_op_in_block.name == "transform.apply_registered_pass":
+        _ = len(named_sequence_op_block.operations)
+        yield_op = named_sequence_op_block.operations[_ - 1].operation
+        current_last_pass = named_sequence_op_block.operations[_ - 2].operation
+        with ir.InsertionPoint(yield_op):
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_func_type,
+                target=current_last_pass.result,
+                pass_name=pass_name,
+                options=options,
+            )
+
+    # otherwise it's the first pass, i.e. only a yield op is in the block
+    # so insert right before the yield op
+    elif first_op_in_block.name == "transform.yield":
+        ip = named_sequence_op.regions[0].blocks[0]
+        with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_func_type,
+                target=ip.arguments[0],
+                pass_name=pass_name,
+                options=options,
+            )
+
+    else:
+        raise RuntimeError(
+            """
+            Unexpected operation in transform.named_sequence! 
+            Only transform.apply_registered_pass and transform.yield are allowed.
+            """
         )
 
     return apply_registered_pass_op.results
