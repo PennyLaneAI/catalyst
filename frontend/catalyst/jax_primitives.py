@@ -426,11 +426,18 @@ def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
 
 
 def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
+    module = jax_ctx.module_context.module
+
+    # If there already is a transform.named_sequence in the module, don't add another one!
+    # Do nothing and exit!
+    for i in range(len(module.body.operations)):
+        if module.body.operations[i].operation.name == "transform.named_sequence":
+            return module.body.operations[i].operation.results
+
     functype = ir.FunctionType.get(inputs=[transform_func_type], results=[])
     functype_attr = ir.TypeAttr.get(functype)
 
     # add the transform.with_named_sequence unit attr to the parent module
-    module = jax_ctx.module_context.module
     with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
     module.operation.attributes["transform.with_named_sequence"] = with_named_sequence_attr
 

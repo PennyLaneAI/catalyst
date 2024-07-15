@@ -32,7 +32,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
-from catalyst.api_extensions.quantum_passes import get_quantum_pass_table
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
@@ -150,61 +149,14 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "transform-interpreter",  # Run the peephole passes
+        "transform-cleanup",  # Must be run IMMEDIATELY after --transform-interpreter
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
     ],
 )
-QUANTUM_COMPILATION_PASS_deafult_len = len(QUANTUM_COMPILATION_PASS[1])
-
-"""
-# We would like the quantum passes pipeline to look something like the following:
-QUANTUM_COMPILATION_PASS = (
-    "QuantumCompilationPass",
-    [
-        # Begin quantum peephole
-        "func.func(remove-chained-self-inverse{func-name=circuit})",
-        "func.func(remove-chained-self-inverse{func-name=toy})",
-        ...
-        # End quantum peephole
-        "annotate-function",
-        ...
-    ],
-)
-
-The peephole circuit transforms should occur before all the lowering
-because the circuit transforms are independent of the lowering and do 
-not need to parse through all the lowered MLIR operations/instructions. 
-"""
-
-
-def fill_quantum_peephole_passes_pipeline(pass_table):
-    """
-    Fill the QUANTUM_COMPILATION_PASS pipeline according to the
-    pass_table. The pass table contains the list of passes to run
-    on each qnode.
-    """
-    quantum_passes_pipeline = []
-    for qnode in pass_table.table.keys():
-        for pass_ in pass_table.query(qnode):
-            # note that "pass" is a python keyword, so "pass_"
-            # The command line option to specify the qnode name is "func-name".
-            # See mlir/include/Quantum/Transforms/Passes.td
-            run_pass = f"func.func({pass_}{{func-name={qnode.__name__}}})"
-            if (run_pass not in quantum_passes_pipeline) and (
-                run_pass not in QUANTUM_COMPILATION_PASS[1]
-            ):
-                quantum_passes_pipeline.append(run_pass)
-    QUANTUM_COMPILATION_PASS[1][:0] = quantum_passes_pipeline
-
-
-def clear_quantum_peephole_passes_pipeline():
-    """
-    Clear the peephole passes in the QUANTUM_COMPILATION_PASS pipeline.
-    """
-    del QUANTUM_COMPILATION_PASS[1][: -1 * QUANTUM_COMPILATION_PASS_deafult_len]
-
 
 BUFFERIZATION_PASS = (
     "BufferizationPass",
@@ -545,7 +497,6 @@ class Compiler:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         try:
-            fill_quantum_peephole_passes_pipeline(get_quantum_pass_table())
             compiler_output = run_compiler_driver(
                 ir,
                 str(workspace),
@@ -555,7 +506,6 @@ class Compiler:
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
             )
-            clear_quantum_peephole_passes_pipeline()
         except RuntimeError as e:
             raise CompileError(*e.args) from e
 

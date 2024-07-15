@@ -142,4 +142,10 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
+def TransformCleanupPass : Pass<"transform-cleanup"> {
+    let summary = "Deletes everything from the transform dialect.";
+
+    let constructor = "catalyst::createTransformCleanupPass()";
+}
+
 #endif // CATALYST_PASSES

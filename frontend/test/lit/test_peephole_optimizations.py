@@ -29,11 +29,15 @@ We need to check that:
 # pylint: disable=line-too-long
 
 import shutil
+import subprocess
 
 import numpy as np
 import pennylane as qml
 
 from catalyst import cancel_inverses, qjit
+
+# clean all potential leftovers from previous test runs
+subprocess.call("rm -rf cancel_inverses_workflow*", shell=True)
 
 
 def flush_peephole_opted_mlir_to_iostream(filename):
@@ -44,8 +48,7 @@ def flush_peephole_opted_mlir_to_iostream(filename):
     to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
-    with open(filename + "/2_QuantumCompilationPass.mlir", encoding="utf-8") as file:
-        print(file.read())
+    subprocess.call("cat " + filename + "/2_QuantumCompilationPass.mlir", shell=True)
     shutil.rmtree(filename)
 
 
@@ -95,21 +98,8 @@ def cancel_inverses_workflow_rerun(xx: float):
     """
     Test catalyst.cancel_inverses but a differently-named QNode is be run.
 
-    This test is testing the reset of the quantum pass table is functioning correctly.
-    In the previous test, the line
-       'func.func(remove-chained-self-inverse{func-name=f})'
-    is added to the pipeline.
-
-    If in a second qjit object some of the local names clash with previous
-    local names, the previous line will run the pass on the second
-    'f' by accident!
-
-    To solve this issue, after every qjit compilation, either aot or jit,
-    the pass table and pipeline are reset.
-
-    When the mid-end supports more gates, and this file contains more tests,
-    the circuit names "f" and "g" will be naturally recycled, and this
-    test can be removed (although I suggest keeping this test and this docstring).
+    This is to test that different QJITs whose local function names clash
+    do not affect each other.
     """
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -143,3 +133,44 @@ def cancel_inverses_workflow_rerun(xx: float):
 ff, gg = cancel_inverses_workflow(42.42)
 assert np.allclose(ff, gg)
 flush_peephole_opted_mlir_to_iostream("cancel_inverses_workflow_rerun")
+
+
+# CHECK-LABEL: public @jit_cancel_inverses_workflow_both_on
+@qjit(keep_intermediate=True)
+def cancel_inverses_workflow_both_on(xx: float):
+    """
+    Test catalyst.cancel_inverses both circuits are decorated.
+    """
+
+    @cancel_inverses
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(x: float):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @cancel_inverses
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def g(x: float):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    _ff = f(xx)
+
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    _gg = g(xx)
+
+    return _ff, _gg
+
+
+ff, gg = cancel_inverses_workflow(42.42)
+assert np.allclose(ff, gg)
+flush_peephole_opted_mlir_to_iostream("cancel_inverses_workflow_both_on")

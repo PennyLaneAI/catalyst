@@ -26,16 +26,17 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.core import new_jaxpr_eqn, no_effects
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 from malt.core import config as ag_config
 
 import catalyst
-from catalyst.api_extensions.quantum_passes import get_quantum_pass_table
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
+from catalyst.jax_primitives import transform_named_sequence_p
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -490,7 +491,6 @@ class QJIT:
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
-            get_quantum_pass_table().reset()
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -499,7 +499,6 @@ class QJIT:
             return self.user_function(*args, **kwargs)
 
         requires_promotion = self.jit_compile(args)
-        get_quantum_pass_table().reset()
 
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
@@ -538,6 +537,10 @@ class QJIT:
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
+        # After compilation is successfully done, remove the transform_named_sequence from the jaxpr
+        if self.jaxpr is not None:
+            del self.jaxpr.eqns[-1]
+
     @debug_logger
     def jit_compile(self, args):
         """Compile Python function on invocation using the provided arguments.
@@ -574,6 +577,10 @@ class QJIT:
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
+
+            # After compilation is successfully done, remove the transform_named_sequence from the jaxpr
+            if self.jaxpr is not None:
+                del self.jaxpr.eqns[-1]
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -632,6 +639,17 @@ class QJIT:
                 self.user_function, static_argnums, abstracted_axes, full_sig, {}
             )
 
+            # After tracing ANY qjit jaxpr, add a transform_named_sequence primitive
+            # Otherwise the -transform-interpreter will complain that a __transform_main is not found
+            jaxpr.eqns.append(
+                new_jaxpr_eqn(
+                    invars=[],
+                    outvars=[],
+                    primitive=transform_named_sequence_p,
+                    params={},
+                    effects=no_effects,
+                )
+            )
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
