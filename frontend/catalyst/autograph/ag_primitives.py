@@ -539,6 +539,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.jacobian,
             catalyst.vjp,
             catalyst.jvp,
+            catalyst.vmap,
         ):
             assert args and callable(args[0])
             wrapped_fn = args[0]
