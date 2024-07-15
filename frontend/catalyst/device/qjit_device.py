@@ -504,7 +504,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def _measurement_transform_program(self):
 
         measurement_program = TransformProgram()
-        
+
         supports_sum_observables = any(
             obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
         )
