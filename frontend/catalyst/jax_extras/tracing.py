@@ -440,17 +440,21 @@ def deduce_signatures(
     )
 
 
-def deduce_avals(f: Callable, args, kwargs):
+def deduce_avals(f: Callable, args, kwargs, static_argnums=None):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     # TODO: deprecate in favor of `deduce_signatures`
+    wf = wrap_init(f)
+    if static_argnums:
+        argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
+        dynamic_argnums = [i for i in range(len(args)) if i not in argnums]
+        wf, args = jax._src.api_util.argnums_partial(wf, dynamic_argnums, args)
     flat_args, in_tree = tree_flatten((args, kwargs))
     abstracted_axes = None
     axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
     in_type = infer_lambda_input_type(axes_specs, flat_args)
     in_avals, keep_inputs = unzip2(in_type)
-    wf = wrap_init(f)
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
     return wffa, in_avals, keep_inputs, out_tree_promise
@@ -536,6 +540,7 @@ def make_jaxpr2(
             in_type, in_tree = abstractify(args, kwargs)
             f, out_tree_promise = flatten_fun(f, in_tree)
             f = annotate(f, in_type)
+            f.f.static_argnums = static_argnums
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()

@@ -1063,7 +1063,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode
+    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -1089,7 +1089,9 @@ def trace_quantum_function(
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
+            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
+                f, args, kwargs, static_argnums
+            )
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing

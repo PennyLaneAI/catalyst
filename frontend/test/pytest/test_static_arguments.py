@@ -16,6 +16,7 @@
 
 from dataclasses import dataclass
 
+import pennylane as qml
 import pytest
 
 from catalyst import qjit
@@ -135,6 +136,22 @@ class TestStaticArguments:
         my_obj.val_1 = 3
         assert f(1, my_obj) == 9
         assert function != f.compiled_function
+
+    def test_qnode_with_static_arguments(self, capsys):
+        """Test if QJIT static arguments pass through QNode correctly."""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit(static_argnums=(1,))
+        @qml.qnode(dev)
+        def circuit(x, c):
+            print("Inside QNode:", c)
+            qml.RY(c, 0)
+            qml.RX(x, 0)
+            return qml.expval(qml.PauliZ(0))
+
+        circuit(0.5, 0.5)
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "Inside QNode: 0.5"
 
 
 if __name__ == "__main__":

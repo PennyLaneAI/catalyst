@@ -34,6 +34,25 @@
   the python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
 
+* Static_argnums now can be passed through a QNode
+  [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+  
+  @qjit(static_argnums=(1,))
+  @qml.qnode(dev)
+  def circuit(x, c):
+      print("Inside QNode:", c)
+      qml.RY(c, 0)
+      qml.RX(x, 0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> circuit(0.5, 0.5)
+  >>> "Inside QNode: 0.5"
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
