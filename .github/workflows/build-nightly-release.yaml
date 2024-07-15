@@ -14,7 +14,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.AUTO_UPDATE_VERSION_RINGO_TOKEN }}
+        ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
 
     - name: Bump dev version
       run: |
