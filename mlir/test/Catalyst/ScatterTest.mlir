@@ -45,9 +45,9 @@ func.func public @scatter_multiply(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> 
     // CHECK-NEXT:   return [[RESTENSOR]] : tensor<f64>
 
 // CHECK: func.func public @scatter_multiply(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tensor<3xf64>
-    // CHECK:    [[IDX0:%.+]] = index.constant 0
-    // CHECK:    [[IDX1:%.+]] = index.constant 1
-    // CHECK:    [[CST:%.+]] = arith.constant dense<2.000000e+00> : tensor<f64>
+    // CHECK-DAG:[[IDX0:%.+]] = index.constant 0
+    // CHECK-DAG:[[IDX1:%.+]] = index.constant 1
+    // CHECK-DAG:[[CST:%.+]] = arith.constant dense<2.000000e+00> : tensor<f64>
     // CHECK:    [[SCF:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX1]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3xf64>)
     // CHECK:    [[INDEX:%.+]] = arith.index_cast {{%.*}} : i32 to index
     // CHECK:    [[EXTRACTED:%.+]] = tensor.extract %arg3[[[INDEX]]] : tensor<3xf64>
@@ -122,10 +122,10 @@ func.func public @two_scatter(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tenso
     // CHECK-NEXT:   return [[RESTENSOR1]] : tensor<f64>
 
 // CHECK: func.func public @two_scatter(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tensor<3xf64>
-    // CHECK:    [[IDX0:%.+]] = index.constant 0
-    // CHECK:    [[IDX1:%.+]] = index.constant 1
-    // CHECK:    [[CST0:%.+]] = arith.constant dense<2.000000e+00> : tensor<f64>
-    // CHECK:    [[CST1:%.+]] = arith.constant dense<3.000000e+00> : tensor<f64>
+    // CHECK-DAG:[[IDX0:%.+]] = index.constant 0
+    // CHECK-DAG:[[IDX1:%.+]] = index.constant 1
+    // CHECK-DAG:[[CST0:%.+]] = arith.constant dense<2.000000e+00> : tensor<f64>
+    // CHECK-DAG:[[CST1:%.+]] = arith.constant dense<3.000000e+00> : tensor<f64>
 
     // CHECK:    [[SCF0:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX1]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3xf64>)
     // CHECK:    [[INDEX:%.+]] = arith.index_cast {{%.*}} : i32 to index
@@ -175,10 +175,10 @@ func.func public @full_example_scatter(%input: tensor<3x4x2xi64>, %update: tenso
     // CHECK-NEXT:   [[RESTENSOR:%.+]] = tensor.from_elements [[RES]] : tensor<i64>
     // CHECK-NEXT:   return [[RESTENSOR]] : tensor<i64>
 
-    // CHECK:    [[CST:%.+]] = arith.constant dense<[[DENSE:.*]]> : tensor<24x4xindex>
-    // CHECK:    [[IDX0:%.+]] = index.constant 0
-    // CHECK:    [[IDX24:%.+]] = index.constant 24
-    // CHECK:    [[IDX1:%.+]] = index.constant 1
+    // CHECK-DAG:[[CST:%.+]] = arith.constant dense<[[DENSE:.*]]> : tensor<24x4xindex>
+    // CHECK-DAG:[[IDX0:%.+]] = index.constant 0
+    // CHECK-DAG:[[IDX24:%.+]] = index.constant 24
+    // CHECK-DAG:[[IDX1:%.+]] = index.constant 1
     // CHECK:    [[SCF:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX24]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3x4x2xi64>)
         // CHECK:    [[EXTRACT:%.+]] = tensor.extract_slice [[CST]][%arg2, 0] [1, 4] [1, 1] : tensor<24x4xindex> to tensor<4xindex>
         // CHECK:    [[EXTRACT0:%.+]] = tensor.extract %arg1[{{%.*}}, {{%.*}}, {{%.*}}, {{%.*}}] : tensor<2x3x2x2xi64>
@@ -219,13 +219,13 @@ func.func public @example_no_update_dim(%arg0: tensor<4xf64>) -> tensor<4xf64> {
 }
 
 // CHECK:    func.func public @example_no_update_dim(%arg0: tensor<4xf64>) -> tensor<4xf64> {
-//   CHECK:    [[CST:%.+]] = arith.constant dense<1.000000e+00> : tensor<f64>
-//   CHECK:    [[CST0:%.+]] = arith.constant dense
-//   CHECK:    [[IDX0:%.+]] = index.constant 0
-//   CHECK:    [[IDX2:%.+]] = index.constant 2
-//   CHECK:    [[IDX1:%.+]] = index.constant 1
-//   CHECK:    [[CST1:%.+]] = arith.constant dense<0.000000e+00> : tensor<4xf64>
-//   CHECK:    [[CST2:%.+]] = arith.constant dense<[0, 2]> : tensor<2xi32>
+//   CHECK-DAG:[[CST:%.+]] = arith.constant dense<1.000000e+00> : tensor<f64>
+//   CHECK-DAG:[[CST0:%.+]] = arith.constant dense
+//   CHECK-DAG:[[IDX0:%.+]] = index.constant 0
+//   CHECK-DAG:[[IDX2:%.+]] = index.constant 2
+//   CHECK-DAG:[[IDX1:%.+]] = index.constant 1
+//   CHECK-DAG:[[CST1:%.+]] = arith.constant dense<0.000000e+00> : tensor<4xf64>
+//   CHECK-DAG:[[CST2:%.+]] = arith.constant dense<[0, 2]> : tensor<2xi32>
 //   CHECK:    [[EMPTY:%.+]] = tensor.empty() : tensor<2x1xi32>
 //   CHECK:    [[GENERIC:%.+]] = linalg.generic {indexing_maps = [#map1, #map2], iterator_types = ["parallel", "parallel"]} ins([[CST2]] : tensor<2xi32>) outs([[EMPTY]] : tensor<2x1xi32>) {
 //   CHECK:    ^bb0(%in: i32, %out: i32):
