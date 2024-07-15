@@ -466,11 +466,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """
 
         _, config = self.original_device.preprocess(execution_config)
-        transform_program_modifies_measurements = False
 
         program = TransformProgram()
 
-        # measurement transforms may change operations on the tape to accommodate 
+        # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
         config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
