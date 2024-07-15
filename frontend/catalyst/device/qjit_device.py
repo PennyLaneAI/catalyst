@@ -520,8 +520,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         return measurement_program
 
-
-
     def execute(self, circuits, execution_config):
         """
         Raises: RuntimeError

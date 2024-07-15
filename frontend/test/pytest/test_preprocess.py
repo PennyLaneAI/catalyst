@@ -390,9 +390,9 @@ class TestPreprocess:
     @pytest.mark.parametrize(
         "observables",
         [
-            (qml.X(0) @ qml.X(1), qml.Y(0)), # distributed to separate tapes, but no sum splitting
-            (qml.X(0) + qml.X(1), qml.Y(0)), # split into 3 seperate terms and distributed
-            ],
+            (qml.X(0) @ qml.X(1), qml.Y(0)),  # distributed to separate tapes, but no sum splitting
+            (qml.X(0) + qml.X(1), qml.Y(0)),  # split into 3 seperate terms and distributed
+        ],
     )
     def test_split_non_commuting_execution(self, observables, mocker):
         """Test that the results of the execution for a tape with non-commuting observables is
