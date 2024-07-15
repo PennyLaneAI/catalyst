@@ -63,3 +63,20 @@ def test2():
 # CHECK-NOT: catalyst.callback @callback
 
 print(test2.mlir)
+
+
+# CHECK-LABEL: module @test3
+@pure_callback
+# CHECK-LABEL func.func private @callback_custom_name
+def custom_name(x) -> float:
+    """A function with a custom name"""
+    return x
+
+
+@qml.qjit
+def test3(x: float) -> float:
+    """Tests that custom_name will be in the IR"""
+    return custom_name(x)
+
+
+print(test3.mlir)

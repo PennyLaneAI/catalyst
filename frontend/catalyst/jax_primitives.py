@@ -301,7 +301,9 @@ def _python_callback_lowering(
     ip = module.body
     attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
     with ir.InsertionPoint(ip):
-        callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
+        # TODO: Name mangling for callbacks
+        name = callback.__name__
+        callbackOp = CallbackOp(f"callback_{name}_{callback_id}", *attrs)
     CALLBACK_OP_CACHE[cache_key] = callbackOp
     callbackOp = CALLBACK_OP_CACHE[cache_key]
     symbol = callbackOp.sym_name.value
