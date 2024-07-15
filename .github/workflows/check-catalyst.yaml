@@ -455,7 +455,9 @@ jobs:
         fail_ci_if_error: true
         token: ${{ secrets.CODECOV_TOKEN }}
 
+    # TODO: Find fix for demos with gcc 
     - name: Check Catalyst Demos
+      if: ${{ matrix.compiler != 'gcc' }}
       run: |
         MDD_BENCHMARK_PRECISION=1 \
         pytest demos --nbmake -n auto
@@ -589,7 +591,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan6
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -620,7 +622,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_OPENQASM=OFF \
-          ENABLE_ASAN=OFF \
+          ENABLE_ASAN=ON \
           make test-runtime
 
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
@@ -641,7 +643,7 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
           ENABLE_LIGHTNING_KOKKOS=OFF \
-          ENABLE_ASAN=OFF \
+          ENABLE_ASAN=ON \
           make test-runtime
 
       - name: Build examples

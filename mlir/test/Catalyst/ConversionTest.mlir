@@ -143,7 +143,7 @@ module @test0 {
   // CHECK-DAG: [[argc:%.+]] = llvm.mlir.constant(2
   // CHECK-DAG: [[resc:%.+]] = llvm.mlir.constant(3
 
-  // CHECK: llvm.call @inactive_callback([[id]], [[argc]], [[resc]]
+  // CHECK: llvm.call @__catalyst_inactive_callback([[id]], [[argc]], [[resc]]
   catalyst.callback @callback_4(memref<f64>, memref<f64>) attributes {argc = 2 : i64, id = 4 : i64, resc = 3 : i64}
 }
 
@@ -152,6 +152,7 @@ module @test0 {
 // CHECK-LABEL: @test1
 module @test1 {
   catalyst.callback @callback_1(memref<f64>, memref<f64>) attributes {argc = 1 : i64, id = 1 : i64, resc = 1 : i64}
+  // CHECK: __catalyst_inactive_callback(i64, i64, i64, ...) attributes {passthrough = ["nofree"]}
   // CHECK-LABEL: func.func private @foo(
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>
   // CHECK-SAME:)

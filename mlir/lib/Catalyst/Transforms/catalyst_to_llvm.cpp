@@ -494,10 +494,13 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         bool isVarArg = true;
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
-        LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
-                                         /*ret_type=*/voidType, isVarArg);
-
+        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
+            mod, "__catalyst_inactive_callback", {/*args=*/i64, i64, i64},
+            /*ret_type=*/voidType, isVarArg);
+        SmallVector<Attribute> passthroughs;
+        auto keyAttr = StringAttr::get(ctx, "nofree");
+        passthroughs.push_back(keyAttr);
+        customCallFnOp.setPassthroughAttr(ArrayAttr::get(ctx, passthroughs));
         // TODO: remove redundant alloca+store since ultimately we'll receive struct*
         for (auto arg : op.getArguments()) {
             Type structTy = typeConverter->convertType(arg.getType());

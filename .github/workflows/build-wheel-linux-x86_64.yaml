@@ -10,9 +10,10 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -316,7 +317,7 @@ jobs:
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=476cac2e39f79c122b8751a77aad8139b39296db \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
@@ -374,7 +375,7 @@ jobs:
         auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: wheel/
@@ -397,7 +398,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download Wheel Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist

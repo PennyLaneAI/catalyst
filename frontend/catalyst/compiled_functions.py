@@ -19,6 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Tuple
 
+import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
@@ -167,6 +168,8 @@ class CompiledFunction:
         if out_type is not None:
             keep_outputs = [k for _, k in out_type]
             retval = [r for (k, r) in zip(keep_outputs, retval) if k]
+
+        retval = [jnp.asarray(arr) for arr in retval]
         return retval
 
     @staticmethod

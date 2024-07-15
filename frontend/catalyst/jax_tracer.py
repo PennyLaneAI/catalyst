@@ -522,7 +522,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    with transient_jax_config():
+    with transient_jax_config({"jax_dynamic_shapes": True}):
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             make_jaxpr_kwargs = {
                 "static_argnums": static_argnums,
@@ -554,7 +554,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     MemrefCallable.clearcache()
     CALLBACK_OP_CACHE.clear()
 
-    with transient_jax_config():
+    with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
 
     return mlir_module, ctx
@@ -1051,8 +1051,11 @@ def trace_function(
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
+
     with EvaluationContext.frame_tracing_context(ctx) as trace:
-        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        arg_expanded_tracers = input_type_to_tracers(
+            in_sig.in_type, trace.new_arg, trace.full_raise
+        )
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
         return res_expanded_tracers, in_sig, out_sig
