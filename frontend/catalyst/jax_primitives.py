@@ -183,6 +183,30 @@ def _obs_lowering(aval):
 
 
 #
+# Trnasform Func Type
+#
+class AbstractTransformFunc(AbstractValue):
+    """Abstract transform func type."""
+
+    hash_value = hash("AbstractTransformFunc")
+
+    def __eq__(self, other):
+        return isinstance(other, AbstractTransformFunc)
+
+    def __hash__(self):
+        return self.hash_value
+
+
+class ConcreteTransformFunc(AbstractTransformFunc):
+    """Concrete transform func type."""
+
+
+def _transform_func_lowering(aval):
+    assert isinstance(aval, AbstractTransformFunc)
+    return (transform_func_type,)
+
+
+#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -193,6 +217,9 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
+
+core.raise_to_shaped_mappings[AbstractTransformFunc] = lambda aval, _: aval
+mlir.ir_type_handlers[AbstractTransformFunc] = _transform_func_lowering
 
 
 ##############
@@ -386,34 +413,6 @@ transform_func_type = ir.OpaqueType.get("transform", 'op<"func.func">', ir.Conte
 
 
 #
-# ???
-#
-class AbstractTransformFunc(AbstractValue):
-    """Abstract transform func type."""
-
-    hash_value = hash("AbstractTransformFunc")
-
-    def __eq__(self, other):
-        return isinstance(other, AbstractTransformFunc)
-
-    def __hash__(self):
-        return self.hash_value
-
-
-class ConcreteTransformFunc(AbstractTransformFunc):
-    """Concrete transform func type."""
-
-
-def _transform_func_lowering(aval):
-    assert isinstance(aval, AbstractTransformFunc)
-    return (transform_func_type,)
-
-
-core.raise_to_shaped_mappings[AbstractTransformFunc] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractTransformFunc] = _transform_func_lowering
-
-
-#
 # transform_named_sequence
 #
 @transform_named_sequence_p.def_abstract_eval
@@ -436,6 +435,8 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
     module.operation.attributes["transform.with_named_sequence"] = with_named_sequence_attr
 
     # Insert the transform.named_sequence op into the module to be transformed
+    # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
+    # Hence we insert at the end, inside the module
     with ir.InsertionPoint(module.body):
         named_sequence_op = NamedSequenceOp(
             sym_name="__transform_main",
@@ -472,16 +473,15 @@ def _apply_registered_pass_lowering(
 ):
     module = jax_ctx.module_context.module
     named_sequence_op = None
-    for i in range(len(module.body.operations)):
+    for i in reversed(range(len(module.body.operations))):
+        # transform.named_sequence usually is at the end of the module, so look for it from the end
         if module.body.operations[i].operation.name == "transform.named_sequence":
             named_sequence_op = module.body.operations[i].operation
+            break
     if named_sequence_op is None:
         raise RuntimeError(
             "transform.apply_registered_pass must be placed in a transform.named_sequence!"
         )
-
-    functype = ir.FunctionType.get(inputs=[transform_func_type], results=[transform_func_type])
-    functype_attr = ir.TypeAttr.get(functype)
 
     # Insert right before the yield op
     # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
