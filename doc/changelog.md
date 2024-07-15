@@ -34,6 +34,8 @@
   the python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
 
+* Autograph now supports static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
