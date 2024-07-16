@@ -56,7 +56,7 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = 0.36
+pl_min_release = 0.37
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -79,7 +79,7 @@ requirements = [
     "tomlkit; python_version < '3.11'",
     "scipy<1.13",
     "numpy<2",
-    "diastatic-malt>=2.15.1",
+    "diastatic-malt>=2.15.2",
 ]
 
 entry_points = {
