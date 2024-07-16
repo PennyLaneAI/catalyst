@@ -498,9 +498,9 @@ class TestDynamicOneShotIntegration:
 
     # TODO: dynamic_one_shot_several_mcms is a flaky test.
     # We remove this test for now and revisit in the future.
-    @pytest.mark.skip(
-        reason="dynamic_one_shot_several_mcms is a flaky test and needs further investigation"
-    )
+    #@pytest.mark.skip(
+    #    reason="dynamic_one_shot_several_mcms is a flaky test and needs further investigation"
+    #)
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
