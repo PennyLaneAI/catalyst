@@ -708,7 +708,7 @@ def trace_observables(
         coeffs, terms = obs.terms()
         coeffs = jax.numpy.array(coeffs)
         nested_obs = []
-        for coeff, term in zip(coeffs, terms):
+        for term in terms:
             obs = trace_observables(term, qrp, m_wires)[0]
             nested_obs.append(obs)
         obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
