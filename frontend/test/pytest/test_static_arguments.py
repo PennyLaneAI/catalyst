@@ -54,7 +54,7 @@ class TestStaticArguments:
 
         assert f(1) == 1
 
-    @pytest.mark.parametrize("argnums", [-1, 100])
+    @pytest.mark.parametrize("argnums", [-2, 100])
     def test_out_of_bounds_static_argument(self, argnums):
         """Test QJIT with invalid static argument index with respect to provided arguments."""
 

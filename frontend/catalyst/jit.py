@@ -494,9 +494,9 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
-            return self.user_function(
-                *args, static_argnums=self.compile_options.static_argnums, **kwargs
-            )
+            if self.compile_options.static_argnums:
+                kwargs = dict(static_argnums=self.compile_options.static_argnums, **kwargs)
+            return self.user_function(*args, **kwargs)
 
         requires_promotion = self.jit_compile(args)
 
@@ -724,6 +724,14 @@ class QJIT:
             )
 
     def _verify_static_argnums(self, args):
+        if not (
+            isinstance(self.compile_options.static_argnums, tuple)
+            and all(isinstance(arg, int) for arg in self.compile_options.static_argnums)
+        ):
+            raise TypeError(
+                "the `static_argnums` argument to `qjit` must be an int or a"
+                f"tuple of ints, but got value {self.compile_options.static_argnums}"
+            )
         for argnum in self.compile_options.static_argnums:
             if argnum < 0 or argnum >= len(args):
                 msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
