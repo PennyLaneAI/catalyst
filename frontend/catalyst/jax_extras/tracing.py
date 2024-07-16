@@ -540,7 +540,6 @@ def make_jaxpr2(
             in_type, in_tree = abstractify(args, kwargs)
             f, out_tree_promise = flatten_fun(f, in_tree)
             f = annotate(f, in_type)
-            f.f.static_argnums = static_argnums
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()

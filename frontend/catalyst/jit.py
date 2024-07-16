@@ -621,8 +621,11 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        def closure(*args, **kwargs):
+            QFunc.__call__(*args, static_argnums=static_argnums, **kwargs)
+
         with Patcher(
-            (qml.QNode, "__call__", QFunc.__call__),
+            (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef = trace_to_jaxpr(

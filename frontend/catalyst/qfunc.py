@@ -136,9 +136,7 @@ class QFunc:
         else:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
-        static_argnums = ()
-        if hasattr(self, "static_argnums") and self.static_argnums is not None:
-            static_argnums = self.static_argnums
+        static_argnums = kwargs.pop("static_argnums", ())
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
