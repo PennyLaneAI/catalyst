@@ -198,5 +198,6 @@ jobs:
         make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
-      run: |
-        make test-demos
+      run: | # Do not run demos in parallel, seems to cause package issues with numpy.
+        MDD_BENCHMARK_PRECISION=1 \
+        python3 -m pytest demos --nbmake
