@@ -26,3 +26,5 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
+# TODO: remove pin once we support jax>=0.4.27
+optax<0.2.3
