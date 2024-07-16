@@ -96,8 +96,6 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
 def DisableAssertionPass : Pass<"disable-assertion"> {
     let summary = "Disable all catalyst_assertions.";
 
-    let dependentDialects = ["LLVM::LLVMDialect"];
-
     let constructor = "catalyst::createDisableAssertionPass()";
 }
 

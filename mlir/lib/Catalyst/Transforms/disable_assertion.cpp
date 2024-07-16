@@ -36,9 +36,6 @@ struct DisableAssertionPass : impl::DisableAssertionPassBase<DisableAssertionPas
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "disable assertion pass"
-                          << "\n");
-
         RewritePatternSet patterns(&getContext());
         populateDisableAssertionPatterns(patterns);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
