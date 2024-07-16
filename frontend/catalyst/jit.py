@@ -729,7 +729,7 @@ class QJIT:
             and all(isinstance(arg, int) for arg in self.compile_options.static_argnums)
         ):
             raise TypeError(
-                "the `static_argnums` argument to `qjit` must be an int or a"
+                "The `static_argnums` argument to `qjit` must be an int or convertable to a"
                 f"tuple of ints, but got value {self.compile_options.static_argnums}"
             )
         for argnum in self.compile_options.static_argnums:
