@@ -2,8 +2,8 @@ name: Build nightly Catalyst releases for TestPyPI
 
 on:
   schedule:
-    # Run every weekday at 23:40
-    - cron: "40 23 * * 1-5"
+    # Run every weekday at 23:40 EDT (cron is in UTC)
+    - cron: "40 3 * * 2-6"
   workflow_dispatch:
 
 jobs:
