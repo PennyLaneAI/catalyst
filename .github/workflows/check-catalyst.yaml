@@ -456,9 +456,9 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Check Catalyst Demos
-      run: |
+      run: | # Do not run demos in parallel, seems to cause package issues with numpy.
         MDD_BENCHMARK_PRECISION=1 \
-        pytest demos --nbmake -n auto
+        python3 -m pytest demos --nbmake
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
