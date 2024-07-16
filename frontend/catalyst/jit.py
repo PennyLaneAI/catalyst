@@ -872,7 +872,7 @@ def erase_transform_primitives_from_jaxpr(jaxpr):
 
     worklist = []
     for primitive in jaxpr.eqns:
-        if primitive.primitive.name in ('transform_named_sequence', 'apply_registered_pass'):
+        if primitive.primitive.name in ("transform_named_sequence", "apply_registered_pass"):
             worklist.append(primitive)
 
     for primitive in worklist:
