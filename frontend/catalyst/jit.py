@@ -865,14 +865,14 @@ class JAX_QJIT:
 
 
 def erase_transform_primitives_from_jaxpr(jaxpr):
-    # removes the `transform_named_sequence_p` and `apply_registered_pass_p`
-    # primitives from a jaxpr
+    """
+    removes the `transform_named_sequence_p` and `apply_registered_pass_p`
+    primitives from a jaxpr
+    """
 
     worklist = []
     for primitive in jaxpr.eqns:
-        if (primitive.primitive.name == "transform_named_sequence") or (
-            primitive.primitive.name == "apply_registered_pass"
-        ):
+        if primitive.primitive.name in ('transform_named_sequence', 'apply_registered_pass'):
             worklist.append(primitive)
 
     for primitive in worklist:
