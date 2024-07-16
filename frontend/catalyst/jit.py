@@ -494,7 +494,9 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
-            return self.user_function(*args, **kwargs)
+            return self.user_function(
+                *args, static_argnums=self.compile_options.static_argnums, **kwargs
+            )
 
         requires_promotion = self.jit_compile(args)
 
@@ -622,7 +624,8 @@ class QJIT:
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
         def closure(*args, **kwargs):
-            QFunc.__call__(*args, static_argnums=static_argnums, **kwargs)
+            st_argnums = kwargs.pop("static_argnums", static_argnums)
+            return QFunc.__call__(*args, static_argnums=st_argnums, **kwargs)
 
         with Patcher(
             (qml.QNode, "__call__", closure),
