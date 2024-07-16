@@ -20,7 +20,7 @@ Here, we integrate AutoGraph into Catalyst to improve the UX and allow programme
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst.
 """
-
+import copy
 import inspect
 from contextlib import ContextDecorator
 
@@ -53,15 +53,20 @@ class CatalystTransformer(PyToPy):
         fn = obj
         if isinstance(obj, qml.QNode):
             fn = obj.func
-
-        if not (inspect.isfunction(fn) or inspect.ismethod(fn)):
+        elif inspect.isfunction(fn) or inspect.ismethod(fn):
+            pass
+        elif callable(obj):
+            # pylint: disable=unnecessary-lambda,unnecessary-lambda-assignment
+            fn = lambda *args, **kwargs: obj(*args, **kwargs)
+        else:
             raise AutoGraphError(f"Unsupported object for transformation: {type(fn)}")
 
         new_fn, module, source_map = self.transform_function(fn, user_context)
         new_obj = new_fn
 
         if isinstance(obj, qml.QNode):
-            new_obj = qml.QNode(new_fn, device=obj.device, diff_method=obj.diff_method)
+            new_obj = copy.copy(obj)
+            new_obj.func = new_fn
 
         return new_obj, module, source_map
 

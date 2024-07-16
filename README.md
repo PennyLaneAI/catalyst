@@ -1,6 +1,7 @@
 [![Tests](https://github.com/PennyLaneAI/catalyst/actions/workflows/check-catalyst.yaml/badge.svg?branch=main&event=push)](https://github.com/PennyLaneAI/catalyst/actions/workflows/check-catalyst.yaml)
 [![Coverage](https://img.shields.io/codecov/c/github/PennyLaneAI/catalyst/master.svg?logo=codecov&style=flat-square)](https://codecov.io/gh/PennyLaneAI/catalyst)
 [![Documentation](https://readthedocs.com/projects/xanaduai-catalyst/badge/?version=latest&token=e6f8607e841564d11d02baef4540523169f95d9c64fcdc656a0ecfd6564203ca)](https://docs.pennylane.ai/projects/catalyst)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.06720/status.svg)](https://doi.org/10.21105/joss.06720)
 [![PyPI](https://img.shields.io/pypi/v/PennyLane-Catalyst.svg?style=flat-square)](https://pypi.org/project/PennyLane-Catalyst)
 [![Forum](https://img.shields.io/discourse/https/discuss.pennylane.ai/posts.svg?logo=discourse&style=flat-square)](https://discuss.pennylane.ai)
 [![License](https://img.shields.io/pypi/l/PennyLane.svg?logo=apache&style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -143,7 +144,23 @@ read and respect the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 Catalyst is the work of [many contributors](https://github.com/PennyLaneAI/catalyst/graphs/contributors).
 
-If you are doing research using Catalyst, please cite our GitHub repo.
+If you are doing research using Catalyst, please cite our paper:
+
+```bibtex
+@article{
+  Ittah2024,
+  doi = {10.21105/joss.06720},
+  url = {https://doi.org/10.21105/joss.06720},
+  year = {2024},
+  publisher = {The Open Journal},
+  volume = {9},
+  number = {99},
+  pages = {6720},
+  author = {David Ittah and Ali Asadi and Erick Ochoa Lopez and Sergei Mironov and Samuel Banning and Romain Moyard and Mai Jacob Peng and Josh Izaac},
+  title = {Catalyst: a Python JIT compiler for auto-differentiable hybrid quantum programs},
+  journal = {Journal of Open Source Software}
+} 
+```
 
 ## License
 
