@@ -455,9 +455,7 @@ jobs:
         fail_ci_if_error: true
         token: ${{ secrets.CODECOV_TOKEN }}
 
-    # TODO: Find fix for randomly failing demos due to package imports
     - name: Check Catalyst Demos
-      if: false
       run: |
         MDD_BENCHMARK_PRECISION=1 \
         pytest demos --nbmake -n auto
