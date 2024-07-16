@@ -10,12 +10,13 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  workflow_call:
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 12
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: Build Catalyst Wheel on macOS (x86_64)-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -261,7 +262,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=476cac2e39f79c122b8751a77aad8139b39296db \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
