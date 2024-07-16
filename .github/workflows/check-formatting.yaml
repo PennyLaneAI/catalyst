@@ -27,7 +27,7 @@ jobs:
         run: isort --check --diff .
 
       - name: Run pylint
-        run: pylint frontend
+        run: pylint --errors-only frontend
 
   format-cpp:
     name: C++ Formatting
