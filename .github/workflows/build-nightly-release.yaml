@@ -25,7 +25,7 @@ jobs:
         git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
         git config --global user.name "ringo-but-quantum"
         git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
-        git commit -m "bump nightly version"
+        git commit -m "[no ci] bump nightly version"
         git push
 
   linux-x86:
