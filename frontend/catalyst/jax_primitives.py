@@ -190,10 +190,10 @@ class AbstractTransformFunc(AbstractValue):
 
     hash_value = hash("AbstractTransformFunc")
 
-    def __eq__(self, other):
+    def __eq__(self, other):  # pragma: nocover
         return isinstance(other, AbstractTransformFunc)
 
-    def __hash__(self):
+    def __hash__(self):  # pragma: nocover
         return self.hash_value
 
 
