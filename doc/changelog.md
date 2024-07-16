@@ -50,6 +50,9 @@
   >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
   ```
 
+* Autograph works when `qjit` is applied to a function decorated with `vmap`.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
@@ -60,7 +63,14 @@
   
 * Using float32 in callback functions would not crash in compilation phase anymore,
   but rather raise the appropriate type exception to the user.
-  [(#916)]https://github.com/PennyLaneAI/catalyst/pull/916
+  [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
+
+* Fix tracing of `SProd` operations
+  [(#935)](https://github.com/PennyLaneAI/catalyst/pull/935)
+
+  After some changes in PennyLane, `Sprod.terms()` returns the terms as leaves
+  instead of a tree. This means that we need to manually trace each term and
+  finally multiply it with the coefficients to create a Hamiltonian.
 
 <h3>Internal changes</h3>
 
@@ -77,6 +87,7 @@ This release contains contributions from (in alphabetical order):
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Raul Torres,
 Tzung-Han Juang,
 
 # Release 0.7.0

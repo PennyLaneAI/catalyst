@@ -705,10 +705,13 @@ def trace_observables(
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
-        terms = obs.terms()
-        coeffs = jax.numpy.array(terms[0])
-        nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
-        obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
+        coeffs, terms = obs.terms()
+        coeffs = jax.numpy.array(coeffs)
+        nested_obs = []
+        for term in terms:
+            obs = trace_observables(term, qrp, m_wires)[0]
+            nested_obs.append(obs)
+        obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
