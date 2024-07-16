@@ -34,6 +34,25 @@
   the python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
 
+* Autograph now supports in-place array assignments with static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
+
+  For example,
+
+  ```python
+  @qjit(autograph=True)
+  def f(x, y):
+    y[1:10:2] = x
+    return y
+  ```
+
+  ```pycon
+  >>> f(jnp.ones(5), jnp.zeros(10))
+  >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
+  ```
+
+* Autograph works when `qjit` is applied to a function decorated with `vmap`.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
@@ -61,6 +80,7 @@ This release contains contributions from (in alphabetical order):
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Raul Torres,
 Tzung-Han Juang,
 
 # Release 0.7.0
