@@ -142,4 +142,13 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
+def AddTBAATags : Pass<"add-tbaa-tags", "mlir::ModuleOp"> {
+  let summary = "Add tbaa tags to operations load and store.";
+  let description = [{
+    TBAA
+  }];
+  let dependentDialects = ["catalyst::CatalystDialect"];
+  let constructor = "::catalyst::createAddTBAATagsPass()";
+}
+
 #endif // CATALYST_PASSES
