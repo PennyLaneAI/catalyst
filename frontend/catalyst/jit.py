@@ -537,9 +537,9 @@ class QJIT:
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
-        # After compilation is successfully done, remove the transform_named_sequence from the jaxpr
+        # After compilation is successfully done, remove the transform primitives from jaxpr
         if self.jaxpr is not None:
-            del self.jaxpr.eqns[-1]
+            erase_transform_primitives_from_jaxpr(self.jaxpr)
 
     @debug_logger
     def jit_compile(self, args):
@@ -578,9 +578,9 @@ class QJIT:
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
 
-            # After compilation is successfully done, remove the transform_named_sequence from the jaxpr
+            # After compilation is successfully done, remove the transform primitives from jaxpr
             if self.jaxpr is not None:
-                del self.jaxpr.eqns[-1]
+                erase_transform_primitives_from_jaxpr(self.jaxpr)
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -640,7 +640,7 @@ class QJIT:
             )
 
             # After tracing ANY qjit jaxpr, add a transform_named_sequence primitive
-            # Otherwise the -transform-interpreter will complain that a __transform_main is not found
+            # Otherwise -transform-interpreter will complain that a __transform_main is not found
             jaxpr.eqns.append(
                 new_jaxpr_eqn(
                     invars=[],
@@ -862,3 +862,18 @@ class JAX_QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
+
+
+def erase_transform_primitives_from_jaxpr(jaxpr):
+    # removes the `transform_named_sequence_p` and `apply_registered_pass_p`
+    # primitives from a jaxpr
+
+    worklist = []
+    for primitive in jaxpr.eqns:
+        if (primitive.primitive.name == "transform_named_sequence") or (
+            primitive.primitive.name == "apply_registered_pass"
+        ):
+            worklist.append(primitive)
+
+    for primitive in worklist:
+        jaxpr.eqns.remove(primitive)
