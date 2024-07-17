@@ -22,7 +22,7 @@
       [1.61605839, 4.42856163]])
   ```
 
-* Runtime validation within QJIT functions using `catalyst.catalyst_assert`.
+* Runtime validation within QJIT functions using `catalyst.debug_assert`.
   [(#925)](https://github.com/PennyLaneAI/catalyst/pull/925)
 
   Can be turned off by setting compile time flag `disable_assertions=True`.
@@ -31,12 +31,12 @@
   ```python
   @qjit
   def f(x):
-      catalyst_assert(x < 5, "x was greater than 5")
+      debug_assert(x < 5, "x was greater than 5")
       return x * 8
 
   @qjit(disable_assertions=True)
   def g(x):
-      catalyst_assert(x < 5, "x was greater than 5")
+      debug_assert(x < 5, "x was greater than 5")
       return x * 8      
   ```
 
