@@ -65,6 +65,23 @@ class TestStaticArguments:
         with pytest.raises(CompileError, match="is beyond the valid range"):
             f(5)
 
+    @pytest.mark.parametrize(
+        "argnums",
+        [
+            (1.0,),
+            ("x",),
+        ],
+    )
+    def test_unsopported_type_static_argument(self, argnums):
+        """Test QJIT with invalid static argument type."""
+
+        @qjit(static_argnums=argnums)
+        def f(x):
+            return x
+
+        with pytest.raises(TypeError, match="The `static_argnums` argument to"):
+            f(5)
+
     def test_one_static_argument(self):
         """Test QJIT with one static argument."""
 
