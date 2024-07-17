@@ -2033,6 +2033,18 @@ class TestDecorators:
 
         assert qjit(cond_fn, autograph=True)() == 36
 
+    def test_for_loop(self):
+        """Test if Autograph works when applied to a decorated function with for_loop"""
+
+        x = 5
+        n = 6
+
+        @for_loop(0, n, 1)
+        def loop(_, agg):
+            return agg + x
+        
+        assert qjit(loop, autograph=True)(0) == 30
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
