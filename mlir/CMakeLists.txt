@@ -38,6 +38,7 @@ set(ALL_MHLO_PASSES
   MhloToStandard
   HloToLinalgUtils
   MhloToLinalg
+  MhloShapeOpsToStandard
   MhloToStablehlo
   StablehloToMhlo
 )
