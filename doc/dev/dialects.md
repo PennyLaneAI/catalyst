@@ -1,14 +1,5 @@
 # MLIR Dialects in Catalyst
 
-## General information
-
-- As of v0.3.2, Catalyst officially supports Linux x86, macOS arm64, and macOS x86 platforms.
-
-- Binary distributions are available via `pip install pennylane-catalyst`. However, writing new
-  dialects requires building Catalyst from source. Detailed instructions are available in the
-  [installation page](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html)
-  of the Catalyst documentation.
-
 ## Introduction to MLIR dialects
 
 A *dialect* in MLIR is intended to represent a certain abstraction level, computing domain, or
@@ -74,7 +65,9 @@ An alternative tutorial on creating a basic MLIR dialect can also be found in th
 
 ## Creating a new dialect
 
-Let's see how we can add a new dialect to Catalyst, using OpenQASM as an example!
+Let's see how we can add a new dialect to Catalyst, using OpenQASM as an example! Note that all
+auto-generated files and build artifacts mentioned in the guide will only appear at the end of
+the [Using the dialect](#using-the-dialect) section when the `make dialects` command is run.
 
 Start by creating a new TableGen file, located at `mlir/include/OpenQASM/OpenQASM.td`, with the
 following content:
@@ -322,7 +315,8 @@ TableGen.
 
 > [!IMPORTANT]
 > For any newly added `CMakeLists.txt`, be sure to add it to its parent CMake file with
-> `add_subdirectory(<name of new folder>)`.
+> `add_subdirectory(<name of new folder>)`. In this case, both `mlir/include/CMakeLists.txt` and
+> `mlir/lib/CMakeLists.txt` will need to be updated with `add_subdirectory(OpenQASM)`.
 
 ## Using the dialect
 
@@ -380,6 +374,23 @@ func.func @my_circuit(%q0 : !oq.qubit) {
 ```console
 ./mlir/build/bin/quantum-opt my_test_file.mlir
 ```
+
+You should see the same code in the input file printed back out to you:
+
+```
+func.func @my_circuit(%q0 : !oq.qubit) {
+    %phi = arith.constant 0.3 : f64
+
+    oq.RZ(%phi) %q0 : !oq.qubit
+
+    func.return
+}
+```
+
+> [!NOTE]
+> If you are encoutering issues, or would like to quickly try out the dialect described in this
+> guide, you can have a look at or cherry-pick this commit which includes all changes described
+> above: https://github.com/PennyLaneAI/catalyst/commit/e36d435c209a32f06715f3e34ac896a0a35aa92c
 
 ## Build your own
 
