@@ -495,7 +495,8 @@ class QJIT:
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
             if self.compile_options.static_argnums:
-                kwargs = dict(static_argnums=self.compile_options.static_argnums, **kwargs)
+                kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
+
             return self.user_function(*args, **kwargs)
 
         requires_promotion = self.jit_compile(args)
