@@ -664,5 +664,49 @@ class TestCondOperatorAccess:
         assert func(False) == 0
 
 
+class TestCondPredicateConversion:
+    """Test suite for checking predicate conversion to bool."""
+
+    def test_conversion_integer(self):
+        """Test predicate conversion from integer to bool"""
+
+        @qml.qjit()
+        def workflow(x):
+            n = 1
+
+            # n is an integer but it gets converted to bool
+            @cond(n)
+            def cond_fn():
+                return x**2
+
+            @cond_fn.otherwise
+            def else_fn():
+                return x
+
+            return cond_fn()
+
+        assert workflow(3) == 9
+
+    def test_conversion_float(self):
+        """Test predicate conversion from float to bool."""
+
+        @qml.qjit()
+        def workflow(x):
+            n = 2.0
+
+            # n is a float but it gets converted to bool
+            @cond(n)
+            def cond_fn():
+                return x**2
+
+            @cond_fn.otherwise
+            def else_fn():
+                return x
+
+            return cond_fn()
+
+        assert workflow(3) == 9
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

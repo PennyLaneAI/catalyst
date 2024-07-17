@@ -549,7 +549,8 @@ class CondCallable:
     """
 
     def __init__(self, pred, true_fn):
-        self.preds = [pred]
+        # Make sure the predicate is a boolean
+        self.preds = [jnp.astype(pred, bool)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda: None
         self._operation = None
