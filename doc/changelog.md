@@ -50,9 +50,10 @@
   >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
   ```
 
-* Autograph works when `qjit` is applied to a function decorated with `vmap` or `cond`.
+* Autograph works when `qjit` is applied to a function decorated with `vmap`, `cond`, `for_loop` or `while_loop`.
   [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
   [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
+  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
 
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.

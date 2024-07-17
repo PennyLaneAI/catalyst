@@ -42,6 +42,7 @@ from catalyst import (
     run_autograph,
     vjp,
     vmap,
+    while_loop,
 )
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
@@ -2032,6 +2033,29 @@ class TestDecorators:
             return n
 
         assert qjit(cond_fn, autograph=True)() == 36
+
+    def test_for_loop(self):
+        """Test if Autograph works when applied to a decorated function with for_loop"""
+
+        x = 5
+        n = 6
+
+        @for_loop(0, n, 1)
+        def loop(_, agg):
+            return agg + x
+
+        assert qjit(loop, autograph=True)(0) == 30
+
+    def test_while_loop(self):
+        """Test if Autograph works when applied to a decorated function with while_loop"""
+
+        n = 6
+
+        @while_loop(lambda i: i < n)
+        def loop(i):
+            return i + 1
+
+        assert qjit(loop, autograph=True)(0) == n
 
 
 if __name__ == "__main__":
