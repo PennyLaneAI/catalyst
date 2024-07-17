@@ -2020,7 +2020,7 @@ class TestDecorators:
 
     def test_cond(self):
         """Test if Autograph works when applied to a decorated function with cond"""
-        
+
         n = 6
 
         @cond(n > 4)
