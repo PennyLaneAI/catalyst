@@ -2043,7 +2043,7 @@ class TestDecorators:
         @for_loop(0, n, 1)
         def loop(_, agg):
             return agg + x
-        
+
         assert qjit(loop, autograph=True)(0) == 30
 
     def test_while_loop(self):
@@ -2054,7 +2054,7 @@ class TestDecorators:
         @while_loop(lambda i: i < n)
         def loop(i):
             return i + 1
-        
+
         assert qjit(loop, autograph=True)(0) == n
 
 
