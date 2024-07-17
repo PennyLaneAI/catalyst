@@ -14,10 +14,9 @@
 
 """Integration tests for the runtime assertion feature."""
 
-import pennylane as qml
 import pytest
 
-from catalyst import catalyst_assert, qjit
+from catalyst import debug_assert, qjit
 
 
 class TestAssertion:
@@ -28,7 +27,7 @@ class TestAssertion:
 
         @qjit
         def circuit(x):
-            catalyst_assert(True, "Always pass")
+            debug_assert(True, "Always pass")
             return x * 8
 
         assert circuit(5) == 40
@@ -38,7 +37,7 @@ class TestAssertion:
 
         @qjit
         def circuit(x):
-            catalyst_assert(False, "Always fail")
+            debug_assert(False, "Always fail")
             return x * 8
 
         with pytest.raises(RuntimeError, match="Always fail"):
@@ -49,7 +48,7 @@ class TestAssertion:
 
         @qjit
         def circuit(x):
-            catalyst_assert(x < 6, "x greater than 6")
+            debug_assert(x < 6, "x greater than 6")
             return x * 8
 
         assert circuit(5) == 40
@@ -61,7 +60,7 @@ class TestAssertion:
 
         @qjit(disable_assertions=True)
         def circuit(x):
-            catalyst_assert(False, "x greater than 6")
+            debug_assert(False, "x greater than 6")
             return x * 8
 
         assert circuit(5) == 40
@@ -71,7 +70,7 @@ class TestAssertion:
 
         @qjit(disable_assertions=True)
         def circuit(x):
-            catalyst_assert(x < 6, "x greater than 6")
+            debug_assert(x < 6, "x greater than 6")
             return x * 8
 
         assert circuit(7) == 56
@@ -81,7 +80,7 @@ class TestAssertion:
         """Test that disabling and enabling disable_assertions pass works properly."""
 
         def circuit():
-            catalyst_assert(False, "Always raise")
+            debug_assert(False, "Always raise")
             return True
 
         with pytest.raises(RuntimeError, match="Always raise"):

@@ -6,7 +6,7 @@ in Catalyst JIT-compiled functions.
 from catalyst.jax_primitives import assert_p
 
 
-def catalyst_assert(condition: bool, error: str):
+def debug_assert(condition: bool, error: str):
     """
     Asserts at runtime that the given condition holds, raising an error with the
     provided message if it does not.
