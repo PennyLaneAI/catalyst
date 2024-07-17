@@ -74,6 +74,9 @@
   instead of a tree. This means that we need to manually trace each term and
   finally multiply it with the coefficients to create a Hamiltonian.
 
+* Compile time conditionals on Python types work with Autograph.
+  [(#944)](https://github.com/PennyLaneAI/catalyst/pull/944)
+
 <h3>Internal changes</h3>
 
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
