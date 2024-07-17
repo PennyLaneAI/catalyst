@@ -2018,6 +2018,21 @@ class TestDecorators:
         )
         assert jnp.allclose(result, expected)
 
+    def test_cond(self):
+        """Test if Autograph works when applied to a decorated function with cond"""
+
+        n = 6
+
+        @cond(n > 4)
+        def cond_fn():
+            return n**2
+
+        @cond_fn.otherwise
+        def else_fn():
+            return n
+
+        assert qjit(cond_fn, autograph=True)() == 36
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
