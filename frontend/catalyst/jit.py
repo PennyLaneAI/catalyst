@@ -45,6 +45,7 @@ from catalyst.tracing.type_signatures import (
     get_type_annotations,
     merge_static_args,
     promote_arguments,
+    verify_static_argnums,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
@@ -616,7 +617,7 @@ class QJIT:
             Tuple[Any]: the dynamic argument signature
         """
 
-        self._verify_static_argnums(args)
+        verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
 
@@ -723,20 +724,6 @@ class QJIT:
             raise CompileError(
                 "In order for 'autograph_include' to work, 'autograph' must be set to True"
             )
-
-    def _verify_static_argnums(self, args):
-        if not (
-            isinstance(self.compile_options.static_argnums, tuple)
-            and all(isinstance(arg, int) for arg in self.compile_options.static_argnums)
-        ):
-            raise TypeError(
-                "The `static_argnums` argument to `qjit` must be an int or convertable to a"
-                f"tuple of ints, but got value {self.compile_options.static_argnums}"
-            )
-        for argnum in self.compile_options.static_argnums:
-            if argnum < 0 or argnum >= len(args):
-                msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
-                raise CompileError(msg)
 
     def _get_workspace(self):
         """Get or create a workspace to use for compilation."""

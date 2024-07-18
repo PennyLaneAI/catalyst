@@ -100,6 +100,7 @@ from jaxlib.xla_extension import PyTreeRegistry
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
 from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
+from catalyst.tracing.type_signatures import verify_static_argnums
 
 # pylint: disable=protected-access
 
@@ -447,8 +448,8 @@ def deduce_avals(f: Callable, args, kwargs, static_argnums=None):
     # TODO: deprecate in favor of `deduce_signatures`
     wf = wrap_init(f)
     if static_argnums:
-        argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
-        dynamic_argnums = [i for i in range(len(args)) if i not in argnums]
+        verify_static_argnums(args, static_argnums)
+        dynamic_argnums = [i for i in range(len(args)) if i not in static_argnums]
         wf, args = jax._src.api_util.argnums_partial(wf, dynamic_argnums, args)
     flat_args, in_tree = tree_flatten((args, kwargs))
     abstracted_axes = None
