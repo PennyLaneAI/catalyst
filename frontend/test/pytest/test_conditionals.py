@@ -669,7 +669,7 @@ class TestCondPredicateConversion:
     """Test suite for checking predicate conversion to bool."""
 
     def test_conversion_integer(self):
-        """Test predicate conversion from integer to bool."""
+        """Test entry predicate conversion from integer to bool."""
 
         @qml.qjit()
         def workflow(x):
@@ -689,7 +689,7 @@ class TestCondPredicateConversion:
         assert workflow(3) == 9
 
     def test_conversion_float(self):
-        """Test predicate conversion from float to bool."""
+        """Test entry predicate conversion from float to bool."""
 
         @qml.qjit()
         def workflow(x):
@@ -708,8 +708,32 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
+    def test_else_if_conversion_integer(self):
+        """Test else_if predicate conversion from integer to bool."""
+
+        @qml.qjit()
+        def workflow(x):
+            n = 1
+
+            @cond(n < 0)
+            def cond_fn():
+                return -x
+
+            # n is an integer but it gets converted to bool
+            @cond_fn.else_if(n)
+            def else_if_fn():
+                return x**2
+
+            @cond_fn.otherwise
+            def else_fn():
+                return x
+
+            return cond_fn()
+
+        assert workflow(3) == 9
+
     def test_conversion_int_autograph(self):
-        """Test predicate conversion from integer to bool using Autograph."""
+        """Test entry predicate conversion from integer to bool using Autograph."""
 
         @qml.qjit(autograph=True)
         def workflow(x):
@@ -719,6 +743,24 @@ class TestCondPredicateConversion:
                 y = x**2
             else:
                 y = x
+
+            return y
+
+        assert workflow(3) == 9
+
+    def test_conversion_int_autograph_elif(self):
+        """Test elif predicate conversion from integer to bool using Autograph."""
+
+        @qml.qjit(autograph=True)
+        def workflow(x):
+            n = 1
+
+            if n < 0:
+                y = -x
+            elif n:
+                y = x**2
+            else:
+                y = 0
 
             return y
 

@@ -588,7 +588,7 @@ class CondCallable:
                 raise TypeError(
                     "Conditional 'else if' function is not allowed to have any arguments"
                 )
-            self.preds.append(pred)
+            self.preds.append(jnp.astype(pred, bool))
             self.branch_fns.append(branch_fn)
             return self
 
