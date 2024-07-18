@@ -271,7 +271,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 
 @transform
-def validate_observables(
+def validate_measurements(
     tape: QuantumTape, qjit_capabilities: dict, name: str
 ) -> (Sequence[QuantumTape], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
@@ -287,9 +287,20 @@ def validate_observables(
         The unaltered input circuit.
 
     Raises:
-        CompileError: if an observable is not supported by the device with Catalyst
+        CompileError: if an observable or measurement type is not supported by the device with Catalyst
 
     """
+
+    mp_types_mapping = {"Counts": CountsMP,
+                        "Expval": ExpectationMP,
+                        "Probs": ProbabilityMP,
+                        "Sample": SampleMP,
+                        "State": StateMP,
+                        "Var": VarianceMP,
+    }
+
+    supported_types = tuple(mp_types_mapping[mp] for mp in qjit_capabilities.measurement_processes)
+
 
     def _obs_checker(obs):
         if not qjit_capabilities.native_obs.get(obs.name):
@@ -297,26 +308,14 @@ def validate_observables(
                 f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
             )
 
-    supported_types = tuple(mp_types_mapping[mp] for mp in qjit_capabilities.measurement_processes)
-
     for m in tape.measurements:
         if m.obs:
             _verify_observable(m.obs, _obs_checker)
         if not isinstance(m, supported_types):
-            print(qjit_capabilities.measurement_processes)
             raise CompileError(
                 f"{type(m)} is not a supported measurement process on the '{name}' device with Catalyst"
             )
 
     return (tape,), lambda x: x[0]
 
-
-mp_types_mapping = {
-    "Counts": CountsMP,
-    "Expval": ExpectationMP,
-    "Probs": ProbabilityMP,
-    "Sample": SampleMP,
-    "State": StateMP,
-    "Var": VarianceMP,
-}
 
