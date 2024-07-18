@@ -21,6 +21,7 @@ with control flow, including conditionals, for loops, and while loops.
 
 from typing import Any, Callable, List
 
+import jax
 import jax.numpy as jnp
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
@@ -549,8 +550,7 @@ class CondCallable:
     """
 
     def __init__(self, pred, true_fn):
-        # Make sure the predicate is a boolean
-        self.preds = [jnp.astype(pred, bool)]
+        self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda: None
         self._operation = None
@@ -588,7 +588,7 @@ class CondCallable:
                 raise TypeError(
                     "Conditional 'else if' function is not allowed to have any arguments"
                 )
-            self.preds.append(jnp.astype(pred, bool))
+            self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
             return self
 
@@ -607,6 +607,22 @@ class CondCallable:
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
+
+    def _convert_predicate_to_bool(self, pred):
+        """Convert predicate to bool if necessary."""
+
+        if isinstance(pred, jax.Array) and pred.shape not in ((), (1,)):
+            raise TypeError("Array with multiple elements is not a valid predicate")
+
+        if not isinstance(pred, bool):
+            try:
+                pred = jnp.astype(pred, bool)
+            except:
+                raise TypeError(
+                    "Conditional predicates are required to be of bool, integer or float type"
+                )
+
+        return pred
 
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace

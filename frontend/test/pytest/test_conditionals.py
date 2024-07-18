@@ -766,16 +766,12 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
-    def test_conversion_failed(self):
-        """Test failure at converting to bool using Autograph."""
-
-        class BoolFail:
-            def __bool__(self):
-                 return 'Fail'
+    def test_string_conversion_failed(self):
+        """Test failure at converting string to bool using Autograph."""
 
         @qml.qjit(autograph=True)
         def workflow(x):
-            n = BoolFail()
+            n = "fail"
 
             if n:
                 y = x**2
@@ -784,7 +780,29 @@ class TestCondPredicateConversion:
 
             return y
 
-        with pytest.raises(TypeError, match="Cannot determine dtype"):
+        with pytest.raises(
+            TypeError,
+            match="Conditional predicates are required to be of bool, integer or float type",
+        ):
+            workflow(3)
+
+    def test_array_conversion_failed(self):
+        """Test failure at converting array to bool using Autograph."""
+
+        @qml.qjit(autograph=True)
+        def workflow(x):
+            n = jnp.array([[1], [2]])
+
+            if n:
+                y = x**2
+            else:
+                y = 0
+
+            return y
+
+        with pytest.raises(
+            TypeError, match="Array with multiple elements is not a valid predicate"
+        ):
             workflow(3)
 
 
