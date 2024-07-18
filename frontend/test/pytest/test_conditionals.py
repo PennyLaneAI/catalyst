@@ -766,6 +766,27 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
+    def test_conversion_failed(self):
+        """Test failure at converting to bool using Autograph."""
+
+        class BoolFail:
+            def __bool__(self):
+                 return 'Fail'
+
+        @qml.qjit(autograph=True)
+        def workflow(x):
+            n = BoolFail()
+
+            if n:
+                y = x**2
+            else:
+                y = 0
+
+            return y
+
+        with pytest.raises(TypeError, match="Cannot determine dtype"):
+            workflow(3)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
