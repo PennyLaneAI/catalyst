@@ -925,13 +925,11 @@ def apply_transform(
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_program_transformed = qnode_program
-
-    if is_program_transformed and qnode_program.is_informative:
+    if qnode_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    if is_program_transformed or device_modify_measurements:
+    if qnode_program or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         total_program = qnode_program + device_program
     else:
@@ -1117,14 +1115,12 @@ def trace_quantum_function(
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
+                device_modify_measurements = config.device_options["transforms_modify_measurements"]
             else:
                 device_program = TransformProgram()
+                device_modify_measurements = False  # this is only for the new API transform program
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
-
-            device_modify_measurements = "measurements_from_counts" in [
-                t.transform.__name__ for t in device_program
-            ]
 
             tapes, post_processing = apply_transform(
                 qnode_program,

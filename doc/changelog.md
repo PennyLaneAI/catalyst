@@ -50,8 +50,10 @@
   >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
   ```
 
-* Autograph works when `qjit` is applied to a function decorated with `vmap`.
+* Autograph works when `qjit` is applied to a function decorated with `vmap`, `cond`, `for_loop` or `while_loop`.
   [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
+  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
 
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
@@ -512,7 +514,7 @@ Tzung-Han Juang,
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 * All decorators in Catalyst, including `vmap`, `qjit`, `mitigate_with_zne`,
-  as well as gradient decorators `grad`, `jacobian`, jvp`, and `vjp`, can now be used
+  as well as gradient decorators `grad`, `jacobian`, `jvp`, and `vjp`, can now be used
   both with and without keyword arguments as a decorator without the need for
   `functools.partial`:
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
