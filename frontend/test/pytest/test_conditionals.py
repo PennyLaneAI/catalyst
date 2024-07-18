@@ -715,7 +715,7 @@ class TestCondPredicateConversion:
             n = 1
 
             if n:
-                y = x ** 2
+                y = x**2
             else:
                 y = x
 
