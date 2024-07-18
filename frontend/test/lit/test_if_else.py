@@ -25,9 +25,13 @@ from catalyst import cond, measure, qjit
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
-    # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK-DAG:   [[b_t_2:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<false> : tensor<i1>
+    # CHECK:       [[b_t_1:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK:       [[b_t_3:%[a-zA-Z0-9_]+]] = stablehlo.broadcast_in_dim [[b_t_2]], dims = [] : (tensor<i1>) -> tensor<i1>
+    # CHECK:       [[b_t_4:%[a-zA-Z0-9_]+]] = stablehlo.compare  NE, [[b_t_1]], [[b_t_3]],  UNSIGNED : (tensor<i1>, tensor<i1>) -> tensor<i1>
+    # CHECK:       [[b_t_5:%[a-zA-Z0-9_]+]] = stablehlo.convert [[b_t_4]] : tensor<i1>
     # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = quantum.alloc
-    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]]
+    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t_5]]    
     @cond(n <= 5)
     # CHECK:       [[qreg_2:%.+]]:2 = scf.if [[b]]
     def cond_fn():
@@ -64,6 +68,7 @@ def test_convert_element_type(i: int, f: float):
     """Test the presence of convert_element_type JAX primitive when the type conversion is
     required."""
 
+    # CHECK: convert_element_type
     # CHECK: cond[
     @cond(i <= 3)
     def cond_fn():
@@ -92,6 +97,7 @@ print(test_convert_element_type.jaxpr)
 def test_no_convert_element_type(i: int):
     """Test the absense of convert_element_type JAX primitive when no type conversion is required"""
 
+    # CHECK: convert_element_type
     # CHECK: cond[
     @cond(i <= 3)
     def cond_fn():
