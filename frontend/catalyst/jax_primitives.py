@@ -728,6 +728,12 @@ def _zne_abstract_eval(*args, jaxpr, fn):  # pylint: disable=unused-argument
     return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
 
 
+def _folding_attribute(ctx, folding: str):
+    ctx = ctx.module_context.context
+    return ir.OpaqueAttr.get(
+        "mitigation", ("folding " + folding).encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
 def _zne_lowering(ctx, *args, jaxpr, fn):
     """Lowering function to the ZNE opearation.
     Args:
@@ -746,8 +752,9 @@ def _zne_lowering(ctx, *args, jaxpr, fn):
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
-        mlir.flatten_lowering_ir_args(args[0:-2]),
-        folding.value,
+        mlir.flatten_lowering_ir_args(args),
+        # TODO: Once this works, change hardcoded value to actual value from input
+        _folding_attribute(ctx, "global"),
         scale_factors,
     ).results
 

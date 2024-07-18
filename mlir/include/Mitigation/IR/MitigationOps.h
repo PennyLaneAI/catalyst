@@ -23,6 +23,7 @@
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 
+#include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/IR/MitigationEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "Mitigation/IR/MitigationAttributes.h.inc"

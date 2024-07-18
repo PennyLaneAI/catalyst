@@ -32,10 +32,12 @@ from catalyst.jax_primitives import zne_p
 from enum import IntEnum
 
 class Folding(IntEnum):
-    GLOBAL = "global"
+    GLOBAL = 1
+    RANDOM = 2
+    ALL = 3
 
 ## API ##
-def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding=Folding.GLOBAL):
+def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding='global'):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -55,6 +57,7 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapol
             By default, perfect polynomial fitting will be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
+        folding (str): The unitary folding technique to be used to scale the circuit 
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
@@ -122,7 +125,7 @@ class ZNE:
         fn: Callable,
         scale_factors: jnp.ndarray,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
-        folding: Folding
+        folding: str
     ):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
@@ -134,7 +137,7 @@ class ZNE:
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
-        jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
+        jaxpr = jax.make_jaxpr(self.fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
         set_dtypes = set(dtypes)
@@ -143,7 +146,8 @@ class ZNE:
         if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
             raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
-        results = zne_p.bind(*args_data, self.folding, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
+        folding = Folding[self.folding.upper()].value
+        results = zne_p.bind(*args_data, folding, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
         results = self.extrapolate(float_scale_factors, results[0])
         # Single measurement

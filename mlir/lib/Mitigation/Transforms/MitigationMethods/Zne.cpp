@@ -45,6 +45,9 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     RankedTensorType scaleFactorType = scaleFactors.getType().cast<RankedTensorType>();
     const auto sizeInt = scaleFactorType.getDimSize(0);
 
+    // Folding type
+    auto folding = op.getFolding();
+
     // Create the folded circuit function
     FlatSymbolRefAttr foldedCircuitRefAttr =
         getOrInsertFoldedCircuit(loc, rewriter, op, scaleFactorType.getElementType());
@@ -149,7 +152,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     func::FuncOp fnAllocOp =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
-    // Get the number of qubits
+    // Get the number of qubits 
     quantum::AllocOp allocOp = *fnOp.getOps<quantum::AllocOp>().begin();
     std::optional<int64_t> numberQubitsOptional = allocOp.getNqubitsAttr();
     int64_t numberQubits = numberQubitsOptional.value_or(0);
