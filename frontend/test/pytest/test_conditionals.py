@@ -668,7 +668,7 @@ class TestCondPredicateConversion:
     """Test suite for checking predicate conversion to bool."""
 
     def test_conversion_integer(self):
-        """Test predicate conversion from integer to bool"""
+        """Test predicate conversion from integer to bool."""
 
         @qml.qjit()
         def workflow(x):
@@ -704,6 +704,22 @@ class TestCondPredicateConversion:
                 return x
 
             return cond_fn()
+
+        assert workflow(3) == 9
+
+    def test_conversion_int_autograph(self):
+        """Test predicate conversion from integer to bool using Autograph."""
+
+        @qml.qjit(autograph=True)
+        def workflow(x):
+            n = 1
+
+            if n:
+                y = x ** 2
+            else:
+                y = x
+
+            return y
 
         assert workflow(3) == 9
 
