@@ -234,9 +234,9 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 
 void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
-// void __catalyst__rt__initialize() { CTX = std::make_unique<ExecutionContext>(); }
+void __catalyst__rt__initialize() { CTX = std::make_unique<ExecutionContext>(); }
 
-void __catalyst__rt__initialize(char *seed)
+void __catalyst__rt__initialize_seeded(char *seed)
 {
     std::string seed_str(seed);
     CTX = std::make_unique<ExecutionContext>(seed_str);

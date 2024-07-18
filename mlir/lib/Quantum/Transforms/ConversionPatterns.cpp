@@ -153,8 +153,6 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
 
         StringRef qirName;
         if constexpr (std::is_same_v<T, InitializeOp>) {
-            qirName = "__catalyst__rt__initialize";
-
             InitializeOp InitOp = cast<InitializeOp>(op);
             if (InitOp->hasAttr("seed")) {
                 Location loc = InitOp.getLoc();
@@ -162,25 +160,37 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                 ModuleOp mod = InitOp->getParentOfType<ModuleOp>();
                 Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
                 auto seed_str = cast<StringAttr>(InitOp->getAttr("seed")).str();
-                auto seed_gs =
-                    getGlobalString(loc, rewriter, seed_str,
-                                    StringRef(seed_str.c_str(), seed_str.length() + 1), mod);
+                if (seed_str != "") {
+                    qirName = "__catalyst__rt__initialize_seeded";
+                    auto seed_gs =
+                        getGlobalString(loc, rewriter, seed_str,
+                                        StringRef(seed_str.c_str(), seed_str.length() + 1), mod);
 
-                Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                                                {/* seed = */ charPtrType});
-                LLVM::LLVMFuncOp fnDecl =
-                    ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-                SmallVector<Value> operands = {seed_gs};
-                rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
-                rewriter.eraseOp(op);
+                    Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                                    {/* seed = */ charPtrType});
+                    LLVM::LLVMFuncOp fnDecl =
+                        ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                    SmallVector<Value> operands = {seed_gs};
+                    rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+                    rewriter.eraseOp(op);
+                }
+                else {
+                    qirName = "__catalyst__rt__initialize";
+                    Type qirSignature =
+                        LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+                    LLVM::LLVMFuncOp fnDecl =
+                        ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+                }
             }
             else {
                 // Note: since in the frontend the qjit seed is defaulted to "" (empty string),
                 // and a StringAttr "seed" is attached to quantum.init in gen_mlir.py,
                 // this else block should NEVER be called.
                 // In other words, quantum.init instruction now ALWAYS has a string attr "seed".
-                // This else block is here because there are still quantum.init without attributes
-                // in mlir tests.
+                // This else block is here because there are still quantum.init without that
+                // attribute in mlir tests.
+                qirName = "__catalyst__rt__initialize";
                 Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
                 LLVM::LLVMFuncOp fnDecl =
                     ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
