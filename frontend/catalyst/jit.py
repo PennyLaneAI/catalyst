@@ -495,7 +495,8 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
-            if self.compile_options.static_argnums:
+            isQNode = isinstance(self.user_function, qml.QNode)
+            if isQNode and self.compile_options.static_argnums:
                 kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
 
             return self.user_function(*args, **kwargs)

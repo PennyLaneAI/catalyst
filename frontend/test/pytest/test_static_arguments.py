@@ -185,7 +185,7 @@ class TestStaticArguments:
         assert captured.out.strip() == "Inside QNode: 0.5"
 
     def test_qnode_switch_params(self, capsys):
-        """Test if QJIT static arguments pass through QNode correctly when parameters are switched."""
+        """Test if QJIT static arguments pass through QNode correctly when params are switched."""
         dev = qml.device("lightning.qubit", wires=1)
 
         @qjit(static_argnums=(0,))
@@ -197,6 +197,25 @@ class TestStaticArguments:
             return qml.expval(qml.PauliZ(0))
 
         @qjit(static_argnums=(1,))
+        def wrapper(x, c):
+            return circuit(c, x)
+
+        wrapper(0.5, 0.5)
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "Inside QNode: 0.5"
+
+    def test_qnode_nested_not_qnode(self, capsys):
+        """Test if QJIT static arguments pass through nested Qjit calls with no QNodes."""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit(static_argnums=(0,))
+        @qml.qnode(dev)
+        def circuit(c, x):
+            print("Inside QNode:", c)
+            return x * c
+
+        @qjit(static_argnums=(1,))
+        @qml.qnode(dev)
         def wrapper(x, c):
             return circuit(c, x)
 
