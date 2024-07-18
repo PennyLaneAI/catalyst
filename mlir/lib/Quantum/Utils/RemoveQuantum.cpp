@@ -39,10 +39,8 @@ void removeQuantumMeasurements(func::FuncOp &function, mlir::PatternRewriter &re
     // inside after measurements?
     //
     // This will remove the operation in opsToDelete as long as it doesn't have any other uses.
-    function.emitRemark() << " function";
     while (!opsToDelete.empty()) {
         Operation *currentOp = opsToDelete.front();
-        currentOp->emitRemark() << " current";
         opsToDelete.pop_front();
 
         rewriter.modifyOpInPlace(currentOp, [&] {currentOp->dropAllReferences();});
@@ -53,7 +51,6 @@ void removeQuantumMeasurements(func::FuncOp &function, mlir::PatternRewriter &re
             }
         }
         if (currentOp && currentOp->use_empty()) {
-            currentOp->emitRemark() << " deleting";
             rewriter.eraseOp(currentOp);
         }
         else {
