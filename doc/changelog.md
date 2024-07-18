@@ -52,6 +52,7 @@
   ```pycon
   >>> circuit(0.5, 0.5)
   >>> "Inside QNode: 0.5"
+  ```
 
 * Autograph now supports in-place array assignments with static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
 
