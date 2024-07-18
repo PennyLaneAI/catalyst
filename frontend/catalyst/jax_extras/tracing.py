@@ -99,8 +99,8 @@ from jaxlib.xla_extension import PyTreeRegistry
 
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
 from catalyst.logging import debug_logger
-from catalyst.utils.patching import Patcher
 from catalyst.tracing.type_signatures import verify_static_argnums
+from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
 

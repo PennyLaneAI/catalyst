@@ -28,8 +28,8 @@ from jax.api_util import shaped_abstractify
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from catalyst.jax_extras import get_aval2
-from catalyst.utils.patching import Patcher
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import Patcher
 
 
 def get_param_annotations(fn: Callable):
