@@ -77,6 +77,22 @@
 * Compile time conditionals on Python types work with Autograph.
   [(#944)](https://github.com/PennyLaneAI/catalyst/pull/944)
 
+  Using a value as a predicate of a condition will no longer fail with Autograph enabled,
+  as the value is now internally converted to `bool`:
+
+  ```python
+  @qml.qjit(autograph=True)
+  def workflow(x):
+      n = 1
+
+      if n:
+          y = x ** 2
+      else:
+          y = x
+
+      return y
+  ```
+
 <h3>Internal changes</h3>
 
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
