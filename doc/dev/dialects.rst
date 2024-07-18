@@ -47,22 +47,22 @@ descriptive languages based on the `TableGen <https://llvm.org/docs/TableGen/ind
 known from LLVM. Consequently, dialects, as well as many operations, types, attributes, and other
 IR objects, are specified in two parts:
 
-- a *declarative* part: The main way to define new IR objects via a simple language called
+- **a declarative part**: The main way to define new IR objects via a simple language called
   `Operation Definition Specification (ODS) <https://mlir.llvm.org/docs/DefiningDialects/Operations/>`_.
   ODS specifications live in TableGen (``.td``) files, which will automatically generate both C++
   header and implementation files via the build system.
 
-In Catalyst, TableGen files for dialects can be found in the public include directory, under
-`catalyst/mlir/include/\<DialectName\>/IR <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/include/Quantum/IR>`_.
+  In Catalyst, TableGen files for dialects can be found in the public include directory, under
+  `catalyst/mlir/include/\<DialectName\>/IR <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/include/Quantum/IR>`_.
 
-- a *C++* part: Additional hand-written logic, and most transformations, are defined directly in C++
+- **a C++ part**: Additional hand-written logic, and most transformations, are defined directly in C++
   source files. An example might be a storage class for a data type, or the implementation of
   interface methods for an operation declared in ODS.
   Note that while the usage of ODS is strongly recommended, full control over the underlying
   objects can always be achieved by directly working with the relevant C++ classes.
 
-In Catalyst, hand-written implementations for classes & methods can be found in the source
-directory, under `catalyst/mlir/lib\/<DialectName\>/IR <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/lib/Quantum/IR>`_.
+  In Catalyst, hand-written implementations for classes & methods can be found in the source
+  directory, under `catalyst/mlir/lib\/<DialectName\>/IR <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/lib/Quantum/IR>`_.
 
 An alternative tutorial on creating a basic MLIR dialect can also be found in the official docs, see
 `Creating a Dialect <https://mlir.llvm.org/docs/Tutorials/CreatingADialect/>`_.
@@ -172,15 +172,15 @@ than LLVM.
 Lastly, we also defined a custom syntax (``assemblyFormat``) for our operation. MLIR provides two ways
 of representing operations in its textual assembly format:
 
-- *generic assembly format*: This format is a one-to-one mapping from how MLIR objects are
+- **generic assembly format**: This format is a one-to-one mapping from how MLIR objects are
   represented in memory, and contains all necessary information to uniquely represent an MLIR
   program with it. As a consequence, this format can be used to parse and print operations from any
   dialect, even unknown ones!
 
-The above format can be very useful for debugging, as it more truthfully represents the IR state. It
+  The generic assembly format can be very useful for debugging, as it more truthfully represents the IR state. It
 also suffers less from crashing in the case of an invalid IR state.
 
-- *pretty assembly format*: This format can be fully customized (with some restrictions) by the
+- **pretty assembly format**: This format can be fully customized (with some restrictions) by the
   dialect designer. Generally speaking the IR can be much more human-readable when printed in this
   form. Common improvements include imitating a particular syntax (e.g. indexed array access),
   structuring operands into groups, and omitting redundant type information.
@@ -368,8 +368,12 @@ target for our dialect as a dependent library:
 
     # ...
 
-That's it! We can now build our additions with ``make dialects`` (assuming the project was already
-successfully built once) and test them out.
+That's it! We can now build our additions with the rest of the dialects and test them out. Assuming
+Catalyst has already been built successfully at least once, simply run:
+
+.. code-block:: console
+
+    make dialects
 
 Save the following test file somewhere and run it through the ``quantum-opt`` tool:
 
