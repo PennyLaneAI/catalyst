@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=line-too-long
+
 # RUN: %PYTHON %s | FileCheck --implicit-check-not convert_element_type %s
 
 import pennylane as qml
@@ -31,7 +33,7 @@ def circuit(n: int):
     # CHECK:       [[b_t_4:%[a-zA-Z0-9_]+]] = stablehlo.compare  NE, [[b_t_1]], [[b_t_3]],  UNSIGNED : (tensor<i1>, tensor<i1>) -> tensor<i1>
     # CHECK:       [[b_t_5:%[a-zA-Z0-9_]+]] = stablehlo.convert [[b_t_4]] : tensor<i1>
     # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = quantum.alloc
-    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t_5]]    
+    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t_5]]
     @cond(n <= 5)
     # CHECK:       [[qreg_2:%.+]]:2 = scf.if [[b]]
     def cond_fn():
