@@ -617,10 +617,10 @@ class CondCallable:
         if not isinstance(pred, bool):
             try:
                 pred = jnp.astype(pred, bool, copy=False)
-            except:
+            except TypeError as e:
                 raise TypeError(
                     "Conditional predicates are required to be of bool, integer or float type"
-                )
+                ) from e
 
         return pred
 
