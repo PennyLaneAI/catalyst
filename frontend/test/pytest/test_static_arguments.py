@@ -183,7 +183,25 @@ class TestStaticArguments:
         wrapper(0.5, 0.5)
         captured = capsys.readouterr()
         assert captured.out.strip() == "Inside QNode: 0.5"
+    def test_qnode_switch_params(self, capsys):
+        """Test if QJIT static arguments pass through QNode correctly when parameters are switched."""
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qjit(static_argnums=(0,))
+        @qml.qnode(dev)
+        def circuit(c, x):
+            print("Inside QNode:", c)
+            qml.RY(c, 0)
+            qml.RX(x, 0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qjit(static_argnums=(1,))
+        def wrapper(x, c):
+            return circuit(c, x)
+
+        wrapper(0.5, 0.5)
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "Inside QNode: 0.5"
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
