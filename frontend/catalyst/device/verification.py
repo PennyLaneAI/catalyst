@@ -20,7 +20,16 @@ with the compiler and device.
 from typing import Any, Callable, Sequence
 
 from pennylane import transform
-from pennylane.measurements import CountsMP, ExpectationMP, MutualInfoMP, ProbabilityMP, SampleMP, StateMP, VarianceMP, VnEntropyMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MutualInfoMP,
+    ProbabilityMP,
+    SampleMP,
+    StateMP,
+    VarianceMP,
+    VnEntropyMP,
+)
 from pennylane.operation import Operation, Tensor
 from pennylane.ops import (
     Adjoint,
@@ -291,16 +300,16 @@ def validate_measurements(
 
     """
 
-    mp_types_mapping = {"Counts": CountsMP,
-                        "Expval": ExpectationMP,
-                        "Probs": ProbabilityMP,
-                        "Sample": SampleMP,
-                        "State": StateMP,
-                        "Var": VarianceMP,
+    mp_types_mapping = {
+        "Counts": CountsMP,
+        "Expval": ExpectationMP,
+        "Probs": ProbabilityMP,
+        "Sample": SampleMP,
+        "State": StateMP,
+        "Var": VarianceMP,
     }
 
     supported_types = tuple(mp_types_mapping[mp] for mp in qjit_capabilities.measurement_processes)
-
 
     def _obs_checker(obs):
         if not qjit_capabilities.native_obs.get(obs.name):
@@ -317,5 +326,3 @@ def validate_measurements(
             )
 
     return (tape,), lambda x: x[0]
-
-
