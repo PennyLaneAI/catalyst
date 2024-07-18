@@ -92,6 +92,8 @@ class CompileOptions:
             self.static_argnums = ()
         elif isinstance(static_argnums, int):
             self.static_argnums = (static_argnums,)
+        elif isinstance(static_argnums, Iterable):
+            self.static_argnums = tuple(static_argnums)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
