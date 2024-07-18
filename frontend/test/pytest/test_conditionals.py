@@ -35,12 +35,13 @@ class TestCondToJaxpr:
             """
             { lambda ; a:i64[]. let
                 b:bool[] = eq a 5
-                c:i64[] = cond[
+                c:bool[] = convert_element_type[new_dtype=bool weak_type=False] b
+                d:i64[] = cond[
                   branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
                                  { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
                   nimplicit_outputs=0
-                ] b a a
-              in (c,) }
+                ] c a a
+              in (d,) }
             """
         )
 
