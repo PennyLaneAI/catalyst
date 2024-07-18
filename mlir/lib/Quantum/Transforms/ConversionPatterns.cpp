@@ -205,12 +205,6 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
         }
 
-        // Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
-
-        // LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
-        // rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
-
         return success();
     }
 };
