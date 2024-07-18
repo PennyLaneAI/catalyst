@@ -17,6 +17,7 @@
 #include <complex>
 #include <memory>
 #include <optional>
+#include <random>
 #include <vector>
 
 #include "DataView.hpp"
@@ -102,6 +103,20 @@ struct QuantumDevice {
      * @return `size_t`
      */
     [[nodiscard]] virtual auto GetDeviceShots() const -> size_t = 0;
+
+    /**
+     * @brief Set the PRNG seed of the device.
+     *
+     * @param gen The PRNG seed.
+     */
+    virtual void SetDeviceSeed(std::string seed) = 0;
+
+    /**
+     * @brief Set the PRNG of the device.
+     *
+     * @param gen The std::mt19937 PRNG object.
+     */
+    virtual void SetDevicePRNG(std::mt19937 *gen) = 0;
 
     /**
      * @brief Start recording a quantum tape if provided.

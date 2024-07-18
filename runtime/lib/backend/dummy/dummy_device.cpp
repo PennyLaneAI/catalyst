@@ -39,6 +39,8 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     [[nodiscard]] auto GetNumQubits() const -> size_t override { return 0; }
     void SetDeviceShots(size_t shots) override {}
     [[nodiscard]] auto GetDeviceShots() const -> size_t override { return 0; }
+    void SetDeviceSeed(std::string seed) override {}
+    void SetDevicePRNG(std::mt19937 *gen) override {}
     void StartTapeRecording() override {}
     void StopTapeRecording() override {}
     void PrintState() override {}

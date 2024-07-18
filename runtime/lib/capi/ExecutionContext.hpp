@@ -18,6 +18,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -262,10 +263,18 @@ class ExecutionContext final {
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
+    // PRNG
+    std::string seed;
+    std::mt19937 gen;
+
   public:
-    explicit ExecutionContext() : initial_tape_recorder_status(false)
+    explicit ExecutionContext(std::string _seed = "") : initial_tape_recorder_status(false)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
+
+        seed = _seed;
+        std::seed_seq seed_evolution(seed.begin(), seed.end());
+        gen = std::mt19937(seed_evolution);
     }
 
     ~ExecutionContext() = default;
@@ -303,6 +312,9 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
+        device->getQuantumDevicePtr()->SetDeviceSeed(this->seed);
+        device->getQuantumDevicePtr()->SetDevicePRNG(
+            &(this->gen)); // TODO: should we send the reference of the context prng or a copy??
         device_pool.push_back(device);
 
 #ifdef __build_with_pybind11

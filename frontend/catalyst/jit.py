@@ -79,6 +79,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
+    seed="",
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -122,6 +123,11 @@ def qjit(
             Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
             with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
             below.
+        seed (str):
+            The seed for random operations in a qjit call, such as circuit measurement results.
+            The default value is an empty string, which means no seeding is performed, and all
+            processes are random.
+            Note that if the circuit is run from shots, the sampled results are NOT seeded.
 
     Returns:
         QJIT object.
@@ -643,7 +649,7 @@ class QJIT:
         mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
-        inject_functions(mlir_module, ctx)
+        inject_functions(mlir_module, ctx, self.compile_options.seed)
 
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         options = copy.deepcopy(self.compile_options)

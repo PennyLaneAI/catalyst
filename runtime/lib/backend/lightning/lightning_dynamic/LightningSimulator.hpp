@@ -51,6 +51,9 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
 
+    std::string seed;
+    std::mt19937 *gen;
+
     bool mcmc{false};
     size_t num_burnin{0};
     std::string kernel_name;
@@ -89,6 +92,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
+
         mcmc = args.contains("mcmc") ? args["mcmc"] == "True" : false;
         num_burnin = args.contains("num_burnin")
                          ? static_cast<size_t>(std::stoll(args["num_burnin"]))

@@ -50,7 +50,7 @@ func.func @teardown () -> () {
     return ir.Module.parse(txt, ctx)
 
 
-def inject_functions(module, ctx):
+def inject_functions(module, ctx, seed):
     """
     This function appends functions to the input module.
     """
@@ -58,6 +58,9 @@ def inject_functions(module, ctx):
     module.body.operations[0].attributes["llvm.emit_c_interface"] = ir.UnitAttr.get(context=ctx)
 
     setup_module = gen_setup(ctx)
+    setup_module.body.operations[0].body.blocks[0].operations[0].attributes["seed"] = (
+        ir.StringAttr.get(seed, context=ctx)
+    )
     setup_func = setup_module.body.operations[0]
     module.body.append(setup_func)
 

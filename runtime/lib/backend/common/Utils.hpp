@@ -44,6 +44,8 @@
     void StopTapeRecording() override;                                                             \
     void SetDeviceShots(size_t shots) override;                                                    \
     [[nodiscard]] auto GetDeviceShots() const->size_t override;                                    \
+    void SetDeviceSeed(std::string seed) override;                                                 \
+    void SetDevicePRNG(std::mt19937 *gen) override;                                                \
     void PrintState() override;                                                                    \
     [[nodiscard]] auto Zero() const->Result override;                                              \
     [[nodiscard]] auto One() const->Result override;
@@ -271,8 +273,8 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
     return false;
 }
 
-static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect)
-    -> bool
+static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
+                                std::mt19937 *gen, bool has_seed) -> bool
 {
     if (postselect) {
         auto postselect_value = postselect.value();
@@ -283,10 +285,17 @@ static inline auto simulateDraw(const std::vector<double> &probs, std::optional<
 
     // Normal flow, no post-selection
     // Draw a number according to the given distribution
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0., 1.);
-    float draw = dis(gen);
+    if (has_seed) {
+        float draw = dis(*gen);
+
+        (*gen)();
+        return draw > probs[0];
+    }
+
+    std::random_device rd;
+    std::mt19937 gen_no_seed(rd());
+    float draw = dis(gen_no_seed);
     return draw > probs[0];
 }
 

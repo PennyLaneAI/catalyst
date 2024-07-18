@@ -80,6 +80,10 @@ void OpenQasmDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shot
 
 auto OpenQasmDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
+void OpenQasmDevice::SetDeviceSeed([[maybe_unused]] std::string _seed) { seed = _seed; }
+
+void OpenQasmDevice::SetDevicePRNG([[maybe_unused]] std::mt19937 *_gen) { gen = _gen; }
+
 void OpenQasmDevice::PrintState()
 {
     using std::cout;

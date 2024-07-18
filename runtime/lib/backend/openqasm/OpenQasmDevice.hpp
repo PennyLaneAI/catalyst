@@ -52,6 +52,9 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
 
+    std::string seed;
+    std::mt19937 *gen;
+
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
     std::unordered_map<std::string, std::string> device_kwargs;

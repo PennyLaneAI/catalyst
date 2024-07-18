@@ -84,6 +84,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    seed: Optional[str] = ""
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
