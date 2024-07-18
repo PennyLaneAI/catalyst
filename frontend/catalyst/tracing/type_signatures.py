@@ -73,11 +73,10 @@ def get_abstract_signature(args):
     return tree_unflatten(treedef, abstract_args)
 
 
-def verify_static_argnums(args, static_argnums):
-    """Verify that static_argnums have correct type and range.
+def verify_static_argnums_type(static_argnums):
+    """Verify that static_argnums have correct type.
 
     Args:
-        args (Iterable): arguments to a compiled function
         static_argnums (Iterable[int]): indices to verify
 
     Returns:
@@ -90,6 +89,21 @@ def verify_static_argnums(args, static_argnums):
             "The `static_argnums` argument to `qjit` must be an int or convertable to a"
             f"tuple of ints, but got value {static_argnums}"
         )
+    return None
+
+
+def verify_static_argnums(args, static_argnums):
+    """Verify that static_argnums have correct type and range.
+
+    Args:
+        args (Iterable): arguments to a compiled function
+        static_argnums (Iterable[int]): indices to verify
+
+    Returns:
+        None
+    """
+    verify_static_argnums_type(static_argnums)
+
     for argnum in static_argnums:
         if argnum < 0 or argnum >= len(args):
             msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
