@@ -37,7 +37,7 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
 )
 from catalyst.device.verification import (
-    validate_observables,
+    validate_measurements,
     validate_observables_adjoint_diff,
     validate_observables_parameter_shift,
     verify_no_state_variance_returns,
