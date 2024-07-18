@@ -209,7 +209,6 @@ class TestStaticArguments:
         dev = qml.device("lightning.qubit", wires=1)
 
         @qjit(static_argnums=(0,))
-        @qml.qnode(dev)
         def circuit(c, x):
             print("Inside QNode:", c)
             return x * c
