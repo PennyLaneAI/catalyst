@@ -312,7 +312,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             }
         });
 
-        quantum::removeQuantumMeasurements(gradientFn);
+        quantum::removeQuantumMeasurements(gradientFn, rewriter);
         gradientFn->setAttr("QuantumFree", rewriter.getUnitAttr());
     }
 
