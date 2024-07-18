@@ -46,11 +46,14 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     const auto sizeInt = scaleFactorType.getDimSize(0);
 
     // Folding type
-    auto folding = op.getFolding();
+    auto foldingAlgorithm = op.getFoldingAlgorithm();
+    // TODO: Just cast this to an integer, by here:
+    // 1 - Global
+    // 2 - Local
 
     // Create the folded circuit function
     FlatSymbolRefAttr foldedCircuitRefAttr =
-        getOrInsertFoldedCircuit(loc, rewriter, op, scaleFactorType.getElementType());
+        getOrInsertFoldedCircuit(loc, rewriter, op, scaleFactorType.getElementType(), foldingAlgorithm);
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
 
@@ -128,7 +131,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 }
 
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
-                                                        mitigation::ZneOp op, Type scalarType)
+                                                        mitigation::ZneOp op, Type scalarType
+                                                        int foldingAlgorithm)
 {
     MLIRContext *ctx = rewriter.getContext();
 
@@ -152,7 +156,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     func::FuncOp fnAllocOp =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
-    // Get the number of qubits 
+    // Get the number of qubits
     quantum::AllocOp allocOp = *fnOp.getOps<quantum::AllocOp>().begin();
     std::optional<int64_t> numberQubitsOptional = allocOp.getNqubitsAttr();
     int64_t numberQubits = numberQubitsOptional.value_or(0);
@@ -161,6 +165,10 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
+
+    if (foldingType == 2) {
+        return localFolding(/* TODO: what args? */);
+    }
 
     // Function without measurements: Create function without measurements and with qreg as last
     // argument
