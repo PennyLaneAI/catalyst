@@ -514,7 +514,7 @@ Tzung-Han Juang,
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 * All decorators in Catalyst, including `vmap`, `qjit`, `mitigate_with_zne`,
-  as well as gradient decorators `grad`, `jacobian`, jvp`, and `vjp`, can now be used
+  as well as gradient decorators `grad`, `jacobian`, `jvp`, and `vjp`, can now be used
   both with and without keyword arguments as a decorator without the need for
   `functools.partial`:
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
