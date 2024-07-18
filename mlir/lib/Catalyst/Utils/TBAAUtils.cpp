@@ -21,12 +21,31 @@ catalyst::TBAATree::TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringR
     intDesc = createTBAATypeDescriptor(ctx, root, intName);
     floatDesc = createTBAATypeDescriptor(ctx, root, floatName);
     pointerDesc = createTBAATypeDescriptor(ctx, root, pointerName);
+    tags = createTags();
 }
 
 mlir::LLVM::TBAATypeDescriptorAttr
-catalyst::TBAATree::createTBAATypeDescriptor(mlir::MLIRContext *ctx, mlir::LLVM::TBAARootAttr rootAttr,
-                                             StringRef typeName)
+catalyst::TBAATree::createTBAATypeDescriptor(mlir::MLIRContext *ctx,
+                                             mlir::LLVM::TBAARootAttr rootAttr, StringRef typeName)
 {
     auto memberAttr = mlir::LLVM::TBAAMemberAttr::get(rootAttr, 0);
     return mlir::LLVM::TBAATypeDescriptorAttr::get(ctx, typeName, memberAttr);
+}
+
+mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> catalyst::TBAATree::createTags()
+{
+    mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> map;
+
+    mlir::LLVM::TBAATagAttr intTag = mlir::LLVM::TBAATagAttr::get(intDesc, intDesc, 0);
+    map.insert({"int", intTag});
+    mlir::LLVM::TBAATagAttr floatTag = mlir::LLVM::TBAATagAttr::get(floatDesc, floatDesc, 0);
+    map.insert({"float", floatTag});
+    mlir::LLVM::TBAATagAttr pointerTag = mlir::LLVM::TBAATagAttr::get(pointerDesc, pointerDesc, 0);
+    map.insert({"any pointer", pointerTag});
+    return map;
+}
+
+mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName)
+{
+    return tags.find(typeName)->getSecond();
 }

@@ -52,7 +52,8 @@ void AddTBAATagsPass::createTBAATree(ModuleOp module)
     auto intName = mlir::StringAttr::get(ctx, "int");
     auto floatName = mlir::StringAttr::get(ctx, "float");
     auto pointerName = mlir::StringAttr::get(ctx, "any pointer");
-    catalyst::TBAATree{ctx, root, intName, floatName, pointerName};
+
+    catalyst::TBAATree tree{ctx, root, intName, floatName, pointerName};
 }
 std::unique_ptr<Pass> catalyst::createAddTBAATagsPass() { return std::make_unique<AddTBAATagsPass>(); }
 

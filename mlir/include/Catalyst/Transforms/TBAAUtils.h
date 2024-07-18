@@ -26,11 +26,16 @@ class TBAATree {
     mlir::LLVM::TBAATypeDescriptorAttr floatDesc;
     mlir::LLVM::TBAATypeDescriptorAttr pointerDesc;
 
-  public:
-    TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringRef intName, StringRef floatName,
-             StringRef pointerName);
+    mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> tags;
+
     mlir::LLVM::TBAATypeDescriptorAttr createTBAATypeDescriptor(mlir::MLIRContext *ctx,
                                                                 mlir::LLVM::TBAARootAttr rootAttr,
                                                                 StringRef typeName);
+    mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> createTags();
+
+  public:
+    TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringRef intName, StringRef floatName,
+             StringRef pointerName);
+    mlir::LLVM::TBAATagAttr getTag(StringRef typeName);
 };
 }; // namespace catalyst
