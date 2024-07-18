@@ -109,7 +109,8 @@ created two kinds of quantum dialects as ``def OpenQASMDialect : QuantumDialect`
 ``def QIRDialect : QuantumDialect`` - if we thought that the two shared some common elements.
 Objects defined with ``def`` are terminal and can no longer be subtyped or inherited from.
 
-Similarly, a new data type for our dialect can be added by via the built-in ``TypeDef`` class:
+Similarly, a new data type for our dialect can be added by via the built-in ``TypeDef`` class
+(in the same file):
 
 .. code-block:: tablegen
 
@@ -131,8 +132,8 @@ class properties, as well as passed on to parent classes.
     Do not confuse TableGen classes with C++ classes. Two TableGen objects that inherit
     from the same TableGen class will not share a common base class in C++!
 
-Lastly, let's also add an operation to our dialect, which will allow us to run a small example at
-the end.
+Lastly, let's also add an operation to our dialect (again in the same file), which will allow us to
+run a small example at the end.
 
 .. code-block:: tablegen
 
