@@ -214,7 +214,6 @@ class TestStaticArguments:
             return x * c
 
         @qjit(static_argnums=(1,))
-        @qml.qnode(dev)
         def wrapper(x, c):
             return circuit(c, x)
 
