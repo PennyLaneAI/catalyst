@@ -16,6 +16,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/Transforms/Passes.h"
+#include "Catalyst/Transforms/TBAAUtils.h"
 
 #include <mlir/Dialect/LLVMIR/LLVMAttrs.h>
 
@@ -46,7 +47,31 @@ void AddTBAATagsPass::runOnOperation()
 void AddTBAATagsPass::createTBAATree(ModuleOp module)
 {
     mlir::MLIRContext *ctx = module.getContext();
-    mlir::LLVM::TBAARootAttr funcRoot =
-        mlir::LLVM::TBAARootAttr::get(ctx, mlir::StringAttr::get(ctx, "My TBAA is great"));
+
+    auto root = mlir::StringAttr::get(ctx, "Catalyst TBAA");
+    auto intName = mlir::StringAttr::get(ctx, "int");
+    auto floatName = mlir::StringAttr::get(ctx, "float");
+    auto pointerName = mlir::StringAttr::get(ctx, "any pointer");
+    catalyst::TBAATree{ctx, root, intName, floatName, pointerName};
 }
 std::unique_ptr<Pass> catalyst::createAddTBAATagsPass() { return std::make_unique<AddTBAATagsPass>(); }
+
+
+// struct LoadOpLowering : public LoadStoreOpLowering<memref::LoadOp> {
+//   using Base::Base;
+
+//   LogicalResult
+//   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
+//                   ConversionPatternRewriter &rewriter) const override {
+//     auto type = loadOp.getMemRefType();
+
+//     Value dataPtr =
+//         getStridedElementPtr(loadOp.getLoc(), type, adaptor.getMemref(),
+//                              adaptor.getIndices(), rewriter);
+//     auto op = rewriter.replaceOpWithNewOp<LLVM::LoadOp>(
+//         loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0,
+//         false, loadOp.getNontemporal());
+//     op.setTBAATags();
+//     return success();
+//   }
+// };
