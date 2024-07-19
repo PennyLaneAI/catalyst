@@ -1563,6 +1563,7 @@ def _cond_lowering(
                 out = mlir.jaxpr_subcomp(
                     if_ctx,
                     true_jaxpr.jaxpr,
+                    jax_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
                     *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
@@ -1584,6 +1585,7 @@ def _cond_lowering(
                     out = mlir.jaxpr_subcomp(
                         else_ctx,
                         otherwise_jaxpr.jaxpr,
+                        jax_ctx.name_stack,
                         mlir.TokenSet(),
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
                         *([a] for a in flat_args_plus_consts),
@@ -1674,6 +1676,7 @@ def _while_loop_lowering(
         ((pred,),), _ = mlir.jaxpr_subcomp(
             cond_ctx,
             cond_jaxpr.jaxpr,
+            name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *([a] for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
