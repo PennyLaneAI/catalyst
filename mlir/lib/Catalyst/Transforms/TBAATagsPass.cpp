@@ -19,7 +19,7 @@
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Catalyst/Transforms/Passes.h"
@@ -57,17 +57,20 @@ void AddTBAATagsPass::createTBAATree(ModuleOp module)
 
     auto root = mlir::StringAttr::get(ctx, "Catalyst TBAA");
     auto intName = mlir::StringAttr::get(ctx, "int");
-    auto floatName = mlir::StringAttr::get(ctx, "float");
+    auto float32Name = mlir::StringAttr::get(ctx, "float");
+    auto float64Name = mlir::StringAttr::get(ctx, "double");
     auto pointerName = mlir::StringAttr::get(ctx, "any pointer");
 
-    catalyst::TBAATree tree{ctx, root, intName, floatName, pointerName};
+    catalyst::TBAATree tree{ctx, root, intName, float32Name, float64Name, pointerName};
     catalyst::TBAATree &treeRef = tree;
-
     LLVMTypeConverter typeConverter(ctx);
 
     RewritePatternSet patterns(&getContext());
     catalyst::populateTBAATagsPatterns(treeRef, typeConverter, patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+
+    LLVMConversionTarget target(*ctx);
+    target.addIllegalOp<memref::LoadOp>();
+    if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
         return signalPassFailure();
     }
 }

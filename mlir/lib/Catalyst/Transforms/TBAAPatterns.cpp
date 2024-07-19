@@ -28,11 +28,11 @@ using namespace mlir;
 namespace catalyst {
 
 struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::LoadOp> {
-    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+    using ConvertOpToLLVMPattern<memref::LoadOp>::ConvertOpToLLVMPattern;
 
     template <typename... Args>
     MemrefLoadTBAARewritePattern(catalyst::TBAATree &tree, Args &&...args)
-        : ConvertOpToLLVMPattern(std::forward<Args>(args)...), tree(&tree) {};
+        : ConvertOpToLLVMPattern(std::forward<Args>(args)...), tree(&tree){};
 
     LogicalResult matchAndRewrite(memref::LoadOp loadOp, memref::LoadOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
@@ -46,13 +46,21 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
         auto baseType = loadOp.getMemRefType().getElementType();
 
         mlir::LLVM::TBAATagAttr tag;
+
         if (isa<IndexType>(baseType) || dyn_cast<IntegerType>(baseType)) {
             tag = tree->getTag("int");
+            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
         }
         else if (dyn_cast<FloatType>(baseType)) {
-            tag = tree->getTag("float");
+            if (baseType.isF32()) {
+                tag = tree->getTag("float");
+            }
+            else if (baseType.isF64()) {
+                tag = tree->getTag("double");
+            }
+
+            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
         }
-        op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
         return success();
     }
 
@@ -60,7 +68,8 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
     catalyst::TBAATree *tree = nullptr;
 };
 
-void populateTBAATagsPatterns(TBAATree &tree, LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateTBAATagsPatterns(TBAATree &tree, LLVMTypeConverter &typeConverter,
+                              RewritePatternSet &patterns)
 {
     patterns.add<catalyst::MemrefLoadTBAARewritePattern>(tree, typeConverter);
 }

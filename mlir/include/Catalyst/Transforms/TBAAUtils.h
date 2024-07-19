@@ -26,7 +26,8 @@ class TBAATree {
     mlir::LLVM::TBAARootAttr root;
 
     mlir::LLVM::TBAATypeDescriptorAttr intDesc;
-    mlir::LLVM::TBAATypeDescriptorAttr floatDesc;
+    mlir::LLVM::TBAATypeDescriptorAttr float32Desc;
+    mlir::LLVM::TBAATypeDescriptorAttr float64Desc;
     mlir::LLVM::TBAATypeDescriptorAttr pointerDesc;
 
     mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> tags;
@@ -37,8 +38,8 @@ class TBAATree {
     mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> createTags();
 
   public:
-    TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringRef intName, StringRef floatName,
-             StringRef pointerName);
+    TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringRef intName, StringRef float32Name,
+             StringRef float64Name, StringRef pointerName);
     mlir::LLVM::TBAATagAttr getTag(StringRef typeName);
 };
 }; // namespace catalyst

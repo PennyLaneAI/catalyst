@@ -15,11 +15,12 @@
 #include "Catalyst/Transforms/TBAAUtils.h"
 
 catalyst::TBAATree::TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringRef intName,
-                             StringRef floatName, StringRef pointerName)
+                             StringRef float32Name, StringRef float64Name, StringRef pointerName)
     : root(mlir::LLVM::TBAARootAttr::get(ctx, mlir::StringAttr::get(ctx, rootName)))
 {
     intDesc = createTBAATypeDescriptor(ctx, root, intName);
-    floatDesc = createTBAATypeDescriptor(ctx, root, floatName);
+    float32Desc = createTBAATypeDescriptor(ctx, root, float32Name);
+    float64Desc = createTBAATypeDescriptor(ctx, root, float64Name);
     pointerDesc = createTBAATypeDescriptor(ctx, root, pointerName);
     tags = createTags();
 }
@@ -38,14 +39,15 @@ mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> catalyst::TBAATree::createTag
 
     mlir::LLVM::TBAATagAttr intTag = mlir::LLVM::TBAATagAttr::get(intDesc, intDesc, 0);
     map.insert({"int", intTag});
-    mlir::LLVM::TBAATagAttr floatTag = mlir::LLVM::TBAATagAttr::get(floatDesc, floatDesc, 0);
-    map.insert({"float", floatTag});
+    mlir::LLVM::TBAATagAttr float32Tag = mlir::LLVM::TBAATagAttr::get(float32Desc, float32Desc, 0);
+    map.insert({"float", float32Tag});
+    mlir::LLVM::TBAATagAttr float64Tag = mlir::LLVM::TBAATagAttr::get(float64Desc, float64Desc, 0);
+    map.insert({"double", float64Tag});
     mlir::LLVM::TBAATagAttr pointerTag = mlir::LLVM::TBAATagAttr::get(pointerDesc, pointerDesc, 0);
     map.insert({"any pointer", pointerTag});
     return map;
 }
 
-mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName)
-{
+mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName) {
     return tags.find(typeName)->getSecond();
 }
