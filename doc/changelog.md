@@ -34,6 +34,26 @@
   the python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
 
+* Static_argnums now can be passed through a QNode
+  [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+  
+  @qjit(static_argnums=(1,))
+  @qml.qnode(dev)
+  def circuit(x, c):
+      print("Inside QNode:", c)
+      qml.RY(c, 0)
+      qml.RX(x, 0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> circuit(0.5, 0.5)
+  >>> "Inside QNode: 0.5"
+  ```
+
 * Autograph now supports in-place array assignments with static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
 
   For example,
@@ -50,8 +70,10 @@
   >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
   ```
 
-* Autograph works when `qjit` is applied to a function decorated with `vmap`.
+* Autograph works when `qjit` is applied to a function decorated with `vmap`, `cond`, `for_loop` or `while_loop`.
   [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
+  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
 
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
@@ -63,7 +85,14 @@
   
 * Using float32 in callback functions would not crash in compilation phase anymore,
   but rather raise the appropriate type exception to the user.
-  [(#916)]https://github.com/PennyLaneAI/catalyst/pull/916
+  [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
+
+* Fix tracing of `SProd` operations
+  [(#935)](https://github.com/PennyLaneAI/catalyst/pull/935)
+
+  After some changes in PennyLane, `Sprod.terms()` returns the terms as leaves
+  instead of a tree. This means that we need to manually trace each term and
+  finally multiply it with the coefficients to create a Hamiltonian.
 
 <h3>Internal changes</h3>
 
@@ -505,7 +534,7 @@ Tzung-Han Juang,
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 * All decorators in Catalyst, including `vmap`, `qjit`, `mitigate_with_zne`,
-  as well as gradient decorators `grad`, `jacobian`, jvp`, and `vjp`, can now be used
+  as well as gradient decorators `grad`, `jacobian`, `jvp`, and `vjp`, can now be used
   both with and without keyword arguments as a decorator without the need for
   `functools.partial`:
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)

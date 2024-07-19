@@ -45,6 +45,7 @@ from catalyst.tracing.type_signatures import (
     get_type_annotations,
     merge_static_args,
     promote_arguments,
+    verify_static_argnums,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
@@ -500,6 +501,10 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
+            isQNode = isinstance(self.user_function, qml.QNode)
+            if isQNode and self.compile_options.static_argnums:
+                kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
+
             return self.user_function(*args, **kwargs)
 
         requires_promotion = self.jit_compile(args)
@@ -619,7 +624,7 @@ class QJIT:
             Tuple[Any]: the dynamic argument signature
         """
 
-        self._verify_static_argnums(args)
+        verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
 
@@ -627,8 +632,12 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        def closure(*args, **kwargs):
+            st_argnums = kwargs.pop("static_argnums", static_argnums)
+            return QFunc.__call__(*args, static_argnums=st_argnums, **kwargs)
+
         with Patcher(
-            (qml.QNode, "__call__", QFunc.__call__),
+            (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef = trace_to_jaxpr(
@@ -722,12 +731,6 @@ class QJIT:
             raise CompileError(
                 "In order for 'autograph_include' to work, 'autograph' must be set to True"
             )
-
-    def _verify_static_argnums(self, args):
-        for argnum in self.compile_options.static_argnums:
-            if argnum < 0 or argnum >= len(args):
-                msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
-                raise CompileError(msg)
 
     def _get_workspace(self):
         """Get or create a workspace to use for compilation."""
