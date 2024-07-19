@@ -146,6 +146,7 @@ def custom_lower_jaxpr_to_module(
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
+            name_stack=name_stack
         )
 
         for op in ctx.module.body.operations:
