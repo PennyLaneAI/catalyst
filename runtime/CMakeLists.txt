@@ -27,6 +27,8 @@ set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
 set(util_includes "${PROJECT_SOURCE_DIR}/utils")
+set(mlir_includes "${PROJECT_SOURCE_DIR}/../mlir/llvm-project/mlir/include")
+message(STATUS "Detected LLVM version - ${PROJECT_SOURCE_DIR}")
 
 
 # Get LLVM hash to target from source tree.
@@ -107,6 +109,8 @@ endif()
 add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
+
+include_directories(${mlir_includes})
 
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}
