@@ -168,7 +168,6 @@ BUFFERIZATION_PASS = (
         "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
         "quantum-bufferize",
         "func-bufferize",
-        "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
