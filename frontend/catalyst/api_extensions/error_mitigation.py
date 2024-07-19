@@ -27,14 +27,8 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import zne_p
+from catalyst.jax_primitives import zne_p, Folding
 
-from enum import IntEnum
-
-class Folding(IntEnum):
-    GLOBAL = 1
-    RANDOM = 2
-    ALL = 3
 
 ## API ##
 def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding='global'):
@@ -146,8 +140,17 @@ class ZNE:
         if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
             raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
-        folding = Folding[self.folding.upper()].value
-        results = zne_p.bind(*args_data, folding, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
+        try:
+            folding=Folding[self.folding]
+        except KeyError as e:
+            raise KeyError(f"Folding type must be one of {Folding._member_names_}") from e 
+        results = zne_p.bind(
+            *args_data, 
+            self.scale_factors, 
+            folding=folding, 
+            jaxpr=jaxpr, 
+            fn=self.fn
+        )
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
         results = self.extrapolate(float_scale_factors, results[0])
         # Single measurement
