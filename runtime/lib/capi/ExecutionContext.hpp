@@ -268,11 +268,11 @@ class ExecutionContext final {
     std::mt19937 gen;
 
   public:
-    explicit ExecutionContext(std::string _seed = "") : initial_tape_recorder_status(false)
+    explicit ExecutionContext(std::string seed = "") : initial_tape_recorder_status(false)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
-        seed = _seed;
+        this->seed = seed;
         std::seed_seq seed_evolution(seed.begin(), seed.end());
         gen = std::mt19937(seed_evolution);
     }
