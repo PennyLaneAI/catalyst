@@ -22,6 +22,33 @@
       [1.61605839, 4.42856163]])
   ```
 
+* Runtime validation within QJIT functions using `catalyst.debug_assert`.
+  [(#925)](https://github.com/PennyLaneAI/catalyst/pull/925)
+
+  Can be turned off by setting compile time flag `disable_assertions=True`.
+
+  For example,
+  ```python
+  @qjit
+  def f(x):
+      debug_assert(x < 5, "x was greater than 5")
+      return x * 8
+
+  @qjit(disable_assertions=True)
+  def g(x):
+      debug_assert(x < 5, "x was greater than 5")
+      return x * 8      
+  ```
+
+  ```pycon
+  >>> f(4)
+  >>> Array(32, dtype=int64)
+  >>> f(6)
+  >>> RuntimeError: x was greater than 5
+  >>> g(6)
+  >>> Array(48, dtype=int64)
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
@@ -125,6 +152,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,

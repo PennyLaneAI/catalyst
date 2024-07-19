@@ -81,6 +81,15 @@ def PrintOp : Catalyst_Op<"print"> {
     );
 }
 
+def AssertionOp : Catalyst_Op<"assert"> {
+    let summary = "Asserts condition at runtime.";
+
+    let arguments = (ins
+      I1:$assertion,
+      StrAttr:$error
+    );
+}
+
 def CustomCallOp: Catalyst_Op<"custom_call",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let summary = "CustomCall operation";
