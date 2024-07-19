@@ -55,6 +55,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
+from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
@@ -135,18 +136,24 @@ class QFunc:
         else:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
+        static_argnums = kwargs.pop("static_argnums", ())
+
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, qjit_device, args, kwargs, self
+                self.func, qjit_device, args, kwargs, self, static_argnums
             )
-            args_expanded = get_implicit_and_explicit_flat_args(None, *args)
+            dynamic_args = filter_static_args(args, static_argnums)
+            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 
-        flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_quantum, args, {})
-        args_flat = tree_flatten(args)[0]
+        flattened_fun, _, _, out_tree_promise = deduce_avals(
+            _eval_quantum, args, {}, static_argnums
+        )
+        dynamic_args = filter_static_args(args, static_argnums)
+        args_flat = tree_flatten(dynamic_args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 

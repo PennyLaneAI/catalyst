@@ -26,6 +26,7 @@ std::unique_ptr<mlir::Pass> createCatalystConversionPass();
 std::unique_ptr<mlir::Pass> createScatterLoweringPass();
 std::unique_ptr<mlir::Pass> createHloCustomCallLoweringPass();
 std::unique_ptr<mlir::Pass> createQnodeToAsyncLoweringPass();
+std::unique_ptr<mlir::Pass> createDisableAssertionPass();
 std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();
 std::unique_ptr<mlir::Pass> createGEPInboundsPass();
 std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
