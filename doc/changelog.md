@@ -121,7 +121,7 @@
   instead of a tree. This means that we need to manually trace each term and
   finally multiply it with the coefficients to create a Hamiltonian.
 
-* Compile time conditionals on Python types work with Autograph.
+* Support for some non-boolean types as predicates of a conditional with Autograph.
   [(#944)](https://github.com/PennyLaneAI/catalyst/pull/944)
 
   Using a value as a predicate of a condition will no longer fail with Autograph enabled,
