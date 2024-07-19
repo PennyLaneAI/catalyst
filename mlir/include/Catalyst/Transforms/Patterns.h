@@ -29,6 +29,8 @@ void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
 void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
+void populateDisableAssertionPatterns(mlir::RewritePatternSet &);
+
 void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
 
 void populateTBAATagsPatterns(TBAATree &, mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);

@@ -99,6 +99,7 @@ from jaxlib.xla_extension import PyTreeRegistry
 
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
 from catalyst.logging import debug_logger
+from catalyst.tracing.type_signatures import verify_static_argnums_type
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
@@ -440,17 +441,21 @@ def deduce_signatures(
     )
 
 
-def deduce_avals(f: Callable, args, kwargs):
+def deduce_avals(f: Callable, args, kwargs, static_argnums=None):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     # TODO: deprecate in favor of `deduce_signatures`
+    wf = wrap_init(f)
+    if static_argnums:
+        verify_static_argnums_type(static_argnums)
+        dynamic_argnums = [i for i in range(len(args)) if i not in static_argnums]
+        wf, args = jax._src.api_util.argnums_partial(wf, dynamic_argnums, args)
     flat_args, in_tree = tree_flatten((args, kwargs))
     abstracted_axes = None
     axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
     in_type = infer_lambda_input_type(axes_specs, flat_args)
     in_avals, keep_inputs = unzip2(in_type)
-    wf = wrap_init(f)
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
     return wffa, in_avals, keep_inputs, out_tree_promise
