@@ -1830,6 +1830,7 @@ def _for_loop_lowering(
         out, _ = mlir.jaxpr_subcomp(
             body_ctx,
             body_jaxpr.jaxpr,
+            name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
             *body_args,
