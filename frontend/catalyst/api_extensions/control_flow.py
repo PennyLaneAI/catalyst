@@ -614,7 +614,7 @@ class CondCallable:
         if isinstance(pred, jax.Array) and pred.shape not in ((), (1,)):
             raise TypeError("Array with multiple elements is not a valid predicate")
 
-        if not isinstance(pred, bool):
+        if not self._is_any_boolean(pred):
             try:
                 pred = jnp.astype(pred, bool, copy=False)
             except TypeError as e:
@@ -623,6 +623,17 @@ class CondCallable:
                 ) from e
 
         return pred
+
+    def _is_any_boolean(self, pred):
+        """Check if a variable represents a type of boolean"""
+
+        if isinstance(pred, bool):
+            return True
+
+        if hasattr(pred, "dtype"):
+            return pred.dtype == bool
+
+        return False
 
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace

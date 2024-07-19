@@ -35,13 +35,12 @@ class TestCondToJaxpr:
             """
             { lambda ; a:i64[]. let
                 b:bool[] = eq a 5
-                c:bool[] = convert_element_type[new_dtype=bool weak_type=False] b
-                d:i64[] = cond[
+                c:i64[] = cond[
                   branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
                                  { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
                   nimplicit_outputs=0
-                ] c a a
-              in (d,) }
+                ] b a a
+              in (c,) }
             """
         )
 
@@ -696,6 +695,26 @@ class TestCondPredicateConversion:
             n = 2.0
 
             # n is a float but it gets converted to bool
+            @cond(n)
+            def cond_fn():
+                return x**2
+
+            @cond_fn.otherwise
+            def else_fn():
+                return x
+
+            return cond_fn()
+
+        assert workflow(3) == 9
+
+    def test_jax_bool(self):
+        """Test entry predicate with a JAX bool."""
+
+        @qml.qjit()
+        def workflow(x):
+            n = jnp.bool_(True)
+
+            # n is a JAX bool and does not need conversion
             @cond(n)
             def cond_fn():
                 return x**2
