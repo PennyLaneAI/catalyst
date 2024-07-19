@@ -14,6 +14,9 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
+#ifndef TBAATREE_H
+#define TBAATREE_H
+
 using namespace mlir;
 
 namespace catalyst {
@@ -39,3 +42,5 @@ class TBAATree {
     mlir::LLVM::TBAATagAttr getTag(StringRef typeName);
 };
 }; // namespace catalyst
+
+#endif // TBAATREE_H

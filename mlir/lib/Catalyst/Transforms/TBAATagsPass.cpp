@@ -15,10 +15,17 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+
+#include "mlir/IR/BuiltinOps.h"
+
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/TBAAUtils.h"
 
-#include <mlir/Dialect/LLVMIR/LLVMAttrs.h>
+#include "Catalyst/Transforms/Patterns.h"
 
 using namespace mlir;
 
@@ -54,27 +61,17 @@ void AddTBAATagsPass::createTBAATree(ModuleOp module)
     auto pointerName = mlir::StringAttr::get(ctx, "any pointer");
 
     catalyst::TBAATree tree{ctx, root, intName, floatName, pointerName};
+    catalyst::TBAATree &treeRef = tree;
 
-    
+    LLVMTypeConverter typeConverter(ctx);
+
+    RewritePatternSet patterns(&getContext());
+    catalyst::populateTBAATagsPatterns(treeRef, typeConverter, patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        return signalPassFailure();
+    }
 }
-std::unique_ptr<Pass> catalyst::createAddTBAATagsPass() { return std::make_unique<AddTBAATagsPass>(); }
-
-
-// struct LoadOpLowering : public LoadStoreOpLowering<memref::LoadOp> {
-//   using Base::Base;
-
-//   LogicalResult
-//   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
-//                   ConversionPatternRewriter &rewriter) const override {
-//     auto type = loadOp.getMemRefType();
-
-//     Value dataPtr =
-//         getStridedElementPtr(loadOp.getLoc(), type, adaptor.getMemref(),
-//                              adaptor.getIndices(), rewriter);
-//     auto op = rewriter.replaceOpWithNewOp<LLVM::LoadOp>(
-//         loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0,
-//         false, loadOp.getNontemporal());
-//     op.setTBAATags();
-//     return success();
-//   }
-// };
+std::unique_ptr<Pass> catalyst::createAddTBAATagsPass()
+{
+    return std::make_unique<AddTBAATagsPass>();
+}

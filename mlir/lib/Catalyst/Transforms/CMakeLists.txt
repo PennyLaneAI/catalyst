@@ -17,6 +17,7 @@ file(GLOB SRC
     GEPInboundsPatterns.cpp
     GEPInboundsPass.cpp
     RegisterInactiveCallbackPass.cpp
+    TBAAPatterns.cpp
     TBAATagsPass.cpp
 )
 

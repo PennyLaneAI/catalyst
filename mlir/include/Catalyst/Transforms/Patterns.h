@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "Catalyst/Transforms/TBAAUtils.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -28,5 +30,7 @@ void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
 void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
+
+void populateTBAATagsPatterns(TBAATree &, mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
 
 } // namespace catalyst
