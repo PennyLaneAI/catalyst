@@ -1561,7 +1561,7 @@ def _cond_lowering(
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
                 out = mlir.jaxpr_subcomp(
-                    if_ctx,
+                    if_ctx.module_context,
                     true_jaxpr.jaxpr,
                     jax_ctx.name_stack,
                     mlir.TokenSet(),
@@ -1583,7 +1583,7 @@ def _cond_lowering(
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
                     out = mlir.jaxpr_subcomp(
-                        else_ctx,
+                        else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
                         jax_ctx.name_stack,
                         mlir.TokenSet(),
