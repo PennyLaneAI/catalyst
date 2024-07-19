@@ -1693,6 +1693,7 @@ def _while_loop_lowering(
         out, _ = mlir.jaxpr_subcomp(
             body_ctx,
             body_jaxpr.jaxpr,
+            name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
@@ -1891,6 +1892,7 @@ def _adjoint_lowering(
                 name_stack=jax_ctx.name_stack.extend("adjoint")
             ),
             jaxpr.jaxpr,
+            jax_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
             *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
