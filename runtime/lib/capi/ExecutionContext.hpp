@@ -314,7 +314,7 @@ class ExecutionContext final {
         device->setDeviceStatus(RTDeviceStatus::Active);
         device->getQuantumDevicePtr()->SetDeviceSeed(this->seed);
         device->getQuantumDevicePtr()->SetDevicePRNG(
-            &(this->gen)); // TODO: should we send the reference of the context prng or a copy??
+            &(this->gen));
         device_pool.push_back(device);
 
 #ifdef __build_with_pybind11

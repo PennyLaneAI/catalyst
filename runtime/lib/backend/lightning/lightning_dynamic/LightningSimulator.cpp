@@ -437,8 +437,7 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
     SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
-    bool has_seed = (this->seed != "");
-    bool mres = Lightning::simulateDraw(probs, postselect, this->gen, has_seed);
+    bool mres = Lightning::simulateDraw(probs, postselect, this->gen, this->hasSeed());
     auto dev_wires = getDeviceWires(wires);
     this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
     return mres ? this->One() : this->Zero();

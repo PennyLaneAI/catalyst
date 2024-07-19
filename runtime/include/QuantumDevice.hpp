@@ -107,7 +107,7 @@ struct QuantumDevice {
     /**
      * @brief Set the PRNG seed of the device.
      *
-     * @param gen The PRNG seed.
+     * @param seed The PRNG seed.
      */
     virtual void SetDeviceSeed(std::string seed) = 0;
 
