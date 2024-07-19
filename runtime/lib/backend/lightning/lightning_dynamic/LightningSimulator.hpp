@@ -51,7 +51,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
 
-    std::string seed;
     std::mt19937 *gen;
 
     bool mcmc{false};
@@ -86,8 +85,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
                        [this](auto w) { return this->qubit_manager.getDeviceId(w); });
         return res;
     }
-
-    inline auto hasSeed() -> bool { return this->seed != ""; }
 
   public:
     explicit LightningSimulator(const std::string &kwargs = "{}")

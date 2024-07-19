@@ -236,7 +236,7 @@ void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __catalyst__rt__initialize(char *seed /* default value = nullptr in declaration */)
 {
-    if (seed == nullptr){
+    if (seed == nullptr) {
         // Preserve legacy usage where __catalyst__rt__initialize is called without any arguments
         CTX = std::make_unique<ExecutionContext>();
     }

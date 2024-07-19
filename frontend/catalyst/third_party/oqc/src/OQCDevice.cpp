@@ -55,9 +55,7 @@ void OQCDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shots = s
 
 auto OQCDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-void OQCDevice::SetDeviceSeed([[maybe_unused]] std::string _seed) { seed = _seed; }
-
-void OQCDevice::SetDevicePRNG([[maybe_unused]] std::mt19937 *_gen) { gen = _gen; }
+void OQCDevice::SetDevicePRNG([[maybe_unused]] std::mt19937 *gen) { this->gen = gen; }
 
 auto OQCDevice::Zero() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
 

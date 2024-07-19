@@ -100,9 +100,7 @@ void LightningKokkosSimulator::SetDeviceShots(size_t shots) { this->device_shots
 
 auto LightningKokkosSimulator::GetDeviceShots() const -> size_t { return this->device_shots; }
 
-void LightningKokkosSimulator::SetDeviceSeed(std::string _seed) { this->seed = _seed; }
-
-void LightningKokkosSimulator::SetDevicePRNG(std::mt19937 *_gen) { this->gen = _gen; }
+void LightningKokkosSimulator::SetDevicePRNG(std::mt19937 *gen) { this->gen = gen; }
 
 void LightningKokkosSimulator::PrintState()
 {
@@ -459,7 +457,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire, std::optional<int32_t> 
     SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
-    bool mres = Lightning::simulateDraw(probs, postselect, this->gen, this->hasSeed());
+    bool mres = Lightning::simulateDraw(probs, postselect, this->gen);
     auto dev_wires = getDeviceWires(wires);
     this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
     return mres ? this->One() : this->Zero();

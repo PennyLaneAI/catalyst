@@ -274,7 +274,7 @@ class ExecutionContext final {
 
         this->seed = seed;
         std::seed_seq seed_evolution(seed.begin(), seed.end());
-        gen = std::mt19937(seed_evolution);
+        this->gen = std::mt19937(seed_evolution);
     }
 
     ~ExecutionContext() = default;
@@ -312,8 +312,12 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
-        device->getQuantumDevicePtr()->SetDeviceSeed(this->seed);
-        device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
+        if (this->seed != "") {
+            device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
+        }
+        else {
+            device->getQuantumDevicePtr()->SetDevicePRNG(nullptr);
+        }
         device_pool.push_back(device);
 
 #ifdef __build_with_pybind11

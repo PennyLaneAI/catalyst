@@ -105,13 +105,6 @@ struct QuantumDevice {
     [[nodiscard]] virtual auto GetDeviceShots() const -> size_t = 0;
 
     /**
-     * @brief Set the PRNG seed of the device.
-     *
-     * @param seed The PRNG seed.
-     */
-    virtual void SetDeviceSeed(std::string seed) = 0;
-
-    /**
      * @brief Set the PRNG of the device.
      *
      * @param gen The std::mt19937 PRNG object.

@@ -49,7 +49,6 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
-    std::string seed;
     std::mt19937 *gen;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
@@ -80,8 +79,6 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
                        [this](auto w) { return this->qubit_manager.getDeviceId(w); });
         return res;
     }
-
-    inline auto hasSeed() -> bool { return this->seed != ""; }
 
   public:
     explicit LightningKokkosSimulator(const std::string &kwargs = "{}")
