@@ -32,7 +32,7 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
 
     template <typename... Args>
     MemrefLoadTBAARewritePattern(catalyst::TBAATree &tree, Args &&...args)
-        : tree(&tree), ConversionPattern(std::forward<Args>(args)...){};
+        : ConvertOpToLLVMPattern(std::forward<Args>(args)...), tree(&tree) {};
 
     LogicalResult matchAndRewrite(memref::LoadOp loadOp, memref::LoadOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
