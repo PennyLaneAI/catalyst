@@ -286,16 +286,18 @@ static inline auto simulateDraw(const std::vector<double> &probs, std::optional<
     // Normal flow, no post-selection
     // Draw a number according to the given distribution
     std::uniform_real_distribution<> dis(0., 1.);
-    if (has_seed) {
-        float draw = dis(*gen);
 
+    float draw;
+    if (has_seed) {
+        draw = dis(*gen);
         (*gen)();
-        return draw > probs[0];
+    }
+    else {
+        std::random_device rd;
+        std::mt19937 gen_no_seed(rd());
+        draw = dis(gen_no_seed);
     }
 
-    std::random_device rd;
-    std::mt19937 gen_no_seed(rd());
-    float draw = dis(gen_no_seed);
     return draw > probs[0];
 }
 

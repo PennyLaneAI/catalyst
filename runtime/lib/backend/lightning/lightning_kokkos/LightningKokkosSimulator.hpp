@@ -80,11 +80,8 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
                        [this](auto w) { return this->qubit_manager.getDeviceId(w); });
         return res;
     }
-    
-    inline auto hasSeed() -> bool
-    {
-        return this->seed != "";
-    }
+
+    inline auto hasSeed() -> bool { return this->seed != ""; }
 
   public:
     explicit LightningKokkosSimulator(const std::string &kwargs = "{}")

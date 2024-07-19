@@ -87,10 +87,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         return res;
     }
 
-    inline auto hasSeed() -> bool
-    {
-        return this->seed != "";
-    }
+    inline auto hasSeed() -> bool { return this->seed != ""; }
 
   public:
     explicit LightningSimulator(const std::string &kwargs = "{}")
