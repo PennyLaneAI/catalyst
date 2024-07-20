@@ -86,6 +86,23 @@ provide return shape and dtype information:
 >>> fn(x)
 Array(4.20735492+0.j, dtype=complex128)
 
+Accelerated functions also fully support autodifferentiation with
+:func:`~.grad`, :func:`~.jacobian`, and other Catalyst differentiation functions,
+without needing to specify VJP rules manually:
+
+.. code-block:: python
+
+    @qjit
+    @grad
+    def f(x):
+        expm = catalyst.accelerate(jax.scipy.linalg.expm)
+        return jnp.sum(expm(jnp.sin(x)) ** 2)
+
+>>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+>>> f(x)
+Array([[2.80120452, 1.67518663],
+       [1.61605839, 4.42856163]], dtype=float64)
+
 Accelerator (GPU and TPU) support
 ---------------------------------
 
