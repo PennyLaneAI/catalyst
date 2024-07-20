@@ -137,7 +137,7 @@ extensions = [
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # add the custom MLIR Lexer
-from .MLIRLexer import MLIRLexer
+from MLIRLexer import MLIRLexer
 lexers['mlir'] = MLIRLexer(startinline=True)
 
 # OpenGraph Metadata
