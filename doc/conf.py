@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from sphinx.highlighting import lexers
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -132,6 +134,10 @@ extensions = [
 ]
 
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
+
+# add the custom MLIR Lexer
+from .MLIRLexer import MLIRLexer
+lexers['mlir'] = MLIRLexer(startinline=True)
 
 # OpenGraph Metadata
 ogp_use_first_image = True  # set to False for autocards
