@@ -86,7 +86,7 @@ def vmap(
     ...                [0.7, 0.8, 0.9]])
     >>> y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
     >>> qjit(vmap(circuit))(x, y)
-    array([-0.93005586, -0.97165424, -0.6987465 ])
+    Array([-0.93005586, -0.97165424, -0.6987465 ], dtype=float64)
 
     ``catalyst.vmap()`` has been implemented to match the same behaviour of
     ``jax.vmap``, so should be a drop-in replacement in most cases.
