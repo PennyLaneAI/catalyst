@@ -212,6 +212,13 @@ If we wish to print the value of variables at *runtime*, we can instead use the
 Value of x = 2.0
 Array(4., dtype=float64)
 
+Similarly, Python-based exceptions (via ``raise``) and assertions (via ``assert``)
+will always be evaluated at program capture time, before certain runtime information
+may be available.
+
+Instead, use :func:`~.debug_assert` to instead raise assertions at runtime, including assertions
+that depend on values of dynamic variables.
+
 Avoiding recompilation
 ----------------------
 
