@@ -413,7 +413,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> x = jnp.array([0.1, 0.2])
     >>> tangent = jnp.array([0.3, 0.6])
     >>> jvp(x, tangent)
-    (Array([0.09983342, 0.04      , 0.02      ], dtype=float64), Array([0.29850125, 0.24      , 0.12      ], dtype=float64))
+    (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
+     Array([0.29850125, 0.24      , 0.12      ], dtype=float64))
 
     **Example 2 (argnum usage)**
 
@@ -516,7 +517,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     >>> x = jnp.array([0.1, 0.2])
     >>> dy = jnp.array([-0.5, 0.1, 0.3])
     >>> vjp(x, dy)
-    (Array([0.09983342, 0.04      , 0.02      ], dtype=float64), (Array([-0.43750208,  0.07      ], dtype=float64),))
+    (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
+     (Array([-0.43750208,  0.07      ], dtype=float64),))
     """
 
     def check_is_iterable(x, hint):

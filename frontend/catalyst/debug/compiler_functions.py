@@ -57,7 +57,8 @@ def print_compilation_stage(fn, stage):
 
     >>> debug.print_compilation_stage(func, "HLOLoweringPass")
     module @func {
-      func.func public @jit_func(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+      func.func public @jit_func(%arg0: tensor<f64>)
+      -> tensor<f64> attributes {llvm.emit_c_interface} {
         return %arg0 : tensor<f64>
       }
       func.func @setup() {
