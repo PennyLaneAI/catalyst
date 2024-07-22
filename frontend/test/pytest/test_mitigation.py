@@ -205,7 +205,7 @@ def test_folding_type_error():
         return 0.0
 
     @catalyst.qjit
-    def mitigated_qnode(*args):
+    def mitigated_qnode(*args):  # unused dummy argument to force lazy evaluation of the function
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=[], folding="bad-folding-type-value"
         )()
