@@ -72,7 +72,8 @@ class CompileOptions:
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
-        seed (Optional[str]) : the seed for random operations in a qjit call. Default is empty string.
+        seed (Optional[str]) : the seed for random operations in a qjit call.
+            Default is empty string.
     """
 
     verbose: Optional[bool] = False

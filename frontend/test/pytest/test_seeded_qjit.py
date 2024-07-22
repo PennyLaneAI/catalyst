@@ -17,7 +17,6 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-import catalyst
 from catalyst import cond, measure, qjit
 
 
@@ -68,8 +67,7 @@ def test_seeded_measurement(seed, device):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same results
-    # TODO: However, each measurement within a qjit should be random.
-    for i in range(300):
+    for _ in range(300):  # pylint: disable=unused-variable
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()

@@ -129,7 +129,8 @@ def qjit(
             The seed for random operations in a qjit call, such as circuit measurement results.
             The default value is an empty string, which means no seeding is performed, and all
             processes are random.
-            Note that if the circuit is run from shots, the sampled results are currently NOT seeded.
+            Note that if the circuit is run with shots, the sampled results are currently NOT
+            seeded.
 
     Returns:
         QJIT object.
