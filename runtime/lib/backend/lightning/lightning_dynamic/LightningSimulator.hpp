@@ -51,7 +51,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
 
-    std::mt19937 *gen;
+    std::mt19937 *gen = nullptr;
     void SetDevicePRNG(std::mt19937 *) override;
 
     bool mcmc{false};

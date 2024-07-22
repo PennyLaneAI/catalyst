@@ -49,7 +49,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
-    std::mt19937 *gen;
+    std::mt19937 *gen = nullptr;
     void SetDevicePRNG(std::mt19937 *) override;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
