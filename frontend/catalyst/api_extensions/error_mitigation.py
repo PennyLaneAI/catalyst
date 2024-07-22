@@ -32,11 +32,11 @@ from catalyst.jax_primitives import zne_p, Folding
 
 ## API ##
 def mitigate_with_zne(
-    fn=None, 
-    *, 
-    scale_factors=None, 
-    extrapolate=None, 
-    extrapolate_kwargs=None, 
+    fn=None,
+    *,
+    scale_factors=None,
+    extrapolate=None,
+    extrapolate_kwargs=None,
     folding="global"
 ):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
@@ -58,7 +58,7 @@ def mitigate_with_zne(
             By default, perfect polynomial fitting will be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
-        folding (str): The unitary folding technique to be used to scale the circuit 
+        folding (str): The unitary folding technique to be used to scale the circuit
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`

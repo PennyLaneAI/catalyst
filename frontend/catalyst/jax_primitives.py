@@ -736,8 +736,8 @@ def _zne_abstract_eval(*args, folding, jaxpr, fn):  # pylint: disable=unused-arg
 def _folding_attribute(ctx, folding):
     ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
-        "mitigation", ("folding " + Folding(folding).name).encode("utf-8"), 
-        ir.NoneType.get(ctx), 
+        "mitigation", ("folding " + Folding(folding).name).encode("utf-8"),
+        ir.NoneType.get(ctx),
         ctx
     )
 
