@@ -8,6 +8,8 @@
   For example,
 
   ```python
+  from catalyst import grad
+
   @qjit
   @grad
   def f(x):
@@ -90,10 +92,21 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+  When executing the qjit-compiled function above, `c` will
+  be a static variable with value known at compile time:
+
   ```pycon
   >>> circuit(0.5, 0.5)
   "Inside QNode: 0.5"
   Array(0.77015115, dtype=float64)
+  ```
+
+  Changing the value of `c` will result in re-compilation:
+
+  ```pycon
+  >>> circuit(0.5, 0.8)
+  "Inside QNode: 0.8"
+  Array(0.61141766, dtype=float64)
   ```
 
 * Autograph now supports in-place array assignments with static slices.
@@ -119,6 +132,8 @@
   [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
 
   ```python
+  from catalyst import vmap, qjit
+
   dev = qml.device("lightning.qubit", wires=2)
 
   @qml.qnode(dev)
