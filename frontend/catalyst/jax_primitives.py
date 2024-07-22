@@ -312,8 +312,8 @@ def _python_callback_lowering(
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
     ctx = jax_ctx.module_context
-    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd)
-    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev)
+    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd, name_stack=jax_ctx.name_stack)
+    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev, name_stack=jax_ctx.name_stack)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
 
     argc = len(args)
