@@ -278,7 +278,7 @@ class MLIRLexer(RegexLexer):
             ),
             (r"(memref)(<)", bygroups(Keyword.Type, Punctuation), ("attr-params", "dim-list")),
             (r"(tensor)(<)", bygroups(Keyword.Type, Punctuation), ("attr-params", "dim-list")),
-            (r"(complex)(<)", bygroups(Keyword.Type, Punctuation), ("type")),
+            (r"(complex)(<)", bygroups(Keyword.Type, Punctuation), ("type"), r"(>)"),
             (r"(vector)(<)", bygroups(Keyword.Type, Punctuation), "vector-params"),
             (
                 f"(!){bare_id_with_ns}(<)",
