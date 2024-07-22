@@ -1696,7 +1696,7 @@ def _while_loop_lowering(
         out, _ = mlir.jaxpr_subcomp(
             body_ctx.module_context,
             body_jaxpr.jaxpr,
-            name_stack,
+            body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
