@@ -1893,7 +1893,7 @@ def _adjoint_lowering(
         out, _ = mlir.jaxpr_subcomp(
             jax_ctx.replace(
                 name_stack=jax_ctx.name_stack.extend("adjoint")
-            ),
+            ).module_context,
             jaxpr.jaxpr,
             jax_ctx.name_stack,
             mlir.TokenSet(),
