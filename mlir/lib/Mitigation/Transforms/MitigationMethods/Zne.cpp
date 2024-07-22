@@ -46,10 +46,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     const auto sizeInt = scaleFactorType.getDimSize(0);
 
     // Folding type
-    auto foldingAlgorithm = op.getFoldingAlgorithm();
-    // TODO: Just cast this to an integer, by here:
-    // 1 - Global
-    // 2 - Local
+    auto foldingAlgorithm = op.getFolding();
 
     // Create the folded circuit function
     FlatSymbolRefAttr foldedCircuitRefAttr =
@@ -132,7 +129,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
                                                         mitigation::ZneOp op, Type scalarType
-                                                        int foldingAlgorithm)
+                                                        Folding foldingAlgorithm)
 {
     MLIRContext *ctx = rewriter.getContext();
 
@@ -166,8 +163,11 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
 
-    if (foldingType == 2) {
-        return localFolding(/* TODO: what args? */);
+    if (foldingAlgorithm == Folding(2)) {
+        return randomLocalFolding(/* TODO: what args? */);
+    }
+    if (foldingAlgorithm == Folding(3)) {
+        return allLocalFolding(/* TODO: what args? */);
     }
 
     // Function without measurements: Create function without measurements and with qreg as last
