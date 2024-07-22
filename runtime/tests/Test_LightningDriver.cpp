@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include <numeric>
+#include <random>
 #include <string>
 
 #include "ExecutionContext.hpp"
@@ -175,6 +176,19 @@ TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
     sim->SetDeviceShots(500);
 
     CHECK(sim->GetDeviceShots() == 500);
+}
+
+TEMPLATE_LIST_TEST_CASE("test DevicePRNG", "[Driver]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    std::string seed = "I am a seed!";
+    std::seed_seq seed_evolution(seed.begin(), seed.end());
+    std::mt19937 gen(seed_evolution);
+
+    sim->SetDevicePRNG(&gen);
+
+    CHECK(sim->GetDevicePRNG() == &gen);
 }
 
 TEMPLATE_LIST_TEST_CASE("compute register tests", "[Driver]", SimTypes)

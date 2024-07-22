@@ -50,7 +50,6 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     size_t device_shots;
 
     std::mt19937 *gen = nullptr;
-    void SetDevicePRNG(std::mt19937 *) override;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
     LightningKokkosObsManager<double> obs_manager{};
@@ -88,6 +87,9 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
     }
     ~LightningKokkosSimulator() = default;
+
+    void SetDevicePRNG(std::mt19937 *) override;
+    std::mt19937 *GetDevicePRNG() override;
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(LightningKokkosSimulator);
 

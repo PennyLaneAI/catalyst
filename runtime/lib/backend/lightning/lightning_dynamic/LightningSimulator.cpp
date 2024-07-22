@@ -87,6 +87,8 @@ auto LightningSimulator::GetDeviceShots() const -> size_t { return this->device_
 
 void LightningSimulator::SetDevicePRNG(std::mt19937 *gen) { this->gen = gen; }
 
+std::mt19937 *LightningSimulator::GetDevicePRNG() { return this->gen; }
+
 void LightningSimulator::PrintState()
 {
     using std::cout;
@@ -435,7 +437,7 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
     SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
-    bool mres = Lightning::simulateDraw(probs, postselect, this->gen);
+    bool mres = Lightning::simulateDraw(probs, postselect, GetDevicePRNG());
     auto dev_wires = getDeviceWires(wires);
     this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
     return mres ? this->One() : this->Zero();
