@@ -152,7 +152,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     func::FuncOp fnAllocOp =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
-    // Get the number of qubits 
+    // Get the number of qubits
     quantum::AllocOp allocOp = *fnOp.getOps<quantum::AllocOp>().begin();
     std::optional<int64_t> numberQubitsOptional = allocOp.getNqubitsAttr();
     int64_t numberQubits = numberQubitsOptional.value_or(0);

@@ -27,17 +27,12 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import zne_p, Folding
+from catalyst.jax_primitives import Folding, zne_p
 
 
 ## API ##
 def mitigate_with_zne(
-    fn=None,
-    *,
-    scale_factors=None,
-    extrapolate=None,
-    extrapolate_kwargs=None,
-    folding="global"
+    fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="GLOBAL"
 ):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
@@ -59,9 +54,9 @@ def mitigate_with_zne(
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
-            - global: global unitary of the input circuit is folded
-            - all: all gates locally folded
-            - random: random subset of gates of the input circuits locally folded
+            - GLOBAL: global unitary of the input circuit is folded
+            - ALL: all gates locally folded
+            - RANDOM: random subset of gates of the input circuits locally folded
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
@@ -129,7 +124,7 @@ class ZNE:
         fn: Callable,
         scale_factors: jnp.ndarray,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
-        folding: str
+        folding: str,
     ):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
@@ -155,15 +150,11 @@ class ZNE:
         except KeyError as e:
             raise KeyError(f"Folding type must be one of {Folding._member_names_}") from e
         # TODO: remove the following check once #755 is completed
-        if folding != Folding.global:
-            raise NotImplementedError(f"Folding type {folding.name}" is being developed")
+        if folding != Folding.GLOBAL:
+            raise NotImplementedError(f"Folding type {folding.name} is being developed")
 
         results = zne_p.bind(
-            *args_data,
-            self.scale_factors,
-            folding=folding,
-            jaxpr=jaxpr,
-            fn=self.fn
+            *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
         )
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
         results = self.extrapolate(float_scale_factors, results[0])

@@ -94,7 +94,6 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
 
 #########
@@ -192,8 +191,7 @@ core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
-
-Folding = IntEnum('Folding', ['global', 'random', 'all'])
+Folding = IntEnum("Folding", ["GLOBAL", "RANDOM", "ALL"])
 
 ##############
 # Primitives #
@@ -739,8 +737,9 @@ def _folding_attribute(ctx, folding):
         "mitigation",
         ("folding " + Folding(folding).name).encode("utf-8"),
         ir.NoneType.get(ctx),
-        ctx
+        ctx,
     )
+
 
 def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     """Lowering function to the ZNE opearation.
