@@ -1832,7 +1832,7 @@ def _for_loop_lowering(
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
-            body_ctx,
+            body_ctx.module_context,
             body_jaxpr.jaxpr,
             name_stack,
             mlir.TokenSet(),
