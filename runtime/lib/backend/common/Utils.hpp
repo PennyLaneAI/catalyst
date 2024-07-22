@@ -272,7 +272,7 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
 }
 
 static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
-                                std::mt19937 *gen=nullptr) -> bool
+                                std::mt19937 *gen = nullptr) -> bool
 {
     if (postselect) {
         auto postselect_value = postselect.value();
