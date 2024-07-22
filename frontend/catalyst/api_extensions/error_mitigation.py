@@ -58,7 +58,10 @@ def mitigate_with_zne(
             By default, perfect polynomial fitting will be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
-        folding (str): The unitary folding technique to be used to scale the circuit
+        folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
+            - global: global unitary of the input circuit is folded
+            - all: all gates locally folded
+            - random: random subset of gates of the input circuits locally folded
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
@@ -151,6 +154,10 @@ class ZNE:
             folding = Folding[self.folding]
         except KeyError as e:
             raise KeyError(f"Folding type must be one of {Folding._member_names_}") from e
+        # TODO: remove the following check once #755 is completed
+        if folding != Folding.global:
+            raise NotImplementedError(f"Folding type {folding.name}" is being developed")
+
         results = zne_p.bind(
             *args_data,
             self.scale_factors,
