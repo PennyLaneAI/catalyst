@@ -49,6 +49,53 @@
   >>> Array(48, dtype=int64)
   ```
 
+* A `qjit` run for `lightning.qubit` and `lightning.kokkos` can now be seeded.
+  [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
+
+  The `qjit` decorator now can take in an argument `seed`, which is an arbitrary string. 
+  Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
+  will return the same sequence of measurement results everytime. 
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1, shots=None)
+
+  @qjit(seed="qwerty")
+  def workflow():
+      @qml.qnode(dev)
+      def circuit():
+          qml.Hadamard(0)
+          m = measure(0)
+          @cond(m)
+          def cfun0():
+              qml.Hadamard(0)
+          cfun0()
+          return qml.probs()
+      return circuit(), circuit(), circuit(), circuit()
+
+  @qjit(seed="qwerty")
+  def workflow_another():
+      @qml.qnode(dev)
+      def circuit():
+          qml.Hadamard(0)
+          m = measure(0)
+          @cond(m)
+          def cfun0():
+              qml.Hadamard(0)
+          cfun0()
+          return qml.probs()
+      return circuit(), circuit(), circuit(), circuit()
+
+  print(workflow())
+  print(workflow())
+  print(workflow1())
+
+  >>> 
+  (Array([0.5, 0.5], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+  (Array([0.5, 0.5], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+  (Array([0.5, 0.5], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
@@ -148,6 +195,11 @@
 * The function `__catalyst_inactive_callback` has the nofree attribute.
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
+* The flaky test `test_dynamic_one_shot_several_mcms` in `frontend/test/pytest/test_mid_circuit_measurement.py`
+  is now seeded for both the `default.qubit` reference run and the `lightning.qubit` qjit run, so it is now no
+  longer flaky and always passes.
+  [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -158,6 +210,7 @@ Romain Moyard,
 Erick Ochoa,
 Raul Torres,
 Tzung-Han Juang,
+Paul Haochen Wang,
 
 # Release 0.7.0
 
