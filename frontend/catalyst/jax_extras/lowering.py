@@ -143,6 +143,8 @@ def custom_lower_jaxpr_to_module(
             jaxpr,
             effects,
             public=True,
+            create_tokens=True,
+            replace_tokens_with_dummy=True,
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
