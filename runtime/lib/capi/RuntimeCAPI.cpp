@@ -237,10 +237,8 @@ void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 void __catalyst__rt__initialize(char *seed /* default value = nullptr in declaration */)
 {
     if (seed == nullptr) {
-        // Preserve legacy usage where __catalyst__rt__initialize is called without any arguments
-        CTX = std::make_unique<ExecutionContext>();
-    }
-    else if (strcmp(seed, "__catalyst__unseeded__qjit__run__") == 0) {
+        // 1. Preserve legacy usage where __catalyst__rt__initialize is called without any arguments
+        // 2. Unseeded runs have nullptr as the seed argument at the end of the mlir pipeline
         CTX = std::make_unique<ExecutionContext>();
     }
     else {

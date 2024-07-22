@@ -52,8 +52,6 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
-    
-    std::mt19937 *gen;
 
     std::unordered_map<std::string, std::string> device_kwargs;
 

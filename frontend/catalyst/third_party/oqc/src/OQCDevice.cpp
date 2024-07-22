@@ -55,8 +55,6 @@ void OQCDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shots = s
 
 auto OQCDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-void OQCDevice::SetDevicePRNG([[maybe_unused]] std::mt19937 *gen) { this->gen = gen; }
-
 auto OQCDevice::Zero() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
 
 auto OQCDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }

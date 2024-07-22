@@ -52,6 +52,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     size_t device_shots;
 
     std::mt19937 *gen;
+    void SetDevicePRNG(std::mt19937 *) override;
 
     bool mcmc{false};
     size_t num_burnin{0};

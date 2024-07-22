@@ -25,7 +25,7 @@ from catalyst import cond, measure, qjit
     "seed",
     [
         "qwerty",
-        "This string is just as random as the nest one",
+        "This string is just as random as the next one",
         "bn980 2y9t'K(*^  jq42)",
         "... and his music was electric",
     ],

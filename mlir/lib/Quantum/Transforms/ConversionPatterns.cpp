@@ -167,8 +167,8 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                                           StringRef(seed_str.c_str(), seed_str.length() + 1), mod);
             }
             else {
-                seed_gs = getGlobalString(loc, rewriter, "unseeded",
-                                          "__catalyst__unseeded__qjit__run__", mod);
+                // Set seed argument to nullptr for unseeded runs
+                seed_gs = rewriter.create<LLVM::ZeroOp>(loc, charPtrType);
             }
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
