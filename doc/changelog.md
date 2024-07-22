@@ -57,7 +57,7 @@
   will return the same sequence of measurement results everytime. 
 
   ```python
-  dev = qml.device("lightning.qubit", wires=1, shots=None)
+  dev = qml.device("lightning.qubit", wires=1)
 
   @qjit(seed="qwerty")
   def workflow():
@@ -87,7 +87,7 @@
 
   print(workflow())
   print(workflow())
-  print(workflow1())
+  print(workflow_another())
 
   >>> 
   (Array([0.5, 0.5], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
