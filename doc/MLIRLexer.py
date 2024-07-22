@@ -278,7 +278,7 @@ class MLIRLexer(RegexLexer):
             ),
             (r"(memref)(<)", bygroups(Keyword.Type, Punctuation), ("attr-params", "dim-list")),
             (r"(tensor)(<)", bygroups(Keyword.Type, Punctuation), ("attr-params", "dim-list")),
-            (r"(complex)(<)", bygroups(Keyword.Type, Punctuation), ("type"), r"(>)"),
+            (r"(complex)(<)", bygroups(Keyword.Type, Punctuation), ("inside_type")),
             (r"(vector)(<)", bygroups(Keyword.Type, Punctuation), "vector-params"),
             (
                 f"(!){bare_id_with_ns}(<)",
@@ -298,6 +298,12 @@ class MLIRLexer(RegexLexer):
             (r"\(", Punctuation, ("arrow-type", "type-list-tail", "type")),
             (r"[^\S\r\n]+", Whitespace),
             default("#pop"),
+        ],
+        "inside_type": [
+            (r"([?x0-9\[\]]+)", bygroups(using(this, state="number"))),
+            (r"->|>=", Punctuation),
+            (r"\b([\w.$\-]+)\b", Keyword),
+            (r">", Punctuation, "#pop"),
         ],
         "type-list-tail": [
             (r"\)", Punctuation, "#pop"),
