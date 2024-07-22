@@ -24,7 +24,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from pygments.lexer import RegexLexer, bygroups, include, default
+from pygments.lexer import RegexLexer, bygroups, include, default, using
 from pygments.token import Name, Keyword, Operator, Comment, Text, Punctuation, Literal, Whitespace
 
 comment_rule = (r"//.*?\n", Comment)
