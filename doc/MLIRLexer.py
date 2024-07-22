@@ -42,8 +42,12 @@ non_assign_operation_rule = (
     bygroups(Name.Namespace, Text, Keyword.Function),
 )
 type_rule = (
-    r"(!)?([a-z_]+)(\.)([a-z0-9_]+)(<([^>]*)>)?",
+    r"(!)([a-z_]+)(\.)([a-z0-9_]+)(<([^>]*)>)?",
     bygroups(Operator, Name.Namespace, Text, Keyword.Type, Keyword.Type),
+)
+complex_type_rule = (
+    r"(complex)(<([^>]*)>)?",
+    bygroups(Operator, Keyword.Type),
 )
 int_float_rule = (r"(i|f)([0-9]+)", bygroups(Text, Keyword.Type))
 abbrev_type_tule = (r"(!)([a-z0-9]+)", bygroups(Operator, Keyword.Type))
@@ -274,6 +278,7 @@ class MLIRLexer(RegexLexer):
             ),
             (r"(memref)(<)", bygroups(Keyword.Type, Punctuation), ("attr-params", "dim-list")),
             (r"(tensor)(<)", bygroups(Keyword.Type, Punctuation), ("attr-params", "dim-list")),
+            (r"(complex)(<)", bygroups(Keyword.Type, Punctuation), ("type")),
             (r"(vector)(<)", bygroups(Keyword.Type, Punctuation), "vector-params"),
             (
                 f"(!){bare_id_with_ns}(<)",
