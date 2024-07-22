@@ -43,7 +43,12 @@ from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
+from mlir_quantum.dialects.catalyst import (
+    AssertionOp,
+    CallbackCallOp,
+    CallbackOp,
+    PrintOp,
+)
 from mlir_quantum.dialects.gradient import (
     CustomGradOp,
     ForwardOp,
@@ -248,6 +253,8 @@ python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
 value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
+assert_p = core.Primitive("assert")
+assert_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -1857,6 +1864,25 @@ def _for_loop_lowering(
 
 
 #
+# assert
+#
+@assert_p.def_impl
+def _assert_def_impl(ctx, assertion, error):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@assert_p.def_abstract_eval
+def _assert_abstract(assertion, error):
+    return ()
+
+
+def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
+    assertion_mlir = TensorExtractOp(ir.IntegerType.get_signless(1), assertion, []).result
+    AssertionOp(assertion=assertion_mlir, error=error)
+    return ()
+
+
+#
 # adjoint
 #
 @adjoint_p.def_impl
@@ -1950,6 +1976,7 @@ mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
+mlir.register_lowering(assert_p, _assert_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
 
