@@ -287,7 +287,7 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     the same constants."""
-    newvar = gensym(jaxprs)
+    newvar = gensym('_')
 
     # List of constant variables of all jaxprs, preprended with '_'
     all_mangled_constvars: List[List[Var]] = []
