@@ -193,6 +193,8 @@ void __catalyst__rt__print_string(char *string)
     std::cout << string << std::endl;
 }
 
+void __catalyst__rt__assert_bool(bool p, char *s) { RT_FAIL_IF(!p, s); }
+
 void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 {
     if (c_memref->datatype == NumericType::idx) {

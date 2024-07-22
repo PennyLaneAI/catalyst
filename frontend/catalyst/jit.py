@@ -80,6 +80,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
+    disable_assertions=False,
     seed="",
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
@@ -128,7 +129,7 @@ def qjit(
             The seed for random operations in a qjit call, such as circuit measurement results.
             The default value is an empty string, which means no seeding is performed, and all
             processes are random.
-            Note that if the circuit is run from shots, the sampled results are NOT seeded.
+            Note that if the circuit is run from shots, the sampled results are currently NOT seeded.
 
     Returns:
         QJIT object.
