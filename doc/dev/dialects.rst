@@ -41,11 +41,11 @@ to Catalyst.
 Catalyst dialect structure
 ==========================
 
-A strong design principle in the MLIR project is the avoidance of boilerplate and redundant code,
-favoring a single source of truth to specify IR components. This is achieved via one or more
-descriptive languages based on the `TableGen <https://llvm.org/docs/TableGen/index.html>`_ format
-known from LLVM. Consequently, dialects, as well as many operations, types, attributes, and other
-IR objects, are specified in two parts:
+A strong design principle in the MLIR project is the avoidance of boilerplate code, favoring
+a single source of truth to specify IR components. This is achieved via one or more descriptive
+languages based on the `TableGen <https://llvm.org/docs/TableGen/index.html>`_ format known from
+LLVM. Consequently, dialects, as well as many operations, types, attributes, and other IR objects,
+are specified in two parts:
 
 - **a declarative part**: The main way to define new IR objects via a simple language called
   `Operation Definition Specification (ODS) <https://mlir.llvm.org/docs/DefiningDialects/Operations/>`_.
@@ -94,7 +94,7 @@ following content:
         /// This is the C++ namespace that the dialect, and all sub-components, get placed in.
         let cppNamespace = "::catalyst::openqasm";
 
-        /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
+        /// Use the default type printing/parsing hooks, otherwise we would have to explicitly define them.
         let useDefaultTypePrinterParser = 1;
     }
 
@@ -170,16 +170,16 @@ themselves just implemented as regular operations with a nested region. The stru
 dialect (SCF) also uses it to represent branching and looping in a much more intuitive fashion
 than LLVM.
 
-Lastly, we also defined a custom syntax (``assemblyFormat``) for our operation. MLIR provides two ways
-of representing operations in its textual assembly format:
+Lastly, we also defined a custom syntax (``assemblyFormat``) for our operation. MLIR provides two
+ways of representing operations in its textual assembly format:
 
 - **generic assembly format**: This format is a one-to-one mapping from how MLIR objects are
   represented in memory, and contains all necessary information to uniquely represent an MLIR
   program with it. As a consequence, this format can be used to parse and print operations from any
   dialect, even unknown ones!
 
-  The generic assembly format can be very useful for debugging, as it more truthfully represents the IR state. It
-also suffers less from crashing in the case of an invalid IR state.
+  The generic assembly format can be very useful for debugging, as it more truthfully represents the
+  IR state. It also suffers less from crashing in the case of an invalid IR state.
 
 - **pretty assembly format**: This format can be fully customized (with some restrictions) by the
   dialect designer. Generally speaking the IR can be much more human-readable when printed in this
@@ -255,9 +255,9 @@ with the following content:
     #include "OpenQASM/OpenQASM.h.inc"
 
 Here we directly included declarations for all the object types we defined in a single header.
-Note that some auto-generated files allow you selectively include code via pre-processor flags, as
-done here for types and operations. It can be a good idea to directly look into ``.inc`` to understand
-the type of code they provide.
+Note that some auto-generated files allow you to selectively include code via pre-processor flags,
+as done here for types and operations. It can be a good idea to directly look into ``.inc`` to
+understand the type of code they provide.
 
 Lastly, let's create a main source file for our dialect at ``mlir/lib/OpenQASM/OpenQASM.cpp``:
 
@@ -300,8 +300,8 @@ Lastly, let's create a main source file for our dialect at ``mlir/lib/OpenQASM/O
     #define GET_OP_CLASSES
     #include "OpenQASM/OpenQASM.cpp.inc"
 
-Besides ensuring the right MLIR headers for our code are included, we mainly need to insert all the
-auto-generated C++ source files, just like we did for the dialect header. The snippet also
+Besides ensuring that the right MLIR headers for our code are included, we mainly need to insert
+all the auto-generated C++ source files, just like we did for the dialect header. The snippet also
 demonstrates that some methods need to be manually implemented, like the dialect initialization
 function ``OpenQASMDialect::initialize()``. Other methods that are typically manually added include
 operation verifiers and operation folding & canonicalization methods.
@@ -340,8 +340,8 @@ is also referred to as "round-tripping". Let's see if we can pass this first tes
 
 Catalyst comes with its own version of the opt tool, ``quantum-opt``, preloaded with all builtin
 MLIR dialects and transformations, as well all additional compiler components developed for
-Catalyst specifically. Find the file located at ``mlir/tools/quantum-opt/quantum-opt.cpp`` and add
-the following two lines to it:
+Catalyst specifically. Add the following two lines to the ``mlir/tools/quantum-opt/quantum-opt.cpp``
+file:
 
 .. code-block:: c++
 
