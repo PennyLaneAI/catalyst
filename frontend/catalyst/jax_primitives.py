@@ -1674,7 +1674,7 @@ def _while_loop_lowering(
 
         # recursively generate the mlir for the while cond
         ((pred,),), _ = mlir.jaxpr_subcomp(
-            cond_ctx,
+            cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             name_stack,
             mlir.TokenSet(),
@@ -1694,7 +1694,7 @@ def _while_loop_lowering(
 
         # recursively generate the mlir for the while body
         out, _ = mlir.jaxpr_subcomp(
-            body_ctx,
+            body_ctx.module_context,
             body_jaxpr.jaxpr,
             name_stack,
             mlir.TokenSet(),
