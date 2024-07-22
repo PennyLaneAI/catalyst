@@ -1891,11 +1891,9 @@ def _adjoint_lowering(
     with ir.InsertionPoint(adjoint_block):
         source_info_util.extend_name_stack("adjoint")
         out, _ = mlir.jaxpr_subcomp(
-            jax_ctx.replace(
-                name_stack=jax_ctx.name_stack.extend("adjoint")
-            ).module_context,
+            jax_ctx.module_context,
             jaxpr.jaxpr,
-            jax_ctx.name_stack,
+            jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
             *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
