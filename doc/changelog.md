@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* JAX-compatible functions which run on classical accelerators, such as GPUs via `catalyst.accelerate`, now support autodifferentiation.
+* JAX-compatible functions that run on classical accelerators, such as GPUs via `catalyst.accelerate`, now support autodifferentiation.
   [(#920)](https://github.com/PennyLaneAI/catalyst/pull/920)
 
   For example,
@@ -35,6 +35,8 @@
   For example,
 
   ```python
+  from catalyst import debug_assert
+  
   @qjit
   def f(x):
       debug_assert(x < 5, "x was greater than 5")
