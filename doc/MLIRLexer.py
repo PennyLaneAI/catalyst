@@ -42,7 +42,7 @@ non_assign_operation_rule = (
     bygroups(Name.Namespace, Text, Keyword.Function),
 )
 type_rule = (
-    r"(!)([a-z_]+)(\.)([a-z0-9_]+)(<([^>]*)>)?",
+    r"(!)?([a-z_]+)(\.)([a-z0-9_]+)(<([^>]*)>)?",
     bygroups(Operator, Name.Namespace, Text, Keyword.Type, Keyword.Type),
 )
 int_float_rule = (r"(i|f)([0-9]+)", bygroups(Text, Keyword.Type))
