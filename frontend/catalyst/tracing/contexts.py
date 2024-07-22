@@ -41,6 +41,79 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+class GradContext:
+    """This class tells us the level of nestedness of grad."""
+
+    # Conceptually:
+    #
+    #   _grad_stack : List[bool] = []
+    #
+    # is a class member variable that reflects the level of
+    # nested-ness of the grad operation. If we have the following code:
+    #
+    #   grad(fun)(x)
+    #
+    # and we are inside fun, then List _grad_stack will contain [True]
+    # if we have:
+    #
+    #  grad(grad(fun))(x)
+    #
+    # and we are tracing fun, then _grad_stack will contain [True, True]
+    #
+    # I say conceptually because you can already tell that we don't need
+    # anything besides an integer that gets incremented and decremented
+    # each time you enter a grad or jacobian operation.
+    #
+    # The reason why we started with a stack is because I think it makes more sense.
+    #
+    # You might also ask, why do we need keep track of the order of the derivative?
+    # Isn't it enough to know that we are inside the grad context or outside?
+    # It is when you are only limited to the first order derivative, but once
+    # you have a higher order derivatives, it will be important to know whether
+    # you need the derivative of the derivative...
+    #
+    # The final question to be asked here is whether we need a new stack for this
+    # context or whether we should reuse the old one.
+    # I think we should keep it simple and this is simpler.
+
+    _grad_stack: int = 0
+    # This message will be used in an assertion because it is not expected
+    # to be a user facing error ever.
+
+    def __init__(self, peel=False):
+        """Peel is useful when we want to temporarily create a context
+        where we peel one order of the derivative"""
+        self.peel = peel
+
+    def __enter__(self, peel=False):
+        _ = GradContext._pop() if self.peel else GradContext._push()
+
+    def __exit__(self, _exc_type, _exc, _exc_tb):
+        _ = GradContext._push() if self.peel else GradContext._pop()
+
+    @staticmethod
+    def am_inside_grad():
+        """Return true if we are currently tracing inside a grad operation."""
+        return GradContext._peek() > 0
+
+    @staticmethod
+    def _pop():
+        retval = GradContext._peek()
+        msg = "This is an impossible state. "
+        msg += "One cannot derive to derive to a negative order / integrate"
+        assert retval > 0, msg
+        GradContext._grad_stack -= 1
+        return retval
+
+    @staticmethod
+    def _push():
+        GradContext._grad_stack += 1
+
+    @staticmethod
+    def _peek():
+        return GradContext._grad_stack
+
+
 class EvaluationMode(Enum):
     """Enumerate the evaluation modes supported by Catalyst:
     INTERPRETATION - native Python execution of a Catalyst program

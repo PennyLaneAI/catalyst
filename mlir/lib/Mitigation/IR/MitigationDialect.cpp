@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
-#include "mlir/Transforms/InliningUtils.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/IR/MitigationOps.h"

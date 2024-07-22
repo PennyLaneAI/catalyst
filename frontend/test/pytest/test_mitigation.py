@@ -196,6 +196,24 @@ def test_shape_error():
         mitigated_qnode(0.1)
 
 
+def test_folding_type_error():
+    """Test that value of folding argument is from allowed list"""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit():
+        return 0.0
+
+    @catalyst.qjit
+    def mitigated_qnode(*args):  # unused dummy argument to force lazy evaluation of the function
+        return catalyst.mitigate_with_zne(
+            circuit, scale_factors=[], folding="bad-folding-type-value"
+        )()
+
+    with pytest.raises(KeyError, match="Folding type must be"):
+        mitigated_qnode()
+
+
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 def test_zne_usage_patterns(params):
     """Test usage patterns of catalyst.zne."""

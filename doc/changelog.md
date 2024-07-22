@@ -2,6 +2,53 @@
 
 <h3>New features</h3>
 
+* JAX-compatible functions which run on classical accelerators such as GPUs via `catalyst.accelerate` now support autodifferentiation.
+  [(#920)](https://github.com/PennyLaneAI/catalyst/pull/920)
+
+  For example,
+
+  ```python
+  @qjit
+  @grad
+  def f(x):
+    expm = catalyst.accelerate(jax.scipy.linalg.expm)
+    return jnp.sum(expm(jnp.sin(x)) ** 2)
+  ```
+
+  ```pycon
+  >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+  >>> f(x)
+  >>> array([[2.80120452, 1.67518663],
+      [1.61605839, 4.42856163]])
+  ```
+
+* Runtime validation within QJIT functions using `catalyst.debug_assert`.
+  [(#925)](https://github.com/PennyLaneAI/catalyst/pull/925)
+
+  Can be turned off by setting compile time flag `disable_assertions=True`.
+
+  For example,
+  ```python
+  @qjit
+  def f(x):
+      debug_assert(x < 5, "x was greater than 5")
+      return x * 8
+
+  @qjit(disable_assertions=True)
+  def g(x):
+      debug_assert(x < 5, "x was greater than 5")
+      return x * 8      
+  ```
+
+  ```pycon
+  >>> f(4)
+  >>> Array(32, dtype=int64)
+  >>> f(6)
+  >>> RuntimeError: x was greater than 5
+  >>> g(6)
+  >>> Array(48, dtype=int64)
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
@@ -14,12 +61,65 @@
   the python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
 
+* Static_argnums now can be passed through a QNode
+  [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+  
+  @qjit(static_argnums=(1,))
+  @qml.qnode(dev)
+  def circuit(x, c):
+      print("Inside QNode:", c)
+      qml.RY(c, 0)
+      qml.RX(x, 0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> circuit(0.5, 0.5)
+  >>> "Inside QNode: 0.5"
+  ```
+
+* Autograph now supports in-place array assignments with static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
+
+  For example,
+
+  ```python
+  @qjit(autograph=True)
+  def f(x, y):
+    y[1:10:2] = x
+    return y
+  ```
+
+  ```pycon
+  >>> f(jnp.ones(5), jnp.zeros(10))
+  >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
+  ```
+
+* Autograph works when `qjit` is applied to a function decorated with `vmap`, `cond`, `for_loop` or `while_loop`.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
+  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
 <h3>Bug fixes</h3>
+
 * Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
+  
+* Using float32 in callback functions would not crash in compilation phase anymore,
+  but rather raise the appropriate type exception to the user.
+  [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
+
+* Fix tracing of `SProd` operations
+  [(#935)](https://github.com/PennyLaneAI/catalyst/pull/935)
+
+  After some changes in PennyLane, `Sprod.terms()` returns the terms as leaves
+  instead of a tree. This means that we need to manually trace each term and
+  finally multiply it with the coefficients to create a Hamiltonian.
 
 <h3>Internal changes</h3>
 
@@ -33,9 +133,11 @@
 
 This release contains contributions from (in alphabetical order):
 
+Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Raul Torres,
 Tzung-Han Juang,
 
 # Release 0.7.0
@@ -460,7 +562,7 @@ Tzung-Han Juang,
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 * All decorators in Catalyst, including `vmap`, `qjit`, `mitigate_with_zne`,
-  as well as gradient decorators `grad`, `jacobian`, jvp`, and `vjp`, can now be used
+  as well as gradient decorators `grad`, `jacobian`, `jvp`, and `vjp`, can now be used
   both with and without keyword arguments as a decorator without the need for
   `functools.partial`:
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)

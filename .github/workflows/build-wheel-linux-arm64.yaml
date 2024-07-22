@@ -10,12 +10,13 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  workflow_call:
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 14.0
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: Build Catalyst Wheel on Linux (arm64)-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -70,7 +71,7 @@ jobs:
         path: mlir/mlir-hlo
         key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
         enableCrossOsArchive: True
-        
+
     - name: Cache Enzyme Source
       id: cache-enzyme-source
       uses: actions/cache@v4
@@ -271,7 +272,7 @@ jobs:
     name: Test Wheels (Python ${{ matrix.python_version.official }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
-    
+
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -287,7 +288,7 @@ jobs:
       with:
         name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.official }}.zip
         path: dist
-    
+
     # Needed for accessing llvm-symbolizer
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -296,7 +297,7 @@ jobs:
         path:  llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
         fail-on-cache-miss: True
-    
+
     - name: Run Python Pytest Tests
       run: |
         set -x

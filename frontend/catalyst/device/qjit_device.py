@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
-from pennylane.transforms import split_non_commuting
+from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -466,14 +466,14 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """
 
         _, config = self.original_device.preprocess(execution_config)
+
         program = TransformProgram()
 
-        # measurement transforms (these may change operations on the tape to accommodate
-        # measurement transformations, so must occur before decomposition of measurements)
-        if self.qjit_capabilities.non_commuting_observables_flag is False:
-            program.add_transform(split_non_commuting)
-        if self.measurement_processes == {"Counts"}:
-            program.add_transform(measurements_from_counts)
+        # measurement transforms may change operations on the tape to accommodate
+        # measurement transformations, so must occur before decomposition
+        measurement_transforms = self._measurement_transform_program()
+        config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
+        program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
@@ -500,6 +500,24 @@ class QJITDeviceNewAPI(qml.devices.Device):
             program.add_transform(validate_observables_parameter_shift)
 
         return program, config
+
+    def _measurement_transform_program(self):
+
+        measurement_program = TransformProgram()
+
+        supports_sum_observables = any(
+            obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
+        )
+
+        if self.qjit_capabilities.non_commuting_observables_flag is False:
+            measurement_program.add_transform(split_non_commuting)
+        elif not supports_sum_observables:
+            measurement_program.add_transform(split_to_single_terms)
+
+        if self.measurement_processes == {"Counts"}:
+            measurement_program.add_transform(measurements_from_counts)
+
+        return measurement_program
 
     def execute(self, circuits, execution_config):
         """

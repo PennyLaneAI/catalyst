@@ -12,8 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-   Version number (major.minor.patch[-label])
-"""
+"""Unit tests for the catalyst assert feature."""
 
-__version__ = "0.8.0-dev3"
+# RUN: %PYTHON %s | FileCheck %s
+
+import pennylane as qml
+
+from catalyst import debug_assert, measure, qjit
+
+
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=1))
+def circuit(x: float):
+    """Test a simple assert example."""
+
+    qml.RX(x, wires=0)
+    # CHECK: tensor.extract {{%.+}}[] : tensor<i1>
+    # CHECK: "catalyst.assert"({{%.+}}) <{error = "x less than 5.0"}> : (i1) -> ()
+    debug_assert(x > 5.0, "x less than 5.0")
+    m = measure(wires=0)
+    return m
+
+
+print(circuit.mlir)

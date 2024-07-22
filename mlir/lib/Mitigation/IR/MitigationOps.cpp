@@ -28,7 +28,6 @@ using namespace catalyst::mitigation;
 #define GET_OP_CLASSES
 #include "Mitigation/IR/MitigationOps.cpp.inc"
 
-
 //===----------------------------------------------------------------------===//
 // SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
