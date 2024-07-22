@@ -128,7 +128,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 }
 
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
-                                                        mitigation::ZneOp op, Type scalarType
+                                                        mitigation::ZneOp op, Type scalarType,
                                                         Folding foldingAlgorithm)
 {
     MLIRContext *ctx = rewriter.getContext();
