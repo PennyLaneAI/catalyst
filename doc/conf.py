@@ -25,7 +25,7 @@ from sphinx.highlighting import lexers
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath(""))
-sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("_ext"))
 sys.path.insert(0, os.path.join(os.getcwd(), "doc"))
 
@@ -138,7 +138,8 @@ intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # add the custom MLIR Lexer
 from MLIRLexer import MLIRLexer
-lexers['mlir'] = MLIRLexer(startinline=True)
+
+lexers["mlir"] = MLIRLexer(startinline=True)
 
 # OpenGraph Metadata
 ogp_use_first_image = True  # set to False for autocards
