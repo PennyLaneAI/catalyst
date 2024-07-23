@@ -139,7 +139,7 @@ class MLIRLexer(RegexLexer):
         ],
         "operation": [
             (
-                r"^(\s*)(%[%\w:,\s]+)(\s+)(=)(\s+)([\w.$\-]+)\b",
+                r"^(\s+)(%[%\w:,\s]+)(\s+)(=)(\s+)([\w.$\-]+)\b",
                 bygroups(
                     Whitespace,
                     using(this, state="ssa_value"),
