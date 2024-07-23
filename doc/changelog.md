@@ -127,6 +127,25 @@
 
 <h3>Bug fixes</h3>
 
+* Circuits with preprocessing functions outside qnodes can now be differentiated.
+  [(#332)](https://github.com/PennyLaneAI/catalyst/pull/332)
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def f(y):
+      qml.RX(y, wires=0)
+      return qml.expval(qml.PauliZ(0))
+
+  @catalyst.qjit
+  def g(x):
+      return catalyst.grad(lambda y: f(jnp.cos(y)) ** 2)(x)
+  ```
+
+  ```pycon
+  >>> g(0.4)
+  0.3751720385067584
+  ```
+
 * Static arguments can now be passed through a QNode when specified
   with the `static_argnums` keyword argument.
   [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
