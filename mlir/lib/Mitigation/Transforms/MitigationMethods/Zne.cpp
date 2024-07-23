@@ -137,8 +137,6 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
 {
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
-    Type indexType = rewriter.getIndexType();
-    typesFolded.push_back(indexType);
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
                                                   typesFolded,
                                                   /*outputs=*/fnOp.getResultTypes());
@@ -232,11 +230,6 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
 {
     // TODO: Implement.
 
-    // MLIRContext *ctx = rewriter.getContext();
-    // StringAttr lib = deviceInitOp.getLibAttr();
-    // StringAttr name = deviceInitOp.getNameAttr();
-    // StringAttr kwargs = deviceInitOp.getKwargsAttr();
-
     return FlatSymbolRefAttr();
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
@@ -269,11 +262,14 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
 
     Type qregType = quantum::QuregType::get(ctx);
-    TypeRange originalTypes = op.getArgs().getTypes();
-    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
+
+    TypeRange originalTypes = op.getArgs().getTypes();
+    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
+    Type indexType = rewriter.getIndexType();
+    typesFolded.push_back(indexType);
 
     // Function without measurements: Create function without measurements and with qreg as last
     // argument
