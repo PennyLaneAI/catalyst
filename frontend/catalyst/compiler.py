@@ -91,6 +91,12 @@ class CompileOptions:
     seed: Optional[str] = ""
 
     def __post_init__(self):
+        # Check that async runs must not be seeded
+        if self.async_qnodes and self.seed != "":
+            raise RuntimeError(
+                "Seeding has no effect on asyncronous qnodes, as the execution order of parallel runs is not guaranteed."
+            )
+
         # Make the format of static_argnums easier to handle.
         static_argnums = self.static_argnums
         if static_argnums is None:

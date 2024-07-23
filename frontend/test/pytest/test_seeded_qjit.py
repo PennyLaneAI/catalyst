@@ -20,6 +20,17 @@ import pytest
 from catalyst import cond, measure, qjit
 
 
+def test_seeded_async():
+    """Test that seeding and async cannot be simultaneously used"""
+    with pytest.raises(RuntimeError, match="Seeding has no effect on asyncronous qnodes"):
+
+        @qjit(async_qnodes=True, seed="some seed!")
+        def _():
+            return
+
+        _()
+
+
 @pytest.mark.parametrize(
     "seed",
     [
