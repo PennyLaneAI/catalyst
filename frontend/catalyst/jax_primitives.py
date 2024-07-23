@@ -42,7 +42,12 @@ from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
+from mlir_quantum.dialects.catalyst import (
+    AssertionOp,
+    CallbackCallOp,
+    CallbackOp,
+    PrintOp,
+)
 from mlir_quantum.dialects.gradient import (
     CustomGradOp,
     ForwardOp,
@@ -93,7 +98,7 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-function-args,protected-access
+# pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
 
 #########
 # Types #
@@ -245,6 +250,8 @@ python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
 value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
+assert_p = core.Primitive("assert")
+assert_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -294,7 +301,9 @@ def _python_callback_lowering(
     ip = module.body
     attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
     with ir.InsertionPoint(ip):
-        callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
+        # TODO: Name mangling for callbacks
+        name = callback.__name__
+        callbackOp = CallbackOp(f"callback_{name}_{callback_id}", *attrs)
     CALLBACK_OP_CACHE[cache_key] = callbackOp
     callbackOp = CALLBACK_OP_CACHE[cache_key]
     symbol = callbackOp.sym_name.value
@@ -534,7 +543,12 @@ def _value_and_grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no 
 def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=unused-argument
     """This function is called with abstract arguments for tracing.
     Note: argument names must match these of `_value_and_grad_lowering`."""
-    return jaxpr.out_avals + jaxpr.out_avals
+
+    signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
+    offset = len(jaxpr.consts)
+    new_argnum = [num + offset for num in grad_params.expanded_argnum]
+    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    return tuple(jaxpr.out_avals + transformed_signature.get_results())
 
 
 def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -549,9 +563,15 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [
-        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
-    ]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        nparray = np.asarray(const)
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
+
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
@@ -566,9 +586,6 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    assert (
-        len(flat_output_types) % 2 == 0
-    ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
     func_op = mlir_fn_cache[fn]
     symbol_name = func_op.name.value
     return ValueAndGradOp(
@@ -1832,6 +1849,25 @@ def _for_loop_lowering(
 
 
 #
+# assert
+#
+@assert_p.def_impl
+def _assert_def_impl(ctx, assertion, error):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@assert_p.def_abstract_eval
+def _assert_abstract(assertion, error):
+    return ()
+
+
+def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
+    assertion_mlir = TensorExtractOp(ir.IntegerType.get_signless(1), assertion, []).result
+    AssertionOp(assertion=assertion_mlir, error=error)
+    return ()
+
+
+#
 # adjoint
 #
 @adjoint_p.def_impl
@@ -1925,6 +1961,7 @@ mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
+mlir.register_lowering(assert_p, _assert_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
 
