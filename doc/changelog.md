@@ -254,10 +254,16 @@
   instead of a tree. This means that we need to manually trace each term and
   finally multiply it with the coefficients to create a Hamiltonian.
 
+* The function `mitigate_with_zne` accomodates a `folding` input argument for specifying the type of
+  circuit folding technique to be used by the error-mitigation routine
+  (only `global` value is supported to date.)
+  [(#946)](https://github.com/PennyLaneAI/catalyst/pull/946)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Alessandro Cosentino,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
