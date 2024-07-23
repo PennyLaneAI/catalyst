@@ -219,6 +219,10 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter, Ty
                                      func::FuncOp fnWithMeasurementsOp)
 {
     // TODO: Implement.
+
+    // Can't throw, because disabled by compilation.
+    //throw std::logic_error("Random local folding not implemented!");
+
     return FlatSymbolRefAttr();
 }
 FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
@@ -229,6 +233,12 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, Type 
                                   func::FuncOp fnWithMeasurementsOp)
 {
     // TODO: Implement.
+
+    // MLIRContext *ctx = rewriter.getContext();
+    // StringAttr lib = deviceInitOp.getLibAttr();
+    // StringAttr name = deviceInitOp.getNameAttr();
+    // StringAttr kwargs = deviceInitOp.getKwargsAttr();
+
     return FlatSymbolRefAttr();
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,

@@ -92,6 +92,10 @@ def mitigate_with_zne(
             s = jax.numpy.array([1, 2, 3])
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
     """
+
+    if folding.upper() == "RANDOM":
+        raise NotImplementedError("Random global folding not yet implemented!")
+
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
