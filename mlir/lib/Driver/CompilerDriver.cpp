@@ -543,20 +543,20 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
 
-    if (options.usePlugin) {
-      auto plugin = PassPlugin::load(options.getPluginPath());
+    for (auto path : options.passPlugins) {
+      auto plugin = PassPlugin::load(path);
       if (!plugin) {
-        llvm::errs() << "Failed to load passes from '" << options.getPluginPath()
+        llvm::errs() << "Failed to load passes from '" << path
                << "'. Request ignored.\n";
         return failure();
       }
       plugin.get().registerPassRegistryCallbacks();
     }
 
-    if (options.usePlugin) {
-      auto plugin = DialectPlugin::load(options.getPluginPath());
+    for (auto path : options.dialectPlugins) {
+      auto plugin = DialectPlugin::load(path);
       if (!plugin) {
-        llvm::errs() << "Failed to load dialect plugin from '" << options.getPluginPath()
+        llvm::errs() << "Failed to load dialect plugin from '" << path
              << "'. Request ignored.\n";
         return failure();
       };
