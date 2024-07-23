@@ -126,16 +126,35 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
 }
+FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
+                                                  Type scalarType, ModuleOp moduleOp,
+                                                  std::string fnFoldedName, func::FuncOp fnOp,
+                                                  TypeRange originalTypes, Type qregType,
+                                                  func::FuncOp fnAllocOp, int64_t numberQubits,
+                                                  quantum::DeviceInitOp deviceInitOp)
+{
+    // TODO: Implement.
+    return FlatSymbolRefAttr();
+}
 
+FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter,
+                                                  Type scalarType, ModuleOp moduleOp,
+                                                  std::string fnFoldedName, func::FuncOp fnOp,
+                                                  TypeRange originalTypes, Type qregType,
+                                                  func::FuncOp fnAllocOp, int64_t numberQubits,
+                                                  quantum::DeviceInitOp deviceInitOp)
+{
+    // TODO: Implement.
+    return FlatSymbolRefAttr();
+}
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
                                                         mitigation::ZneOp op, Type scalarType,
                                                         Folding foldingAlgorithm)
 {
-    MLIRContext *ctx = rewriter.getContext();
-
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
     std::string fnFoldedName = op.getCallee().str() + ".folded";
+    MLIRContext *ctx = rewriter.getContext();
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnFoldedName)) {
         return SymbolRefAttr::get(ctx, fnFoldedName);
@@ -144,7 +163,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Original function
     func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     TypeRange originalTypes = op.getArgs().getTypes();
-    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    Type qregType = quantum::QuregType::get(ctx);
 
     // Set insertion in the module
     rewriter.setInsertionPointToStart(moduleOp.getBody());
@@ -154,21 +173,44 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
     // Get the number of qubits
-    quantum::AllocOp allocOp = *fnOp.getOps<quantum::AllocOp>().begin();
-    std::optional<int64_t> numberQubitsOptional = allocOp.getNqubitsAttr();
-    int64_t numberQubits = numberQubitsOptional.value_or(0);
+    const int64_t numberQubits = (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
     // Get the device
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
+
+    if (foldingAlgorithm == Folding(2)) {
+        return randomLocalFolding(
+            loc,
+            rewriter,
+            scalarType,
+            moduleOp,
+            fnFoldedName,
+            fnOp,
+            originalTypes,
+            qregType,
+            fnAllocOp,
+            numberQubits,
+            deviceInitOp
+        );
+    }
+    if (foldingAlgorithm == Folding(3)) {
+        return allLocalFolding(
+            loc,
+            rewriter,
+            scalarType,
+            moduleOp,
+            fnFoldedName,
+            fnOp,
+            originalTypes,
+            qregType,
+            fnAllocOp,
+            numberQubits,
+            deviceInitOp
+        );
+    }
+
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
-
-    if (foldingAlgorithm == Folding(2)) {
-        return randomLocalFolding(/* TODO: what args? */);
-    }
-    if (foldingAlgorithm == Folding(3)) {
-        return allLocalFolding(/* TODO: what args? */);
-    }
 
     // Function without measurements: Create function without measurements and with qreg as last
     // argument
