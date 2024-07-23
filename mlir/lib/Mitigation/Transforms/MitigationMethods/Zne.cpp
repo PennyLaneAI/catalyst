@@ -49,8 +49,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     auto foldingAlgorithm = op.getFolding();
 
     // Create the folded circuit function
-    FlatSymbolRefAttr foldedCircuitRefAttr =
-        getOrInsertFoldedCircuit(loc, rewriter, op, scaleFactorType.getElementType(), foldingAlgorithm);
+    FlatSymbolRefAttr foldedCircuitRefAttr = getOrInsertFoldedCircuit(
+        loc, rewriter, op, scaleFactorType.getElementType(), foldingAlgorithm);
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
 
@@ -126,23 +126,19 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
 }
-FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
-                                                  Type scalarType, ModuleOp moduleOp,
-                                                  std::string fnFoldedName, func::FuncOp fnOp,
-                                                  TypeRange originalTypes, Type qregType,
-                                                  func::FuncOp fnAllocOp, int64_t numberQubits,
-                                                  quantum::DeviceInitOp deviceInitOp)
+FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
+                                     ModuleOp moduleOp, std::string fnFoldedName, func::FuncOp fnOp,
+                                     TypeRange originalTypes, Type qregType, func::FuncOp fnAllocOp,
+                                     int64_t numberQubits, quantum::DeviceInitOp deviceInitOp)
 {
     // TODO: Implement.
     return FlatSymbolRefAttr();
 }
 
-FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter,
-                                                  Type scalarType, ModuleOp moduleOp,
-                                                  std::string fnFoldedName, func::FuncOp fnOp,
-                                                  TypeRange originalTypes, Type qregType,
-                                                  func::FuncOp fnAllocOp, int64_t numberQubits,
-                                                  quantum::DeviceInitOp deviceInitOp)
+FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
+                                  ModuleOp moduleOp, std::string fnFoldedName, func::FuncOp fnOp,
+                                  TypeRange originalTypes, Type qregType, func::FuncOp fnAllocOp,
+                                  int64_t numberQubits, quantum::DeviceInitOp deviceInitOp)
 {
     // TODO: Implement.
     return FlatSymbolRefAttr();
@@ -173,39 +169,18 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
     // Get the number of qubits
-    const int64_t numberQubits = (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+    const int64_t numberQubits =
+        (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
     // Get the device
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
 
     if (foldingAlgorithm == Folding(2)) {
-        return randomLocalFolding(
-            loc,
-            rewriter,
-            scalarType,
-            moduleOp,
-            fnFoldedName,
-            fnOp,
-            originalTypes,
-            qregType,
-            fnAllocOp,
-            numberQubits,
-            deviceInitOp
-        );
+        return randomLocalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp,
+                                  originalTypes, qregType, fnAllocOp, numberQubits, deviceInitOp);
     }
     if (foldingAlgorithm == Folding(3)) {
-        return allLocalFolding(
-            loc,
-            rewriter,
-            scalarType,
-            moduleOp,
-            fnFoldedName,
-            fnOp,
-            originalTypes,
-            qregType,
-            fnAllocOp,
-            numberQubits,
-            deviceInitOp
-        );
+        return allLocalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp,
+                               originalTypes, qregType, fnAllocOp, numberQubits, deviceInitOp);
     }
 
     StringAttr lib = deviceInitOp.getLibAttr();
