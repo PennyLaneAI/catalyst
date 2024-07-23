@@ -37,6 +37,6 @@ def test_mcmc():
         )
     )
     def circuit():
-        return qml.state()
+        return qml.expval(qml.X(0))
 
     print(circuit.mlir)

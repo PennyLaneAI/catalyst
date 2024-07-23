@@ -216,7 +216,7 @@ class TestPreprocess:
 
     def test_decompose_integration(self):
         """Test the decompose transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4)
+        dev = DummyDevice(wires=4, shots=None)
 
         @qml.qjit
         @qml.qnode(dev)
@@ -243,7 +243,7 @@ class TestPreprocess:
 
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4)
+        dev = DummyDevice(wires=4, shots=None)
 
         @qml.qjit
         @qml.qnode(dev)

@@ -18,7 +18,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import CompileError, qjit
 
 
 class TestExpval:
@@ -486,7 +486,7 @@ class TestOtherMeasurements:
         def circuit():
             return meas_fun(wires=0)
 
-        with pytest.raises(ValueError, match="cannot work with shots=None"):
+        with pytest.raises(CompileError, match="cannot work with shots=None"):
             qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):
