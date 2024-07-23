@@ -17,7 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 import sys
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 from itertools import chain
 from typing import Any, Dict, Iterable, List, Union
 
@@ -196,7 +196,7 @@ core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
-class Folding(StrEnum):
+class Folding(Enum):
     """
     Folding types supported by ZNE mitigation
     """
@@ -750,7 +750,7 @@ def _folding_attribute(ctx, folding):
     ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
         "mitigation",
-        ("folding " + Folding(folding)).encode("utf-8"),
+        ("folding " + Folding(folding).value).encode("utf-8"),
         ir.NoneType.get(ctx),
         ctx,
     )
