@@ -168,6 +168,26 @@
   signature is declared incorrectly and the callback function is differentiated.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
 
+* AutoGraph will now correctly convert conditional statements where the condition is a non-boolean
+  static value.
+  [(#944)](https://github.com/PennyLaneAI/catalyst/pull/944)
+
+  Internally, statically known non-boolean predicates (such as `1`) will be
+  converted to `bool`:
+
+  ```python
+  @qml.qjit(autograph=True)
+  def workflow(x):
+      n = 1
+
+      if n:
+          y = x ** 2
+      else:
+          y = x
+
+      return y
+  ```
+
 <h3>Internal changes</h3>
 
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
