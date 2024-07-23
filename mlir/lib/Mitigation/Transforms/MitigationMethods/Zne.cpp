@@ -126,13 +126,15 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
 }
-FlatSymbolRefAttr
-globalFolding(Location loc, PatternRewriter &rewriter, Type scalarType, std::string fnFoldedName,
-              func::FuncOp fnOp, SmallVector<Type> typesFolded, Type qregType,
-              func::FuncOp fnAllocOp, int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
-              func::FuncOp fnWithoutMeasurementsOp, func::FuncOp fnWithMeasurementsOp)
+FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
+                                std::string fnFoldedName, func::FuncOp fnOp,
+                                SmallVector<Type> typesFolded, func::FuncOp fnAllocOp,
+                                int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
+                                func::FuncOp fnWithoutMeasurementsOp,
+                                func::FuncOp fnWithMeasurementsOp)
 {
     MLIRContext *ctx = rewriter.getContext();
+    Type qregType = quantum::QuregType::get(ctx);
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
@@ -210,9 +212,8 @@ globalFolding(Location loc, PatternRewriter &rewriter, Type scalarType, std::str
 }
 FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
                                      std::string fnFoldedName, func::FuncOp fnOp,
-                                     SmallVector<Type> typesFolded, Type qregType,
-                                     func::FuncOp fnAllocOp, int64_t numberQubits,
-                                     quantum::DeviceInitOp deviceInitOp,
+                                     SmallVector<Type> typesFolded, func::FuncOp fnAllocOp,
+                                     int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
                                      func::FuncOp fnWithoutMeasurementsOp,
                                      func::FuncOp fnWithMeasurementsOp)
 {
@@ -223,11 +224,12 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter, Ty
 
     return FlatSymbolRefAttr();
 }
-FlatSymbolRefAttr
-allLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType, std::string fnFoldedName,
-                func::FuncOp fnOp, SmallVector<Type> typesFolded, Type qregType,
-                func::FuncOp fnAllocOp, int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
-                func::FuncOp fnWithoutMeasurementsOp, func::FuncOp fnWithMeasurementsOp)
+FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
+                                  std::string fnFoldedName, func::FuncOp fnOp,
+                                  SmallVector<Type> typesFolded, func::FuncOp fnAllocOp,
+                                  int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
+                                  func::FuncOp fnWithoutMeasurementsOp,
+                                  func::FuncOp fnWithMeasurementsOp)
 {
     // TODO: Implement.
 
@@ -254,7 +256,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Original function
     func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     TypeRange originalTypes = op.getArgs().getTypes();
-    Type qregType = quantum::QuregType::get(ctx);
 
     // Set insertion in the module
     rewriter.setInsertionPointToStart(moduleOp.getBody());
@@ -286,18 +287,18 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     if (foldingAlgorithm == Folding(1)) {
-        return globalFolding(loc, rewriter, scalarType, fnFoldedName, fnOp, typesFolded, qregType,
-                             fnAllocOp, numberQubits, deviceInitOp, fnWithoutMeasurementsOp,
+        return globalFolding(loc, rewriter, scalarType, fnFoldedName, fnOp, typesFolded, fnAllocOp,
+                             numberQubits, deviceInitOp, fnWithoutMeasurementsOp,
                              fnWithMeasurementsOp);
     }
     if (foldingAlgorithm == Folding(2)) {
         return randomLocalFolding(loc, rewriter, scalarType, fnFoldedName, fnOp, typesFolded,
-                                  qregType, fnAllocOp, numberQubits, deviceInitOp,
-                                  fnWithoutMeasurementsOp, fnWithMeasurementsOp);
+                                  fnAllocOp, numberQubits, deviceInitOp, fnWithoutMeasurementsOp,
+                                  fnWithMeasurementsOp);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
-    return allLocalFolding(loc, rewriter, scalarType, fnFoldedName, fnOp, typesFolded, qregType,
-                           fnAllocOp, numberQubits, deviceInitOp, fnWithoutMeasurementsOp,
+    return allLocalFolding(loc, rewriter, scalarType, fnFoldedName, fnOp, typesFolded, fnAllocOp,
+                           numberQubits, deviceInitOp, fnWithoutMeasurementsOp,
                            fnWithMeasurementsOp);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
