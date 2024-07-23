@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+// RUN: quantum-opt --disable-assertion --split-input-file %s | FileCheck %s
 
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+//////////////////////////
+// Catalyst AssertionOp //
+//////////////////////////
 
-namespace catalyst {
-
-void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
-
-void populateScatterPatterns(mlir::RewritePatternSet &);
-
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
-
-void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
-
-void populateDisableAssertionPatterns(mlir::RewritePatternSet &);
-
-void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
-
-} // namespace catalyst
+func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
+    // CHECK-NOT: @__catalyst__rt__assert_bool
+    "catalyst.assert"(%arg0) <{error = "Test Message"}> : (i1) -> ()
+    
+    return
+}
