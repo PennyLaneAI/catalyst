@@ -209,6 +209,11 @@
 
 <h3>Internal changes</h3>
 
+* When memrefs have no identity layout, memrefs copy operations are replaced by the linalg copy operation.
+  It does not use a runtime function but instead lowers to scf and standard dialects. It also ensures
+  a better compatibility with Enzyme.
+  [(#917)](https://github.com/PennyLaneAI/catalyst/pull/917)
+
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
   [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
 
