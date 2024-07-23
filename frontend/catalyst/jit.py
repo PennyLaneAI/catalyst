@@ -131,8 +131,9 @@ def qjit(
             The seed for random operations in a qjit call, such as circuit measurement results.
             The default value is an empty string, which means no seeding is performed, and all
             processes are random.
-            Note that if the circuit is run with shots, the sampled results are currently NOT
-            seeded.
+            Note that `lightning.qubit` and `lightning.kokkos` currently only support seeding
+            measurements, and do not yet support seeding samples. As such, these devices with
+            shots will still return random results.
 
     Returns:
         QJIT object.
