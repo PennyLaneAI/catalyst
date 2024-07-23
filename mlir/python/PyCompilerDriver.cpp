@@ -77,7 +77,7 @@ PYBIND11_MODULE(compiler_driver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool verbose, py::list pipelines,
+           bool verbose, py::list pipelines, py::list passPlugins, py::list dialectPlugins,
            bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
             // Install signal handler to catch user interrupts (e.g. CTRL-C).
             signal(SIGINT,
@@ -95,7 +95,9 @@ PYBIND11_MODULE(compiler_driver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .lowerToLLVM = lower_to_llvm
+                                    .lowerToLLVM = lower_to_llvm,
+                                    .passPlugins = passPlugins.cast<std::vector<std::string>>(),
+                                    .dialectPlugins = dialectPlugins.cast<std::vector<std::string>>()
                                     };
 
             errStream.flush();
@@ -107,5 +109,5 @@ PYBIND11_MODULE(compiler_driver, m)
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("keep_intermediate") = false, py::arg("verbose") = false,
-        py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true);
+        py::arg("pipelines") = py::list(), py::arg("passPlugins") = py::list(), py::arg("dialectPlugins") = py::list(), py::arg("lower_to_llvm") = true);
 }

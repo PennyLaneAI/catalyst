@@ -31,7 +31,9 @@
 #include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassRegistry.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Tools/Plugins/DialectPlugin.h"
 #include "mlir/Tools/Plugins/PassPlugin.h"
@@ -40,6 +42,10 @@
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -551,6 +557,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         return failure();
       }
       plugin.get().registerPassRegistryCallbacks();
+      llvm::errs() << "load passes from '" << path;
     }
 
     for (auto path : options.dialectPlugins) {
@@ -561,6 +568,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         return failure();
       };
       plugin.get().registerDialectRegistryCallbacks(registry);
+      llvm::errs() << "load passes from '" << path;
     }
 
     registerAllCatalystDialects(registry);
