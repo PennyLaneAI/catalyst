@@ -22,6 +22,8 @@ from jax.tree_util import tree_flatten
 
 from catalyst import for_loop, grad, qjit, vmap
 
+# pylint: disable=too-many-public-methods
+
 
 class TestVectorizeMap:
     """Test QJIT compatibility with JAX vectorization."""
@@ -754,6 +756,7 @@ class TestVectorizeMap:
         ):
             qjit(workflow)(x)
 
+    @pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
     def test_vmap_worflow_derivation(self, backend):
         """Check the gradient of a vmap workflow"""
         n_wires = 5
@@ -806,7 +809,7 @@ class TestVectorizeMap:
 
         assert pytree_enzyme == pytree_fd
         assert jnp.allclose(data_enzyme[0], data_jax[0])
-        assert jnp.allclose(data_enzyme[1], data_jax[1], atol=8e-2)
+        assert jnp.allclose(data_enzyme[1], data_jax[1])
 
     def test_vmap_usage_patterns(self, backend):
         """Test usage patterns of catalyst.vmap."""

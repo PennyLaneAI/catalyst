@@ -93,6 +93,12 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
     let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
 
+def DisableAssertionPass : Pass<"disable-assertion"> {
+    let summary = "Disable all catalyst_assertions.";
+
+    let constructor = "catalyst::createDisableAssertionPass()";
+}
+
 def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
     let summary = "Adds exception handling for async qnodes.";
 

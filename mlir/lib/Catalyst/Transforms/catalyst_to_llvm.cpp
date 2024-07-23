@@ -260,6 +260,42 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     }
 };
 
+struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(AssertionOp op, AssertionOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        StringRef qirName = "__catalyst__rt__assert_bool";
+
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        Type int1Type = IntegerType::get(ctx, 1);
+        Type charPtrType = LLVM::LLVMPointerType::get(ctx);
+
+        SmallVector<Type> argTypes{int1Type, charPtrType};
+        Type assertSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
+
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        LLVM::LLVMFuncOp assertFunc =
+            ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
+
+        Value assertionDescriptor = adaptor.getAssertion();
+
+        StringRef errorMessage = op.getError();
+        std::string symbolName = std::to_string(std::hash<std::string>()(errorMessage.str()));
+        Value globalString = getGlobalString(loc, rewriter, symbolName, errorMessage, mod);
+
+        SmallVector<Value> callArgs{assertionDescriptor, globalString};
+        rewriter.create<LLVM::CallOp>(loc, assertFunc, callArgs);
+
+        rewriter.eraseOp(op);
+
+        return success();
+    }
+};
+
 // Encodes memref as LLVM struct value:
 //
 // {
@@ -585,6 +621,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
+        patterns.add<AssertionOpPattern>(typeConverter, context);
         patterns.add<DefineCallbackOpPattern>(typeConverter, context);
         patterns.add<ReplaceCallbackOpWithFuncOp>(typeConverter, context);
         patterns.add<CallbackCallOpPattern>(typeConverter, context);

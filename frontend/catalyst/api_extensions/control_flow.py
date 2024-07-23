@@ -21,6 +21,7 @@ with control flow, including conditionals, for loops, and while loops.
 
 from typing import Any, Callable, List
 
+import jax
 import jax.numpy as jnp
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
@@ -124,9 +125,9 @@ def cond(pred: DynamicJaxprTracer):
             return qml.expval(qml.PauliZ(0))
 
     >>> circuit(1.4)
-    array(0.16996714)
+    Array(0.16996714, dtype=float64)
     >>> circuit(1.6)
-    array(0.)
+    Array(0., dtype=float64)
 
     Additional 'else-if' clauses can also be included via the ``else_if`` method:
 
@@ -204,7 +205,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return 6.  # float
         ...     return cond_fn()
         >>> f(1.5)
-        array(6.)
+        Array(6., dtype=float64)
 
         Similarly, the else (``my_cond_fn.otherwise``) may be omitted **as long as
         other branches do not return any values**. If other branches do return values,
@@ -231,7 +232,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return x
         ...     return cond_fn()
         >>> f(1.6)
-        array(2.56)
+        Array(2.56, dtype=float64)
     """
 
     def _decorator(true_fn: Callable):
@@ -322,7 +323,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
             return qml.expval(qml.PauliZ(0)), final_x
 
     >>> circuit(7, 1.6)
-    [array(0.97926626), array(0.55395718)]
+    (Array(0.97926626, dtype=float64), Array(0.55395718, dtype=float64))
 
     Note that using dynamically-shaped arrays within for loops, while loops, and
     conditional statements, are also supported:
@@ -335,7 +336,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     ...         return a + i
     ...     return loop(a)
     >>> f(5)
-    array([21., 21., 21., 21., 21.])
+    Array([21., 21., 21., 21., 21.], dtype=float64)
 
     By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
     arrays from outside the for loop to be correctly captured, and arrays of the
@@ -352,7 +353,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     >>> a = jnp.ones([1,3], dtype=float)
     >>> b = jnp.ones([1,3], dtype=float)
     >>> g(a, b)
-    array(3.)
+    Array(3., dtype=float64)
 
     However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
@@ -365,7 +366,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     ...         return jnp.ones([i], dtype=float) # return array of new dimensions
     ...     return loop(a)
     >>> f(5)
-    array([1., 1., 1., 1., 1., 1., 1., 1., 1.])
+    Array([1., 1., 1., 1., 1., 1., 1., 1., 1.], dtype=float64)
 
     Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
     can no longer be captured from outer-scopes by the for loop, and binary operations
@@ -447,7 +448,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
             return qml.expval(qml.PauliZ(0)), final_x
 
     >>> circuit(1.6)
-    [array(-0.02919952), array(2.56)]
+    (Array(-0.02919952, dtype=float64), Array(2.56, dtype=float64))
 
     By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
     arrays from outside the for loop to be correctly captured, and arrays of the
@@ -464,7 +465,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     >>> x = jnp.array([0.1, 0.2, 0.3])
     >>> y = jnp.array([5.2, 10.3, 2.4])
     >>> g(x, y)
-    array([0.052, 0.412, 0.216])
+    Array([0.052, 0.412, 0.216], dtype=float64)
 
     However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
@@ -480,7 +481,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     ...         return (a, b, i) # return array of new dimensions
     ...     return loop(a0, b0, 0)
     >>> f(2)
-    (array([1., 1.]), array([1., 1., 1., 1.]), array(3))
+    (Array([1., 1.], dtype=float64), Array([1., 1., 1., 1.], dtype=float64), Array(3, dtype=int64))
 
     Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
     can no longer be captured from outer-scopes by the for loop, and binary operations
@@ -545,11 +546,11 @@ class CondCallable:
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
     [Hadamard(wires=[0]), Cond(tapes=[[Hadamard(wires=[1])], [T(wires=[0])]])]
-    (array([0.25, 0.25, 0.25, 0.25]),)
+    (Array([0.25, 0.25, 0.25, 0.25], dtype=float64),)
     """
 
     def __init__(self, pred, true_fn):
-        self.preds = [pred]
+        self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda: None
         self._operation = None
@@ -587,7 +588,7 @@ class CondCallable:
                 raise TypeError(
                     "Conditional 'else if' function is not allowed to have any arguments"
                 )
-            self.preds.append(pred)
+            self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
             return self
 
@@ -606,6 +607,33 @@ class CondCallable:
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
+
+    def _convert_predicate_to_bool(self, pred):
+        """Convert predicate to bool if necessary."""
+
+        if isinstance(pred, jax.Array) and pred.shape not in ((), (1,)):
+            raise TypeError("Array with multiple elements is not a valid predicate")
+
+        if not self._is_any_boolean(pred):
+            try:
+                pred = jnp.astype(pred, bool, copy=False)
+            except TypeError as e:
+                raise TypeError(
+                    "Conditional predicates are required to be of bool, integer or float type"
+                ) from e
+
+        return pred
+
+    def _is_any_boolean(self, pred):
+        """Check if a variable represents a type of boolean"""
+
+        if isinstance(pred, bool):
+            return True
+
+        if hasattr(pred, "dtype"):
+            return pred.dtype == bool
+
+        return False
 
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace
@@ -753,7 +781,7 @@ class ForLoopCallable:
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
     [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
-    (array([0.5, 0. , 0.5, 0. ]),)
+    (Array([0.5, 0. , 0.5, 0. ], dtype=float64),)
     """
 
     def __init__(
@@ -928,7 +956,7 @@ class WhileLoopCallable:
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
     [X(0), WhileLoop(tapes=[[X(0)]])]
-    (array([0., 0., 1., 0.]),)
+    (Array([0., 0., 1., 0.], dtype=float64),)
     """
 
     def __init__(self, cond_fn, body_fn, experimental_preserve_dimensions):
