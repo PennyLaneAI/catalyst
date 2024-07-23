@@ -197,6 +197,10 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
 class Folding(StrEnum):
+    """
+    Folding types supported by ZNE mitigation
+    """
+
     GLOBAL = "global"
     RANDOM = "random"
     ALL = "all"

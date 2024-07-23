@@ -149,7 +149,7 @@ class ZNE:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
         # TODO: remove the following check once #755 is completed
         if folding != Folding.GLOBAL:
-            raise NotImplementedError(f"Folding type {folding.name} is being developed")
+            raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
         results = zne_p.bind(
             *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
