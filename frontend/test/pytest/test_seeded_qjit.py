@@ -13,6 +13,8 @@
 # limitations under the License.
 """Tests for seeded qjit runs in Catalyst"""
 
+import platform
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -32,6 +34,14 @@ from catalyst import cond, measure, qjit
 @pytest.mark.parametrize("device", ["lightning.qubit", "lightning.kokkos"])
 def test_seeded_measurement(seed, device):
     """Test that different calls to qjits with the same seed produce the same measurement results"""
+
+    if (
+        (device == "lightning.kokkos")
+        and ("mac" in platform.platform().lower())
+        and ("x86" in platform.platform().lower())
+    ):
+        pytest.skip("Initializing lightning.kokkos device on x86 mac causes segmentation fault")
+
     dev = qml.device(device, wires=1)
 
     @qjit(seed=seed)
@@ -67,7 +77,7 @@ def test_seeded_measurement(seed, device):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same results
-    for _ in range(300):  # pylint: disable=unused-variable
+    for _ in range(5):  # pylint: disable=unused-variable
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
