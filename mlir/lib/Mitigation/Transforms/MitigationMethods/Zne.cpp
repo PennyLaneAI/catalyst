@@ -126,6 +126,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
 }
+// In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                 func::FuncOp fnOp, SmallVector<Type> typesFolded,
                                 func::FuncOp fnAllocOp, int64_t numberQubits,
@@ -210,6 +211,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     rewriter.create<func::ReturnOp>(loc, funcFolded);
     return SymbolRefAttr::get(ctx, fnFoldedName);
 }
+// In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
                                      std::string fnFoldedName, func::FuncOp fnOp,
                                      SmallVector<Type> typesFolded, func::FuncOp fnAllocOp,
@@ -224,6 +226,7 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
 
     return FlatSymbolRefAttr();
 }
+// In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                   func::FuncOp fnOp, SmallVector<Type> typesFolded,
                                   func::FuncOp fnAllocOp, int64_t numberQubits,
