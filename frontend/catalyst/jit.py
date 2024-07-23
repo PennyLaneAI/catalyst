@@ -319,7 +319,7 @@ def qjit(
         have dynamic shape ``n``.
 
         Passing a sequence of dictionaries:
- 
+
         .. code-block:: python
 
             abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
