@@ -756,7 +756,7 @@ class TestVectorizeMap:
         ):
             qjit(workflow)(x)
 
-    @pytest.xfail("wrong results for vmap")
+    @pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
     def test_vmap_worflow_derivation(self, backend):
         """Check the gradient of a vmap workflow"""
         n_wires = 5
