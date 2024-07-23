@@ -79,8 +79,12 @@ struct CompilerOptions {
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool lowerToLLVM;
 
-    std::vector<std::string> passPlugins;
-    std::vector<std::string> dialectPlugins;
+    bool usePlugin;
+
+    std::string getPluginPath() const {
+      std::string pluginPath = "/home/ubuntu/code/catalyst/plugin/build/lib/StandalonePlugin.so";
+      return pluginPath;
+    }
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const

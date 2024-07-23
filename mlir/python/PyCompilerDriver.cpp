@@ -95,8 +95,7 @@ PYBIND11_MODULE(compiler_driver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .lowerToLLVM = lower_to_llvm
-                                    };
+                                    .lowerToLLVM = lower_to_llvm};
 
             errStream.flush();
 
