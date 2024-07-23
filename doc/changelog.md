@@ -160,8 +160,8 @@
 * Fixes a bug where Catalyst would fail to apply quantum transforms and preserve QNode configuration settings when Autograph was enabled.
   [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
   
-* Passing arrays with `float32` dtype to callback functions will no longer cause compilation to
-  crash, but rather will raise the appropriate type exception.
+* `pure_callback` will no longer cause a crash in the compiler if the return type
+  signature is declared incorrectly and the callback function is differentiated.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
 
 <h3>Internal changes</h3>
@@ -172,8 +172,8 @@
 * The function `__catalyst_inactive_callback` has the nofree attribute.
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
-* Callbacks now have nicer identifiers. The identifiers include the name of
-  the Python function being called back into.
+* Callbacks now have nicer identifiers in their MLIR representation. The identifiers include
+  the name of the Python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
 
 * Fix tracing of `SProd` operations to bring Catalyst in line with PennyLane v0.38.
