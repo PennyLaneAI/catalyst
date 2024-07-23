@@ -567,16 +567,16 @@ class TestObservableValidation:
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3)
+        dev = qml.device(backend, wires=3, shots=2048)
         qjit_capabilities = get_device_capabilities(dev)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
-                validate_measurements(tape, qjit_capabilities, dev.name)
+                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
         else:
-            validate_measurements(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
     @pytest.mark.parametrize(
         "obs, obs_type",
@@ -599,11 +599,11 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
         # all good
-        validate_measurements(tape, qjit_capabilities, dev.name)
+        validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
         del qjit_capabilities.native_obs[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
     def test_non_qjit_observables_raise_error(self, backend):
         """Test that an observable that is supported by the backend according to the
@@ -625,7 +625,7 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)

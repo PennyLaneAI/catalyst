@@ -489,7 +489,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
             verify_operations, grad_method=config.gradient_method, qjit_device=self
         )
         program.add_transform(
-            validate_measurements, self.qjit_capabilities, self.original_device.name
+            validate_measurements, self.qjit_capabilities, self.original_device.name, self.original_device.shots,
         )
 
         if config.gradient_method is not None:

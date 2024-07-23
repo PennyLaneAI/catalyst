@@ -17,19 +17,22 @@ This module contains the functions to verify quantum tapes are fully compatible
 with the compiler and device.
 """
 
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, Union
 
-from pennylane import transform
+from pennylane import Device, transform
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MutualInfoMP,
     ProbabilityMP,
+    SampleMeasurement,
     SampleMP,
+    StateMeasurement,
     StateMP,
     VarianceMP,
     VnEntropyMP,
 )
+from pennylane.measurements.shots import Shots
 from pennylane.operation import Operation, Tensor
 from pennylane.ops import (
     Adjoint,
@@ -281,7 +284,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 @transform
 def validate_measurements(
-    tape: QuantumTape, qjit_capabilities: dict, name: str
+    tape: QuantumTape, qjit_capabilities: dict, name: str, shots: Union[int, Shots]
 ) -> (Sequence[QuantumTape], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
     from the TOML file.
@@ -289,7 +292,8 @@ def validate_measurements(
     Args:
         tape (QuantumTape or QNode or Callable): a quantum circuit.
         qjit_capabilities (dict): specifies the capabilities of the qjitted device
-        name (str): the name of the device to use in error messages.
+        name: the name of the device to use in error messages
+        shots: the shots on the device to use in error messages
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[.QuantumTape], function]:
@@ -314,15 +318,26 @@ def validate_measurements(
     def _obs_checker(obs):
         if not qjit_capabilities.native_obs.get(obs.name):
             raise CompileError(
-                f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
+                f"{m.obs} is not supported as an observable on '{name}' with Catalyst"
             )
 
     for m in tape.measurements:
         if m.obs:
             _verify_observable(m.obs, _obs_checker)
         if not isinstance(m, supported_types):
-            raise CompileError(
-                f"{type(m)} is not a supported measurement process on the '{name}' device with Catalyst"
-            )
+            if isinstance(m, StateMeasurement) and shots:
+                raise CompileError(
+                        f"State-based measurements like {m} cannot work with finite shots. "
+                        "Please specify shots=None."
+                    )
+            elif isinstance(m, SampleMeasurement) and not shots:
+                raise CompileError(
+                        f"Sample-based measurements like {m} cannot work with shots=None. "
+                        "Please specify a finite number of shots."
+                    )
+            else:
+                raise CompileError(
+                    f"{type(m)} is not a supported measurement process on '{device.name}' with Catalyst"
+                )
 
     return (tape,), lambda x: x[0]
