@@ -16,7 +16,7 @@
 This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code.
 """
-
+import copy
 import functools
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
@@ -515,6 +515,7 @@ def get_source_code_info(tb_frame):
 module_allowlist = (
     ag_config.DoNotConvert("pennylane"),
     ag_config.DoNotConvert("catalyst"),
+    ag_config.DoNotConvert("optax"),
     ag_config.DoNotConvert("jax"),
     *ag_config.CONVERSION_RULES,
 )
@@ -538,6 +539,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.jacobian,
             catalyst.vjp,
             catalyst.jvp,
+            catalyst.vmap,
         ):
             assert args and callable(args[0])
             wrapped_fn = args[0]
@@ -569,7 +571,9 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             def qnode_call_wrapper():
                 return ag_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
 
-            new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
+            # Copy the original qnode but replace its function.
+            new_qnode = copy.copy(fn)
+            new_qnode.func = qnode_call_wrapper
             return new_qnode()
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
@@ -593,7 +597,10 @@ def set_item(target, i, x):
     # Apply the 'at...set' transformation only to Jax arrays.
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].set(x)
+        if isinstance(i, slice):
+            target = target.at[i.start : i.stop : i.step].set(x)
+        else:
+            target = target.at[i].set(x)
     else:
         target[i] = x
 

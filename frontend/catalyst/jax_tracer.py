@@ -522,7 +522,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    with transient_jax_config():
+    with transient_jax_config({"jax_dynamic_shapes": True}):
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             make_jaxpr_kwargs = {
                 "static_argnums": static_argnums,
@@ -554,7 +554,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     MemrefCallable.clearcache()
     CALLBACK_OP_CACHE.clear()
 
-    with transient_jax_config():
+    with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
 
     return mlir_module, ctx
@@ -705,10 +705,13 @@ def trace_observables(
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
-        terms = obs.terms()
-        coeffs = jax.numpy.array(terms[0])
-        nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
-        obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
+        coeffs, terms = obs.terms()
+        coeffs = jax.numpy.array(coeffs)
+        nested_obs = []
+        for term in terms:
+            obs = trace_observables(term, qrp, m_wires)[0]
+            nested_obs.append(obs)
+        obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
@@ -922,13 +925,11 @@ def apply_transform(
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_program_transformed = qnode_program
-
-    if is_program_transformed and qnode_program.is_informative:
+    if qnode_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    if is_program_transformed or device_modify_measurements:
+    if qnode_program or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         total_program = qnode_program + device_program
     else:
@@ -1063,7 +1064,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode
+    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -1089,7 +1090,9 @@ def trace_quantum_function(
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
+            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
+                f, args, kwargs, static_argnums
+            )
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
@@ -1114,14 +1117,12 @@ def trace_quantum_function(
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
+                device_modify_measurements = config.device_options["transforms_modify_measurements"]
             else:
                 device_program = TransformProgram()
+                device_modify_measurements = False  # this is only for the new API transform program
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
-
-            device_modify_measurements = "measurements_from_counts" in [
-                t.transform.__name__ for t in device_program
-            ]
 
             tapes, post_processing = apply_transform(
                 qnode_program,

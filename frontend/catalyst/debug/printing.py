@@ -59,10 +59,16 @@ def print(fmt, *args, **kwargs):
     positionally:
 
     >>> @qjit
+    ... @grad
     ... def f(x, y):
     ...     debug.print("Value of x = {0:.2f}", x)
+    ...     return x * jnp.sin(y)
     >>> f(0.543, 0.23)
     Value of x = 0.54
+    Array(0.22797752, dtype=float64)
+
+    Note that during differentiation, printing will only be executed
+    during the forward pass.
 
     .. note::
 
