@@ -65,7 +65,7 @@ def print(fmt, *args, **kwargs):
     ...     return x * jnp.sin(y)
     >>> f(0.543, 0.23)
     Value of x = 0.54
-    array(0.22797752)
+    Array(0.22797752, dtype=float64)
 
     Note that during differentiation, printing will only be executed
     during the forward pass.

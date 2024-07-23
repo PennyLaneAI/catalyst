@@ -60,9 +60,9 @@ a qjit-compiled function, as long as the return shape and type is known:
         return simpson(x, x ** 2)
 
 >>> integrate_xsq(-1, 1)
-array(0.66666667)
+Array(0.66666667, dtype=float64)
 >>> integrate_xsq(-1, 2)
-array(3.)
+Array(3., dtype=float64)
 
 Please see the docstring of :func:`~.pure_callback` for more details, including how to define
 vector-Jacobian product (VJP) rules for autodifferentiation, and for specifying the return-type
@@ -84,7 +84,24 @@ provide return shape and dtype information:
 
 >>> x = np.array([1.0, 2.0, 1.0, -1.0, 1.5])
 >>> fn(x)
-array(4.20735492+0.j)
+Array(4.20735492+0.j, dtype=complex128)
+
+Accelerated functions also fully support autodifferentiation with
+:func:`~.grad`, :func:`~.jacobian`, and other Catalyst differentiation functions,
+without needing to specify VJP rules manually:
+
+.. code-block:: python
+
+    @qjit
+    @grad
+    def f(x):
+        expm = catalyst.accelerate(jax.scipy.linalg.expm)
+        return jnp.sum(expm(jnp.sin(x)) ** 2)
+
+>>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+>>> f(x)
+Array([[2.80120452, 1.67518663],
+       [1.61605839, 4.42856163]], dtype=float64)
 
 Accelerator (GPU and TPU) support
 ---------------------------------
