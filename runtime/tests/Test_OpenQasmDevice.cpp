@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <random>
+
 #include "MemRefUtils.hpp"
 
 #include "ExecutionContext.hpp"
@@ -87,6 +89,15 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
         REQUIRE_THROWS_WITH(device.Circuit(),
                             Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
                                             "Invalid number of quantum register"));
+    }
+
+    SECTION("Seed")
+    {
+        auto device = OpenQasmDevice();
+        CHECK(device.GetDevicePRNG() == nullptr);
+        std::mt19937 gen(42);
+        device.SetDevicePRNG(&gen);
+        CHECK(device.GetDevicePRNG() == nullptr);
     }
 
     SECTION("Braket SV1")

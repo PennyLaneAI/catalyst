@@ -13,8 +13,6 @@
 # limitations under the License.
 """Tests for seeded qjit runs in Catalyst"""
 
-import platform
-
 import numpy as np
 import pennylane as qml
 import pytest
@@ -31,21 +29,12 @@ from catalyst import cond, measure, qjit
         "... and his music was electric",
     ],
 )
-@pytest.mark.parametrize("device", ["lightning.qubit", "lightning.kokkos"])
-def test_seeded_measurement(seed, device):
+def test_seeded_measurement(seed, backend):
     """Test that different calls to qjits with the same seed produce the same measurement results"""
 
-    #if (
-    #    (device == "lightning.kokkos")
-    #    and ("mac" in platform.platform().lower())
-    #    and ("x86" in platform.platform().lower())
-    #):
-    #    pytest.skip("Initializing lightning.kokkos device on x86 mac causes segmentation fault")
+    dev = qml.device(backend, wires=1)
 
-    dev = qml.device(device, wires=1)
-
-    #@qjit(seed=seed)
-    @qjit
+    @qjit(seed=seed)
     def workflow():
         @qml.qnode(dev)
         def circuit():
@@ -61,8 +50,7 @@ def test_seeded_measurement(seed, device):
 
         return circuit(), circuit(), circuit(), circuit()
 
-    #@qjit(seed=seed)
-    @qjit
+    @qjit(seed=seed)
     def workflow1():
         @qml.qnode(dev)
         def circuit():
@@ -83,9 +71,8 @@ def test_seeded_measurement(seed, device):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
-        #assert np.allclose(results0, results1)
-        #assert np.allclose(results0, results2)
-        assert True
+        assert np.allclose(results0, results1)
+        assert np.allclose(results0, results2)
 
 
 if __name__ == "__main__":
