@@ -128,8 +128,9 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 }
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
                                 ModuleOp moduleOp, std::string fnFoldedName, func::FuncOp fnOp,
-                                TypeRange originalTypes, Type qregType, func::FuncOp fnAllocOp,
-                                int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
+                                SmallVector<Type> typesFolded, Type qregType,
+                                func::FuncOp fnAllocOp, int64_t numberQubits,
+                                quantum::DeviceInitOp deviceInitOp,
                                 func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp)
 {
@@ -141,7 +142,6 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, Type sc
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
     rewriter.setInsertionPointToStart(moduleOp.getBody());
-    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
     Type indexType = rewriter.getIndexType();
     typesFolded.push_back(indexType);
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
@@ -213,22 +213,24 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, Type sc
 }
 FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
                                      ModuleOp moduleOp, std::string fnFoldedName, func::FuncOp fnOp,
-                                     TypeRange originalTypes, Type qregType, func::FuncOp fnAllocOp,
-                                     int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
+                                     SmallVector<Type> typesFolded, Type qregType,
+                                     func::FuncOp fnAllocOp, int64_t numberQubits,
+                                     quantum::DeviceInitOp deviceInitOp,
                                      func::FuncOp fnWithoutMeasurementsOp,
                                      func::FuncOp fnWithMeasurementsOp)
 {
     // TODO: Implement.
 
     // Can't throw, because disabled by compilation.
-    //throw std::logic_error("Random local folding not implemented!");
+    // throw std::logic_error("Random local folding not implemented!");
 
     return FlatSymbolRefAttr();
 }
 FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, Type scalarType,
                                   ModuleOp moduleOp, std::string fnFoldedName, func::FuncOp fnOp,
-                                  TypeRange originalTypes, Type qregType, func::FuncOp fnAllocOp,
-                                  int64_t numberQubits, quantum::DeviceInitOp deviceInitOp,
+                                  SmallVector<Type> typesFolded, Type qregType,
+                                  func::FuncOp fnAllocOp, int64_t numberQubits,
+                                  quantum::DeviceInitOp deviceInitOp,
                                   func::FuncOp fnWithoutMeasurementsOp,
                                   func::FuncOp fnWithMeasurementsOp)
 {
@@ -285,18 +287,20 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     func::FuncOp fnWithMeasurementsOp =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
 
+    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
+
     if (foldingAlgorithm == Folding(1)) {
-        return globalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp, originalTypes,
+        return globalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp, typesFolded,
                              qregType, fnAllocOp, numberQubits, deviceInitOp,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
     if (foldingAlgorithm == Folding(2)) {
         return randomLocalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp,
-                                  originalTypes, qregType, fnAllocOp, numberQubits, deviceInitOp,
+                                  typesFolded, qregType, fnAllocOp, numberQubits, deviceInitOp,
                                   fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
-    return allLocalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp, originalTypes,
+    return allLocalFolding(loc, rewriter, scalarType, moduleOp, fnFoldedName, fnOp, typesFolded,
                            qregType, fnAllocOp, numberQubits, deviceInitOp, fnWithoutMeasurementsOp,
                            fnWithMeasurementsOp);
 }
