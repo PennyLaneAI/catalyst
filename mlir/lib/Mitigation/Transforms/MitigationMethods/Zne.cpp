@@ -45,9 +45,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     RankedTensorType scaleFactorType = scaleFactors.getType().cast<RankedTensorType>();
     const auto sizeInt = scaleFactorType.getDimSize(0);
 
-    // Folding type
-    auto folding = op.getFolding();
-
     // Create the folded circuit function
     FlatSymbolRefAttr foldedCircuitRefAttr =
         getOrInsertFoldedCircuit(loc, rewriter, op, scaleFactorType.getElementType());
