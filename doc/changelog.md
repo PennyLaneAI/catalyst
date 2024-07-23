@@ -8,7 +8,7 @@
   For example,
 
   ```python
-  from catalyst import grad
+  from catalyst import qjit, grad
 
   @qjit
   @grad
@@ -76,6 +76,57 @@
   function within qjit-compiled functions.
   [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
 
+* Autograph now supports in-place array assignments with static slices.
+  [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
+
+  For example,
+
+  ```python
+  @qjit(autograph=True)
+  def f(x, y):
+      y[1:10:2] = x
+      return y
+  ```
+
+  ```pycon
+  >>> f(jnp.ones(5), jnp.zeros(10))
+  Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
+  ```
+
+* Autograph now works when `qjit` is applied to a function decorated with
+  `vmap`, `cond`, `for_loop` or `while_loop`. Previously, stacking the
+  autograph-enabled qjit decorator directly on top of other Catalyst
+  decorators would lead to errors.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
+  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
+
+  ```python
+  from catalyst import vmap, qjit
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> x = jnp.array([0.1, 0.2, 0.3])
+  >>> qjit(vmap(circuit), autograph=True)(x)
+  Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
+  ```
+
+<h3>Breaking changes</h3>
+
+* Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
+  `jax.Array` instead. This should have minimal impact, but code that depends on the output of
+  qjit-compiled function being NumPy arrays will need to be updated.
+  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
+
+<h3>Bug fixes</h3>
+
 * Static arguments can now be passed through a QNode when specified
   with the `static_argnums` keyword argument.
   [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
@@ -109,55 +160,8 @@
   Array(0.61141766, dtype=float64)
   ```
 
-* Autograph now supports in-place array assignments with static slices.
-  [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
-
-  For example,
-
-  ```python
-  @qjit(autograph=True)
-  def f(x, y):
-      y[1:10:2] = x
-      return y
-  ```
-
-  ```pycon
-  >>> f(jnp.ones(5), jnp.zeros(10))
-  Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
-  ```
-
-* Autograph now works when `qjit` is applied to a function decorated with `vmap`, `cond`, `for_loop` or `while_loop`.
-  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
-  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
-  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
-
-  ```python
-  from catalyst import vmap, qjit
-
-  dev = qml.device("lightning.qubit", wires=2)
-
-  @qml.qnode(dev)
-  def circuit(x):
-      qml.RX(x, wires=0)
-      return qml.expval(qml.PauliZ(0))
-  ```
-
-  ```pycon
-  >>> x = jnp.array([0.1, 0.2, 0.3])
-  >>> qjit(vmap(circuit), autograph=True)(x)
-  Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
-  ```
-
-<h3>Breaking changes</h3>
-
-* Return values of qjit-compiled functions are now of type `jax.Array` instead of `numpy.ndarray`.
-  This should have minimal impact, but code that depends on the output of qjit-compiled function
-  being NumPy arrays will need to be updated.
-  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
-
-<h3>Bug fixes</h3>
-
-* Fixes a bug where Catalyst would fail to apply quantum transforms and preserve QNode configuration settings when Autograph was enabled.
+* Fixes a bug where Catalyst would fail to apply quantum transforms and preserve
+  QNode configuration settings when Autograph was enabled.
   [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
   
 * Passing arrays with `float32` dtype to callback functions will no longer cause compilation to
