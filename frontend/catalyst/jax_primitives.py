@@ -17,6 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from itertools import chain
 from typing import Any, Dict, Iterable, List, Union
 
@@ -193,6 +194,16 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
+
+
+class Folding(Enum):
+    """
+    Folding types supported by ZNE mitigation
+    """
+
+    GLOBAL = "global"
+    RANDOM = "random"
+    ALL = "all"
 
 
 ##############
@@ -723,19 +734,29 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
 
 @zne_p.def_impl
-def _zne_def_impl(ctx, *args, jaxpr, fn):  # pragma: no cover
+def _zne_def_impl(ctx, *args, folding, jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
 @zne_p.def_abstract_eval
-def _zne_abstract_eval(*args, jaxpr, fn):  # pylint: disable=unused-argument
+def _zne_abstract_eval(*args, folding, jaxpr, fn):  # pylint: disable=unused-argument
     shape = list(args[-1].shape)
     if len(jaxpr.out_avals) > 1:
         shape.append(len(jaxpr.out_avals))
     return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
 
 
-def _zne_lowering(ctx, *args, jaxpr, fn):
+def _folding_attribute(ctx, folding):
+    ctx = ctx.module_context.context
+    return ir.OpaqueAttr.get(
+        "mitigation",
+        ("folding " + Folding(folding).value).encode("utf-8"),
+        ir.NoneType.get(ctx),
+        ctx,
+    )
+
+
+def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     """Lowering function to the ZNE opearation.
     Args:
         ctx: the MLIR context
@@ -748,11 +769,13 @@ def _zne_lowering(ctx, *args, jaxpr, fn):
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
+    scale_factors = args[-1]
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args[0:-1]),
-        args[-1],
+        _folding_attribute(ctx, folding),
+        scale_factors,
     ).results
 
 

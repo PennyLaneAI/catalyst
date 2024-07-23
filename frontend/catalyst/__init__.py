@@ -183,6 +183,7 @@ __all__ = (
     "AutoGraphError",
     "CompileError",
     "DifferentiableCompileError",
+    "debug_assert",
     "CompileOptions",
     "debug",
     *_api_extension_list,
