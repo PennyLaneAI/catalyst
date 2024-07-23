@@ -642,7 +642,9 @@ def get_device_capabilities(
         return device.qjit_capabilities
     else:
         program_features = (
-            program_features if program_features else ProgramFeatures(device.shots is not None)
+            program_features
+            if program_features
+            else ProgramFeatures(shots_present=bool(device.shots))
         )
         device_name = (
             device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
