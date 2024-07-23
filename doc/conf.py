@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from MLIRLexer import MLIRLexer
 from sphinx.highlighting import lexers
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -137,8 +138,6 @@ extensions = [
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # add the custom MLIR Lexer
-from MLIRLexer import MLIRLexer
-
 lexers["mlir"] = MLIRLexer(startinline=True)
 
 # OpenGraph Metadata

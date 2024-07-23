@@ -8,7 +8,6 @@ by Maksim Levental.
 
 import re
 
-import pygments.cmdline as _cmdline
 from pygments.lexer import RegexLexer, bygroups, include, this, using
 from pygments.token import (
     Comment,
