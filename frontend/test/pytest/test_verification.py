@@ -34,7 +34,7 @@ from catalyst import (
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
-from catalyst.device.verification import validate_observables
+from catalyst.device.verification import validate_measurements
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
@@ -563,8 +563,8 @@ class TestObservableValidation:
             ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
         ],
     )
-    def test_validate_observables_transform(self, backend, measurements, invalid_op):
-        """Test that the validate_observables transform raises an error (or not) as expected
+    def test_validate_measurements_transform(self, backend, measurements, invalid_op):
+        """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
         dev = qml.device(backend, wires=3)
@@ -574,9 +574,9 @@ class TestObservableValidation:
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
-                validate_observables(tape, qjit_capabilities, dev.name)
+                validate_measurements(tape, qjit_capabilities, dev.name)
         else:
-            validate_observables(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name)
 
     @pytest.mark.parametrize(
         "obs, obs_type",
@@ -588,7 +588,7 @@ class TestObservableValidation:
         ],
     )
     def test_arithmetic_ops_validation(self, obs, obs_type, backend):
-        """Test that the validate_observables transform raises an error (or not) as expected
+        """Test that the validate_measurements transform raises an error (or not) as expected
         for different observables composed of other base observables, when the overall observable
         type is supported/unsupported."""
 
@@ -599,11 +599,11 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
         # all good
-        validate_observables(tape, qjit_capabilities, dev.name)
+        validate_measurements(tape, qjit_capabilities, dev.name)
 
         del qjit_capabilities.native_obs[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
-            validate_observables(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name)
 
     def test_non_qjit_observables_raise_error(self, backend):
         """Test that an observable that is supported by the backend according to the
@@ -625,7 +625,7 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
-            validate_observables(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name)
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
