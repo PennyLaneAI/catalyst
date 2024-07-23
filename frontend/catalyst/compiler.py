@@ -94,7 +94,10 @@ class CompileOptions:
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed != "":
             raise RuntimeError(
-                "Seeding has no effect on asyncronous qnodes, as the execution order of parallel runs is not guaranteed."
+                """
+                Seeding has no effect on asyncronous qnodes,
+                as the execution order of parallel runs is not guaranteed.
+                """
             )
 
         # Make the format of static_argnums easier to handle.
