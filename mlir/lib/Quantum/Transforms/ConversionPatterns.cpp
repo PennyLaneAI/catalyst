@@ -154,15 +154,14 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
         StringRef qirName;
         if constexpr (std::is_same_v<T, InitializeOp>) {
             qirName = "__catalyst__rt__initialize";
-            InitializeOp InitOp = cast<InitializeOp>(op);
-            Location loc = InitOp.getLoc();
-            ModuleOp mod = InitOp->getParentOfType<ModuleOp>();
+            Location loc = op->getLoc();
+            ModuleOp mod = op->template getParentOfType<ModuleOp>();
             Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                             /* seed = */ {charPtrType});
             Value seed_gs;
-            if (InitOp->hasAttr("seed")) {
-                auto seed_str = cast<StringAttr>(InitOp->getAttr("seed")).str();
+            if (op->hasAttr("seed")) {
+                auto seed_str = cast<StringAttr>(op->getAttr("seed")).str();
                 seed_gs = getGlobalString(loc, rewriter, seed_str,
                                           StringRef(seed_str.c_str(), seed_str.length() + 1), mod);
             }
@@ -173,8 +172,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
             SmallVector<Value> operands = {seed_gs};
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
-            rewriter.eraseOp(op);
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
         }
         else {
             qirName = "__catalyst__rt__finalize";

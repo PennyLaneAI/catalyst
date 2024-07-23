@@ -254,11 +254,6 @@
   instead of a tree. This means that we need to manually trace each term and
   finally multiply it with the coefficients to create a Hamiltonian.
 
-* The flaky test `test_dynamic_one_shot_several_mcms` in `frontend/test/pytest/test_mid_circuit_measurement.py`
-  is now seeded for both the `default.qubit` reference run and the `lightning.qubit` qjit run, so it is now no
-  longer flaky and always passes.
-  [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
-
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):

@@ -93,10 +93,11 @@ class CompileOptions:
     def __post_init__(self):
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed != "":
-            raise RuntimeError(
+            raise CompileError(
                 """
                 Seeding has no effect on asyncronous qnodes,
                 as the execution order of parallel runs is not guaranteed.
+                As such, seeding an asynchronous run is not supported.
                 """
             )
 

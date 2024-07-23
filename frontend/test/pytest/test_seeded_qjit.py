@@ -17,12 +17,12 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, measure, qjit
+from catalyst import CompileError, cond, measure, qjit
 
 
 def test_seeded_async():
     """Test that seeding and async cannot be simultaneously used"""
-    with pytest.raises(RuntimeError, match="Seeding has no effect on asyncronous qnodes"):
+    with pytest.raises(CompileError, match="Seeding has no effect on asyncronous qnodes"):
 
         @qjit(async_qnodes=True, seed="some seed!")
         def _():
@@ -78,7 +78,7 @@ def test_seeded_measurement(seed, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same results
-    for _ in range(5):  # pylint: disable=unused-variable
+    for _ in range(5):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
