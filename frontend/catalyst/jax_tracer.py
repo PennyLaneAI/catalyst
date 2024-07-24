@@ -840,9 +840,24 @@ def trace_quantum_measurements(
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
                 counts_tree = tree_structure(("keys", "counts"))
+
+                def change_tracer(leaf):
+                    if leaf.num_nodes == 1:
+                        return counts_tree
+                    children = leaf.children()
+                    children[0] = change_tracer(children[0])
+                    leaf = leaf.make_from_node_data_and_children(
+                        PyTreeRegistry(),
+                        leaf.node_data(),
+                        children,
+                    )
+                    return leaf
+
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children):
-                    meas_return_trees_children[i] = counts_tree
+                    meas_return_trees_children[i] = jax.tree_util.tree_map(
+                        change_tracer, meas_return_trees_children[i]
+                    )
                     out_tree = out_tree.make_from_node_data_and_children(
                         PyTreeRegistry(),
                         out_tree.node_data(),
@@ -1146,6 +1161,9 @@ def trace_quantum_function(
             qreg_in = qalloc_p.bind(len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
+            return_values = (
+                (return_values,) if not isinstance(return_values, tuple) else return_values
+            )
             for i, tape in enumerate(tapes):
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
@@ -1153,7 +1171,15 @@ def trace_quantum_function(
                 if qnode_transformed or device_modify_measurements:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
-                    _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
+                    size_difference = len(return_values_flat) - len(output)
+                    if size_difference > 0:
+                        output.extend(return_values_flat[len(output):])
+                        
+                    if size_difference < 0:
+                        return_values += tuple(output[len(return_values):])
+                    _, trees = jax.tree_util.tree_flatten(
+                        return_values, is_leaf=is_leaf
+                    )
                 else:
                     output = return_values_flat
                     trees = return_values_tree
@@ -1167,15 +1193,15 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if qnode_transformed or device_modify_measurements:
-                    assert isinstance(meas_results, list)
-                    if len(meas_results) == 1:
-                        transformed_results.append(meas_results[0])
-                    else:
-                        transformed_results.append(tuple(meas_results))
-                else:
-                    transformed_results.append(meas_results)
-
+                # if qnode_transformed or device_modify_measurements:
+                #     # assert isinstance(meas_results, list)
+                #     if len(meas_results) == 1:
+                #         transformed_results.append(meas_results[0])
+                #     else:
+                #         transformed_results.append(tuple(meas_results))
+                # else:
+                #     transformed_results.append(meas_results)
+                transformed_results.append(meas_results)
                 # Reset the qubits and update the register value for the next tape.
                 if len(tapes) > 1 and i < len(tapes) - 1:
                     for w in device.wires:
