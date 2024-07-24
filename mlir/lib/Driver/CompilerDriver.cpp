@@ -39,6 +39,13 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
@@ -356,6 +363,23 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 LogicalResult runLLVMPasses(const CompilerOptions &options,
                             std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
+    std::string targetTriple = llvm::sys::getDefaultTargetTriple();
+
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    std::string err;
+    auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
+    llvm::TargetOptions opt;
+    const char *cpu = "generic";
+    const char *features = "";
+    auto targetMachine =
+        target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
+
+    llvmModule->setDataLayout(targetMachine->createDataLayout());
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
