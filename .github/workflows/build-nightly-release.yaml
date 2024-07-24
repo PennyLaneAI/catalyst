@@ -28,25 +28,27 @@ jobs:
         git commit -m "[no ci] bump nightly version"
         git push
 
+  # Only build the most popular configurations on a nightly schedule to save PyPI storage.
+
   linux-x86:
     name: Build on Linux x86-64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
-  linux-aarch:
-    name: Build on Linux aarch64
-    needs: [setup]
-    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+  # linux-aarch:
+  #   name: Build on Linux aarch64
+  #   needs: [setup]
+  #   uses: ./.github/workflows/build-wheel-linux-arm64.yaml
 
   macos-arm:
     name: Build on macOS arm64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
 
-  macos-x86:
-    name: Build on macOS x86-64
-    needs: [setup]
-    uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
+  # macos-x86:
+  #   name: Build on macOS x86-64
+  #   needs: [setup]
+  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
@@ -71,6 +73,8 @@ jobs:
         rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
         rename "s/_universal2/_x86_64/" dist/PennyLane_Catalyst-*
+        # Discard the 3.9 wheels to save space on nightly builds.
+        rm dist/PennyLane_Catalyst-*-cp39-cp39-*
 
     - name: Upload wheels
       uses: pypa/gh-action-pypi-publish@release/v1

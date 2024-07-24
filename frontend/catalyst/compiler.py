@@ -71,6 +71,7 @@ class CompileOptions:
         static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
+        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
     """
 
     verbose: Optional[bool] = False
@@ -84,6 +85,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    disable_assertions: Optional[bool] = False
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
@@ -92,6 +94,8 @@ class CompileOptions:
             self.static_argnums = ()
         elif isinstance(static_argnums, int):
             self.static_argnums = (static_argnums,)
+        elif isinstance(static_argnums, Iterable):
+            self.static_argnums = tuple(static_argnums)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -110,6 +114,12 @@ class CompileOptions:
             return self.pipelines
         elif self.async_qnodes:
             return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
+        if self.disable_assertions:
+            if "disable-assertion" not in QUANTUM_COMPILATION_PASS[1]:
+                QUANTUM_COMPILATION_PASS[1].append("disable-assertion")
+        else:
+            if "disable-assertion" in QUANTUM_COMPILATION_PASS[1]:
+                QUANTUM_COMPILATION_PASS[1].remove("disable-assertion")
         return DEFAULT_PIPELINES
 
 
@@ -155,6 +165,7 @@ QUANTUM_COMPILATION_PASS = (
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
+        "disable-assertion",
     ],
 )
 

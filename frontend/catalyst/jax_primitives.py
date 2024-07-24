@@ -17,6 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from itertools import chain
 from typing import Any, Dict, Iterable, List, Union
 
@@ -47,7 +48,12 @@ from mlir_quantum.dialects._transform_ops_gen import (
     NamedSequenceOp,
 )
 from mlir_quantum.dialects._transform_ops_gen import YieldOp as TransformYieldOp
-from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
+from mlir_quantum.dialects.catalyst import (
+    AssertionOp,
+    CallbackCallOp,
+    CallbackOp,
+    PrintOp,
+)
 from mlir_quantum.dialects.gradient import (
     CustomGradOp,
     ForwardOp,
@@ -218,6 +224,16 @@ core.raise_to_shaped_mappings[AbstractTransformFunc] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractTransformFunc] = _transform_func_lowering
 
 
+class Folding(Enum):
+    """
+    Folding types supported by ZNE mitigation
+    """
+
+    GLOBAL = "global"
+    RANDOM = "random"
+    ALL = "all"
+
+
 ##############
 # Primitives #
 ##############
@@ -273,6 +289,8 @@ python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
 value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
+assert_p = core.Primitive("assert")
+assert_p.multiple_results = True
 apply_registered_pass_p = core.Primitive("apply_registered_pass")
 transform_named_sequence_p = core.Primitive("transform_named_sequence")
 transform_named_sequence_p.multiple_results = True
@@ -874,19 +892,29 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
 
 @zne_p.def_impl
-def _zne_def_impl(ctx, *args, jaxpr, fn):  # pragma: no cover
+def _zne_def_impl(ctx, *args, folding, jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
 @zne_p.def_abstract_eval
-def _zne_abstract_eval(*args, jaxpr, fn):  # pylint: disable=unused-argument
+def _zne_abstract_eval(*args, folding, jaxpr, fn):  # pylint: disable=unused-argument
     shape = list(args[-1].shape)
     if len(jaxpr.out_avals) > 1:
         shape.append(len(jaxpr.out_avals))
     return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
 
 
-def _zne_lowering(ctx, *args, jaxpr, fn):
+def _folding_attribute(ctx, folding):
+    ctx = ctx.module_context.context
+    return ir.OpaqueAttr.get(
+        "mitigation",
+        ("folding " + Folding(folding).value).encode("utf-8"),
+        ir.NoneType.get(ctx),
+        ctx,
+    )
+
+
+def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     """Lowering function to the ZNE opearation.
     Args:
         ctx: the MLIR context
@@ -899,11 +927,13 @@ def _zne_lowering(ctx, *args, jaxpr, fn):
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
+    scale_factors = args[-1]
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args[0:-1]),
-        args[-1],
+        _folding_attribute(ctx, folding),
+        scale_factors,
     ).results
 
 
@@ -2000,6 +2030,25 @@ def _for_loop_lowering(
 
 
 #
+# assert
+#
+@assert_p.def_impl
+def _assert_def_impl(ctx, assertion, error):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@assert_p.def_abstract_eval
+def _assert_abstract(assertion, error):
+    return ()
+
+
+def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
+    assertion_mlir = TensorExtractOp(ir.IntegerType.get_signless(1), assertion, []).result
+    AssertionOp(assertion=assertion_mlir, error=error)
+    return ()
+
+
+#
 # adjoint
 #
 @adjoint_p.def_impl
@@ -2093,6 +2142,7 @@ mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
+mlir.register_lowering(assert_p, _assert_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
 mlir.register_lowering(apply_registered_pass_p, _apply_registered_pass_lowering)
