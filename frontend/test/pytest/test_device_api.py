@@ -30,7 +30,7 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_toml_config,
-    qjit_device
+    qjit_device,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import ProgramFeatures
@@ -204,6 +204,7 @@ def test_qjit_device_measurements(shots, mocker):
     circuit()
 
     assert spy.spy_return.measurement_processes == expected_measurements
+
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
