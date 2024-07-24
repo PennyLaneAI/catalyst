@@ -363,23 +363,6 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 LogicalResult runLLVMPasses(const CompilerOptions &options,
                             std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
-    std::string targetTriple = llvm::sys::getDefaultTargetTriple();
-
-    llvm::InitializeAllTargetInfos();
-    llvm::InitializeAllTargets();
-    llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmParsers();
-    llvm::InitializeAllAsmPrinters();
-
-    std::string err;
-    auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
-    llvm::TargetOptions opt;
-    const char *cpu = "generic";
-    const char *features = "";
-    auto targetMachine =
-        target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
-
-    llvmModule->setDataLayout(targetMachine->createDataLayout());
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
@@ -631,6 +614,26 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
+        // Set data layout before LLVM passes or the default one is used.
+        std::string targetTriple = llvm::sys::getDefaultTargetTriple();
+
+        llvm::InitializeAllTargetInfos();
+        llvm::InitializeAllTargets();
+        llvm::InitializeAllTargetMCs();
+        llvm::InitializeAllAsmParsers();
+        llvm::InitializeAllAsmPrinters();
+
+        std::string err;
+        auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
+        llvm::TargetOptions opt;
+        const char *cpu = "generic";
+        const char *features = "";
+        auto targetMachine =
+            target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
+        targetMachine->setOptLevel(llvm::CodeGenOptLevel::None);
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+        llvmModule->setTargetTriple(targetTriple);
+
         if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
                                 llvmModule, output))) {
             return failure();
@@ -684,7 +687,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         auto outfile = options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), outfile))) {
+                                std::move(llvmModule), targetMachine, outfile))) {
             return failure();
         }
         output.objectFilename = outfile;
