@@ -90,6 +90,7 @@ RUNTIME_OPERATIONS = [
     "RY",
     "RZ",
     "S",
+    "StatePrep",
     "SWAP",
     "T",
     "Toffoli",
