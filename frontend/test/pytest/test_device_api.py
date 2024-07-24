@@ -167,7 +167,8 @@ def test_qjit_device_invalid_wires(wires):
 
 @pytest.mark.parametrize("shots", [2048, None])
 def test_qjit_device_measurements(shots, mocker):
-    """Test that the subset of measurements"""
+    """Test that the list of measurements that are supported is correctly
+    updated based on shots provided to the device"""
 
     spy = mocker.spy(qjit_device, "get_device_capabilities")
 
