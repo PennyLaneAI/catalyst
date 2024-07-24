@@ -26,10 +26,10 @@ def gen_setup(ctx, seed):
     function is a function that needs to be called before calling a
     JIT-compiled function. It initializes the global device context in the runtime.
     """
-    if seed != "":
+    if seed != None:
         txt = f"""
 func.func @setup() -> () {{
-    "quantum.init"() {{seed = "{seed}"}} : () -> ()
+    "quantum.init"() {{seed = {seed} : i32}} : () -> ()
     return
 }}
 """

@@ -24,7 +24,19 @@ def test_seeded_async():
     """Test that seeding and async cannot be simultaneously used"""
     with pytest.raises(CompileError, match="Seeding has no effect on asyncronous qnodes"):
 
-        @qjit(async_qnodes=True, seed="some seed!")
+        @qjit(async_qnodes=True, seed=37)
+        def _():
+            return
+
+        _()
+
+
+@pytest.mark.parametrize("seed", [-1, 2**32])
+def test_seed_out_of_range(seed):
+    """Test that a seed that is not a unsigned 32-bit int raises an error"""
+    with pytest.raises(ValueError, match="Seed must be an unsigned 32-bit integer!"):
+
+        @qjit(seed=seed)
         def _():
             return
 
@@ -34,10 +46,11 @@ def test_seeded_async():
 @pytest.mark.parametrize(
     "seed",
     [
-        "qwerty",
-        "This string is just as random as the next one",
-        "bn980 2y9t'K(*^  jq42)",
-        "... and his music was electric",
+        42,
+        37,
+        1337,
+        2**32 - 1,
+        0,
     ],
 )
 def test_seeded_measurement(seed, backend):

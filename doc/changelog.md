@@ -70,14 +70,14 @@
 * A `qjit` run for `lightning.qubit` and `lightning.kokkos` can now be seeded.
   [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
 
-  The `qjit` decorator now can take in an argument `seed`, which is an arbitrary string. 
+  The `qjit` decorator now can take in an argument `seed`, which is an unsigned 32-bit integer. 
   Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
   will return the same sequence of measurement results everytime. 
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
 
-  @qjit(seed="qwerty")
+  @qjit(seed=37)
   def workflow():
       @qml.qnode(dev)
       def circuit():
@@ -90,7 +90,7 @@
           return qml.probs()
       return circuit(), circuit(), circuit(), circuit()
 
-  @qjit(seed="qwerty")
+  @qjit(seed=37)
   def workflow_another():
       @qml.qnode(dev)
       def circuit():

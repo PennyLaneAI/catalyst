@@ -182,9 +182,7 @@ TEMPLATE_LIST_TEST_CASE("test DevicePRNG", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-    std::string seed = "I am a seed!";
-    std::seed_seq seed_evolution(seed.begin(), seed.end());
-    std::mt19937 gen(seed_evolution);
+    std::mt19937 gen(37);
 
     sim->SetDevicePRNG(&gen);
 

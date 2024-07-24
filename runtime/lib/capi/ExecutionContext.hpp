@@ -264,17 +264,18 @@ class ExecutionContext final {
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
     // PRNG
-    std::string seed;
+    uint32_t *seed = nullptr;
     std::mt19937 gen;
 
   public:
-    explicit ExecutionContext(std::string seed = "") : initial_tape_recorder_status(false)
+    explicit ExecutionContext(uint32_t *seed = nullptr) : initial_tape_recorder_status(false)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
         this->seed = seed;
-        std::seed_seq seed_evolution(seed.begin(), seed.end());
-        this->gen = std::mt19937(seed_evolution);
+        if (this->seed) {
+            this->gen = std::mt19937(*seed);
+        }
     }
 
     ~ExecutionContext() = default;
@@ -312,7 +313,7 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
-        if (this->seed != "") {
+        if (this->seed) {
             device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
         }
         else {

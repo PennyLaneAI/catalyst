@@ -156,22 +156,27 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
             qirName = "__catalyst__rt__initialize";
             Location loc = op->getLoc();
             ModuleOp mod = op->template getParentOfType<ModuleOp>();
-            Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+            Type intPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                                            /* seed = */ {charPtrType});
-            Value seed_gs;
+                                                            /* seed = */ {intPtrType});
+            Value seed_val;
             if (op->hasAttr("seed")) {
-                auto seed_str = cast<StringAttr>(op->getAttr("seed")).str();
-                seed_gs = getGlobalString(loc, rewriter, seed_str,
-                                          StringRef(seed_str.c_str(), seed_str.length() + 1), mod);
+                mlir::IRRewriter::InsertPoint ip = rewriter.saveInsertionPoint();
+                OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
+                rewriter.setInsertionPointToStart(mod.getBody());
+                LLVM::GlobalOp seed_glb = rewriter.create<LLVM::GlobalOp>(
+                    loc, IntegerType::get(ctx, 32), true, LLVM::Linkage::Internal, "seed",
+                    cast<IntegerAttr>(op->getAttr("seed")));
+                rewriter.restoreInsertionPoint(ip);
+                seed_val = rewriter.create<LLVM::AddressOfOp>(loc, seed_glb);
             }
             else {
                 // Set seed argument to nullptr for unseeded runs
-                seed_gs = rewriter.create<LLVM::ZeroOp>(loc, charPtrType);
+                seed_val = rewriter.create<LLVM::ZeroOp>(loc, intPtrType);
             }
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-            SmallVector<Value> operands = {seed_gs};
+            SmallVector<Value> operands = {seed_val};
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
         }
         else {

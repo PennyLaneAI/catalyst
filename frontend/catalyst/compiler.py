@@ -72,8 +72,8 @@ class CompileOptions:
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
-        seed (Optional[str]) : the seed for random operations in a qjit call.
-            Default is empty string.
+        seed (Optional[int]) : the seed for random operations in a qjit call.
+            Default is None.
     """
 
     verbose: Optional[bool] = False
@@ -88,16 +88,24 @@ class CompileOptions:
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
     disable_assertions: Optional[bool] = False
-    seed: Optional[str] = ""
+    seed: Optional[int] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded
-        if self.async_qnodes and self.seed != "":
+        if self.async_qnodes and self.seed != None:
             raise CompileError(
                 """
                 Seeding has no effect on asyncronous qnodes,
                 as the execution order of parallel runs is not guaranteed.
                 As such, seeding an asynchronous run is not supported.
+                """
+            )
+
+        # Check that seed is 32-bit unsigned int
+        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
+            raise ValueError(
+                """
+                Seed must be an unsigned 32-bit integer!
                 """
             )
 

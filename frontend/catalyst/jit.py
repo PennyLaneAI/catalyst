@@ -81,7 +81,7 @@ def qjit(
     static_argnums=None,
     abstracted_axes=None,
     disable_assertions=False,
-    seed="",
+    seed=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -127,10 +127,10 @@ def qjit(
             below.
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
-        seed (str):
+        seed (Optional[Int]):
             The seed for random operations in a qjit call, such as circuit measurement results.
-            The default value is an empty string, which means no seeding is performed, and all
-            processes are random.
+            The default value is None, which means no seeding is performed, and all processes
+            are random. A seed is expected to be an unsigned 32-bit integer.
             Note that `lightning.qubit` and `lightning.kokkos` currently only support seeding
             measurements, and do not yet support seeding samples. As such, these devices with
             shots will still return random results.

@@ -1751,9 +1751,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement with a seeded device", "[Measures]", SimTyp
         std::unique_ptr<TestType> sim = std::make_unique<TestType>();
         std::unique_ptr<TestType> sim1 = std::make_unique<TestType>();
 
-        std::string seed = "I am a seed!";
-        std::seed_seq seed_evolution(seed.begin(), seed.end());
-        std::mt19937 gen(seed_evolution);
+        std::mt19937 gen(37);
         sim->SetDevicePRNG(&gen);
         std::vector<QubitIdType> Qs;
         Qs.reserve(1);
@@ -1761,9 +1759,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement with a seeded device", "[Measures]", SimTyp
         sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
         auto m = sim->Measure(Qs[0]);
 
-        std::string seed1 = "I am a seed!";
-        std::seed_seq seed_evolution1(seed1.begin(), seed1.end());
-        std::mt19937 gen1(seed_evolution1);
+        std::mt19937 gen1(37);
         sim1->SetDevicePRNG(&gen1);
         std::vector<QubitIdType> Qs1;
         Qs1.reserve(1);
