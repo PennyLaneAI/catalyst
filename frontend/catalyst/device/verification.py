@@ -337,7 +337,7 @@ def validate_measurements(
                     )
             else:
                 raise CompileError(
-                    f"{type(m)} is not a supported measurement process on '{device.name}' with Catalyst"
+                    f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"
                 )
 
     return (tape,), lambda x: x[0]
