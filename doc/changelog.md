@@ -112,6 +112,7 @@ This release contains contributions from (in alphabetical order):
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Mudit Pandey,
 Raul Torres,
 Tzung-Han Juang,
 
