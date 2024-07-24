@@ -20,18 +20,7 @@ with the compiler and device.
 from typing import Any, Callable, Sequence, Union
 
 from pennylane import transform
-from pennylane.measurements import (
-    CountsMP,
-    ExpectationMP,
-    MutualInfoMP,
-    ProbabilityMP,
-    SampleMeasurement,
-    SampleMP,
-    StateMeasurement,
-    StateMP,
-    VarianceMP,
-    VnEntropyMP,
-)
+from pennylane.measurements import SampleMeasurement, StateMeasurement, VarianceMP
 from pennylane.measurements.shots import Shots
 from pennylane.operation import Operation, Tensor
 from pennylane.ops import (
@@ -114,7 +103,7 @@ EMPTY_PROPERTIES = OperationProperties(False, False, False)
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     """Verify that no measuremnts contain state or variance."""
 
-    if any(isinstance(m, (StateMP, VnEntropyMP, MutualInfoMP)) for m in tape.measurements):
+    if any(isinstance(m, (StateMeasurements)) for m in tape.measurements):
         raise DifferentiableCompileError("State returns are forbidden in gradients")
 
     if any(isinstance(m, VarianceMP) for m in tape.measurements):

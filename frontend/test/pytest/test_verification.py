@@ -629,6 +629,8 @@ class TestObservableValidation:
 
 
 class TestMeasurementTypeValidation:
+    """Test validation of measurement processes versus the a device's supported
+    measurement types"""
 
     def test_state_measurements_rejected_with_shots(self):
         """Test that trying to measure a state on a device with finite shots
@@ -668,14 +670,17 @@ class TestMeasurementTypeValidation:
         dev = qml.device("lightning.qubit", wires=1, shots=100)
 
         class MyMeasurement(qml.measurements.SampleMeasurement):
+            """A custom measurement (not supported on lightning.qubit)"""
 
             def __init__(self, obs=None, wires=None, eigvals=None, id=None):
                 super().__init__(obs=obs, wires=wires, eigvals=eigvals, id=id)
 
             def process_samples(self, samples, wire_order, shot_range, bin_size):
+                """overwrite ABC method"""
                 raise NotImplementedError
 
             def process_counts(self, counts, wire_order):
+                """overwrite ABC method"""
                 raise NotImplementedError
 
         @qml.qnode(dev)
