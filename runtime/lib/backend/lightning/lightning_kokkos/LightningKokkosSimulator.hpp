@@ -89,7 +89,6 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     ~LightningKokkosSimulator() = default;
 
     void SetDevicePRNG(std::mt19937 *) override;
-    std::mt19937 *GetDevicePRNG() override;
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(LightningKokkosSimulator);
 

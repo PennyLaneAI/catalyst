@@ -91,15 +91,6 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
                                             "Invalid number of quantum register"));
     }
 
-    SECTION("Seed")
-    {
-        auto device = OpenQasmDevice();
-        CHECK(device.GetDevicePRNG() == nullptr);
-        std::mt19937 gen(42);
-        device.SetDevicePRNG(&gen);
-        CHECK(device.GetDevicePRNG() == nullptr);
-    }
-
     SECTION("Braket SV1")
     {
         auto device =

@@ -125,13 +125,6 @@ struct QuantumDevice {
     virtual void SetDevicePRNG(std::mt19937 *gen){};
 
     /**
-     * @brief Get the PRNG of the device.
-     *
-     * @return `std::mt19937*`
-     */
-    [[nodiscard]] virtual std::mt19937 *GetDevicePRNG() { return nullptr; };
-
-    /**
      * @brief Start recording a quantum tape if provided.
      *
      * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in

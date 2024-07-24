@@ -100,7 +100,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     ~LightningSimulator() override = default;
 
     void SetDevicePRNG(std::mt19937 *) override;
-    std::mt19937 *GetDevicePRNG() override;
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(LightningSimulator);
 

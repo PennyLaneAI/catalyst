@@ -178,17 +178,6 @@ TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
     CHECK(sim->GetDeviceShots() == 500);
 }
 
-TEMPLATE_LIST_TEST_CASE("test DevicePRNG", "[Driver]", SimTypes)
-{
-    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-
-    std::mt19937 gen(37);
-
-    sim->SetDevicePRNG(&gen);
-
-    CHECK(sim->GetDevicePRNG() == &gen);
-}
-
 TEMPLATE_LIST_TEST_CASE("compute register tests", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
