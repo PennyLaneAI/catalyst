@@ -81,8 +81,9 @@
 
 <h3>Bug fixes</h3>
 
-* Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
-  
+* Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`.
+  [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
+
 * Using float32 in callback functions would not crash in compilation phase anymore,
   but rather raise the appropriate type exception to the user.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
@@ -101,6 +102,8 @@
 
 * The function `__catalyst_inactive_callback` has the nofree attribute.
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
+
+* `catalyst.dynamic_one_shot` uses `postselect_mode="pad-invalid-samples"` in favour of `interface="jax"` when processing results.
 
 <h3>Contributors</h3>
 
