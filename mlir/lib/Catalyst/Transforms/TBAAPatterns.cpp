@@ -68,10 +68,52 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
     catalyst::TBAATree *tree = nullptr;
 };
 
+struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::StoreOp> {
+    using ConvertOpToLLVMPattern<memref::StoreOp>::ConvertOpToLLVMPattern;
+
+    template <typename... Args>
+    MemrefStoreTBAARewritePattern(catalyst::TBAATree &tree, Args &&...args)
+        : ConvertOpToLLVMPattern(std::forward<Args>(args)...), tree(&tree){};
+
+    LogicalResult matchAndRewrite(memref::StoreOp storeOp, memref::StoreOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto type = storeOp.getMemRefType();
+        auto baseType = type.getElementType();
+
+        Value dataPtr = getStridedElementPtr(storeOp.getLoc(), type, adaptor.getMemref(),
+                                             adaptor.getIndices(), rewriter);
+        auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
+                                                             0, false, storeOp.getNontemporal());
+
+        mlir::LLVM::TBAATagAttr tag;
+
+        if (isa<IndexType>(baseType) || dyn_cast<IntegerType>(baseType)) {
+            tag = tree->getTag("int");
+            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
+        }
+        else if (dyn_cast<FloatType>(baseType)) {
+            if (baseType.isF32()) {
+                tag = tree->getTag("float");
+            }
+            else if (baseType.isF64()) {
+                tag = tree->getTag("double");
+            }
+
+            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
+        }
+        return success();
+    }
+
+  private:
+    catalyst::TBAATree *tree = nullptr;
+};
+
 void populateTBAATagsPatterns(TBAATree &tree, LLVMTypeConverter &typeConverter,
                               RewritePatternSet &patterns)
 {
     patterns.add<catalyst::MemrefLoadTBAARewritePattern>(tree, typeConverter);
+    patterns.add<catalyst::MemrefStoreTBAARewritePattern>(tree, typeConverter);
 }
 
 } // namespace catalyst

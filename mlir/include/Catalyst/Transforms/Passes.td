@@ -148,13 +148,9 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
-def AddTBAATagsPass : Pass<"add-tbaa-tags", "mlir::ModuleOp"> {
-  let summary = "Add tbaa tags to operations load and store.";
-  let description = [{
-    TBAA
-  }];
-
-  let constructor = "::catalyst::createAddTBAATagsPass()";
+def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
+  let summary = "Lower the memref load and store operation to LLVM and add the TBAA tags.";
+  let constructor = "::catalyst::createMemrefToLLVMWithTBAAPass()";
 }
 
 #endif // CATALYST_PASSES

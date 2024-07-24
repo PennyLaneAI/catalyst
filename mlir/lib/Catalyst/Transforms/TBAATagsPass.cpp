@@ -31,13 +31,13 @@ using namespace mlir;
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_ADDTBAATAGSPASS
-#define GEN_PASS_DECL_ADDTBAATAGSPASS
+#define GEN_PASS_DEF_MEMREFTOLLVMWITHTBAAPASS
+#define GEN_PASS_DECL_MEMREFTOLLVMWITHTBAAPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst
 
-class AddTBAATagsPass : public catalyst::impl::AddTBAATagsPassBase<AddTBAATagsPass> {
+class MemrefToLLVMWithTBAAPass : public catalyst::impl::MemrefToLLVMWithTBAAPassBase<MemrefToLLVMWithTBAAPass> {
   public:
     void runOnOperation() override;
 
@@ -45,13 +45,13 @@ class AddTBAATagsPass : public catalyst::impl::AddTBAATagsPassBase<AddTBAATagsPa
     void createTBAATree(ModuleOp module);
 };
 
-void AddTBAATagsPass::runOnOperation()
+void MemrefToLLVMWithTBAAPass::runOnOperation()
 {
     ModuleOp mod = getOperation();
     createTBAATree(mod);
 }
 
-void AddTBAATagsPass::createTBAATree(ModuleOp module)
+void MemrefToLLVMWithTBAAPass::createTBAATree(ModuleOp module)
 {
     mlir::MLIRContext *ctx = module.getContext();
 
@@ -74,7 +74,7 @@ void AddTBAATagsPass::createTBAATree(ModuleOp module)
         return signalPassFailure();
     }
 }
-std::unique_ptr<Pass> catalyst::createAddTBAATagsPass()
+std::unique_ptr<Pass> catalyst::createMemrefToLLVMWithTBAAPass()
 {
-    return std::make_unique<AddTBAATagsPass>();
+    return std::make_unique<MemrefToLLVMWithTBAAPass>();
 }
