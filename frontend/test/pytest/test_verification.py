@@ -627,13 +627,14 @@ class TestObservableValidation:
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
             validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
+
 class TestMeasurementTypeValidation:
 
     def test_state_measurements_rejected_with_shots(self):
         """Test that trying to measure a state on a device with finite shots
         raises a CompileError informing the user that shots must be None for
         state based measurements"""
-        
+
         dev = qml.device("lightning.qubit", wires=1, shots=100)
 
         @qml.qnode(dev)
@@ -646,10 +647,10 @@ class TestMeasurementTypeValidation:
 
     @pytest.mark.parametrize("measurement", [qml.sample, qml.counts])
     def test_sample_measurements_rejected_without_shots(self, measurement):
-        """Test that trying to take a sample-based measurement on a device 
-        without shots raises a CompileError informing the user that a 
+        """Test that trying to take a sample-based measurement on a device
+        without shots raises a CompileError informing the user that a
         finite number of shots is needed for sampling"""
-        
+
         dev = qml.device("lightning.qubit", wires=1, shots=None)
 
         @qml.qnode(dev)
@@ -684,7 +685,6 @@ class TestMeasurementTypeValidation:
 
         with pytest.raises(CompileError, match="is not a supported measurement process"):
             qml.qjit(f)()
-
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
