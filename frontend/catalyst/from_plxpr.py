@@ -22,8 +22,8 @@ import jax
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import AbstractMeasurement, AbstractOperator, qnode_prim
 
-from .device import extract_backend_info, get_device_capabilities
-from .jax_primitives import (
+from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.jax_primitives import (
     AbstractQreg,
     AbstractQbit,
     compbasis_p,
@@ -41,7 +41,7 @@ from .jax_primitives import (
     state_p,
     var_p,
 )
-from .utils.toml import ProgramFeatures
+from catalyst.utils.toml import ProgramFeatures
 
 measurement_map = {
     "sample_wires": sample_p,
@@ -105,7 +105,7 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
         jaxpr (jax.core.Jaxpr): PennyLane variant jaxpr
 
     Returns:
-        Callable: a function that accepts the same arguments as the plxpr and returns catalyst
+        Callable: A function that accepts the same arguments as the plxpr and returns catalyst
         variant jaxpr.
 
     Note that the input jaxpr should be workflow level and contain qnode primitives, rather than
