@@ -61,7 +61,7 @@ To enable AutoGraph in Catalyst, simply pass ``autograph=True`` to the ``@qjit``
 >>> weights = jnp.linspace(-1, 1, 20).reshape([5, 4])
 >>> data = jnp.ones([4])
 >>> cost(weights, data)
-array(0.30455313)
+Array(0.30455313, dtype=float64)
 
 This would be equivalent to writing the following program, without using
 AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
@@ -97,7 +97,7 @@ AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
         return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
 
 >>> cost(weights, data)
-array(0.30455313)
+Array(0.30455313, dtype=float64)
 
 Currently, AutoGraph supports converting the following Python statements:
 
@@ -136,7 +136,7 @@ within the qjit-compiled function.
         return x
 
 >>> g(0.4, 6)
-array(22.14135448)
+Array(22.14135448, dtype=float64)
 
 One way to verify that the control flow is being correctly captured and
 converted is to examine the jaxpr representation of the compiled
@@ -241,10 +241,10 @@ AssertionError: Expected matching shapes
 ...         y = jnp.array([0.4, 0.5, -0.1])
 ...     return jnp.sum(y)
 >>> f(0.5)
-array(0.8)
+Array(0.8, dtype=float64)
 
 More generally, this also applies to common container classes such as
-`dict`, `list`, and `tuple`. If one branch assigns an external variable,
+``dict``, ``list``, and ``tuple``. If one branch assigns an external variable,
 then all other branches must also assign the external variable with the same
 type, nested structure, number of elements, element types, and array shapes.
 
@@ -256,7 +256,7 @@ type, nested structure, number of elements, element types, and array shapes.
 ...         y = {"a": jnp.array([0.5, 0., -0.2]), "b": -1}
 ...     return y
 >>> f(1.5)
-{'a': array([0.1, 0.2, 0.3]), 'b': array(6)}
+{'a': Array([0.1, 0.2, 0.3], dtype=float64), 'b': Array(6, dtype=int64)}
 
 Automatic data type promotion in branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -272,7 +272,7 @@ Catalyst will automatically perform data type promotion (such as converting inte
 ...         y = 4
 ...     return y
 >>> f(0.5)
-array(4.)
+Array(4., dtype=float64)
 
 New variable assignments
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -299,7 +299,7 @@ does not apply **as long as you don't change the type**:
 ...         y = 0.4
 ...     return y
 >>> f(0.5)
-array(0.4)
+Array(0.4, dtype=float64)
 
 If we change the type of the ``y``, however, we will need to include an
 ``else`` statement to also change the type:
@@ -313,7 +313,7 @@ If we change the type of the ``y``, however, we will need to include an
 ...         y = -1
 ...     return y
 >>> f(0.5)
-array(-1)
+Array(-1, dtype=int64)
 
 Compatible type assignments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -348,14 +348,14 @@ This includes automatic unpacking and enumeration through JAX arrays:
 ...     return z
 >>> weights = jnp.array([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]).T
 >>> f(weights)
-array(8.4)
+Array(8.4, dtype=float64)
 
 This also works when looping through Python containers, **as long as the containers
 can be converted to a JAX array**:
 
 >>> weights = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
 >>> f(weights)
-array(3.4)
+Array(3.4, dtype=float64)
 
 If the container cannot be converted to a JAX array (e.g., a list of strings),
 then AutoGraph will **not** capture the for loop; instead, AutoGraph will
@@ -374,7 +374,7 @@ fallback to Python, and the loop will be unrolled at compile-time:
         return qml.expval(qml.PauliZ(0))
 
 >>> f()
-array(-0.70710678)
+Array(-0.70710678, dtype=float64)
 
 The Python ``range`` function is also fully supported by AutoGraph, even when
 its input is a **dynamic variable** (i.e., its numeric value is only known at
@@ -387,7 +387,7 @@ runtime):
 ...         x = x + 1 / k
 ...     return x
 >>> f(100000)
-array(0.57722066)
+Array(0.57722066, dtype=float64)
 
 Indexing within a loop
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -405,7 +405,7 @@ For example, using a for loop with static bounds to index a JAX array is straigh
 ...     return qml.expval(qml.PauliZ(0))
 >>> weights = jnp.array([0.1, 0.2, 0.3])
 >>> f(weights)
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 
 However, for optimal performance, indexing within a for loop with AutoGraph will require
 that the object indexed is a JAX array or dynamic runtime variable.
@@ -431,7 +431,7 @@ The compiled function will still execute, but has been compiled without the for
 loop (the for loop was unrolled at compilation):
 
 >>> f()
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 
 To allow AutoGraph conversion to work in this case, simply convert the list to
 a JAX array:
@@ -444,7 +444,7 @@ a JAX array:
 ...         qml.RX(x[i], wires=i)
 ...     return qml.expval(qml.PauliZ(0))
 >>> f()
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 
 
 What if the object you are indexing **cannot** be converted to a JAX
@@ -486,9 +486,9 @@ as the object indexed is a JAX array:
 ...         qml.RY(x[i], wires=0)
 ...     return qml.expval(qml.PauliZ(0))
 >>> f(2)
-array(0.70710678)
+Array(0.70710678, dtype=float64)
 >>> f(3)
-array(-0.70710678)
+Array(-0.70710678, dtype=float64)
 
 However AutoGraph conversion will fail if the object being indexed by the
 loop with dynamic bounds is **not** a JAX array, because you cannot index
@@ -538,7 +538,7 @@ For loops that update variables can also be converted with AutoGraph:
 ...         x = x + y
 ...     return x
 >>> f(4)
-array(13)
+Array(13, dtype=int64)
 
 However, like with conditionals, a similar restriction applies: variables
 which are updated across iterations of the loop must have a JAX compilable
@@ -553,7 +553,7 @@ You can also utilize temporary variables within a for loop:
 ...         x = x + y * c
 ...     return x
 >>> f(4)
-array(22)
+Array(22, dtype=int64)
 
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
@@ -572,7 +572,7 @@ AutoGraph:
 ...         n += 1
 ...     return n
 >>> f(0.1)
-array(9.)
+Array(9., dtype=float64)
 
 Break and continue
 ~~~~~~~~~~~~~~~~~~
@@ -602,7 +602,7 @@ As with for loops, while loops that update variables can also be converted with 
 ...         x = x + 2
 ...     return x
 >>> f(4)
-array(6.4)
+Array(6.4, dtype=float64)
 
 However, like with conditionals, a similar restriction applies: variables
 which are updated across iterations of the loop must have a JAX compilable
@@ -617,7 +617,7 @@ You can also utilize temporary variables within a while loop:
 ...         x = x + 2 * len(c)
 ...     return x
 >>> f(4)
-array(8.4)
+Array(8.4, dtype=float64)
 
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
@@ -635,9 +635,9 @@ computed at runtime.
 ...     b = not y >= 1.0
 ...     return a or b
 >>> f(0.5, 1.1)
-array(True)
+Array(True, dtype=bool)
 >>> f(1.5, 1.6)
-array(False)
+Array(False, dtype=bool)
 
 Internally, logical statements are converted as follows:
 
@@ -671,7 +671,7 @@ of multiple measurements. For example,
         return qml.expval(qml.PauliZ(1))
 
 >>> circuit()
-array(0.87758256)
+Array(0.87758256, dtype=float64)
 
 Note that there are a couple of important constraints and restrictions that must be
 considered when working with logical statements.
@@ -702,9 +702,9 @@ and ``jnp.logical_not(x)`` explicitly if one of your arguments is static:
 ... def f(x):
 ...     return jnp.logical_and(x, True)
 >>> f(False)
-array(False)
+Array(False, dtype=bool)
 >>> f(True)
-array(True)
+Array(True, dtype=bool)
 
 Array arguments
 ~~~~~~~~~~~~~~~
@@ -715,7 +715,7 @@ Note that, like with NumPy and JAX, logical operators apply elementwise to array
 ... def f(x, y):
 ...     return x and y
 >>> f(jnp.array([0, 1]), jnp.array([1, 1]))
-array([False,  True])
+Array([False,  True], dtype=bool)
 
 Care must therefore be taken when using logical operators within conditional branches;
 ``jnp.all`` and ``jnp.any`` can be used to generate a single boolean for conditionals:
@@ -728,7 +728,7 @@ Care must therefore be taken when using logical operators within conditional bra
 ...         z = -1
 ...     return z
 >>> f(jnp.array([0, 1]), jnp.array([1, 1]))
-array(-1)
+Array(-1, dtype=int64)
 
 .. _debugging:
 
@@ -792,7 +792,7 @@ silence AutoGraph warnings; this can be done via ``autograph_ignore_fallbacks``:
 ...         qml.RX(float(x[i]), wires=i)
 ...     return qml.expval(qml.PauliZ(0))
 >>> f()
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 
 Finally, we've seen examples above where we have used the JAXPR representation
 of the compiled function in order to verify that AutoGraph is correctly capturing
@@ -844,7 +844,7 @@ Let's consider an example where a for loop is evaluated at compile time:
 >>> f(2.)
 0 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
 1 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
-array(0.25)
+Array(0.25, dtype=float64)
 
 Here, the for loop is evaluated at compile time (notice the multiple tracers
 that have been printed out during program capture --- one for each loop!),
@@ -880,7 +880,7 @@ function with ``autograph=True``:
       return x
 
 >>> g(0.1, 10)
-array(4.02997319)
+Array(4.02997319, dtype=float64)
 
 Note that for Autograph to be disabled, the decorated function must be
 defined **outside** the qjit-compiled function. If it is defined within
@@ -955,27 +955,35 @@ To update array values when using JAX, the `JAX syntax for array assignment
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#array-updates-x-at-idx-set-y>`__
 (which uses the array ``at`` and ``set`` methods) must be used:
 
->>> @qjit(autograph=True)
-... def f(x):
-...     first_dim = x.shape[0]
-...     result = jnp.empty((first_dim,), dtype=x.dtype)
-...
-...     for i in range(first_dim):
-...         result = result.at[i].set(x[i]* 2)
-...
-...     return result
+.. code-block:: python
 
-However, if updating a single index of the array, Autograph supports conversion of
-standard Python array assignment syntax:
+    @qjit(autograph=True, abstracted_axes=(0,))
+    def f(x):
+        first_dim = x.shape[0]
+        result = jnp.empty((first_dim,), dtype=x.dtype)
 
->>> @qjit(autograph=True)
-... def f(x):
-...     first_dim = x.shape[0]
-...     result = jnp.empty((first_dim,), dtype=x.dtype)
-...
-...     for i in range(first_dim):
-...         result[i] = x[i] * 2
-...
-...     return result
+        for i in range(first_dim):
+            result = result.at[i].set(x[i] * 2)
+
+        return result
+
+>>> f(jnp.array([0.1, 0.2, 0.3]))
+Array([0.2, 0.4, 0.6], dtype=float64)
+
+However, if updating a single static index or slice of the array, then Autograph supports conversion
+of standard Python array assignment syntax:
+
+.. code-block:: python
+
+    @qjit(autograph=True)
+    def f(x, y):
+        y[1:10:2] = x  # static slice index
+        y[0] = x[-1] ** 2   # single integer index
+        return y
+
+>>> x = jnp.linspace(2, 5, 5)
+>>> y = jnp.zeros([11])
+>>> f(x, y)
+Array([25.,  2.,  0.,  2.75,  0.,  3.5,  0.,  4.25,  0., 5.,  0.], dtype=float64)
 
 Under the hood, Catalyst converts anything coming in the latter notation into the former one.

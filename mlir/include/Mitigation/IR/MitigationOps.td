@@ -15,12 +15,27 @@
 #ifndef MITIGATION_OPS
 #define MITIGATION_OPS
 
-include "mlir/Interfaces/CallInterfaces.td"
-include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 
 include "Mitigation/IR/MitigationDialect.td"
+
+def Folding : I32EnumAttr<"Folding",
+    "Folding types",
+    [
+        I32EnumAttrCase<"global", 1>,
+        I32EnumAttrCase<"random", 2>,
+        I32EnumAttrCase<"all",    3>,
+    ]> {
+    let cppNamespace = "catalyst::mitigation";
+    let genSpecializedAttr = 0;
+}
+
+def FoldingAttr : EnumAttr<Mitigation_Dialect, Folding, "folding">;
+
 
 def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -32,12 +47,13 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
+        FoldingAttr:$folding,
         RankedTensorOf<[AnySignlessIntegerOrIndex]>:$scaleFactors
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
     let assemblyFormat = [{
-        $callee `(` $args `)` `scaleFactors` `(` $scaleFactors `:` type($scaleFactors) `)` attr-dict `:` functional-type($args, results)
+        $callee `(` $args `)` `folding` `(` $folding `)` `scaleFactors` `(` $scaleFactors `:` type($scaleFactors) `)` attr-dict `:` functional-type($args, results)
     }];
 }
 
