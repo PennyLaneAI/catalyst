@@ -671,14 +671,12 @@ class TestMeasurementTypeValidation:
             def __init__(self, obs=None, wires=None, eigvals=None, id=None):
                 super().__init__(obs=obs, wires=wires, eigvals=eigvals, id=id)
 
-            return_type = "mymeasurement"
-
             def process_samples(self, samples, wire_order, shot_range, bin_size):
                 raise NotImplementedError
 
             def process_counts(self, counts, wire_order):
                 raise NotImplementedError
-                
+
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)

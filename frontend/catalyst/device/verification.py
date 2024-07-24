@@ -304,17 +304,6 @@ def validate_measurements(
 
     """
 
-    mp_types_mapping = {
-        "Counts": CountsMP,
-        "Expval": ExpectationMP,
-        "Probs": ProbabilityMP,
-        "Sample": SampleMP,
-        "State": StateMP,
-        "Var": VarianceMP,
-    }
-
-    supported_types = tuple(mp_types_mapping[mp] for mp in qjit_capabilities.measurement_processes)
-
     def _obs_checker(obs):
         if not qjit_capabilities.native_obs.get(obs.name):
             raise CompileError(
@@ -322,9 +311,12 @@ def validate_measurements(
             )
 
     for m in tape.measurements:
+        # verify observable is supported
         if m.obs:
             _verify_observable(m.obs, _obs_checker)
-        if not isinstance(m, supported_types):
+        # verify measurement process type is supported
+        mp_name = m.return_type.value if m.return_type else type(m).__name__
+        if not mp_name.title() in qjit_capabilities.measurement_processes:
             if isinstance(m, StateMeasurement) and shots:
                 raise CompileError(
                     f"State-based measurements like {m} cannot work with finite shots. "
