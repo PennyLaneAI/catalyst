@@ -103,7 +103,7 @@ EMPTY_PROPERTIES = OperationProperties(False, False, False)
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     """Verify that no measuremnts contain state or variance."""
 
-    if any(isinstance(m, (StateMeasurements)) for m in tape.measurements):
+    if any(isinstance(m, StateMeasurement) for m in tape.measurements):
         raise DifferentiableCompileError("State returns are forbidden in gradients")
 
     if any(isinstance(m, VarianceMP) for m in tape.measurements):

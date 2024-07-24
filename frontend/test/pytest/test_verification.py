@@ -672,8 +672,8 @@ class TestMeasurementTypeValidation:
         class MyMeasurement(qml.measurements.SampleMeasurement):
             """A custom measurement (not supported on lightning.qubit)"""
 
-            def __init__(self, obs=None, wires=None, eigvals=None, id=None):
-                super().__init__(obs=obs, wires=wires, eigvals=eigvals, id=id)
+            def __init__(self):
+                super().__init__(obs=None, wires=None, eigvals=None, id=None)
 
             def process_samples(self, samples, wire_order, shot_range, bin_size):
                 """overwrite ABC method"""
