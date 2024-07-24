@@ -20,7 +20,14 @@ with the compiler and device.
 from typing import Any, Callable, Sequence, Union
 
 from pennylane import transform
-from pennylane.measurements import SampleMeasurement, StateMeasurement, VarianceMP
+from pennylane.measurements import (
+    MutualInfoMP,
+    SampleMeasurement,
+    StateMeasurement,
+    StateMP,
+    VarianceMP,
+    VnEntropyMP,
+)
 from pennylane.measurements.shots import Shots
 from pennylane.operation import Operation, Tensor
 from pennylane.ops import (
@@ -103,7 +110,7 @@ EMPTY_PROPERTIES = OperationProperties(False, False, False)
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     """Verify that no measuremnts contain state or variance."""
 
-    if any(isinstance(m, StateMeasurement) for m in tape.measurements):
+    if any(isinstance(m, (StateMP, VnEntropyMP, MutualInfoMP)) for m in tape.measurements):
         raise DifferentiableCompileError("State returns are forbidden in gradients")
 
     if any(isinstance(m, VarianceMP) for m in tape.measurements):
@@ -306,12 +313,12 @@ def validate_measurements(
         # verify measurement process type is supported
         mp_name = m.return_type.value if m.return_type else type(m).__name__
         if not mp_name.title() in qjit_capabilities.measurement_processes:
-            if isinstance(m, StateMeasurement) and shots:
+            if shots and not isinstance(m, SampleMeasurement):
                 raise CompileError(
                     f"State-based measurements like {m} cannot work with finite shots. "
                     "Please specify shots=None."
                 )
-            if isinstance(m, SampleMeasurement) and not shots:
+            if not shots and not isinstance(m, StateMeasurement):
                 raise CompileError(
                     f"Sample-based measurements like {m} cannot work with shots=None. "
                     "Please specify a finite number of shots."
