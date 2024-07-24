@@ -327,14 +327,14 @@ def validate_measurements(
         if not isinstance(m, supported_types):
             if isinstance(m, StateMeasurement) and shots:
                 raise CompileError(
-                        f"State-based measurements like {m} cannot work with finite shots. "
-                        "Please specify shots=None."
-                    )
+                    f"State-based measurements like {m} cannot work with finite shots. "
+                    "Please specify shots=None."
+                )
             elif isinstance(m, SampleMeasurement) and not shots:
                 raise CompileError(
-                        f"Sample-based measurements like {m} cannot work with shots=None. "
-                        "Please specify a finite number of shots."
-                    )
+                    f"Sample-based measurements like {m} cannot work with shots=None. "
+                    "Please specify a finite number of shots."
+                )
             else:
                 raise CompileError(
                     f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"

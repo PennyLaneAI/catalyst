@@ -302,9 +302,7 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert len(result["state"]) == 4
-        assert jnp.allclose(
-            result["expval"]["z0"], expected_expval
-        )
+        assert jnp.allclose(result["expval"]["z0"], expected_expval)
 
         @qjit
         def workflow1(param):
