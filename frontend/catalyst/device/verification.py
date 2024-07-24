@@ -303,7 +303,7 @@ def validate_measurements(
     def _obs_checker(obs):
         if not qjit_capabilities.native_obs.get(obs.name):
             raise CompileError(
-                f"{m.obs} is not supported as an observable on '{name}' with Catalyst"
+                f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
             )
 
     for m in tape.measurements:
