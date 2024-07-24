@@ -19,7 +19,7 @@ with the compiler and device.
 
 from typing import Any, Callable, Sequence, Union
 
-from pennylane import Device, transform
+from pennylane import transform
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -300,7 +300,7 @@ def validate_measurements(
         The unaltered input circuit.
 
     Raises:
-        CompileError: if an observable or measurement type is not supported by the device with Catalyst
+        CompileError: if a measurement is not supported by the given device with Catalyst
 
     """
 

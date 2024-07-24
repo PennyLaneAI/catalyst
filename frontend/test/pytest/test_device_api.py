@@ -30,7 +30,7 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_toml_config,
-    qjit_device,
+    qjit_device
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import ProgramFeatures
@@ -176,7 +176,7 @@ def test_qjit_device_measurements(shots, mocker):
     finite_shot_measurements = {"Counts", "Sample"}
 
     config = get_device_toml_config(dev)
-    all_measurements = {mp for mp in config["measurement_processes"]}
+    all_measurements = set(config["measurement_processes"])
 
     assert state_measurements.issubset(all_measurements)
     assert finite_shot_measurements.issubset(all_measurements)
@@ -185,11 +185,11 @@ def test_qjit_device_measurements(shots, mocker):
     expected_measurements = dev_capabilities.measurement_processes
 
     if shots is None:
-        # state measurements are present in dev_measurements, finite shot measurements are not
+        # state measurements are present in expected_measurements, finite shot measurements are not
         assert state_measurements.issubset(expected_measurements)
         assert finite_shot_measurements.intersection(expected_measurements) == set()
     else:
-        # finite shot measurements are present in dev_measurements, state measurements are not
+        # finite shot measurements are present in expected_measurements, state measurements are not
         assert finite_shot_measurements.issubset(expected_measurements)
         assert state_measurements.intersection(expected_measurements) == set()
 
@@ -197,14 +197,13 @@ def test_qjit_device_measurements(shots, mocker):
 
     @qjit
     @qml.qnode(dev)
-    def circuit(a: float):
+    def circuit():
         qml.X(0)
         return qml.expval(qml.PauliZ(0))
 
-    circuit(1.2)
+    circuit()
 
     assert spy.spy_return.measurement_processes == expected_measurements
-
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""

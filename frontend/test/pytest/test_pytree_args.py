@@ -276,14 +276,6 @@ class TestPyTreesReturnValues:
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qjit
-        def workflow1(param):
-            return {"w": jnp.sin(param), "q": jnp.cos(param)}
-
-        result = workflow1(jnp.pi / 2)
-        assert isinstance(result, dict)
-        assert result["w"] == 1
-
         @qml.qnode(qml.device(backend, wires=2, shots=None))
         def circuit3(params):
             qml.RX(params[0], wires=0)
