@@ -102,6 +102,10 @@
   [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
   [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
 
+* Verification is now performed before compilation to confirm that the measurements included in the quantum tape 
+  are compatible with the device.
+  [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
+
 <h3>Breaking changes</h3>
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
@@ -152,6 +156,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Lillian M. A. Frederiksen,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
