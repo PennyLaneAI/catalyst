@@ -17,6 +17,8 @@ file(GLOB SRC
     GEPInboundsPatterns.cpp
     GEPInboundsPass.cpp
     RegisterInactiveCallbackPass.cpp
+    disable_assertion.cpp
+    DisableAssertionPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
