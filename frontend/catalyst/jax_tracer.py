@@ -620,6 +620,10 @@ def trace_quantum_operations(
                 adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
+        elif isinstance(op, qml.StatePrep):
+            # Here we see that StatePrep was not decomposed
+            # TODO: Perform proper binding
+            raise TypeError("StatePrep is not implemented yet in Catalyst")
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
