@@ -69,7 +69,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=kwargs.get("shots") is not None)
+            program_features = ProgramFeatures(shots_present=bool(kwargs.get("shots")))
             lightning_capabilities = get_device_capabilities(lightning_device, program_features)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
