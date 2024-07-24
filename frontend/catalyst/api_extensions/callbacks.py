@@ -108,15 +108,21 @@ def accelerate(func=None, *, dev=None):
             y = accelerate(classical_fn)(x) # will be executed on a GPU
             return jnp.cos(y)
 
-    With gradients:
+    Accelerated functions also fully support autodifferentiation with
+    :func:`~.grad`, :func:`~.jacobian`, and other Catalyst differentiation functions:
 
     .. code-block:: python
 
         @qjit
         @grad
         def f(x):
-            expm = catalyst.accelerate(jax.scipy.linalg.expm)
+            expm = accelerate(jax.scipy.linalg.expm)
             return jnp.sum(expm(jnp.sin(x)) ** 2)
+
+    >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+    >>> f(x)
+    Array([[2.80120452, 1.67518663],
+           [1.61605839, 4.42856163]], dtype=float64)
     """
     # Setting default parameters
     if dev is None:
@@ -181,7 +187,7 @@ def pure_callback(callback_fn, result_type=None):
             return jnp.cos(callback_fn(x ** 2))
 
     >>> fn(0.654)
-    array(0.9151995)
+    Array(0.9151995, dtype=float64)
 
     It can also be used functionally:
 
@@ -189,7 +195,7 @@ def pure_callback(callback_fn, result_type=None):
     >>> def add_one(x):
     ...     return catalyst.pure_callback(lambda x: x + 1, int)(x)
     >>> add_one(2)
-    array(3)
+    Array(3, dtype=int64)
 
     For callback functions that return arrays, a ``jax.ShapeDtypeStruct``
     object can be created to specify the expected return shape and data type:
@@ -210,7 +216,7 @@ def pure_callback(callback_fn, result_type=None):
             return x
 
     >>> fn(jnp.array([0.1, 0.2]))
-    array([1.97507074+0.j, 0.01493759+0.j])
+    Array([1.97507074+0.j, 0.01493759+0.j], dtype=complex128)
 
     .. details::
         :title: Differentiating callbacks with custom VJP rules
@@ -252,7 +258,7 @@ def pure_callback(callback_fn, result_type=None):
         ...     y = jnp.array([jnp.cos(x[0]), x[1]])
         ...     return jnp.sin(callback_fn(y))
         >>> f(jnp.array([0.1, 0.2]))
-        array([-0.01071923,  0.82698717])
+        Array([-0.01071923,  0.82698717], dtype=float64)
     """
 
     # Verify inputs
