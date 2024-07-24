@@ -183,7 +183,7 @@ def _obs_lowering(aval):
 
 
 #
-# Trnasform Func Type
+# Transform Func Type
 #
 class AbstractTransformFunc(AbstractValue):
     """Abstract transform func type."""
@@ -195,10 +195,6 @@ class AbstractTransformFunc(AbstractValue):
 
     def __hash__(self):  # pragma: nocover
         return self.hash_value
-
-
-class ConcreteTransformFunc(AbstractTransformFunc):
-    """Concrete transform func type."""
 
 
 def _transform_func_lowering(aval):

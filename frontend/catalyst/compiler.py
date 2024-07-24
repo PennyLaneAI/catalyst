@@ -149,7 +149,7 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "transform-interpreter",  # Run the peephole passes
+        "transform-interpreter",  # Run the transform sequence defined in the MLIR module
         "transform-cleanup",  # Must be run IMMEDIATELY after --transform-interpreter
         "annotate-function",
         "lower-mitigation",
