@@ -77,7 +77,7 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         Value gradSize = op.getGradSize();
         SmallVector<Value> memrefValues;
         for (Type resType : resTypes) {
-            MemRefType memrefType = resType.cast<MemRefType>();
+            MemRefType memrefType = mlir::cast<MemRefType>(resType);
             Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
             memrefValues.push_back(memrefValue);
         }

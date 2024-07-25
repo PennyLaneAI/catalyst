@@ -62,7 +62,7 @@ void verifyTypeIsCacheable(Type ty, mlir::Operation *op)
         op->emitOpError() << "Caching only supports tensors complex F64";
     }
 
-    auto aTensorType = ty.cast<RankedTensorType>();
+    auto aTensorType = mlir::cast<RankedTensorType>(ty);
     ArrayRef<int64_t> shape = aTensorType.getShape();
 
     // TODO: Generalize to arbitrary dimensions
@@ -75,7 +75,7 @@ void verifyTypeIsCacheable(Type ty, mlir::Operation *op)
         op->emitOpError() << "Caching only supports tensors complex F64";
     }
     // TODO: Generalize to other types
-    Type f64 = elementType.cast<ComplexType>().getElementType();
+    Type f64 = mlir::cast<ComplexType>(elementType).getElementType();
     if (!f64.isF64()) {
         op->emitOpError() << "Caching only supports tensors complex F64";
     }
@@ -136,7 +136,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             gate.emitOpError() << "Unexpected type.";
         }
 
-        auto aTensor = paramType.cast<RankedTensorType>();
+        auto aTensor = mlir::cast<RankedTensorType>(paramType);
         ArrayRef<int64_t> shape = aTensor.getShape();
         Value c0 = builder.create<index::ConstantOp>(loc, 0);
         Value c1 = builder.create<index::ConstantOp>(loc, 1);

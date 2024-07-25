@@ -89,26 +89,26 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
 
             Type gradientTy = gradResTypes[diffArgIdxIdx + diffResIdx * diffArgIndices.size()];
 
-            const bool isOperandTensor = operandTy.isa<TensorType>();
-            const bool isResultTensor = resultTy.isa<TensorType>();
-            const bool isGradientTensor = gradientTy.isa<TensorType>();
+            const bool isOperandTensor = mlir::isa<TensorType>(operandTy);
+            const bool isResultTensor = mlir::isa<TensorType>(resultTy);
+            const bool isGradientTensor = mlir::isa<TensorType>(gradientTy);
 
-            int64_t operandRank = isOperandTensor ? operandTy.cast<TensorType>().getRank() : -1;
-            int64_t resultRank = isResultTensor ? resultTy.cast<TensorType>().getRank() : -1;
+            int64_t operandRank = isOperandTensor ? mlir::cast<TensorType>(operandTy).getRank() : -1;
+            int64_t resultRank = isResultTensor ? mlir::cast<TensorType>(resultTy).getRank() : -1;
 
             const bool isOperandScalarTensor = operandRank == 0;
 
             ArrayRef<int64_t> operandShape =
-                isOperandTensor ? operandTy.cast<TensorType>().getShape() : ArrayRef<int64_t>();
+                isOperandTensor ? mlir::cast<TensorType>(operandTy).getShape() : ArrayRef<int64_t>();
             ArrayRef<int64_t> resultShape =
-                isResultTensor ? resultTy.cast<TensorType>().getShape() : ArrayRef<int64_t>();
+                isResultTensor ? mlir::cast<TensorType>(resultTy).getShape() : ArrayRef<int64_t>();
             ArrayRef<int64_t> gradientShape =
-                isGradientTensor ? gradientTy.cast<TensorType>().getShape() : ArrayRef<int64_t>();
+                isGradientTensor ? mlir::cast<TensorType>(gradientTy).getShape() : ArrayRef<int64_t>();
 
             Type baseOperandTy =
-                isOperandTensor ? operandTy.cast<TensorType>().getElementType() : operandTy;
+                isOperandTensor ? mlir::cast<TensorType>(operandTy).getElementType() : operandTy;
             Type baseResultTy =
-                isResultTensor ? resultTy.cast<TensorType>().getElementType() : resultTy;
+                isResultTensor ? mlir::cast<TensorType>(resultTy).getElementType() : resultTy;
 
             std::vector<Value> dynamicDimSizes;
             for (int64_t j = 0; j < resultRank; j++) {
@@ -124,7 +124,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
 
             TypedAttr shiftForResult = rewriter.getFloatAttr(baseResultTy, hValue);
             Value hForResult = rewriter.create<arith::ConstantOp>(loc, shiftForResult);
-            if (isGradientTensor && gradientTy.cast<TensorType>().hasStaticShape()) {
+            if (isGradientTensor && mlir::cast<TensorType>(gradientTy).hasStaticShape()) {
                 hForResult = rewriter.create<tensor::SplatOp>(loc, hForResult, gradientTy);
             }
             else if (isGradientTensor) {
@@ -136,7 +136,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
 
             TypedAttr shiftForOperand =
                 isOperandScalarTensor
-                    ? (TypedAttr)DenseFPElementsAttr::get(cast<ShapedType>(operandTy), hValue)
+                    ? (TypedAttr)DenseFPElementsAttr::get(mlir::cast<ShapedType>(operandTy), hValue)
                     : (TypedAttr)rewriter.getFloatAttr(baseOperandTy, hValue);
             Value hForOperand = rewriter.create<arith::ConstantOp>(loc, shiftForOperand);
 

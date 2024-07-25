@@ -224,12 +224,12 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
         for (Type type : op.getResultTypes()) {
-            if (!type.isa<MemRefType>())
+            if (!mlir::isa<MemRefType>(type))
                 return op.emitOpError("must be bufferized before lowering");
 
             // Currently only expval gradients are supported by the runtime,
             // leading to tensor<?xf64> return values.
-            if (type.dyn_cast<MemRefType>() != MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
+            if (mlir::dyn_cast<MemRefType>(type) != MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
                 return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
         }
 
@@ -257,7 +257,7 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
         Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
-        if (!qreg.getType().isa<catalyst::quantum::QuregType>())
+        if (!mlir::isa<catalyst::quantum::QuregType>(qreg.getType()))
             return callee.emitOpError("qfunc must return quantum register");
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
 
