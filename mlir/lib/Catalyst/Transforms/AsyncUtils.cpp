@@ -62,7 +62,7 @@ void AsyncUtils::cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
 void AsyncUtils::cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter)
 {
     rewriter.modifyOpInPlace(source,
-                               [&] { source->removeAttr(AsyncUtilsConstants::sourceOfRefCounts); });
+                             [&] { source->removeAttr(AsyncUtilsConstants::sourceOfRefCounts); });
 }
 
 void AsyncUtils::cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter)

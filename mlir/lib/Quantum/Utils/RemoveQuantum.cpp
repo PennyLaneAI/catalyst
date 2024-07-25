@@ -43,7 +43,7 @@ void removeQuantumMeasurements(func::FuncOp &function, mlir::PatternRewriter &re
         Operation *currentOp = opsToDelete.front();
         opsToDelete.pop_front();
 
-        rewriter.modifyOpInPlace(currentOp, [&] {currentOp->dropAllReferences();});
+        rewriter.modifyOpInPlace(currentOp, [&] { currentOp->dropAllReferences(); });
         for (Operation *user : currentOp->getUsers()) {
             if (!visited.contains(user)) {
                 visited.insert(user);

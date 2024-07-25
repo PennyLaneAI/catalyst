@@ -39,7 +39,7 @@ void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry)
 
 LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options,
                                                   std::shared_ptr<llvm::Module> llvmModule,
-                                                  llvm::TargetMachine* targetMachine,
+                                                  llvm::TargetMachine *targetMachine,
                                                   StringRef filename)
 {
     using namespace llvm;
