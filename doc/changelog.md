@@ -67,6 +67,53 @@
   Array(48, dtype=int64)
   ```
 
+* A `qjit` run for `lightning.qubit` and `lightning.kokkos` can now be seeded.
+  [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
+
+  The `qjit` decorator now can take in an argument `seed`, which is an unsigned 32-bit integer. 
+  Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
+  will return the same sequence of measurement results everytime. 
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(seed=37)
+  def workflow():
+      @qml.qnode(dev)
+      def circuit():
+          qml.Hadamard(0)
+          m = measure(0)
+          @cond(m)
+          def cfun0():
+              qml.Hadamard(0)
+          cfun0()
+          return qml.probs()
+      return circuit(), circuit(), circuit(), circuit()
+
+  @qjit(seed=37)
+  def workflow_another():
+      @qml.qnode(dev)
+      def circuit():
+          qml.Hadamard(0)
+          m = measure(0)
+          @cond(m)
+          def cfun0():
+              qml.Hadamard(0)
+          cfun0()
+          return qml.probs()
+      return circuit(), circuit(), circuit(), circuit()
+
+  print(workflow())
+  print(workflow())
+  print(workflow_another())
+
+  >>> 
+  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
@@ -232,6 +279,7 @@ Romain Moyard,
 Erick Ochoa,
 Raul Torres,
 Tzung-Han Juang,
+Paul Haochen Wang,
 
 # Release 0.7.0
 
