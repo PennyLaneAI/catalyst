@@ -117,6 +117,10 @@
   >>> qjit(vmap(circuit), autograph=True)(x)
   Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
   ```
+  
+* Verification is now performed before compilation to confirm that the measurements included in the quantum tape 
+  are compatible with the device.
+  [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
 
 <h3>Breaking changes</h3>
 
@@ -163,6 +167,7 @@
 * Fixes a bug where Catalyst would fail to apply quantum transforms and preserve
   QNode configuration settings when Autograph was enabled.
   [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
+
   
 * `pure_callback` will no longer cause a crash in the compiler if the return type
   signature is declared incorrectly and the callback function is differentiated.
@@ -217,6 +222,7 @@
 This release contains contributions from (in alphabetical order):
 
 Alessandro Cosentino,
+Lillian M. A. Frederiksen,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,

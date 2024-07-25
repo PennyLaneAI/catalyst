@@ -34,7 +34,7 @@ from catalyst import qjit
     )
 )
 def circuit():
-    return qml.state()
+    return qml.expval(qml.X(0))
 
 
 # CHECK: 'mcmc': True, 'num_burnin': 200, 'kernel_name': 'NonZeroRandom'
