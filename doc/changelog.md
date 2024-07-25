@@ -129,6 +129,9 @@
   qjit-compiled function being NumPy arrays will need to be updated.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
+* Support for TOML files in Schema 1 has been deprecated.
+  [(#960)](https://github.com/PennyLaneAI/catalyst/pull/960)
+
 <h3>Bug fixes</h3>
 
 * Static arguments can now be passed through a QNode when specified
