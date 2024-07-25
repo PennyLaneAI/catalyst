@@ -273,7 +273,6 @@ class ExecutionContext final {
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
-        this->seed = seed;
         if (this->seed) {
             this->gen = std::mt19937(*seed);
         }
