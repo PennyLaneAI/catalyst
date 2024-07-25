@@ -29,7 +29,7 @@ target triple = "x86_64-pc-linux-gnu"
 
 declare void @__catalyst__rt__device_init(i8*, i8*, i8*)
 
-declare void @__catalyst__rt__initialize()
+declare void @__catalyst__rt__initialize(i32*)
 
 declare void @__catalyst__rt__finalize()
 
@@ -59,7 +59,7 @@ define void @print_probs_at(double* %0, i64 %1) {
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__catalyst__rt__initialize()
+  call void @__catalyst__rt__initialize(i32* null)
   call void @__catalyst__rt__device_init(i8* getelementptr ([33 x i8], [33 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([11 x i8], [11 x i8]* @rtd_kwargs, i64 0, i64 0))
 
   ; Allocate 2 qubits
