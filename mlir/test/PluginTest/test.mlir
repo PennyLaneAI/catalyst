@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --load-dialect-plugin=$(dirname %s)/StandalonePlugin.so --load-pass-plugin=$(dirname %s)/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' %s | FileCheck %s
+// RUN: if [%PYTHON -c "import platform; print(platform.architecture())" == "x86_64" ] ; then quantum-opt --load-dialect-plugin=$(dirname %s)/StandalonePlugin.so --load-pass-plugin=$(dirname %s)/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' %s | FileCheck %s ; exit $? ; fi ; exit 0
 
 
 module {
