@@ -56,6 +56,28 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
     shutil.rmtree(QJIT.__name__)
 
 
+def print_attr(f, attr, *args, aot: bool = False, **kwargs):
+    """Print function attribute"""
+    name = f"TEST {f.__name__}"
+    print("\n" + "-" * len(name))
+    print(f"{name}\n")
+    res = None
+    if not aot:
+        res = f(*args, **kwargs)
+    print(getattr(f, attr))
+    return res
+
+
+def print_jaxpr(f, *args, **kwargs):
+    """Print jaxpr code of a function"""
+    return print_attr(f, "jaxpr", *args, **kwargs)
+
+
+def print_mlir(f, *args, **kwargs):
+    """Print mlir code of a function"""
+    return print_attr(f, "mlir", *args, **kwargs)
+
+
 #
 # cancel_inverses
 #
@@ -102,6 +124,11 @@ assert np.allclose(ff, gg)
 flush_peephole_opted_mlir_to_iostream(test_peephole_workflow_cancel_inverses)
 
 
+#
+# General lowering tests
+#
+
+
 @qjit
 def test_cancel_inverses_tracing_and_lowering(xx: float):
     """
@@ -135,30 +162,25 @@ def test_cancel_inverses_tracing_and_lowering(xx: float):
     _gg = g(xx)
     _hh = h(xx)
 
-    jp = EvaluationContext.find_jaxpr_frame().to_jaxpr([])
-    mlir = lower_jaxpr_to_mlir(ClosedJaxpr(jp[0], jp[1]), "_")
 
-    # CHECK: transform_named_sequence
-    # CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
-    # CHECK-NEXT:   options=func-name=f
-    # CHECK-NEXT:   pass_name=remove-chained-self-inverse
-    # CHECK-NEXT: ]
-    # CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
-    # CHECK-NEXT:   options=func-name=g
-    # CHECK-NEXT:   pass_name=remove-chained-self-inverse
-    # CHECK-NEXT: ]
-    # CHECK-NOT: _:AbstractTransformFunc() = apply_registered_pass[
-    # CHECK-NOT:   options=func-name=h
-    # CHECK-NOT:   pass_name=remove-chained-self-inverse
-    print(jp[0])
+# CHECK: transform_named_sequence
+# CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
+# CHECK-NEXT:   options=func-name=f
+# CHECK-NEXT:   pass_name=remove-chained-self-inverse
+# CHECK-NEXT: ]
+# CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
+# CHECK-NEXT:   options=func-name=g
+# CHECK-NEXT:   pass_name=remove-chained-self-inverse
+# CHECK-NEXT: ]
+# CHECK-NOT: _:AbstractTransformFunc() = apply_registered_pass[
+# CHECK-NOT:   options=func-name=h
+# CHECK-NOT:   pass_name=remove-chained-self-inverse
+print_jaxpr(test_cancel_inverses_tracing_and_lowering, 1.1)
 
-    # CHECK: module @_ attributes {transform.with_named_sequence}
-    # CHECK: "transform.named_sequence"() ({
-    # CHECK: {{%.+}} = "transform.apply_registered_pass"({{%.+}}) {options = "func-name=f", pass_name = "remove-chained-self-inverse"}
-    # CHECK-NEXT: {{%.+}} = "transform.apply_registered_pass"({{%.+}}) {options = "func-name=g", pass_name = "remove-chained-self-inverse"}
-    # CHECK-NOT: {{%.+}} = "transform.apply_registered_pass"({{%.+}}) {options = "func-name=h", pass_name = "remove-chained-self-inverse"}
-    # CHECK-NEXT: "transform.yield"() : () -> ()
-    print(mlir[0])
-
-
-test_cancel_inverses_tracing_and_lowering(42.42)
+# CHECK: module @test_cancel_inverses_tracing_and_lowering attributes {transform.with_named_sequence}
+# CHECK: transform.named_sequence @__transform_main
+# CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
+# CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g"}
+# CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h"}
+# CHECK-NEXT: transform.yield
+print_mlir(test_cancel_inverses_tracing_and_lowering, 1.1)

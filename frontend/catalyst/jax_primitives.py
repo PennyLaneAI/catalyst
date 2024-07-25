@@ -194,14 +194,6 @@ def _obs_lowering(aval):
 class AbstractTransformFunc(AbstractValue):
     """Abstract transform func type."""
 
-    hash_value = hash("AbstractTransformFunc")
-
-    def __eq__(self, other):  # pragma: nocover
-        return isinstance(other, AbstractTransformFunc)
-
-    def __hash__(self):  # pragma: nocover
-        return self.hash_value
-
 
 def _transform_func_lowering(aval):
     assert isinstance(aval, AbstractTransformFunc)
