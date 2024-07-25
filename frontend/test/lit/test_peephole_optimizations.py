@@ -36,12 +36,9 @@ import shutil
 
 import numpy as np
 import pennylane as qml
-from jax._src.core import ClosedJaxpr
 
 from catalyst import cancel_inverses, qjit
 from catalyst.debug.compiler_functions import print_compilation_stage
-from catalyst.jax_tracer import lower_jaxpr_to_mlir
-from catalyst.tracing.contexts import EvaluationContext
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
