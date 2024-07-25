@@ -7,6 +7,7 @@ add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 # include external MLIR runner utils
 FetchContent_MakeAvailable(MLIRRunnerUtils)
 FetchContent_MakeAvailable(MLIRCRunnerUtils)
+FetchContent_MakeAvailable(MLIRFloat16Bits)
 
 # link to rt_backend
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS} catalyst_python_interpreter)
