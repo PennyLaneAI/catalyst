@@ -143,12 +143,10 @@ def test_cancel_inverses_tracing_and_lowering(xx: float):
     # CHECK-NEXT:   options=func-name=f
     # CHECK-NEXT:   pass_name=remove-chained-self-inverse
     # CHECK-NEXT: ]
-    # CHECK-NEXT: transform_named_sequence
     # CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
     # CHECK-NEXT:   options=func-name=g
     # CHECK-NEXT:   pass_name=remove-chained-self-inverse
     # CHECK-NEXT: ]
-    # CHECK-NOT: transform_named_sequence
     # CHECK-NOT: _:AbstractTransformFunc() = apply_registered_pass[
     # CHECK-NOT:   options=func-name=h
     # CHECK-NOT:   pass_name=remove-chained-self-inverse

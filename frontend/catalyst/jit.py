@@ -26,17 +26,16 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax._src.core import new_jaxpr_eqn, no_effects
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 from malt.core import config as ag_config
 
 import catalyst
+from catalyst import inject_transform_named_sequence
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
-from catalyst.jax_primitives import transform_named_sequence_p
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -484,10 +483,6 @@ class QJIT:
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
-        # After compilation is successfully done, remove the transform primitives from jaxpr
-        if self.jaxpr is not None:
-            erase_transform_primitives_from_jaxpr(self.jaxpr)
-
     @debug_logger
     def jit_compile(self, args):
         """Compile Python function on invocation using the provided arguments.
@@ -524,10 +519,6 @@ class QJIT:
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
-
-            # After compilation is successfully done, remove the transform primitives from jaxpr
-            if self.jaxpr is not None:
-                erase_transform_primitives_from_jaxpr(self.jaxpr)
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -586,21 +577,26 @@ class QJIT:
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
+
+            def fn_with_transform_named_sequence(*args, **kwargs):
+                """
+                This function behaves exactly like the user function being jitted,
+                taking in the same arguments and producing the same results, except
+                it injects a transform_named_sequence jax primitive at the beginning
+                of the jaxpr when being traced.
+
+                Note that we do not overwrite self.original_function and self.user_function;
+                this processed_fn is ONLY used here to produce tracing results with a
+                transform_named_sequence primitive at the beginning of the jaxpr. It is
+                never executed or used anywhere, except being traced here.
+                """
+                inject_transform_named_sequence()
+                return self.user_function(*args, **kwargs)
+
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                self.user_function, static_argnums, abstracted_axes, full_sig, {}
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, {}
             )
 
-            # After tracing ANY qjit jaxpr, add a transform_named_sequence primitive
-            # Otherwise -transform-interpreter will complain that a __transform_main is not found
-            jaxpr.eqns.append(
-                new_jaxpr_eqn(
-                    invars=[],
-                    outvars=[],
-                    primitive=transform_named_sequence_p,
-                    params={},
-                    effects=no_effects,
-                )
-            )
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
@@ -807,18 +803,3 @@ class JAX_QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
-
-
-def erase_transform_primitives_from_jaxpr(jaxpr):
-    """
-    removes the `transform_named_sequence_p` and `apply_registered_pass_p`
-    primitives from a jaxpr
-    """
-
-    worklist = []
-    for primitive in jaxpr.eqns:
-        if primitive.primitive.name in ("transform_named_sequence", "apply_registered_pass"):
-            worklist.append(primitive)
-
-    for primitive in worklist:
-        jaxpr.eqns.remove(primitive)

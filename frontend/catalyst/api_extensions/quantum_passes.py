@@ -30,6 +30,18 @@ import pennylane as qml
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
 
 
+def inject_transform_named_sequence():
+    """
+    Inject a transform_named_sequence jax primitive.
+
+    This must be called when preprocessing the traced function in QJIT.capture(),
+    since to invoke -transform-interpreter, a transform_named_sequence primitive
+    must be in the jaxpr.
+    """
+
+    transform_named_sequence_p.bind()
+
+
 ## API ##
 def cancel_inverses(fn=None):
     """
@@ -40,7 +52,6 @@ def cancel_inverses(fn=None):
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    transform_named_sequence_p.bind()
     apply_registered_pass_p.bind(
         pass_name="remove-chained-self-inverse", options=f"func-name={fn.__name__}"
     )
