@@ -68,7 +68,7 @@ def get_test_device_capabilities(
 ) -> DeviceCapabilities:
     """Parse test config into the DeviceCapabilities structure"""
     config = get_test_config(config_text)
-    device_capabilities = load_device_capabilities(config, program_features, "dummy")
+    device_capabilities = load_device_capabilities(config, program_features)
     return device_capabilities
 
 

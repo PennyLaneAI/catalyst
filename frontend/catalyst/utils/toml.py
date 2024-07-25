@@ -239,7 +239,7 @@ def _validate_schema_version(schema):
 
 
 def load_device_capabilities(
-    config: TOMLDocument, program_features: ProgramFeatures, device_name: str
+    config: TOMLDocument, program_features: ProgramFeatures
 ) -> DeviceCapabilities:
     """Load device capabilities from device config"""
 
