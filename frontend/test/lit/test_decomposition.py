@@ -115,7 +115,7 @@ def test_decompose_multicontrolledx():
         # CHECK:     quantum.custom "PauliX"() {{%[a-zA-Z0-9_]+}} ctrls({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
         # CHECK-NOT: name = "MultiControlledX"
         qml.MultiControlledX(wires=[0, 1, 2, 3])
-        return qml.expval(qml.X(0))
+        return qml.state()
 
     print(decompose_multicontrolled_x1.mlir)
 
