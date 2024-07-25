@@ -236,17 +236,7 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 
 void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
-void __catalyst__rt__initialize(uint32_t *seed /* default value = nullptr in declaration */)
-{
-    if (seed == nullptr) {
-        // 1. Preserve legacy usage where __catalyst__rt__initialize is called without any arguments
-        // 2. Unseeded runs have nullptr as the seed argument at the end of the mlir pipeline
-        CTX = std::make_unique<ExecutionContext>();
-    }
-    else {
-        CTX = std::make_unique<ExecutionContext>(seed);
-    }
-}
+void __catalyst__rt__initialize(uint32_t *seed) { CTX = std::make_unique<ExecutionContext>(seed); }
 
 void __catalyst__rt__finalize()
 {

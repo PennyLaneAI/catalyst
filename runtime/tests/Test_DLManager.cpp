@@ -67,7 +67,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering a custom device with sho
           "device=lightning.qubit",
           "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     char dev1[17] = "lightning.qubit";
     __catalyst__rt__device_init((int8_t *)dev1, nullptr, nullptr);
@@ -89,7 +89,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering a custom device with sho
 #ifdef __device_lightning_kokkos
 TEST_CASE("Test __catalyst__rt__device_init registering device=lightning.kokkos", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     char rtd_name[18] = "lightning.kokkos";
     __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr);
