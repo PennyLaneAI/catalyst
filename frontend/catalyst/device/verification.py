@@ -311,19 +311,18 @@ def validate_measurements(
         if m.obs:
             _verify_observable(m.obs, _obs_checker)
         # verify measurement process type is supported
+        if shots and not isinstance(m, SampleMeasurement):
+            raise CompileError(
+                f"State-based measurements like {m} cannot work with finite shots. "
+                "Please specify shots=None."
+            )
+        if not shots and not isinstance(m, StateMeasurement):
+            raise CompileError(
+                f"Sample-based measurements like {m} cannot work with shots=None. "
+                "Please specify a finite number of shots."
+            )
         mp_name = m.return_type.value if m.return_type else type(m).__name__
         if not mp_name.title() in qjit_capabilities.measurement_processes:
-            if shots and not isinstance(m, SampleMeasurement):
-                raise CompileError(
-                    f"State-based measurements like {m} cannot work with finite shots. "
-                    "Please specify shots=None."
-                )
-            if not shots and not isinstance(m, StateMeasurement):
-                raise CompileError(
-                    f"Sample-based measurements like {m} cannot work with shots=None. "
-                    "Please specify a finite number of shots."
-                )
-
             raise CompileError(
                 f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"
             )
