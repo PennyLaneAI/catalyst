@@ -61,6 +61,11 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
 
             op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
         }
+        else if (dyn_cast<MemRefType>(baseType)) {
+            tag = tree->getTag("any pointer");
+
+            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
+        }
         return success();
     }
 
@@ -99,6 +104,11 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
             else if (baseType.isF64()) {
                 tag = tree->getTag("double");
             }
+
+            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
+        }
+        else if (dyn_cast<MemRefType>(baseType)) {
+            tag = tree->getTag("any pointer");
 
             op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
         }
