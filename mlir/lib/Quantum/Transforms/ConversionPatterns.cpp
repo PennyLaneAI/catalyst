@@ -447,7 +447,7 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
-        assert(op.getMatrix().getType().isa<MemRefType>() &&
+        assert(mlir::isa<MemRefType>(op.getMatrix().getType()) &&
                "unitary must take in memref before lowering");
 
         Type matrixType = conv->convertType(
@@ -543,7 +543,7 @@ struct HermitianOpPattern : public OpConversionPattern<HermitianOp> {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        assert(op.getMatrix().getType().isa<MemRefType>() &&
+        assert(mlir::isa<MemRefType>(op.getMatrix().getType()) &&
                "hermitian must take in memref before lowering");
 
         Type matrixType = conv->convertType(
@@ -611,7 +611,7 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        assert(op.getCoeffs().getType().isa<MemRefType>() &&
+        assert(mlir::isa<MemRefType>(op.getCoeffs().getType()) &&
                "hamiltonian must take in memref before lowering");
 
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));

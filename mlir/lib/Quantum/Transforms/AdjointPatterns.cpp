@@ -179,7 +179,7 @@ class AdjointGenerator {
                 }
 
                 // Guaranteed by verifyTypeIsPoppable above.
-                auto aTensorType = paramType.cast<RankedTensorType>();
+                auto aTensorType = mlir::cast<RankedTensorType>(paramType);
                 ArrayRef<int64_t> shape = aTensorType.getShape();
                 Type elementType = aTensorType.getElementType();
                 // Constants
