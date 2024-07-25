@@ -264,11 +264,12 @@ class ExecutionContext final {
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
     // PRNG
-    uint32_t *seed = nullptr;
+    uint32_t *seed;
     std::mt19937 gen;
 
   public:
-    explicit ExecutionContext(uint32_t *seed = nullptr) : initial_tape_recorder_status(false)
+    explicit ExecutionContext(uint32_t *seed = nullptr)
+        : initial_tape_recorder_status(false), seed(seed)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
