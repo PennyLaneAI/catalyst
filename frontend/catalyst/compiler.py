@@ -514,8 +514,8 @@ class Compiler:
                 keep_intermediate=self.options.keep_intermediate,
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
-                passPlugins=["/home/ubuntu/code/catalyst/plugin/build/lib/StandalonePlugin.so"],
-                dialectPlugins=["/home/ubuntu/code/catalyst/plugin/build/lib/StandalonePlugin.so"],
+                passPlugins=["/home/ubuntu/code/catalyst/mlir/build/python_packages/quantum/mlir_quantum/StandalonePlugin.so"],
+                dialectPlugins=["/home/ubuntu/code/catalyst/mlir/build/python_packages/quantum/mlir_quantum/StandalonePlugin.so"],
                 lower_to_llvm=lower_to_llvm,
             )
         except RuntimeError as e:
