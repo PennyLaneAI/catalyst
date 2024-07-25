@@ -1326,6 +1326,23 @@ def test_preprocessing_outside_qnode(inp, backend):
     assert np.allclose(g(inp), h(inp))
 
 
+def test_ellipsis_differentiation(backend):
+    """Test circuit diff with ellipsis in the preprocessing."""
+    dev = qml.device(backend, wires=3)
+
+    @qml.qnode(dev)
+    def circuit(weights):
+        r = weights[..., 1, 2, 0]
+        qml.RY(r, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    weights = jnp.ones([5, 3, 3])
+
+    cat_res = qjit(grad(circuit, argnum=0))(weights)
+    jax_res = jax.grad(circuit, argnums=0)(weights)
+    assert np.allclose(cat_res, jax_res)
+
+
 class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""
