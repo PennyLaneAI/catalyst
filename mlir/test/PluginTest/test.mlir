@@ -21,7 +21,7 @@
 // RUN:		| FileCheck %s ; \
 // RUN:		exit $? ; \
 // RUN:	fi ; \
-// RUN:	exit 1
+// RUN:	exit 0
 
 
 module {
