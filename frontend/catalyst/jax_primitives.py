@@ -436,9 +436,9 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
 
     # If there already is a transform.named_sequence in the module, don't add another one!
     # Do nothing and exit!
-    for i in range(len(module.body.operations)):
-        if module.body.operations[i].operation.name == "transform.named_sequence":
-            return module.body.operations[i].operation.results
+    for i, op in enumerate(module.body.operations):
+        if op.operation.name == "transform.named_sequence":
+            return op.operation.results
 
     functype = ir.FunctionType.get(inputs=[transform_func_type], results=[])
     functype_attr = ir.TypeAttr.get(functype)
@@ -486,17 +486,18 @@ def _apply_registered_pass_lowering(
 ):
     module = jax_ctx.module_context.module
     named_sequence_op = None
-    for i in reversed(range(len(module.body.operations))):
+    for i, op in reversed(list(enumerate(module.body.operations))):
         # transform.named_sequence usually is at the end of the module, so look for it from the end
-        if module.body.operations[i].operation.name == "transform.named_sequence":
-            named_sequence_op = module.body.operations[i].operation
+        if op.operation.name == "transform.named_sequence":
+            named_sequence_op = op.operation
             break
     if named_sequence_op is None:
         raise RuntimeError(
             "transform.apply_registered_pass must be placed in a transform.named_sequence!"
         )
 
-    # If there already is a apply_registered_pass, insert after the existing one
+    # If there already is a apply_registered_pass, 
+    # insert after the last pass in the existing pass sequence.
     # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
     named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
     first_op_in_block = named_sequence_op_block.operations[0].operation
