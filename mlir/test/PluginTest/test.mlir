@@ -12,7 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: machine="$(%PYTHON -c 'import platform; print(platform.system(), platform.machine())')" ; if [ "${machine}" == "Linux x86_64" ] ; then quantum-opt --load-dialect-plugin=$(dirname %s)/StandalonePlugin.so --load-pass-plugin=$(dirname %s)/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' %s | FileCheck %s ; exit $? ; fi ; exit 0
+// RUN: machine="$(%PYTHON -c 'import platform; print(platform.system(), platform.machine())')" ; \
+// RUN:	if [ "${machine}" == "Linux x86_64" ] ; then \
+// RUN:		quantum-opt \
+// RUN:			--load-dialect-plugin=$(dirname %s)/StandalonePlugin.so \
+// RUN:			--load-pass-plugin=$(dirname %s)/StandalonePlugin.so \
+// RUN:			--pass-pipeline='builtin.module(standalone-switch-bar-foo)' %s \
+// RUN:		| FileCheck %s ; \
+// RUN:		exit $? ; \
+// RUN:	fi ; \
+// RUN:	exit 1
 
 
 module {
