@@ -1585,9 +1585,7 @@ def _cond_lowering(
 
             # if block
             source_info_util.extend_name_stack("if")
-            if_ctx = jax_ctx.replace(
-                name_stack=jax_ctx.name_stack.extend("if")
-            )
+            if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
                 out = mlir.jaxpr_subcomp(
@@ -1604,9 +1602,7 @@ def _cond_lowering(
 
             # else block
             source_info_util.extend_name_stack("else")
-            else_ctx = jax_ctx.replace(
-                name_stack=jax_ctx.name_stack.extend("else")
-            )
+            else_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("else"))
             else_block = if_op_scf.else_block
             if len(preds) == 1:
                 # Base case: reached the otherwise block
