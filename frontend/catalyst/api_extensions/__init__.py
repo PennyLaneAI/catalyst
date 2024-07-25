@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This module is a collection of public API extensions for pragramming with Catalyst frontends.
+This module is a collection of public API extensions for programming with Catalyst frontends.
 """
 
 from catalyst.api_extensions.callbacks import accelerate, pure_callback
