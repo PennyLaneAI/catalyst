@@ -494,14 +494,25 @@ def _apply_registered_pass_lowering(
             break
     if named_sequence_op is None:
         raise RuntimeError(
-            "transform.apply_registered_pass must be placed in a transform.named_sequence!"
+            """
+            transform.apply_registered_pass must be placed in a transform.named_sequence, 
+            but none exist in the module.
+            """
         )
 
-    # If there already is a apply_registered_pass, 
+    # If there already is a apply_registered_pass,
     # insert after the last pass in the existing pass sequence.
     # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
     named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
     first_op_in_block = named_sequence_op_block.operations[0].operation
+
+    assert first_op_in_block.name in (
+        "transform.apply_registered_pass",
+        "transform.yield",
+    ), """
+            Unexpected operation in transform.named_sequence! 
+            Only transform.apply_registered_pass and transform.yield are allowed.
+        """
 
     if first_op_in_block.name == "transform.apply_registered_pass":
         _ = len(named_sequence_op_block.operations)
@@ -517,7 +528,7 @@ def _apply_registered_pass_lowering(
 
     # otherwise it's the first pass, i.e. only a yield op is in the block
     # so insert right before the yield op
-    elif first_op_in_block.name == "transform.yield":
+    else:
         ip = named_sequence_op.regions[0].blocks[0]
         with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
             apply_registered_pass_op = ApplyRegisteredPassOp(
@@ -526,14 +537,6 @@ def _apply_registered_pass_lowering(
                 pass_name=pass_name,
                 options=options,
             )
-
-    else:
-        raise RuntimeError(
-            """
-            Unexpected operation in transform.named_sequence! 
-            Only transform.apply_registered_pass and transform.yield are allowed.
-            """
-        )
 
     return apply_registered_pass_op.results
 

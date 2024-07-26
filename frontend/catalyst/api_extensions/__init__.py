@@ -42,10 +42,7 @@ from catalyst.api_extensions.quantum_operators import (
     ctrl,
     measure,
 )
-from catalyst.api_extensions.quantum_passes import (
-    cancel_inverses,
-    inject_transform_named_sequence,
-)
+from catalyst.api_extensions.quantum_passes import cancel_inverses
 
 __all__ = (
     "accelerate",
@@ -65,5 +62,4 @@ __all__ = (
     "adjoint",
     "ctrl",
     "cancel_inverses",
-    "inject_transform_named_sequence",
 )
