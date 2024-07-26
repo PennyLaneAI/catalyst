@@ -88,6 +88,7 @@ class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     runtime_code_generation_flag: bool = False
     dynamic_qubit_management_flag: bool = False
     non_commuting_observables_flag: bool = False
+    skip_initial_state_prep_flag: bool = False
     options: Dict[str, bool] = field(default_factory=dict)
 
 
@@ -262,10 +263,11 @@ def load_device_capabilities(
         to_matrix_ops=matrix_decomp_props,
         native_obs=observable_props,
         measurement_processes=measurements_props,
-        qjit_compatible_flag=_get_compilation_flag(config, "qjit_compatible"),
-        mid_circuit_measurement_flag=_get_compilation_flag(config, "mid_circuit_measurement"),
-        runtime_code_generation_flag=_get_compilation_flag(config, "runtime_code_generation"),
-        dynamic_qubit_management_flag=_get_compilation_flag(config, "dynamic_qubit_management"),
-        non_commuting_observables_flag=_get_compilation_flag(config, "non_commuting_observables"),
-        options=_get_options(config),
+        qjit_compatible_flag=get_compilation_flag(config, "qjit_compatible"),
+        mid_circuit_measurement_flag=get_compilation_flag(config, "mid_circuit_measurement"),
+        runtime_code_generation_flag=get_compilation_flag(config, "runtime_code_generation"),
+        dynamic_qubit_management_flag=get_compilation_flag(config, "dynamic_qubit_management"),
+        non_commuting_observables_flag=get_compilation_flag(config, "non_commuting_observables"),
+        skip_initial_state_prep_flag=get_compilation_flag(config, "skip_initial_state_prep"),
+        options=get_options(config),
     )
