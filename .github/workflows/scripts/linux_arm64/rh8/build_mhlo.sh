@@ -46,4 +46,4 @@ cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DLLVM_ENABLE_ZLIB=OFF \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
     -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-LIT_FILTER_OUT=\"zeta_f16\" cmake --build /catalyst/mhlo-build --target check-mlir-hlo
+cmake --build /catalyst/mhlo-build --target check-mlir-hlo
