@@ -17,12 +17,12 @@
 import numpy as np
 import pennylane as qml
 
-from catalyst import qjit
+from catalyst import CompileError, qjit
 
 # TODO: NOTE:
-# The tests sample1 and sample2 below used to pass, before verification steps were added in the 
-# device preprocessing. Now that the measurement validation is run, the circuit below complains 
-# (observables with MeasurementProcess types other than ExpectationMP and VarianceMP are not 
+# The tests sample1 and sample2 below used to pass, before verification steps were added in the
+# device preprocessing. Now that the measurement validation is run, the circuit below complains
+# (observables with MeasurementProcess types other than ExpectationMP and VarianceMP are not
 # currently supported).
 #
 # This test is commented out and the expected output is also commented out using the FileCheck
@@ -42,9 +42,7 @@ try:
         # COM: CHECK: quantum.sample [[obs]] {shots = 1000 : i64} : tensor<1000xf64>
         return qml.sample(qml.PauliZ(0))
 
-
     print(sample1.mlir)
-
 
     # COM: CHECK-LABEL: private @sample2(
     @qjit(target="mlir")
@@ -62,10 +60,10 @@ try:
         # COM: CHECK: quantum.sample [[obs3]] {shots = 1000 : i64} : tensor<1000xf64>
         return qml.sample(qml.PauliX(1) @ qml.Identity(0))
 
-
     print(sample2.mlir)
-except:
+except CompileError:
     ...
+
 
 # CHECK-LABEL: private @sample3(
 @qjit(target="mlir")

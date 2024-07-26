@@ -555,7 +555,7 @@ class TestObservableValidation:
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
             # sample with observable is currently unsupported
-            # ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  
+            # ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),
             # ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
             ([qml.probs(wires=0), qml.var(qml.X(1) + qml.Y(2))], None),  # with probs
             ([qml.probs(wires=0), qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
