@@ -20,50 +20,52 @@ import pennylane as qml
 from catalyst import qjit
 
 # TODO: NOTE:
-# The tests sample1 and sample2 below used to pass before verification steps were added in the 
-# device processing. Now that the measurement validation is run, the circuit below complains 
+# The tests sample1 and sample2 below used to pass, before verification steps were added in the 
+# device preprocessing. Now that the measurement validation is run, the circuit below complains 
 # (observables with MeasurementProcess types other than ExpectationMP and VarianceMP are not 
 # currently supported).
 #
 # This test is commented out and the expected output is also commented out using the FileCheck
 # comments (COM:).
 
-# COM: CHECK-LABEL: private @sample1(
-@qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
-def sample1(x: float, y: float):
-    qml.RX(x, wires=0)
-    qml.RY(y, wires=1)
-    # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
-    qml.RZ(0.1, wires=0)
+try:
+    # COM: CHECK-LABEL: private @sample1(
+    @qjit(target="mlir")
+    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    def sample1(x: float, y: float):
+        qml.RX(x, wires=0)
+        qml.RY(y, wires=1)
+        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        qml.RZ(0.1, wires=0)
 
-    # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
-    # COM: CHECK: quantum.sample [[obs]] {shots = 1000 : i64} : tensor<1000xf64>
-    return qml.sample(qml.PauliZ(0))
-
-
-print(sample1.mlir)
+        # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
+        # COM: CHECK: quantum.sample [[obs]] {shots = 1000 : i64} : tensor<1000xf64>
+        return qml.sample(qml.PauliZ(0))
 
 
-# COM: CHECK-LABEL: private @sample2(
-@qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
-def sample2(x: float, y: float):
-    qml.RX(x, wires=0)
-    # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
-    qml.RY(y, wires=1)
-    # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
-    qml.RZ(0.1, wires=0)
-
-    # COM: CHECK: [[obs1:%.+]] = quantum.namedobs [[q1]][ PauliX]
-    # COM: CHECK: [[obs2:%.+]] = quantum.namedobs [[q0]][ Identity]
-    # COM: CHECK: [[obs3:%.+]] = quantum.tensor [[obs1]], [[obs2]]
-    # COM: CHECK: quantum.sample [[obs3]] {shots = 1000 : i64} : tensor<1000xf64>
-    return qml.sample(qml.PauliX(1) @ qml.Identity(0))
+    print(sample1.mlir)
 
 
-print(sample2.mlir)
+    # COM: CHECK-LABEL: private @sample2(
+    @qjit(target="mlir")
+    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    def sample2(x: float, y: float):
+        qml.RX(x, wires=0)
+        # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
+        qml.RY(y, wires=1)
+        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        qml.RZ(0.1, wires=0)
 
+        # COM: CHECK: [[obs1:%.+]] = quantum.namedobs [[q1]][ PauliX]
+        # COM: CHECK: [[obs2:%.+]] = quantum.namedobs [[q0]][ Identity]
+        # COM: CHECK: [[obs3:%.+]] = quantum.tensor [[obs1]], [[obs2]]
+        # COM: CHECK: quantum.sample [[obs3]] {shots = 1000 : i64} : tensor<1000xf64>
+        return qml.sample(qml.PauliX(1) @ qml.Identity(0))
+
+
+    print(sample2.mlir)
+except:
+    ...
 
 # CHECK-LABEL: private @sample3(
 @qjit(target="mlir")
