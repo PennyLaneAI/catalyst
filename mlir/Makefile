@@ -84,9 +84,10 @@ mhlo:
 	@if patch --dry-run -p1 $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
-	cd mlir-hlo
-	git rev-parse HEAD
-	cd ..
+	cd mlir-hlo;\
+	pwd;\
+	git rev-parse HEAD;\
+	cd ..;\
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
