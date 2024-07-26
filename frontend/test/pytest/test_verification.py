@@ -632,7 +632,7 @@ class TestObservableValidation:
         "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
     )
     def test_only_expval_and_var_allow_observables(self, measurement):
-        """Test that the validate_measurements transform catches measurements other 
+        """Test that the validate_measurements transform catches measurements other
         than expval and var that include observables, and raises an error"""
 
         dev = qml.device("lightning.qubit", wires=1)
