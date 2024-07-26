@@ -733,7 +733,7 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         auto terminator = abort->getTerminator();
         rewriter.setInsertionPoint(terminator);
-        assert(isa<LLVM::UnreachableOp>(terminator) || isa<LLVM::BrOp>(terminator));
+        assert(isa<LLVM::UnreachableOp>(terminator));
         auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
         // Make sure we clean it up later.
         AsyncUtils::annotateBrToUnreachable(brOp, rewriter);
