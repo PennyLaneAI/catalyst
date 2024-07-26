@@ -105,6 +105,9 @@ def test_peephole_workflow_cancel_inverses(xx: float):
     @cancel_inverses
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def h(x: float):
+        """
+        Test that non-neighbouring self inverses are not canceled
+        """
         qml.Hadamard(wires=0)
         qml.RX(x, wires=0)
         qml.Hadamard(wires=0)
@@ -137,6 +140,28 @@ flush_peephole_opted_mlir_to_iostream(test_peephole_workflow_cancel_inverses)
 #
 # General lowering tests
 #
+
+
+def test_transform_named_sequence_injection():
+    """
+    Test the transform.with_named_sequence jax primitive and mlir operation are
+    always generated for qjit.
+    """
+
+    @qjit
+    def func():
+        return
+
+    # CHECK: transform_named_sequence
+    print_jaxpr(func)
+
+    # CHECK: module @func attributes {transform.with_named_sequence}
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: transform.yield
+    print_mlir(func)
+
+
+test_transform_named_sequence_injection()
 
 
 @qjit
@@ -174,14 +199,14 @@ def test_cancel_inverses_tracing_and_lowering(xx: float):
 
 
 # CHECK: transform_named_sequence
-# CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
-# CHECK-NEXT:   options=func-name=f
-# CHECK-NEXT:   pass_name=remove-chained-self-inverse
-# CHECK-NEXT: ]
-# CHECK-NEXT: _:AbstractTransformFunc() = apply_registered_pass[
-# CHECK-NEXT:   options=func-name=g
-# CHECK-NEXT:   pass_name=remove-chained-self-inverse
-# CHECK-NEXT: ]
+# CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+# CHECK:   options=func-name=f
+# CHECK:   pass_name=remove-chained-self-inverse
+# CHECK: ]
+# CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+# CHECK:   options=func-name=g
+# CHECK:   pass_name=remove-chained-self-inverse
+# CHECK: ]
 # CHECK-NOT: _:AbstractTransformFunc() = apply_registered_pass[
 # CHECK-NOT:   options=func-name=h
 # CHECK-NOT:   pass_name=remove-chained-self-inverse
@@ -194,3 +219,54 @@ print_jaxpr(test_cancel_inverses_tracing_and_lowering, 1.1)
 # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h"}
 # CHECK-NEXT: transform.yield
 print_mlir(test_cancel_inverses_tracing_and_lowering, 1.1)
+
+
+def test_cancel_inverses_tracing_and_lowering_outside_qjit():
+    """
+    Test when cancel_inverses act on a qnode outside qjit
+    """
+
+    @cancel_inverses
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(x: float):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def workflow(xx: float):
+
+        @cancel_inverses
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def g(x: float):
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        ff = f(xx)
+        gg = g(xx)
+
+        return ff, gg
+
+    # CHECK: transform_named_sequence
+    # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+    # CHECK:   options=func-name=f
+    # CHECK:   pass_name=remove-chained-self-inverse
+    # CHECK: ]
+    # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+    # CHECK:   options=func-name=g
+    # CHECK:   pass_name=remove-chained-self-inverse
+    # CHECK: ]
+    print_jaxpr(workflow, 1.1)
+
+    # CHECK: module @workflow attributes {transform.with_named_sequence}
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g"}
+    # CHECK-NEXT: transform.yield
+    print_mlir(workflow, 1.1)
+
+
+test_cancel_inverses_tracing_and_lowering_outside_qjit()

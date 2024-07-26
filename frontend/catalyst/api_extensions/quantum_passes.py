@@ -138,12 +138,19 @@ def cancel_inverses(fn=None):
 
     We see that ``f``, decorated by ``cancel_inverses``, no longer has the neighbouring Hadamard gates.
     """
-
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    apply_registered_pass_p.bind(
-        pass_name="remove-chained-self-inverse", options=f"func-name={fn.__name__}"
-    )
+    wrapped_qnode_function = fn.func
+
+    def wrapper(*args, **kwrags):
+
+        apply_registered_pass_p.bind(
+            pass_name="remove-chained-self-inverse", options=f"func-name={fn.__name__}"
+        )
+
+        return wrapped_qnode_function(*args, **kwrags)
+
+    fn.func = wrapper
 
     return fn
