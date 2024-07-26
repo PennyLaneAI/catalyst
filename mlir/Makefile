@@ -12,6 +12,8 @@ ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
+TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
+PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
@@ -79,7 +81,9 @@ llvm:
 mhlo:
 	@echo "build MLIR-HLO"
 	# Patch MHLO cmake dependency
-	patch -p1 $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+	@if patch --dry-run -p1 $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
+		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
 
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
