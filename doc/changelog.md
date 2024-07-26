@@ -168,6 +168,7 @@
 * Verification is now performed before compilation to confirm that the measurements included in the quantum tape 
   are compatible with the device.
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
+  [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
 
 <h3>Breaking changes</h3>
 
