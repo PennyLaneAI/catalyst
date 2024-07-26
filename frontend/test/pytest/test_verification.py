@@ -20,6 +20,7 @@ from unittest.mock import patch
 import pennylane as qml
 import pytest
 from pennylane.ops import Adjoint, Controlled
+from pennylane.measurements import ExpectationMP, VarianceMP
 
 from catalyst import (
     CompileError,
@@ -626,6 +627,26 @@ class TestObservableValidation:
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
             validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+
+    @pytest.mark.parametrize(
+        "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
+    )
+    def test_only_expval_and_var_allow_observables(self, measurement):
+
+        dev = qml.device("lightning.qubit", wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        tape = qml.tape.QuantumScript([], measurements=[measurement])
+
+        if isinstance(measurement, (ExpectationMP, VarianceMP)):
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+        else:
+            with pytest.raises(
+                CompileError,
+                match="Only expectation value and variance measurements can accept observables",
+            ):
+                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
 
 class TestMeasurementTypeValidation:
