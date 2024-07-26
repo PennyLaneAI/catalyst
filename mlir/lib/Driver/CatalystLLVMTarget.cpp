@@ -44,6 +44,12 @@ LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options
 {
     using namespace llvm;
 
+    InitializeAllTargetInfos();
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+    InitializeAllAsmParsers();
+    InitializeAllAsmPrinters();
+
     std::error_code errCode;
     raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
 
