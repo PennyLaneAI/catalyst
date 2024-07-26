@@ -25,13 +25,10 @@ from catalyst.device import QJITDeviceNewAPI
 from catalyst.device.qjit_device import validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
+    ALL_SUPPORTED_SCHEMAS,
     DeviceCapabilities,
     ProgramFeatures,
     TOMLDocument,
-    check_quantum_control_flag,
-    get_decomposable_gates,
-    get_matrix_decomposable_gates,
-    get_native_ops,
     load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
@@ -55,9 +52,6 @@ class DeviceToBeTested(qml.QubitDevice):
         raise RuntimeError("Only C/C++ interface is defined")
 
 
-ALL_SCHEMAS = [1, 2]
-
-
 def get_test_config(config_text: str) -> TOMLDocument:
     """Parse test config into the TOMLDocument structure"""
     with TemporaryDirectory() as d:
@@ -73,11 +67,11 @@ def get_test_device_capabilities(
 ) -> DeviceCapabilities:
     """Parse test config into the DeviceCapabilities structure"""
     config = get_test_config(config_text)
-    device_capabilities = load_device_capabilities(config, program_features, "dummy")
+    device_capabilities = load_device_capabilities(config, program_features)
     return device_capabilities
 
 
-@pytest.mark.parametrize("schema", ALL_SCHEMAS)
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
 def test_config_qjit_incompatible_device(schema):
     """Test error is raised if checking for qjit compatibility and field is false in toml file."""
     device_capabilities = get_test_device_capabilities(
@@ -99,98 +93,33 @@ def test_config_qjit_incompatible_device(schema):
         validate_device_capabilities(DeviceToBeTested(), device_capabilities)
 
 
-def test_get_observables_schema1():
-    """Test observables are properly obtained from the toml schema 1."""
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_get_observables(schema):
+    """Test observables are properly obtained."""
     device_capabilities = get_test_device_capabilities(
         ProgramFeatures(False),
         dedent(
-            r"""
-                schema = 1
-                [operators]
-                observables = [ "PauliX" ]
-            """
-        ),
-    )
-    assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_obs)
-
-
-def test_get_observables_schema2():
-    """Test observables are properly obtained from the toml schema 2."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            r"""
-                schema = 2
+            f"""
+                schema = {schema}
                 [operators.observables]
-                PauliX = { }
+                PauliX = {{ }}
             """
         ),
     )
     assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_obs)
 
 
-def test_get_native_ops_schema1_no_qcontrol():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_get_native_ops(schema):
     """Test native gates are properly obtained from the toml."""
     device_capabilities = get_test_device_capabilities(
         ProgramFeatures(False),
         dedent(
-            r"""
-                schema = 1
-                [[operators.gates]]
-                native = [ "PauliX" ]
-                [compilation]
-                quantum_control = false
-            """
-        ),
-    )
-    assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_ops)
-
-
-def test_get_native_ops_schema1_qcontrol():
-    """Test native gates are properly obtained from the toml."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            r"""
-                schema = 1
-                [[operators.gates]]
-                native = [ "PauliZ" ]
-                [compilation]
-                quantum_control = true
-            """
-        ),
-    )
-    assert {"PauliZ", "C(PauliZ)"} == pennylane_operation_set(device_capabilities.native_ops)
-
-
-@pytest.mark.parametrize("qadjoint", [True, False])
-def test_get_native_ops_schema1_qadjoint(qadjoint):
-    """Test native gates are properly obtained from the toml."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            rf"""
-                schema = 1
-                [[operators.gates]]
-                native = [ "PauliZ" ]
-                [compilation]
-                quantum_adjoint = {str(qadjoint).lower()}
-            """
-        ),
-    )
-    assert device_capabilities.native_ops["PauliZ"].invertible is qadjoint
-
-
-def test_get_native_ops_schema2():
-    """Test native gates are properly obtained from the toml."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            r"""
-                schema = 2
+            f"""
+                schema = {schema}
                 [operators.gates.native]
-                PauliX = { properties = [ 'controllable' ] }
-                PauliY = { }
+                PauliX = {{ properties = [ 'controllable' ] }}
+                PauliY = {{ }}
             """
         ),
     )
@@ -200,16 +129,17 @@ def test_get_native_ops_schema2():
     )
 
 
-def test_get_native_ops_schema2_optional_shots():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_get_native_ops_optional_shots(schema):
     """Test native gates are properly obtained from the toml."""
     device_capabilities = get_test_device_capabilities(
         ProgramFeatures(True),
         dedent(
-            r"""
-                schema = 2
+            f"""
+                schema = {schema}
                 [operators.gates.native]
-                PauliX = { condition = ['finiteshots'] }
-                PauliY = { condition = ['analytic'] }
+                PauliX = {{ condition = ['finiteshots'] }}
+                PauliY = {{ condition = ['analytic'] }}
             """
         ),
     )
@@ -217,16 +147,17 @@ def test_get_native_ops_schema2_optional_shots():
     assert "PauliY" not in device_capabilities.native_ops
 
 
-def test_get_native_ops_schema2_optional_noshots():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_get_native_ops_optional_noshots(schema):
     """Test native gates are properly obtained from the toml."""
     device_capabilities = get_test_device_capabilities(
         ProgramFeatures(False),
         dedent(
-            r"""
-                schema = 2
+            f"""
+                schema = {schema}
                 [operators.gates.native]
-                PauliX = { condition = ['finiteshots'] }
-                PauliY = { condition = ['analytic'] }
+                PauliX = {{ condition = ['finiteshots'] }}
+                PauliY = {{ condition = ['analytic'] }}
             """
         ),
     )
@@ -234,31 +165,14 @@ def test_get_native_ops_schema2_optional_noshots():
     assert "PauliY" in device_capabilities.native_ops
 
 
-def test_get_decomp_gates_schema1():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_get_decomp_gates(schema):
     """Test native decomposition gates are properly obtained from the toml."""
     device_capabilities = get_test_device_capabilities(
         ProgramFeatures(False),
         dedent(
-            """
-                schema = 1
-                [[operators.gates]]
-                decomp = ["PauliX", "PauliY"]
-            """
-        ),
-    )
-
-    assert "PauliX" in device_capabilities.to_decomp_ops
-    assert "PauliY" in device_capabilities.to_decomp_ops
-    assert "PauliZ" not in device_capabilities.to_decomp_ops
-
-
-def test_get_decomp_gates_schema2():
-    """Test native decomposition gates are properly obtained from the toml."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            """
-            schema = 2
+            f"""
+            schema = {schema}
             [operators.gates]
             decomp = ["PauliX", "PauliY"]
         """
@@ -269,32 +183,16 @@ def test_get_decomp_gates_schema2():
     assert "PauliY" in device_capabilities.to_decomp_ops
 
 
-def test_get_matrix_decomposable_gates_schema1():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_get_matrix_decomposable_gates(schema):
     """Test native matrix gates are properly obtained from the toml."""
     device_capabilities = get_test_device_capabilities(
         ProgramFeatures(False),
         dedent(
-            """
-            schema = 1
-            [[operators.gates]]
-            matrix = ["PauliX", "PauliY"]
-        """
-        ),
-    )
-
-    assert "PauliX" in device_capabilities.to_matrix_ops
-    assert "PauliY" in device_capabilities.to_matrix_ops
-
-
-def test_get_matrix_decomposable_gates_schema2():
-    """Test native matrix gates are properly obtained from the toml."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            r"""
-            schema = 2
+            f"""
+            schema = {schema}
             [operators.gates.matrix]
-            PauliZ = {}
+            PauliZ = {{}}
         """
         ),
     )
@@ -302,7 +200,8 @@ def test_get_matrix_decomposable_gates_schema2():
     assert "PauliZ" in device_capabilities.to_matrix_ops
 
 
-def test_config_invalid_attr():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_config_invalid_attr(schema):
     """Check the gate condition handling logic"""
     with pytest.raises(
         CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
@@ -310,16 +209,17 @@ def test_config_invalid_attr():
         get_test_device_capabilities(
             ProgramFeatures(False),
             dedent(
-                r"""
-                    schema = 2
+                f"""
+                    schema = {schema}
                     [operators.gates.native]
-                    TestGate = { unknown_attribute = 33 }
+                    TestGate = {{ unknown_attribute = 33 }}
                 """
             ),
         )
 
 
-def test_config_invalid_condition_unknown():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_config_invalid_condition_unknown(schema):
     """Check the gate condition handling logic"""
     with pytest.raises(
         CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
@@ -327,16 +227,17 @@ def test_config_invalid_condition_unknown():
         get_test_device_capabilities(
             ProgramFeatures(True),
             dedent(
-                r"""
-                    schema = 2
+                f"""
+                    schema = {schema}
                     [operators.gates.native]
-                    TestGate = { condition = ["unknown", "analytic"] }
+                    TestGate = {{ condition = ["unknown", "analytic"] }}
                 """
             ),
         )
 
 
-def test_config_invalid_property_unknown():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_config_invalid_property_unknown(schema):
     """Check the gate condition handling logic"""
     with pytest.raises(
         CompileError, match="Configuration for gate 'TestGate' has unknown properties"
@@ -344,42 +245,59 @@ def test_config_invalid_property_unknown():
         get_test_device_capabilities(
             ProgramFeatures(True),
             dedent(
-                r"""
-                    schema = 2
+                f"""
+                    schema = {schema}
                     [operators.gates.native]
-                    TestGate = { properties = ["unknown", "invertible"] }
+                    TestGate = {{ properties = ["unknown", "invertible"] }}
                 """
             ),
         )
 
 
-@pytest.mark.parametrize("shots", [True, False])
-def test_config_invalid_condition_duplicate(shots):
-    """Check the gate condition handling logic"""
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_config_invalid_condition_duplicate_true(schema):
+    """Check the gate condition handling logic for True"""
     with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
         get_test_device_capabilities(
-            ProgramFeatures(shots),
+            ProgramFeatures(True),
             dedent(
-                r"""
-                    schema = 2
+                f"""
+                    schema = {schema}
                     [operators.gates.native]
-                    TestGate = { condition = ["finiteshots", "analytic"] }
+                    TestGate = {{ condition = ["finiteshots", "analytic"] }}
                 """
             ),
         )
 
 
-def test_config_qjit_device_operations():
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_config_invalid_condition_duplicate_false(schema):
+    """Check the gate condition handling logic for False"""
+    with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
+        get_test_device_capabilities(
+            ProgramFeatures(False),
+            dedent(
+                f"""
+                    schema = {schema}
+                    [operators.gates.native]
+                    TestGate = {{ condition = ["finiteshots", "analytic"] }}
+                """
+            ),
+        )
+
+
+@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
+def test_config_qjit_device_operations(schema):
     """Check the gate condition handling logic"""
     capabilities = get_test_device_capabilities(
         ProgramFeatures(False),
         dedent(
-            r"""
-                schema = 2
+            f"""
+                schema = {schema}
                 [operators.gates.native]
-                PauliX = {}
+                PauliX = {{}}
                 [operators.observables]
-                PauliY = {}
+                PauliY = {{}}
             """
         ),
     )
@@ -389,30 +307,18 @@ def test_config_qjit_device_operations():
     assert "PauliY" in qjit_device.observables
 
 
-def test_config_unsupported_schema():
-    """Test native matrix gates are properly obtained from the toml."""
+@pytest.mark.parametrize("schema", [1, 999])
+def test_config_unsupported_schema(schema):
+    """Test unsupported schema version."""
     program_features = ProgramFeatures(False)
     config_text = dedent(
-        r"""
-            schema = 999
+        f"""
+            schema = {schema}
         """
     )
-    config = get_test_config(config_text)
 
-    with pytest.raises(CompileError):
+    with pytest.raises(AssertionError, match="Unsupported config schema"):
         get_test_device_capabilities(program_features, config_text)
-
-    with pytest.raises(CompileError):
-        get_matrix_decomposable_gates(config, program_features)
-
-    with pytest.raises(CompileError):
-        get_decomposable_gates(config, program_features)
-
-    with pytest.raises(CompileError):
-        get_native_ops(config, program_features)
-
-    with pytest.raises(CompileError):
-        check_quantum_control_flag(config)
 
 
 if __name__ == "__main__":
