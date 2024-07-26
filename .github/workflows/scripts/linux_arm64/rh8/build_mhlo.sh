@@ -39,7 +39,6 @@ sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mli
 # Patch MHLO cmake dependency
 patch -p1 /catalyst/.github/workflows/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch /catalyst/mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
 
-
 # Build MHLO
 cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
