@@ -554,14 +554,16 @@ class TestObservableValidation:
             ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
-            ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  # with sample with observable
-            ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
+            # sample with observable is currently unsupported
+            # ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  
+            # ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
             ([qml.probs(wires=0), qml.var(qml.X(1) + qml.Y(2))], None),  # with probs
             ([qml.probs(wires=0), qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
             ([qml.counts(), qml.expval(qml.X(0))], None),  # with empty counts
             ([qml.counts(), qml.expval(qml.RX(1.2, 0))], "RX"),
-            ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
-            ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
+            # counts with observable is currently unsupported
+            # ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
+            # ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
         ],
     )
     def test_validate_measurements_transform(self, backend, measurements, invalid_op):
