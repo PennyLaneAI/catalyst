@@ -60,11 +60,6 @@ existing_text = open(dep_versions_path, "r", encoding="UTF-8").read()
 match = re.search(r"enzyme=([a-zA-Z0-9]*)", existing_text)
 enzyme_commit = match.group(1)
 
-# Patch HLO and enzyme verions for jax 0.4.30:
-if jax_version == "0.4.30":
-    hlo_commit = "8adf54931c1f2276703757218e12d6f6e919548b"
-    enzyme_commit = "v0.0.130"
-
 with open(dep_versions_path, "w", encoding="UTF-8") as f:
     f.write(
         f"""\
