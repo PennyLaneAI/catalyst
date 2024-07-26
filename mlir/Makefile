@@ -103,7 +103,7 @@ mhlo:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
-	LIT_FILTER_OUT="MLIR_HLO_OPT :: Dialect/chlo/chlo_legalize_to_mhlo.mlir" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
+	LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
 .PHONY: enzyme
 enzyme:
