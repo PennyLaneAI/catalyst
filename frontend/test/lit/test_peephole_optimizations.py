@@ -102,6 +102,14 @@ def test_peephole_workflow_cancel_inverses(xx: float):
         qml.Hadamard(wires=0)
         return qml.expval(qml.PauliZ(0))
 
+    @cancel_inverses
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def h(x: float):
+        qml.Hadamard(wires=0)
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.namedobs {{%.+}}[ PauliZ] : !quantum.obs
@@ -113,10 +121,15 @@ def test_peephole_workflow_cancel_inverses(xx: float):
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     _gg = g(xx)
 
-    return _ff, _gg
+    # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    _hh = h(xx)
+
+    return _ff, _gg, _hh
 
 
-ff, gg = test_peephole_workflow_cancel_inverses(42.42)
+ff, gg, hh = test_peephole_workflow_cancel_inverses(42.42)
 assert np.allclose(ff, gg)
 flush_peephole_opted_mlir_to_iostream(test_peephole_workflow_cancel_inverses)
 
