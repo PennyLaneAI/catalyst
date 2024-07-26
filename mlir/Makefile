@@ -78,6 +78,9 @@ llvm:
 .PHONY: mhlo
 mhlo:
 	@echo "build MLIR-HLO"
+	# Patch MHLO cmake dependency
+	patch -p1 $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
