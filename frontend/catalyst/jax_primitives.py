@@ -436,7 +436,8 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
 
     # If there already is a transform.named_sequence in the module, don't add another one!
     # Do nothing and exit!
-    for i, op in enumerate(module.body.operations):
+    for op in reversed(module.body.operations):
+        # transform.named_sequence usually is at the end of the module, so look for it from the end
         if op.operation.name == "transform.named_sequence":
             return op.operation.results
 
@@ -486,7 +487,7 @@ def _apply_registered_pass_lowering(
 ):
     module = jax_ctx.module_context.module
     named_sequence_op = None
-    for i, op in reversed(list(enumerate(module.body.operations))):
+    for op in reversed(module.body.operations):
         # transform.named_sequence usually is at the end of the module, so look for it from the end
         if op.operation.name == "transform.named_sequence":
             named_sequence_op = op.operation
