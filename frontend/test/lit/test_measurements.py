@@ -25,7 +25,7 @@ from catalyst import CompileError, qjit
 # (observables with MeasurementProcess types other than ExpectationMP and VarianceMP are not
 # currently supported).
 #
-# This test is commented out and the expected output is also commented out using the FileCheck
+# These tests are commented out and the expected output is also commented out using the FileCheck
 # comments (COM:).
 
 try:
@@ -82,33 +82,30 @@ def sample3(x: float, y: float):
 
 print(sample3.mlir)
 
-
-# CHECK-LABEL: private @counts1(
-@qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
-def counts1(x: float, y: float):
-    qml.RX(x, wires=0)
-    qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
-    qml.RZ(0.1, wires=0)
-
-    # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
-    # CHECK: quantum.counts [[obs]] {shots = 1000 : i64} : tensor<2xf64>, tensor<2xi64>
-    return qml.counts(qml.PauliZ(0))
-
-
-print(counts1.mlir)
-
 # TODO: NOTE:
-# The test below used to pass before the compiler driver. This is because before the compiler
-# driver, "target='mlir'" would not run the verifier. Now that the verifier is run, the circuit
-# below complains.
+# The tests below used to pass before the compiler driver (in the case of counts2) and device
+# preprocessing verification (in the case of counts1). Now that the validation is run, the circuits
+# below complain.
 #
-# This test is commented out and the expected output is also commented out using the FileCheck
+# These tests are commented out and the expected output is also commented out using the FileCheck
 # comments (COM:).
 #
-# COM: CHECK-LABEL: private @counts2(
 try:
+
+    # COM: CHECK-LABEL: private @counts1(
+    @qjit(target="mlir")
+    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    def counts1(x: float, y: float):
+        qml.RX(x, wires=0)
+        qml.RY(y, wires=1)
+        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        qml.RZ(0.1, wires=0)
+
+        # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
+        # COM: CHECK: quantum.counts [[obs]] {shots = 1000 : i64} : tensor<2xf64>, tensor<2xi64>
+        return qml.counts(qml.PauliZ(0))
+
+    print(counts1.mlir)
 
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
