@@ -48,7 +48,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=shots is not None)
+            program_features = ProgramFeatures(shots_present=bool(shots))
             lightning_capabilities = get_device_capabilities(
                 self.lightning_device, program_features
             )

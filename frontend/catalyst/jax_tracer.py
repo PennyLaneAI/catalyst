@@ -807,7 +807,7 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                if shots is None:
+                if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
@@ -829,7 +829,7 @@ def trace_quantum_measurements(
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
-                if shots is None:
+                if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."

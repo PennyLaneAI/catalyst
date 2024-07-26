@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <random>
+
 #include "cmath"
 
 #include "RuntimeCAPI.h"
@@ -1741,4 +1743,30 @@ TEMPLATE_LIST_TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=
     }
     CHECK(sum3 == shots);
     CHECK(sum4 == shots);
+}
+
+TEMPLATE_LIST_TEST_CASE("Measurement with a seeded device", "[Measures]", SimTypes)
+{
+    for (size_t _ = 0; _ < 5; _++) {
+        std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+        std::unique_ptr<TestType> sim1 = std::make_unique<TestType>();
+
+        std::mt19937 gen(37);
+        sim->SetDevicePRNG(&gen);
+        std::vector<QubitIdType> Qs;
+        Qs.reserve(1);
+        Qs.push_back(sim->AllocateQubit());
+        sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+        auto m = sim->Measure(Qs[0]);
+
+        std::mt19937 gen1(37);
+        sim1->SetDevicePRNG(&gen1);
+        std::vector<QubitIdType> Qs1;
+        Qs1.reserve(1);
+        Qs1.push_back(sim1->AllocateQubit());
+        sim1->NamedOperation("Hadamard", {}, {Qs1[0]}, false);
+        auto m1 = sim1->Measure(Qs1[0]);
+
+        CHECK(*m == *m1);
+    }
 }

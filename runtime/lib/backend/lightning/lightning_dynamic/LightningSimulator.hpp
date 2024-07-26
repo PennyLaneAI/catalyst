@@ -51,6 +51,8 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
 
+    std::mt19937 *gen = nullptr;
+
     bool mcmc{false};
     size_t num_burnin{0};
     std::string kernel_name;
@@ -96,6 +98,8 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         kernel_name = args.contains("kernel_name") ? args["kernel_name"] : default_kernel_name;
     }
     ~LightningSimulator() override = default;
+
+    void SetDevicePRNG(std::mt19937 *) override;
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(LightningSimulator);
 

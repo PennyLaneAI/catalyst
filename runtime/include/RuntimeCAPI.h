@@ -24,7 +24,7 @@ extern "C" {
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
-void __catalyst__rt__initialize();
+void __catalyst__rt__initialize(uint32_t *seed);
 void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *);
 void __catalyst__rt__device_release();
 void __catalyst__rt__finalize();
