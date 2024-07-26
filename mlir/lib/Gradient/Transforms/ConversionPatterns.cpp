@@ -229,7 +229,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
 
             // Currently only expval gradients are supported by the runtime,
             // leading to tensor<?xf64> return values.
-            if (mlir::dyn_cast<MemRefType>(type) != MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
+            if (mlir::dyn_cast<MemRefType>(type) !=
+                MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
                 return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
         }
 

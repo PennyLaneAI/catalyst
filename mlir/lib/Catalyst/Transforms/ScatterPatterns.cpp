@@ -468,7 +468,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     Value extractUpdateIndices(Value allUpdatesIndicesTensor, Value i, Location loc,
                                OpBuilder builder) const
     {
-        RankedTensorType updateType = mlir::cast<RankedTensorType>(allUpdatesIndicesTensor.getType());
+        RankedTensorType updateType =
+            mlir::cast<RankedTensorType>(allUpdatesIndicesTensor.getType());
 
         auto rank = updateType.getRank();
         auto shape = updateType.getShape();

@@ -116,8 +116,10 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Location loc = op.getLoc();
         Type tensorType0 = op.getType(0);
         Type tensorType1 = op.getType(1);
-        MemRefType resultType0 = mlir::cast<MemRefType>(getTypeConverter()->convertType(tensorType0));
-        MemRefType resultType1 = mlir::cast<MemRefType>(getTypeConverter()->convertType(tensorType1));
+        MemRefType resultType0 =
+            mlir::cast<MemRefType>(getTypeConverter()->convertType(tensorType0));
+        MemRefType resultType1 =
+            mlir::cast<MemRefType>(getTypeConverter()->convertType(tensorType1));
         Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
         Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
