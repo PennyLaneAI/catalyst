@@ -149,6 +149,8 @@ class QFunc:
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
+            for _ in range(out_tree.num_leaves - len(res_flat)):
+                res_flat.append(res_flat[-1])
             return tree_unflatten(out_tree, res_flat)
 
         flattened_fun, _, _, out_tree_promise = deduce_avals(
@@ -265,6 +267,9 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
+        if isinstance(results[0], list) and len(results) == 1:
+            results = results[0]
+        results = list(results) if isinstance(results, tuple) else results
 
         # Don't flatten tuples that are inherent to the measurement output structure like ("keys", "counts") in qml.counts()
         def is_leaf(obj):
