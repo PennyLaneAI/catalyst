@@ -19,8 +19,8 @@ from unittest.mock import patch
 
 import pennylane as qml
 import pytest
-from pennylane.ops import Adjoint, Controlled
 from pennylane.measurements import ExpectationMP, VarianceMP
+from pennylane.ops import Adjoint, Controlled
 
 from catalyst import (
     CompileError,
