@@ -25,7 +25,6 @@ from catalyst.device import QJITDeviceNewAPI
 from catalyst.device.qjit_device import validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
-    ALL_DEPRECATED_SCHEMAS,
     ALL_SUPPORTED_SCHEMAS,
     DeviceCapabilities,
     ProgramFeatures,
@@ -308,7 +307,7 @@ def test_config_qjit_device_operations(schema):
     assert "PauliY" in qjit_device.observables
 
 
-@pytest.mark.parametrize("schema", [999])
+@pytest.mark.parametrize("schema", [1, 999])
 def test_config_unsupported_schema(schema):
     """Test unsupported schema version."""
     program_features = ProgramFeatures(False)
@@ -319,20 +318,6 @@ def test_config_unsupported_schema(schema):
     )
 
     with pytest.raises(AssertionError, match="Unsupported config schema"):
-        get_test_device_capabilities(program_features, config_text)
-
-
-@pytest.mark.parametrize("schema", ALL_DEPRECATED_SCHEMAS)
-def test_config_deprecated_schema(schema):
-    """Test deprecated schema version."""
-    program_features = ProgramFeatures(False)
-    config_text = dedent(
-        f"""
-            schema = {schema}
-        """
-    )
-
-    with pytest.raises(AssertionError, match="is deprecated"):
         get_test_device_capabilities(program_features, config_text)
 
 

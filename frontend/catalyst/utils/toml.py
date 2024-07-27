@@ -47,7 +47,6 @@ else:  # pragma: nocover
     from tomlkit.exceptions import TOMLKitError as TOMLException
 
 ALL_SUPPORTED_SCHEMAS = [2]
-ALL_DEPRECATED_SCHEMAS = [1]
 
 
 def read_toml_file(toml_file: str) -> TOMLDocument:
@@ -229,21 +228,13 @@ def _get_operation_properties(config_props: dict) -> OperationProperties:
     )
 
 
-def _validate_schema_version(schema):
-    """Pass on supported schema versions. Otherwise, raise an error"""
-
-    # TODO: remove deprecation message when appropriate
-    assert schema not in ALL_DEPRECATED_SCHEMAS, f"Schema {schema} is deprecated"
-
-    assert schema in ALL_SUPPORTED_SCHEMAS, f"Unsupported config schema {schema}"
-
-
 def load_device_capabilities(
     config: TOMLDocument, program_features: ProgramFeatures
 ) -> DeviceCapabilities:
     """Load device capabilities from device config"""
 
-    _validate_schema_version(int(config["schema"]))
+    schema = int(config["schema"])
+    assert schema in ALL_SUPPORTED_SCHEMAS, f"Unsupported config schema {schema}"
 
     native_gate_props = {}
     for g, props in _get_native_ops(config, program_features).items():
