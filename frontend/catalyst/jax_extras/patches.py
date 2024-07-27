@@ -34,6 +34,7 @@ __all__ = (
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
     "_sin_lowering2",
+    "_cos_lowering2",
 )
 
 
