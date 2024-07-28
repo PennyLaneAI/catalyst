@@ -33,6 +33,8 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/Export.h"
+#include "mlir/Tools/Plugins/DialectPlugin.h"
+#include "mlir/Tools/Plugins/PassPlugin.h"
 #include "stablehlo/dialect/Register.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -540,6 +542,28 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     initialized |= true;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
+
+    for (auto path : options.passPlugins) {
+      auto plugin = PassPlugin::load(path);
+      if (!plugin) {
+        llvm::errs() << "Failed to load passes from '" << path
+               << "'. Request ignored.\n";
+        return failure();
+      }
+      plugin.get().registerPassRegistryCallbacks();
+      llvm::errs() << "load passes from '" << path;
+    }
+
+    for (auto path : options.dialectPlugins) {
+      auto plugin = DialectPlugin::load(path);
+      if (!plugin) {
+        llvm::errs() << "Failed to load dialect plugin from '" << path
+             << "'. Request ignored.\n";
+        return failure();
+      };
+      plugin.get().registerDialectRegistryCallbacks(registry);
+      llvm::errs() << "load passes from '" << path;
+    }
 
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);

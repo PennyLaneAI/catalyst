@@ -36,9 +36,8 @@ set(LIBS
     StablehloRegister
     MLIRCatalystTest
     ${ALL_MHLO_PASSES}
-    ${ENZYME_LIB}
 )
-
+set(LLVM_NO_DEAD_STRIP On)
 add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
@@ -46,4 +45,5 @@ add_mlir_library(CatalystCompilerDriver
     LINK_LIBS PRIVATE
     ${EXTERNAL_LIB}
     ${LIBS}
+
     )
