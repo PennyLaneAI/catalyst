@@ -141,6 +141,25 @@ def test_classical_tracing_init(shape, dtype):
     "op",
     [
         jnp.sin,
+        jnp.cos,
+    ],
+)
+def test_classical_tracing_scalar_unary_ops(op):
+    """Test that tensor primitives work with basic scalar unary operations"""
+
+    dtype = complex
+
+    @qjit
+    def f():
+        return op(jnp.ones((), dtype))
+
+    assert_array_and_dtype_equal(f(), op(jnp.ones((), dtype)))
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        jnp.sin,
         jnp.abs,
     ],
 )
