@@ -18,13 +18,23 @@ user to input what MLIR compiler passes to run.
 
 Currently, each pass has its own user-facing decorator. In the future,
 a unified user interface for all the passes will be available.
-"""
 
-"""
-Note that the decorators do not need to modify the qnode in
-any way. Its only purpose is to mark down the passes the user wants to
-run on each qnode, and then generate the corresponding
-transform.apply_apply_registered_pass in the lowered mlir.
+.. note::
+
+    Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
+    the QNode itself will not changed or transformed.
+
+    In other words, circuit inspection tools such as
+    :func:`~.draw` will still
+    display the neighbouring self-inverse gates. However, Catalyst never
+    executes the PennyLane code directly; instead, Catalyst captures the
+    workflow from Python and lowers it into MLIR, performing compiler
+    optimizations at the MLIR level.
+    To inspect the compiled MLIR from Catalyst, use
+    :func:`~.print_compilation_stage`,
+    where ``stage="QuantumCompilationPass"``, and with ``keep_intermediate=True``
+    in the ``qjit`` decorator.
+
 """
 
 import pennylane as qml
@@ -50,29 +60,11 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
     Specify that a compiler pass for cancelling two neighbouring self-inverse
     gates should be applied to the decorated QNode during qjit compilation.
 
-    This decorator is always applied to a qnode, and it cancels two neighbouring
-    self-inverse gates in the compiled mlir.
-
 
     .. note::
 
         Currently, only Hadamard gates are canceled.
 
-    .. note::
-
-        Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
-        the QNode itself will not changed or transformed.
-
-        In other words, circuit inspection tools such as
-        :func:`~.draw` will still
-        display the neighbouring self-inverse gates. However, Catalyst never
-        executes the PennyLane code directly; instead, Catalyst captures the
-        workflow from Python and lowers it into MLIR, performing compiler
-        optimizations at the MLIR level.
-        To inspect the compiled MLIR from Catalyst, use
-        :func:`catalyst.debug.compiler_functions.print_compilation_stage`,
-        where ``stage="QuantumCompilationPass"``, and with ``keep_intermediate=True``
-        in the ``qjit`` decorator.
 
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
@@ -84,7 +76,7 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
     .. code-block:: python
 
-        from catalyst.debug.compiler_functions import print_compilation_stage
+        from catalyst.debug import print_compilation_stage
         from catalyst.passes import cancel_inverses
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -113,7 +105,6 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
     >>> workflow()
     (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
-
     >>> print_compilation_stage(workflow, "QuantumCompilationPass")
 
     .. code-block:: mlir

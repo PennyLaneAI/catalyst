@@ -29,7 +29,7 @@ import shutil
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.debug.compiler_functions import print_compilation_stage
+from catalyst.debug import print_compilation_stage
 from catalyst.passes import cancel_inverses
 
 
@@ -100,11 +100,12 @@ test_transform_named_sequence_injection()
 
 
 def test_cancel_inverses_tracing_and_lowering():
+    """
+    Test cancel_inverses during tracing and lowering
+    """
+
     @qjit
     def test_cancel_inverses_tracing_and_lowering_workflow(xx: float):
-        """
-        Test cancel_inverses during tracing and lowering
-        """
 
         @cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=1))
