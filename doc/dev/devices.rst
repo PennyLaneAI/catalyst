@@ -1,3 +1,16 @@
+
+.. raw:: html
+
+    <style>
+    tr {
+        border-top: #d3d3d3 1px solid;
+        border-bottom: #d3d3d3 1px solid;
+    }
+    .row-odd {
+        background-color: #f7f7f7;
+    }
+    </style>
+
 Supported devices
 =================
 
@@ -72,67 +85,3 @@ Supported backend devices include:
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for more details.
 
-
-
-Device features
----------------
-
-The ``lightning,qubit``, ``lightning.kokkos``, ``braket.aws.qubit``, ``braket.local.qubit``,
-and ``oqc.cloud`` devices are currently provided by the Catalyst package. For these
-built-in devices, the following table shows supported features devices (for external
-qjit-compatible devices, please consult the corresponding device documentation):
-
-.. list-table::
-  :widths: 16 21 21 21 21
-  :header-rows: 0
-
-  * - **Features**
-    - ``lightning.qubit``
-    - ``lightning.kokkos``
-    - ``braket.aws.qubit``
-    - ``oqc.cloud``
-  * - Qubit Management
-    - Dynamic allocation/deallocation
-    - Static allocation/deallocation
-    - Static allocation/deallocation
-    - Static allocation/deallocation
-  * - Gate Operations
-    - `Lightning Qubit operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__
-    - `Lightning Kokkos operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
-    - `Braket operations <https://github.com/PennyLaneAI/catalyst/blob/main/runtime/lib/backend/openqasm/braket_aws_qubit.toml>`__
-    - `OQC operations <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
-  * - Quantum Observables
-    - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
-    - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
-    - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, and Tensor Product of Observables
-    - ``PauliX``, ``PauliY``, ``PauliZ``, and ``Hadamard``.
-  * - Expectation Value
-    - All observables; Finite-shots supported except for ``Hermitian``
-    - All observables; Finite-shots supported except for ``Hermitian``
-    - All observables; Finite-shots supported
-    - All observables; Finite-shots supported
-  * - Variance
-    - All observables; Finite-shots supported except for ``Hermitian``
-    - All observables; Finite-shots supported except for ``Hermitian``
-    - All observables; Finite-shots supported
-    - Not supported
-  * - Probability
-    - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
-    - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
-    - Not currently supported
-    - Only for the computational basis on the supplied qubits
-  * - Sampling
-    - Only for the computational basis on the supplied qubits
-    - Only for the computational basis on the supplied qubits
-    - The computational basis on all active qubits; Finite-shots supported
-    - The computational basis on all active qubits; Finite-shots supported
-  * - Mid-Circuit Measurement
-    - Only for the computational basis on the supplied qubit
-    - Only for the computational basis on the supplied qubit
-    - Not supported
-    - Not supported
-  * - Gradient
-    - The Adjoint-Jacobian method for expectation values on all observables
-    - The Adjoint-Jacobian method for expectation values on all observables
-    - Not supported
-    - Not supported
