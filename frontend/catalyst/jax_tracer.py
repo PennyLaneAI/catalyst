@@ -84,6 +84,7 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     qunitary_p,
     sample_p,
+    set_state_p,
     state_p,
     tensorobs_p,
     var_p,
@@ -621,9 +622,10 @@ def trace_quantum_operations(
             )
             qrp.insert(controlled_wires, qubits2)
         elif isinstance(op, qml.StatePrep):
-            # Here we see that StatePrep was not decomposed
-            # TODO: Perform proper binding
-            raise TypeError("StatePrep is not implemented yet in Catalyst")
+            num_wires = qrp.base.length
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            set_state_p.bind(*op.parameters)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -1147,7 +1149,7 @@ def trace_quantum_function(
                 rtd_name=device.backend_name,
                 rtd_kwargs=str(device.backend_kwargs),
             )
-            qreg_in = qalloc_p.bind(len(device.wires))
+            qreg_in = qalloc_p.bind(len(device.wires), static_size=len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
