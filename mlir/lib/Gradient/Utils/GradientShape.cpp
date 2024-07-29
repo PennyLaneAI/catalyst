@@ -150,8 +150,7 @@ std::vector<size_t> computeDiffArgIndices(std::optional<DenseIntElementsAttr> in
 
 /// Produce a filtered list of arguments which are differentiable.
 ///
-std::vector<Value> computeDiffArgs(ValueRange args,
-                                         std::optional<DenseIntElementsAttr> indices)
+std::vector<Value> computeDiffArgs(ValueRange args, std::optional<DenseIntElementsAttr> indices)
 {
     const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(indices);
 

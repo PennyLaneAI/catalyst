@@ -93,20 +93,17 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
             const bool isResultTensor = isa<TensorType>(resultTy);
             const bool isGradientTensor = isa<TensorType>(gradientTy);
 
-            int64_t operandRank =
-                isOperandTensor ? cast<TensorType>(operandTy).getRank() : -1;
+            int64_t operandRank = isOperandTensor ? cast<TensorType>(operandTy).getRank() : -1;
             int64_t resultRank = isResultTensor ? cast<TensorType>(resultTy).getRank() : -1;
 
             const bool isOperandScalarTensor = operandRank == 0;
 
-            ArrayRef<int64_t> operandShape = isOperandTensor
-                                                 ? cast<TensorType>(operandTy).getShape()
-                                                 : ArrayRef<int64_t>();
+            ArrayRef<int64_t> operandShape =
+                isOperandTensor ? cast<TensorType>(operandTy).getShape() : ArrayRef<int64_t>();
             ArrayRef<int64_t> resultShape =
                 isResultTensor ? cast<TensorType>(resultTy).getShape() : ArrayRef<int64_t>();
-            ArrayRef<int64_t> gradientShape = isGradientTensor
-                                                  ? cast<TensorType>(gradientTy).getShape()
-                                                  : ArrayRef<int64_t>();
+            ArrayRef<int64_t> gradientShape =
+                isGradientTensor ? cast<TensorType>(gradientTy).getShape() : ArrayRef<int64_t>();
 
             Type baseOperandTy =
                 isOperandTensor ? cast<TensorType>(operandTy).getElementType() : operandTy;
