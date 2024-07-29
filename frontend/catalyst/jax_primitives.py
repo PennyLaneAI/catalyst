@@ -80,6 +80,7 @@ from mlir_quantum.dialects.quantum import (
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
+    SetStateOp,
     StateOp,
     TensorOp,
     VarianceOp,
@@ -1911,8 +1912,11 @@ def set_state_abstract(*qubits_or_params):
 
 
 def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
-    # TODO
-    return ()
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    out_qubits = [qubit.type for qubit in qubits]
+    return SetStateOp(out_qubits, param, qubits).results
 
 #
 # adjoint
