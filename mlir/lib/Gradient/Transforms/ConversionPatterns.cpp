@@ -224,12 +224,12 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
         for (Type type : op.getResultTypes()) {
-            if (!mlir::isa<MemRefType>(type))
+            if (!isa<MemRefType>(type))
                 return op.emitOpError("must be bufferized before lowering");
 
             // Currently only expval gradients are supported by the runtime,
             // leading to tensor<?xf64> return values.
-            if (mlir::dyn_cast<MemRefType>(type) !=
+            if (dyn_cast<MemRefType>(type) !=
                 MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
                 return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
         }
@@ -258,7 +258,7 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
         Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
-        if (!mlir::isa<catalyst::quantum::QuregType>(qreg.getType()))
+        if (!isa<catalyst::quantum::QuregType>(qreg.getType()))
             return callee.emitOpError("qfunc must return quantum register");
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
 
@@ -878,7 +878,7 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         auto oldFuncTy = op.getFunctionType();
         auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {retTy});
 
-        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
+        auto func = rewriter.create<func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
         func.setPrivate();
 
         auto noinline = rewriter.getStringAttr("noinline");
@@ -964,7 +964,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), newFuncTy);
+        auto func = rewriter.create<func::FuncOp>(op.getLoc(), op.getSymName(), newFuncTy);
         func.setPrivate();
 
         Block *entry = func.addEntryBlock();

@@ -26,7 +26,7 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-void removeQuantumMeasurements(func::FuncOp &function, mlir::PatternRewriter &rewriter)
+void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
     // Delete measurement operations.
     std::deque<Operation *> opsToDelete;
