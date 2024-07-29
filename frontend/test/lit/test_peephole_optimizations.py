@@ -13,17 +13,9 @@
 # limitations under the License.
 
 """
-This file performs the frontend lit tests that the peephole transformations are correctly applied.
-Each test has two components:
-  1. A qnode with a peephole optimization applied, here we call it "f"
-  2. The SAME qnode without a peephole optimization applied, here we call it "g"
+This file performs the frontend lit tests that the peephole transformations are correctly lowered.
 
-We need to check that:
-  1. For "f", the peephole transform is correctly applied in mlir
-  2. For "g", the peephole transform is correctly not applied in mlir
-  3. "f" and "g" returns the same results.
-
-In addition, we check the transform jax primitives for each pass is correctly injected
+We check the transform jax primitives for each pass is correctly injected
 during tracing, and these transform primitives are correctly lowered to the mlir before
 running -transform-interpreter. 
 """
@@ -76,68 +68,6 @@ def print_mlir(f, *args, **kwargs):
 
 
 #
-# cancel_inverses
-#
-
-
-# CHECK-LABEL: public @jit_test_peephole_workflow_cancel_inverses
-@qjit(keep_intermediate=True)
-def test_peephole_workflow_cancel_inverses(xx: float):
-    """
-    Test catalyst.cancel_inverses
-    """
-
-    @cancel_inverses
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def f(x: float):
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
-
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def g(x: float):
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
-
-    @cancel_inverses
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def h(x: float):
-        """
-        Test that non-neighbouring self inverses are not canceled
-        """
-        qml.Hadamard(wires=0)
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
-
-    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
-    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-NEXT: {{%.+}} = quantum.namedobs {{%.+}}[ PauliZ] : !quantum.obs
-    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    _ff = f(xx)
-
-    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
-    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    _gg = g(xx)
-
-    # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
-    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    _hh = h(xx)
-
-    return _ff, _gg, _hh
-
-
-ff, gg, hh = test_peephole_workflow_cancel_inverses(42.42)
-assert np.allclose(ff, gg)
-flush_peephole_opted_mlir_to_iostream(test_peephole_workflow_cancel_inverses)
-
-
-#
 # General lowering tests
 #
 
@@ -162,6 +92,11 @@ def test_transform_named_sequence_injection():
 
 
 test_transform_named_sequence_injection()
+
+
+#
+# cancel_inverses
+#
 
 
 @qjit
@@ -193,9 +128,10 @@ def test_cancel_inverses_tracing_and_lowering(xx: float):
         qml.Hadamard(wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    _ff = f(xx)
-    _gg = g(xx)
-    _hh = h(xx)
+    _f = f(xx)
+    _g = g(xx)
+    _h = h(xx)
+    return _f, _g, _h
 
 
 # CHECK: transform_named_sequence
@@ -237,26 +173,13 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
     @qjit
     def workflow(xx: float):
 
-        @cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def g(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+        _f = f(xx)
 
-        ff = f(xx)
-        gg = g(xx)
-
-        return ff, gg
+        return _f
 
     # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
     # CHECK:   options=func-name=f
-    # CHECK:   pass_name=remove-chained-self-inverse
-    # CHECK: ]
-    # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
-    # CHECK:   options=func-name=g
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     print_jaxpr(workflow, 1.1)
@@ -264,9 +187,69 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
     # CHECK: module @workflow attributes {transform.with_named_sequence}
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g"}
     # CHECK-NEXT: transform.yield
     print_mlir(workflow, 1.1)
 
 
 test_cancel_inverses_tracing_and_lowering_outside_qjit()
+
+
+def test_cancel_inverses_lowering_transform_interpreter_applied():
+    """
+    Test catalyst.cancel_inverses mlir after -transfrom-interpreter is applied.
+    In other words, test that the pass takes the correct effect with this frontend call.
+    """
+
+    # CHECK-LABEL: public @jit_test_peephole_workflow_cancel_inverses
+    @qjit(keep_intermediate=True)
+    def test_peephole_workflow_cancel_inverses(xx: float):
+
+        @cancel_inverses
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def g(x: float):
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @cancel_inverses
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def h(x: float):
+            """
+            Test that non-neighbouring self inverses are not canceled
+            """
+            qml.Hadamard(wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+        # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+        # CHECK-NEXT: {{%.+}} = quantum.namedobs {{%.+}}[ PauliZ] : !quantum.obs
+        # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+        _f = f(xx)
+
+        # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+        # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+        # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+        _g = g(xx)
+
+        # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+        # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+        # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+        _h = h(xx)
+
+        return _f, _g, _h
+
+    ff, gg, hh = test_peephole_workflow_cancel_inverses(42.42)
+    flush_peephole_opted_mlir_to_iostream(test_peephole_workflow_cancel_inverses)
+
+
+test_cancel_inverses_lowering_transform_interpreter_applied()

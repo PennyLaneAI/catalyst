@@ -29,7 +29,8 @@ from catalyst import cancel_inverses, qjit
 
 
 ### Test peephole pass decorators preserve functionality of circuits ###
-def test_cancel_inverses_functionality():
+@pytest.mark.parametrize("theta", [42.42])
+def test_cancel_inverses_functionality(theta):
 
     @qjit
     def workflow():
@@ -48,9 +49,17 @@ def test_cancel_inverses_functionality():
             qml.Hadamard(wires=0)
             return qml.probs()
 
-        return f(42.42), g(42.42)
+        return f(theta), g(theta)
+
+    @qml.qnode(qml.device("default.qubit", wires=1))
+    def reference(x):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.probs()
 
     assert np.allclose(workflow()[0], workflow()[1])
+    assert np.allclose(workflow()[1], reference(theta))
 
 
 ### Test bad usages of pass decorators ###
