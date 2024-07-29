@@ -154,16 +154,38 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
         StringRef qirName;
         if constexpr (std::is_same_v<T, InitializeOp>) {
             qirName = "__catalyst__rt__initialize";
+            Location loc = op->getLoc();
+            ModuleOp mod = op->template getParentOfType<ModuleOp>();
+            Type intPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                            /* seed = */ {intPtrType});
+            Value seed_val;
+            if (op->hasAttr("seed")) {
+                mlir::IRRewriter::InsertPoint ip = rewriter.saveInsertionPoint();
+                OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
+                rewriter.setInsertionPointToStart(mod.getBody());
+                LLVM::GlobalOp seed_glb = rewriter.create<LLVM::GlobalOp>(
+                    loc, IntegerType::get(ctx, 32), true, LLVM::Linkage::Internal, "seed",
+                    cast<IntegerAttr>(op->getAttr("seed")));
+                rewriter.restoreInsertionPoint(ip);
+                seed_val = rewriter.create<LLVM::AddressOfOp>(loc, seed_glb);
+            }
+            else {
+                // Set seed argument to nullptr for unseeded runs
+                seed_val = rewriter.create<LLVM::ZeroOp>(loc, intPtrType);
+            }
+            LLVM::LLVMFuncOp fnDecl =
+                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            SmallVector<Value> operands = {seed_val};
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
         }
         else {
             qirName = "__catalyst__rt__finalize";
+            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+            LLVM::LLVMFuncOp fnDecl =
+                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
         }
-
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
-
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
 
         return success();
     }

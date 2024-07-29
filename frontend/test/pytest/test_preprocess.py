@@ -87,7 +87,7 @@ def get_test_device_capabilities(
 ) -> DeviceCapabilities:
     """Parse test config into the DeviceCapabilities structure"""
     config = get_test_config(config_text)
-    device_capabilities = load_device_capabilities(config, program_features, "dummy")
+    device_capabilities = load_device_capabilities(config, program_features)
     return device_capabilities
 
 
@@ -99,7 +99,7 @@ class DummyDevice(Device):
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
-        program_features = ProgramFeatures(shots is not None)
+        program_features = ProgramFeatures(bool(shots))
         dummy_capabilities = get_device_capabilities(self, program_features)
         dummy_capabilities.native_ops.pop("BlockEncode")
         dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
@@ -216,7 +216,7 @@ class TestPreprocess:
 
     def test_decompose_integration(self):
         """Test the decompose transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4)
+        dev = DummyDevice(wires=4, shots=None)
 
         @qml.qjit
         @qml.qnode(dev)
@@ -243,7 +243,7 @@ class TestPreprocess:
 
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4)
+        dev = DummyDevice(wires=4, shots=None)
 
         @qml.qjit
         @qml.qnode(dev)
@@ -343,7 +343,7 @@ class TestPreprocess:
         sum_observables_flag and the non_commuting_observables_flag"""
 
         dev = DummyDevice(wires=4, shots=1000)
-        dev_capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
+        dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         assert "Sum" in dev_capabilities.native_obs

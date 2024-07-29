@@ -46,11 +46,22 @@ response = requests.get(url)
 match = re.search(r'LLVM_COMMIT = "([a-zA-Z0-9]*)"', response.text)
 llvm_commit = match.group(1)
 
-url = f"https://api.github.com/repos/openxla/xla/commits?sha={xla_commit}&path=xla/mlir_hlo&per_page=1"
+# If the XLA commit is an "Integrate LLVM" commit we need to get the piper_id directly from there
+# to look up the corresponding mlir-hlo commit.
+url = f"https://api.github.com/repos/openxla/xla/commits?sha={xla_commit}&per_page=1"
 response = requests.get(url).json()
-tf_hlo_commit = response[0]["sha"]
-match = re.search(r"PiperOrigin-RevId: ([0-9]*)", response[0]["commit"]["message"])
-piper_id = match.group(1)
+match = re.search(r"Integrate LLVM", response[0]["commit"]["message"])
+if match:
+    match = re.search(r"PiperOrigin-RevId: ([0-9]*)", response[0]["commit"]["message"])
+    piper_id = match.group(1)
+else:
+    # Otherwise, we get the last commit in the XLA repository that touched the mlir-hlo files, and
+    # get its piper_id to get the same commit in the standalone mlir-hlo repo.
+    url = f"https://api.github.com/repos/openxla/xla/commits?sha={xla_commit}&path=xla/mlir_hlo&per_page=1"
+    response = requests.get(url).json()
+    xla_hlo_commit = response[0]["sha"]
+    match = re.search(r"PiperOrigin-RevId: ([0-9]*)", response[0]["commit"]["message"])
+    piper_id = match.group(1)
 
 url = f"https://api.github.com/search/commits?q=repo:tensorflow/mlir-hlo+{piper_id}"
 response = requests.get(url).json()
