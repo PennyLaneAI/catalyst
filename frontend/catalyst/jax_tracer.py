@@ -622,10 +622,20 @@ def trace_quantum_operations(
             )
             qrp.insert(controlled_wires, qubits2)
         elif isinstance(op, qml.StatePrep):
+            # The assumption is that if we are here,
+            # StatePrep's wires are all wires
+            # non-controlled, all static.
             num_wires = qrp.base.length
-            qubits = qrp.extract(op.wires)
-            controlled_qubits = qrp.extract(controlled_wires)
-            set_state_p.bind(*op.parameters)
+            # StatePrep acts on all wires here.
+            assert num_wires == len(op.wires), "StatePrep must act on all wires"
+            qubits = qrp.extract(range(num_wires))
+            params = op.parameters
+            assert len(params) == 1, "StatePrep only has one parameter"
+            param = params[0]
+            can_be_promoted = jnp.promote_types(param.dtype, jnp.dtype(jnp.complex128))
+            param_cast = jax.numpy.array(param, dtype=can_be_promoted)
+            qubits2 = set_state_p.bind(*qubits, param_cast)
+            qrp.insert(op.wires, qubits2)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
