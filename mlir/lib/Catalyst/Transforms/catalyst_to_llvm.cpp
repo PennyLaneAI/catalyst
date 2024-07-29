@@ -377,7 +377,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         SmallVector<LLVM::AllocaOp> encodedArgs;
         for (auto tuple : llvm::zip(args, argsConverted)) {
-            auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
+            auto memref_type = cast<MemRefType>(std::get<0>(tuple).getType());
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
@@ -415,7 +415,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Encode all returns as a set of pointers
         SmallVector<LLVM::AllocaOp> encodedRess;
         for (auto tuple : llvm::zip(res, resConverted)) {
-            auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
+            auto memref_type = cast<MemRefType>(std::get<0>(tuple).getType());
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedRes =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
@@ -471,7 +471,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
                  ConversionPatternRewriter &rewriter) const override
     {
         Block *entry;
-        rewriter.updateRootInPlace(op, [&] { entry = op.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { entry = op.addEntryBlock(); });
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(entry);
 
