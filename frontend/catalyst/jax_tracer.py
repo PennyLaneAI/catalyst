@@ -777,7 +777,6 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
-    out_tree_expected: PyTreeDef,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -854,31 +853,18 @@ def trace_quantum_measurements(
                     )
                     return leaf
 
-                def change_child_tree(tree, index, sub_tree):
-                    meas_return_trees_children = tree.children()
-                    if len(meas_return_trees_children):
-                        meas_return_trees_children[index] = jax.tree_util.tree_map(
-                            change_child, meas_return_trees_children[index], counts_tree
-                        )
-                        tree = tree.make_from_node_data_and_children(
-                            PyTreeRegistry(), tree.node_data(), meas_return_trees_children
-                        )
-                    else:
-                        tree = jax.tree_util.tree_map(change_child, tree, sub_tree)
-                    return tree
-
-                # out_tree = change_child_tree(out_tree, i, counts_tree)
+                # Swap the ith element in node children with counts_tree
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children):
-                    meas_return_trees_children[i] = counts_tree
+                    meas_return_trees_children[i] = jax.tree_util.tree_map(
+                        change_child, meas_return_trees_children[i], counts_tree
+                    )
                     out_tree = out_tree.make_from_node_data_and_children(
-                        PyTreeRegistry(),
-                        out_tree.node_data(),
-                        meas_return_trees_children,
+                        PyTreeRegistry(), out_tree.node_data(), meas_return_trees_children
                     )
                 else:
-                    out_tree = counts_tree
-                out_tree_expected = change_child_tree(out_tree_expected, i, counts_tree)
+                    out_tree = jax.tree_util.tree_map(change_child, out_tree, counts_tree)
+
             elif o.return_type.value == "state":
                 assert using_compbasis
                 shape = (2**nqubits,)
@@ -893,24 +879,7 @@ def trace_quantum_measurements(
             assert not isinstance(o, (list, dict)), f"Expected a tracer or a measurement, got {o}"
             out_classical_tracers.append(o)
 
-    def expand_tree(tree, ref_tree):
-        node_diff = ref_tree.num_leaves - tree.num_leaves
-        if node_diff > 0:
-            children = tree.children()  # if tree.num_leaves > 1 else [tree]
-            for _ in range(node_diff):
-                children.append(tree_structure(1))
-            tree = tree.make_from_node_data_and_children(
-                PyTreeRegistry(),
-                ref_tree.node_data(),
-                children,
-            )
-        # to_flatten = (tree_unflatten(tree, [1 for _ in range(tree.num_leaves)]),)
-        # _, tree = tree_flatten(to_flatten)
-        return tree
-
-    out_tree_expected_expanded = expand_tree(out_tree_expected, out_tree)
-
-    return out_classical_tracers, out_tree, out_tree_expected_expanded
+    return out_classical_tracers, out_tree
 
 
 @debug_logger
@@ -1157,14 +1126,9 @@ def trace_quantum_function(
                 return isinstance(obj, qml.measurements.MeasurementProcess)
 
             # 2. Create a new tree that has measurements as leaves
-            isTuple = isinstance(return_values, tuple)
-            isList = isinstance(return_values, list)
-            return_values = list(return_values) if isTuple else return_values
-            return_values = [return_values] if not isList else return_values
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
@@ -1209,24 +1173,54 @@ def trace_quantum_function(
                     output = return_values_flat
                     trees = return_values_tree
 
-                _, tree_expected = jax.tree_util.tree_flatten(return_values, is_leaf=is_leaf)
                 mcm_config = qnode.execute_kwargs["mcm_config"]
                 qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
-
-                meas, meas_trees, out_tree_expected = trace_quantum_measurements(
-                    device, qrp_out, output, trees, tree_expected
-                )
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
-                for _ in range(out_tree_expected.num_leaves - len(meas_tracers)):
-                    meas_tracers.append(meas_tracers[-1])
+                # arbitrary output pytree support in case of a single tape
+                # by modifying the tree to match the output pytree
+                if len(tapes) == 1:
 
-                meas_results = tree_unflatten(out_tree_expected, meas_tracers)
-                meas_results = (
-                    [meas_results] if not isinstance(meas_results, list) else meas_results
-                )
+                    def expand_tree(tree, ref_tree):
+                        node_diff = ref_tree.num_leaves - tree.num_leaves
+                        if node_diff > 0:
+                            tree = tree.make_from_node_data_and_children(
+                                PyTreeRegistry(),
+                                tree_structure([1]).node_data(),
+                                [tree],
+                            )
+                            children = tree.children()
+                            for _ in range(node_diff):
+                                children.append(tree_structure(1))
+                            tree = tree.make_from_node_data_and_children(
+                                PyTreeRegistry(),
+                                tree.node_data(),
+                                children,
+                            )
+                        return tree
 
+                    _, out_tree_expected = jax.tree_util.tree_flatten(
+                        return_values, is_leaf=is_leaf
+                    )
+                    _, out_tree_expected = trace_quantum_measurements(
+                        device, qrp_out, output, out_tree_expected
+                    )
+                    out_tree_expanded = expand_tree(out_tree_expected, meas_trees)
+
+                    for _ in range(out_tree_expanded.num_leaves - len(meas_tracers)):
+                        meas_tracers.append(meas_tracers[-1])
+
+                    meas_results = tree_unflatten(out_tree_expanded, meas_tracers)
+                    meas_results = (
+                        [meas_results] if not isinstance(meas_results, list) else meas_results
+                    )
+
+                else:
+                    meas_results = tree_unflatten(meas_trees, meas_tracers)
+
+                # TODO: Allow the user to return whatever types they specify.
                 if len(meas_results) == 1:
                     transformed_results.append(meas_results[0])
                 else:

@@ -149,8 +149,6 @@ class QFunc:
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
-            for _ in range(out_tree.num_leaves - len(res_flat)):
-                res_flat.append(res_flat[-1])
             return tree_unflatten(out_tree, res_flat)
 
         flattened_fun, _, _, out_tree_promise = deduce_avals(
@@ -267,8 +265,6 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        if isinstance(results[0], list) and len(results) == 1:
-            results = results[0]
         results = list(results) if isinstance(results, tuple) else results
 
         # Don't flatten tuples that are inherent to the measurement output structure like ("keys", "counts") in qml.counts()
@@ -277,14 +273,11 @@ def dynamic_one_shot(qnode, **kwargs):
 
         results_flatten, _ = tree_flatten(results, is_leaf)
 
-        if isinstance(results_flatten[0], tuple) and len(results_flatten) == 1:
-            results_flatten = results_flatten[0]
-
         out_flat = parse_native_mid_circuit_measurements(
             cpy_tape, aux_tapes, results_flatten, interface="jax"
         )
         out_flat, _ = tree_flatten(out_flat)
-        _, results_tree = tree_flatten(results)
+        _, results_tree = tree_flatten(tuple(results))
 
         size_diff = results_tree.num_leaves - len(out_flat)
         if size_diff > 0:
@@ -296,7 +289,7 @@ def dynamic_one_shot(qnode, **kwargs):
             )
 
         out = tree_unflatten(results_tree, out_flat)
-        if isinstance(out[0], DynamicJaxprTracer) and len(out) == 1:
+        if isinstance(out, tuple) and len(out) == 1:
             out = out[0]
         return out
 
