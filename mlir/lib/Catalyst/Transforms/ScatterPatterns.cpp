@@ -125,7 +125,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         if (updatesIndices) {
                             if (isa<RankedTensorType>(updatesIndices.getType())) {
                                 RankedTensorType updateType =
-                                    mlir::cast<RankedTensorType>(updatesIndices.getType());
+                                   cast<RankedTensorType>(updatesIndices.getType());
 
                                 for (int64_t index = 0; index < updateType.getShape()[0]; ++index) {
                                     Value indexValue =
