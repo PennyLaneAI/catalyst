@@ -58,14 +58,14 @@ def cancel_inverses(fn=None):
 
         Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
         the QNode itself will not changed or transformed.
-        
+
         In other words, circuit inspection tools such as
-        :func:`~.draw` will still 
-        display the neighbouring self-inverse gates. However, Catalyst never 
-        executes the PennyLane code directly; instead, Catalyst captures the 
-        workflow from Python and lowers it into MLIR, performing compiler 
+        :func:`~.draw` will still
+        display the neighbouring self-inverse gates. However, Catalyst never
+        executes the PennyLane code directly; instead, Catalyst captures the
+        workflow from Python and lowers it into MLIR, performing compiler
         optimizations at the MLIR level.
-        To inspect the compiled MLIR from Catalyst, use 
+        To inspect the compiled MLIR from Catalyst, use
         :func:`catalyst.debug.compiler_functions.print_compilation_stage`,
         where ``stage="QuantumCompilationPass"``, and with ``keep_intermediate=True``
         in the ``qjit`` decorator.
@@ -74,7 +74,7 @@ def cancel_inverses(fn=None):
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
 
     Returns:
-        ~.QNode
+        ~.QNode:
 
     **Example**
 
@@ -110,7 +110,7 @@ def cancel_inverses(fn=None):
     (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
 
     >>> print_compilation_stage(workflow, "QuantumCompilationPass")
-    
+
     .. code-block:: mlir
 
           func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
