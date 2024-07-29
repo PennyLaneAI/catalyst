@@ -25,11 +25,18 @@ from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
 
 quadratic_extrapolation = polynomial_extrapolation(2)
 
+def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func):
+    if circuit_param < 0.3 and extrapolation_func == exponential_extrapolate:
+        pytest.skip("Exponential extrapolation unstable in this region.")
+    
 
-@pytest.mark.parametrize("params", [0.3, 0.4, 0.5])
+
+@pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrap", [quadratic_extrapolation, exponential_extrapolate])
 def test_single_measurement(params, extrap):
     """Test that without noise the same results are returned for single measurements."""
+    skip_if_exponential_extrapolation_unstable(params, extrap)
+
     dev = qml.device("lightning.qubit", wires=2)
 
     @qml.qnode(device=dev)
@@ -50,10 +57,12 @@ def test_single_measurement(params, extrap):
     assert np.allclose(mitigated_qnode(params), circuit(params))
 
 
-@pytest.mark.parametrize("params", [0.3, 0.4, 0.5])
+@pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrap", [quadratic_extrapolation, exponential_extrapolate])
 def test_multiple_measurements(params, extrap):
     """Test that without noise the same results are returned for multiple measurements"""
+    skip_if_exponential_extrapolation_unstable(params, extrap)
+
     dev = qml.device("lightning.qubit", wires=2)
 
     @qml.qnode(device=dev)
@@ -234,10 +243,12 @@ def test_folding_type_not_implemented():
         catalyst.qjit(mitigated_qnode)
 
 
-@pytest.mark.parametrize("params", [0.3, 0.4, 0.5])
+@pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrap", [quadratic_extrapolation, exponential_extrapolate])
 def test_zne_usage_patterns(params, extrap):
     """Test usage patterns of catalyst.zne."""
+    skip_if_exponential_extrapolation_unstable(params, extrap)
+
     dev = qml.device("lightning.qubit", wires=2)
 
     @qml.qnode(device=dev)
