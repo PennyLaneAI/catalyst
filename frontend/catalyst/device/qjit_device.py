@@ -649,11 +649,8 @@ def get_device_capabilities(
             if program_features
             else ProgramFeatures(shots_present=bool(device.shots))
         )
-        device_name = (
-            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-        )
         device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features, device_name)
+        return load_device_capabilities(device_config, program_features)
 
 
 def check_device_wires(wires):

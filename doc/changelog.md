@@ -177,6 +177,9 @@
   qjit-compiled function being NumPy arrays will need to be updated.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
+* Support for TOML files in Schema 1 has been disabled.
+  [(#960)](https://github.com/PennyLaneAI/catalyst/pull/960)
+
 <h3>Bug fixes</h3>
 
 * Static arguments can now be passed through a QNode when specified
@@ -249,6 +252,9 @@
 * The function `__catalyst_inactive_callback` has the nofree attribute.
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
+* `catalyst.dynamic_one_shot` uses `postselect_mode="pad-invalid-samples"` in favour of `interface="jax"` when processing results.
+  [(#956)](https://github.com/PennyLaneAI/catalyst/pull/956)
+
 * Callbacks now have nicer identifiers in their MLIR representation. The identifiers include
   the name of the Python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
@@ -275,6 +281,7 @@ Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Mudit Pandey,
 Raul Torres,
 Tzung-Han Juang,
 Paul Haochen Wang,
