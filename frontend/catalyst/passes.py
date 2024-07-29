@@ -158,6 +158,3 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
     fn.func = wrapper
     return fn
-
-
-passes = [cancel_inverses]
