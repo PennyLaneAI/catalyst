@@ -149,6 +149,11 @@ def SetStateOp : Memory_Op<"set_state", []> {
         `(` $in_state `)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return getInState().getType().isa<mlir::MemRefType>();
+        }
+    }];
 
 }
 

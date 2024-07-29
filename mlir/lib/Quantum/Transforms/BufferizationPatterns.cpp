@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -127,6 +128,24 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
     }
 };
 
+struct BufferizeSetStateOp : public OpConversionPattern<SetStateOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(SetStateOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        Type tensorType = op.getInState().getType();
+        MemRefType memrefType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        auto toMemrefOp =
+            rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, op.getInState());
+        auto memref = toMemrefOp.getResult();
+        rewriter.replaceOpWithNewOp<SetStateOp>(op, op.getOutQubits().getTypes(), memref,
+                                                adaptor.getInQubits());
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -147,6 +166,7 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<StateOp>([&](StateOp op) { return op.isBufferized(); });
     target.addDynamicallyLegalOp<ProbsOp>([&](ProbsOp op) { return op.isBufferized(); });
     target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<SetStateOp>([&](SetStateOp op) { return op.isBufferized(); });
 }
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
@@ -158,6 +178,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<BufferizeStateOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeProbsOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeCountsOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeSetStateOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace quantum

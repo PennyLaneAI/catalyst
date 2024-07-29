@@ -52,3 +52,14 @@ func.func @state(%q0: !quantum.bit, %q1: !quantum.bit) {
     %state = quantum.state %obs : tensor<4xcomplex<f64>>
     func.return
 }
+
+// -----
+
+// CHECK-LABEL: @set_state
+module @set_state {
+  func.func @foo(%arg0: tensor<2xcomplex<f64>>, %q0 : !quantum.bit) {
+    // CHECK: quantum.set_state(%{{.*}}) %{{.*}} : (memref<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    %0 = quantum.set_state(%arg0) %q0 : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    return
+  }
+}
