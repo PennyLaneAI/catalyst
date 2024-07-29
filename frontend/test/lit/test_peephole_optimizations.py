@@ -26,7 +26,6 @@ running -transform-interpreter.
 
 import shutil
 
-import numpy as np
 import pennylane as qml
 
 from catalyst import cancel_inverses, qjit

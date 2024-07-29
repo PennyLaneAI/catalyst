@@ -13,15 +13,15 @@
 # limitations under the License.
 
 """
-This module contains public API functions that provide control for the 
-user to input what MLIR compiler passes to run. 
+This module contains public API functions that provide control for the
+user to input what MLIR compiler passes to run.
 
-Currently, each pass has its own user-facing decorator. In the future, 
-a unified user interface for all the passes is necessary. 
+Currently, each pass has its own user-facing decorator. In the future,
+a unified user interface for all the passes is necessary.
 
-Note that the decorators do not need to modify the qnode in 
-any way. Its only purpose is to mark down the passes the user wants to 
-run on each qnode, and then generate the corresponding 
+Note that the decorators do not need to modify the qnode in
+any way. Its only purpose is to mark down the passes the user wants to
+run on each qnode, and then generate the corresponding
 transform.apply_apply_registered_pass in the lowered mlir.
 """
 
@@ -43,11 +43,13 @@ def inject_transform_named_sequence():
 
 
 ## API ##
-def cancel_inverses(fn=None):
+def cancel_inverses(fn=None):  # pylint: disable=line-too-long
     """
-    Specify that a compiler pass for cancelling two neighbouring self-inverse gates should be applied to the decorated QNode during qjit compilation.
+    Specify that a compiler pass for cancelling two neighbouring self-inverse
+    gates should be applied to the decorated QNode during qjit compilation.
 
-    This decorator is always applied to a qnode, and it cancels two neighbouring self-inverse gates in the compiled mlir.
+    This decorator is always applied to a qnode, and it cancels two neighbouring
+    self-inverse gates in the compiled mlir.
 
 
     .. note::
@@ -146,7 +148,8 @@ def cancel_inverses(fn=None):
             return %from_elements : tensor<f64>
           }
 
-    We see that ``f``, decorated by ``cancel_inverses``, no longer has the neighbouring Hadamard gates.
+    We see that ``f``, decorated by ``cancel_inverses``, no longer has the neighbouring
+    Hadamard gates.
     """
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
