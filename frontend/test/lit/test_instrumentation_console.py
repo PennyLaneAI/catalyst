@@ -15,11 +15,14 @@
 # Redirect stderr to stdout to make the output visible to FileCheck.
 # RUN: %PYTHON %s 2>&1 | FileCheck %s
 
+import jax
 import numpy as np
 import pennylane as qml
 
 from catalyst import qjit
 from catalyst.debug import instrumentation
+
+jax.config.update("jax_platforms", "cpu")
 
 num_layers = 1
 num_wires = 1
