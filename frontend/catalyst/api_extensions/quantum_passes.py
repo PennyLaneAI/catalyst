@@ -45,7 +45,7 @@ def inject_transform_named_sequence():
 ## API ##
 def cancel_inverses(fn=None):
     """
-    The top-level ``catalyst.cancel_inverses`` decorator.
+    Specify that a compiler pass for cancelling two neighbouring self-inverse gates should be applied to the decorated QNode during qjit compilation.
 
     This decorator is always applied to a qnode, and it cancels two neighbouring self-inverse gates in the compiled mlir.
 
@@ -56,35 +56,45 @@ def cancel_inverses(fn=None):
 
     .. note::
 
-        The qnode itself is not changed. In other words, circuit inspection tools such as ``qml.draw`` will still display the
-        neighbouring self-inverse gates. However, catalyst never executes the pennylane code directly. Instead catalyst
-        executes the compiled mlir, and these neighbouring self inverse gates are canceled in the compiled mlir.
-
-        To inspect the compiled mlir from Catalyst, use ``qjit(keep_intermediate=True)`` in the top-level ``qjit`` decorator.
-        This will create the intermediate mlir in a directory under the same directory where your python file is.
-        The cancel inverse happens at the stage ``QuantumCompilationPass``.
+        Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
+        the QNode itself will not changed or transformed.
+        
+        In other words, circuit inspection tools such as
+        :func:`~.draw` will still 
+        display the neighbouring self-inverse gates. However, Catalyst never 
+        executes the PennyLane code directly; instead, Catalyst captures the 
+        workflow from Python and lowers it into MLIR, performing compiler 
+        optimizations at the MLIR level.
+        To inspect the compiled MLIR from Catalyst, use 
+        :func:`catalyst.debug.compiler_functions.print_compilation_stage`,
+        where ``stage="QuantumCompilationPass"``, and with ``keep_intermediate=True``
+        in the ``qjit`` decorator.
 
     Args:
-        fn (Callable): a qml.QNode to run the cancel inverses transformation on
+        fn (QNode): the QNode to apply the cancel inverses compiler pass to
 
     Returns:
-        The same qml.QNode.
+        ~.QNode
 
     **Example**
 
     .. code-block:: python
 
+        from catalyst.debug.compiler_functions import print_compilation_stage
+
+        dev = qml.device("lightning.qubit", wires=1)
+
         @qjit(keep_intermediate=True)
         def workflow():
             @cancel_inverses
-            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            @qml.qnode(dev)
             def f(x: float):
                 qml.RX(x, wires=0)
                 qml.Hadamard(wires=0)
                 qml.Hadamard(wires=0)
                 return qml.expval(qml.PauliZ(0))
 
-            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            @qml.qnode(dev)
             def g(x: float):
                 qml.RX(x, wires=0)
                 qml.Hadamard(wires=0)
@@ -92,15 +102,15 @@ def cancel_inverses(fn=None):
                 return qml.expval(qml.PauliZ(0))
 
             ff = f(1.0)
-            gg = g(2.0)
+            gg = g(1.0)
 
             return ff, gg
 
     >>> workflow()
-    (Array(0.54030231, dtype=float64), Array(-0.41614684, dtype=float64))
+    (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
 
-    In the compiled mlir files, specifically in ``workflow/2_QuantumCompilationPass.mlir``:
-
+    >>> print_compilation_stage(workflow, "QuantumCompilationPass")
+    
     .. code-block:: mlir
 
           func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
