@@ -46,7 +46,7 @@
 #include "Driver/CompilerDriver.h"
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
-#include "Gradient/IR/GradientOps.h"
+#include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
@@ -254,23 +254,11 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
 
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
-bool containsGradients(mlir::Operation *op)
+bool containsGradients(mlir::ModuleOp moduleOp)
 {
-    auto name = op->getName().getStringRef();
-    if (name == "gradOp" || name == "VJPOp" || name == "JVPOp") {
-        return true;
-    }
-
-    for (auto &region : op->getRegions()) {
-        for (auto &block : region) {
-            for (auto &nestedOp : block) {
-                if (containsGradients(&nestedOp)) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+    bool contain = false;
+    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) { contain = true; });
+    return contain;
 }
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
@@ -587,8 +575,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> op =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
     catalyst::utils::LinesCount::ModuleOp(*op);
-
+    bool enzymeRun = false;
     if (op) {
+        enzymeRun = containsGradients(*op);
         if (failed(runLowering(options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -629,19 +618,20 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
-                                llvmModule, output))) {
-            return failure();
+
+        if (enzymeRun) {
+            if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
+                                    llvmModule, output))) {
+                return failure();
+            }
+
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
+                                    options, llvmModule, output))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
-
-        catalyst::utils::LinesCount::Module(*llvmModule.get());
-
-        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false, options,
-                                llvmModule, output))) {
-            return failure();
-        }
-
-        catalyst::utils::LinesCount::Module(*llvmModule.get());
 
         output.outIR.clear();
         outIRStream << *llvmModule;
