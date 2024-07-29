@@ -80,6 +80,7 @@ from jax.core import (
     new_jaxpr_eqn,
     thread_local_state,
 )
+from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -87,7 +88,6 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.linear_util import transformation_with_aux, wrap_init
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
