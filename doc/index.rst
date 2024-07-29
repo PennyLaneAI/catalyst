@@ -81,6 +81,7 @@ Catalyst
    dev/architecture
    PennyLane Frontend <modules/frontend>
    Compiler Core <modules/mlir>
+   MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
    Quantum Runtime <modules/runtime>
    dev/debugging

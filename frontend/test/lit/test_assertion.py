@@ -1,4 +1,4 @@
-# Copyright 2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,31 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for the catalyst assert feature."""
+
 # RUN: %PYTHON %s | FileCheck %s
-"""
-Test that mcmc, num_burnin, and kernel_name are set in MLIR
-"""
 
 import pennylane as qml
 
-from catalyst import qjit
+from catalyst import debug_assert, measure, qjit
 
 
-def test_mcmc():
-    """Test MCMC (even though same test is in lit tests, it is needed here for coverage.)"""
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=1))
+def circuit(x: float):
+    """Test a simple assert example."""
 
-    @qjit
-    @qml.qnode(
-        qml.device(
-            "lightning.qubit",
-            wires=1,
-            mcmc=True,
-            num_burnin=300,
-            kernel_name="NonZeroRandom",
-            shots=1000,
-        )
-    )
-    def circuit():
-        return qml.state()
+    qml.RX(x, wires=0)
+    # CHECK: tensor.extract {{%.+}}[] : tensor<i1>
+    # CHECK: "catalyst.assert"({{%.+}}) <{error = "x less than 5.0"}> : (i1) -> ()
+    debug_assert(x > 5.0, "x less than 5.0")
+    m = measure(wires=0)
+    return m
 
-    print(circuit.mlir)
+
+print(circuit.mlir)

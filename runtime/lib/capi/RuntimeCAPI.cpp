@@ -193,6 +193,8 @@ void __catalyst__rt__print_string(char *string)
     std::cout << string << std::endl;
 }
 
+void __catalyst__rt__assert_bool(bool p, char *s) { RT_FAIL_IF(!p, s); }
+
 void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 {
     if (c_memref->datatype == NumericType::idx) {
@@ -234,7 +236,7 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 
 void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
-void __catalyst__rt__initialize() { CTX = std::make_unique<ExecutionContext>(); }
+void __catalyst__rt__initialize(uint32_t *seed) { CTX = std::make_unique<ExecutionContext>(seed); }
 
 void __catalyst__rt__finalize()
 {

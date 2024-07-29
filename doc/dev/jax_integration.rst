@@ -77,7 +77,7 @@ and only apply outside of QNodes:
         return jax.lax.fori_loop(0, 10, cost, x)
 
 >>> fn(jnp.array([0.1, 0.2, 0.3, 0.5]))
-array([0.6, 0.6, 0.8, 1. ])
+Array([0.6, 0.6, 0.8, 1. ], dtype=float64)
 
 Function support
 ----------------
@@ -88,7 +88,6 @@ that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
-- ``jax.numpy.argsort``
 - ``jax.scipy.linalg``
 - ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
   indices.
@@ -124,14 +123,14 @@ functions can accept, create, and return arrays of dynamic shape without trigger
 ...     return jax.numpy.ones([size, size], dtype=float)
 >>> func(3)
 Compiling
-array([[1., 1., 1.],
+Array([[1., 1., 1.],
        [1., 1., 1.],
-       [1., 1., 1.]])
+       [1., 1., 1.]], dtype=float64)
 >>> func(4)
-array([[1., 1., 1., 1.],
+Array([[1., 1., 1., 1.],
        [1., 1., 1., 1.],
        [1., 1., 1., 1.],
-       [1., 1., 1., 1.]])
+       [1., 1., 1., 1.]], dtype=float64)
 
 Dynamic arrays can be created using ``jnp.ones`` and ``jnp.zeros``. Note that ``jnp.arange``
 and ``jnp.linspace`` do not currently support generating dynamically-shaped arrays (however, unlike
@@ -186,7 +185,7 @@ can be used **as long as they are not applied to quantum processing**.
 ...         return -jnp.sin(y) ** 2
 ...     return jax.grad(g)(x)
 >>> f(0.4)
-array(-0.71735609)
+Array(-0.71735609, dtype=float64)
 
 If they are applied to quantum processing, an error will occur:
 
@@ -211,7 +210,7 @@ quantum-classical processing:
 ...         return qml.expval(qml.PauliZ(0))
 ...     return grad(lambda y: g(y) ** 2)(x)
 >>> f(0.4)
-array(-0.71735609)
+Array(-0.71735609, dtype=float64)
 
 Always use the equivalent Catalyst transformation
 (:func:`catalyst.grad`, :func:`catalyst.jacobian`, :func:`catalyst.vjp`, :func:`catalyst.jvp`)

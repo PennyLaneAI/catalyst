@@ -45,6 +45,7 @@ from catalyst.tracing.type_signatures import (
     get_type_annotations,
     merge_static_args,
     promote_arguments,
+    verify_static_argnums,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
@@ -79,6 +80,8 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
+    disable_assertions=False,
+    seed=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -122,6 +125,15 @@ def qjit(
             Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
             with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
             below.
+        disable_assertions (bool): If set to ``True``, runtime assertions included in
+            ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
+        seed (Optional[Int]):
+            The seed for random operations in a qjit call, such as circuit measurement results.
+            The default value is None, which means no seeding is performed, and all processes
+            are random. A seed is expected to be an unsigned 32-bit integer.
+            Note that `lightning.qubit` and `lightning.kokkos` currently only support seeding
+            measurements, and do not yet support seeding samples. As such, these devices with
+            shots will still return random results.
 
     Returns:
         QJIT object.
@@ -150,28 +162,28 @@ def qjit(
             return qml.expval(qml.PauliZ(wires=1))
 
     >>> circuit(0.5)  # the first call, compilation occurs here
-    array(0.)
+    Array(0., dtype=float64)
     >>> circuit(0.5)  # the precompiled quantum function is called
-    array(0.)
+    Array(0., dtype=float64)
 
     Alternatively, if argument type hints are provided, compilation
     can occur 'ahead of time' when the function is decorated.
 
     .. code-block:: python
 
-        from jax.core import ShapedArray
+        dev = qml.device("lightning.qubit", wires=2)
 
-        @qjit  # compilation happens at definition
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: complex, z: jax.ShapeDtypeStruct((3,), jnp.float64)):
             theta = jnp.abs(x)
             qml.RY(theta, wires=0)
             qml.Rot(z[0], z[1], z[2], wires=0)
             return qml.state()
 
     >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
-    array([0.75634905-0.52801002j, 0. +0.j,
-           0.35962678+0.14074839j, 0. +0.j])
+    Array([0.75634905-0.52801002j, 0.        +0.j        ,
+           0.35962678+0.14074839j, 0.        +0.j        ], dtype=complex128)
 
     For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
 
@@ -198,10 +210,10 @@ def qjit(
                 return qml.expval(qml.PauliZ(0))
 
         >>> circuit(3)
-        array(0.)
+        Array(0., dtype=float64)
 
         >>> circuit(5)
-        array(1.)
+        Array(1., dtype=float64)
 
         Note that imperative control flow will still work in Catalyst even when the AutoGraph
         feature is turned off, it just won't be captured in the compiled program and cannot involve
@@ -209,67 +221,6 @@ def qjit(
         ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
         be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
         appearing as is.
-
-
-    .. details::
-        :title: Adding modules for Autograph conversion
-
-        Library code is not meant to be targeted by Autograph conversion, hence
-        ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
-        But sometimes it might make sense enabling specific submodules from the
-        excluded modules for which conversion may be appropriate. For these cases
-        one can use the ``autograph_include`` parameter, which provides a list
-        of modules/submodules that will always be enabled for conversion no matter
-        if the default conversion rules were excluding them before.
-
-        .. code-block:: python
-
-            import excluded_module
-
-            @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
-            def g(x: int):
-                return excluded_module.submodule.f(x)
-
-        Notice that ``autograph=True`` must be set in order to process the
-        ``autograph_include`` list. Otherwise an error will be reported.
-
-
-    .. details::
-        :title: In-place JAX array assignments with Autograph
-
-        To update array values when using JAX, the JAX syntax for array assignment
-        (which uses the array ``at`` and ``set`` methods) must be used:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result = result.at[i].set(x[i]* 2)
-
-            return result
-
-        However, if updating a single index of the array, Autograph supports conversion of
-        standard Python array assignment syntax:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result[i] = x[i] * 2
-
-            return result
-
-        Under the hood, Catalyst converts anything coming in the latter notation into the
-        former one.
-
 
     .. details::
         :title: Static arguments
@@ -494,6 +445,10 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
+            isQNode = isinstance(self.user_function, qml.QNode)
+            if isQNode and self.compile_options.static_argnums:
+                kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
+
             return self.user_function(*args, **kwargs)
 
         requires_promotion = self.jit_compile(args)
@@ -613,7 +568,7 @@ class QJIT:
             Tuple[Any]: the dynamic argument signature
         """
 
-        self._verify_static_argnums(args)
+        verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
 
@@ -621,8 +576,12 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        def closure(*args, **kwargs):
+            st_argnums = kwargs.pop("static_argnums", static_argnums)
+            return QFunc.__call__(*args, static_argnums=st_argnums, **kwargs)
+
         with Patcher(
-            (qml.QNode, "__call__", QFunc.__call__),
+            (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef = trace_to_jaxpr(
@@ -643,7 +602,7 @@ class QJIT:
         mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
-        inject_functions(mlir_module, ctx)
+        inject_functions(mlir_module, ctx, self.compile_options.seed)
 
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         options = copy.deepcopy(self.compile_options)
@@ -716,12 +675,6 @@ class QJIT:
             raise CompileError(
                 "In order for 'autograph_include' to work, 'autograph' must be set to True"
             )
-
-    def _verify_static_argnums(self, args):
-        for argnum in self.compile_options.static_argnums:
-            if argnum < 0 or argnum >= len(args):
-                msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
-                raise CompileError(msg)
 
     def _get_workspace(self):
         """Get or create a workspace to use for compilation."""
