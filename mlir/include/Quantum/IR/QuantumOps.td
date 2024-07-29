@@ -126,6 +126,32 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
+def SetStateOp : Memory_Op<"set_state", []> {
+    let summary = "Set state to a complex vector.";
+    let description = [{
+        This operation is useful for simulators implementing state preparation.
+        Instead of decomposing state preparation into multiple operations, this
+        operation shortcuts all of that into a single operation.
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[
+            1DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [1]>
+        ]>:$in_state,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $in_state `)` $in_qubits attr-dict `:` functional-type(operands, results)
+    }];
+
+
+}
+
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate a quantum register.";
     let description = [{
@@ -923,5 +949,6 @@ def StateOp : Measurement_Op<"state"> {
 
     let hasVerifier = 1;
 }
+
 
 #endif // QUANTUM_OPS
