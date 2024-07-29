@@ -125,7 +125,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=latest_release \
-        ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
 
@@ -137,7 +136,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=v0.37.0_rc \
-        ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
 
