@@ -31,13 +31,13 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from malt.core import config as ag_config
 
 import catalyst
-from catalyst.api_extensions.quantum_passes import inject_transform_named_sequence
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.passes import _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -598,7 +598,7 @@ class QJIT:
                 results with a transform_named_sequence primitive at the beginning of the
                 jaxpr. It is never executed or used anywhere, except being traced here.
                 """
-                inject_transform_named_sequence()
+                _inject_transform_named_sequence()
                 return self.user_function(*args, **kwargs)
 
             jaxpr, out_type, treedef = trace_to_jaxpr(

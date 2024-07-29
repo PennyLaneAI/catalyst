@@ -28,8 +28,9 @@ import shutil
 
 import pennylane as qml
 
-from catalyst import cancel_inverses, qjit
+from catalyst import qjit
 from catalyst.debug.compiler_functions import print_compilation_stage
+from catalyst.passes import cancel_inverses
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
@@ -102,7 +103,7 @@ def test_cancel_inverses_tracing_and_lowering():
     @qjit
     def test_cancel_inverses_tracing_and_lowering_workflow(xx: float):
         """
-        Test catalyst.cancel_inverses during tracing and lowering
+        Test cancel_inverses during tracing and lowering
         """
 
         @cancel_inverses
@@ -196,7 +197,7 @@ test_cancel_inverses_tracing_and_lowering_outside_qjit()
 
 def test_cancel_inverses_lowering_transform_interpreter_applied():
     """
-    Test catalyst.cancel_inverses mlir after -transfrom-interpreter is applied.
+    Test cancel_inverses mlir after -transfrom-interpreter is applied.
     In other words, test that the pass takes the correct effect with this frontend call.
     """
 

@@ -17,8 +17,10 @@ This module contains public API functions that provide control for the
 user to input what MLIR compiler passes to run.
 
 Currently, each pass has its own user-facing decorator. In the future,
-a unified user interface for all the passes is necessary.
+a unified user interface for all the passes will be available.
+"""
 
+"""
 Note that the decorators do not need to modify the qnode in
 any way. Its only purpose is to mark down the passes the user wants to
 run on each qnode, and then generate the corresponding
@@ -30,7 +32,7 @@ import pennylane as qml
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
 
 
-def inject_transform_named_sequence():
+def _inject_transform_named_sequence():
     """
     Inject a transform_named_sequence jax primitive.
 
@@ -83,6 +85,7 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
     .. code-block:: python
 
         from catalyst.debug.compiler_functions import print_compilation_stage
+        from catalyst.passes import cancel_inverses
 
         dev = qml.device("lightning.qubit", wires=1)
 
@@ -157,13 +160,13 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
     wrapped_qnode_function = fn.func
 
     def wrapper(*args, **kwrags):
-
         apply_registered_pass_p.bind(
             pass_name="remove-chained-self-inverse", options=f"func-name={fn.__name__}"
         )
-
         return wrapped_qnode_function(*args, **kwrags)
 
     fn.func = wrapper
-
     return fn
+
+
+passes = [cancel_inverses]

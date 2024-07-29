@@ -18,7 +18,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cancel_inverses, qjit
+from catalyst import qjit
+from catalyst.passes import cancel_inverses
 
 # pylint: disable=missing-function-docstring
 
@@ -65,7 +66,7 @@ def test_cancel_inverses_functionality(theta):
 ### Test bad usages of pass decorators ###
 def test_cancel_inverses_bad_usages():
     """
-    Tests that an error is raised when catalyst.cancel_inverses is not used properly
+    Tests that an error is raised when cancel_inverses is not used properly
     """
 
     def test_cancel_inverses_not_on_qnode():
