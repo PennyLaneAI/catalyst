@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 import pennylane as qml
 import pytest
+from pennylane.measurements import ExpectationMP, VarianceMP
 from pennylane.ops import Adjoint, Controlled
 
 from catalyst import (
@@ -34,7 +35,7 @@ from catalyst import (
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
-from catalyst.device.verification import validate_observables
+from catalyst.device.verification import validate_measurements
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
@@ -69,7 +70,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=kwargs.get("shots") is not None)
+            program_features = ProgramFeatures(shots_present=bool(kwargs.get("shots")))
             lightning_capabilities = get_device_capabilities(lightning_device, program_features)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
@@ -553,30 +554,32 @@ class TestObservableValidation:
             ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
-            ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  # with sample with observable
-            ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
+            # sample with observable is currently unsupported
+            # ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),
+            # ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
             ([qml.probs(wires=0), qml.var(qml.X(1) + qml.Y(2))], None),  # with probs
             ([qml.probs(wires=0), qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
             ([qml.counts(), qml.expval(qml.X(0))], None),  # with empty counts
             ([qml.counts(), qml.expval(qml.RX(1.2, 0))], "RX"),
-            ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
-            ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
+            # counts with observable is currently unsupported
+            # ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
+            # ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
         ],
     )
-    def test_validate_observables_transform(self, backend, measurements, invalid_op):
-        """Test that the validate_observables transform raises an error (or not) as expected
+    def test_validate_measurements_transform(self, backend, measurements, invalid_op):
+        """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3)
+        dev = qml.device(backend, wires=3, shots=2048)
         qjit_capabilities = get_device_capabilities(dev)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
-                validate_observables(tape, qjit_capabilities, dev.name)
+                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
         else:
-            validate_observables(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
     @pytest.mark.parametrize(
         "obs, obs_type",
@@ -588,7 +591,7 @@ class TestObservableValidation:
         ],
     )
     def test_arithmetic_ops_validation(self, obs, obs_type, backend):
-        """Test that the validate_observables transform raises an error (or not) as expected
+        """Test that the validate_measurements transform raises an error (or not) as expected
         for different observables composed of other base observables, when the overall observable
         type is supported/unsupported."""
 
@@ -599,11 +602,11 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
         # all good
-        validate_observables(tape, qjit_capabilities, dev.name)
+        validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
         del qjit_capabilities.native_obs[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
-            validate_observables(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
     def test_non_qjit_observables_raise_error(self, backend):
         """Test that an observable that is supported by the backend according to the
@@ -625,7 +628,115 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
-            validate_observables(tape, qjit_capabilities, dev.name)
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+
+    @pytest.mark.parametrize(
+        "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
+    )
+    def test_only_expval_and_var_allow_observables(self, measurement):
+        """Test that the validate_measurements transform catches measurements other
+        than expval and var that include observables, and raises an error"""
+
+        dev = qml.device("lightning.qubit", wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        tape = qml.tape.QuantumScript([], measurements=[measurement])
+
+        if isinstance(measurement, (ExpectationMP, VarianceMP)):
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+        else:
+            with pytest.raises(
+                CompileError,
+                match="Only expectation value and variance measurements can accept observables",
+            ):
+                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+
+
+class TestMeasurementTypeValidation:
+    """Test validation of measurement processes versus the a device's supported
+    measurement types"""
+
+    @pytest.mark.parametrize(
+        "measurement, shots, msg",
+        [
+            (qml.state(), 100, "Please specify shots=None."),
+            (qml.sample(), None, "Please specify a finite number of shots."),
+            (qml.expval(qml.X(0)), 100, "is not a supported measurement process"),
+            (qml.expval(qml.X(0)), None, "is not a supported measurement process"),
+        ],
+    )
+    def test_validate_measurements_works_on_measurement_processes(self, measurement, shots, msg):
+        """Test that the validate_measurements transform raises a CompileError as
+        expected for an unsupported MeasurementProcess"""
+
+        dev = qml.device("lightning.qubit", wires=1, shots=shots)
+        tape = qml.tape.QuantumScript([], measurements=[measurement])
+
+        qjit_capabilities = get_device_capabilities(dev)
+        qjit_capabilities.measurement_processes.remove("Expval")
+
+        with pytest.raises(CompileError, match=msg):
+            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+
+    def test_state_measurements_rejected_with_shots(self):
+        """Test that trying to measure a state on a device with finite shots
+        raises a CompileError informing the user that shots must be None for
+        state based measurements"""
+
+        dev = qml.device("lightning.qubit", wires=1, shots=100)
+
+        @qml.qnode(dev)
+        def f():
+            qml.RX(1.23, 0)
+            return qml.state()
+
+        with pytest.raises(CompileError, match="Please specify shots=None."):
+            qml.qjit(f)()
+
+    @pytest.mark.parametrize("measurement", [qml.sample, qml.counts])
+    def test_sample_measurements_rejected_without_shots(self, measurement):
+        """Test that trying to take a sample-based measurement on a device
+        without shots raises a CompileError informing the user that a
+        finite number of shots is needed for sampling"""
+
+        dev = qml.device("lightning.qubit", wires=1, shots=None)
+
+        @qml.qnode(dev)
+        def f():
+            qml.RX(1.23, 0)
+            return measurement()
+
+        with pytest.raises(CompileError, match="Please specify a finite number of shots."):
+            qml.qjit(f)()
+
+    def test_unsupported_measurement_types_rejected(self):
+        """Test that trying to use a measurement type that is generally unsupported by
+        the device raises a CompileError"""
+
+        dev = qml.device("lightning.qubit", wires=1, shots=100)
+
+        class MyMeasurement(qml.measurements.SampleMeasurement):
+            """A custom measurement (not supported on lightning.qubit)"""
+
+            def __init__(self, obs=None, wires=None):
+                super().__init__(obs=obs, wires=wires, eigvals=None, id=None)
+
+            def process_samples(self, samples, wire_order, shot_range, bin_size):
+                """overwrite ABC method"""
+                raise NotImplementedError
+
+            def process_counts(self, counts, wire_order):
+                """overwrite ABC method"""
+                raise NotImplementedError
+
+        @qml.qnode(dev)
+        def f():
+            qml.RX(1.23, 0)
+            return MyMeasurement()
+
+        with pytest.raises(CompileError, match="is not a supported measurement process"):
+            qml.qjit(f)()
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)

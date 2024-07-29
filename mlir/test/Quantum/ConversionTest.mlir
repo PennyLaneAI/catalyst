@@ -18,12 +18,12 @@
 // Runtime Management //
 ////////////////////////
 
-// CHECK: llvm.func @__catalyst__rt__initialize()
+// CHECK: llvm.func @__catalyst__rt__initialize(!llvm.ptr)
 
 // CHECK-LABEL: @init
 func.func @init() {
 
-    // CHECK: llvm.call @__catalyst__rt__initialize()
+    // CHECK: llvm.call @__catalyst__rt__initialize({{%.+}}) : (!llvm.ptr) -> ()
     quantum.init
 
     return
