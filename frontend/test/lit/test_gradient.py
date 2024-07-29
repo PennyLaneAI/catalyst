@@ -31,7 +31,7 @@ def grad_default(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: gradient.grad "fd" @f(%cst) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad "fd" @f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
     g = grad(f, method="fd")
     return g(jax.numpy.pi)
 
