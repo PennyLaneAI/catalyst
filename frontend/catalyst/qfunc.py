@@ -48,11 +48,11 @@ from catalyst.device import (
     validate_device_capabilities,
 )
 from catalyst.jax_extras import (
+    DynamicJaxprTracer,
+    PyTreeRegistry,
     deduce_avals,
     get_implicit_and_explicit_flat_args,
     unzip2,
-    PyTreeRegistry,
-    DynamicJaxprTracer,
 )
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
