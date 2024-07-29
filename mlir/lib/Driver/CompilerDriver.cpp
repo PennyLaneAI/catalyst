@@ -46,6 +46,7 @@
 #include "Driver/CompilerDriver.h"
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
@@ -249,6 +250,27 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     ParserConfig parserConfig{ctx, /*verifyAfterParse=*/true, &fallbackResourceMap};
 
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
+}
+
+/// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
+/// output to diagnosticStream.
+bool containsGradients(mlir::Operation *op)
+{
+    auto name = op->getName().getStringRef();
+    if (name == "gradOp" || name == "VJPOp" || name == "JVPOp") {
+        return true;
+    }
+
+    for (auto &region : op->getRegions()) {
+        for (auto &block : region) {
+            for (auto &nestedOp : block) {
+                if (containsGradients(&nestedOp)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
