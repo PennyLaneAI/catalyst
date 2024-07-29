@@ -100,6 +100,7 @@ mhlo:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
+        # TODO: figure out why this test is failing
 	LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
 .PHONY: enzyme
