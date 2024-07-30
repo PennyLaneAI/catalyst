@@ -126,8 +126,7 @@ void LightningKokkosSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningKokkosSimulator::SetState(std::vector<std::complex<double>>) {
-}
+void LightningKokkosSimulator::SetState(std::vector<std::complex<double>>) {}
 
 auto LightningKokkosSimulator::Zero() const -> Result
 {
