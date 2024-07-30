@@ -694,11 +694,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
 
-        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
-                                llvmModule, output))) {
-            return failure();
-        }
-
         catalyst::utils::LinesCount::Module(*llvmModule.get());
 
         if (options.asyncQnodes) {

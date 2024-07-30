@@ -76,8 +76,8 @@ PYBIND11_MODULE(compiler_driver, m)
 
     m.def(
         "run_compiler_driver",
-        [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate, bool asyncQnodes,
-           bool verbose, py::list pipelines,
+        [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
+           bool asyncQnodes, bool verbose, py::list pipelines,
            bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
             // Install signal handler to catch user interrupts (e.g. CTRL-C).
             signal(SIGINT,
@@ -106,6 +106,7 @@ PYBIND11_MODULE(compiler_driver, m)
             return output;
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
-        py::arg("keep_intermediate") = false, py::arg("async_qnodes") = false, py::arg("verbose") = false,
-        py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true);
+        py::arg("keep_intermediate") = false, py::arg("async_qnodes") = false,
+        py::arg("verbose") = false, py::arg("pipelines") = py::list(),
+        py::arg("lower_to_llvm") = true);
 }
