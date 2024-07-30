@@ -1,0 +1,24 @@
+From 431da821402484bfa128d0559788c86e33f14dc2 Mon Sep 17 00:00:00 2001
+From: Tzung-Han Juang <tzunghan.juang@gmail.com>
+Date: Fri, 26 Jul 2024 10:39:45 -0400
+Subject: [PATCH 1/1] Add PassesIncGen in transforms CMakeList
+
+---
+ mhlo/transforms/CMakeLists.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mhlo/transforms/CMakeLists.txt b/mhlo/transforms/CMakeLists.txt
+index ecec1370..9e80604f 100644
+--- a/mhlo/transforms/CMakeLists.txt
++++ b/mhlo/transforms/CMakeLists.txt
+@@ -195,6 +195,7 @@ add_mlir_library(ChloPasses
+   MLIRhlo_opsIncGen
+   MLIRChloLegalizeToHloIncGen
+   MLIRMhloPassIncGen
++  PassesIncGen
+ 
+   LINK_COMPONENTS
+   Core
+-- 
+2.34.1
+

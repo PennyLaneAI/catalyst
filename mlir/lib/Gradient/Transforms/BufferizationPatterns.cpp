@@ -77,7 +77,7 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         Value gradSize = op.getGradSize();
         SmallVector<Value> memrefValues;
         for (Type resType : resTypes) {
-            MemRefType memrefType = resType.cast<MemRefType>();
+            MemRefType memrefType = cast<MemRefType>(resType);
             Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
             memrefValues.push_back(memrefValue);
         }
@@ -202,7 +202,7 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
         SmallVector<Value> cotangents;
 
         Block *block;
-        rewriter.updateRootInPlace(op, [&] { block = op.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
 
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(block);
@@ -295,7 +295,7 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         SmallVector<Value> tapeElements;
 
         Block *block;
-        rewriter.updateRootInPlace(op, [&] { block = op.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
 
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(block);
