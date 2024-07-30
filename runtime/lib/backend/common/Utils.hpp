@@ -45,7 +45,7 @@
     void SetDeviceShots(size_t shots) override;                                                    \
     [[nodiscard]] auto GetDeviceShots() const->size_t override;                                    \
     void PrintState() override;                                                                    \
-    void SetState(std::vector<std::complex<double>>) override;                                     \
+    void SetState(DataView<std::complex<double>, 1> &) override;                                     \
     [[nodiscard]] auto Zero() const->Result override;                                              \
     [[nodiscard]] auto One() const->Result override;
 

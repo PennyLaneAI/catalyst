@@ -162,7 +162,7 @@ struct QuantumDevice {
     /**
      * @brief Function to set state to vector of complex variables.
      */
-    virtual void SetState(std::vector<std::complex<double>>) = 0;
+    virtual void SetState(DataView<std::complex<double>, 1> &) = 0;
 
     /**
      * @brief Apply a single gate to the state vector of a device with its name if this is

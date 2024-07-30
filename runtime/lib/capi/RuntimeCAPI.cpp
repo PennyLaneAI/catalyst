@@ -156,7 +156,6 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    // void *ptr = malloc(size);
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -459,7 +458,11 @@ void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
 
 void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data)
 {
-    std::vector<std::complex<double>> data_vector;
+    // Data guaranteed to be only one dimension by the type system.
+    // But what is not guaranteed is the strided.
+    MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
+    DataView<std::complex<double>, 1> data_vector(data_p->data_aligned, data_p->offset,
+                                           data_p->sizes, data_p->strides);
     getQuantumDevicePtr()->SetState(data_vector);
 }
 

@@ -104,7 +104,7 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningSimulator::SetState(std::vector<std::complex<double>> data) {}
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data) {}
 
 auto LightningSimulator::Zero() const -> Result
 {
