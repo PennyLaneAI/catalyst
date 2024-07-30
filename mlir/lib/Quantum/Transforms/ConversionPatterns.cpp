@@ -356,15 +356,25 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         bool isVarArg = false;
         MLIRContext *ctx = rewriter.getContext();
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
+        auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func =
-            mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
-                                         {adaptor.getInState().getType()}, voidTy, isVarArg);
+        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState", {ptrTy},
+                                                 voidTy, isVarArg);
+
+        auto structTy = adaptor.getInState().getType();
+
+        Location loc = op.getLoc();
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+
+        auto allocaOp = rewriter.create<LLVM::AllocaOp>(
+            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structTy, c1);
+        auto allocaPtr = allocaOp.getResult();
+
+        auto storeOp = rewriter.create<LLVM::StoreOp>(loc, adaptor.getInState(), allocaPtr);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        Location loc = op.getLoc();
-        rewriter.create<LLVM::CallOp>(loc, func, ValueRange{adaptor.getInState()});
+        rewriter.create<LLVM::CallOp>(loc, func, ValueRange{allocaPtr});
         rewriter.replaceOp(op, values);
         return success();
     }
