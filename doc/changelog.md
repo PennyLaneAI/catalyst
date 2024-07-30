@@ -248,6 +248,10 @@
 
 <h3>Internal changes</h3>
 
+* llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
+   Coroutine lowering pass.
+  [(#968)](https://github.com/PennyLaneAI/catalyst/pull/968)
+
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
   [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
 
