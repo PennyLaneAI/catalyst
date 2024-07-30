@@ -27,7 +27,8 @@ Supported backend devices include:
     - A fast state-vector qubit simulator written with a C++ backend. See the
       `Lightning documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`__
       for more details, as well as its
-      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__.
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__
+      for natively supported instructions.
 
   * - ``lightning.kokkos``
 
@@ -35,7 +36,8 @@ Supported backend devices include:
       circuit simulation. See the
       `Lightning documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`__
       for more details, as well as its
-      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__.
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
+      for natively supported instructions.
 
   * - ``braket.aws.qubit``
 
@@ -44,7 +46,7 @@ Supported backend devices include:
       `PennyLane-Braket plugin <https://amazon-braket-pennylane-plugin-python.readthedocs.io/en/latest/>`__.
       See the
       `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/runtime/lib/backend/openqasm/braket_aws_qubit.toml>`__
-      for supported operations.
+      for natively supported instructions.
 
   * - ``braket.local.qubit``
 
@@ -53,7 +55,7 @@ Supported backend devices include:
       `PennyLane-Braket plugin <https://amazon-braket-pennylane-plugin-python.readthedocs.io/en/latest/>`__.
       See the
       `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/runtime/lib/backend/openqasm/braket_local_qubit.toml>`__
-      for more details.
+      for natively supported instructions.
 
   * - ``qrack.simulator``
 
@@ -64,7 +66,7 @@ Supported backend devices include:
       the `QJIT compilation with Qrack and Catalyst tutorial <https://pennylane.ai/qml/demos/qrack/>`__.
 
       See the `Catalyst configuration file <https://github.com/unitaryfund/pennylane-qrack/blob/master/pennylane_qrack/QrackDeviceConfig.toml>`__
-      for more details.
+      for natively supported instructions.
 
   * - ``oqc.cloud``
 
@@ -83,5 +85,5 @@ Supported backend devices include:
           dev = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
-      for more details.
+      for natively supported instructions.
 
