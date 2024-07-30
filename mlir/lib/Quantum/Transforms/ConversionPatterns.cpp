@@ -14,6 +14,7 @@
 
 #include <string>
 
+#include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -342,6 +343,27 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
     {
         // Unravel use-def chain of quantum register values, converting back to reference semantics.
         rewriter.replaceOp(op, adaptor.getInQreg());
+        return success();
+    }
+};
+
+struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(SetStateOp op, SetStateOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        bool isVarArg = false;
+        MLIRContext *ctx = rewriter.getContext();
+        auto voidTy = LLVM::LLVMVoidType::get(ctx);
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState", {adaptor.getInState().getType()}, voidTy, isVarArg);
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        Location loc = op.getLoc();
+        rewriter.create<LLVM::CallOp>(loc, func, ValueRange{adaptor.getInState()});
+        rewriter.replaceOp(op, values);
         return success();
     }
 };
@@ -913,6 +935,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
