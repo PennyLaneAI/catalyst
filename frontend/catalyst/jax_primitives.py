@@ -1896,6 +1896,7 @@ def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
     AssertionOp(assertion=assertion_mlir, error=error)
     return ()
 
+
 #
 # state_prep
 #
@@ -1917,6 +1918,7 @@ def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
     qubits = qubits_or_params
     out_qubits = [qubit.type for qubit in qubits]
     return SetStateOp(out_qubits, param, qubits).results
+
 
 #
 # adjoint
