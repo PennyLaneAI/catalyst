@@ -161,7 +161,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                                                             /* seed = */ {intPtrType});
             Value seed_val;
             if (op->hasAttr("seed")) {
-                mlir::IRRewriter::InsertPoint ip = rewriter.saveInsertionPoint();
+                IRRewriter::InsertPoint ip = rewriter.saveInsertionPoint();
                 OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
                 rewriter.setInsertionPointToStart(mod.getBody());
                 LLVM::GlobalOp seed_glb = rewriter.create<LLVM::GlobalOp>(
@@ -469,7 +469,7 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
-        assert(op.getMatrix().getType().isa<MemRefType>() &&
+        assert(isa<MemRefType>(op.getMatrix().getType()) &&
                "unitary must take in memref before lowering");
 
         Type matrixType = conv->convertType(
@@ -565,7 +565,7 @@ struct HermitianOpPattern : public OpConversionPattern<HermitianOp> {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        assert(op.getMatrix().getType().isa<MemRefType>() &&
+        assert(isa<MemRefType>(op.getMatrix().getType()) &&
                "hermitian must take in memref before lowering");
 
         Type matrixType = conv->convertType(
@@ -633,7 +633,7 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        assert(op.getCoeffs().getType().isa<MemRefType>() &&
+        assert(isa<MemRefType>(op.getCoeffs().getType()) &&
                "hamiltonian must take in memref before lowering");
 
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
