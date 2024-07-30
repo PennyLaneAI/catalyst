@@ -533,6 +533,7 @@ class Compiler:
                 str(workspace),
                 module_name,
                 keep_intermediate=self.options.keep_intermediate,
+                async_qnodes=self.options.async_qnodes,
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
