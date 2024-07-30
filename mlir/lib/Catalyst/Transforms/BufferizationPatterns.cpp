@@ -55,7 +55,7 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
         ValueRange results = op.getResults();
         for (Value result : results) {
             Type resultType = result.getType();
-            RankedTensorType tensorType = resultType.dyn_cast<RankedTensorType>();
+            RankedTensorType tensorType = dyn_cast<RankedTensorType>(resultType);
             if (!tensorType) {
                 return failure();
             }
@@ -110,7 +110,7 @@ struct BufferizeCallbackOp : public OpConversionPattern<CallbackOp> {
         SmallVector<Type> args(argTys.begin(), argTys.end());
         args.insert(args.end(), retTys.begin(), retTys.end());
         auto callbackTy = rewriter.getFunctionType(args, emptyRets);
-        rewriter.updateRootInPlace(op, [&] { op.setFunctionType(callbackTy); });
+        rewriter.modifyOpInPlace(op, [&] { op.setFunctionType(callbackTy); });
     }
 };
 
