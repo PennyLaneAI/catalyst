@@ -204,7 +204,7 @@ jobs:
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
-        cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build --target EnzymeStatic-18
+        cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build --target EnzymeStatic-19
 
   catalyst-macos-wheels-arm64:
     needs: [constants, build-dependencies]
