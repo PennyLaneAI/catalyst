@@ -129,10 +129,6 @@ jobs:
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
-        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
-        if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-        
         set -x
         # With GCC 13, LLVM fails some tests, then we use GCC 12 instead
         export GCC_VERSION=12
