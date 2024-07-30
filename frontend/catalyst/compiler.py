@@ -165,7 +165,6 @@ HLO_LOWERING_PASS = (
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
         "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-shapeops-to-standard)",
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
         "func.func(hlo-legalize-sort)",

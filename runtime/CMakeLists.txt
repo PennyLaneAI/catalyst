@@ -49,6 +49,13 @@ FetchContent_Declare(
     SOURCE_DIR          mlir/ExecutionEngine
 )
 
+FetchContent_Declare(
+    MLIRFloat16Bits
+    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/Float16bits.h
+    DOWNLOAD_NO_EXTRACT True
+    SOURCE_DIR          mlir/ExecutionEngine
+)
+
 function(fetch_pybind11)
     find_package(pybind11 CONFIG)
     if (pybind11_FOUND)

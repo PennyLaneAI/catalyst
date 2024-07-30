@@ -108,9 +108,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             auto tang = tangOperands[nparam];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
 
-            auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
-            auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
-            auto stang = _tovec(tang.getType().cast<mlir::TensorType>().getShape());
+            auto sjac = _tovec(cast<TensorType>(jac.getType()).getShape());
+            auto sparam = _tovec(cast<TensorType>(param.getType()).getShape());
+            auto stang = _tovec(cast<TensorType>(tang.getType()).getShape());
 
             std::vector<int64_t> sjac_param(sjac.begin() + sjac.size() - sparam.size(), sjac.end());
 
@@ -229,9 +229,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
             auto cotang = cotang_operands[nout];
 
-            auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
-            auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
-            auto scotang = _tovec(cotang.getType().cast<mlir::TensorType>().getShape());
+            auto sjac = _tovec(cast<TensorType>(jac.getType()).getShape());
+            auto sparam = _tovec(cast<TensorType>(param.getType()).getShape());
+            auto scotang = _tovec(cast<TensorType>(cotang.getType()).getShape());
 
             std::vector<int64_t> sjac_cotang(sjac.begin(), sjac.end() - sparam.size());
 
