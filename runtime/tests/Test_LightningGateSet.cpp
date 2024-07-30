@@ -830,7 +830,7 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSi
 TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
 {
     const size_t N = 3;
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         // TODO: remove when other devices support controlled gates

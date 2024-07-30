@@ -161,7 +161,7 @@ class AdjointGenerator {
         clone.setAdjointFlag(!gate.getAdjointFlag());
 
         // Read cached parameters from the recorded parameter vector.
-        mlir::Operation *operation = gate;
+        Operation *operation = gate;
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
             OpBuilder::InsertionGuard insertionGuard(builder);
             builder.setInsertionPoint(clone);
@@ -179,7 +179,7 @@ class AdjointGenerator {
                 }
 
                 // Guaranteed by verifyTypeIsPoppable above.
-                auto aTensorType = paramType.cast<RankedTensorType>();
+                auto aTensorType = cast<RankedTensorType>(paramType);
                 ArrayRef<int64_t> shape = aTensorType.getShape();
                 Type elementType = aTensorType.getElementType();
                 // Constants
@@ -483,14 +483,13 @@ class AdjointGenerator {
     bool generationFailed = false;
 };
 
-struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> {
-    using mlir::OpRewritePattern<AdjointOp>::OpRewritePattern;
+struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
+    using OpRewritePattern<AdjointOp>::OpRewritePattern;
 
     /// We build a map from values mentioned in the source data flow to the values of
     /// the program where quantum control flow is reversed. Most of the time, there is a 1-to-1
     /// correspondence with a notable exception caused by `insert`/`extract` API asymmetry.
-    mlir::LogicalResult matchAndRewrite(AdjointOp adjoint,
-                                        mlir::PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
         auto cache = QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());

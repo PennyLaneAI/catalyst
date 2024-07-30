@@ -126,7 +126,7 @@ class QFunc:
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
-        program_features = ProgramFeatures(self.device.shots is not None)
+        program_features = ProgramFeatures(shots_present=bool(self.device.shots))
         device_capabilities = get_device_capabilities(self.device, program_features)
         backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
 
@@ -274,7 +274,7 @@ def dynamic_one_shot(qnode, **kwargs):
         results_flatten, _ = tree_flatten(results, is_leaf)
 
         out_flat = parse_native_mid_circuit_measurements(
-            cpy_tape, aux_tapes, results_flatten, interface="jax"
+            cpy_tape, aux_tapes, results_flatten, postselect_mode="pad-invalid-samples"
         )
         out_flat, _ = tree_flatten(out_flat)
         _, results_tree = tree_flatten(tuple(results))

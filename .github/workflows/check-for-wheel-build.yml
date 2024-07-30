@@ -22,25 +22,25 @@ jobs:
         run: echo "needs_wheel_builds=${{ contains(github.event.pull_request.labels.*.name, 'requires-wheel-builds') }}" >>$GITHUB_OUTPUT
 
       # If the trigger for this workflow (on pull_request) is not a labelling event, then only build the wheels if the
-      # label being added is `ci:build-wheels`. If the pull_request event is not a labelling event (eg: new commit is pushed)
-      # then build wheels as long as the `ci:build-wheels` label is present
+      # label being added is `author:build-wheels`. If the pull_request event is not a labelling event (eg: new commit is pushed)
+      # then build wheels as long as the `author:build-wheels` label is present
       - name: Build Wheels for Pull Request
         id: build_wheels
         if: steps.is_pr.outputs.is_pr == 'true'
         run: |
           echo "build_wheels=${{
-           (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'ci:build-wheels')) ||
-           github.event.label.name == 'ci:build-wheels'
+           (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'author:build-wheels')) ||
+           github.event.label.name == 'author:build-wheels'
           }}" >> $GITHUB_OUTPUT
 
       # If a pr has the `requires-wheel-builds` label, that means that the Workflows which build wheels need to successfully run against it
-      # However, the PR does not have the `ci:build-wheels` label, meaning it is not ready for the wheel workflows to run against it yet.
+      # However, the PR does not have the `author:build-wheels` label, meaning it is not ready for the wheel workflows to run against it yet.
       # In that condition, this step will fail, causing the entire workflow to fail.
       # And since this job is required to pass on all jobs, it will cause the merging of the pull request to be blocked.
       - name: Fail for Pull Request that needs wheels built but does not have build-wheels label
         if: steps.is_pr.outputs.is_pr == 'true' && steps.needs_wheel_builds.outputs.needs_wheel_builds == 'true' && steps.build_wheels.outputs.build_wheels == 'false'
         run: |
-          echo ::error title=Failing for Pull Request that needs wheel builds with build-wheels label missing::This pull request requires the wheels to build successfully against it. Add the `ci:build-wheels` label. && exit 1
+          echo ::error title=Failing for Pull Request that needs wheel builds with build-wheels label missing::This pull request requires the wheels to build successfully against it. Add the `author:build-wheels` label. && exit 1
 
     outputs:
       build-wheels: >-
