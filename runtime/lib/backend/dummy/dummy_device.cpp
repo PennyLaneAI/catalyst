@@ -42,7 +42,7 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     void StartTapeRecording() override {}
     void StopTapeRecording() override {}
     void PrintState() override {}
-    void SetState(std::vector<std::complex<double>>) override {}
+    void SetState(DataView<std::complex<double>, 1> &) override {}
 
     void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
