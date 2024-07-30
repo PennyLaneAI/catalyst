@@ -124,6 +124,8 @@ def qjit(
             Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
             with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
             below.
+        disable_assertions (bool): If set to ``True``, runtime assertions included in
+            ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
 
     Returns:
         QJIT object.
@@ -152,28 +154,28 @@ def qjit(
             return qml.expval(qml.PauliZ(wires=1))
 
     >>> circuit(0.5)  # the first call, compilation occurs here
-    array(0.)
+    Array(0., dtype=float64)
     >>> circuit(0.5)  # the precompiled quantum function is called
-    array(0.)
+    Array(0., dtype=float64)
 
     Alternatively, if argument type hints are provided, compilation
     can occur 'ahead of time' when the function is decorated.
 
     .. code-block:: python
 
-        from jax.core import ShapedArray
+        dev = qml.device("lightning.qubit", wires=2)
 
-        @qjit  # compilation happens at definition
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: complex, z: jax.ShapeDtypeStruct((3,), jnp.float64)):
             theta = jnp.abs(x)
             qml.RY(theta, wires=0)
             qml.Rot(z[0], z[1], z[2], wires=0)
             return qml.state()
 
     >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
-    array([0.75634905-0.52801002j, 0. +0.j,
-           0.35962678+0.14074839j, 0. +0.j])
+    Array([0.75634905-0.52801002j, 0.        +0.j        ,
+           0.35962678+0.14074839j, 0.        +0.j        ], dtype=complex128)
 
     For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
 
@@ -200,10 +202,10 @@ def qjit(
                 return qml.expval(qml.PauliZ(0))
 
         >>> circuit(3)
-        array(0.)
+        Array(0., dtype=float64)
 
         >>> circuit(5)
-        array(1.)
+        Array(1., dtype=float64)
 
         Note that imperative control flow will still work in Catalyst even when the AutoGraph
         feature is turned off, it just won't be captured in the compiled program and cannot involve
@@ -211,67 +213,6 @@ def qjit(
         ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
         be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
         appearing as is.
-
-
-    .. details::
-        :title: Adding modules for Autograph conversion
-
-        Library code is not meant to be targeted by Autograph conversion, hence
-        ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
-        But sometimes it might make sense enabling specific submodules from the
-        excluded modules for which conversion may be appropriate. For these cases
-        one can use the ``autograph_include`` parameter, which provides a list
-        of modules/submodules that will always be enabled for conversion no matter
-        if the default conversion rules were excluding them before.
-
-        .. code-block:: python
-
-            import excluded_module
-
-            @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
-            def g(x: int):
-                return excluded_module.submodule.f(x)
-
-        Notice that ``autograph=True`` must be set in order to process the
-        ``autograph_include`` list. Otherwise an error will be reported.
-
-
-    .. details::
-        :title: In-place JAX array assignments with Autograph
-
-        To update array values when using JAX, the JAX syntax for array assignment
-        (which uses the array ``at`` and ``set`` methods) must be used:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result = result.at[i].set(x[i]* 2)
-
-            return result
-
-        However, if updating a single index of the array, Autograph supports conversion of
-        standard Python array assignment syntax:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result[i] = x[i] * 2
-
-            return result
-
-        Under the hood, Catalyst converts anything coming in the latter notation into the
-        former one.
-
 
     .. details::
         :title: Static arguments

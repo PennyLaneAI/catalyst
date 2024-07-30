@@ -15,20 +15,20 @@
 #ifndef MITIGATION_OPS
 #define MITIGATION_OPS
 
+include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
-include "mlir/IR/BuiltinAttributes.td"
+include "mlir/Interfaces/CallInterfaces.td"
 
 include "Mitigation/IR/MitigationDialect.td"
 
 def Folding : I32EnumAttr<"Folding",
     "Folding types",
     [
-        I32EnumAttrCase<"GLOBAL", 1>,
-        I32EnumAttrCase<"RANDOM", 2>,
-        I32EnumAttrCase<"ALL",    3>,
+        I32EnumAttrCase<"global", 1>,
+        I32EnumAttrCase<"random", 2>,
+        I32EnumAttrCase<"all",    3>,
     ]> {
     let cppNamespace = "catalyst::mitigation";
     let genSpecializedAttr = 0;

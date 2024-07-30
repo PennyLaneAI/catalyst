@@ -53,10 +53,10 @@ def callback(callback_fn):
 
     >>> fn(0.54)
     Value of y = 0.5141359916531132
-    array(0.26433582)
+    Array(0.26433582, dtype=float64)
     >>> fn(1.52)
     Value of y = 0.998710143975583
-    array(0.99742195)
+    Array(0.99742195, dtype=float64)
 
     It can also be used functionally:
 
@@ -75,7 +75,7 @@ def callback(callback_fn):
 
     >>> fn(0.543)
     INFO:__main__:Value of y = 0.5167068002272901
-    array(0.88476988)
+    Array(0.88476988, dtype=float64)
 
     Note that during differentiation, the callback function will only be executed
     during the forward pass.

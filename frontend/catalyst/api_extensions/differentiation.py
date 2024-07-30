@@ -111,7 +111,7 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
             return g(x)
 
     >>> workflow(2.0)
-    array(-3.14159265)
+    Array(-3.14159265, dtype=float64)
 
     **Example 2 (Classical preprocessing and postprocessing)**
 
@@ -132,7 +132,7 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
             return catalyst.grad(loss, method="auto")(theta)
 
     >>> grad_loss(1.0)
-    array(-1.90958669)
+    Array(-1.90958669, dtype=float64)
 
     **Example 3 (Multiple QNodes with their own differentiation methods)**
 
@@ -158,7 +158,7 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
             return catalyst.grad(loss)(theta)
 
     >>> grad_loss(jnp.array([1.0, 2.0]))
-    array([ 0.57367285, 44.4911605 ])
+    Array([ 0.57367285, 44.4911605 ], dtype=float64)
 
     **Example 4 (Purely classical functions)**
 
@@ -172,7 +172,7 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
             return catalyst.grad(square)(x)
 
     >>> dsquare(2.3)
-    array(4.6)
+    Array(4.6, dtype=float64)
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
@@ -247,12 +247,11 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
             def circuit(x):
                 qml.RX(jnp.pi * x, wires=0)
                 return qml.expval(qml.PauliY(0))
+            return value_and_grad(circuit)(x)
 
-            g = value_and_grad(circuit)
-            return g(x)
-
-    >>> workflow(2.0)
-    (array(0.2), array(-3.14159265))
+    >>> workflow(0.2)
+    (Array(-0.58778525, dtype=float64),
+    (Array(-0.58778525, dtype=float64), Array(-2.54160185, dtype=float64)))
 
     **Example 2 (Classical preprocessing and postprocessing)**
 
@@ -273,7 +272,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
             return catalyst.value_and_grad(loss, method="auto")(theta)
 
     >>> value_and_grad_loss(1.0)
-    (array(-4.12502201), array(4.34374983))
+    (Array(-4.2622289, dtype=float64), Array(5.04324559, dtype=float64))
 
     **Example 3 (Purely classical functions)**
 
@@ -287,7 +286,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
             return catalyst.value_and_grad(square)(x)
 
     >>> dsquare(2.3)
-    (array(5.29), array(4.6))
+    (Array(5.29, dtype=float64), Array(4.6, dtype=float64))
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
@@ -358,8 +357,8 @@ def jacobian(fn=None, *, method=None, h=None, argnum=None):
             return g(x)
 
     >>> workflow(jnp.array([2.0, 1.0]))
-    array([[ 3.48786850e-16 -4.20735492e-01]
-           [-8.71967125e-17  4.20735492e-01]])
+    Array([[ 3.48786850e-16 -4.20735492e-01]
+           [-8.71967125e-17  4.20735492e-01]], dtype=float64)
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
@@ -414,7 +413,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> x = jnp.array([0.1, 0.2])
     >>> tangent = jnp.array([0.3, 0.6])
     >>> jvp(x, tangent)
-    (array([0.09983342, 0.04      , 0.02      ]), array([0.29850125, 0.24      , 0.12      ]))
+    (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
+     Array([0.29850125, 0.24      , 0.12      ], dtype=float64))
 
     **Example 2 (argnum usage)**
 
@@ -438,7 +438,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> params = jnp.array([[0.54, 0.3154], [0.654, 0.123]])
     >>> dy = jnp.array([[1.0, 1.0], [1.0, 1.0]])
     >>> workflow(params, dy)
-    (array(0.78766064), array(-0.7011436))
+    (Array(0.78766064, dtype=float64), Array(-0.7011436, dtype=float64))
     """
 
     def check_is_iterable(x, hint):
@@ -517,7 +517,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     >>> x = jnp.array([0.1, 0.2])
     >>> dy = jnp.array([-0.5, 0.1, 0.3])
     >>> vjp(x, dy)
-    (array([0.09983342, 0.04      , 0.02      ]), (array([-0.43750208,  0.07      ]),))
+    (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
+     (Array([-0.43750208,  0.07      ], dtype=float64),))
     """
 
     def check_is_iterable(x, hint):

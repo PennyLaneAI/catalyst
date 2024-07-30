@@ -67,7 +67,7 @@ The :func:`.qjit` decorator can be used to jit a workflow of quantum functions:
     jitted_circuit = qjit(circuit)
 
 >>> jitted_circuit(0.7)
-array(0.)
+Array(0., dtype=float64)
 
 In Catalyst, dynamic wire values are fully supported for operations, observables and measurements.
 For example, the following circuit can be jitted with wires as arguments:
@@ -83,7 +83,7 @@ For example, the following circuit can be jitted with wires as arguments:
         return qml.probs(wires=[arg1 + 1])
 
 >>> circuit(jnp.pi / 3, 1, 2)
-array([0.625, 0.375])
+Array([0.625, 0.375], dtype=float64)
 
 
 Operations
@@ -311,22 +311,22 @@ In the following example, the number of shots is set to :math:`500` in the devic
         )
 
 >>> circuit([0.3, 0.5, 0.7])
-[array([[0., 0., 0.],
-        [0., 0., 0.],
-        [0., 0., 0.],
+(Array([[0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
         ...,
-        [0., 0., 0.],
-        [0., 0., 0.],
-        [0., 0., 0.]]),
-array([0., 1., 2., 3., 4., 5., 6., 7.]),
-array([458,   7,  35,   0,   0,   0,   0,   0]),
-array(0.95533649),
-array(0.08733219),
-array([0.91782642, 0.05984182, 0.02096486, 0.0013669 ]),
-array([ 0.89994966-0.32850727j,  0.        +0.j        ,
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0]], dtype=int64),
+ (Array([0, 1, 2, 3, 4, 5, 6, 7], dtype=int64),
+  Array([453,   0,  31,   0,  16,   0,   0,   0], dtype=int64)),
+ Array(0.936, dtype=float64),
+ Array(0.138816, dtype=float64),
+ Array([0.926, 0.048, 0.026, 0.   ], dtype=float64),
+ Array([ 0.89994966-0.32850727j,  0.        +0.j        ,
         -0.08388168-0.22979488j,  0.        +0.j        ,
         -0.04964902-0.13601409j,  0.        +0.j        ,
-        -0.0347301 +0.01267748j,  0.        +0.j        ])]
+        -0.0347301 +0.01267748j,  0.        +0.j        ],      dtype=complex128))
 
 The PennyLane projective mid-circuit measurement is also supported in Catalyst.
 :func:`.measure` is a QJIT compatible mid-circuit measurement for Catalyst that only
@@ -352,9 +352,9 @@ In the following example, ``m`` will be equal to ``True`` if wire :math:`0` is r
         return m
 
 >>> circuit(jnp.pi)
-True
+Array(True, dtype=bool)
 >>> circuit(0.0)
-False
+Array(False, dtype=bool)
 
 Compilation Modes
 =================
@@ -379,9 +379,9 @@ the quantum function is executed. For example, ``circuit`` is compiled as early 
         return qml.expval(qml.PauliZ(wires=1))
 
 >>> circuit(0.5)  # the first call, compilation occurs here
-array(0.)
+Array(0., dtype=float64)
 >>> circuit(0.5)  # the precompiled quantum function is called
-array(0.)
+Array(0., dtype=float64)
 
 .. _ahead_of_time:
 
@@ -407,8 +407,8 @@ and data type of a tensor:
         return qml.state()
 
 >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
-array([0.75634905-0.52801002j, 0. +0.j,
-   0.35962678+0.14074839j, 0. +0.j])
+Array([0.75634905-0.52801002j, 0. +0.j,
+   0.35962678+0.14074839j, 0. +0.j], dtype=complex128)
 
 At this stage the compilation already happened, so the execution of ``circuit`` calls the compiled function directly on
 the first call, resulting in faster initial execution. Note that implicit type promotion for most datatypes are allowed
@@ -574,7 +574,7 @@ This decorator accepts the function to differentiate, a differentiation strategy
         return g(x)
 
 >>> workflow(2.0)
-array(-3.14159265)
+Array(-3.14159265, dtype=float64)
 
 To specify the differentiation strategy, the ``method`` argument can be passed
 to the ``grad`` function:
@@ -619,7 +619,7 @@ also feasible.
         return grad(circuit, argnum=0)(params)
 
 >>> workflow(jnp.array([2.0, 3.0]))
-array([-2.88051099, -1.92034063])
+Array([-2.88051099, -1.92034063], dtype=float64)
 
 The :func:`.grad` decorator works for functions that return a scalar value. You can also use the :func:`.jacobian`
 decorator to compute Jacobian matrices of general hybrid functions with multiple or multivariate results.
@@ -638,10 +638,10 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
         return g(x)
 
 >>> workflow(jnp.array([2.0, 1.0]))
-array([[ 3.48786850e-16 -4.20735492e-01]
-       [-8.71967125e-17  4.20735492e-01]])
+Array([[ 3.48786850e-16 -4.20735492e-01]
+       [-8.71967125e-17  4.20735492e-01]], dtype=float64)
 
-This decorator has the same methods and API as `grad`. See the documentation for more details.
+This decorator has the same methods and API as ``grad``. See the documentation for more details.
 
 Optimizers
 ----------
@@ -697,7 +697,7 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
         return param
 
 >>> workflow()
-array(1.57079633)
+Array(1.57079633, dtype=float64)
 
 JAX Integration
 ===============

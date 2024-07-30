@@ -48,7 +48,7 @@ Let's look at a simple example starting in Python:
 
 The corresponding IR might look something like this (simplified):
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @circuit(%arg0: complex<f64>) -> i1 {
         %c00 = complex.constant [0.0, 0.0] : complex<f64>
@@ -107,7 +107,7 @@ We'll start with DAG-to-DAG transformations, which typically match small pieces 
 In our example above, we might to consider merging the two ``quantum.unitary`` applications because
 they act on the same qubit in immediate succession:
 
-.. code-block::
+.. code-block:: mlir
 
     %0 = complex.exp %arg0 : complex<f64>
     %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
@@ -281,14 +281,14 @@ changes (also called the insertion point). Let's have look at some of these elem
   In this case, we simply replace the output qubit values with the input qubit values to maintain
   the correct "wire" connections. We would thus change
 
-  .. code-block::
+  .. code-block:: mlir
 
       %q2 = quantum.unitary %A, %q1 : !quantum.bit
       %q3 = quantum.unitary %B, %q2 : !quantum.bit
 
   into
 
-  .. code-block::
+  .. code-block:: mlir
 
       %q3 = quantum.unitary %B, %q1 : !quantum.bit
 
@@ -368,7 +368,7 @@ The starting point for the transformation is the differentiation instruction in 
 It acts like a function call, but instead returns the derivative of the function for some given
 inputs:
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @my_func(f64, f64, f64) -> f64 {
         ...
@@ -444,7 +444,7 @@ values used everywhere else in the IR.
 
 To help visualize the process, after this step we would have gone from the IR shown above:
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @my_func(%x: f64, %y: f64, %z: f64) -> f64 {
         ...
@@ -454,7 +454,7 @@ To help visualize the process, after this step we would have gone from the IR sh
 
 to the following IR:
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @my_func(%x: f64, %y: f64, %z: f64) -> f64 {
         ...
@@ -511,7 +511,7 @@ In code:
 
 Alright, our function should now look something like this:
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @my_func.finitediff(%x: f64, %y: f64, %z: f64) -> (f64, f64, f64) {
         %h = arith.constant 0.1 : f64
@@ -567,7 +567,7 @@ in one go. This turns the previous IR:
 
 into:
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @my_func(%x: f64, %y: f64, %z: f64) -> f64 {
         ...

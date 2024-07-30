@@ -106,9 +106,9 @@ def measure(
             return qml.expval(qml.PauliZ(0)), m2
 
     >>> circuit(0.43)
-    [array(1.), array(False)]
+    [Array(1., dtype=float64), Array(False, dtype=bool)]
     >>> circuit(0.43)
-    [array(-1.), array(True)]
+    [Array(-1., dtype=float64), Array(True, dtype=bool)]
 
     **Example with post-selection**
 
@@ -124,7 +124,7 @@ def measure(
             return qml.expval(qml.PauliZ(0))
 
     >>> circuit()
-    -1.0
+    Array(-1., dtype=float64)
 
     **Example with reset**
 
@@ -140,7 +140,7 @@ def measure(
             return qml.expval(qml.PauliZ(0))
 
     >>> circuit()
-    1.0
+    Array(1., dtype=float64)
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
@@ -226,7 +226,7 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
             return qml.probs()
 
     >>> workflow(jnp.pi/2, wires=0)
-    array([0.5, 0.5])
+    Array([0.5, 0.5], dtype=float64)
 
     **Example 2 (with Catalyst control flow)**
 
@@ -304,7 +304,7 @@ def ctrl(
             return qml.probs()
 
     >>> workflow(jnp.pi/4, 1, 0)
-    array([0.25, 0.25, 0.03661165, 0.46338835])
+    Array([0.25, 0.25, 0.03661165, 0.46338835], dtype=float64)
     """
     if control_values is not None and (
         (len(control) if isinstance(control, Sized) else 1)

@@ -32,7 +32,7 @@ from catalyst.jax_primitives import Folding, zne_p
 
 ## API ##
 def mitigate_with_zne(
-    fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="GLOBAL"
+    fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="global"
 ):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
@@ -54,9 +54,7 @@ def mitigate_with_zne(
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
-            - GLOBAL: global unitary of the input circuit is folded
-            - ALL: all gates locally folded
-            - RANDOM: random subset of gates of the input circuits locally folded
+            - global: the global unitary of the input circuit is folded
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
@@ -150,12 +148,12 @@ class ZNE:
             raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
         try:
-            folding = Folding[self.folding]
-        except KeyError as e:
-            raise KeyError(f"Folding type must be one of {Folding._member_names_}") from e
+            folding = Folding(self.folding)
+        except ValueError as e:
+            raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
         # TODO: remove the following check once #755 is completed
         if folding != Folding.GLOBAL:
-            raise NotImplementedError(f"Folding type {folding.name} is being developed")
+            raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
         results = zne_p.bind(
             *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn

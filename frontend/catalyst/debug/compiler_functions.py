@@ -45,6 +45,8 @@ def print_compilation_stage(fn, stage):
         fn (QJIT): a qjit-decorated function
         stage (str): string corresponding with the name of the stage to be printed
 
+    .. seealso:: :doc:`/dev/debugging`
+
     **Example**
 
     .. code-block:: python
@@ -53,7 +55,21 @@ def print_compilation_stage(fn, stage):
         def func(x: float):
             return x
 
-        debug.print_compilation_stage(func, "HLOLoweringPass")
+    >>> debug.print_compilation_stage(func, "HLOLoweringPass")
+    module @func {
+      func.func public @jit_func(%arg0: tensor<f64>)
+      -> tensor<f64> attributes {llvm.emit_c_interface} {
+        return %arg0 : tensor<f64>
+      }
+      func.func @setup() {
+        quantum.init
+        return
+      }
+      func.func @teardown() {
+        quantum.finalize
+        return
+      }
+    }
     """
     EvaluationContext.check_is_not_tracing("C interface cannot be generated from tracing context.")
 

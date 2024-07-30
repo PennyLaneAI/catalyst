@@ -2,38 +2,60 @@
 
 <h3>New features</h3>
 
-* JAX-compatible functions which run on classical accelerators such as GPUs via `catalyst.accelerate` now support autodifferentiation.
+* JAX-compatible functions that run on classical accelerators, such as GPUs, via `catalyst.accelerate` now support autodifferentiation.
   [(#920)](https://github.com/PennyLaneAI/catalyst/pull/920)
 
   For example,
 
   ```python
+  from catalyst import qjit, grad
+
   @qjit
   @grad
   def f(x):
-    expm = catalyst.accelerate(jax.scipy.linalg.expm)
-    return jnp.sum(expm(jnp.sin(x)) ** 2)
+      expm = catalyst.accelerate(jax.scipy.linalg.expm)
+      return jnp.sum(expm(jnp.sin(x)) ** 2)
   ```
 
   ```pycon
   >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
   >>> f(x)
-  >>> array([[2.80120452, 1.67518663],
-      [1.61605839, 4.42856163]])
+  Array([[2.80120452, 1.67518663],
+         [1.61605839, 4.42856163]], dtype=float64)
   ```
 
-* Runtime validation within QJIT functions using `catalyst.debug_assert`.
+* Assertions can now be raised at runtime via the `catalyst.debug_assert` function.
   [(#925)](https://github.com/PennyLaneAI/catalyst/pull/925)
 
-  Can be turned off by setting compile time flag `disable_assertions=True`.
+  Python-based exceptions (via `raise`) and assertions (via `assert`)
+  will always be evaluated at program capture time, before certain runtime information
+  may be available.
+
+  Use `debug_assert` to instead raise assertions at runtime, including
+  assertions that depend on values of dynamic variables.
 
   For example,
+
   ```python
+  from catalyst import debug_assert
+  
   @qjit
   def f(x):
       debug_assert(x < 5, "x was greater than 5")
       return x * 8
+  ```
 
+  ```pycon
+  >>> f(4)
+  Array(32, dtype=int64)
+  >>> f(6)
+  RuntimeError: x was greater than 5
+  ```
+
+  Assertions can be disabled globally for a qjit-compiled function
+  via the ``disable_assertions`` keyword argument:
+
+  ```python
   @qjit(disable_assertions=True)
   def g(x):
       debug_assert(x < 5, "x was greater than 5")
@@ -41,12 +63,8 @@
   ```
 
   ```pycon
-  >>> f(4)
-  >>> Array(32, dtype=int64)
-  >>> f(6)
-  >>> RuntimeError: x was greater than 5
   >>> g(6)
-  >>> Array(48, dtype=int64)
+  Array(48, dtype=int64)
   ```
 
 <h3>Improvements</h3>
@@ -54,14 +72,63 @@
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
-* Added support for the jax.numpy.argsort function so it works when compiled with qjit.
+* Support has been added for the `jax.numpy.argsort`
+  function within qjit-compiled functions.
   [(#901)](https://github.com/PennyLaneAI/catalyst/pull/901)
 
-* Callbacks now have nicer identifiers. The identifiers include the name of
-  the python function being called back into.
-  [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
+* Autograph now supports in-place array assignments with static slices.
+  [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
 
-* Static_argnums now can be passed through a QNode
+  For example,
+
+  ```python
+  @qjit(autograph=True)
+  def f(x, y):
+      y[1:10:2] = x
+      return y
+  ```
+
+  ```pycon
+  >>> f(jnp.ones(5), jnp.zeros(10))
+  Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
+  ```
+
+* Autograph now works when `qjit` is applied to a function decorated with
+  `vmap`, `cond`, `for_loop` or `while_loop`. Previously, stacking the
+  autograph-enabled qjit decorator directly on top of other Catalyst
+  decorators would lead to errors.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
+  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
+
+  ```python
+  from catalyst import vmap, qjit
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> x = jnp.array([0.1, 0.2, 0.3])
+  >>> qjit(vmap(circuit), autograph=True)(x)
+  Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
+  ```
+
+<h3>Breaking changes</h3>
+
+* Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
+  `jax.Array` instead. This should have minimal impact, but code that depends on the output of
+  qjit-compiled function being NumPy arrays will need to be updated.
+  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
+
+<h3>Bug fixes</h3>
+
+* Static arguments can now be passed through a QNode when specified
+  with the `static_argnums` keyword argument.
   [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
 
   ```python
@@ -76,50 +143,50 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+  When executing the qjit-compiled function above, `c` will
+  be a static variable with value known at compile time:
+
   ```pycon
   >>> circuit(0.5, 0.5)
-  >>> "Inside QNode: 0.5"
+  "Inside QNode: 0.5"
+  Array(0.77015115, dtype=float64)
   ```
 
-* Autograph now supports in-place array assignments with static slices. [(#843)](https://github.com/PennyLaneAI/catalyst/pull/843)
-
-  For example,
-
-  ```python
-  @qjit(autograph=True)
-  def f(x, y):
-    y[1:10:2] = x
-    return y
-  ```
+  Changing the value of `c` will result in re-compilation:
 
   ```pycon
-  >>> f(jnp.ones(5), jnp.zeros(10))
-  >>> Array([0., 1., 0., 1., 0., 1., 0., 1., 0., 1.], dtype=float64)
+  >>> circuit(0.5, 0.8)
+  "Inside QNode: 0.8"
+  Array(0.61141766, dtype=float64)
   ```
 
-* Autograph works when `qjit` is applied to a function decorated with `vmap`, `cond`, `for_loop` or `while_loop`.
-  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
-  [(#938)](https://github.com/PennyLaneAI/catalyst/pull/938)
-  [(#942)](https://github.com/PennyLaneAI/catalyst/pull/942)
-
-<h3>Breaking changes</h3>
-* Return values are `jax.Array` typed instead of `numpy.array`.
-  [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
-
-<h3>Bug fixes</h3>
-
-* Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
+* Fixes a bug where Catalyst would fail to apply quantum transforms and preserve
+  QNode configuration settings when Autograph was enabled.
+  [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
   
-* Using float32 in callback functions would not crash in compilation phase anymore,
-  but rather raise the appropriate type exception to the user.
+* `pure_callback` will no longer cause a crash in the compiler if the return type
+  signature is declared incorrectly and the callback function is differentiated.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
 
-* Fix tracing of `SProd` operations
-  [(#935)](https://github.com/PennyLaneAI/catalyst/pull/935)
+* AutoGraph will now correctly convert conditional statements where the condition is a non-boolean
+  static value.
+  [(#944)](https://github.com/PennyLaneAI/catalyst/pull/944)
 
-  After some changes in PennyLane, `Sprod.terms()` returns the terms as leaves
-  instead of a tree. This means that we need to manually trace each term and
-  finally multiply it with the coefficients to create a Hamiltonian.
+  Internally, statically known non-boolean predicates (such as `1`) will be
+  converted to `bool`:
+
+  ```python
+  @qml.qjit(autograph=True)
+  def workflow(x):
+      n = 1
+
+      if n:
+          y = x ** 2
+      else:
+          y = x
+
+      return y
+  ```
 
 <h3>Internal changes</h3>
 
@@ -129,10 +196,27 @@
 * The function `__catalyst_inactive_callback` has the nofree attribute.
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
+* Callbacks now have nicer identifiers in their MLIR representation. The identifiers include
+  the name of the Python function being called back into.
+  [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
+
+* Fix tracing of `SProd` operations to bring Catalyst in line with PennyLane v0.38.
+  [(#935)](https://github.com/PennyLaneAI/catalyst/pull/935)
+
+  After some changes in PennyLane, `Sprod.terms()` returns the terms as leaves
+  instead of a tree. This means that we need to manually trace each term and
+  finally multiply it with the coefficients to create a Hamiltonian.
+
+* The function `mitigate_with_zne` accomodates a `folding` input argument for specifying the type of
+  circuit folding technique to be used by the error-mitigation routine
+  (only `global` value is supported to date.)
+  [(#946)](https://github.com/PennyLaneAI/catalyst/pull/946)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Alessandro Cosentino,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
