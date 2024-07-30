@@ -269,6 +269,8 @@ assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
 set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
+set_basis_state_p = jax.core.Primitive("set_basis_state")
+set_basis_state_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -1918,6 +1920,28 @@ def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
     qubits = qubits_or_params
     out_qubits = [qubit.type for qubit in qubits]
     return SetStateOp(out_qubits, param, qubits).results
+
+#
+# set_basis_state
+#
+@set_basis_state_p.def_impl
+def set_basis_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@set_basis_state_p.def_abstract_eval
+def set_basis_state_abstract(*qubits_or_params):
+    length = len(qubits_or_params)
+    qubits_length = length - 1
+    return (AbstractQbit(),) * qubits_length
+
+
+def _set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    out_qubits = [qubit.type for qubit in qubits]
+    return SetBasisStateOp(out_qubits, param, qubits).results
 
 
 #
