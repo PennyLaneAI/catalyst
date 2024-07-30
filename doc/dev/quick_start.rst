@@ -102,14 +102,14 @@ PennyLane are also supported via the decomposition mechanism in Catalyst. For ex
         qml.adjoint(qml.SingleExcitation(jnp.pi / 3, wires=[0, 1]))
         return qml.state()
 
-In addition, you can qjit most of :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
+In addition, you can qjit most :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
 more complex quantum circuits.
 
 .. important::
 
    Decomposition will generally happen in accordance with the specification provided by devices,
    which can vary from device to device (e.g., ``default.qubit`` and ``lightning.qubit`` might
-   decompose quite differently.)
+   decompose quite differently).
    However, Catalyst's decomposition logic will differ in the following cases:
 
    1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
