@@ -268,7 +268,10 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
 bool containsGradients(mlir::ModuleOp moduleOp)
 {
     bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) { contain = true; });
+    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
+        contain = true;
+        return WalkResult::interrupt();
+    });
     return contain;
 }
 
@@ -402,12 +405,8 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     PB.registerLoopAnalyses(LAM);
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-    // Create the pass manager.
-    llvm::ModulePassManager MPM;
-    MPM.addPass(llvm::CoroConditionalWrapper(std::move(CoroPM)));
-
     // Optimize the IR!
-    MPM.run(*llvmModule.get(), MAM);
+    CoroPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["CoroOpt"]};
