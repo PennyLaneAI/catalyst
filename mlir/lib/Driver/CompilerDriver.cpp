@@ -709,6 +709,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
 
             catalyst::utils::LinesCount::Module(*llvmModule.get());
+
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
