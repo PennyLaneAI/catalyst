@@ -116,6 +116,9 @@ void OpenQasmDevice::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
+void OpenQasmDevice::SetState(std::vector<std::complex<double>>) {
+}
+
 auto OpenQasmDevice::Zero() const -> Result
 {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
