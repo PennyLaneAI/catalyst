@@ -7,5 +7,5 @@ add_mlir_library(MLIRMitigation
 
     DEPENDS
     MLIRMitigationOpsIncGen
-
+    MLIRMitigationEnumsIncGen
 )

@@ -67,6 +67,53 @@
   Array(48, dtype=int64)
   ```
 
+* A `qjit` run for `lightning.qubit` and `lightning.kokkos` can now be seeded.
+  [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
+
+  The `qjit` decorator now can take in an argument `seed`, which is an unsigned 32-bit integer. 
+  Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
+  will return the same sequence of measurement results everytime. 
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(seed=37)
+  def workflow():
+      @qml.qnode(dev)
+      def circuit():
+          qml.Hadamard(0)
+          m = measure(0)
+          @cond(m)
+          def cfun0():
+              qml.Hadamard(0)
+          cfun0()
+          return qml.probs()
+      return circuit(), circuit(), circuit(), circuit()
+
+  @qjit(seed=37)
+  def workflow_another():
+      @qml.qnode(dev)
+      def circuit():
+          qml.Hadamard(0)
+          m = measure(0)
+          @cond(m)
+          def cfun0():
+              qml.Hadamard(0)
+          cfun0()
+          return qml.probs()
+      return circuit(), circuit(), circuit(), circuit()
+
+  print(workflow())
+  print(workflow())
+  print(workflow_another())
+
+  >>> 
+  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
+
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
@@ -117,6 +164,13 @@
   >>> qjit(vmap(circuit), autograph=True)(x)
   Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
   ```
+  
+* Verification is now performed before compilation to confirm that the measurements included in the quantum tape 
+  are compatible with the device.
+  [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
+  [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
+
+* Update JAX to `v0.4.28`. [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
 
 <h3>Breaking changes</h3>
 
@@ -124,6 +178,9 @@
   `jax.Array` instead. This should have minimal impact, but code that depends on the output of
   qjit-compiled function being NumPy arrays will need to be updated.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
+
+* Support for TOML files in Schema 1 has been disabled.
+  [(#960)](https://github.com/PennyLaneAI/catalyst/pull/960)
 
 <h3>Bug fixes</h3>
 
@@ -182,6 +239,7 @@
 * Fixes a bug where Catalyst would fail to apply quantum transforms and preserve
   QNode configuration settings when Autograph was enabled.
   [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
+
   
 * `pure_callback` will no longer cause a crash in the compiler if the return type
   signature is declared incorrectly and the callback function is differentiated.
@@ -215,6 +273,9 @@
 * The function `__catalyst_inactive_callback` has the nofree attribute.
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
+* `catalyst.dynamic_one_shot` uses `postselect_mode="pad-invalid-samples"` in favour of `interface="jax"` when processing results.
+  [(#956)](https://github.com/PennyLaneAI/catalyst/pull/956)
+
 * Callbacks now have nicer identifiers in their MLIR representation. The identifiers include
   the name of the Python function being called back into.
   [(#919)](https://github.com/PennyLaneAI/catalyst/pull/919)
@@ -226,16 +287,25 @@
   instead of a tree. This means that we need to manually trace each term and
   finally multiply it with the coefficients to create a Hamiltonian.
 
+* The function `mitigate_with_zne` accomodates a `folding` input argument for specifying the type of
+  circuit folding technique to be used by the error-mitigation routine
+  (only `global` value is supported to date.)
+  [(#946)](https://github.com/PennyLaneAI/catalyst/pull/946)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Alessandro Cosentino,
+Lillian M. A. Frederiksen,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
+Mudit Pandey,
 Raul Torres,
 Tzung-Han Juang,
+Paul Haochen Wang,
 
 # Release 0.7.0
 

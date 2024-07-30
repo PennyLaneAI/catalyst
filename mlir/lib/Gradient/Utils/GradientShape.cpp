@@ -42,7 +42,7 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
         Type fnResType = fnType.getResult(j);
 
         std::vector<int64_t> resShape;
-        auto tensorType = fnResType.dyn_cast<TensorType>();
+        auto tensorType = dyn_cast<TensorType>(fnResType);
         if (tensorType) {
             resShape.reserve(tensorType.getRank());
             resShape.insert(resShape.end(), tensorType.getShape().begin(),
@@ -54,7 +54,7 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
 
             std::vector<int64_t> gradResShape = resShape;
             Type diffArgType = fnType.getInput(diffArgIndices[i]);
-            if (auto tensorType = diffArgType.dyn_cast<TensorType>()) {
+            if (auto tensorType = dyn_cast<TensorType>(diffArgType)) {
                 gradResShape.reserve(resShape.size() + tensorType.getRank());
                 gradResShape.insert(gradResShape.end(), tensorType.getShape().begin(),
                                     tensorType.getShape().end());
@@ -83,7 +83,7 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
     for (Type resultType : callee.getResultTypes()) {
         std::vector<int64_t> gradShape = {ShapedType::kDynamic};
 
-        if (auto tensorType = resultType.dyn_cast<RankedTensorType>()) {
+        if (auto tensorType = dyn_cast<RankedTensorType>(resultType)) {
             assert(tensorType.hasStaticShape() && "only static tensors supported for autodiff");
             ArrayRef<int64_t> tensorShape = tensorType.getShape();
             gradShape.insert(gradShape.end(), tensorShape.begin(), tensorShape.end());
@@ -150,8 +150,7 @@ std::vector<size_t> computeDiffArgIndices(std::optional<DenseIntElementsAttr> in
 
 /// Produce a filtered list of arguments which are differentiable.
 ///
-std::vector<mlir::Value> computeDiffArgs(ValueRange args,
-                                         std::optional<mlir::DenseIntElementsAttr> indices)
+std::vector<Value> computeDiffArgs(ValueRange args, std::optional<DenseIntElementsAttr> indices)
 {
     const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(indices);
 

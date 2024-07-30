@@ -532,7 +532,7 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
 
 TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     char device_aws[30] = "braket.aws.qubit";
 
@@ -545,7 +545,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[
 
     __catalyst__rt__finalize();
 
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     char device_local[30] = "braket.local.qubit";
 
