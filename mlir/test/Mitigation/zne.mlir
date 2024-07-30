@@ -40,9 +40,9 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 }
 
 // CHECK:    func.func private @simpleCircuit.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
-    // CHECK:    [[nQubits:%.+]] = arith.constant 1 : i64
-    // CHECK:    %idx0 = index.constant 0
-    // CHECK:    %idx1 = index.constant 1
+    // CHECK-DAG:    [[nQubits:%.+]] = arith.constant 1 : i64
+    // CHECK-DAG:    %idx0 = index.constant 0
+    // CHECK-DAG:    %idx1 = index.constant 1
     // CHECK:    quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     // CHECK:    [[qReg:%.+]] = call @simpleCircuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
     // CHECK:    [[outQregFor:%.+]]  = scf.for %arg2 = %idx0 to %arg1 step %idx1 iter_args([[inQreg:%.+]] = [[qReg]]) -> (!quantum.reg) {
@@ -82,12 +82,12 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 // CHECK:    func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 
 // CHECK:    func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
-    // CHECK:    [[c0:%.+]] = index.constant 0
-    // CHECK:    [[c1:%.+]] = index.constant 1
-    // CHECK:    [[c5:%.+]] = index.constant 5
-    // CHECK:    [[dense5:%.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    // CHECK:    [[emptyRes:%.+]] = tensor.empty() : tensor<5xf64>
-    // CHECK:    [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c5]] step [[c1]] iter_args(%arg2 = [[emptyRes]]) -> (tensor<5xf64>) {
+    // CHECK-DAG:    [[c0:%.+]] = index.constant 0
+    // CHECK-DAG:    [[c1:%.+]] = index.constant 1
+    // CHECK-DAG:    [[c5:%.+]] = index.constant 5
+    // CHECK-DAG:    [[dense5:%.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
+    // CHECK-DAG:    [[emptyRes:%.+]] = tensor.empty() : tensor<5xf64>
+    // CHECK:        [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c5]] step [[c1]] iter_args(%arg2 = [[emptyRes]]) -> (tensor<5xf64>) {
         // CHECK:    [[scalarFactor:%.+]] = tensor.extract [[dense5]][[[idx]]] : tensor<5xindex>
         // CHECK:    [[intermediateRes:%.+]] = func.call @simpleCircuit.folded(%arg0, [[scalarFactor]]) : (tensor<3xf64>, index) -> f64
         // CHECK:    [[tensorRes:%.+]] = tensor.from_elements [[intermediateRes]] : tensor<1xf64>
@@ -99,6 +99,6 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     // CHECK:    return [[results]] : tensor<5xf64>
 func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
     %scaleFactors = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    %0 = mitigation.zne @simpleCircuit(%arg0) scaleFactors (%scaleFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
+    %0 = mitigation.zne @simpleCircuit(%arg0) folding (global) scaleFactors (%scaleFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
     func.return %0 : tensor<5xf64>
 }

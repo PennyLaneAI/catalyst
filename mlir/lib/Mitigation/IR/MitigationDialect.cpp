@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/IR/MitigationOps.h"
@@ -44,9 +47,26 @@ struct MitigationInlinerInterface : public DialectInlinerInterface {
 
 void MitigationDialect::initialize()
 {
+    addTypes<
+#define GET_TYPEDEF_LIST
+#include "Mitigation/IR/MitigationOpsTypes.cpp.inc"
+        >();
+
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Mitigation/IR/MitigationAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "Mitigation/IR/MitigationOps.cpp.inc"
         >();
+
     addInterface<MitigationInlinerInterface>();
 }
+
+#define GET_TYPEDEF_CLASSES
+#include "Mitigation/IR/MitigationOpsTypes.cpp.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "Mitigation/IR/MitigationAttributes.cpp.inc"
