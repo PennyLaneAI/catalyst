@@ -465,7 +465,7 @@ class HybridAdjoint(HybridOp):
             frame_ctx = EvaluationContext.frame_tracing_context(ctx, body_trace)
 
         with frame_ctx as body_trace:
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg(qrp.base.length)])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
