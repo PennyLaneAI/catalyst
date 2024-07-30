@@ -36,9 +36,16 @@
 #include "stablehlo/dialect/Register.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
@@ -607,6 +614,26 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
+        // Set data layout before LLVM passes or the default one is used.
+        std::string targetTriple = llvm::sys::getDefaultTargetTriple();
+
+        llvm::InitializeAllTargetInfos();
+        llvm::InitializeAllTargets();
+        llvm::InitializeAllTargetMCs();
+        llvm::InitializeAllAsmParsers();
+        llvm::InitializeAllAsmPrinters();
+
+        std::string err;
+        auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
+        llvm::TargetOptions opt;
+        const char *cpu = "generic";
+        const char *features = "";
+        auto targetMachine =
+            target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
+        targetMachine->setOptLevel(llvm::CodeGenOptLevel::None);
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+        llvmModule->setTargetTriple(targetTriple);
+
         if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
                                 llvmModule, output))) {
             return failure();
@@ -660,7 +687,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         auto outfile = options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), outfile))) {
+                                std::move(llvmModule), targetMachine, outfile))) {
             return failure();
         }
         output.objectFilename = outfile;

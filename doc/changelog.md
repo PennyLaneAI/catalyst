@@ -227,6 +227,8 @@
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
   [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
 
+* Update JAX to `v0.4.28`. [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
