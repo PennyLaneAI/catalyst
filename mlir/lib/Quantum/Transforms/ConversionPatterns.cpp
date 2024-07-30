@@ -357,7 +357,9 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         MLIRContext *ctx = rewriter.getContext();
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState", {adaptor.getInState().getType()}, voidTy, isVarArg);
+        auto func =
+            mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
+                                         {adaptor.getInState().getType()}, voidTy, isVarArg);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
