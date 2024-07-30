@@ -457,6 +457,11 @@ void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data) {
+    std::vector<std::complex<double>> data_vector;
+    getQuantumDevicePtr()->SetState(data_vector);
+}
+
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation("Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
