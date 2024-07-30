@@ -257,8 +257,7 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
-/// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
-/// output to diagnosticStream.
+/// From the MLIR module it checks if gradients operations are in the program.
 bool containsGradients(mlir::ModuleOp moduleOp)
 {
     bool contain = false;
