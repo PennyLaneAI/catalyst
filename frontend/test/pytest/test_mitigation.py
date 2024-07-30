@@ -27,6 +27,7 @@ quadratic_extrapolation = polynomial_extrapolation(2)
 
 
 def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func):
+    """skip test if exponential extrapolation will be unstable"""
     if circuit_param < 0.3 and extrapolation_func == exponential_extrapolate:
         pytest.skip("Exponential extrapolation unstable in this region.")
 
