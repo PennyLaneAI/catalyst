@@ -439,15 +439,6 @@ def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
 def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
     module = jax_ctx.module_context.module
 
-    # If there already is a transform.named_sequence, don't add another one!
-    # Do nothing and exit!
-    for op in reversed(module.body.operations):
-        # transformer module usually is at the end of the module, so look for it from the end
-        if op.operation.name == "builtin.module":
-            named_sequence_op = get_named_sequence_in_module(op)
-            if named_sequence_op is not None:
-                return op.operation.results
-
     # We wish to generate the transformer module, and place it in the top-level module
     # The transformer module must be marked with the "transform.with_named_sequence" attribute
     # The transformer module has a single block, and the block contains the

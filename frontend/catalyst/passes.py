@@ -42,18 +42,6 @@ import pennylane as qml
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
 
 
-def _inject_transform_named_sequence():
-    """
-    Inject a transform_named_sequence jax primitive.
-
-    This must be called when preprocessing the traced function in QJIT.capture(),
-    since to invoke -transform-interpreter, a transform_named_sequence primitive
-    must be in the jaxpr.
-    """
-
-    transform_named_sequence_p.bind()
-
-
 ## API ##
 def cancel_inverses(fn=None):  # pylint: disable=line-too-long
     """
@@ -158,3 +146,16 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
     fn.func = wrapper
     return fn
+
+
+## IMPL and helpers ##
+def _inject_transform_named_sequence():
+    """
+    Inject a transform_named_sequence jax primitive.
+
+    This must be called when preprocessing the traced function in QJIT.capture(),
+    since to invoke -transform-interpreter, a transform_named_sequence primitive
+    must be in the jaxpr.
+    """
+
+    transform_named_sequence_p.bind()
