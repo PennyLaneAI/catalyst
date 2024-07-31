@@ -114,6 +114,20 @@
 
   ```
 
+* Exponential extrapolation is now a supported method of extrapolation when using `mitigate_with_zne`.
+  [(#953)](https://github.com/PennyLaneAI/catalyst/pull/953)
+
+  This new functionality fits the data from noise-scaled circuits with an exponential function,
+  and returns the zero-noise value. This functionality is available through the pennylane module
+  as follows
+  ```py
+  from pennylane.transforms import exponential_extrapolate
+
+  catalyst.mitigate_with_zne(
+      circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=exponential_extrapolate
+  )
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst now supports arbitrary output pytrees when using mid-circuit measurements.
@@ -202,6 +216,12 @@
 * Support for TOML files in Schema 1 has been disabled.
   [(#960)](https://github.com/PennyLaneAI/catalyst/pull/960)
 
+* The `mitigate_with_zne` function no longer accepts a `degree` parameter for polynomial fitting
+  and instead accepts a callable to perform extrapolation. Any qjit-compatible extrapolation
+  function is valid. Keyword arguments can be passed to this function using the
+  `extrapolate_kwargs` keyword argument in `mitigate_with_zne`.
+  [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
+
 <h3>Bug fixes</h3>
 
 * Static arguments can now be passed through a QNode when specified
@@ -268,6 +288,10 @@
 
 <h3>Internal changes</h3>
 
+* llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
+   Coroutine lowering pass.
+  [(#968)](https://github.com/PennyLaneAI/catalyst/pull/968)
+
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
   [(#899)](https://github.com/PennyLaneAI/catalyst/pull/899)
 
@@ -304,6 +328,7 @@ Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa,
 Mudit Pandey,
+nate stemen,
 Raul Torres,
 Tzung-Han Juang,
 Paul Haochen Wang,
@@ -818,12 +843,6 @@ Paul Haochen Wang,
   ```
 
 <h3>Breaking changes</h3>
-
-* The `mitigate_with_zne` function no longer accepts a `degree` parameter for polynomial fitting
-  and instead accepts a callable to perform extrapolation. Any qjit-compatible extrapolation
-  function is valid. Keyword arguments can be passed to this function using the
-  `extrapolate_kwargs` keyword argument in `mitigate_with_zne`.
-  [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
   As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above
