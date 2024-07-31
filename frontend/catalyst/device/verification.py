@@ -30,14 +30,13 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.measurements.shots import Shots
-from pennylane.operation import Operation, Tensor
+from pennylane.operation import Operation, StatePrepBase, Tensor
 from pennylane.ops import (
     Adjoint,
     CompositeOp,
     Controlled,
     ControlledOp,
     Hamiltonian,
-    StatePrep,
     SymbolicOp,
 )
 from pennylane.tape import QuantumTape
@@ -213,7 +212,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         if (
             type(op) in (Controlled, ControlledOp)
             or isinstance(op, Adjoint)
-            or isinstance(op, StatePrep)
+            or isinstance(op, StatePrepBase)
         ):
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
