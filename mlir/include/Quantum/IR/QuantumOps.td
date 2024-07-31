@@ -151,8 +151,32 @@ def SetStateOp : Memory_Op<"set_state", []> {
 
     let extraClassDeclaration = [{
         bool isBufferized() {
-            return getInState().getType().isa<mlir::MemRefType>();
+            return mlir::isa<mlir::MemRefType>(getInState().getType());
         }
+    }];
+
+}
+
+def SetBasisStateOp : Memory_Op<"set_basis_state", []> {
+    let summary = "Set basis state.";
+    let description = [{
+        This operation is useful for simulators implementing set basis state.
+        Instead of decomposing basis state into multiple operations, this
+        operation shortcuts all of that into a single operation.
+        This signature matches the one in pennylane-lightning which expects
+        only a single integer as opposed to a binary digit.
+    }];
+
+    let arguments = (ins
+        I64:$index,
+        Variadic<QubitType>:$in_qubits
+    );
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $index `)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
 }
