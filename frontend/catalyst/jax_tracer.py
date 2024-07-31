@@ -629,7 +629,8 @@ def trace_quantum_operations(
             # non-controlled, all static.
             num_wires = qrp.base.length
             # StatePrep acts on all wires here.
-            assert num_wires == len(op.wires), "StatePrep must act on all wires"
+            if num_wires != len(op.wires):
+                raise ValueError("qml.StatePrep must act on all wires")
             qubits = qrp.extract(range(num_wires))
             params = op.parameters
             assert len(params) == 1, "StatePrep only has one parameter"
@@ -642,6 +643,9 @@ def trace_quantum_operations(
             # TODO: We may want to have this index generation
             # in the runtime to also save some more compile time here.
             # TODO: Also, we need to verify that these are all either 1 or 0.
+            # TODO: Also, would be good to jax.jit 
+            # qml.BasisState(x, 0).state_vector(wire_order) to avoid 
+            # duplication
             num_wires = qrp.base.length
             # we need to convert this into an index
             params = op.parameters
@@ -649,6 +653,10 @@ def trace_quantum_operations(
             qubits = qrp.extract(range(num_wires))
             param_array = params[0]
             size = jnp.size(param_array)
+            if num_wires != len(op.wires):
+                raise ValueError("qml.BasisState must act on all wires.")
+            if size != len(op.wires):
+                raise ValueError("BasisState parameter and wires must be of equal length.")
             one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
 
             def decimal(x, pos):
