@@ -134,9 +134,8 @@ struct BufferizeSetStateOp : public OpConversionPattern<SetStateOp> {
     LogicalResult matchAndRewrite(SetStateOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
         Type tensorType = op.getInState().getType();
-        MemRefType memrefType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        MemRefType memrefType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         auto toMemrefOp =
             rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, op.getInState());
         auto memref = toMemrefOp.getResult();
