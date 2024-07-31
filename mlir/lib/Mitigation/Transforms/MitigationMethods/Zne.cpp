@@ -130,12 +130,16 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                 StringAttr lib, StringAttr name, StringAttr kwargs, Type qregType,
                                 FunctionType fnFoldedType, SmallVector<Type> typesFolded,
-                                func::FuncOp fnFoldedOp, Value allocQreg,
+                                func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp, const int64_t numberQubits,
                                 func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp)
 {
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
+    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
+
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
@@ -193,7 +197,7 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
                                      std::string fnFoldedName, StringAttr lib, StringAttr name,
                                      StringAttr kwargs, Type qregType, FunctionType fnFoldedType,
                                      SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
-                                     Value allocQreg, func::FuncOp fnWithMeasurementsOp)
+                                     func::FuncOp fnAllocOp, const int64_t numberQubits, func::FuncOp fnWithMeasurementsOp)
 {
     // TODO: Implement.
 
@@ -206,14 +210,36 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
 FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                   StringAttr lib, StringAttr name, StringAttr kwargs, Type qregType,
                                   FunctionType fnFoldedType, SmallVector<Type> typesFolded,
-                                  func::FuncOp fnFoldedOp, Value allocQreg,
+                                  func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp, const int64_t numberQubits,
                                   func::FuncOp fnWithMeasurementsOp)
 {
-    fnWithMeasurementsOp.walk([&](mlir::Operation *op) {
-        // process Operation `op`.
-    });
+    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue);
 
-    return FlatSymbolRefAttr();
+    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
+    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
+
+    fnWithMeasurementsOp.walk([&](quantum::QubitUnitaryOp *op) {
+        // TODO: Skip measurements and control structures.
+        // Add scf for loop to create the folding
+        rewriter.setInsertionPointAfter(op);
+        rewriter
+            .create<scf::ForOp>(
+                loc, c0, size, c1, ValueRange(),
+                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                    // Call the function without measurements in an adjoint region
+                    auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType,*op);
+                    auto origOp = builder.create<quantum::AdjointOp>(loc, qregType,adjointOp);
+                    builder.setInsertionPointAfter(origOp);
+                    builder.create<scf::YieldOp>(loc, origOp.getResult());
+                });
+    });
+    // Remove device
+    rewriter.create<quantum::DeviceReleaseOp>(loc);
+    return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
                                                         mitigation::ZneOp op,
@@ -280,23 +306,20 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     rewriter.setInsertionPointToStart(foldedBlock);
     // Add device
     rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
-    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
-    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     if (foldingAlgorithm == Folding(1)) {
         return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, qregType, fnFoldedType,
-                             typesFolded, fnFoldedOp, allocQreg, fnWithoutMeasurementsOp,
+                             typesFolded, fnFoldedOp, numberQubits, fnAllocOp, fnWithoutMeasurementsOp,
                              fnWithMeasurementsOp);
     }
     if (foldingAlgorithm == Folding(2)) {
         return randomLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, qregType,
-                                  fnFoldedType, typesFolded, fnFoldedOp, allocQreg,
+                                  fnFoldedType, typesFolded, fnFoldedOp, numberQubits, fnAllocOp,
                                   fnWithMeasurementsOp);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
     return allLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, qregType, fnFoldedType,
-                           typesFolded, fnFoldedOp, allocQreg, fnWithMeasurementsOp);
+                           typesFolded, fnFoldedOp, numberQubits, fnAllocOp, fnWithMeasurementsOp);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
                                                        mitigation::ZneOp op)
