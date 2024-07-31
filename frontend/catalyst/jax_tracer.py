@@ -1207,7 +1207,7 @@ def trace_quantum_function(
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
-                # arbitrary output pytree support in case of a single tape
+                # arbitrary output pytree support in case of mid-circuit measurement
                 # by modifying the tree to match the output pytree
                 if mcm_config.mcm_method:
                     for _ in range(out_tree_expanded.num_leaves - len(meas_tracers)):

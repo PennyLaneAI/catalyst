@@ -116,6 +116,26 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now supports arbitrary output pytrees when using mid-circuit measurements.
+  [(#957)](https://github.com/PennyLaneAI/catalyst/pull/957)
+
+  For example:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1, shots=20)
+  @qml.qjit
+  @qml.qnode(dev, mcm_method="one-shot")
+  def func(x):
+      qml.RX(x, wires=0)
+      m_0 = catalyst.measure(0, postselect=1)
+      return {"hi": qml.expval(qml.Z(0))}
+  ```
+  
+  ```pycon
+  >>> func(0.9)
+  {'hi': Array(-1., dtype=float64)}
+  ```
+
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
