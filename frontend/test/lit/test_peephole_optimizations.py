@@ -17,7 +17,7 @@ This file performs the frontend lit tests that the peephole transformations are 
 
 We check the transform jax primitives for each pass is correctly injected
 during tracing, and these transform primitives are correctly lowered to the mlir before
-running -transform-interpreter. 
+running -apply-transform-sequence. 
 """
 
 # RUN: %PYTHON %s | FileCheck %s

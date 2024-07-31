@@ -154,7 +154,7 @@ def _inject_transform_named_sequence():
     Inject a transform_named_sequence jax primitive.
 
     This must be called when preprocessing the traced function in QJIT.capture(),
-    since to invoke -transform-interpreter, a transform_named_sequence primitive
+    since to invoke -apply-transform-sequence, a transform_named_sequence primitive
     must be in the jaxpr.
     """
 
