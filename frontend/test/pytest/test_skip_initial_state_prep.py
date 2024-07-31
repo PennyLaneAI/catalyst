@@ -49,19 +49,53 @@ class TestExamplesFromWebsite:
 
         @qml.qnode(qml.device(backend, wires=2))
         def example_circuit():
-            qml.BasisState(
-                jnp.array(
-                    [
-                        1,
-                        1,
-                    ]
-                ),
-                wires=range(2),
-            )
+            qml.BasisState(jnp.array([1, 1]), wires=range(2))
             return qml.state()
 
         expected = example_circuit()
         observed = qml.qjit(example_circuit)()
+        assert jnp.allclose(expected, observed)
+
+
+class TestDynamicWires:
+    def test_state_prep(self, backend):
+        """Test example from
+        https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
+        as of July 31st 2024.
+
+        Modified to use jax.numpy and a non trivial StatePrep
+        Modified to use dynamic wires.
+        Dynamic wires won't do anything though, since StatePrep (compiled)
+        assumes all wires will be used in order.
+        """
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a: int):
+            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
+            return qml.state()
+
+        expected = example_circuit(0)
+        observed = qml.qjit(example_circuit)(0)
+        assert jnp.allclose(expected, observed)
+
+    def test_basis_state(self, backend):
+        """Test example from
+        https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
+        as of July 31st 2024.
+
+        Modified to use jax.numpy
+        Modified to use dynamic wires.
+        Dynamic wires won't do anything though, since StatePrep (compiled)
+        assumes all wires will be used in order.
+        """
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a: int):
+            qml.BasisState(jnp.array([1, 1]), wires=[a, a + 1])
+            return qml.state()
+
+        expected = example_circuit(0)
+        observed = qml.qjit(example_circuit)(0)
         assert jnp.allclose(expected, observed)
 
 
