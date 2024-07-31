@@ -648,7 +648,7 @@ def trace_quantum_operations(
             qubits = qrp.extract(range(num_wires))
             param_array = params[0]
             size = jnp.size(param_array)
-            one_to_n = jnp.linspace(0, size, size, dtype=jnp.dtype(jnp.int64))
+            one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
 
             def decimal(x, pos):
                 return 2**pos * x
