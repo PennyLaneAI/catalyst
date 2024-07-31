@@ -563,6 +563,78 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     return mlir_module, ctx
 
 
+def trace_state_prep(op, qrp):
+    """Trace qml.StatePrep
+
+    Args:
+        op: StatePrep op being traced
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
+
+    Postcondition:
+        qrp is updated to hold the output qubits from qml.StatePrep
+    """
+    assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
+
+    num_wires = qrp.base.length
+    if num_wires != len(op.wires):
+        # TODO: This behaviour is different than PennyLane's
+        # it would be better if we can match the same behaviour.
+        raise ValueError("qml.StatePrep must act on all wires")
+
+    qubits = qrp.extract(range(num_wires))
+    params = op.parameters
+    param = params[0]
+    param_cast = jax.numpy.array(param, dtype=jnp.dtype(jnp.complex128))
+    qubits2 = set_state_p.bind(*qubits, param_cast)
+    qrp.insert(op.wires, qubits2)
+
+
+def trace_basis_state(op, qrp):
+    """Trace qml.BasisState
+    Args:
+        op: qml.BasisState op being traced
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
+    Postcondition:
+        qrp is updated to hold the output qubits from qml.StatePrep
+    """
+    # TODO: Also, would be good to jax.jit
+    # qml.BasisState(x, 0).state_vector(wire_order) to avoid
+    # duplication
+    num_wires = qrp.base.length
+    params = op.parameters
+    param_array = params[0]
+    size = jnp.size(param_array)
+
+    if num_wires != len(op.wires):
+        # TODO: This behaviour is different than PennyLane's
+        # it would be better if we can match the same behaviour.
+        raise ValueError("qml.BasisState must act on all wires.")
+
+    if size != len(op.wires):
+        raise ValueError("BasisState parameter and wires must be of equal length.")
+
+    qubits = qrp.extract(range(num_wires))
+
+    ones = jnp.ones(param_array.shape, param_array.dtype)
+    zeros = jnp.zeros(param_array.shape, param_array.dtype)
+    is_one = jnp.equal(param_array, ones)
+    is_zero = jnp.equal(param_array, zeros)
+    zeros_or_ones = jnp.logical_or(is_one, is_zero)
+    err_msg = "BasisState parameter must consist of 0 or 1 integers"
+    is_valid = jnp.all(zeros_or_ones)
+    catalyst.debug.assertion.debug_assert(is_valid, err_msg)
+
+    one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
+
+    def decimal(x, pos):
+        return 2**pos * x
+
+    runtime_index = jnp.sum(jax.vmap(decimal)(param_array, one_to_n))
+
+    qubits2 = set_basis_state_p.bind(*qubits, runtime_index)
+    qrp.insert(op.wires, qubits2)
+
+
 # pylint: disable=too-many-arguments
 @debug_logger
 def trace_quantum_operations(
@@ -624,57 +696,9 @@ def trace_quantum_operations(
             )
             qrp.insert(controlled_wires, qubits2)
         elif isinstance(op, qml.StatePrep):
-            # The assumption is that if we are here,
-            # StatePrep's wires are all wires
-            # non-controlled, all static.
-            num_wires = qrp.base.length
-            # StatePrep acts on all wires here.
-            if num_wires != len(op.wires):
-                raise ValueError("qml.StatePrep must act on all wires")
-            qubits = qrp.extract(range(num_wires))
-            params = op.parameters
-            assert len(params) == 1, "StatePrep only has one parameter"
-            param = params[0]
-            can_be_promoted = jnp.promote_types(param.dtype, jnp.dtype(jnp.complex128))
-            param_cast = jax.numpy.array(param, dtype=can_be_promoted)
-            qubits2 = set_state_p.bind(*qubits, param_cast)
-            qrp.insert(op.wires, qubits2)
+            trace_state_prep(op, qrp)
         elif isinstance(op, qml.BasisState):
-            # TODO: We may want to have this index generation
-            # in the runtime to also save some more compile time here.
-            # TODO: Also, we need to verify that these are all either 1 or 0.
-            # TODO: Also, would be good to jax.jit
-            # qml.BasisState(x, 0).state_vector(wire_order) to avoid
-            # duplication
-            num_wires = qrp.base.length
-            # we need to convert this into an index
-            params = op.parameters
-            assert len(params) == 1
-            qubits = qrp.extract(range(num_wires))
-            param_array = params[0]
-            size = jnp.size(param_array)
-            if num_wires != len(op.wires):
-                raise ValueError("qml.BasisState must act on all wires.")
-            if size != len(op.wires):
-                raise ValueError("BasisState parameter and wires must be of equal length.")
-
-            ones = jnp.ones(param_array.shape, param_array.dtype)
-            zeros = jnp.zeros(param_array.shape, param_array.dtype)
-            is_one = jnp.equal(param_array, ones)
-            is_zero = jnp.equal(param_array, zeros)
-            zeros_or_ones = jnp.logical_or(is_one, is_zero)
-            err_msg = "BasisState parameter must consist of 0 or 1 integers"
-            catalyst.debug.assertion.debug_assert(jnp.all(zeros_or_ones), err_msg)
-
-            one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
-
-            def decimal(x, pos):
-                return 2**pos * x
-
-            runtime_index = jnp.sum(jax.vmap(decimal)(param_array, one_to_n))
-
-            qubits2 = set_basis_state_p.bind(*qubits, runtime_index)
-            qrp.insert(op.wires, qubits2)
+            trace_basis_state(op, qrp)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
