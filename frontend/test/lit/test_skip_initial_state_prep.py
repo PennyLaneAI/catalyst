@@ -22,7 +22,7 @@ import pennylane as qml
 
 @qml.qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
-def example_circuit():
+def state_prep_example():
     """Test example from
     https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
     as of July 31st 2024.
@@ -32,6 +32,22 @@ def example_circuit():
     qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
     return qml.state()
 
-# CHECK-LABEL: func.func private @example_circuit
+# CHECK-LABEL: func.func private @state_prep_example
 #       CHECK: quantum.set_state
-print(example_circuit.mlir)
+print(state_prep_example.mlir)
+
+@qml.qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def basis_state_example():
+    """Test example from
+    https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
+    as of July 31st 2024.
+
+    Modified to use jax.numpy and a non trivial StatePrep
+    """
+    qml.BasisState(jnp.array([1, 1,]), wires=range(2))
+    return qml.state()
+
+# CHECK-LABEL: func.func private @basis_state_example
+#       CHECK: quantum.set_basis_state
+print(basis_state_example.mlir)
