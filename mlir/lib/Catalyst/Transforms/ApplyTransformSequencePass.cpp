@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This pass removes the transform.named_sequence operation and the
-// transform.with_named_sequence attribute from the IR after the
-// -transform-interpreter is run during the quantum peephole optimizations.
+// This pass applies the passes scheduled with the transform dialect,
+// and then removes the transformer module from the payload.
 
 #define DEBUG_TYPE "applytransformsequence"
 
