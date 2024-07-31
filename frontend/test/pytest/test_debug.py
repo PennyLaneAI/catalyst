@@ -260,7 +260,7 @@ class TestCompileFromIR:
         # pylint: disable=line-too-long
         ir = (
             r"""
-module @workflow attributes {transform.with_named_sequence} {
+module @workflow {
   func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
     %0 = call @workflow(%arg0) : (tensor<f64>) -> tensor<f64>
     return %0 : tensor<f64>
@@ -298,8 +298,10 @@ module @workflow attributes {transform.with_named_sequence} {
     quantum.finalize
     return
   }
-  transform.named_sequence @__transform_main(%arg0: !transform.op<"func.func">){
-    transform.yield
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
+      transform.yield
+    }
   }
 }
 """
@@ -314,7 +316,7 @@ module @workflow attributes {transform.with_named_sequence} {
         compiler = Compiler(options)
 
         ir = r"""
-module @workflow attributes {transform.with_named_sequence} {
+module @workflow {
   func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
     return %arg0 : tensor<f64>
   }
@@ -326,8 +328,10 @@ module @workflow attributes {transform.with_named_sequence} {
     quantum.finalize
     return
   }
-  transform.named_sequence @__transform_main(%arg0: !transform.op<"func.func">){
-    transform.yield
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
+      transform.yield
+    }
   }
 }
 """
