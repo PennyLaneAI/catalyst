@@ -392,8 +392,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         auto indexVal = op.getIndex();
         auto indexTy = indexVal.getType();
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState", {indexTy},
-                                                 voidTy, isVarArg);
+        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState",
+                                                 {indexTy}, voidTy, isVarArg);
 
         Location loc = op.getLoc();
 

@@ -104,7 +104,8 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data) {
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data)
+{
     const size_t num_qubits = this->device_sv->getNumQubits();
     const size_t size = Pennylane::Util::exp2(num_qubits);
     auto &&state = this->device_sv->getDataVector();
@@ -116,7 +117,8 @@ void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data) {
     }
 }
 
-void LightningSimulator::SetBasisState(const std::size_t index) {
+void LightningSimulator::SetBasisState(const std::size_t index)
+{
     this->device_sv->setBasisState(index);
 }
 
