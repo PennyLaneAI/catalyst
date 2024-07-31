@@ -461,9 +461,9 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data)
     // Data guaranteed to be only one dimension by the type system.
     // But what is not guaranteed is the strided.
     MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
-    DataView<std::complex<double>, 1> data_vector(data_p->data_aligned, data_p->offset,
+    DataView<std::complex<double>, 1> data_view(data_p->data_aligned, data_p->offset,
                                                   data_p->sizes, data_p->strides);
-    getQuantumDevicePtr()->SetState(data_vector);
+    getQuantumDevicePtr()->SetState(data_view);
 }
 
 void __catalyst__qis__SetBasisState(uint64_t index)
