@@ -106,15 +106,10 @@ void LightningSimulator::PrintState()
 
 void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data)
 {
-    const size_t num_qubits = this->device_sv->getNumQubits();
-    const size_t size = Pennylane::Util::exp2(num_qubits);
-    auto &&state = this->device_sv->getDataVector();
-    auto iter = data.begin();
-    for (size_t idx = 0; idx < size; idx++) {
-        std::complex<double> element = *iter;
-        state[idx] = element;
-        iter++;
-    }
+    std::vector<std::complex<double>> data_vector(data.begin(), data.end());
+    std::vector<std::size_t> count(data_vector.size());
+    std::iota(std::begin(count), std::end(count), 0);
+    this->device_sv->setStateVector(count, data_vector);
 }
 
 void LightningSimulator::SetBasisState(const std::size_t index)
