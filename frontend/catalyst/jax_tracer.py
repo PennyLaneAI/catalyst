@@ -641,6 +641,7 @@ def trace_quantum_operations(
         elif isinstance(op, qml.BasisState):
             # TODO: We may want to have this index generation
             # in the runtime to also save some more compile time here.
+            # TODO: Also, we need to verify that these are all either 1 or 0.
             num_wires = qrp.base.length
             # we need to convert this into an index
             params = op.parameters
