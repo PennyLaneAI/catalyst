@@ -267,7 +267,8 @@ def dynamic_one_shot(qnode, **kwargs):
             results = results[0]
         results = list(results) if isinstance(results, tuple) else results
 
-        # Don't flatten tuples that are inherent to the measurement output structure like ("keys", "counts") in qml.counts()
+        # Don't flatten tuples that are inherent to the measurement output structure 
+        # like ("keys", "counts") in qml.counts()
         def is_leaf(obj):
             return isinstance(obj, tuple) and all(isinstance(o, DynamicJaxprTracer) for o in obj)
 
