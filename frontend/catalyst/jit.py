@@ -626,18 +626,18 @@ class QJIT:
         if pass_name == "canonicalize":
             file_path = str(self.workspace) + "/1_0_canonicalize.mlir"
             with open(file_path, "r") as file:
-                data = file.read().replace("\n", "")
+                data = file.read()
                 return data
         if pass_name == "llvm":
             file_path = str(self.workspace) + "/5_llvm_ir.ll"
             with open(file_path, "r") as file:
-                data = file.read().replace("\n", "")
+                data = file.read()
                 return data
         raise NotImplementedError
 
     def recompile(self, level, function_str):
         if level == "llvm":
-            func_name = str(self.mlir_module.operation.attributes["sym_name"]).replace('"', "")
+            func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
             entry_point_func = self.mlir_module.body.operations[0]
             restype = entry_point_func.type.results
             shared_object, llvm_ir, _ = self.compiler.run_from_ir(function_str, func_name, self.workspace)
