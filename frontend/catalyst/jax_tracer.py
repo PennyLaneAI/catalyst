@@ -286,6 +286,8 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
     if all_ends_with_qreg:  # [1]
         length = types[-1][-1].length
         types = [t[:-1] for t in types]
+    else:
+        length = None
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
     return results + ([AbstractQreg(length)] if all_ends_with_qreg else [])
 
