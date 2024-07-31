@@ -579,3 +579,13 @@ func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantu
     return
 }
 
+// -----
+
+// CHECK-LABEL: @test_set_state
+module @test_set_state {
+    func.func @set_state(%1 : !quantum.bit, %arg0 : memref<2xcomplex<f64>>) {
+        // CHECK: llvm.call @__catalyst__qis__SetState
+        %2 = quantum.set_state(%arg0) %1 : (memref<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+        return
+    }
+}
