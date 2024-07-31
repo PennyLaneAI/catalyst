@@ -1,0 +1,37 @@
+# Copyright 2024 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# RUN: %PYTHON %s | FileCheck %s
+
+"""Tests code generation of state prep"""
+
+import jax.numpy as jnp
+
+import pennylane as qml
+
+@qml.qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def example_circuit():
+    """Test example from
+    https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
+    as of July 31st 2024.
+
+    Modified to use jax.numpy and a non trivial StatePrep
+    """
+    qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+    return qml.state()
+
+# CHECK-LABEL: func.func private @example_circuit
+#       CHECK: quantum.set_state
+print(example_circuit.mlir)
