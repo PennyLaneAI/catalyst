@@ -639,6 +639,8 @@ def trace_quantum_operations(
             qubits2 = set_state_p.bind(*qubits, param_cast)
             qrp.insert(op.wires, qubits2)
         elif isinstance(op, qml.BasisState):
+            # TODO: We may want to have this index generation
+            # in the runtime to also save some more compile time here.
             num_wires = qrp.base.length
             # we need to convert this into an index
             params = op.parameters
