@@ -370,11 +370,36 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
             loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structTy, c1);
         auto allocaPtr = allocaOp.getResult();
 
-        auto storeOp = rewriter.create<LLVM::StoreOp>(loc, adaptor.getInState(), allocaPtr);
+        rewriter.create<LLVM::StoreOp>(loc, adaptor.getInState(), allocaPtr);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         rewriter.create<LLVM::CallOp>(loc, func, ValueRange{allocaPtr});
+        rewriter.replaceOp(op, values);
+        return success();
+    }
+};
+
+struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(SetBasisStateOp op, SetBasisStateOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        bool isVarArg = false;
+        MLIRContext *ctx = rewriter.getContext();
+        auto voidTy = LLVM::LLVMVoidType::get(ctx);
+        auto indexVal = op.getIndex();
+        auto indexTy = indexVal.getType();
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState", {indexTy},
+                                                 voidTy, isVarArg);
+
+        Location loc = op.getLoc();
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.create<LLVM::CallOp>(loc, func, ValueRange{indexVal});
         rewriter.replaceOp(op, values);
         return success();
     }
@@ -948,6 +973,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
     patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<SetBasisStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
