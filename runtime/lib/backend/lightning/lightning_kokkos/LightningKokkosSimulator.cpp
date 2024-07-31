@@ -126,7 +126,8 @@ void LightningKokkosSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningKokkosSimulator::SetState(DataView<std::complex<double>, 1> &data_view) {
+void LightningKokkosSimulator::SetState(DataView<std::complex<double>, 1> &data_view)
+{
     std::vector<Kokkos::complex<double>> data_vector(data_view.begin(), data_view.end());
     std::vector<std::size_t> count(data_vector.size());
     std::iota(std::begin(count), std::end(count), 0);

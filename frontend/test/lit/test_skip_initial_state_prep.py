@@ -17,8 +17,8 @@
 """Tests code generation of state prep"""
 
 import jax.numpy as jnp
-
 import pennylane as qml
+
 
 @qml.qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -32,9 +32,11 @@ def state_prep_example():
     qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
     return qml.state()
 
+
 # CHECK-LABEL: func.func private @state_prep_example
 #       CHECK: quantum.set_state
 print(state_prep_example.mlir)
+
 
 @qml.qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -45,8 +47,17 @@ def basis_state_example():
 
     Modified to use jax.numpy and a non trivial StatePrep
     """
-    qml.BasisState(jnp.array([1, 1,]), wires=range(2))
+    qml.BasisState(
+        jnp.array(
+            [
+                1,
+                1,
+            ]
+        ),
+        wires=range(2),
+    )
     return qml.state()
+
 
 # CHECK-LABEL: func.func private @basis_state_example
 #       CHECK: quantum.set_basis_state
@@ -62,6 +73,7 @@ def state_prep_example_double():
     qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
     qml.StatePrep(jnp.array([1, 0, 0, 0]), wires=range(2))
     return qml.state()
+
 
 # CHECK-LABEL: func.func private @state_prep_example_double
 #       CHECK:   quantum.set_state

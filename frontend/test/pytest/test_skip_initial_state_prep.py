@@ -15,7 +15,6 @@
 """Test skipping iniitial state prep"""
 
 import jax.numpy as jnp
-
 import pennylane as qml
 import pytest
 
@@ -75,6 +74,7 @@ class TestPossibleErrors:
         """
 
         with pytest.raises(ValueError, match="State vector must have shape"):
+
             @qml.qjit
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit():
@@ -87,10 +87,12 @@ class TestPossibleErrors:
         """
 
         with pytest.raises(ValueError, match="must be of equal length"):
+
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([1]), wires=range(2))
                 return qml.state()
+
             example_circuit()
 
     def test_wires_with_less_than_all(self, backend):
@@ -101,6 +103,7 @@ class TestPossibleErrors:
         """
 
         with pytest.raises(ValueError, match="qml.StatePrep must act on all wires"):
+
             @qml.qjit
             @qml.qnode(qml.device(backend, wires=3))
             def example_circuit():
@@ -114,6 +117,7 @@ class TestPossibleErrors:
         let's submit this and we can fix it later.
         """
         with pytest.raises(ValueError, match="qml.BasisState must act on all wires"):
+
             @qml.qjit
             @qml.qnode(qml.device(backend, wires=3))
             def example_circuit():
@@ -122,12 +126,13 @@ class TestPossibleErrors:
 
     def test_domain_invalid_basis_state(self, backend):
         """Test what happens when BasisState operand is not between {0, 1}"""
-        with pytest.raises(RuntimeError, match="BasisState parameter must consist of 0 or 1 integers"):
+        msg = "BasisState parameter must consist of 0 or 1 integers"
+        with pytest.raises(RuntimeError, match=msg):
+
             @qml.qjit
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([0, 2]), wires=range(2))
                 return qml.state()
+
             example_circuit()
-
-

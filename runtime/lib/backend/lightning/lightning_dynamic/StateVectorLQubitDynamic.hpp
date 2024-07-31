@@ -388,7 +388,8 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param indices Indices of the target elements.
      */
     void setStateVector(const std::vector<std::size_t> &indices,
-                        const std::vector<ComplexT> &values) {
+                        const std::vector<ComplexT> &values)
+    {
         for (std::size_t n = 0; n < indices.size(); n++) {
             data_[indices[n]] = values[n];
         }

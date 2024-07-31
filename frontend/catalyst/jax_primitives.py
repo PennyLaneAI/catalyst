@@ -1905,17 +1905,20 @@ def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
 #
 @set_state_p.def_impl
 def set_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    """Concrete evaluation"""
     raise NotImplementedError()
 
 
 @set_state_p.def_abstract_eval
 def set_state_abstract(*qubits_or_params):
+    """Abstract evaluation"""
     length = len(qubits_or_params)
     qubits_length = length - 1
     return (AbstractQbit(),) * qubits_length
 
 
 def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set state"""
     qubits_or_params = list(qubits_or_params)
     param = qubits_or_params.pop()
     qubits = qubits_or_params
@@ -1928,17 +1931,20 @@ def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
 #
 @set_basis_state_p.def_impl
 def set_basis_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    """Concrete evaluation"""
     raise NotImplementedError()
 
 
 @set_basis_state_p.def_abstract_eval
 def set_basis_state_abstract(*qubits_or_params):
+    """Abstract evaluation"""
     length = len(qubits_or_params)
     qubits_length = length - 1
     return (AbstractQbit(),) * qubits_length
 
 
 def _set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set basis state"""
     qubits_or_params = list(qubits_or_params)
     param = qubits_or_params.pop()
     qubits = qubits_or_params

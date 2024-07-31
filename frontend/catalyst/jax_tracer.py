@@ -643,8 +643,8 @@ def trace_quantum_operations(
             # TODO: We may want to have this index generation
             # in the runtime to also save some more compile time here.
             # TODO: Also, we need to verify that these are all either 1 or 0.
-            # TODO: Also, would be good to jax.jit 
-            # qml.BasisState(x, 0).state_vector(wire_order) to avoid 
+            # TODO: Also, would be good to jax.jit
+            # qml.BasisState(x, 0).state_vector(wire_order) to avoid
             # duplication
             num_wires = qrp.base.length
             # we need to convert this into an index
@@ -658,10 +658,13 @@ def trace_quantum_operations(
             if size != len(op.wires):
                 raise ValueError("BasisState parameter and wires must be of equal length.")
 
-            ones = jax.numpy.ones(param_array.shape, param_array.dtype)
-            zeros = jax.numpy.zeros(param_array.shape, param_array.dtype)
-            zeros_or_ones = jax.numpy.logical_or(jax.numpy.equal(param_array, ones), jax.numpy.equal(param_array, zeros))
-            catalyst.debug.assertion.debug_assert(jax.numpy.all(zeros_or_ones), "BasisState parameter must consist of 0 or 1 integers")
+            ones = jnp.ones(param_array.shape, param_array.dtype)
+            zeros = jnp.zeros(param_array.shape, param_array.dtype)
+            is_one = jnp.equal(param_array, ones)
+            is_zero = jnp.equal(param_array, zeros)
+            zeros_or_ones = jnp.logical_or(is_one, is_zero)
+            err_msg = "BasisState parameter must consist of 0 or 1 integers"
+            catalyst.debug.assertion.debug_assert(jnp.all(zeros_or_ones), err_msg)
 
             one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
 
