@@ -380,6 +380,19 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
         std::fill(data_.begin(), data_.end(), 0.0);
         data_[index] = {1.0, 0.0};
     }
+
+    /**
+     * @brief Set values for a batch of elements of the state-vector.
+     *
+     * @param values Values to be set for the target elements.
+     * @param indices Indices of the target elements.
+     */
+    void setStateVector(const std::vector<std::size_t> &indices,
+                        const std::vector<ComplexT> &values) {
+        for (std::size_t n = 0; n < indices.size(); n++) {
+            data_[indices[n]] = values[n];
+        }
+    }
 };
 
 } // namespace Pennylane::LightningQubit
