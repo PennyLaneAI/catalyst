@@ -589,3 +589,14 @@ module @test_set_state {
         return
     }
 }
+
+// -----
+
+// CHECK-LABEL: @test_set_basis_state
+module @test_set_basis_state {
+    func.func @set_basis_state(%1 : !quantum.bit, %arg0 : i64) {
+        // CHECK: llvm.call @__catalyst__qis__SetBasisState
+        %2 = quantum.set_basis_state(%arg0) %1 : (i64, !quantum.bit) -> !quantum.bit
+        return
+    }
+}
