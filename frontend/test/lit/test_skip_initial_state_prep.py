@@ -51,3 +51,19 @@ def basis_state_example():
 # CHECK-LABEL: func.func private @basis_state_example
 #       CHECK: quantum.set_basis_state
 print(basis_state_example.mlir)
+
+
+@qml.qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def state_prep_example_double():
+    """What happens if we have two? It shouldn't be repeated because
+    we only skip the first one
+    """
+    qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+    qml.StatePrep(jnp.array([1, 0, 0, 0]), wires=range(2))
+    return qml.state()
+
+# CHECK-LABEL: func.func private @state_prep_example_double
+#       CHECK:   quantum.set_state
+#   CHECK-NOT:   quantum.set_state
+print(state_prep_example_double.mlir)
