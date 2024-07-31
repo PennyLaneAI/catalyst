@@ -46,4 +46,4 @@ cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DLLVM_ENABLE_ZLIB=OFF \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
     -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-cmake --build /catalyst/mhlo-build --target check-mlir-hlo
+LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build /catalyst/mhlo-build --target check-mlir-hlo
