@@ -615,6 +615,26 @@ class QJIT:
 
         return mlir_module, mlir_string
 
+    def get_pipeline_output(self, pass_name):
+        if pass_name in self.compiler.options.get_pipelines():
+            return self.compiler.get_output_of(pass_name)
+        if pass_name == "mlir":
+            file_path = str(self.workspace) + "/0_" + self.__name__ + ".mlir"
+            with open(file_path, "r") as file:
+                data = file.read().replace("\n", "")
+                return data
+        if pass_name == "canonicalize":
+            file_path = str(self.workspace) + "/1_0_canonicalize.mlir"
+            with open(file_path, "r") as file:
+                data = file.read().replace("\n", "")
+                return data
+        if pass_name == "llvm":
+            file_path = str(self.workspace) + "/5_llvm_ir.ll"
+            with open(file_path, "r") as file:
+                data = file.read().replace("\n", "")
+                return data
+        return NotImplementedError
+
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
     def compile(self):
