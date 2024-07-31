@@ -657,6 +657,12 @@ def trace_quantum_operations(
                 raise ValueError("qml.BasisState must act on all wires.")
             if size != len(op.wires):
                 raise ValueError("BasisState parameter and wires must be of equal length.")
+
+            ones = jax.numpy.ones(param_array.shape, param_array.dtype)
+            zeros = jax.numpy.zeros(param_array.shape, param_array.dtype)
+            zeros_or_ones = jax.numpy.logical_or(jax.numpy.equal(param_array, ones), jax.numpy.equal(param_array, zeros))
+            catalyst.debug.assertion.debug_assert(jax.numpy.all(zeros_or_ones), "BasisState parameter must consist of 0 or 1 integers")
+
             one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
 
             def decimal(x, pos):
