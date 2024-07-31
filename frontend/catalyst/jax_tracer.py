@@ -597,6 +597,8 @@ def trace_basis_state(op, qrp):
     Postcondition:
         qrp is updated to hold the output qubits from qml.StatePrep
     """
+    assert isinstance(op, qml.BasisState), "qml.StatePrep expected"
+
     # TODO: Also, would be good to jax.jit
     # qml.BasisState(x, 0).state_vector(wire_order) to avoid
     # duplication
@@ -615,6 +617,7 @@ def trace_basis_state(op, qrp):
 
     qubits = qrp.extract(range(num_wires))
 
+    param_array = jnp.astype(param_array, jnp.dtype(jnp.int64))
     ones = jnp.ones(param_array.shape, param_array.dtype)
     zeros = jnp.zeros(param_array.shape, param_array.dtype)
     is_one = jnp.equal(param_array, ones)
