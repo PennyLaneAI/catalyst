@@ -31,11 +31,11 @@ from catalyst.passes import cancel_inverses
 
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
-def test_cancel_inverses_functionality(theta):
+def test_cancel_inverses_functionality(theta, backend):
 
     @qjit
     def workflow():
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x, wires=0)
             qml.Hadamard(wires=0)
@@ -43,7 +43,7 @@ def test_cancel_inverses_functionality(theta):
             return qml.probs()
 
         @cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def g(x):
             qml.RX(x, wires=0)
             qml.Hadamard(wires=0)
@@ -61,6 +61,34 @@ def test_cancel_inverses_functionality(theta):
 
     assert np.allclose(workflow()[0], workflow()[1])
     assert np.allclose(workflow()[1], reference(theta))
+
+
+@pytest.mark.parametrize("theta", [42.42])
+def test_cancel_inverses_functionality_outside_qjit(theta, backend):
+
+    @cancel_inverses
+    @qml.qnode(qml.device(backend, wires=1))
+    def f(x):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.probs()
+
+    @qjit
+    def workflow():
+        @cancel_inverses
+        @qml.qnode(qml.device(backend, wires=1))
+        def g(x):
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.probs()
+
+        _f = f(theta)
+        _g = g(theta)
+        return _f, _g
+
+    assert np.allclose(workflow()[0], workflow()[1])
 
 
 ### Test bad usages of pass decorators ###
