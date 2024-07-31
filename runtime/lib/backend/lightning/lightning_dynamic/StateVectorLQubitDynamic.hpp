@@ -375,7 +375,8 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      *
      * @param index Index of the target element.
      */
-    void setBasisState(const std::size_t index) {
+    void setBasisState(const std::size_t index)
+    {
         std::fill(data_.begin(), data_.end(), 0.0);
         data_[index] = {1.0, 0.0};
     }
