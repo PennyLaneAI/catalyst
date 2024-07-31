@@ -22,6 +22,8 @@ import pennylane as qml
 from catalyst import qjit
 from catalyst.debug import instrumentation
 
+# Test only on CPU execution platform
+original_jax_platforms = jax.config.jax_platforms if hasattr(jax.config, "jax_platforms") else None
 jax.config.update("jax_platforms", "cpu")
 
 num_layers = 1
@@ -80,3 +82,6 @@ with instrumentation(circuit.__name__, filename=None, detailed=False):
 
 with instrumentation(circuit.__name__, filename=None, detailed=True):
     qjit(circuit)(weights)
+
+# Restore original execution platforms
+jax.config.update("jax_platforms", original_jax_platforms)
