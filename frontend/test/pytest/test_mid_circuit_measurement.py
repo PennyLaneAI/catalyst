@@ -374,7 +374,7 @@ class TestMidCircuitMeasurement:
                 {"2": qml.probs(wires=[0])},
                 {"3": qml.probs(op=m_0)},
                 {"4": qml.sample(op=m_0)},
-                {"5": qml.expval(qml.PauliY(0))},
+                {"5": qml.expval(qml.PauliX(0))},
             )
 
         observed = circuit(0.9)
