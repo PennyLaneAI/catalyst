@@ -45,29 +45,29 @@ struct RemoveChainedSelfInversePass
     : impl::RemoveChainedSelfInversePassBase<RemoveChainedSelfInversePass> {
     using RemoveChainedSelfInversePassBase::RemoveChainedSelfInversePassBase;
 
-    bool canScheduleOn(RegisteredOperationName opInfo) const override
-    {
-        return opInfo.hasInterface<FunctionOpInterface>();
-    }
-
     void runOnOperation() final
     {
-        // Run the pass on a qnode (function) whose name is "FuncNameOpt" from command line
-
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
 
-        FunctionOpInterface op = cast<FunctionOpInterface>(getOperation());
+        Operation *module = getOperation();
+        Operation *targetfunc;
 
-        StringRef funcName = op.getName();
+        module->walk([&](Operation *op) {
+            if (isa<func::FuncOp>(op)) {
+                StringRef funcName = cast<func::FuncOp>(op).getSymName();
 
-        if (funcName != FuncNameOpt) {
-            return; // not the function to run the pass on, so do nothing and exit
-        }
+                if (funcName != FuncNameOpt) {
+                    return; // not the function to run the pass on, so do nothing and exit
+                }
+                targetfunc = op;
+            }
+        });
 
         RewritePatternSet patterns(&getContext());
         populateSelfInversePatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+
+        if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

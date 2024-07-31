@@ -179,8 +179,7 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "transform-interpreter",  # Run the transform sequence defined in the MLIR module
-        "transform-cleanup",  # Must be run IMMEDIATELY after --transform-interpreter
+        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",

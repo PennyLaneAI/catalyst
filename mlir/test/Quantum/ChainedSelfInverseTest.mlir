@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(func.func(remove-chained-self-inverse{func-name=test_chained_self_inverse}))" --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(remove-chained-self-inverse{func-name=test_chained_self_inverse})" --split-input-file -verify-diagnostics %s | FileCheck %s
 
 // test chained Hadamard
 // CHECK-LABEL: test_chained_self_inverse

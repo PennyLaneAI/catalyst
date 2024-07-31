@@ -85,7 +85,9 @@ def test_transform_named_sequence_injection():
     # CHECK: transform_named_sequence
     print_jaxpr(func)
 
-    # CHECK: module @func attributes {transform.with_named_sequence}
+    # CHECK: module @func {
+    # CHECK: module attributes {
+    # CHECK-SAME: transform.with_named_sequence
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: transform.yield
     print_mlir(func)
@@ -136,20 +138,20 @@ def test_cancel_inverses_tracing_and_lowering():
         return _f, _g, _h
 
     # CHECK: transform_named_sequence
-    # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=f
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
-    # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=g
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
-    # CHECK-NOT: _:AbstractTransformFunc() = apply_registered_pass[
+    # CHECK-NOT: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK-NOT:   options=func-name=h
     # CHECK-NOT:   pass_name=remove-chained-self-inverse
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
-    # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow attributes {transform.with_named_sequence}
+    # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g"}
@@ -180,13 +182,13 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
         return _f
 
     # CHECK: transform_named_sequence
-    # CHECK: _:AbstractTransformFunc() = apply_registered_pass[
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=f
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 
-    # CHECK: module @test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow attributes {transform.with_named_sequence}
+    # CHECK: module @test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
     # CHECK-NEXT: transform.yield
@@ -196,15 +198,15 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
 test_cancel_inverses_tracing_and_lowering_outside_qjit()
 
 
-def test_cancel_inverses_lowering_transform_interpreter_applied():
+def test_cancel_inverses_lowering_transform_applied():
     """
-    Test cancel_inverses mlir after -transfrom-interpreter is applied.
+    Test cancel_inverses mlir after apply-transform-sequence
     In other words, test that the pass takes the correct effect with this frontend call.
     """
 
-    # CHECK-LABEL: public @jit_test_cancel_inverses_lowering_transform_interpreter_applied_workflow
+    # CHECK-LABEL: public @jit_test_cancel_inverses_lowering_transform_applied_workflow
     @qjit(keep_intermediate=True)
-    def test_cancel_inverses_lowering_transform_interpreter_applied_workflow(xx: float):
+    def test_cancel_inverses_lowering_transform_applied_workflow(xx: float):
 
         @cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -250,10 +252,8 @@ def test_cancel_inverses_lowering_transform_interpreter_applied():
 
         return _f, _g, _h
 
-    test_cancel_inverses_lowering_transform_interpreter_applied_workflow(42.42)
-    flush_peephole_opted_mlir_to_iostream(
-        test_cancel_inverses_lowering_transform_interpreter_applied_workflow
-    )
+    test_cancel_inverses_lowering_transform_applied_workflow(42.42)
+    flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_lowering_transform_applied_workflow)
 
 
-test_cancel_inverses_lowering_transform_interpreter_applied()
+test_cancel_inverses_lowering_transform_applied()

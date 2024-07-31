@@ -189,15 +189,15 @@ def _obs_lowering(aval):
 
 
 #
-# Transform Func Type
+# Transform Module Type
 #
-class AbstractTransformFunc(AbstractValue):
-    """Abstract transform func type."""
+class AbstractTransformMod(AbstractValue):
+    """Abstract transform module type."""
 
 
-def _transform_func_lowering(aval):
-    assert isinstance(aval, AbstractTransformFunc)
-    return (transform_func_type,)
+def _transform_mod_lowering(aval):
+    assert isinstance(aval, AbstractTransformMod)
+    return (transform_mod_type,)
 
 
 #
@@ -212,8 +212,8 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
-core.raise_to_shaped_mappings[AbstractTransformFunc] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractTransformFunc] = _transform_func_lowering
+core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
+mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
 
 
 class Folding(Enum):
@@ -413,9 +413,14 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 # transform dialect lowering
 #
 
-# Note: we currently only support peephole passes on function ops
+transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">', ir.Context())
 
-transform_func_type = ir.OpaqueType.get("transform", 'op<"func.func">', ir.Context())
+
+def get_named_sequence_in_module(mod):
+    for op in mod.body.operations:
+        if op.operation.name == "transform.named_sequence":
+            return op.operation
+    return None
 
 
 #
@@ -434,24 +439,34 @@ def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
 def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
     module = jax_ctx.module_context.module
 
-    # If there already is a transform.named_sequence in the module, don't add another one!
+    # If there already is a transform.named_sequence, don't add another one!
     # Do nothing and exit!
     for op in reversed(module.body.operations):
-        # transform.named_sequence usually is at the end of the module, so look for it from the end
-        if op.operation.name == "transform.named_sequence":
-            return op.operation.results
+        # transformer module usually is at the end of the module, so look for it from the end
+        if op.operation.name == "builtin.module":
+            named_sequence_op = get_named_sequence_in_module(op)
+            if named_sequence_op is not None:
+                return op.operation.results
 
-    functype = ir.FunctionType.get(inputs=[transform_func_type], results=[])
+    # We wish to generate the transformer module, and place it in the top-level module
+    # The transformer module must be marked with the "transform.with_named_sequence" attribute
+    # The transformer module has a single block, and the block contains the
+    # "transform.named_sequence @__transform_main" operation
+
+    with ir.InsertionPoint(module.body):
+        transformer_module = ir.Operation.create("builtin.module", regions=1)
+        with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
+        transformer_module.operation.attributes["transform.with_named_sequence"] = (
+            with_named_sequence_attr
+        )
+        bb_transformer = ir.Block.create_at_start(transformer_module.bodyRegion)
+
+    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
     functype_attr = ir.TypeAttr.get(functype)
 
-    # add the transform.with_named_sequence unit attr to the parent module
-    with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
-    module.operation.attributes["transform.with_named_sequence"] = with_named_sequence_attr
-
-    # Insert the transform.named_sequence op into the module to be transformed
+    # Insert the transform.named_sequence op into the transformer module
     # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
-    # Hence we insert at the end, inside the module
-    with ir.InsertionPoint(module.body):
+    with ir.InsertionPoint(bb_transformer):
         named_sequence_op = NamedSequenceOp(
             sym_name="__transform_main",
             function_type=functype_attr,
@@ -459,11 +474,13 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
 
         # transform.named_sequence op is the "main function" of the transform dialect
         # and thus needs an entry block (which also should be its only block)
-        # The argument of the block is the target function to run the transform sequence on
-        bb = ir.Block.create_at_start(named_sequence_op.body, arg_types=[transform_func_type])
+        # The argument of the block is the payload module
+        bb_named_sequence = ir.Block.create_at_start(
+            named_sequence_op.body, arg_types=[transform_mod_type]
+        )
 
         # The transform.named_sequence needs a terminator called "transform.yield"
-        with ir.InsertionPoint(bb):
+        with ir.InsertionPoint(bb_named_sequence):
             transform_yield_op = TransformYieldOp(operands_=[])  # pylint: disable=unused-variable
 
     return named_sequence_op.results
@@ -474,7 +491,7 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
 #
 @apply_registered_pass_p.def_abstract_eval
 def _apply_registered_pass_abstract_eval(*args, pass_name, options=None):
-    return AbstractTransformFunc()
+    return AbstractTransformMod()
 
 
 @apply_registered_pass_p.def_impl
@@ -488,17 +505,16 @@ def _apply_registered_pass_lowering(
     module = jax_ctx.module_context.module
     named_sequence_op = None
     for op in reversed(module.body.operations):
-        # transform.named_sequence usually is at the end of the module, so look for it from the end
-        if op.operation.name == "transform.named_sequence":
-            named_sequence_op = op.operation
+        # transformer module usually is at the end of the module, so look for it from the end
+        if op.operation.name == "builtin.module":
+            named_sequence_op = get_named_sequence_in_module(op)
             break
-    if named_sequence_op is None:
-        raise RuntimeError(
-            """
+    assert (
+        named_sequence_op is not None
+    ), """
             transform.apply_registered_pass must be placed in a transform.named_sequence, 
             but none exist in the module.
             """
-        )
 
     # If there already is a apply_registered_pass,
     # insert after the last pass in the existing pass sequence.
@@ -520,7 +536,7 @@ def _apply_registered_pass_lowering(
         current_last_pass = named_sequence_op_block.operations[_ - 2].operation
         with ir.InsertionPoint(yield_op):
             apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_func_type,
+                result=transform_mod_type,
                 target=current_last_pass.result,
                 pass_name=pass_name,
                 options=options,
@@ -532,7 +548,7 @@ def _apply_registered_pass_lowering(
         ip = named_sequence_op.regions[0].blocks[0]
         with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
             apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_func_type,
+                result=transform_mod_type,
                 target=ip.arguments[0],
                 pass_name=pass_name,
                 options=options,
