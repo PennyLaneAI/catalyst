@@ -128,7 +128,8 @@ void LightningKokkosSimulator::PrintState()
 
 void LightningKokkosSimulator::SetState(DataView<std::complex<double>, 1> &) {}
 
-void LightningKokkosSimulator::SetBasisState(const std::size_t index) {
+void LightningKokkosSimulator::SetBasisState(const std::size_t index)
+{
     this->device_sv->setBasisState(index);
 }
 
