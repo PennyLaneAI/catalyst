@@ -1107,9 +1107,9 @@ class Cond(HybridOp):
         op = self
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                qreg_in = _input_type_to_tracers(
-                    region.trace.new_arg, [AbstractQreg(qrp.base.length)]
-                )[0]
+                reg_len = qrp.base.length
+                new_qreg = AbstractQreg(reg_len)
+                qreg_in = _input_type_to_tracers(region.trace.new_arg, [new_qreg])[0]
                 qreg_out = trace_quantum_operations(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 ).actualize()
@@ -1167,9 +1167,9 @@ class ForLoop(HybridOp):
         expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
-            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg(qrp.base.length)])[
-                0
-            ]
+            reg_len = qrp.base.length
+            new_qreg = AbstractQreg(reg_len)
+            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
 
