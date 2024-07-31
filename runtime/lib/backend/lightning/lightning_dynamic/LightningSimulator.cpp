@@ -116,6 +116,10 @@ void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data) {
     }
 }
 
+void LightningSimulator::SetBasisState(const std::size_t index) {
+    this->device_sv->setBasisState(index);
+}
+
 auto LightningSimulator::Zero() const -> Result
 {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);

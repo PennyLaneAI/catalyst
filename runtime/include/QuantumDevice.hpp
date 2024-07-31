@@ -165,6 +165,11 @@ struct QuantumDevice {
     virtual void SetState(DataView<std::complex<double>, 1> &) = 0;
 
     /**
+     * @brief Function to set state to vector of complex variables.
+     */
+    virtual void SetBasisState(uint64_t) = 0;
+
+    /**
      * @brief Apply a single gate to the state vector of a device with its name if this is
      * supported.
      *
