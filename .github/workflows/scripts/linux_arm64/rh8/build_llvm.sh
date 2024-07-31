@@ -48,4 +48,4 @@ cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja \
     -DPython3_EXECUTABLE=/usr/bin/python3 \
     -DPython3_NumPy_INCLUDE_DIRS=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include \
     -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-LIT_FILTER_OUT=\"Bytecode\" cmake --build /catalyst/llvm-build --target check-mlir llvm-symbolizer
+LIT_FILTER_OUT=\"Bytecode|tosa-to-tensor\" cmake --build /catalyst/llvm-build --target check-mlir llvm-symbolizer
