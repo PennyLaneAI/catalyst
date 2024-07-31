@@ -84,6 +84,7 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
     set_state_p,
     state_p,
     tensorobs_p,
@@ -636,6 +637,23 @@ def trace_quantum_operations(
             can_be_promoted = jnp.promote_types(param.dtype, jnp.dtype(jnp.complex128))
             param_cast = jax.numpy.array(param, dtype=can_be_promoted)
             qubits2 = set_state_p.bind(*qubits, param_cast)
+            qrp.insert(op.wires, qubits2)
+        elif isinstance(op, qml.BasisState):
+            num_wires = qrp.base.length
+            # we need to convert this into an index
+            params = op.parameters
+            assert len(params) == 1
+            qubits = qrp.extract(range(num_wires))
+            param_array = params[0]
+            size = jnp.size(param_array)
+            one_to_n = jnp.linspace(0, size, size, dtype=jnp.dtype(jnp.int64))
+
+            def decimal(x, pos):
+                return 2**pos * x
+
+            runtime_index = jnp.sum(jax.vmap(decimal)(param_array, one_to_n))
+
+            qubits2 = set_basis_state_p.bind(*qubits, runtime_index)
             qrp.insert(op.wires, qubits2)
         else:
             qubits = qrp.extract(op.wires)

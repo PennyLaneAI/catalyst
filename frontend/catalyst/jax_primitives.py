@@ -85,6 +85,7 @@ from mlir_quantum.dialects.quantum import (
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
+    SetBasisStateOp,
     SetStateOp,
     StateOp,
     TensorOp,
@@ -2103,6 +2104,7 @@ def _set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_para
     param = qubits_or_params.pop()
     qubits = qubits_or_params
     out_qubits = [qubit.type for qubit in qubits]
+    param = TensorExtractOp(ir.IntegerType.get_signless(64), param, []).result
     return SetBasisStateOp(out_qubits, param, qubits).results
 
 
@@ -2205,6 +2207,7 @@ mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
 mlir.register_lowering(apply_registered_pass_p, _apply_registered_pass_lowering)
 mlir.register_lowering(transform_named_sequence_p, _transform_named_sequence_lowering)
 mlir.register_lowering(set_state_p, _set_state_lowering)
+mlir.register_lowering(set_basis_state_p, _set_basis_state_lowering)
 
 
 def _scalar_abstractify(t):
