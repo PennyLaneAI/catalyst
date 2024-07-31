@@ -369,6 +369,16 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
         // the init state-vector
         data_.push_back(ONE<PrecisionT>());
     }
+
+    /**
+     * @brief Prepares a single computational basis state.
+     *
+     * @param index Index of the target element.
+     */
+    void setBasisState(const std::size_t index) {
+        std::fill(data_.begin(), data_.end(), 0.0);
+        data_[index] = {1.0, 0.0};
+    }
 };
 
 } // namespace Pennylane::LightningQubit

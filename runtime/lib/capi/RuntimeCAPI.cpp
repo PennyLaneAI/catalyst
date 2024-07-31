@@ -466,6 +466,11 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data)
     getQuantumDevicePtr()->SetState(data_vector);
 }
 
+void __catalyst__qis__SetBasisState(uint64_t index) {
+    std::size_t index_cast = static_cast<std::size_t>(index);
+    getQuantumDevicePtr()->SetBasisState(index_cast);
+}
+
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation("Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
