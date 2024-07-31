@@ -373,7 +373,7 @@ class TestMidCircuitMeasurement:
                 {"1": qml.probs(wires=[0])},
                 {"2": qml.probs(wires=[0])},
                 {"3": qml.probs(op=m_0)},
-                {"4": qml.sample(op=m_0)}
+                {"4": qml.sample(op=m_0)},
             )
 
         observed = circuit(0.9)
@@ -385,7 +385,7 @@ class TestMidCircuitMeasurement:
                 "4": jnp.array(
                     (-2147483648, -2147483648, -2147483648, 1, -2147483648), dtype=jnp.int64
                 )
-            }
+            },
         )
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
