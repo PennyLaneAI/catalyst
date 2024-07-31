@@ -326,7 +326,7 @@ class TestMidCircuitMeasurement:
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
-            m_0 = measure(0, postselect=1)
+            measure(0, postselect=1)
             return {"hi": qml.expval(qml.Z(0))}
 
         observed = circuit(0.9)
@@ -343,7 +343,7 @@ class TestMidCircuitMeasurement:
         @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
             qml.RX(x, wires=0)
-            m_0 = measure(0, postselect=1)
+            measure(0, postselect=1)
             return {"hi": qml.counts()}, {"bye": qml.expval(qml.Z(0))}, {"hi": qml.counts()}
 
         observed = circuit(0.9)
