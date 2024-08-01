@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+import jaxlib
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
@@ -580,27 +581,35 @@ def trace_state_prep(op, qrp):
     wires_in_circuit = qrp.base.length
     assert type(wires_in_circuit) == int, "Wires in circuit must be statically known"
 
-    wires_in_operation = jax.numpy.array(op.wires.toarray(), dtype=jnp.dtype(jnp.uint8))
-
-    zero_state_vector = jnp.zeros((2,) * wires_in_circuit, jnp.dtype(jnp.complex128))
     params = op.parameters
     param = params[0]
     param_cast = jax.numpy.array(param, dtype=jnp.dtype(jnp.complex128))
-    size = len(wires_in_operation)
-    param_cast = jax.numpy.reshape(param_cast, shape=((2,) * size))
+    size = len(op.wires)
 
-    wire_enum = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.uint8))
+    @catalyst.pure_callback
+    def callback(
+        param_cast, *wires
+    ) -> jnp.zeros((2**wires_in_circuit,), dtype=jnp.dtype(jnp.complex128)):
+        """TODO: Get rid of this callback.
 
-    for wire in wire_enum:
-        wire_in_op = wires_in_operation[wire]
-        jnp_wire_in_op = jax.numpy.array(wire_in_op, dtype=jnp.dtype(jnp.uint8))
-        binary = jnp.unpackbits(jnp_wire_in_op, count=wires_in_circuit)
-        binary_in_op = jnp.unpackbits(wire, count=size)
-        value = param_cast[binary_in_op]
-        zero_state_vector = zero_state_vector.at[binary].set(value)
+        On August 1st, 2024, @erick-xanadu attempted to write a procedure so that code would
+        be generated for state prep. However, I had issues because of indexing. It may be
+        that the solution was wrong. But for now, this is a proof of concept that
+        as long as we have the flow of data, then it should work.
+        """
+        sanitized_wires = []
+        for wire in wires:
+            sanitized_wires.append(wire.tolist())
 
+        @qml.qnode(qml.device("default.qubit", wires=wires_in_circuit))
+        def stateprep():
+            qml.StatePrep(param_cast, wires=sanitized_wires)
+            return qml.state()
+
+        return stateprep()
+
+    state_vector = callback(param_cast, *op.wires)
     qubits = qrp.extract(range(wires_in_circuit))
-    state_vector = jax.numpy.reshape(zero_state_vector, shape=(2**wires_in_circuit,))
     qubits2 = set_state_p.bind(*qubits, state_vector)
     qrp.insert(range(wires_in_circuit), qubits2)
 
