@@ -36,7 +36,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(keep_intermediate=True)(example_circuit)()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state(self, backend):
@@ -53,7 +53,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qml.qjit(keep_intermediate=True)(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_array_less_than_size_state_prep(self, backend):
@@ -68,7 +68,23 @@ class TestExamplesFromWebsite:
 
         expected = example_circuit()
         observed = qml.qjit(example_circuit)()
-        print(expected, observed)
+        assert jnp.allclose(expected, observed)
+
+    def test_wires_with_less_than_all_basis_state(self, backend):
+        """Test what happens when not all wires are included.
+
+        This is not the same behaviour as PennyLane, but for expediency,
+        let's submit this and we can fix it later.
+        """
+
+        @qml.qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def example_circuit():
+            qml.BasisState(jnp.array([0, 1]), wires=range(2))
+            return qml.state()
+
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
 
@@ -130,20 +146,6 @@ class TestPossibleErrors:
                 return qml.state()
 
             example_circuit()
-
-    def test_wires_with_less_than_all_basis_state(self, backend):
-        """Test what happens when not all wires are included.
-
-        This is not the same behaviour as PennyLane, but for expediency,
-        let's submit this and we can fix it later.
-        """
-        with pytest.raises(ValueError, match="qml.BasisState must act on all wires"):
-
-            @qml.qjit
-            @qml.qnode(qml.device(backend, wires=3))
-            def example_circuit():
-                qml.BasisState(jnp.array([0, 1]), wires=range(2))
-                return qml.state()
 
     def test_domain_invalid_basis_state(self, backend):
         """Test what happens when BasisState operand is not between {0, 1}"""
