@@ -40,8 +40,9 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 
 .. warning::
 
-    The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-    ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud`` but future plans include the addition of more.
+    Not all PennyLane devices currently work with Catalyst. Supported backend devices include
+    ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+    a full of supported devices, please see :doc:`/dev/devices`.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
 way you are used to, as long as you ensure that all operations are added to the main tape.
@@ -101,101 +102,19 @@ PennyLane are also supported via the decomposition mechanism in Catalyst. For ex
         qml.adjoint(qml.SingleExcitation(jnp.pi / 3, wires=[0, 1]))
         return qml.state()
 
-In addition, you can jit most of :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
-more complex quantum circuits; see below for the list of currently supported operations and templates.
+In addition, you can qjit most :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
+more complex quantum circuits.
 
 .. important::
 
    Decomposition will generally happen in accordance with the specification provided by devices,
-   which can vary from device to device (e.g. ``default.qubit`` and ``lightning.qubit`` might
-   decompose quite differently.)
+   which can vary from device to device (e.g., ``default.qubit`` and ``lightning.qubit`` might
+   decompose quite differently).
    However, Catalyst's decomposition logic will differ in the following cases:
 
    1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
    2. The set of operations supported by Catalyst itself can in some instances lead to additional decompositions compared to the device itself.
 
-.. raw:: html
-
-    <div class="summary-table">
-
-.. details::
-    :title: List of supported native operations
-
-    .. autosummary::
-        :nosignatures:
-
-        ~pennylane.Identity
-        ~pennylane.PauliX
-        ~pennylane.PauliY
-        ~pennylane.PauliZ
-        ~pennylane.Hadamard
-        ~pennylane.S
-        ~pennylane.T
-        ~pennylane.PhaseShift
-        ~pennylane.RX
-        ~pennylane.RY
-        ~pennylane.RZ
-        ~pennylane.CNOT
-        ~pennylane.CY
-        ~pennylane.CZ
-        ~pennylane.SWAP
-        ~pennylane.IsingXX
-        ~pennylane.IsingYY
-        ~pennylane.IsingXY
-        ~pennylane.IsingZZ
-        ~pennylane.ControlledPhaseShift
-        ~pennylane.CRX
-        ~pennylane.CRY
-        ~pennylane.CRZ
-        ~pennylane.CRot
-        ~pennylane.CSWAP
-        ~pennylane.MultiRZ
-        ~pennylane.QubitUnitary
-
-.. raw:: html
-
-    </div>
-    <div class="summary-table">
-
-.. details::
-    :title: List of supported templates
-
-    .. autosummary::
-        :nosignatures:
-
-        ~pennylane.AllSinglesDoubles
-        ~pennylane.AmplitudeEmbedding
-        ~pennylane.AngleEmbedding
-        ~pennylane.ApproxTimeEvolution
-        ~pennylane.ArbitraryStatePreparation
-        ~pennylane.BasicEntanglerLayers
-        ~pennylane.BasisEmbedding
-        ~pennylane.BasisStatePreparation
-        ~pennylane.broadcast
-        ~pennylane.FermionicDoubleExcitation
-        ~pennylane.FermionicSingleExcitation
-        ~pennylane.FlipSign
-        ~pennylane.GateFabric
-        ~pennylane.GroverOperator
-        ~pennylane.IQPEmbedding
-        ~pennylane.kUpCCGSD
-        ~pennylane.MERA
-        ~pennylane.MottonenStatePreparation
-        ~pennylane.MPS
-        ~pennylane.Permute
-        ~pennylane.QAOAEmbedding
-        ~pennylane.QFT
-        ~pennylane.QuantumMonteCarlo
-        ~pennylane.QuantumPhaseEstimation
-        ~pennylane.RandomLayers
-        ~pennylane.SimplifiedTwoDesign
-        ~pennylane.StronglyEntanglingLayers
-        ~pennylane.TTN
-        ~pennylane.UCCSD
-
-.. raw:: html
-
-    </div>
 
 Observables
 -----------
@@ -217,28 +136,6 @@ a tensor product of a :class:`qml.PauliX <pennylane.PauliX>`, :class:`qml.Hadama
             [complex(2.0, 0.0), complex(-1.0, 0.0)]]
         )
         return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(h_matrix, 2))
-
-.. raw:: html
-
-    <div class="summary-table">
-
-.. details::
-    :title: List of supported observables
-
-    .. autosummary::
-        :nosignatures:
-
-        ~pennylane.Identity
-        ~pennylane.PauliX
-        ~pennylane.PauliY
-        ~pennylane.PauliZ
-        ~pennylane.Hadamard
-        ~pennylane.Hermitian
-        ~pennylane.Hamiltonian
-
-.. raw:: html
-
-    </div>
 
 Measurements
 ------------
