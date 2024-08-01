@@ -425,10 +425,11 @@ class TestCProgramGeneration:
 
         @qjit(keep_intermediate=True)
         def f(x):
+            """Square function."""
             return x**2
 
-        input = 2.0
-        old_result = f(input)
+        data = 2.0
+        old_result = f(data)
         old_ir = f.get_pipeline_output("llvm")
         old_workspace = str(f.workspace)
 
@@ -437,11 +438,11 @@ class TestCProgramGeneration:
             "%x = load double, ptr %1, align 8\n  %cc = fmul double %15, %x\n  store double %cc, ptr %9, align 8\n",
         )
         f.overwrite_ir("llvm", new_ir)
-        new_result = f(input)
+        new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(f.workspace), ignore_errors=True)
-        assert old_result * input == new_result
+        assert old_result * data == new_result
 
 
 if __name__ == "__main__":

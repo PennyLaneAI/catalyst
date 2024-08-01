@@ -617,6 +617,15 @@ class QJIT:
         return mlir_module, mlir_string
 
     def get_pipeline_output(self, pass_name):
+        """Capture IR string from the given compiler pass.
+
+        Args:
+            pass_name (str): target compiler pass name
+
+        Returns:
+            str: output ir from the target compiler pass
+        """
+
         if pass_name in self.compiler.options.get_pipelines():
             return self.compiler.get_output_of(pass_name)
         if pass_name == "mlir":
@@ -637,6 +646,12 @@ class QJIT:
         raise NotImplementedError
 
     def overwrite_ir(self, level, new_ir):
+        """Specify new IR that will be used for future compilation.
+
+        Args:
+            level (str): llvm or mlir pass
+            new_ir (str): new ir in the string format
+        """
         if level == "llvm":
             self.overwritten_ir = new_ir
             self.fn_cache.clear()
