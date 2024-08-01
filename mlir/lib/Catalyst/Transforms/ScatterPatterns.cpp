@@ -380,12 +380,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         }
         else {
             SmallVector<Value> fullStartIndex;
+            int inner_index = 0;
             for (size_t i = 0; i < inputsShape.size(); ++i) {
                 // Full start indices (use scatter dims op)
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, i);
+                    Value index = builder.create<index::ConstantOp>(loc, inner_index);
+                    inner_index++;
                     auto indexScatter =
                         builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
                     fullStartIndex.push_back(indexScatter);
@@ -397,16 +399,16 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 }
             }
             // Full windows indices
-            SmallVector<Value> fullWindowIndex;
+            SmallVector<Value> fullWindowIndex = updateWindowsIndices;
             for (auto insertedDim : insertedWindowsDims) {
                 auto c0 = builder.create<index::ConstantOp>(loc, 0);
-                updateWindowsIndices.insert(updateWindowsIndices.begin() + insertedDim, c0);
+                fullWindowIndex.insert(fullWindowIndex.begin() + insertedDim, c0);
             }
             // Add
             SmallVector<Value> results;
-            for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
+            for (size_t i = 0; i < fullWindowIndex.size(); ++i) {
                 Value indexScatter = fullStartIndex[i];
-                auto indexUpdate = updateWindowsIndices[i];
+                Value indexUpdate = fullWindowIndex[i];
                 auto indexUpdateCasted =
                     builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                 Value addValue =

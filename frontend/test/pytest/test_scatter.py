@@ -59,7 +59,7 @@ def test_matrix():
     assert np.allclose(res, jnp.array([[0, 1, 2], [9, 12, 15], [18, 21, 24]]))
 
 
-def test_matrix_list_index():
+def test_matrix_list_index_right():
     """Test to index (list) a jax array and have operations on it."""
 
     A = jnp.ones([3, 3]) * 2
@@ -70,6 +70,19 @@ def test_matrix_list_index():
 
     res = qjit(matrix_list_index)(A)
     assert np.allclose(res, jnp.array([[1, 1, 1], [1, 1, 1], [2, 2, 2]]))
+
+
+def test_matrix_list_index_left():
+    """Test to index (list) a jax array and have operations on it."""
+
+    A = jnp.ones([3, 3]) * 2
+
+    def matrix_list_index(A):
+        A = A.at[:, [0, 1]].set(jnp.ones([3, 2]), indices_are_sorted=True, unique_indices=True)
+        return A
+
+    res = qjit(matrix_list_index)(A)
+    assert np.allclose(res, jnp.array([[1, 1, 2], [1, 1, 2], [1, 1, 2]]))
 
 
 def test_gather_derivative():
