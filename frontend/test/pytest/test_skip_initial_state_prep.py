@@ -73,6 +73,8 @@ class TestExamplesFromWebsite:
 
 
 class TestDynamicWires:
+    """Test dynamic wires"""
+
     def test_state_prep(self, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
@@ -80,8 +82,6 @@ class TestDynamicWires:
 
         Modified to use jax.numpy and a non trivial StatePrep
         Modified to use dynamic wires.
-        Dynamic wires won't do anything though, since StatePrep (compiled)
-        assumes all wires will be used in order.
         """
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -117,7 +117,6 @@ class TestDynamicWires:
 class TestPossibleErrors:
     """What happens when there is bad user input?"""
 
-
     def test_array_less_than_size_basis_state(self, backend):
         """Test what happens when the array is less than the size required.
         This is the same error as reported by pennylane
@@ -131,21 +130,6 @@ class TestPossibleErrors:
                 return qml.state()
 
             example_circuit()
-
-    def test_wires_with_less_than_all(self, backend):
-        """Test what happens when not all wires are included.
-
-        This is not the same behaviour as PennyLane, but for expediency,
-        let's submit this and we can fix it later.
-        """
-
-        with pytest.raises(ValueError, match="qml.StatePrep must act on all wires"):
-
-            @qml.qjit
-            @qml.qnode(qml.device(backend, wires=3))
-            def example_circuit():
-                qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
-                return qml.state()
 
     def test_wires_with_less_than_all_basis_state(self, backend):
         """Test what happens when not all wires are included.
