@@ -630,11 +630,9 @@ def trace_basis_state(op, qrp):
     catalyst.debug.assertion.debug_assert(is_valid, err_msg)
 
     one_to_n = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.int64))
-
-    def decimal(x, pos):
-        return 2**pos * x
-
-    runtime_index = jnp.sum(jax.vmap(decimal)(param_array, one_to_n))
+    twos = jnp.array([2] * size, dtype=jnp.dtype(jnp.int64))
+    two_to_the_n = jnp.power(twos, one_to_n)
+    runtime_index = jnp.sum(two_to_the_n * param_array)
 
     qubits2 = set_basis_state_p.bind(*qubits, runtime_index)
     qrp.insert(op.wires, qubits2)
