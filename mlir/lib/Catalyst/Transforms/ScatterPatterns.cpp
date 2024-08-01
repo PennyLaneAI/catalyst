@@ -361,9 +361,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, i);
+                    int innerIndex = std::distance(scatterDimsToOperandDims.begin(), itScatter);
+                    Value indexConstantOp = builder.create<index::ConstantOp>(loc, innerIndex);
                     auto indexScatter =
-                        builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                        builder.create<tensor::ExtractOp>(loc, scatterIndices, indexConstantOp);
                     auto indexUpdateCasted =
                         builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                     Value addValue =
@@ -380,16 +381,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         }
         else {
             SmallVector<Value> fullStartIndex;
-            int inner_index = 0;
             for (size_t i = 0; i < inputsShape.size(); ++i) {
                 // Full start indices (use scatter dims op)
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, inner_index);
-                    inner_index++;
+                    int innerIndex = std::distance(scatterDimsToOperandDims.begin(), itScatter);
+                    Value indexConstantOp = builder.create<index::ConstantOp>(loc, innerIndex);
                     auto indexScatter =
-                        builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                        builder.create<tensor::ExtractOp>(loc, scatterIndices, indexConstantOp);
                     fullStartIndex.push_back(indexScatter);
                 }
                 else {
