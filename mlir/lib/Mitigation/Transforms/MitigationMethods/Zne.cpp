@@ -42,7 +42,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
     // Scalar factors
     auto scaleFactors = op.getScaleFactors();
-    RankedTensorType scaleFactorType = scaleFactors.getType().cast<RankedTensorType>();
+    RankedTensorType scaleFactorType = cast<RankedTensorType>(scaleFactors.getType());
     const auto sizeInt = scaleFactorType.getDimSize(0);
 
     // Folding type
@@ -54,7 +54,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
 
-    RankedTensorType resultType = op.getResultTypes().front().cast<RankedTensorType>();
+    RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
 
     // Loop over the scalars to create a folded circuit per factor
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
@@ -406,7 +406,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
-    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp);
+    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
     return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,

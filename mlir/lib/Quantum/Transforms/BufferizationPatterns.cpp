@@ -68,7 +68,7 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         Type tensorType = op.getType(0);
-        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
@@ -84,7 +84,7 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         Type tensorType = op.getType(0);
-        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
@@ -99,7 +99,7 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         Type tensorType = op.getType(0);
-        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
@@ -116,8 +116,8 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Location loc = op.getLoc();
         Type tensorType0 = op.getType(0);
         Type tensorType1 = op.getType(1);
-        MemRefType resultType0 = getTypeConverter()->convertType(tensorType0).cast<MemRefType>();
-        MemRefType resultType1 = getTypeConverter()->convertType(tensorType1).cast<MemRefType>();
+        MemRefType resultType0 = cast<MemRefType>(getTypeConverter()->convertType(tensorType0));
+        MemRefType resultType1 = cast<MemRefType>(getTypeConverter()->convertType(tensorType1));
         Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
         Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});

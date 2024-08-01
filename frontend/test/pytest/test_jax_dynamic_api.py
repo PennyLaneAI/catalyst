@@ -141,6 +141,7 @@ def test_classical_tracing_init(shape, dtype):
     "op",
     [
         jnp.sin,
+        jnp.cos,
         jnp.abs,
     ],
 )

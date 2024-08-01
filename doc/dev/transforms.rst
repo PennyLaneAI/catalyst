@@ -553,7 +553,7 @@ Finally, we have to amend our rewrite function to invoke the new function we cre
 Note how we can create a new operation, take its results, and use those to replace another operation
 in one go. This turns the previous IR:
 
-.. code-block::
+.. code-block:: mlir
 
     func.func @my_func(%x: f64, %y: f64, %z: f64) -> f64 {
         ...

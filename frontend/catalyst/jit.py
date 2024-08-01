@@ -81,6 +81,7 @@ def qjit(
     static_argnums=None,
     abstracted_axes=None,
     disable_assertions=False,
+    seed=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -89,9 +90,9 @@ def qjit(
 
     .. note::
 
-        The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-        ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud``. For a list of supported
-        operations, observables, and measurements, please see the :doc:`/dev/quick_start`.
+        Not all PennyLane devices currently work with Catalyst. Supported backend devices include
+        ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+        a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
         fn (Callable): the quantum or classical function
@@ -126,6 +127,13 @@ def qjit(
             below.
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
+        seed (Optional[Int]):
+            The seed for random operations in a qjit call, such as circuit measurement results.
+            The default value is None, which means no seeding is performed, and all processes
+            are random. A seed is expected to be an unsigned 32-bit integer.
+            Note that `lightning.qubit` and `lightning.kokkos` currently only support seeding
+            measurements, and do not yet support seeding samples. As such, these devices with
+            shots will still return random results.
 
     Returns:
         QJIT object.
@@ -594,7 +602,7 @@ class QJIT:
         mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
-        inject_functions(mlir_module, ctx)
+        inject_functions(mlir_module, ctx, self.compile_options.seed)
 
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         options = copy.deepcopy(self.compile_options)

@@ -41,8 +41,8 @@ func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
 func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcScalarTensor.finitediff0(%arg0: f64) -> tensor<2x3xf64>
-    // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<2.000000e+00> : tensor<2x3xf64>
-    // CHECK:        [[OPERANDCONST:%.+]] = arith.constant 2.000000e+00 : f64
+    // CHECK-DAG:    [[RESULTCONST:%.+]] = arith.constant dense<2.000000e+00> : tensor<2x3xf64>
+    // CHECK-DAG:    [[OPERANDCONST:%.+]] = arith.constant 2.000000e+00 : f64
     // CHECK:        [[CALLPOS:%.+]] = call @funcScalarTensor(%arg0) : (f64) -> tensor<2x3xf64>
     // CHECK:        [[OPERANDFRWRD:%.+]] = arith.addf %arg0, [[OPERANDCONST]] : f64
     // CHECK-NEXT:   [[CALLFRWRD:%.+]] = call @funcScalarTensor([[OPERANDFRWRD]]) : (f64) -> tensor<2x3xf64>
@@ -65,8 +65,8 @@ func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
 func.func private @funcTensorScalar(%arg0: tensor<f64>) -> f64 attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcTensorScalar.finitediff0(%arg0: tensor<f64>) -> f64
-    // CHECK:        [[CONSTANT:%.+]] = arith.constant {{.+}} : f64
-    // CHECK:        [[CONSTANTTENSOR:%.+]] = arith.constant dense<{{.+}}> : tensor<f64>
+    // CHECK-DAG:    [[CONSTANT:%.+]] = arith.constant {{.+}} : f64
+    // CHECK-DAG:    [[CONSTANTTENSOR:%.+]] = arith.constant dense<{{.+}}> : tensor<f64>
     // CHECK:        [[CALLPOS:%.+]] = call @funcTensorScalar(%arg0) : (tensor<f64>) -> f64
     // CHECK:        [[OPERANDFRWD:%.+]] = arith.addf %arg0, [[CONSTANTTENSOR]] : tensor<f64>
     // CHECK-NEXT:   [[CALLFRWRD:%.+]] = call @funcTensorScalar([[OPERANDFRWD]]) : (tensor<f64>) -> f64
@@ -89,8 +89,8 @@ func.func @gradCallTensorScalar(%arg0: tensor<f64>) -> f64 {
 func.func private @funcScalarScalarTensor(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcScalarScalarTensor.finitediff0(%arg0: f64) -> tensor<f64>
-    // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<{{.+}}> : tensor<f64>
-    // CHECK:        [[OPERANDCONST:%.+]] = arith.constant {{.+}} : f64
+    // CHECK-DAG:    [[RESULTCONST:%.+]] = arith.constant dense<{{.+}}> : tensor<f64>
+    // CHECK-DAG:    [[OPERANDCONST:%.+]] = arith.constant {{.+}} : f64
     // CHECK:        [[CALLPOS:%.+]] = call @funcScalarScalarTensor(%arg0) : (f64) -> tensor<f64>
     // CHECK:        [[OPERANDFRWRD:%.+]] = arith.addf %arg0, [[OPERANDCONST]] : f64
     // CHECK-NEXT:   [[CALLFRWRD:%.+]] = call @funcScalarScalarTensor([[OPERANDFRWRD]]) : (f64) -> tensor<f64>
@@ -114,8 +114,8 @@ func.func @gradCallScalarScalarTensor(%arg0: f64) -> tensor<f64> {
 func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcTensorScalar.finitediff0(%arg0: tensor<3xf64>) -> tensor<3xf64>
-    // CHECK:        [[OPERANDCONST:%.+]] = arith.constant dense<3.000000e+00> : tensor<3xf64>
-    // CHECK:        [[RESULTCONST:%.+]] = arith.constant 3.000000e+00 : f64
+    // CHECK-DAG:    [[OPERANDCONST:%.+]] = arith.constant dense<3.000000e+00> : tensor<3xf64>
+    // CHECK-DAG:    [[RESULTCONST:%.+]] = arith.constant 3.000000e+00 : f64
     // CHECK:        [[CALLPOS:%.+]] = call @funcTensorScalar(%arg0) : (tensor<3xf64>) -> f64
     // CHECK:        [[ABSDIFF:%.+]] = tensor.generate
     // CHECK:        [[RESULT:%.+]] = arith.divf [[ABSDIFF]], [[OPERANDCONST]] : tensor<3xf64>
@@ -136,8 +136,8 @@ func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcTensorTensor.finitediff0(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
-    // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<4.000000e+00> : tensor<2x7x3x2x1xf64>
-    // CHECK:        [[BASETYPECONST:%.+]] = arith.constant 4.000000e+00 : f64
+    // CHECK-DAG:    [[RESULTCONST:%.+]] = arith.constant dense<4.000000e+00> : tensor<2x7x3x2x1xf64>
+    // CHECK-DAG:    [[BASETYPECONST:%.+]] = arith.constant 4.000000e+00 : f64
     // CHECK:        [[CALLPOS:%.+]] = call @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<2xf64>
     // CHECK:        [[ABSDIFF:%.+]] = tensor.generate
     // CHECK:        [[RESULT:%.+]] = arith.divf [[ABSDIFF]], [[RESULTCONST]] : tensor<2x7x3x2x1xf64>
