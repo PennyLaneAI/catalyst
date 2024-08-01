@@ -90,7 +90,7 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
     for (size_t i = 0; i < evalPos.size(); i++) {
         Value diff = rewriter.create<arith::SubFOp>(loc, evalPos[i], evalNeg[i]);
         Value divisor = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
-        if (auto tensorType = evalPos[i].getType().dyn_cast<TensorType>())
+        if (auto tensorType = dyn_cast<TensorType>(evalPos[i].getType()))
             divisor = rewriter.create<tensor::SplatOp>(loc, divisor, tensorType);
         derivatives.push_back(rewriter.create<arith::DivFOp>(loc, diff, divisor));
     }
@@ -108,9 +108,9 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
     for (size_t i = 0; i < gradientBuffers.size(); i++) {
         Value gradientBuffer = gradientBuffers[i];
         Value derivative = derivatives[i];
-        bool isDerivativeTensor = derivative.getType().isa<TensorType>();
+        bool isDerivativeTensor = isa<TensorType>(derivative.getType());
         bool isDerivativeScalarTensor =
-            isDerivativeTensor && derivative.getType().cast<TensorType>().getRank() == 0;
+            isDerivativeTensor && cast<TensorType>(derivative.getType()).getRank() == 0;
         if (isDerivativeTensor && !isDerivativeScalarTensor) {
             // In the case of tensor return values, we have to do some extra work to
             // extract a view of the gradient buffer corresponding to a partially
@@ -129,7 +129,7 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             //
             // Note that dynamic values for these arrays are specifically marked (with kDynamic)
             // and need to be provided separately as SSA values (e.g. from a tensor.dim op).
-            MemRefType gradientBufferType = gradientBuffer.getType().cast<MemRefType>();
+            MemRefType gradientBufferType = cast<MemRefType>(gradientBuffer.getType());
             int64_t rank = gradientBufferType.getRank();
 
             std::vector<int64_t> sizes = gradientBufferType.getShape();
@@ -230,7 +230,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             rewriter.create<memref::StoreOp>(loc, cZero, gradientsProcessed);
 
             for (Type gradType : gradResTypes) {
-                TensorType gradTensorType = gradType.cast<TensorType>();
+                TensorType gradTensorType = cast<TensorType>(gradType);
                 MemRefType gradBufferType =
                     MemRefType::get(gradTensorType.getShape(), gradTensorType.getElementType());
 
@@ -312,7 +312,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             }
         });
 
-        quantum::removeQuantumMeasurements(gradientFn);
+        quantum::removeQuantumMeasurements(gradientFn, rewriter);
         gradientFn->setAttr("QuantumFree", rewriter.getUnitAttr());
     }
 

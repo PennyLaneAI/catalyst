@@ -41,7 +41,7 @@ def ListDeallocOp : Catalyst_Op<"list_dealloc"> {
 def ListPushOp : Catalyst_Op<"list_push",
         [TypesMatchWith<"type of 'value' matches element type of 'list'",
                         "list", "value",
-                        "$_self.cast<ArrayListType>().getElementType()">]> {
+                        "mlir::cast<ArrayListType>($_self).getElementType()">]> {
     let summary = "Append an element to the end of an array list.";
     let arguments = (ins AnyType:$value, ArrayListType:$list);
     let assemblyFormat = [{ $value `,` $list attr-dict `:` type($list) }];
@@ -50,7 +50,7 @@ def ListPushOp : Catalyst_Op<"list_push",
 def ListPopOp : Catalyst_Op<"list_pop",
         [TypesMatchWith<"type of 'result' matches element type of 'list'",
                         "list", "result",
-                        "$_self.cast<ArrayListType>().getElementType()">]> {
+                        "mlir::cast<ArrayListType>($_self).getElementType()">]> {
     let summary = "Remove an element from the end of an array list and return it.";
     let arguments = (ins ArrayListType:$list);
     let results = (outs AnyType:$result);

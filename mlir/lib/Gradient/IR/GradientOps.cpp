@@ -88,7 +88,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         if (auto tensorType = dyn_cast<ShapedType>(diffArgBaseType))
             diffArgBaseType = tensorType.getElementType();
 
-        if (!diffArgBaseType.isa<FloatType>())
+        if (!isa<FloatType>(diffArgBaseType))
             return op_state->emitOpError("invalid numeric base type: callee operand at position ")
                    << idx << " must be floating point to be differentiable";
     }

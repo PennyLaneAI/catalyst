@@ -32,9 +32,9 @@ struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
         if (op.getInbounds() || (defOp && isa<LLVM::ZeroOp>(defOp))) {
             return failure();
         }
-        rewriter.startRootUpdate(op);
+        rewriter.startOpModification(op);
         op.setInbounds(true);
-        rewriter.finalizeRootUpdate(op);
+        rewriter.finalizeOpModification(op);
         return success();
     }
 };

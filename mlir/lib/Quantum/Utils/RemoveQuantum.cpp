@@ -19,13 +19,14 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+#include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
 
 namespace catalyst {
 namespace quantum {
 
-void removeQuantumMeasurements(func::FuncOp &function)
+void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
     // Delete measurement operations.
     std::deque<Operation *> opsToDelete;
@@ -37,19 +38,20 @@ void removeQuantumMeasurements(func::FuncOp &function)
     // But the question then becomes, can we have arbitrary control flow
     // inside after measurements?
     //
-    // This will remove the operation in opsToDelete as long as any other uses.
+    // This will remove the operation in opsToDelete as long as it doesn't have any other uses.
     while (!opsToDelete.empty()) {
         Operation *currentOp = opsToDelete.front();
         opsToDelete.pop_front();
-        currentOp->dropAllReferences();
+
+        rewriter.modifyOpInPlace(currentOp, [&] { currentOp->dropAllReferences(); });
         for (Operation *user : currentOp->getUsers()) {
             if (!visited.contains(user)) {
                 visited.insert(user);
                 opsToDelete.push_back(user);
             }
         }
-        if (currentOp->use_empty()) {
-            currentOp->erase();
+        if (currentOp && currentOp->use_empty()) {
+            rewriter.eraseOp(currentOp);
         }
         else {
             opsToDelete.push_back(currentOp);

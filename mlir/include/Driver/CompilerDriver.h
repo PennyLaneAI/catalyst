@@ -71,6 +71,8 @@ struct CompilerOptions {
     llvm::raw_ostream &diagnosticStream;
     /// If true, the driver will output the module at intermediate points.
     bool keepIntermediate;
+    /// If true, the llvm.coroutine will be lowered.
+    bool asyncQnodes;
     /// Sets the verbosity level to use when printing messages.
     Verbosity verbosity;
     /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR

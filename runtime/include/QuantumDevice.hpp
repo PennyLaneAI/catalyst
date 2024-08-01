@@ -122,7 +122,7 @@ struct QuantumDevice {
      *
      * @param gen The std::mt19937 PRNG object.
      */
-    virtual void SetDevicePRNG(std::mt19937 *gen){};
+    virtual void SetDevicePRNG([[maybe_unused]] std::mt19937 *gen){};
 
     /**
      * @brief Start recording a quantum tape if provided.

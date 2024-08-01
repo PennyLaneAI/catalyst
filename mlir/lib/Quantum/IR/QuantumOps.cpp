@@ -137,7 +137,7 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
 
 static LogicalResult verifyTensorResult(Type ty, int64_t length)
 {
-    ShapedType tensor = ty.cast<ShapedType>();
+    ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 1 ||
         tensor.getShape()[0] != length) {
         return failure();
@@ -148,7 +148,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length)
 
 static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
 {
-    ShapedType tensor = ty.cast<ShapedType>();
+    ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
         tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
         return failure();
@@ -162,7 +162,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 LogicalResult QubitUnitaryOp::verify()
 {
     size_t dim = std::pow(2, getInQubits().size());
-    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim, dim))) {
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
     }
 
@@ -174,7 +174,7 @@ LogicalResult QubitUnitaryOp::verify()
 LogicalResult HermitianOp::verify()
 {
     size_t dim = std::pow(2, getQubits().size());
-    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim, dim)))
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
 
     return success();
@@ -264,7 +264,7 @@ LogicalResult ProbsOp::verify()
     Type toVerify =
         getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits.value());
-    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
+    if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
 
@@ -288,7 +288,7 @@ LogicalResult StateOp::verify()
 
     Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits.value());
-    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
+    if (failed(verifyTensorResult(cast<ShapedType>(toVerify), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
 

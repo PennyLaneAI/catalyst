@@ -15,11 +15,12 @@
 #pragma once
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace catalyst {
 namespace quantum {
 
-void removeQuantumMeasurements(mlir::func::FuncOp &function);
+void removeQuantumMeasurements(mlir::func::FuncOp &function, mlir::PatternRewriter &rewriter);
 mlir::LogicalResult verifyQuantumFree(mlir::func::FuncOp function);
 
 } // namespace quantum

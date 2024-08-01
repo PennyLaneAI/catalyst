@@ -39,4 +39,4 @@ cmake -S /catalyst/mlir/Enzyme/enzyme -B /catalyst/enzyme-build -G Ninja \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm \
     -DENZYME_STATIC_LIB=ON \
     -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-cmake --build /catalyst/enzyme-build --target EnzymeStatic-18
+cmake --build /catalyst/enzyme-build --target EnzymeStatic-19

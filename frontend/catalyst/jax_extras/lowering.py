@@ -125,7 +125,6 @@ def custom_lower_jaxpr_to_module(
         backend_or_name=None,
         platforms=[platform],
         axis_context=axis_context,
-        name_stack=name_stack,
         keepalives=keepalives,
         channel_iterator=channel_iter,
         host_callbacks=host_callbacks,
@@ -149,6 +148,7 @@ def custom_lower_jaxpr_to_module(
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
+            name_stack=name_stack,
         )
 
         for op in ctx.module.body.operations:

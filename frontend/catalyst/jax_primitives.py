@@ -330,8 +330,8 @@ def _python_callback_lowering(
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
     ctx = jax_ctx.module_context
-    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd)
-    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev)
+    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd, name_stack=jax_ctx.name_stack)
+    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev, name_stack=jax_ctx.name_stack)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
 
     argc = len(args)
@@ -397,11 +397,11 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
+def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
-    func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
+    func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple(), name_stack=name_stack)
 
     if isinstance(fn, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
@@ -443,7 +443,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in mlir_fn_cache:
         func_op = mlir_fn_cache[fn]
     else:
-        func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr)
+        func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr, name_stack=ctx.name_stack)
         mlir_fn_cache[fn] = func_op
 
     symbol_name = func_op.name.value
@@ -1585,14 +1585,13 @@ def _cond_lowering(
 
             # if block
             source_info_util.extend_name_stack("if")
-            if_ctx = jax_ctx.module_context.replace(
-                name_stack=jax_ctx.module_context.name_stack.extend("if")
-            )
+            if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
                 out = mlir.jaxpr_subcomp(
-                    if_ctx,
+                    if_ctx.module_context,
                     true_jaxpr.jaxpr,
+                    if_ctx.name_stack,
                     mlir.TokenSet(),
                     [mlir.ir_constants(c) for c in true_jaxpr.consts],
                     *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
@@ -1603,17 +1602,16 @@ def _cond_lowering(
 
             # else block
             source_info_util.extend_name_stack("else")
-            else_ctx = jax_ctx.module_context.replace(
-                name_stack=jax_ctx.module_context.name_stack.extend("else")
-            )
+            else_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("else"))
             else_block = if_op_scf.else_block
             if len(preds) == 1:
                 # Base case: reached the otherwise block
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
                     out = mlir.jaxpr_subcomp(
-                        else_ctx,
+                        else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
+                        else_ctx.name_stack,
                         mlir.TokenSet(),
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
                         *([a] for a in flat_args_plus_consts),
@@ -1695,15 +1693,16 @@ def _while_loop_lowering(
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
-    name_stack = jax_ctx.module_context.name_stack.extend("while")
-    cond_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("cond"))
+    name_stack = jax_ctx.name_stack.extend("while")
+    cond_ctx = jax_ctx.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
 
         # recursively generate the mlir for the while cond
         ((pred,),), _ = mlir.jaxpr_subcomp(
-            cond_ctx,
+            cond_ctx.module_context,
             cond_jaxpr.jaxpr,
+            cond_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *([a] for a in (cond_consts + cond_args)),  # fn expects [a1], [a2], [a3] format
@@ -1715,14 +1714,15 @@ def _while_loop_lowering(
 
     # body block
     body_block = while_op_scf.regions[1].blocks.append(*loop_carry_types)
-    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
+    body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
 
         # recursively generate the mlir for the while body
         out, _ = mlir.jaxpr_subcomp(
-            body_ctx,
+            body_ctx.module_context,
             body_jaxpr.jaxpr,
+            body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *([a] for a in (body_consts + body_args)),  # fn expects [a1], [a2], [a3] format
@@ -1831,9 +1831,9 @@ def _for_loop_lowering(
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
 
-    name_stack = jax_ctx.module_context.name_stack.extend("for")
+    name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body
-    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
+    body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
 
     with ir.InsertionPoint(body_block):
         body_args = list(body_block.arguments)
@@ -1858,8 +1858,9 @@ def _for_loop_lowering(
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
-            body_ctx,
+            body_ctx.module_context,
             body_jaxpr.jaxpr,
+            body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
             *body_args,
@@ -1935,10 +1936,9 @@ def _adjoint_lowering(
     with ir.InsertionPoint(adjoint_block):
         source_info_util.extend_name_stack("adjoint")
         out, _ = mlir.jaxpr_subcomp(
-            jax_ctx.module_context.replace(
-                name_stack=jax_ctx.module_context.name_stack.extend("adjoint")
-            ),
+            jax_ctx.module_context,
             jaxpr.jaxpr,
+            jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
             *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]

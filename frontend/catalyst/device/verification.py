@@ -21,6 +21,7 @@ from typing import Any, Callable, Sequence, Union
 
 from pennylane import transform
 from pennylane.measurements import (
+    ExpectationMP,
     MutualInfoMP,
     SampleMeasurement,
     StateMeasurement,
@@ -309,6 +310,11 @@ def validate_measurements(
     for m in tape.measurements:
         # verify observable is supported
         if m.obs:
+            if not isinstance(m, (ExpectationMP, VarianceMP)):
+                raise CompileError(
+                    "Only expectation value and variance measurements can "
+                    "accept observables with Catalyst"
+                )
             _verify_observable(m.obs, _obs_checker)
         # verify measurement process type is supported
         if shots and not isinstance(m, SampleMeasurement):

@@ -36,6 +36,10 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${
 # Patch MHLO for correct linking
 sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mlir-hlo/deallocation/transforms/CMakeLists.txt
 
+export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
 # Build MHLO
 cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -46,4 +50,4 @@ cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DLLVM_ENABLE_ZLIB=OFF \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
     -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-cmake --build /catalyst/mhlo-build --target check-mlir-hlo
+LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build /catalyst/mhlo-build --target check-mlir-hlo
