@@ -645,14 +645,13 @@ class QJIT:
                 return data
         raise NotImplementedError
 
-    def overwrite_ir(self, level, new_ir):
+    def overwrite_ir(self, new_ir):
         """Specify new IR that will be used for future compilation.
 
         Args:
-            level (str): llvm or mlir pass
             new_ir (str): new ir in the string format
         """
-        if level == "llvm":
+        if new_ir:
             self.overwritten_ir = new_ir
             self.fn_cache.clear()
 
