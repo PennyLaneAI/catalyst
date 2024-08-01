@@ -204,6 +204,24 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug where scatter did not work correctly with list indices.
+  [(#982)](https://github.com/PennyLaneAI/catalyst/pull/982)
+
+  ```python
+  A = jnp.ones([3, 3]) * 2
+
+  def update(A):
+      A = A.at[[0, 1], :].set(jnp.ones([2, 3]), indices_are_sorted=True, unique_indices=True)
+      return A
+  ```
+
+  ```pycon
+  >>> update
+  [[1. 1. 1.]
+   [1. 1. 1.]
+   [2. 2. 2.]]
+  ```
+
 * Static arguments can now be passed through a QNode when specified
   with the `static_argnums` keyword argument.
   [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
