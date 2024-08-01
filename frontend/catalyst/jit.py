@@ -33,7 +33,7 @@ from malt.core import config as ag_config
 import catalyst
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler
+from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
@@ -633,7 +633,7 @@ class QJIT:
             str: output ir from the target compiler pass
         """
 
-        if pass_name in self.compiler.options.get_pipelines():
+        if pass_name in [n[0] for n in DEFAULT_PIPELINES]:
             return self.compiler.get_output_of(pass_name)
         if pass_name == "mlir":
             file_path = str(self.workspace) + "/0_" + self.__name__ + ".mlir"

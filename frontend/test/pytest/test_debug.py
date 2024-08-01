@@ -446,7 +446,7 @@ class TestCProgramGeneration:
         shutil.rmtree(str(f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    def test_modify_mlir_ir(self):
+    def test_modify_mlir(self):
         """Turn a square function in mlir into a cubic one."""
 
         @qjit(keep_intermediate=True)
@@ -463,6 +463,30 @@ class TestCProgramGeneration:
             "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
             "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
              %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    ",
+        )
+        f.overwrite_ir(new_ir)
+        new_result = f(data)
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(f.workspace), ignore_errors=True)
+        assert old_result * data == new_result
+
+    def test_modify_mlir_HLOLoweringPass(self):
+        """Turn a square function in mlir (after HLOLoweringPass) into a cubic one."""
+
+        @qjit(keep_intermediate=True)
+        def f(x):
+            """Square function."""
+            return x**2
+
+        data = 2.0
+        old_result = f(data)
+        old_ir = f.get_pipeline_output("HLOLoweringPass")
+        old_workspace = str(f.workspace)
+
+        new_ir = old_ir.replace(
+            "%2 = arith.mulf %in, %in_0 : f64\n",
+            "%c = arith.mulf %in, %in_0 : f64\n  " "%2 = arith.mulf %c, %in_0 : f64\n",
         )
         f.overwrite_ir(new_ir)
         new_result = f(data)
