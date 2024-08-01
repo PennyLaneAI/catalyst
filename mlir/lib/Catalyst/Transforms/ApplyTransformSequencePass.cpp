@@ -80,8 +80,8 @@ struct ApplyTransformSequencePass
             return signalPassFailure();
         };
 
-        // All done. The transformer module in memory is automatically deleted when
-        // we go out of scope here.
+        // All done, erase the transformer module
+        transformer->erase();
     }
 };
 
