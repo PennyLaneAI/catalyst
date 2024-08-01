@@ -11,6 +11,7 @@
 
 import platform
 import re
+import shutil
 
 import jax.numpy as jnp
 import numpy as np
@@ -418,6 +419,29 @@ class TestCProgramGeneration:
 
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
+
+    def test_modify_llvm_ir(self):
+        """Turn a square function into a cubic one."""
+
+        @qjit(keep_intermediate=True)
+        def f(x):
+            return x**2
+
+        input = 2.0
+        old_result = f(input)
+        old_ir = f.get_pipeline_output("llvm")
+        old_workspace = str(f.workspace)
+
+        new_ir = old_ir.replace(
+            "store double %15, ptr %9, align 8\n",
+            "%x = load double, ptr %1, align 8\n  %cc = fmul double %15, %x\n  store double %cc, ptr %9, align 8\n",
+        )
+        f.overwrite_ir("llvm", new_ir)
+        new_result = f(input)
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(f.workspace), ignore_errors=True)
+        assert old_result * input == new_result
 
 
 if __name__ == "__main__":

@@ -621,17 +621,17 @@ class QJIT:
             return self.compiler.get_output_of(pass_name)
         if pass_name == "mlir":
             file_path = str(self.workspace) + "/0_" + self.__name__ + ".mlir"
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 data = file.read().replace("\n", "")
                 return data
         if pass_name == "canonicalize":
             file_path = str(self.workspace) + "/1_0_canonicalize.mlir"
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 data = file.read()
                 return data
         if pass_name == "llvm":
             file_path = str(self.workspace) + "/5_llvm_ir.ll"
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 data = file.read()
                 return data
         raise NotImplementedError
@@ -666,7 +666,9 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwritten_ir:
-            shared_object, llvm_ir, _ = self.compiler.run_from_ir(self.overwritten_ir, func_name, self.workspace)
+            shared_object, llvm_ir, _ = self.compiler.run_from_ir(
+                self.overwritten_ir, func_name, self.workspace
+            )
         else:
             shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
 
