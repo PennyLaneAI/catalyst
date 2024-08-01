@@ -38,9 +38,7 @@ sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mli
 
 export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
 export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
-export PATCH_FILE2=mlir/patches/mhlo-Add-MLIRTransforms-in-transforms-CMakeList.patch
 if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE2 > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE2; fi
 
 # Build MHLO
 cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
