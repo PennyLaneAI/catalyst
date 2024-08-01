@@ -197,7 +197,7 @@ class AbstractTransformMod(AbstractValue):
 
 def _transform_mod_lowering(aval):
     assert isinstance(aval, AbstractTransformMod)
-    return (transform_mod_type,)
+    return (ir.OpaqueType.get("transform", 'op<"builtin.module">'),)
 
 
 #
@@ -413,8 +413,6 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 # transform dialect lowering
 #
 
-transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">', ir.Context())
-
 
 def get_named_sequence_in_module(mod):
     for op in mod.body.operations:
@@ -437,6 +435,7 @@ def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
 
 
 def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
 
     # We wish to generate the transformer module, and place it in the top-level module
@@ -493,6 +492,7 @@ def _apply_registered_pass_def_impl(*args, pass_name, options=None):  # pragma: 
 def _apply_registered_pass_lowering(
     jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
 ):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
     named_sequence_op = None
     for op in reversed(module.body.operations):
