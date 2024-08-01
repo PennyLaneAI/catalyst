@@ -323,6 +323,12 @@
       return y
   ```
 
+<h3>Documentation</h3>
+
+* A page has been added to the documentation, listing devices that are
+  Catalyst compatible.
+  [(#966)](https://github.com/PennyLaneAI/catalyst/pull/966)
+
 <h3>Internal changes</h3>
 
 * llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
@@ -360,10 +366,11 @@ This release contains contributions from (in alphabetical order):
 
 Alessandro Cosentino,
 Lillian M. A. Frederiksen,
+Josh Izaac,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
-Erick Ochoa,
+Erick Ochoa Lopez,
 Mudit Pandey,
 nate stemen,
 Raul Torres,

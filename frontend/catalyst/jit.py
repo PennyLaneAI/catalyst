@@ -91,9 +91,9 @@ def qjit(
 
     .. note::
 
-        The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-        ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud``. For a list of supported
-        operations, observables, and measurements, please see the :doc:`/dev/quick_start`.
+        Not all PennyLane devices currently work with Catalyst. Supported backend devices include
+        ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+        a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
         fn (Callable): the quantum or classical function
