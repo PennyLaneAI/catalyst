@@ -119,10 +119,16 @@ jobs:
         path: enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
+    - name: Setup Python version
+      # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already
+      # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
+      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      run: |
+        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
+
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
-        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -197,10 +203,16 @@ jobs:
       run: |
         brew install libomp
 
+    - name: Setup Python version
+      # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already
+      # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
+      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      run: |
+        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
+
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
-        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -352,6 +364,13 @@ jobs:
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
+
+    - name: Setup Python version
+      # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already
+      # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
+      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      run: |
+        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
     - name: Install Python dependencies
       run: |
