@@ -615,7 +615,7 @@ class QJIT:
             _, mlir_string, _ = canonicalizer.run_from_ir(
                 self.override_ir,
                 str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
-                self.workspace
+                self.workspace,
             )
         else:
             # TODO: the in-memory and textual form are different after this, consider unification
@@ -688,7 +688,9 @@ class QJIT:
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.override_ir:
             shared_object, llvm_ir, _ = self.compiler.run_from_ir(
-                self.override_ir, func_name, self.workspace
+                self.override_ir,
+                str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+                self.workspace,
             )
         else:
             shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
