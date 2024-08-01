@@ -193,6 +193,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Dependencies (System)
+      run: |
+        brew install libomp
+
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
