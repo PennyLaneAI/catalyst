@@ -229,6 +229,7 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                     builder.create<quantum::AdjointOp>(loc, qregType, adjointOp.getResult());
                 builder.create<scf::YieldOp>(loc, origOp.getResult());
             });
+        return WalkResult::advance();
     });
     // Remove device
     std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
