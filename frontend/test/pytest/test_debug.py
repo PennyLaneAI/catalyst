@@ -421,7 +421,7 @@ class TestCProgramGeneration:
             get_cmain(f, 0.5)
 
     def test_modify_llvm_ir(self):
-        """Turn a square function into a cubic one."""
+        """Turn a square function in llvm into a cubic one."""
 
         @qjit(keep_intermediate=True)
         def f(x):
@@ -439,7 +439,32 @@ class TestCProgramGeneration:
              %cc = fmul double %15, %x\n\
              store double %cc, ptr %9, align 8\n",
         )
-        f.overwrite_ir("llvm", new_ir)
+        f.overwrite_ir(new_ir)
+        new_result = f(data)
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(f.workspace), ignore_errors=True)
+        assert old_result * data == new_result
+
+    def test_modify_mlir_ir(self):
+        """Turn a square function in mlir into a cubic one."""
+
+        @qjit(keep_intermediate=True)
+        def f(x):
+            """Square function."""
+            return x**2
+
+        data = 2.0
+        old_result = f(data)
+        old_ir = f.get_pipeline_output("mlir")
+        old_workspace = str(f.workspace)
+
+        new_ir = old_ir.replace(
+            "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
+            "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
+             %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    ",
+        )
+        f.overwrite_ir(new_ir)
         new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
