@@ -53,17 +53,18 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(keep_intermediate=True)(example_circuit)()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
-    def test_array_less_than_size_state_prep(self, backend):
+    @pytest.mark.parametrize("wires", [(0), (1), (2)])
+    def test_array_less_than_size_state_prep(self, wires, backend):
         """Test what happens when the array is less than the size required.
         This is the same error as reported by pennylane
         """
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(qml.device(backend, wires=3))
         def example_circuit():
-            qml.StatePrep(jnp.array([0, 1]), wires=range(1))
+            qml.StatePrep(jnp.array([0, 1]), wires=wires)
             return qml.state()
 
         expected = example_circuit()
@@ -109,7 +110,8 @@ class TestDynamicWires:
         observed = qml.qjit(example_circuit)(0)
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state(self, backend):
+    @pytest.mark.parametrize("inp", [(0), (1)])
+    def test_basis_state(self, inp, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
         as of July 31st 2024.
@@ -120,13 +122,13 @@ class TestDynamicWires:
         assumes all wires will be used in order.
         """
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(qml.device(backend, wires=3))
         def example_circuit(a: int):
             qml.BasisState(jnp.array([1, 1]), wires=[a, a + 1])
             return qml.state()
 
-        expected = example_circuit(0)
-        observed = qml.qjit(example_circuit)(0)
+        expected = example_circuit(inp)
+        observed = qml.qjit(example_circuit)(inp)
         assert jnp.allclose(expected, observed)
 
 

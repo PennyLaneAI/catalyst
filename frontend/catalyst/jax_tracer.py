@@ -631,6 +631,8 @@ def trace_basis_state(op, qrp):
     params = op.parameters
     param_array = params[0]
     size = jnp.size(param_array)
+    if size != len(op.wires):
+        raise ValueError("BasisState parameter and wires must be of equal length.")
 
     zeros_full = jnp.zeros((num_wires,), jnp.dtype(jnp.int64))
     wires = jnp.array(op.wires.tolist())
@@ -641,6 +643,7 @@ def trace_basis_state(op, qrp):
     # indices_are_sorted = True and unique_indices = True.
     # I would like to guarantee that this is the case.
     # So, I am sorting the indices
+    argsort_wires = jnp.argsort(wires)
     sorted_wires = jnp.sort(wires)
     # and I also want to make sure that they are unique.
     # This must happen at run-time because the wires may be dynamic.
@@ -660,13 +663,9 @@ def trace_basis_state(op, qrp):
     #   catalyst.debug.assertion.debug_assert(wires_are_unique, err_msg)
     #   basis_state = zeros_full.at[unique].set(param_array[unique],  indices_are_sorted=True, unique_indices=True)
     user_wires_sorted = zeros_full.at[sorted_wires]
+    kwargs = {"indices_are_sorted": True, "unique_indices": True}
     sorted_basis_state = param_array[sorted_wires]
-    basis_state = user_wires_sorted.set(
-        sorted_basis_state, indices_are_sorted=True, unique_indices=True
-    )
-
-    if size != len(op.wires):
-        raise ValueError("BasisState parameter and wires must be of equal length.")
+    basis_state = user_wires_sorted.set(sorted_basis_state, **kwargs)
 
     qubits = qrp.extract(range(num_wires))
 
@@ -679,11 +678,12 @@ def trace_basis_state(op, qrp):
     is_valid = jnp.all(zeros_or_ones)
     catalyst.debug.assertion.debug_assert(is_valid, err_msg)
 
-    one_to_n = jnp.linspace(0, num_wires - 1, num_wires, dtype=jnp.dtype(jnp.int64))
+    zero_to_n_minus_1 = jnp.linspace(0, num_wires - 1, num_wires, dtype=jnp.dtype(jnp.int64))
     twos = jnp.array([2] * num_wires, dtype=jnp.dtype(jnp.int64))
-    two_or_zero = twos * basis_state
-    two_to_the_ns = jnp.power(two_or_zero, one_to_n)
-    runtime_index = jnp.sum(two_to_the_ns)
+    two_to_the_ns = jnp.power(twos, zero_to_n_minus_1)
+    # endian-ness
+    basis_state = jnp.flip(basis_state)
+    runtime_index = jnp.sum(two_to_the_ns * basis_state)
 
     qubits2 = set_basis_state_p.bind(*qubits, runtime_index)
     qrp.insert(range(num_wires), qubits2)
