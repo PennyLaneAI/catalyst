@@ -223,16 +223,17 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
-    fnWithMeasurementsOp.walk([&](quantum::QubitUnitaryOp *op) {
+    fnWithMeasurementsOp.walk([&](quantum::QubitUnitaryOp op) {
         // TODO: Skip measurements and control structures.
         // Add scf for loop to create the folding
-        rewriter.setInsertionPointAfter((mlir::Operation *)op);
+        rewriter.setInsertionPointAfter(op);
         rewriter.create<scf::ForOp>(
             loc, c0, size, c1, ValueRange(),
             [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                 // Call the function without measurements in an adjoint region
-                auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, (*op).getResult(0));
-                auto origOp = builder.create<quantum::AdjointOp>(loc, qregType, adjointOp.getResult());
+                auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, op.getResult(0));
+                auto origOp =
+                    builder.create<quantum::AdjointOp>(loc, qregType, adjointOp.getResult());
                 builder.setInsertionPointAfter(origOp);
                 builder.create<scf::YieldOp>(loc, origOp.getResult());
             });
