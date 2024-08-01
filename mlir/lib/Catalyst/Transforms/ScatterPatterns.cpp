@@ -228,16 +228,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         int64_t start = 0;
         std::vector<int64_t> dimensions;
 
-        for (int64_t i = start; i <= updatesSize; ++i) {
+        for (int64_t i = start; i < updatesSize; ++i) {
             dimensions.push_back(i);
         }
         if (!data.updatedWindowsDims.empty()) {
-            std::copy_if(data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
-                         std::back_inserter(data.updatedScatterDims),
-                         [&dimensions](int64_t element) {
-                             return std::find(dimensions.begin(), dimensions.end(), element) !=
-                                    dimensions.end();
-                         });
+            std::set_difference(dimensions.begin(), dimensions.end(),
+                                data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
+                                std::back_inserter(data.updatedScatterDims));
         }
         else {
             data.updatedScatterDims = dimensions;
