@@ -1577,7 +1577,6 @@ special_par_op_decomps = [
 custom_ctrl_op_decomps = special_non_par_op_decomps + special_par_op_decomps
 
 pauli_x_based_op_decomps = [
-    (qml.PauliX, [0], [1], [qml.CNOT([1, 0])]),
     (
         qml.PauliX,
         [2],
