@@ -645,6 +645,7 @@ class QJIT:
                 shared_object, func_name, restype, self.out_type, self.compile_options
             )
             self.compiled_function, self.qir = compiled_fn, llvm_ir
+            self.fn_cache.clear()
 
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
