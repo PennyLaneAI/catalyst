@@ -796,6 +796,31 @@ def trace_quantum_measurements(
     shots = get_device_shots(device)
     out_classical_tracers = []
 
+    def change_child(leaf, sub_tree):
+        if leaf.num_nodes == 1:
+            return sub_tree
+        children = leaf.children()
+        children[0] = change_child(children[0], sub_tree)
+        leaf = leaf.make_from_node_data_and_children(
+            PyTreeRegistry(),
+            leaf.node_data(),
+            children,
+        )
+        return leaf
+
+    def change_child_tree(tree, index, subtree):
+        meas_return_trees_children = tree.children()
+        if len(meas_return_trees_children):
+            meas_return_trees_children[index] = jax.tree_util.tree_map(
+                change_child, meas_return_trees_children[index], subtree
+            )
+            tree = tree.make_from_node_data_and_children(
+                PyTreeRegistry(), tree.node_data(), meas_return_trees_children
+            )
+        else:
+            tree = jax.tree_util.tree_map(change_child, tree, subtree)
+        return tree
+
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
             if isinstance(device, qml.devices.LegacyDevice):
@@ -841,35 +866,9 @@ def trace_quantum_measurements(
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
                 counts_tree = tree_structure(("keys", "counts"))
-
-                def change_child(leaf, sub_tree):
-                    if leaf.num_nodes == 1:
-                        return sub_tree
-                    children = leaf.children()
-                    children[0] = change_child(children[0], sub_tree)
-                    leaf = leaf.make_from_node_data_and_children(
-                        PyTreeRegistry(),
-                        leaf.node_data(),
-                        children,
-                    )
-                    return leaf
-
                 # Swap the ith element in node children with counts_tree
-                def change_child_tree(tree):
-                    meas_return_trees_children = tree.children()
-                    if len(meas_return_trees_children):
-                        meas_return_trees_children[i] = jax.tree_util.tree_map(
-                            change_child, meas_return_trees_children[i], counts_tree
-                        )
-                        tree = tree.make_from_node_data_and_children(
-                            PyTreeRegistry(), tree.node_data(), meas_return_trees_children
-                        )
-                    else:
-                        tree = jax.tree_util.tree_map(change_child, tree, counts_tree)
-                    return tree
-
-                out_tree = change_child_tree(out_tree)
-                out_tree_expected = change_child_tree(out_tree_expected)
+                out_tree = change_child_tree(out_tree, i, counts_tree)
+                out_tree_expected = change_child_tree(out_tree_expected, i, counts_tree)
 
             elif o.return_type.value == "state":
                 assert using_compbasis
