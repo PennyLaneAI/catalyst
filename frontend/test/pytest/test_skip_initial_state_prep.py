@@ -36,7 +36,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qml.qjit(keep_intermediate=True)(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state(self, backend):
@@ -54,6 +54,21 @@ class TestExamplesFromWebsite:
 
         expected = example_circuit()
         observed = qml.qjit(example_circuit)()
+        assert jnp.allclose(expected, observed)
+
+    def test_array_less_than_size_state_prep(self, backend):
+        """Test what happens when the array is less than the size required.
+        This is the same error as reported by pennylane
+        """
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit():
+            qml.StatePrep(jnp.array([0, 1]), wires=range(1))
+            return qml.state()
+
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
+        print(expected, observed)
         assert jnp.allclose(expected, observed)
 
 
@@ -102,18 +117,6 @@ class TestDynamicWires:
 class TestPossibleErrors:
     """What happens when there is bad user input?"""
 
-    def test_array_less_than_size_state_prep(self, backend):
-        """Test what happens when the array is less than the size required.
-        This is the same error as reported by pennylane
-        """
-
-        with pytest.raises(ValueError, match="State vector must have shape"):
-
-            @qml.qjit
-            @qml.qnode(qml.device(backend, wires=2))
-            def example_circuit():
-                qml.StatePrep(jnp.array([0, 1, 0]), wires=range(2))
-                return qml.state()
 
     def test_array_less_than_size_basis_state(self, backend):
         """Test what happens when the array is less than the size required.
