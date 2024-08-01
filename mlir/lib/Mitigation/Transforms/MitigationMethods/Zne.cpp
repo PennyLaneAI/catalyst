@@ -238,7 +238,15 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
             });
     });
     // Remove device
+    std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
+                                             fnFoldedOp.getArguments().end());
+    argsAndRegMeasurement.pop_back();
+    argsAndRegMeasurement.push_back(fnWithMeasurementsOp->getResult(0));
+    ValueRange funcFolded =
+        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndRegMeasurement)
+            .getResults();
     rewriter.create<quantum::DeviceReleaseOp>(loc);
+    rewriter.create<func::ReturnOp>(loc, funcFolded);
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
