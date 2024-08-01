@@ -60,7 +60,7 @@ def test_matrix():
 
 
 def test_matrix_list_index():
-    """Test to index a jax array and have operations on it."""
+    """Test to index (list) a jax array and have operations on it."""
 
     A = jnp.ones([3, 3]) * 2
 
