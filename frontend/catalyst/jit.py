@@ -420,6 +420,7 @@ class QJIT:
         self.mlir_module = None
         self.qir = None
         self.out_type = None
+        self.overwritten_ir = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
@@ -635,16 +636,9 @@ class QJIT:
                 return data
         raise NotImplementedError
 
-    def recompile(self, level, function_str):
+    def overwrite_ir(self, level, new_ir):
         if level == "llvm":
-            func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-            entry_point_func = self.mlir_module.body.operations[0]
-            restype = entry_point_func.type.results
-            shared_object, llvm_ir, _ = self.compiler.run_from_ir(function_str, func_name, self.workspace)
-            compiled_fn = CompiledFunction(
-                shared_object, func_name, restype, self.out_type, self.compile_options
-            )
-            self.compiled_function, self.qir = compiled_fn, llvm_ir
+            self.overwritten_ir = new_ir
             self.fn_cache.clear()
 
     @instrument(size_from=1, has_finegrained=True)
@@ -671,7 +665,11 @@ class QJIT:
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+        if self.overwritten_ir:
+            shared_object, llvm_ir, _ = self.compiler.run_from_ir(self.overwritten_ir, func_name, self.workspace)
+        else:
+            shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
