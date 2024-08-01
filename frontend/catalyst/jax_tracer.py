@@ -577,18 +577,32 @@ def trace_state_prep(op, qrp):
     """
     assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
 
-    num_wires = qrp.base.length
-    if num_wires != len(op.wires):
-        # TODO: This behaviour is different than PennyLane's
-        # it would be better if we can match the same behaviour.
-        raise ValueError("qml.StatePrep must act on all wires")
+    wires_in_circuit = qrp.base.length
+    assert type(wires_in_circuit) == int, "Wires in circuit must be statically known"
 
-    qubits = qrp.extract(range(num_wires))
+    wires_in_operation = jax.numpy.array(op.wires.toarray(), dtype=jnp.dtype(jnp.uint8))
+
+    zero_state_vector = jnp.zeros((2,) * wires_in_circuit, jnp.dtype(jnp.complex128))
     params = op.parameters
     param = params[0]
     param_cast = jax.numpy.array(param, dtype=jnp.dtype(jnp.complex128))
-    qubits2 = set_state_p.bind(*qubits, param_cast)
-    qrp.insert(op.wires, qubits2)
+    size = len(wires_in_operation)
+    param_cast = jax.numpy.reshape(param_cast, shape=((2,) * size))
+
+    wire_enum = jnp.linspace(0, size - 1, size, dtype=jnp.dtype(jnp.uint8))
+
+    for wire in wire_enum:
+        wire_in_op = wires_in_operation[wire]
+        jnp_wire_in_op = jax.numpy.array(wire_in_op, dtype=jnp.dtype(jnp.uint8))
+        binary = jnp.unpackbits(jnp_wire_in_op, count=wires_in_circuit)
+        binary_in_op = jnp.unpackbits(wire, count=size)
+        value = param_cast[binary_in_op]
+        zero_state_vector = zero_state_vector.at[binary].set(value)
+
+    qubits = qrp.extract(range(wires_in_circuit))
+    state_vector = jax.numpy.reshape(zero_state_vector, shape=(2**wires_in_circuit,))
+    qubits2 = set_state_p.bind(*qubits, state_vector)
+    qrp.insert(range(wires_in_circuit), qubits2)
 
 
 def trace_basis_state(op, qrp):
