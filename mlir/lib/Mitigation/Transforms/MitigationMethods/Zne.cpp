@@ -131,13 +131,11 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
                                 StringAttr lib, StringAttr name, StringAttr kwargs, Type qregType,
                                 FunctionType fnFoldedType, SmallVector<Type> typesFolded,
                                 func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp,
-                                const int64_t numberQubits, func::FuncOp fnWithoutMeasurementsOp,
+                                Value numberQubitsValue, func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp, Value c0, Value c1)
 {
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
-    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
@@ -195,7 +193,7 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
                                      std::string fnFoldedName, StringAttr lib, StringAttr name,
                                      StringAttr kwargs, Type qregType, FunctionType fnFoldedType,
                                      SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
-                                     func::FuncOp fnAllocOp, const int64_t numberQubits,
+                                     func::FuncOp fnAllocOp, Value numberQubitsValue,
                                      func::FuncOp fnWithMeasurementsOp, Value c0, Value c1)
 {
     // TODO: Implement.
@@ -210,11 +208,9 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                                   StringAttr lib, StringAttr name, StringAttr kwargs, Type qregType,
                                   FunctionType fnFoldedType, SmallVector<Type> typesFolded,
                                   func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp,
-                                  const int64_t numberQubits, func::FuncOp fnWithMeasurementsOp,
+                                  Value numberQubitsValue, func::FuncOp fnWithMeasurementsOp,
                                   Value c0, Value c1)
 {
-    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
     rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
@@ -310,6 +306,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     Block *foldedBlock = fnFoldedOp.addEntryBlock();
     rewriter.setInsertionPointToStart(foldedBlock);
+    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
     // Loop control variables
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
@@ -318,18 +316,18 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     if (foldingAlgorithm == Folding(1)) {
         return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, qregType, fnFoldedType,
-                             typesFolded, fnFoldedOp, fnAllocOp, numberQubits,
+                             typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp, c0, c1);
     }
     if (foldingAlgorithm == Folding(2)) {
         return randomLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, qregType,
-                                  fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp, numberQubits,
-                                  fnWithMeasurementsOp, c0, c1);
+                                  fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
+                                  numberQubitsValue, fnWithMeasurementsOp, c0, c1);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
     return allLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, qregType, fnFoldedType,
-                           typesFolded, fnFoldedOp, fnAllocOp, numberQubits, fnWithMeasurementsOp,
-                           c0, c1);
+                           typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue,
+                           fnWithMeasurementsOp, c0, c1);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
                                                        mitigation::ZneOp op)
