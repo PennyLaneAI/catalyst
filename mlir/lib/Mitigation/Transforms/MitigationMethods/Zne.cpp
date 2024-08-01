@@ -227,7 +227,6 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                 auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, op.getResult(0));
                 auto origOp =
                     builder.create<quantum::AdjointOp>(loc, qregType, adjointOp.getResult());
-                builder.setInsertionPointAfter(origOp);
                 builder.create<scf::YieldOp>(loc, origOp.getResult());
             });
     });
