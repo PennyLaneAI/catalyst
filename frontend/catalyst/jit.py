@@ -420,7 +420,7 @@ class QJIT:
         self.mlir_module = None
         self.qir = None
         self.out_type = None
-        self.overwritten_ir = None
+        self.override_ir = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
@@ -611,8 +611,15 @@ class QJIT:
         options.lower_to_llvm = False
         canonicalizer = Compiler(options)
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
+        if self.override_ir:
+            _, mlir_string, _ = canonicalizer.run_from_ir(
+                self.override_ir,
+                str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+                self.workspace
+            )
+        else:
+            # TODO: the in-memory and textual form are different after this, consider unification
+            _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
 
         return mlir_module, mlir_string
 
@@ -652,7 +659,7 @@ class QJIT:
             new_ir (str): new ir in the string format
         """
         if new_ir:
-            self.overwritten_ir = new_ir
+            self.override_ir = new_ir
             self.fn_cache.clear()
 
     @instrument(size_from=1, has_finegrained=True)
@@ -679,9 +686,9 @@ class QJIT:
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        if self.overwritten_ir:
+        if self.override_ir:
             shared_object, llvm_ir, _ = self.compiler.run_from_ir(
-                self.overwritten_ir, func_name, self.workspace
+                self.override_ir, func_name, self.workspace
             )
         else:
             shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
