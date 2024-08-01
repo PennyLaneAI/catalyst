@@ -435,7 +435,9 @@ class TestCProgramGeneration:
 
         new_ir = old_ir.replace(
             "store double %15, ptr %9, align 8\n",
-            "%x = load double, ptr %1, align 8\n  %cc = fmul double %15, %x\n  store double %cc, ptr %9, align 8\n",
+            "%x = load double, ptr %1, align 8\n\
+             %cc = fmul double %15, %x\n\
+             store double %cc, ptr %9, align 8\n",
         )
         f.overwrite_ir("llvm", new_ir)
         new_result = f(data)
