@@ -231,8 +231,8 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
             loc, c0, size, c1, ValueRange(),
             [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                 // Call the function without measurements in an adjoint region
-                auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, *op);
-                auto origOp = builder.create<quantum::AdjointOp>(loc, qregType, adjointOp);
+                auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, (*op).getResult(0));
+                auto origOp = builder.create<quantum::AdjointOp>(loc, qregType, adjointOp.getResult());
                 builder.setInsertionPointAfter(origOp);
                 builder.create<scf::YieldOp>(loc, origOp.getResult());
             });
