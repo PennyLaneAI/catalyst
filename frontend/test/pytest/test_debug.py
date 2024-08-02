@@ -423,22 +423,36 @@ class TestCProgramGeneration:
     @pytest.mark.parametrize(
         ("pass_name", "target", "replacement"),
         [
-            ("llvm", "store double %15, ptr %9, align 8\n",
-             "%x = load double, ptr %1, align 8\n\
+            (
+                "llvm",
+                "store double %15, ptr %9, align 8\n",
+                "%x = load double, ptr %1, align 8\n\
               %cc = fmul double %15, %x\n\
-              store double %cc, ptr %9, align 8\n"),
-            ("mlir", "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
-             "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
-              %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    "),
-            ("HLOLoweringPass", "%2 = arith.mulf %in, %in_0 : f64\n",
-             "%c = arith.mulf %in, %in_0 : f64\n\
-              %2 = arith.mulf %c, %in_0 : f64\n"),
-            ("QuantumCompilationPass", "%2 = arith.mulf %in, %in_0 : f64\n",
-             "%c = arith.mulf %in, %in_0 : f64\n\
-              %2 = arith.mulf %c, %in_0 : f64\n"),
-            ("BufferizationPass", "%6 = arith.mulf %in, %in_0 : f64\n",
-             "%c = arith.mulf %in, %in_0 : f64\n"
-             "%6 = arith.mulf %c, %in_0 : f64\n"),
+              store double %cc, ptr %9, align 8\n",
+            ),
+            (
+                "mlir",
+                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
+                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
+              %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    ",
+            ),
+            (
+                "HLOLoweringPass",
+                "%2 = arith.mulf %in, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n\
+              %2 = arith.mulf %c, %in_0 : f64\n",
+            ),
+            (
+                "QuantumCompilationPass",
+                "%2 = arith.mulf %in, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n\
+              %2 = arith.mulf %c, %in_0 : f64\n",
+            ),
+            (
+                "BufferizationPass",
+                "%6 = arith.mulf %in, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n" "%6 = arith.mulf %c, %in_0 : f64\n",
+            ),
         ],
     )
     def test_modify_ir(self, pass_name, target, replacement):
