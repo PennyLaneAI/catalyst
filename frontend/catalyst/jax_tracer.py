@@ -24,7 +24,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import jaxlib
 import numpy as np
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
@@ -595,10 +594,9 @@ def trace_state_prep(op, qrp):
     # use numpy as we need concrete values.
     all_wires = np.array(list(range(0, qrp.base.length)), dtype=np.int64)
     extra_wires = np.delete(all_wires, wires)
-    for extra_wire in extra_wires:
+    for _ in extra_wires:
         sv = jnp.stack([sv, jnp.zeros_like(sv)], axis=-1)
 
-    kwargs = {"indices_are_sorted": True, "unique_indices": True}
     current_wires = np.concatenate([wires, extra_wires])
     transpose_axes = [np.where(current_wires == wire)[0][0] for wire in all_wires]
     sv = jnp.transpose(sv, axes=transpose_axes)
@@ -655,7 +653,8 @@ def trace_basis_state(op, qrp):
     #   wires_are_unique = jnp.all(jnp.equal(counts, 1))
     #   err_msg = "Wires are not unique"
     #   catalyst.debug.assertion.debug_assert(wires_are_unique, err_msg)
-    #   basis_state = zeros_full.at[unique].set(param_array[unique],  indices_are_sorted=True, unique_indices=True)
+    #   basis_state = zeros_full.at[unique].set(param_array[unique], \
+    #       indices_are_sorted=True, unique_indices=True)
     user_wires_sorted = zeros_full.at[sorted_wires]
     kwargs = {"indices_are_sorted": True, "unique_indices": True}
     sorted_basis_state = param_array.at[sorted_wires].get()
