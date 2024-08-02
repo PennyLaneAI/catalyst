@@ -18,6 +18,7 @@ import os
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
+
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["lucy", "toshiko"]
