@@ -420,8 +420,29 @@ class TestCProgramGeneration:
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
 
-    def test_modify_llvm_ir(self):
-        """Turn a square function in llvm into a cubic one."""
+    @pytest.mark.parametrize(
+        ("pass_name", "target", "replacement"),
+        [
+            ("llvm", "store double %15, ptr %9, align 8\n",
+             "%x = load double, ptr %1, align 8\n\
+              %cc = fmul double %15, %x\n\
+              store double %cc, ptr %9, align 8\n"),
+            ("mlir", "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
+             "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
+              %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    "),
+            ("HLOLoweringPass", "%2 = arith.mulf %in, %in_0 : f64\n",
+             "%c = arith.mulf %in, %in_0 : f64\n\
+              %2 = arith.mulf %c, %in_0 : f64\n"),
+            ("QuantumCompilationPass", "%2 = arith.mulf %in, %in_0 : f64\n",
+             "%c = arith.mulf %in, %in_0 : f64\n\
+              %2 = arith.mulf %c, %in_0 : f64\n"),
+            ("BufferizationPass", "%6 = arith.mulf %in, %in_0 : f64\n",
+             "%c = arith.mulf %in, %in_0 : f64\n"
+             "%6 = arith.mulf %c, %in_0 : f64\n"),
+        ],
+    )
+    def test_modify_ir(self, pass_name, target, replacement):
+        """Turn a square function in IRs into a cubic one."""
 
         @qjit(keep_intermediate=True)
         def f(x):
@@ -430,65 +451,11 @@ class TestCProgramGeneration:
 
         data = 2.0
         old_result = f(data)
-        old_ir = f.get_pipeline_output("llvm")
+        old_ir = f.get_pipeline_output(pass_name)
         old_workspace = str(f.workspace)
 
-        new_ir = old_ir.replace(
-            "store double %15, ptr %9, align 8\n",
-            "%x = load double, ptr %1, align 8\n\
-             %cc = fmul double %15, %x\n\
-             store double %cc, ptr %9, align 8\n",
-        )
-        f.replace_ir(new_ir)
-        new_result = f(data)
-
-        shutil.rmtree(old_workspace, ignore_errors=True)
-        shutil.rmtree(str(f.workspace), ignore_errors=True)
-        assert old_result * data == new_result
-
-    def test_modify_mlir(self):
-        """Turn a square function in mlir into a cubic one."""
-
-        @qjit(keep_intermediate=True)
-        def f(x):
-            """Square function."""
-            return x**2
-
-        data = 2.0
-        old_result = f(data)
-        old_ir = f.get_pipeline_output("mlir")
-        old_workspace = str(f.workspace)
-
-        new_ir = old_ir.replace(
-            "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
-            "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
-             %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    ",
-        )
-        f.replace_ir(new_ir)
-        new_result = f(data)
-
-        shutil.rmtree(old_workspace, ignore_errors=True)
-        shutil.rmtree(str(f.workspace), ignore_errors=True)
-        assert old_result * data == new_result
-
-    def test_modify_mlir_HLOLoweringPass(self):
-        """Turn a square function in mlir (after HLOLoweringPass) into a cubic one."""
-
-        @qjit(keep_intermediate=True)
-        def f(x):
-            """Square function."""
-            return x**2
-
-        data = 2.0
-        old_result = f(data)
-        old_ir = f.get_pipeline_output("HLOLoweringPass")
-        old_workspace = str(f.workspace)
-
-        new_ir = old_ir.replace(
-            "%2 = arith.mulf %in, %in_0 : f64\n",
-            "%c = arith.mulf %in, %in_0 : f64\n  " "%2 = arith.mulf %c, %in_0 : f64\n",
-        )
-        f.replace_ir(new_ir)
+        new_ir = old_ir.replace(target, replacement)
+        f.replace_ir(pass_name, new_ir)
         new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)

@@ -652,7 +652,7 @@ class QJIT:
                 return data
         raise NotImplementedError
 
-    def replace_ir(self, new_ir):
+    def replace_ir(self, pass_name, new_ir):
         """Specify new IR that will be used for future compilation.
 
         Args:
