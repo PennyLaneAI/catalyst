@@ -584,6 +584,8 @@ def trace_state_prep(op, qrp):
     err_msg = "Sum of amplitudes-squared does not equal one."
     catalyst.debug.assertion.debug_assert(is_valid, err_msg)
 
+    # TODO: Implement at runtime.
+    # Current limitation is given by jnp.transpose/swapaxes/moveaxes
     for wire in op.wires.tolist():
         if isinstance(wire, DynamicJaxprTracer):
             raise TypeError("wires must be static")
@@ -599,6 +601,11 @@ def trace_state_prep(op, qrp):
 
     current_wires = np.concatenate([wires, extra_wires])
     transpose_axes = [np.where(current_wires == wire)[0][0] for wire in all_wires]
+    # This is the reason we need concrete values:
+    # for jnp.transpose
+    # On August 1st, 2024 I was unable to find any jax numpy API
+    # that allowed me to move axes which are not known at compile
+    # time.
     sv = jnp.transpose(sv, axes=transpose_axes)
 
     qubits = qrp.extract(range(qrp.base.length))
