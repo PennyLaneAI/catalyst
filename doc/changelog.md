@@ -204,23 +204,22 @@
 
 <h3>Bug fixes</h3>
 
-* Circuits with preprocessing functions outside qnodes can now be differentiated.
-  [(#332)](https://github.com/PennyLaneAI/catalyst/pull/332)
+* Fix a bug where scatter did not work correctly with list indices.
+  [(#982)](https://github.com/PennyLaneAI/catalyst/pull/982)
 
   ```python
-  @qml.qnode(qml.device("lightning.qubit", wires=1))
-  def f(y):
-      qml.RX(y, wires=0)
-      return qml.expval(qml.PauliZ(0))
+  A = jnp.ones([3, 3]) * 2
 
-  @catalyst.qjit
-  def g(x):
-      return catalyst.grad(lambda y: f(jnp.cos(y)) ** 2)(x)
+  def update(A):
+      A = A.at[[0, 1], :].set(jnp.ones([2, 3]), indices_are_sorted=True, unique_indices=True)
+      return A
   ```
 
   ```pycon
-  >>> g(0.4)
-  0.3751720385067584
+  >>> update
+  [[1. 1. 1.]
+   [1. 1. 1.]
+   [2. 2. 2.]]
   ```
 
 * Static arguments can now be passed through a QNode when specified
@@ -293,6 +292,10 @@
 
 <h3>Internal changes</h3>
 
+* When memrefs have no identity layout, memrefs copy operations are replaced by the linalg copy operation.
+  It does not use a runtime function but instead lowers to scf and standard dialects. It also ensures
+  a better compatibility with Enzyme.
+  [(#917)](https://github.com/PennyLaneAI/catalyst/pull/917)
 * llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
    Coroutine lowering pass.
   [(#968)](https://github.com/PennyLaneAI/catalyst/pull/968)
