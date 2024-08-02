@@ -100,7 +100,7 @@ struct CompilerOutput {
     PipelineOutputs pipelineOutputs;
     size_t pipelineCounter = 0;
     /// if last entry point is reached.
-    std::string reachStartingPoint;
+    bool reachStartingPoint;
 
     // Gets the next pipeline dump file name, prefixed with number.
     std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir")
