@@ -104,7 +104,12 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
 // After this poitn everything is unsupported
 auto OQCDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
 void OQCDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
-void OQCDevice::SetState(std::vector<std::complex<double>>)
+void OQCDevice::SetState(DataView<std::complex<double>, 1> &)
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+void OQCDevice::SetBasisState(const std::size_t)
 {
     RT_FAIL("Unsupported functionality");
 }
