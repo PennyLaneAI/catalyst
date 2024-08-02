@@ -37,7 +37,7 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
 )
 from catalyst.device.verification import (
-    validate_observables,
+    validate_measurements,
     validate_observables_adjoint_diff,
     validate_observables_parameter_shift,
     verify_no_state_variance_returns,
@@ -489,7 +489,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
             verify_operations, grad_method=config.gradient_method, qjit_device=self
         )
         program.add_transform(
-            validate_observables, self.qjit_capabilities, self.original_device.name
+            validate_measurements,
+            self.qjit_capabilities,
+            self.original_device.name,
+            self.original_device.shots,
         )
 
         if config.gradient_method is not None:
@@ -642,13 +645,12 @@ def get_device_capabilities(
         return device.qjit_capabilities
     else:
         program_features = (
-            program_features if program_features else ProgramFeatures(device.shots is not None)
-        )
-        device_name = (
-            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+            program_features
+            if program_features
+            else ProgramFeatures(shots_present=bool(device.shots))
         )
         device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features, device_name)
+        return load_device_capabilities(device_config, program_features)
 
 
 def check_device_wires(wires):

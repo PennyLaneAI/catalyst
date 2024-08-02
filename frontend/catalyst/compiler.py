@@ -72,6 +72,8 @@ class CompileOptions:
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
+        seed (Optional[int]) : the seed for random operations in a qjit call.
+            Default is None.
     """
 
     verbose: Optional[bool] = False
@@ -86,8 +88,27 @@ class CompileOptions:
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
     disable_assertions: Optional[bool] = False
+    seed: Optional[int] = None
 
     def __post_init__(self):
+        # Check that async runs must not be seeded
+        if self.async_qnodes and self.seed != None:
+            raise CompileError(
+                """
+                Seeding has no effect on asyncronous qnodes,
+                as the execution order of parallel runs is not guaranteed.
+                As such, seeding an asynchronous run is not supported.
+                """
+            )
+
+        # Check that seed is 32-bit unsigned int
+        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
+            raise ValueError(
+                """
+                Seed must be an unsigned 32-bit integer!
+                """
+            )
+
         # Make the format of static_argnums easier to handle.
         static_argnums = self.static_argnums
         if static_argnums is None:
@@ -144,7 +165,6 @@ HLO_LOWERING_PASS = (
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
         "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-shapeops-to-standard)",
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
         "func.func(hlo-legalize-sort)",
@@ -512,6 +532,7 @@ class Compiler:
                 str(workspace),
                 module_name,
                 keep_intermediate=self.options.keep_intermediate,
+                async_qnodes=self.options.async_qnodes,
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,

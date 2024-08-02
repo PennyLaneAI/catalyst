@@ -496,11 +496,6 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, 1.0)
 
-    # TODO: dynamic_one_shot_several_mcms is a flaky test.
-    # We remove this test for now and revisit in the future.
-    @pytest.mark.skip(
-        reason="dynamic_one_shot_several_mcms is a flaky test and needs further investigation"
-    )
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
@@ -542,7 +537,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
-        @qjit
+        @qjit(seed=123456)
         @qml.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
         def func(x, y):
             qml.RX(x, 0)
