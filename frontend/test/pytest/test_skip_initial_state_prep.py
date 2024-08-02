@@ -18,6 +18,8 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
+from catalyst import grad
+
 
 class TestExamplesFromWebsite:
     """Test the easiest examples from the website"""
@@ -78,7 +80,6 @@ class TestExamplesFromWebsite:
         let's submit this and we can fix it later.
         """
 
-        @qml.qjit
         @qml.qnode(qml.device(backend, wires=3))
         def example_circuit():
             qml.BasisState(jnp.array([0, 1]), wires=range(2))
@@ -99,6 +100,7 @@ class TestDynamicWires:
 
         Modified to use jax.numpy and a non trivial StatePrep
         Modified to use dynamic wires.
+        Dynamic wires is not currently supported.
         """
 
         with pytest.raises(TypeError, match="wires must be static"):
@@ -117,8 +119,6 @@ class TestDynamicWires:
 
         Modified to use jax.numpy
         Modified to use dynamic wires.
-        Dynamic wires won't do anything though, since StatePrep (compiled)
-        assumes all wires will be used in order.
         """
 
         @qml.qnode(qml.device(backend, wires=3))
@@ -149,7 +149,11 @@ class TestPossibleErrors:
             example_circuit()
 
     def test_domain_invalid_basis_state(self, backend):
-        """Test what happens when BasisState operand is not between {0, 1}"""
+        """Test what happens when BasisState operand is not between {0, 1}.
+        This is the same error message, but different error class.
+        In PennyLane the error raised is a ValueError, but all errors
+        in Catalyst that happen during runtime are RuntimeErrors.
+        """
         msg = "BasisState parameter must consist of 0 or 1 integers"
         with pytest.raises(RuntimeError, match=msg):
 
@@ -160,3 +164,91 @@ class TestPossibleErrors:
                 return qml.state()
 
             example_circuit()
+
+
+class TestGrad:
+    """What happens if grad?"""
+
+    def test_state_prep_grad(self, backend):
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a):
+            qml.StatePrep(jnp.array([0, 1]), wires=[0])
+            qml.RX(a, wires=[0])
+            return qml.state()
+
+        expected = qml.grad(example_circuit)(jnp.pi / 2)
+        observed = qml.qjit(grad(example_circuit))(jnp.pi / 2)
+        assert jnp.allclose(expected, observed)
+
+    def test_basis_state_grad(self, backend):
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a):
+            qml.BasisState(jnp.array([0, 1]), wires=range(2))
+            qml.RX(a, wires=[0])
+            return qml.state()
+
+        expected = qml.grad(example_circuit)(jnp.pi / 2)
+        observed = qml.qjit(grad(example_circuit))(jnp.pi / 2)
+        assert jnp.allclose(expected, observed)
+
+
+class TestControlled:
+    """What happens if ctrl?"""
+
+    def test_state_prep_ctrl(self, backend):
+        """Test state prep with ctrl"""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a):
+            """Example provided by Tom in Slack"""
+            qml.ctrl(qml.StatePrep, 0)([0, 1], 1)
+            return qml.state()
+
+        expected = example_circuit(jnp.pi / 2)
+        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        assert jnp.allclose(expected, observed)
+
+    def test_basis_state_ctrl(self, backend):
+        """Test basis state with ctrl"""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a):
+            """Changed from above to use qml.BasisState"""
+            qml.ctrl(qml.BasisState, 0)([1], 1)
+            return qml.state()
+
+        expected = example_circuit(jnp.pi / 2)
+        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        assert jnp.allclose(expected, observed)
+
+
+class TestAdjoint:
+    """What happens if adjoint?"""
+
+    def test_state_prep_ctrl(self, backend):
+        """Test state prep with adjoint"""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a):
+            """Example provided by Tom in Slack"""
+            qml.adjoint(qml.StatePrep, 0)([0, 1], 1)
+            return qml.state()
+
+        expected = example_circuit(jnp.pi / 2)
+        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        assert jnp.allclose(expected, observed)
+
+    def test_basis_state_ctrl(self, backend):
+        """Test basis state with adjoint"""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit(a):
+            """Changed from above to use qml.BasisState"""
+            qml.adjoint(qml.BasisState, 0)([1], 1)
+            return qml.state()
+
+        expected = example_circuit(jnp.pi / 2)
+        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        assert jnp.allclose(expected, observed)
