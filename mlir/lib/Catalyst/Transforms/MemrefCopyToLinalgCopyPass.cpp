@@ -32,7 +32,8 @@ namespace catalyst {
 #define GEN_PASS_DEF_MEMREFCOPYTOLINALGCOPYPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct MemrefCopyToLinalgCopyPass : impl::MemrefCopyToLinalgCopyPassBase<MemrefCopyToLinalgCopyPass> {
+struct MemrefCopyToLinalgCopyPass
+    : impl::MemrefCopyToLinalgCopyPassBase<MemrefCopyToLinalgCopyPass> {
     using MemrefCopyToLinalgCopyPassBase::MemrefCopyToLinalgCopyPassBase;
 
     void runOnOperation() final
@@ -49,6 +50,9 @@ struct MemrefCopyToLinalgCopyPass : impl::MemrefCopyToLinalgCopyPassBase<MemrefC
     }
 };
 
-std::unique_ptr<Pass> createMemrefCopyToLinalgCopyPass() { return std::make_unique<MemrefCopyToLinalgCopyPass>(); }
+std::unique_ptr<Pass> createMemrefCopyToLinalgCopyPass()
+{
+    return std::make_unique<MemrefCopyToLinalgCopyPass>();
+}
 
 } // namespace catalyst
