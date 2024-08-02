@@ -371,7 +371,7 @@ def qjit(
 
     if fn is None:
         return functools.partial(qjit, **kwargs)
-
+    start_after_pass
     return QJIT(fn, CompileOptions(**kwargs))
 
 
@@ -421,7 +421,6 @@ class QJIT:
         self.qir = None
         self.out_type = None
         self.overwrite_ir = None
-        self.pass_start_after = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)

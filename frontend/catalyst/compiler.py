@@ -87,6 +87,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    start_after_pass:  Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
 
@@ -535,6 +536,7 @@ class Compiler:
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
+                start_after_pass=self.options.start_after_pass
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e
