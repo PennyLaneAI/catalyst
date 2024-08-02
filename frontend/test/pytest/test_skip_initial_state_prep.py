@@ -102,16 +102,14 @@ class TestDynamicWires:
         """
 
         with pytest.raises(TypeError, match="wires must be static"):
+
             @qml.qjit
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit(a: int):
                 qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
                 return qml.state()
 
-        expected = example_circuit(0)
-        observed = qml.qjit(example_circuit)(0)
-        assert jnp.allclose(expected, observed)
-
+    @pytest.mark.parametrize("inp", [(0), (1)])
     def test_basis_state(self, inp, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
