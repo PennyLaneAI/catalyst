@@ -37,9 +37,9 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja pytest pytest-xdist pytest-mock autoray PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1'
 
-if [ "$PYTHON_VERSION" == "3.9" ] || [ "$PYTHON_VERSION" == "3.10" ]; then
-    /usr/bin/python3 -m pip install oqc-qcaas-client
-fi
+# if [ "$PYTHON_VERSION" == "3.9" ] || [ "$PYTHON_VERSION" == "3.10" ]; then
+#     /usr/bin/python3 -m pip install oqc-qcaas-client
+# fi
 
 # Install Catalyst wheel
 /usr/bin/python3 -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple
