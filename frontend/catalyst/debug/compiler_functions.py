@@ -22,7 +22,7 @@ from jax.interpreters import mlir
 
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler
+from catalyst.compiler import DEFAULT_PIPELINES, Compiler
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
@@ -160,3 +160,44 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
+
+
+def get_pipeline_output(fn, pass_name):
+    """Capture IR string from the given compiler pass.
+
+    Args:
+        pass_name (str): target compiler pass name
+
+    Returns:
+        str: output ir from the target compiler pass
+    """
+
+    if pass_name in [n[0] for n in DEFAULT_PIPELINES]:
+        return fn.compiler.get_output_of(pass_name)
+    if pass_name == "mlir":
+        file_path = str(fn.workspace) + "/0_" + fn.__name__ + ".mlir"
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = file.read().replace("\n", "")
+            return data
+    if pass_name == "canonicalize":
+        file_path = str(fn.workspace) + "/1_0_canonicalize.mlir"
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = file.read()
+            return data
+    if pass_name == "llvm":
+        file_path = str(fn.workspace) + "/5_llvm_ir.ll"
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = file.read()
+            return data
+    raise NotImplementedError
+
+
+def replace_ir(fn, pass_name, new_ir):
+    """Specify new IR that will be used for future compilation.
+
+    Args:
+        new_ir (str): new ir in the string format
+    """
+    if new_ir:
+        fn.overwrite_ir = new_ir
+        fn.fn_cache.clear()

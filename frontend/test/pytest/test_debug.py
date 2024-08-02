@@ -22,6 +22,7 @@ from jax.tree_util import register_pytree_node_class
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
+from catalyst.debug.compiler_functions import get_pipeline_output, replace_ir
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -451,7 +452,8 @@ class TestCProgramGeneration:
             (
                 "BufferizationPass",
                 "%6 = arith.mulf %in, %in_0 : f64\n",
-                "%c = arith.mulf %in, %in_0 : f64\n" "%6 = arith.mulf %c, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n\
+              %6 = arith.mulf %c, %in_0 : f64\n",
             ),
         ],
     )
@@ -465,11 +467,11 @@ class TestCProgramGeneration:
 
         data = 2.0
         old_result = f(data)
-        old_ir = f.get_pipeline_output(pass_name)
+        old_ir = get_pipeline_output(f, pass_name)
         old_workspace = str(f.workspace)
 
         new_ir = old_ir.replace(target, replacement)
-        f.replace_ir(pass_name, new_ir)
+        replace_ir(f, pass_name, new_ir)
         new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)

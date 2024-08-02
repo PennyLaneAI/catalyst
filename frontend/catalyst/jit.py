@@ -33,7 +33,7 @@ from malt.core import config as ag_config
 import catalyst
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler
+from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
@@ -622,45 +622,6 @@ class QJIT:
             _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
 
         return mlir_module, mlir_string
-
-    def get_pipeline_output(self, pass_name):
-        """Capture IR string from the given compiler pass.
-
-        Args:
-            pass_name (str): target compiler pass name
-
-        Returns:
-            str: output ir from the target compiler pass
-        """
-
-        if pass_name in [n[0] for n in DEFAULT_PIPELINES]:
-            return self.compiler.get_output_of(pass_name)
-        if pass_name == "mlir":
-            file_path = str(self.workspace) + "/0_" + self.__name__ + ".mlir"
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = file.read().replace("\n", "")
-                return data
-        if pass_name == "canonicalize":
-            file_path = str(self.workspace) + "/1_0_canonicalize.mlir"
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = file.read()
-                return data
-        if pass_name == "llvm":
-            file_path = str(self.workspace) + "/5_llvm_ir.ll"
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = file.read()
-                return data
-        raise NotImplementedError
-
-    def replace_ir(self, pass_name, new_ir):
-        """Specify new IR that will be used for future compilation.
-
-        Args:
-            new_ir (str): new ir in the string format
-        """
-        if new_ir:
-            self.overwrite_ir = new_ir
-            self.fn_cache.clear()
 
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
