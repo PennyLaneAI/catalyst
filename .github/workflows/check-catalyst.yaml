@@ -368,6 +368,7 @@ jobs:
 
     - name: Build MLIR Dialects
       run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -382,7 +383,7 @@ jobs:
         name: quantum-build-${{ matrix.compiler }}
         path: |
           quantum-build/bin
-          quantum-build/lib/lib*.so*
+          quantum-build/lib/lib*.a*
           quantum-build/python_packages/*
         retention-days: 1
 
