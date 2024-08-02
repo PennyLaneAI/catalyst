@@ -18,7 +18,8 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import DifferentiableCompileError as DiffErr, grad
+from catalyst import DifferentiableCompileError as DiffErr
+from catalyst import grad
 
 
 class TestExamplesFromWebsite:
