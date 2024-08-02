@@ -162,10 +162,12 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
 
 
+@debug_logger
 def get_pipeline_output(fn, pass_name):
     """Capture IR string from the given compiler pass.
 
     Args:
+        fn (QJIT): a qjit-decorated function
         pass_name (str): target compiler pass name
 
     Returns:
@@ -192,10 +194,13 @@ def get_pipeline_output(fn, pass_name):
     raise NotImplementedError
 
 
+@debug_logger
 def replace_ir(fn, pass_name, new_ir):
     """Specify new IR that will be used for future compilation.
 
     Args:
+        fn (QJIT): a qjit-decorated function
+        pass_name (str): name of a pass
         new_ir (str): new ir in the string format
     """
     if new_ir:

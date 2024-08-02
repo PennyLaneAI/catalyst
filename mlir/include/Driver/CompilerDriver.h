@@ -80,6 +80,8 @@ struct CompilerOptions {
     std::vector<Pipeline> pipelinesCfg;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool lowerToLLVM;
+    /// Specify last entry point.
+    std::string startingPoint;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
@@ -97,6 +99,8 @@ struct CompilerOutput {
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
     size_t pipelineCounter = 0;
+    /// if last entry point is reached.
+    std::string reachStartingPoint;
 
     // Gets the next pipeline dump file name, prefixed with number.
     std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir")
