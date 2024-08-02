@@ -18,7 +18,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import grad
+from catalyst import DifferentiableCompileError as DiffErr, grad
 
 
 class TestExamplesFromWebsite:
@@ -170,28 +170,34 @@ class TestGrad:
     """What happens if grad?"""
 
     def test_state_prep_grad(self, backend):
+        """Test error happens with gradient"""
 
-        @qml.qnode(qml.device(backend, wires=2))
-        def example_circuit(a):
-            qml.StatePrep(jnp.array([0, 1]), wires=[0])
-            qml.RX(a, wires=[0])
-            return qml.state()
+        with pytest.raises(DiffErr):
 
-        expected = qml.grad(example_circuit)(jnp.pi / 2)
-        observed = qml.qjit(grad(example_circuit))(jnp.pi / 2)
-        assert jnp.allclose(expected, observed)
+            @qml.qjit
+            @grad
+            @qml.qnode(qml.device(backend, wires=2))
+            def example_circuit(a: float):
+                qml.StatePrep(jnp.array([0, 1]), wires=[0])
+                qml.RX(a, wires=[0])
+                return qml.state()
+
+            example_circuit(0.0)
 
     def test_basis_state_grad(self, backend):
+        """Test error happens with gradient"""
 
-        @qml.qnode(qml.device(backend, wires=2))
-        def example_circuit(a):
-            qml.BasisState(jnp.array([0, 1]), wires=range(2))
-            qml.RX(a, wires=[0])
-            return qml.state()
+        with pytest.raises(DiffErr):
 
-        expected = qml.grad(example_circuit)(jnp.pi / 2)
-        observed = qml.qjit(grad(example_circuit))(jnp.pi / 2)
-        assert jnp.allclose(expected, observed)
+            @qml.qjit
+            @grad
+            @qml.qnode(qml.device(backend, wires=2))
+            def example_circuit(a: float):
+                qml.BasisState(jnp.array([0, 1]), wires=range(2))
+                qml.RX(a, wires=[0])
+                return qml.state()
+
+            example_circuit(0.0)
 
 
 class TestControlled:
