@@ -249,7 +249,7 @@ jobs:
             bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4.3.4
       with:
         name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.official}}.zip
         path: wheel/
