@@ -497,9 +497,6 @@ jobs:
         name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
-    - name: Debugging with ssh
-      uses: lhotari/action-upterm@v1
-
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v4
       with:
