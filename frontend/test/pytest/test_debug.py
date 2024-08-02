@@ -455,6 +455,12 @@ class TestCProgramGeneration:
                 "%c = arith.mulf %in, %in_0 : f64\n\
               %6 = arith.mulf %c, %in_0 : f64\n",
             ),
+            (
+                "MLIRToLLVMDialect",
+                "%21 = llvm.fmul %19, %20  : f64\n",
+                "%c = llvm.fmul %19, %20  : f64\n\
+              %21 = llvm.fmul %c, %20  : f64\n",
+            ),
         ],
     )
     def test_modify_ir(self, pass_name, target, replacement):
