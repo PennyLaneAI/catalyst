@@ -46,6 +46,11 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/Transforms/Coroutines/CoroCleanup.h"
+#include "llvm/Transforms/Coroutines/CoroConditionalWrapper.h"
+#include "llvm/Transforms/Coroutines/CoroEarly.h"
+#include "llvm/Transforms/Coroutines/CoroSplit.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
@@ -53,6 +58,7 @@
 #include "Driver/CompilerDriver.h"
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
+#include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
@@ -258,6 +264,17 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
+/// From the MLIR module it checks if gradients operations are in the program.
+bool containsGradients(mlir::ModuleOp moduleOp)
+{
+    bool contain = false;
+    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
+        contain = true;
+        return WalkResult::interrupt();
+    });
+    return contain;
+}
+
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
 /// the provided SMDiagnostic.
 std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
@@ -360,8 +377,49 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
     return failure();
 }
 
-LogicalResult runLLVMPasses(const CompilerOptions &options,
-                            std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
+LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
+                                std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
+{
+
+    auto &outputs = output.pipelineOutputs;
+
+    // Create a pass to lower LLVM coroutines (similar to what happens in O0)
+    llvm::ModulePassManager CoroPM;
+    CoroPM.addPass(llvm::CoroEarlyPass());
+    llvm::CGSCCPassManager CGPM;
+    CGPM.addPass(llvm::CoroSplitPass());
+    CoroPM.addPass(llvm::createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
+    CoroPM.addPass(llvm::CoroCleanupPass());
+    CoroPM.addPass(llvm::GlobalDCEPass());
+
+    // Create the analysis managers.
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
+
+    llvm::PassBuilder PB;
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+    // Optimize the IR!
+    CoroPM.run(*llvmModule.get(), MAM);
+
+    if (options.keepIntermediate) {
+        llvm::raw_string_ostream rawStringOstream{outputs["CoroOpt"]};
+        llvmModule->print(rawStringOstream, nullptr);
+        auto outFile = output.nextPipelineDumpFilename("CoroOpt", ".ll");
+        dumpToFile(options, outFile, outputs["CoroOpt"]);
+    }
+
+    return success();
+}
+
+LogicalResult runO2LLVMPasses(const CompilerOptions &options,
+                              std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
     // opt -O2
     // As seen here:
@@ -393,10 +451,10 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
-        llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
+        llvm::raw_string_ostream rawStringOstream{outputs["O2Opt"]};
         llvmModule->print(rawStringOstream, nullptr);
-        auto outFile = output.nextPipelineDumpFilename("PreEnzymeOpt", ".ll");
-        dumpToFile(options, outFile, outputs["PreEnzymeOpt"]);
+        auto outFile = output.nextPipelineDumpFilename("O2Opt", ".ll");
+        dumpToFile(options, outFile, outputs["O2Opt"]);
     }
 
     return success();
@@ -572,8 +630,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> op =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
     catalyst::utils::LinesCount::ModuleOp(*op);
-
+    bool enzymeRun = false;
     if (op) {
+        enzymeRun = containsGradients(*op);
         if (failed(runLowering(options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -634,19 +693,28 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
 
-        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
-                                llvmModule, output))) {
-            return failure();
-        }
-
         catalyst::utils::LinesCount::Module(*llvmModule.get());
 
-        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false, options,
-                                llvmModule, output))) {
-            return failure();
+        if (options.asyncQnodes) {
+            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
+                                    options, llvmModule, output))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
+        if (enzymeRun) {
+            if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
+                                    options, llvmModule, output))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
 
-        catalyst::utils::LinesCount::Module(*llvmModule.get());
+            if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
+                                    options, llvmModule, output))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
+        }
 
         output.outIR.clear();
         outIRStream << *llvmModule;

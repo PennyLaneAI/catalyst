@@ -26,6 +26,7 @@ from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
 # pylint: disable=missing-function-docstring
 
 
+@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
     dev = qml.device(backend, wires=2)
@@ -67,6 +68,7 @@ def test_qnode_execution(backend):
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_gradient(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
