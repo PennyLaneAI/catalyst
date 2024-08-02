@@ -219,7 +219,6 @@ setup(
     packages=find_namespace_packages(
         where="frontend",
         include=["catalyst", "catalyst.*", "mlir_quantum"],
-        exclude=["catalyst.third_party.oqc.*"],
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
