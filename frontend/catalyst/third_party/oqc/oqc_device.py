@@ -43,7 +43,9 @@ class OQCDevice(Device):
 
     def __init__(self, wires, backend, shots=1024, **kwargs):
         try:
-            from qcaas_client.client import OQCClient  # pylint: disable=unused-import
+            from qcaas_client.client import (
+                OQCClient,  # pylint: disable=unused-import,import-outside-toplevel
+            )
         except ImportError as e:  # pragma: no cover
             raise ImportError(
                 "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
