@@ -81,7 +81,7 @@ def compare_eqns(eqn1, eqn2, skip_counts=False):
             assert ov1.count == ov2.count, f"{eqn1}, {ov1.count}, {ov2.count}"
 
 
-class TestErorrs:
+class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
     def test_dynamic_shots(self):
@@ -195,6 +195,36 @@ class TestErorrs:
 
 class TestCatalystCompareJaxpr:
     """Test comparing catalyst and pennylane jaxpr for a variety of situations."""
+
+    def test_qubit_unitary(self):
+        """Test that qubit unitary can be converted."""
+
+        dev = qml.device('lightning.qubit', wires=2)
+
+        @qml.qnode(dev)
+        def circuit(U):
+            qml.QubitUnitary(U, wires=0)
+            return qml.expval(qml.Z(0))
+
+        x = qml.X.compute_matrix()
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)(x)
+        qml.capture.disable()
+        converted = from_plxpr(plxpr)(x)
+
+        catalyst_res = catalyst_execute_jaxpr(converted)(x)
+        assert len(catalyst_res) == 1
+        assert qml.math.allclose(catalyst_res[0], -1)
+
+        qjit_obj = qml.qjit(circuit)
+        qjit_obj(x)
+        catalxpr = qjit_obj.jaxpr 
+        call_jaxpr_pl = converted.eqns[0].params['call_jaxpr']
+        call_jaxpr_c = catalxpr.eqns[0].params['call_jaxpr']
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    def test_globalphase(self):
+        """Test conversion of a global phase."""
 
     def test_expval(self):
         """Test comparison and execution of the jaxpr for a simple qnode."""
@@ -456,7 +486,7 @@ class TestHybridPrograms:
         compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4], skip_counts=True)
 
     def test_multiple_qnodes(self):
-
+        """Test that a workflow with multiple qnodes can be converted."""
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x):
             qml.RX(x, wires=0)

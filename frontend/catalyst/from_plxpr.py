@@ -14,7 +14,6 @@
 """
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
-from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable
 
@@ -24,11 +23,12 @@ from pennylane.capture import AbstractMeasurement, AbstractOperator, qnode_prim
 
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.jax_primitives import (
-    AbstractQreg,
     AbstractQbit,
+    AbstractQreg,
     compbasis_p,
     expval_p,
     func_p,
+    gphase_p,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -37,6 +37,7 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
+    qunitary_p,
     sample_p,
     state_p,
     var_p,
@@ -53,19 +54,6 @@ measurement_map = {
 
 
 def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
-    if jax.config.jax_enable_x64:
-        dtype_map = {
-            float: jax.numpy.float64,
-            int: jax.numpy.int64,
-            complex: jax.numpy.complex128,
-        }
-    else:
-        dtype_map = {
-            float: jax.numpy.float32,
-            int: jax.numpy.int32,
-            complex: jax.numpy.complex64,
-        }
-
     shapes = []
     if not shots:
         shots = [None]
@@ -73,7 +61,7 @@ def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
     for s in shots:
         for m in measurements:
             shape, dtype = m.abstract_eval(shots=s, num_device_wires=num_device_wires)
-            shapes.append(jax.core.ShapedArray(shape, dtype_map.get(dtype, dtype)))
+            shapes.append(jax.core.ShapedArray(shape, dtype))
     return shapes
 
 
@@ -89,6 +77,7 @@ def _get_device_kwargs(device: "pennylane.devices.Device") -> dict:
     info = extract_backend_info(device, capabilities)
     # Note that the value of rtd_kwargs is a string version of
     # the info kwargs, not the info kwargs itself
+    # this is due to ease of serialization to MLIR
     return {
         "rtd_kwargs": str(info.kwargs),
         "rtd_lib": info.lpath,
@@ -175,11 +164,8 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
     function will fail outside of an abstract evaluation call.
 
     """
-    env = {}  # dict mapping var "variables" to val "values"
+    env = {invar: arg for arg, invar in zip(args, jaxpr.invars)}
 
-    # Bind args and consts to environment
-    for arg, invar in zip(args, jaxpr.invars):
-        env[invar] = arg
     for const, constvar in zip(consts, jaxpr.constvars):
         env[constvar] = const
 
@@ -192,10 +178,9 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
                 raise NotImplementedError("catalyst does not yet support dynamic shots")
 
             f = partial(
-                _bind_catalxpr,
-                eqn.params["qfunc_jaxpr"].jaxpr,
-                eqn.params["qfunc_jaxpr"].consts,
-                eqn.params["device"],
+                QFuncPlxprInterpreter(eqn.params["device"]).convert,
+                eqn.params["qfunc_jaxpr"],
+                n_consts=eqn.params['n_consts']
             )
             # func_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
@@ -212,160 +197,180 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
     return [env[outvar] for outvar in jaxpr.outvars]
 
 
-@dataclass
-class _InterpreterState:
+class QFuncPlxprInterpreter:
     """This dataclass stores the mutable variables modified
     over the course of interpreting the plxpr as catalxpr."""
 
     qreg: AbstractQreg
     """The current quantum register."""
 
-    env: dict = field(default_factory=dict)
+    env: dict
     """A dictionary mapping variables to values."""
 
-    wire_map: dict = field(default_factory=dict)
+    wire_map: dict
     """A map from wire values to ``AbstractQbit`` instances.
     
     If a value is not present in this dictionary, it needs to be extracted
     from the ``qreg`` property.
     """
 
-    op_math_cache: dict = field(default_factory=dict)
+    op_math_cache: dict
     """A cache of operations that will be consumed by later operations.
     This is a map from the ``AbstractOperator`` variables to the corresponding
     equation. The equation will need to be interpreted when the abstract
     operator is consumed.
     """
 
+    def __init__(self, device):
+        self._device = device
+        self.qreg = None
+        self.env = {}
+        self.wire_map = {}
+        self.op_math_cache = {}
+
+
+    def setup(self):
+        qdevice_p.bind(**_get_device_kwargs(self._device))
+        self.qreg = qalloc_p.bind(len(self._device.wires))
+        self.wire_map = {}
+
+
+    def cleanup(self):
+        for orig_wire, wire in self.wire_map.items():
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+        qdealloc_p.bind(self.qreg)
+
     def read(self, var):
         """Extract the value corresponding to a variable."""
         return var.val if type(var) is jax.core.Literal else self.env[var]
 
-    def get_wire(self, wire_value) -> AbstractQbit:
+
+    def _get_wire(self, wire_value) -> AbstractQbit:
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
         return qextract_p.bind(self.qreg, wire_value)
 
 
-def _deallocate(state: _InterpreterState) -> None:
-    """Reinsert all active wires into the quantum register and deallocate the register."""
-    for orig_wire, wire in state.wire_map.items():
-        state.qreg = qinsert_p.bind(state.qreg, orig_wire, wire)
-    qdealloc_p.bind(state.qreg)
+    def interpret_operator_eqn(self, eqn: jax.core.JaxprEqn) -> None:
+        """Interpret a plxpr equation describing an operation as a catalxpr equation."""
+        if not isinstance(eqn.outvars[0], jax.core.DropVar):
+            self.op_math_cache[eqn.outvars[0]] = eqn
+            return
 
+        if "n_wires" not in eqn.params:
+            raise NotImplementedError(
+                f"Operator {eqn.primitive.name} not yet supported for catalyst conversion."
+            )
+        n_wires = eqn.params["n_wires"]
+        split = None if n_wires == 0 else -n_wires
 
-def _operator_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState) -> None:
-    """Interpret a plxpr equation describing an operation as a catalxpr equation."""
-    if not isinstance(eqn.outvars[0], jax.core.DropVar):
-        state.op_math_cache[eqn.outvars[0]] = eqn
-        return
+        wire_values = [self.read(w) for w in eqn.invars[split:]]
+        wires = [self._get_wire(w) for w in wire_values]
 
-    if "n_wires" not in eqn.params:
-        raise NotImplementedError(
-            f"Operator {eqn.primitive.name} not yet supported for catalyst conversion."
-        )
-    n_wires = eqn.params["n_wires"]
+        invals = [self.read(invar) for invar in eqn.invars[:split]]
 
-    wire_values = [state.read(w) for w in eqn.invars[-n_wires:]]
-    wires = [state.get_wire(w) for w in wire_values]
+        kwargs = {
+            'qubits_len': eqn.params['n_wires'],
+            'ctrl_len': 0,
+            'adjoint': False,
+        }
 
-    invals = [state.read(invar) for invar in eqn.invars[:-n_wires]]
-    outvals = qinst_p.bind(
-        *wires,
-        *invals,
-        op=eqn.primitive.name,
-        qubits_len=eqn.params["n_wires"],
-        params_len=len(eqn.invars) - eqn.params["n_wires"],
-        ctrl_len=0,
-        adjoint=False,
-    )
-
-    for wire_values, new_wire in zip(wire_values, outvals):
-        state.wire_map[wire_values] = new_wire
-
-
-def _obs(eqn: jax.core.JaxprEqn, state: _InterpreterState):
-    """Interpret the observable equation corresponding to a measurement equation's input."""
-    obs_eqn = state.op_math_cache[eqn.invars[0]]
-    if "n_wires" not in obs_eqn.params:
-        raise NotImplementedError(
-            f"from_plxpr can not yet interpret observables of type {obs_eqn.primitive}"
-        )
-
-    n_wires = obs_eqn.params["n_wires"]
-    wires = [state.get_wire(state.read(w)) for w in obs_eqn.invars[-n_wires:]]
-    invals = [state.read(invar) for invar in obs_eqn.invars[:-n_wires]]
-    return namedobs_p.bind(*wires, *invals, kind=obs_eqn.primitive.name)
-
-
-def _compbasis_obs(eqn: jax.core.JaxprEqn, state: _InterpreterState, device: "qml.devices.Device"):
-    """Add a computational basis sampling observable."""
-    if eqn.invars:
-        w_vals = [state.read(w_var) for w_var in eqn.invars]
-    else:
-        w_vals = device.wires  # broadcast across all wires
-    wires = [state.get_wire(w) for w in w_vals]
-    return compbasis_p.bind(*wires)
-
-
-def _measurement_eqn(eqn: jax.core.JaxprEqn, state: _InterpreterState, device):
-    if eqn.primitive.name not in measurement_map:
-        raise NotImplementedError(
-            f"measurement {eqn.primitive.name} not yet supported for conversion."
-        )
-    if eqn.params.get("has_eigvals", False):
-        raise NotImplementedError("from_plxpr does not yet support measurements with eigenvalues.")
-
-    if "_wires" in eqn.primitive.name:
-        obs = _compbasis_obs(eqn, state, device)
-    else:
-        obs = _obs(eqn, state)
-    # mcm based measurements wont be in measurement map yet
-    # so we can assume observable based
-
-    shaped_array = _get_shapes_for(
-        eqn.outvars[0].aval, shots=device.shots, num_device_wires=len(device.wires)
-    )[0]
-
-    primitive = measurement_map[eqn.primitive.name]
-    mval = primitive.bind(obs, shape=shaped_array.shape, shots=device.shots.total_shots)
-
-    # sample_p returns floats, so we need to converted it back to the expected integers here
-    if shaped_array.dtype != mval.dtype:
-        return jax.lax.convert_element_type(mval, shaped_array.dtype)
-    return mval
-
-
-def _bind_catalxpr(jaxpr: jax.core.Jaxpr, consts, device, *args) -> list:
-    """Interpret plxpr as jaxpr."""
-
-    qdevice_p.bind(**_get_device_kwargs(device))
-    qreg = qalloc_p.bind(len(device.wires))
-    state = _InterpreterState(qreg=qreg)
-
-    for arg, invar in zip(args, jaxpr.invars):
-        state.env[invar] = arg
-    for const, constvar in zip(consts, jaxpr.constvars):
-        state.env[constvar] = const
-
-    measurements = []
-    for eqn in jaxpr.eqns:
-        if isinstance(eqn.outvars[0].aval, AbstractOperator):
-            _operator_eqn(eqn, state)
-
-        elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-            mval = _measurement_eqn(eqn, state, device)
-            state.env[eqn.outvars[0]] = mval
-            measurements.append(eqn.outvars[0])
+        if eqn.primitive.name == "QubitUnitary":
+            outvals = qunitary_p.bind(*invals, *wires, **kwargs)
+        elif eqn.primitive.name == "GlobalPhase":
+            outvals = gphase_p.bind(*invals, ctrl_len=0, adjoint=False)
         else:
-            invals = [state.read(invar) for invar in eqn.invars]
-            outvals = eqn.primitive.bind(*invals, **eqn.params)
-            if not eqn.primitive.multiple_results:
-                outvals = [outvals]
-            for outvar, outval in zip(eqn.outvars, outvals):
-                state.env[outvar] = outval
+            outvals = qinst_p.bind(
+                *wires,
+                *invals,
+                op=eqn.primitive.name,
+                params_len=len(eqn.invars) - eqn.params["n_wires"],
+                **kwargs
+            )
 
-    _deallocate(state)
-    # Read the final result of the Jaxpr from the environment
-    return [state.read(outvar) for outvar in measurements]
+        for wire_values, new_wire in zip(wire_values, outvals):
+            self.wire_map[wire_values] = new_wire
+
+
+    def _obs(self, eqn: jax.core.JaxprEqn):
+        """Interpret the observable equation corresponding to a measurement equation's input."""
+        obs_eqn = self.op_math_cache[eqn.invars[0]]
+        if "n_wires" not in obs_eqn.params:
+            raise NotImplementedError(
+                f"from_plxpr can not yet interpret observables of type {obs_eqn.primitive}"
+            )
+
+        n_wires = obs_eqn.params["n_wires"]
+        wires = [self._get_wire(self.read(w)) for w in obs_eqn.invars[-n_wires:]]
+        invals = [self.read(invar) for invar in obs_eqn.invars[:-n_wires]]
+        return namedobs_p.bind(*wires, *invals, kind=obs_eqn.primitive.name)
+
+
+    def _compbasis_obs(self, eqn: jax.core.JaxprEqn):
+        """Add a computational basis sampling observable."""
+        if eqn.invars:
+            w_vals = [self.read(w_var) for w_var in eqn.invars]
+        else:
+            w_vals = self._device.wires  # broadcast across all wires
+        wires = [self._get_wire(w) for w in w_vals]
+        return compbasis_p.bind(*wires)
+
+
+    def interpret_measurement_eqn(self, eqn: jax.core.JaxprEqn):
+        if eqn.primitive.name not in measurement_map:
+            raise NotImplementedError(
+                f"measurement {eqn.primitive.name} not yet supported for conversion."
+            )
+        if eqn.params.get("has_eigvals", False):
+            raise NotImplementedError("from_plxpr does not yet support measurements with eigenvalues.")
+
+        if "_wires" in eqn.primitive.name:
+            obs = self._compbasis_obs(eqn)
+        else:
+            obs = self._obs(eqn)
+        # mcm based measurements wont be in measurement map yet
+        # so we can assume observable based
+
+        shaped_array = _get_shapes_for(
+            eqn.outvars[0].aval, shots=self._device.shots, num_device_wires=len(self._device.wires)
+        )[0]
+
+        primitive = measurement_map[eqn.primitive.name]
+        mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+
+        # sample_p returns floats, so we need to converted it back to the expected integers here
+        if shaped_array.dtype != mval.dtype:
+            return jax.lax.convert_element_type(mval, shaped_array.dtype)
+        return mval
+
+
+    def convert(self, jaxpr: jax.core.Jaxpr, *args, n_consts=0) -> list:
+        """Interpret plxpr as catalxpr."""
+
+        consts = args[:n_consts]
+        args = args[n_consts:]
+        self.setup()
+
+        self.op_math_cache = {}
+        self.env = {invar: arg for arg, invar in zip(args, jaxpr.invars)}
+        for const, constvar in zip(consts, jaxpr.constvars):
+            self.env[constvar] = const
+
+        for eqn in jaxpr.eqns:
+            if isinstance(eqn.outvars[0].aval, AbstractOperator):
+                self.interpret_operator_eqn(eqn)
+            elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
+                outval = self.interpret_measurement_eqn(eqn)
+                self.env[eqn.outvars[0]] = outval
+            else:
+                invals = [self.read(invar) for invar in eqn.invars]
+                outvals = eqn.primitive.bind(*invals, **eqn.params)
+                if not eqn.primitive.multiple_results:
+                    outvals = [outvals]
+                for outvar, outval in zip(eqn.outvars, outvals):
+                    self.env[outvar] = outval
+
+        self.cleanup()
+        # Read the final result of the Jaxpr from the environment
+        return [self.read(outvar) for outvar in jaxpr.outvars]
