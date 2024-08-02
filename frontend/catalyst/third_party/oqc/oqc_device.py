@@ -18,14 +18,6 @@ import os
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
-
-try:
-    from qcaas_client.client import OQCClient  # pylint: disable=unused-import
-except ImportError as e:  # pragma: no cover
-    raise ImportError(
-        "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
-    ) from e
-
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["lucy", "toshiko"]
@@ -49,6 +41,13 @@ class OQCDevice(Device):
         return "oqc", get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc.so"
 
     def __init__(self, wires, backend, shots=1024, **kwargs):
+        try:
+            from qcaas_client.client import OQCClient  # pylint: disable=unused-import
+        except ImportError as e:  # pragma: no cover
+            raise ImportError(
+                "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
+            ) from e
+
         self._backend = backend
         _check_backend(backend=backend)
         _check_envvar()
