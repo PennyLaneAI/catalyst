@@ -141,6 +141,7 @@ class TestPossibleErrors:
 
         with pytest.raises(ValueError, match="must be of equal length"):
 
+            @qml.qjit
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([1]), wires=range(2))
@@ -207,26 +208,26 @@ class TestControlled:
         """Test state prep with ctrl"""
 
         @qml.qnode(qml.device(backend, wires=2))
-        def example_circuit(a):
+        def example_circuit():
             """Example provided by Tom in Slack"""
             qml.ctrl(qml.StatePrep, 0)([0, 1], 1)
             return qml.state()
 
-        expected = example_circuit(jnp.pi / 2)
-        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_ctrl(self, backend):
         """Test basis state with ctrl"""
 
         @qml.qnode(qml.device(backend, wires=2))
-        def example_circuit(a):
+        def example_circuit():
             """Changed from above to use qml.BasisState"""
             qml.ctrl(qml.BasisState, 0)([1], 1)
             return qml.state()
 
-        expected = example_circuit(jnp.pi / 2)
-        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
 
@@ -237,24 +238,24 @@ class TestAdjoint:
         """Test state prep with adjoint"""
 
         @qml.qnode(qml.device(backend, wires=2))
-        def example_circuit(a):
+        def example_circuit():
             """Example provided by Tom in Slack"""
             qml.adjoint(qml.StatePrep, 0)([0, 1], 1)
             return qml.state()
 
-        expected = example_circuit(jnp.pi / 2)
-        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_ctrl(self, backend):
         """Test basis state with adjoint"""
 
         @qml.qnode(qml.device(backend, wires=2))
-        def example_circuit(a):
+        def example_circuit():
             """Changed from above to use qml.BasisState"""
             qml.adjoint(qml.BasisState, 0)([1], 1)
             return qml.state()
 
-        expected = example_circuit(jnp.pi / 2)
-        observed = qml.qjit(example_circuit)(jnp.pi / 2)
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
