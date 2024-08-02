@@ -39,37 +39,10 @@ void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry)
 
 LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options,
                                                   std::shared_ptr<llvm::Module> llvmModule,
+                                                  llvm::TargetMachine *targetMachine,
                                                   StringRef filename)
 {
     using namespace llvm;
-
-    std::string targetTriple = sys::getDefaultTargetTriple();
-
-    InitializeAllTargetInfos();
-    InitializeAllTargets();
-    InitializeAllTargetMCs();
-    InitializeAllAsmParsers();
-    InitializeAllAsmPrinters();
-
-    std::string err;
-
-    auto target = TargetRegistry::lookupTarget(targetTriple, err);
-
-    if (!target) {
-        CO_MSG(options, Verbosity::Urgent, err);
-        return failure();
-    }
-
-    // Target a generic CPU without any additional features, options, or relocation model
-    const char *cpu = "generic";
-    const char *features = "";
-
-    TargetOptions opt;
-    auto targetMachine =
-        target->createTargetMachine(targetTriple, cpu, features, opt, Reloc::Model::PIC_);
-    targetMachine->setOptLevel(CodeGenOptLevel::None);
-    llvmModule->setDataLayout(targetMachine->createDataLayout());
-    llvmModule->setTargetTriple(targetTriple);
 
     std::error_code errCode;
     raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
