@@ -94,7 +94,7 @@ class TestExamplesFromWebsite:
 class TestDynamicWires:
     """Test dynamic wires"""
 
-    def test_state_prep(self, backend):
+    def test_state_prep(self):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
         as of July 31st 2024.
@@ -102,12 +102,15 @@ class TestDynamicWires:
         Modified to use jax.numpy and a non trivial StatePrep
         Modified to use dynamic wires.
         Dynamic wires is not currently supported.
+
+        Limit this test to lightning.qubit since kokkos is old device
+        and this optimization does not yet work for it.
         """
 
         with pytest.raises(TypeError, match="wires must be static"):
 
             @qml.qjit
-            @qml.qnode(qml.device(backend, wires=2))
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit(a: int):
                 qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
                 return qml.state()
@@ -135,7 +138,7 @@ class TestDynamicWires:
 class TestPossibleErrors:
     """What happens when there is bad user input?"""
 
-    def test_array_less_than_size_basis_state(self, backend):
+    def test_array_less_than_size_basis_state(self):
         """Test what happens when the array is less than the size required.
         This is the same error as reported by pennylane
         """
@@ -143,14 +146,14 @@ class TestPossibleErrors:
         with pytest.raises(ValueError, match="must be of equal length"):
 
             @qml.qjit
-            @qml.qnode(qml.device(backend, wires=2))
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([1]), wires=range(2))
                 return qml.state()
 
             example_circuit()
 
-    def test_domain_invalid_basis_state(self, backend):
+    def test_domain_invalid_basis_state(self):
         """Test what happens when BasisState operand is not between {0, 1}.
         This is the same error message, but different error class.
         In PennyLane the error raised is a ValueError, but all errors
@@ -160,7 +163,7 @@ class TestPossibleErrors:
         with pytest.raises(RuntimeError, match=msg):
 
             @qml.qjit
-            @qml.qnode(qml.device(backend, wires=2))
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([0, 2]), wires=range(2))
                 return qml.state()
@@ -205,10 +208,10 @@ class TestGrad:
 class TestControlled:
     """What happens if ctrl?"""
 
-    def test_state_prep_ctrl(self, backend):
+    def test_state_prep_ctrl(self):
         """Test state prep with ctrl"""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def example_circuit():
             """Example provided by Tom in Slack"""
             qml.ctrl(qml.StatePrep, 0)([0, 1], 1)
@@ -218,10 +221,10 @@ class TestControlled:
         observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state_ctrl(self, backend):
+    def test_basis_state_ctrl(self):
         """Test basis state with ctrl"""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def example_circuit():
             """Changed from above to use qml.BasisState"""
             qml.ctrl(qml.BasisState, 0)([1], 1)
