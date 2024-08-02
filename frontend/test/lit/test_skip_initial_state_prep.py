@@ -47,15 +47,7 @@ def basis_state_example():
 
     Modified to use jax.numpy and a non trivial StatePrep
     """
-    qml.BasisState(
-        jnp.array(
-            [
-                1,
-                1,
-            ]
-        ),
-        wires=range(2),
-    )
+    qml.BasisState(jnp.array([1, 1]), wires=range(2))
     return qml.state()
 
 
