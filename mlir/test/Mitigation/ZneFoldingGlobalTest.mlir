@@ -14,6 +14,47 @@
 
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
+// CHECK-LABEL: func.func private @simpleCircuit.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
+    // CHECK:      [[nQubits:%.+]] = arith.constant 1
+    // CHECK:      [[c0:%.+]] = index.constant 0
+    // CHECK:      [[c1:%.+]] = index.constant 1
+    // CHECK:      quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    // CHECK:      [[qReg:%.+]] = call @simpleCircuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
+    // CHECK:      [[outQregFor:%.+]]  = scf.for %arg2 = [[c0]] to %arg1 step [[c1]] iter_args([[inQreg:%.+]] = [[qReg]]) -> (!quantum.reg) {
+        // CHECK:      [[outQreg1:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, [[inQreg]]) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
+        // CHECK:      [[outQreg2:%.+]] = quantum.adjoint([[outQreg1]]) : !quantum.reg {
+        // CHECK:      ^bb0(%arg4: !quantum.reg):
+            // CHECK:      [[callWithoutMeasurements:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, %arg4) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
+            // CHECK:      quantum.yield [[callWithoutMeasurements]] : !quantum.reg
+        // CHECK:      scf.yield [[outQreg2]] : !quantum.reg
+    // CHECK:      [[results:%.+]]  = call @simpleCircuit.withMeasurements(%arg0, [[outQregFor]]) : (tensor<3xf64>, !quantum.reg) -> f64
+    // CHECK:      quantum.device_release
+    // CHECK:      return [[results]]
+
+// CHECK-LABEL: func.func private @simpleCircuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
+    // CHECK:     [[allocQreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
+    // CHECK:     return [[allocQreg]] : !quantum.reg
+
+// CHECK-LABEL:    func.func private @simpleCircuit.withoutMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> !quantum.reg {
+    // CHECK:    [[q_0:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
+    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
+    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
+    // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
+    // CHECK:    return [[q_4]] : !quantum.reg
+
+// CHECK-LABEL:    func.func private @simpleCircuit.withMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> f64 {
+    // CHECK:    [[q_0:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
+    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
+    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
+    // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
+    // CHECK:    [[q_5:%.+]] = quantum.namedobs [[q_3]][ PauliX] : !quantum.obs
+    // CHECK:    [[results:%.+]] = quantum.expval [[q_5]] : f64
+    // CHECK:    quantum.dealloc [[q_4]] : !quantum.reg
+    // CHECK:    return [[results]] : f64
+
+// CHECK-LABEL: func.func @simpleCircuit
 func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %c0 = arith.constant 0 : index
@@ -39,53 +80,11 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     func.return %expval : f64
 }
 
-// CHECK:    func.func private @simpleCircuit.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
-    // CHECK:    [[nQubits:%.+]] = arith.constant 1 : i64
-    // CHECK:    %idx0 = index.constant 0
-    // CHECK:    %idx1 = index.constant 1
-    // CHECK:    quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
-    // CHECK:    [[qReg:%.+]] = call @simpleCircuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
-    // CHECK:    [[outQregFor:%.+]]  = scf.for %arg2 = %idx0 to %arg1 step %idx1 iter_args([[inQreg:%.+]] = [[qReg]]) -> (!quantum.reg) {
-        // CHECK:    [[outQreg1:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, [[inQreg]]) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
-        // CHECK:    [[outQreg2:%.+]] = quantum.adjoint([[outQreg1]]) : !quantum.reg {
-        // CHECK:    ^bb0(%arg4: !quantum.reg):
-            // CHECK:    [[callWithoutMeasurements:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, %arg4) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
-            // CHECK:    quantum.yield [[callWithoutMeasurements]] : !quantum.reg
-        // CHECK:    scf.yield [[outQreg2]] : !quantum.reg
-    // CHECK:    [[results:%.+]]  = call @simpleCircuit.withMeasurements(%arg0, [[outQregFor]]) : (tensor<3xf64>, !quantum.reg) -> f64
-    // CHECK:    quantum.device_release
-    // CHECK:    return [[results]] : f64
-
-// CHECK:    func.func private @simpleCircuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
-    // CHECK:    [[allocQreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
-    // CHECK:    return [[allocQreg]] : !quantum.reg
-
-// CHECK:    func.func private @simpleCircuit.withoutMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> !quantum.reg {
-    // CHECK:    [[q_0:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
-    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
-    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
-    // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
-    // CHECK:    return [[q_4]] : !quantum.reg
-
-// CHECK:    func.func private @simpleCircuit.withMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> f64 {
-    // CHECK:    [[q_0:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
-    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
-    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
-    // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
-    // CHECK:    [[q_5:%.+]] = quantum.namedobs [[q_3]][ PauliX] : !quantum.obs
-    // CHECK:    [[resulst:%.+]] = quantum.expval [[q_5]] : f64
-    // CHECK:    quantum.dealloc [[q_4]] : !quantum.reg
-    // CHECK:    return [[resulst]] : f64
-
-// CHECK:    func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
-
-// CHECK:    func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
+// CHECK-LABEL:    func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
     // CHECK:    [[c0:%.+]] = index.constant 0
     // CHECK:    [[c1:%.+]] = index.constant 1
     // CHECK:    [[c5:%.+]] = index.constant 5
-    // CHECK:    [[dense5:%.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
+    // CHECK:    [[dense5:%.+]] = arith.constant dense<[1, 2, 3, 4, 5]>
     // CHECK:    [[emptyRes:%.+]] = tensor.empty() : tensor<5xf64>
     // CHECK:    [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c5]] step [[c1]] iter_args(%arg2 = [[emptyRes]]) -> (tensor<5xf64>) {
         // CHECK:    [[scalarFactor:%.+]] = tensor.extract [[dense5]][[[idx]]] : tensor<5xindex>
@@ -94,9 +93,9 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
             // CHECK:    [[resultsFor:%.+]] = scf.for [[idxJ:%.+]] = [[c0]] to [[c1]] step [[c1]] iter_args(%arg4 = %arg2) -> (tensor<5xf64>) {
                 // CHECK:    [[extracted:%.+]] = tensor.extract [[tensorRes]][%arg3] : tensor<1xf64>
                 // CHECK:    [[insertedRes:%.+]] = tensor.insert [[extracted]] into %arg4[%arg1] : tensor<5xf64>
-                // CHECK:    scf.yield [[insertedRes]] : tensor<5xf64>
-        // CHECK:    scf.yield [[resultsFor]] : tensor<5xf64>
-    // CHECK:    return [[results]] : tensor<5xf64>
+                // CHECK:    scf.yield [[insertedRes]]
+        // CHECK:    scf.yield [[resultsFor]]
+    // CHECK:    return [[results]]
 func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
     %scaleFactors = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
     %0 = mitigation.zne @simpleCircuit(%arg0) folding (global) scaleFactors (%scaleFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>

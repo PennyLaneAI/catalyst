@@ -14,6 +14,38 @@
 
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
+// CHECK:   func.func private @circuit.folded(%arg0: index) -> tensor<f64> {
+    // CHECK:   [[nQubits:%.+]] = arith.constant 2
+    // CHECK:   [[c0:%.+]] = index.constant 0
+    // CHECK:   [[c1:%.+]] = index.constant 1
+    // CHECK:   quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    // CHECK:   [[qReg:%.+]] = call @circuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
+    // CHECK:   [[q0:%.+]] = quantum.extract [[qReg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK:   [[q0_out:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
+    // CHECK:   [[q0_out_1:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] -> (!quantum.bit) {
+    // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_out]] {adjoint} : !quantum.bit
+    // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_out]] : !quantum.bit
+    // CHECK:     scf.yield [[q0_out]]: !quantum.bit
+    // CHECK:   [[%q1:%.+]] = quantum.extract [[qReg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK:   [[q01_out:%.+]] = quantum.custom "CNOT"() [[q0_out_1]],[[q1]] : !quantum.bit, !quantum.bit
+    // CHECK:   [[q01_out2:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] -> (!quantum.bit, !quantum.bit) {
+    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 {adjoint} : !quantum.bit, !quantum.bit
+    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 : !quantum.bit, !quantum.bit
+    // CHECK:     scf.yield [[q01_out]] : (!quantum.bit, !quantum.bit)
+    // CHECK:   [[%q2:%.+]] = quantum.namedobs [[q01_out2]]#0[ PauliY] : !quantum.obs
+    // CHECK:   [[results:%.+]] = quantum.expval [[q1]] : f64
+    // CHECK:   [[tensorRes:%.+]] = tensor.from_elements [[result]] : tensor<f64>
+    // CHECK:   [[%q2:%.+]] = quantum.insert %0[ 0], [[q01_out2]]#0 : !quantum.reg, !quantum.bit
+    // CHECK:   [[%q3:%.+]] = quantum.insert %7[ 1], [[q01_out2]]#1 : !quantum.reg, !quantum.bit
+    // CHECK:   quantum.dealloc [[q2]] : !quantum.reg
+    // CHECK:   quantum.device_release
+    // CHECK:   return [[tensorRes]]
+
+// CHECK:    func.func private @simpleCircuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
+    // CHECK:    [[allocQreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
+    // CHECK:    return [[allocQreg]] : !quantum.reg
+
+//CHECK-LABEL: func.func @circuit
 func.func @circuit() -> tensor<f64> attributes {qnode} {
     quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -31,64 +63,25 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
     return %from_elements : tensor<f64>
 }
 
-  // CHECK:   func.func private @circuit.folded(%arg0: index) -> tensor<f64> {
-      // CHECK:   %c2_i64 = arith.constant 2 : i64
-      // CHECK:   %idx0 = index.constant 0
-      // CHECK:   %idx1 = index.constant 1
-      // CHECK:   quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
-      // CHECK:   %0 = call @circuit.quantumAlloc(%c2_i64) : (i64) -> !quantum.reg
-      // CHECK:   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-      // CHECK:   %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-      // CHECK:   %2 = scf.for %arg1 = %idx0 to %arg0 step %idx1 -> (!quantum.bit) {
-      // CHECK:     %out_qubits = quantum.custom "Hadamard"() %out_qubits {adjoint} : !quantum.bit
-      // CHECK:     %out_qubits = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-      // CHECK:     scf.yield %out_qubits: !quantum.bit
-      // CHECK:   }
-      // CHECK:   %3 = quantum.extract %arg0[ 1] : !quantum.reg -> !quantum.bit
-      // CHECK:   %out_qubits_0:2 = quantum.custom "CNOT"() %2, %3 : !quantum.bit, !quantum.bit
-      // CHECK:   %4 = scf.for %arg1 = %idx0 to %arg0 step %idx1 -> (!quantum.bit, !quantum.bit) {
-      // CHECK:     %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits_0#0, %out_qubits_0#1 {adjoint} : !quantum.bit, !quantum.bit
-      // CHECK:     %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
-      // CHECK:     scf.yield %out_qubits_0 : (!quantum.bit, !quantum.bit)
-      // CHECK:   }
-      // CHECK:   %5 = quantum.namedobs %out_qubits_0#0[ PauliY] : !quantum.obs
-      // CHECK:   %6 = quantum.expval %5 : f64
-      // CHECK:   %from_elements = tensor.from_elements %6 : tensor<f64>
-      // CHECK:   %7 = quantum.insert %0[ 0], %out_qubits_0#0 : !quantum.reg, !quantum.bit
-      // CHECK:   %8 = quantum.insert %7[ 1], %out_qubits_0#1 : !quantum.reg, !quantum.bit
-      // CHECK:   quantum.dealloc %8 : !quantum.reg
-      // CHECK:   quantum.device_release
-      // CHECK:   return %from_elements : tensor<f64>
-  // CHECK:   }
 
-  // CHECK: func.func private @circuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
-    // CHECK:   %0 = quantum.alloc(%arg0) : !quantum.reg
-    // CHECK:   return %0 : !quantum.reg
-  // CHECK: }
-
-
+//CHECK-LABEL: func.func @mitigated_circuit()
+    //CHECK:    [[c0:%.+]] = index.constant 0
+    //CHECK:    [[c1:%.+]] = index.constant 1
+    //CHECK:    [[c3:%.+]] = index.constant 3
+    //CHECK:    [[dense3:%.+]] = arith.constant dense<[1, 2, 3]>
+    //CHECK:    [[emptyRes:%.+]] = tensor.empty() : tensor<3xf64>
+    //CHECK:    [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c3]] step [[c1]] iter_args(%arg1 = [[emptyRes]]) -> (tensor<3xf64>) {
+        //CHECK:    [[scaleFactor:%.+]] = tensor.extract [[dense3]][[[idx]]] : tensor<3xindex>
+        //CHECK:    [[intermediateRes:%.+]] = func.call @circuit.folded([[scaleFactor]]) : (index) -> tensor<f64>
+        //CHECK:    [[tensorRes:%.+]] = tensor.from_elements [[intermediateRes]] : tensor<1xf64>
+        //CHECK:    [[resultsFor:%.+]] = scf.for %arg2 = [[c0]] to [[c1]] step [[c1]] iter_args(%arg3 = %arg1) -> (tensor<3xf64>) {
+            //CHECK:    [[extracted:%.+]] = tensor.extract [[tensorRes]][%arg3] : tensor<1xf64>
+            //CHECK:    [[insertedRes:%.+]] = tensor.insert [[extracted]] into %arg3[%arg1] : tensor<5xf64>
+            //CHECK:    scf.yield [[insertedRes]]
+        //CHECK:    scf.yield [[resultsFor]]
+    //CHECK:    return [[results]]
 func.func @mitigated_circuit() -> tensor<3xf64> {
     %scaleFactors = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
     %0 = mitigation.zne @circuit() folding (all) scaleFactors (%scaleFactors : tensor<3xindex>) : () -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
-//CHECK:    func.func @mitigated_circuit() -> tensor<3xf64> {
-    //CHECK:    %idx0 = index.constant 0
-    //CHECK:    %idx1 = index.constant 1
-    //CHECK:    %idx3 = index.constant 3
-    //CHECK:    %cst = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
-    //CHECK:    %0 = tensor.empty() : tensor<3xf64>
-    //CHECK:    %1 = scf.for %arg0 = %idx0 to %idx3 step %idx1 iter_args(%arg1 = %0) -> (tensor<3xf64>) {
-        //CHECK:    %extracted = tensor.extract %cst[%arg0] : tensor<3xindex>
-        //CHECK:    %2 = func.call @circuit.folded(%extracted) : (index) -> tensor<f64>
-        //CHECK:    %extracted_0 = tensor.extract %2[] : tensor<f64>
-        //CHECK:    %from_elements = tensor.from_elements %extracted_0 : tensor<1xf64>
-        //CHECK:    %3 = scf.for %arg2 = %idx0 to %idx1 step %idx1 iter_args(%arg3 = %arg1) -> (tensor<3xf64>) {
-            //CHECK:    %extracted_1 = tensor.extract %from_elements[%arg2] : tensor<1xf64>
-            //CHECK:    %inserted = tensor.insert %extracted_1 into %arg3[%arg0] : tensor<3xf64>
-            //CHECK:    scf.yield %inserted : tensor<3xf64>
-        //CHECK:    }
-        //CHECK:    scf.yield %3 : tensor<3xf64>
-    //CHECK:    }
-    //CHECK:    return %1 : tensor<3xf64>
-//CHECK:    }
