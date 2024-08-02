@@ -84,7 +84,6 @@ requirements = [
 
 entry_points = {
     "pennylane.plugins": [
-        "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
         "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
