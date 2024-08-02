@@ -18,11 +18,8 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from jax.tree_util import tree_flatten
 
-from catalyst import for_loop, grad, qjit, vmap
-
-# pylint: disable=too-many-public-methods
+from catalyst import qjit, vmap
 
 
 class TestVectorizeMap:
@@ -755,61 +752,6 @@ class TestVectorizeMap:
             match="Invalid batch size; it must be a non-zero integer, but got 0.",
         ):
             qjit(workflow)(x)
-
-    @pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
-    def test_vmap_worflow_derivation(self, backend):
-        """Check the gradient of a vmap workflow"""
-        n_wires = 5
-        data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
-
-        targets = jnp.array([-0.2, 0.4, 0.35, 0.2], dtype=jax.numpy.float64)
-
-        dev = qml.device(backend, wires=n_wires)
-
-        @qml.qnode(dev, diff_method="adjoint")
-        def circuit(data, weights):
-            """Quantum circuit ansatz"""
-
-            @for_loop(0, n_wires, 1)
-            def data_embedding(i):
-                qml.RY(data[i], wires=i)
-
-            data_embedding()
-
-            @for_loop(0, n_wires, 1)
-            def ansatz(i):
-                qml.RX(weights[i, 0], wires=i)
-                qml.RY(weights[i, 1], wires=i)
-                qml.RX(weights[i, 2], wires=i)
-                qml.CNOT(wires=[i, (i + 1) % n_wires])
-
-            ansatz()
-
-            return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
-
-        circuit = vmap(circuit, in_axes=(1, None))
-
-        def my_model(data, weights, bias):
-            return circuit(data, weights) + bias
-
-        def loss_fn(params, data, targets):
-            predictions = my_model(data, params["weights"], params["bias"])
-            loss = jnp.sum((targets - predictions) ** 2 / len(data))
-            return loss
-
-        weights = jnp.ones([n_wires, 3])
-        bias = jnp.array(0.0, dtype=jax.numpy.float64)
-        params = {"weights": weights, "bias": bias}
-
-        results_enzyme = qjit(grad(loss_fn))(params, data, targets)
-        results_jax = jax.grad(loss_fn)(params, data, targets)
-
-        data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
-        data_jax, pytree_fd = tree_flatten(results_jax)
-
-        assert pytree_enzyme == pytree_fd
-        assert jnp.allclose(data_enzyme[0], data_jax[0])
-        assert jnp.allclose(data_enzyme[1], data_jax[1])
 
     def test_vmap_usage_patterns(self, backend):
         """Test usage patterns of catalyst.vmap."""

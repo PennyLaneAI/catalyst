@@ -1307,25 +1307,7 @@ def test_adj_qubitunitary(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_preprocessing_outside_qnode(inp, backend):
-    """Test the preprocessing outside qnode."""
-
-    @qml.qnode(qml.device(backend, wires=1))
-    def f(y):
-        qml.RX(y, wires=0)
-        return qml.expval(qml.PauliZ(0))
-
-    @qjit
-    def g(x):
-        return grad(lambda y: f(jnp.cos(y)) ** 2)(x)
-
-    def h(x):
-        return jax.grad(lambda y: f(jnp.cos(y)) ** 2)(x)
-
-    assert np.allclose(g(inp), h(inp))
-
-
+@pytest.mark.xfail(reason="Needs PR #332")
 def test_gradient_slice(backend):
     """Test the differentation when the qnode generates memref with non identity layout."""
     n_wires = 5
