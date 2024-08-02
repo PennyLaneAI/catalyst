@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import jaxlib
+import numpy as np
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
@@ -578,40 +579,34 @@ def trace_state_prep(op, qrp):
     """
     assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
 
-    wires_in_circuit = qrp.base.length
-    assert type(wires_in_circuit) == int, "Wires in circuit must be statically known"
+    sv = jnp.array(op.parameters[0], dtype=jnp.dtype(jnp.complex128))
+    norm = jnp.linalg.norm(sv, axis=-1, ord=2)
+    is_valid = jnp.allclose(norm, 1.0, atol=1e-10)
+    err_msg = "Sum of amplitudes-squared does not equal one."
+    catalyst.debug.assertion.debug_assert(is_valid, err_msg)
 
-    params = op.parameters
-    param = params[0]
-    param_cast = jax.numpy.array(param, dtype=jnp.dtype(jnp.complex128))
-    size = len(op.wires)
+    for wire in op.wires.tolist():
+        if isinstance(wire, DynamicJaxprTracer):
+            raise TypeError("wires must be static")
 
-    @catalyst.pure_callback
-    def callback(
-        param_cast, *wires
-    ) -> jnp.zeros((2**wires_in_circuit,), dtype=jnp.dtype(jnp.complex128)):
-        """TODO: Get rid of this callback.
+    wires = np.array(op.wires.tolist(), dtype=np.int64)
+    sv = jnp.reshape(sv, (2,) * len(wires))
 
-        On August 1st, 2024, @erick-xanadu attempted to write a procedure so that code would
-        be generated for state prep. However, I had issues because of indexing. It may be
-        that the solution was wrong. But for now, this is a proof of concept that
-        as long as we have the flow of data, then it should work.
-        """
-        sanitized_wires = []
-        for wire in wires:
-            sanitized_wires.append(wire.tolist())
+    # use numpy as we need concrete values.
+    all_wires = np.array(list(range(0, qrp.base.length)), dtype=np.int64)
+    extra_wires = np.delete(all_wires, wires)
+    for extra_wire in extra_wires:
+        sv = jnp.stack([sv, jnp.zeros_like(sv)], axis=-1)
 
-        @qml.qnode(qml.device("default.qubit", wires=wires_in_circuit))
-        def stateprep():
-            qml.StatePrep(param_cast, wires=sanitized_wires)
-            return qml.state()
+    kwargs = {"indices_are_sorted": True, "unique_indices": True}
+    current_wires = np.concatenate([wires, extra_wires])
+    transpose_axes = [np.where(current_wires == wire)[0][0] for wire in all_wires]
+    sv = jnp.transpose(sv, axes=transpose_axes)
 
-        return stateprep()
-
-    state_vector = callback(param_cast, *op.wires)
-    qubits = qrp.extract(range(wires_in_circuit))
-    qubits2 = set_state_p.bind(*qubits, state_vector)
-    qrp.insert(range(wires_in_circuit), qubits2)
+    qubits = qrp.extract(range(qrp.base.length))
+    sv = jnp.reshape(sv, (2**qrp.base.length))
+    qubits2 = set_state_p.bind(*qubits, sv)
+    qrp.insert(range(qrp.base.length), qubits2)
 
 
 def trace_basis_state(op, qrp):
@@ -643,7 +638,6 @@ def trace_basis_state(op, qrp):
     # indices_are_sorted = True and unique_indices = True.
     # I would like to guarantee that this is the case.
     # So, I am sorting the indices
-    argsort_wires = jnp.argsort(wires)
     sorted_wires = jnp.sort(wires)
     # and I also want to make sure that they are unique.
     # This must happen at run-time because the wires may be dynamic.
@@ -664,7 +658,7 @@ def trace_basis_state(op, qrp):
     #   basis_state = zeros_full.at[unique].set(param_array[unique],  indices_are_sorted=True, unique_indices=True)
     user_wires_sorted = zeros_full.at[sorted_wires]
     kwargs = {"indices_are_sorted": True, "unique_indices": True}
-    sorted_basis_state = param_array[sorted_wires]
+    sorted_basis_state = param_array.at[sorted_wires].get()
     basis_state = user_wires_sorted.set(sorted_basis_state, **kwargs)
 
     qubits = qrp.extract(range(num_wires))
