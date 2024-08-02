@@ -109,10 +109,7 @@ void OQCDevice::SetState(DataView<std::complex<double>, 1> &)
     RT_FAIL("Unsupported functionality");
 }
 
-void OQCDevice::SetBasisState(const std::size_t)
-{
-    RT_FAIL("Unsupported functionality");
-}
+void OQCDevice::SetBasisState(const std::size_t) { RT_FAIL("Unsupported functionality"); }
 
 void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
 {
