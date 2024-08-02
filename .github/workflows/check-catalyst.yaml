@@ -409,7 +409,7 @@ jobs:
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
-        # python3 -m pip install oqc-qcaas-client
+        python3 -m pip install oqc-qcaas-client --no-deps
         make frontend
 
     - name: Get Cached LLVM Build
