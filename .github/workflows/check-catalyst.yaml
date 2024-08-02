@@ -386,6 +386,9 @@ jobs:
           quantum-build/python_packages/*
         retention-days: 1
 
+    - name: Debugging with ssh
+      uses: lhotari/action-upterm@v1
+
   frontend-tests:
     name: Frontend Tests
     needs: [constants, llvm, runtime, quantum, determine_runner]
@@ -496,6 +499,9 @@ jobs:
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
+
+    - name: Debugging with ssh
+      uses: lhotari/action-upterm@v1
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v4
