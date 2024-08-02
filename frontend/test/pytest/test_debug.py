@@ -439,7 +439,7 @@ class TestCProgramGeneration:
              %cc = fmul double %15, %x\n\
              store double %cc, ptr %9, align 8\n",
         )
-        f.overwrite_ir(new_ir)
+        f.replace_ir(new_ir)
         new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
@@ -464,7 +464,7 @@ class TestCProgramGeneration:
             "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    \
              %0 = stablehlo.multiply %x, %arg0 : tensor<f64>    ",
         )
-        f.overwrite_ir(new_ir)
+        f.replace_ir(new_ir)
         new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
@@ -488,7 +488,7 @@ class TestCProgramGeneration:
             "%2 = arith.mulf %in, %in_0 : f64\n",
             "%c = arith.mulf %in, %in_0 : f64\n  " "%2 = arith.mulf %c, %in_0 : f64\n",
         )
-        f.overwrite_ir(new_ir)
+        f.replace_ir(new_ir)
         new_result = f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
