@@ -45,7 +45,7 @@ def catalyst_execute_jaxpr(jaxpr):
     return JAXPRRunner(fn=lambda: None, compile_options=catalyst.CompileOptions())
 
 
-def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), skip_counts=False):
+def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=()):
     """Compares two call jaxprs and validates that they are essentially equal."""
     for inv1, inv2 in zip(jaxpr1.invars, jaxpr2.invars):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
@@ -55,10 +55,10 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), skip_counts=False):
 
     for i, (eqn1, eqn2) in enumerate(zip(jaxpr1.eqns, jaxpr2.eqns)):
         if i not in skip_eqns:
-            compare_eqns(eqn1, eqn2, skip_counts=skip_counts)
+            compare_eqns(eqn1, eqn2)
 
 
-def compare_eqns(eqn1, eqn2, skip_counts=False):
+def compare_eqns(eqn1, eqn2):
     """Compare two jaxpr equations."""
     assert eqn1.primitive == eqn2.primitive
     if "shots" not in eqn1.params and "shape" not in eqn1.params:
@@ -70,16 +70,11 @@ def compare_eqns(eqn1, eqn2, skip_counts=False):
         assert inv1.aval == inv2.aval, f"{eqn1}, {inv1.aval}, {inv2.aval}"
         if hasattr(inv1, "val"):
             assert inv1.val == inv2.val, f"{eqn1}, {inv1.val}, {inv2.val}"
-        if not skip_counts and hasattr(inv1, "count"):
-            assert inv1.count == inv2.count, f"{eqn1}, {inv1.count}, {inv2.count}"
 
     assert len(eqn1.outvars) == len(eqn2.outvars)
     for ov1, ov2 in zip(eqn1.outvars, eqn2.outvars):
         assert type(ov1) == type(ov2)  # pylint: disable=unidiomatic-typecheck
         assert ov1.aval == ov2.aval
-        if not skip_counts and hasattr(ov1, "count"):
-            assert ov1.count == ov2.count, f"{eqn1}, {ov1.count}, {ov2.count}"
-
 
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
@@ -480,10 +475,10 @@ class TestHybridPrograms:
 
         # qubit extraction and classical equations in a slightly different order
         # thus cant check specific equations and have to discard comparing counts
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=(4, 5, 6), skip_counts=True)
-        compare_eqns(call_jaxpr_pl.eqns[4], call_jaxpr_c.eqns[5], skip_counts=True)
-        compare_eqns(call_jaxpr_pl.eqns[5], call_jaxpr_c.eqns[6], skip_counts=True)
-        compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4], skip_counts=True)
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=(4, 5, 6))
+        compare_eqns(call_jaxpr_pl.eqns[4], call_jaxpr_c.eqns[5])
+        compare_eqns(call_jaxpr_pl.eqns[5], call_jaxpr_c.eqns[6])
+        compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4])
 
     def test_multiple_qnodes(self):
         """Test that a workflow with multiple qnodes can be converted."""

@@ -230,12 +230,22 @@ class QFuncPlxprInterpreter:
 
 
     def setup(self):
+        """Perform any customized setup and processing before processing the plxpr.
+        
+        For conversion to catalyst, this allocates the device, extracts a register, and
+        resets the wire map.
+        """
         qdevice_p.bind(**_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
 
     def cleanup(self):
+        """Perform any final steps after processing the plxpr.
+
+        For conversion to calayst, this reinserts extracted qubits and
+        deallocates the register.
+        """
         for orig_wire, wire in self.wire_map.items():
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
         qdealloc_p.bind(self.qreg)
