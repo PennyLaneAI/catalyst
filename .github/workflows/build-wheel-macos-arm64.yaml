@@ -183,6 +183,11 @@ jobs:
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
         export PATH=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/bin:$PATH
+        
+        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+        if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+        
         cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo -B ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -358,7 +363,7 @@ jobs:
         delocate-wheel --require-archs=arm64 -w ./wheel -v dist/*.whl --ignore-missing-dependencies -vv
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4.3.4
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: wheel/
@@ -405,7 +410,7 @@ jobs:
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
-        python${{ matrix.python_version }} -m pip install 'oqc-qcaas-client<3.6.0'
+        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
     - name: Install Catalyst
       run: |
