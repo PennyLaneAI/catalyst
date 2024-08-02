@@ -796,29 +796,55 @@ def trace_quantum_measurements(
     shots = get_device_shots(device)
     out_classical_tracers = []
 
-    def change_child(leaf, sub_tree):
-        if leaf.num_nodes == 1:
-            return sub_tree
-        children = leaf.children()
-        children[0] = change_child(children[0], sub_tree)
-        leaf = leaf.make_from_node_data_and_children(
+    def swap_tree(tree, subtree):
+        """
+        swap tree with subtree. If the input tree has multiple nodes, the function will
+        recursively swap the first node with subtree.
+        #TODO: Need to better handle the case when the tree has multiple nodes, Since the
+        current implementation would not work if we have nested trees, and the target subtree
+        is not the first node.
+
+        Args:
+            tree: The input pytree.
+            subtree: The subtree to replace the input pytree.
+
+        Returns:
+            The modified pytree
+        """
+        if tree.num_nodes == 1:
+            return subtree
+        children = tree.children()
+        children[0] = swap_tree(children[0], subtree)
+        tree = tree.make_from_node_data_and_children(
             PyTreeRegistry(),
-            leaf.node_data(),
+            tree.node_data(),
             children,
         )
-        return leaf
+        return tree
 
     def change_child_tree(tree, index, subtree):
+        """
+        Replace a child of a pytree at the specified index with subtree.
+        This is a helper function to handle counts measurements.
+
+        Args:
+            tree: The input pytree.
+            index: The index of the child to be replaced.
+            subtree: The subtree to replace the child.
+
+        Returns:
+            The modified pytree with the child replaced.
+        """
         meas_return_trees_children = tree.children()
         if len(meas_return_trees_children):
             meas_return_trees_children[index] = jax.tree_util.tree_map(
-                change_child, meas_return_trees_children[index], subtree
+                swap_tree, meas_return_trees_children[index], subtree
             )
             tree = tree.make_from_node_data_and_children(
                 PyTreeRegistry(), tree.node_data(), meas_return_trees_children
             )
         else:
-            tree = jax.tree_util.tree_map(change_child, tree, subtree)
+            tree = jax.tree_util.tree_map(swap_tree, tree, subtree)
         return tree
 
     for i, o in enumerate(outputs):
