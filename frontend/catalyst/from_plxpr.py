@@ -180,7 +180,7 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
             f = partial(
                 QFuncPlxprInterpreter(eqn.params["device"]).convert,
                 eqn.params["qfunc_jaxpr"],
-                n_consts=eqn.params['n_consts']
+                n_consts=eqn.params["n_consts"],
             )
             # func_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
@@ -228,17 +228,15 @@ class QFuncPlxprInterpreter:
         self.wire_map = {}
         self.op_math_cache = {}
 
-
     def setup(self):
         """Perform any customized setup and processing before processing the plxpr.
-        
+
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
         qdevice_p.bind(**_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
-
 
     def cleanup(self):
         """Perform any final steps after processing the plxpr.
@@ -254,13 +252,11 @@ class QFuncPlxprInterpreter:
         """Extract the value corresponding to a variable."""
         return var.val if type(var) is jax.core.Literal else self.env[var]
 
-
     def _get_wire(self, wire_value) -> AbstractQbit:
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
         return qextract_p.bind(self.qreg, wire_value)
-
 
     def interpret_operator_eqn(self, eqn: jax.core.JaxprEqn) -> None:
         """Interpret a plxpr equation describing an operation as a catalxpr equation."""
@@ -281,9 +277,9 @@ class QFuncPlxprInterpreter:
         invals = [self.read(invar) for invar in eqn.invars[:split]]
 
         kwargs = {
-            'qubits_len': eqn.params['n_wires'],
-            'ctrl_len': 0,
-            'adjoint': False,
+            "qubits_len": eqn.params["n_wires"],
+            "ctrl_len": 0,
+            "adjoint": False,
         }
 
         if eqn.primitive.name == "QubitUnitary":
@@ -296,12 +292,11 @@ class QFuncPlxprInterpreter:
                 *invals,
                 op=eqn.primitive.name,
                 params_len=len(eqn.invars) - eqn.params["n_wires"],
-                **kwargs
+                **kwargs,
             )
 
         for wire_values, new_wire in zip(wire_values, outvals):
             self.wire_map[wire_values] = new_wire
-
 
     def _obs(self, eqn: jax.core.JaxprEqn):
         """Interpret the observable equation corresponding to a measurement equation's input."""
@@ -316,7 +311,6 @@ class QFuncPlxprInterpreter:
         invals = [self.read(invar) for invar in obs_eqn.invars[:-n_wires]]
         return namedobs_p.bind(*wires, *invals, kind=obs_eqn.primitive.name)
 
-
     def _compbasis_obs(self, eqn: jax.core.JaxprEqn):
         """Add a computational basis sampling observable."""
         if eqn.invars:
@@ -326,14 +320,15 @@ class QFuncPlxprInterpreter:
         wires = [self._get_wire(w) for w in w_vals]
         return compbasis_p.bind(*wires)
 
-
     def interpret_measurement_eqn(self, eqn: jax.core.JaxprEqn):
         if eqn.primitive.name not in measurement_map:
             raise NotImplementedError(
                 f"measurement {eqn.primitive.name} not yet supported for conversion."
             )
         if eqn.params.get("has_eigvals", False):
-            raise NotImplementedError("from_plxpr does not yet support measurements with eigenvalues.")
+            raise NotImplementedError(
+                "from_plxpr does not yet support measurements with eigenvalues."
+            )
 
         if "_wires" in eqn.primitive.name:
             obs = self._compbasis_obs(eqn)
@@ -353,7 +348,6 @@ class QFuncPlxprInterpreter:
         if shaped_array.dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, shaped_array.dtype)
         return mval
-
 
     def convert(self, jaxpr: jax.core.Jaxpr, *args, n_consts=0) -> list:
         """Interpret plxpr as catalxpr."""

@@ -76,6 +76,7 @@ def compare_eqns(eqn1, eqn2):
         assert type(ov1) == type(ov2)  # pylint: disable=unidiomatic-typecheck
         assert ov1.aval == ov2.aval
 
+
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
@@ -194,7 +195,7 @@ class TestCatalystCompareJaxpr:
     def test_qubit_unitary(self):
         """Test that qubit unitary can be converted."""
 
-        dev = qml.device('lightning.qubit', wires=2)
+        dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qnode(dev)
         def circuit(U):
@@ -213,9 +214,9 @@ class TestCatalystCompareJaxpr:
 
         qjit_obj = qml.qjit(circuit)
         qjit_obj(x)
-        catalxpr = qjit_obj.jaxpr 
-        call_jaxpr_pl = converted.eqns[0].params['call_jaxpr']
-        call_jaxpr_c = catalxpr.eqns[0].params['call_jaxpr']
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_globalphase(self):
@@ -482,6 +483,7 @@ class TestHybridPrograms:
 
     def test_multiple_qnodes(self):
         """Test that a workflow with multiple qnodes can be converted."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x):
             qml.RX(x, wires=0)
