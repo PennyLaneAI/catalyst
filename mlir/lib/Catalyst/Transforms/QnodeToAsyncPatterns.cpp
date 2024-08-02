@@ -190,7 +190,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         auto noopExec = [&](OpBuilder &executeBuilder, Location executeLoc,
                             ValueRange executeArgs) {};
 
-        rewriter.updateRootInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
+        rewriter.modifyOpInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
         IRMapping map;
         auto executeOp =
             rewriter.create<async::ExecuteOp>(op.getLoc(), retTy, dependencies, operands, noopExec);
