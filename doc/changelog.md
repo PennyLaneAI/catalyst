@@ -310,6 +310,11 @@
 
 <h3>Internal changes</h3>
 
+* When memrefs have no identity layout, memrefs copy operations are replaced by the linalg copy operation.
+  It does not use a runtime function but instead lowers to scf and standard dialects. It also ensures
+  a better compatibility with Enzyme.
+  [(#917)](https://github.com/PennyLaneAI/catalyst/pull/917)
+
 * llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
    Coroutine lowering pass.
   [(#968)](https://github.com/PennyLaneAI/catalyst/pull/968)
