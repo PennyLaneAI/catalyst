@@ -16,6 +16,8 @@ file(GLOB SRC
     AsyncUtils.cpp
     GEPInboundsPatterns.cpp
     GEPInboundsPass.cpp
+    MemrefCopyToLinalgCopyPatterns.cpp
+    MemrefCopyToLinalgCopyPass.cpp
     RegisterInactiveCallbackPass.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp

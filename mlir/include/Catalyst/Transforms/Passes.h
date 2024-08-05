@@ -31,6 +31,7 @@ std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();
 std::unique_ptr<mlir::Pass> createGEPInboundsPass();
 std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
 std::unique_ptr<mlir::Pass> createMemrefToLLVMWithTBAAPass();
+std::unique_ptr<mlir::Pass> createMemrefCopyToLinalgCopyPass();
 
 void registerAllCatalystPasses();
 
