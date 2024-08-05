@@ -518,9 +518,11 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
-        if (options.startAfterPass != "" && options.startAfterPass != pipeline.name && !output.reachStartingPass) {
+        if (options.startAfterPass != "" && options.startAfterPass != pipeline.name &&
+            !output.reachStartingPass) {
             continue;
-        } else if(options.startAfterPass == pipeline.name){
+        }
+        else if (options.startAfterPass == pipeline.name) {
             output.reachStartingPass = true;
             continue;
         }
