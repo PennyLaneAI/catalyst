@@ -48,8 +48,6 @@ from catalyst.device import (
     validate_device_capabilities,
 )
 from catalyst.jax_extras import (
-    DynamicJaxprTracer,
-    PyTreeRegistry,
     deduce_avals,
     get_implicit_and_explicit_flat_args,
     unzip2,
@@ -275,33 +273,8 @@ def dynamic_one_shot(qnode, **kwargs):
         )
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        results = list(results) if isinstance(results, tuple) else results
-
-        # Don't flatten tuples that are inherent to the measurement output structure
-        # like ("keys", "counts") in qml.counts()
-        def is_leaf(obj):
-            return isinstance(obj, tuple) and all(isinstance(o, DynamicJaxprTracer) for o in obj)
-
-        results_flatten, _ = tree_flatten(results, is_leaf)
-
-        out_flat = parse_native_mid_circuit_measurements(
-            cpy_tape, aux_tapes, results_flatten, postselect_mode="pad-invalid-samples"
+        return parse_native_mid_circuit_measurements(
+            cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
         )
-        out_flat, _ = tree_flatten(out_flat)
-        _, results_tree = tree_flatten(tuple(results))
-
-        size_diff = results_tree.num_leaves - len(out_flat)
-        if size_diff > 0:
-            results_tree_children = results_tree.children()[:-size_diff]
-            results_tree = results_tree.make_from_node_data_and_children(
-                PyTreeRegistry(),
-                results_tree.node_data(),
-                results_tree_children,
-            )
-
-        out = tree_unflatten(results_tree, out_flat)
-        if isinstance(out, tuple) and len(out) == 1:
-            out = out[0]
-        return out
 
     return one_shot_wrapper
