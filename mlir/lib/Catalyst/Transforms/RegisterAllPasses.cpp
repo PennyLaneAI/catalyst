@@ -42,5 +42,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
+    mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createApplyTransformSequencePass);
+>>>>>>> origin/main
 }
