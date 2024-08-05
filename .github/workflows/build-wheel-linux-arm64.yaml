@@ -61,7 +61,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/llvm-project
-        key: ${{ runner.os }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Source
@@ -69,7 +69,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache Enzyme Source
@@ -77,7 +77,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -204,7 +204,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -221,7 +221,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -238,7 +238,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/Enzyme
-        key: ${{ runner.os }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Build

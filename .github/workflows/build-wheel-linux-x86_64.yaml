@@ -296,7 +296,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Build

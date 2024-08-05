@@ -254,6 +254,7 @@ jobs:
       with:
         path: mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Build
