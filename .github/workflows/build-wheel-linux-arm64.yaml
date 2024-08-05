@@ -176,7 +176,6 @@ jobs:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39",   alternative: "39"},
                          {official: "3.10", subversion: "14", package: "python3.10", alternative: "310"},
@@ -272,7 +271,6 @@ jobs:
     needs: [constants, catalyst-linux-wheels-arm64]
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39"},
                          {official: "3.10", subversion: "14", package: "python3.10"},
