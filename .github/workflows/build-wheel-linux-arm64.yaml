@@ -126,6 +126,18 @@ jobs:
         path: enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
+    - name: Build LLD
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        set -x
+        # With GCC 13, LLVM fails some tests, then we use GCC 12 instead (Copied from below)
+        export GCC_VERSION=12
+        docker run --rm --platform linux/aarch64 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v `pwd`:/catalyst \
+            -i ${{ matrix.container_img }} \
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_lld.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
@@ -249,7 +261,7 @@ jobs:
             bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4.3.4
       with:
         name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.official}}.zip
         path: wheel/

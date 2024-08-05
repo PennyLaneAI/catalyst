@@ -204,6 +204,24 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug where scatter did not work correctly with list indices.
+  [(#982)](https://github.com/PennyLaneAI/catalyst/pull/982)
+
+  ```python
+  A = jnp.ones([3, 3]) * 2
+
+  def update(A):
+      A = A.at[[0, 1], :].set(jnp.ones([2, 3]), indices_are_sorted=True, unique_indices=True)
+      return A
+  ```
+
+  ```pycon
+  >>> update
+  [[1. 1. 1.]
+   [1. 1. 1.]
+   [2. 2. 2.]]
+  ```
+
 * Static arguments can now be passed through a QNode when specified
   with the `static_argnums` keyword argument.
   [(#932)](https://github.com/PennyLaneAI/catalyst/pull/932)
@@ -273,6 +291,11 @@
   [(#966)](https://github.com/PennyLaneAI/catalyst/pull/966)
 
 <h3>Internal changes</h3>
+
+* When memrefs have no identity layout, memrefs copy operations are replaced by the linalg copy operation.
+  It does not use a runtime function but instead lowers to scf and standard dialects. It also ensures
+  a better compatibility with Enzyme.
+  [(#917)](https://github.com/PennyLaneAI/catalyst/pull/917)
 
 * llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
    Coroutine lowering pass.
