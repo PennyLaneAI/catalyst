@@ -88,6 +88,7 @@ class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     runtime_code_generation_flag: bool = False
     dynamic_qubit_management_flag: bool = False
     non_commuting_observables_flag: bool = False
+    initial_state_prep_flag: bool = False
     options: Dict[str, bool] = field(default_factory=dict)
 
 
@@ -267,5 +268,6 @@ def load_device_capabilities(
         runtime_code_generation_flag=_get_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=_get_compilation_flag(config, "dynamic_qubit_management"),
         non_commuting_observables_flag=_get_compilation_flag(config, "non_commuting_observables"),
+        initial_state_prep_flag=_get_compilation_flag(config, "initial_state_prep"),
         options=_get_options(config),
     )

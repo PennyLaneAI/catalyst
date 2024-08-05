@@ -104,6 +104,19 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data)
+{
+    std::vector<std::complex<double>> data_vector(data.begin(), data.end());
+    std::vector<std::size_t> count(data_vector.size());
+    std::iota(std::begin(count), std::end(count), 0);
+    this->device_sv->setStateVector(count, data_vector);
+}
+
+void LightningSimulator::SetBasisState(const std::size_t index)
+{
+    this->device_sv->setBasisState(index);
+}
+
 auto LightningSimulator::Zero() const -> Result
 {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);

@@ -30,7 +30,7 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.measurements.shots import Shots
-from pennylane.operation import Operation, Tensor
+from pennylane.operation import Operation, StatePrepBase, Tensor
 from pennylane.ops import (
     Adjoint,
     CompositeOp,
@@ -209,7 +209,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # is handled in _inv_op_checker and _ctrl_op_checker.
         # Specialed control op classes (e.g. CRZ) should be checked directly though, which is why we
         # can't use isinstance(op, Controlled).
-        if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
+        if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint, StatePrepBase)):
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
             raise CompileError(

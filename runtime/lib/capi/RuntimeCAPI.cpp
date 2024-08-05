@@ -156,7 +156,6 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    // void *ptr = malloc(size);
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -455,6 +454,22 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
 void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data)
+{
+    // Data guaranteed to be only one dimension by the type system.
+    // But what is not guaranteed is the strided.
+    MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
+    DataView<std::complex<double>, 1> data_view(data_p->data_aligned, data_p->offset, data_p->sizes,
+                                                data_p->strides);
+    getQuantumDevicePtr()->SetState(data_view);
+}
+
+void __catalyst__qis__SetBasisState(uint64_t index)
+{
+    std::size_t index_cast = static_cast<std::size_t>(index);
+    getQuantumDevicePtr()->SetBasisState(index_cast);
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)

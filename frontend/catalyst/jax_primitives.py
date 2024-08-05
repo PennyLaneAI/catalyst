@@ -80,6 +80,8 @@ from mlir_quantum.dialects.quantum import (
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
+    SetBasisStateOp,
+    SetStateOp,
     StateOp,
     TensorOp,
     VarianceOp,
@@ -137,6 +139,9 @@ class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
     hash_value = hash("AbstractQreg")
+
+    def __init__(self, length):
+        self.length = length
 
     def __eq__(self, other):
         return isinstance(other, AbstractQreg)
@@ -263,6 +268,10 @@ value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
+set_state_p = jax.core.Primitive("state_prep")
+set_state_p.multiple_results = True
+set_basis_state_p = jax.core.Primitive("set_basis_state")
+set_basis_state_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -806,17 +815,17 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
 # qalloc
 #
 @qalloc_p.def_impl
-def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
+def _qalloc_def_impl(ctx, size_value, static_size=None):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qalloc_p.def_abstract_eval
-def _qalloc_abstract_eval(size):
+def _qalloc_abstract_eval(size, static_size=None):
     """This function is called with abstract arguments for tracing."""
-    return AbstractQreg()
+    return AbstractQreg(static_size)
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value, static_size=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -906,7 +915,7 @@ def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
     assert isinstance(qubit, AbstractQbit)
-    return AbstractQreg()
+    return AbstractQreg(qreg_old.length)
 
 
 def _qinsert_lowering(
@@ -1892,6 +1901,59 @@ def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
 
 
 #
+# state_prep
+#
+@set_state_p.def_impl
+def set_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    """Concrete evaluation"""
+    raise NotImplementedError()
+
+
+@set_state_p.def_abstract_eval
+def set_state_abstract(*qubits_or_params):
+    """Abstract evaluation"""
+    length = len(qubits_or_params)
+    qubits_length = length - 1
+    return (AbstractQbit(),) * qubits_length
+
+
+def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set state"""
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    out_qubits = [qubit.type for qubit in qubits]
+    return SetStateOp(out_qubits, param, qubits).results
+
+
+#
+# set_basis_state
+#
+@set_basis_state_p.def_impl
+def set_basis_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    """Concrete evaluation"""
+    raise NotImplementedError()
+
+
+@set_basis_state_p.def_abstract_eval
+def set_basis_state_abstract(*qubits_or_params):
+    """Abstract evaluation"""
+    length = len(qubits_or_params)
+    qubits_length = length - 1
+    return (AbstractQbit(),) * qubits_length
+
+
+def _set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set basis state"""
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    out_qubits = [qubit.type for qubit in qubits]
+    param = TensorExtractOp(ir.IntegerType.get_signless(64), param, []).result
+    return SetBasisStateOp(out_qubits, param, qubits).results
+
+
+#
 # adjoint
 #
 @adjoint_p.def_impl
@@ -1987,6 +2049,8 @@ mlir.register_lowering(print_p, _print_lowering)
 mlir.register_lowering(assert_p, _assert_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
+mlir.register_lowering(set_state_p, _set_state_lowering)
+mlir.register_lowering(set_basis_state_p, _set_basis_state_lowering)
 
 
 def _scalar_abstractify(t):
