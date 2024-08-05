@@ -154,7 +154,7 @@ jobs:
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
         set -x
-        export GCC_VERSION=12
+        export GCC_VERSION=13
         docker run --rm --platform linux/aarch64 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
@@ -165,7 +165,7 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         set -x
-        export GCC_VERSION=12
+        export GCC_VERSION=13
         docker run --rm --platform linux/aarch64 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
