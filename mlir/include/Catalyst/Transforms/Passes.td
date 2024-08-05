@@ -137,6 +137,17 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let constructor = "catalyst::GEPInboundsPass()";
 }
 
+def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
+    let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
+    
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "linalg::LinalgDialect"
+    ];
+
+    let constructor = "catalyst::MemrefCopyToLinalgCopyPass()";
+}
+
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
     let summary = "Register `__catalyst_inactive_callback` as inactive with Enzyme";
 

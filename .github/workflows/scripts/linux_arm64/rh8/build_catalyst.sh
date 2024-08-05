@@ -77,7 +77,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DENZYME_SRC_DIR=/catalyst/mlir/Enzyme \
     -DLLVM_ENABLE_ZLIB=OFF \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
-    -DLLVM_ENABLE_LLD=OFF \
+    -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
 cmake --build quantum-build --target check-dialects compiler_driver
 

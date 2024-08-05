@@ -28,7 +28,7 @@ ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 
 export PYTHON=/usr/bin/python3
 
 # Add LLVM, Python and GCC to the PATH env var
-export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
+export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:/catalyst/llvm-build/bin:$PATH
 
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja
@@ -38,7 +38,7 @@ sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mli
 
 export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
 export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
-if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
 
 # Build MHLO
 cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
@@ -46,8 +46,8 @@ cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir \
     -DPython3_EXECUTABLE=/usr/bin/python3 \
-    -DLLVM_ENABLE_LLD=OFF \
+    -DLLVM_ENABLE_LLD=ON \
     -DLLVM_ENABLE_ZLIB=OFF \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
-    -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+    -DCMAKE_CXX_VISIBILITY_PRESET=protected
 LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build /catalyst/mhlo-build --target check-mlir-hlo

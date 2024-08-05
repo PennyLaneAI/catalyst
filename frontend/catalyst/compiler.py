@@ -226,6 +226,7 @@ MLIR_TO_LLVM_PASS = (
     [
         "expand-realloc",
         "convert-gradient-to-llvm",
+        "memrefcpy-to-linalgcpy",
         "func.func(convert-linalg-to-loops)",
         "convert-scf-to-cf",
         # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,

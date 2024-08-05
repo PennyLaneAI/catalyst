@@ -155,11 +155,11 @@ jobs:
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        
+
         export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
-        if patch --dry-run -p1 $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-        
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
