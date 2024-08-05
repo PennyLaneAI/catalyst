@@ -39,5 +39,7 @@ cmake -S /catalyst/mlir/Enzyme/enzyme -B /catalyst/enzyme-build -G Ninja \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm \
     -DENZYME_STATIC_LIB=ON \
     -DCMAKE_CXX_VISIBILITY_PRESET=protected \
-    -DLLVM_ENABLE_LLD=ON
+    -DLLVM_ENABLE_LLD=ON \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+
 cmake --build /catalyst/enzyme-build --target EnzymeStatic-19
