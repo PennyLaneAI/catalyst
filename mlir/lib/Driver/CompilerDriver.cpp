@@ -522,11 +522,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             !output.reachStartingPass) {
             continue;
         }
-        else if (options.startAfterPass == pipeline.name) {
+        if (options.startAfterPass == pipeline.name) {
             output.reachStartingPass = true;
             continue;
         }
-        llvm::outs() << pipeline.name << "\n";
         size_t existingPasses = pm.size();
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
