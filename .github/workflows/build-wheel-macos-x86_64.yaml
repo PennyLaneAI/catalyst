@@ -35,8 +35,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
         python_version: [3.9]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -188,12 +186,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-12
 
     steps:
     - name: Checkout Catalyst repo
@@ -345,13 +341,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Mac x86
+    runs-on: macos-12
 
     steps:
     - name: Checkout Catalyst repo
@@ -384,13 +378,13 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
+        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         # TODO: Uncomment after fixing https://github.com/PennyLaneAI/pennylane-lightning/issues/552
-        # python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/test_oqc/oqc -n auto
+        # python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/async_tests
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto

@@ -40,8 +40,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        arch: [x86_64]
         python_version: [3.9]
         container_img: ["manylinux_2_28_x86_64"]
 
@@ -229,13 +227,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
-        arch: [x86_64]
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
         container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
@@ -333,8 +329,8 @@ jobs:
       run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
-          OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
@@ -387,12 +383,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -425,12 +420,12 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
+        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/async_tests
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
