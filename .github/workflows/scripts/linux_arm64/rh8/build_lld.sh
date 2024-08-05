@@ -36,6 +36,7 @@ export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/o
 cmake -S /catalyst/mlir/llvm-project/llvm -B llvm-build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DLLVM_TARGETS_TO_BUILD="host" \
-      -DLLVM_ENABLE_PROJECTS="lld"
+      -DLLVM_ENABLE_PROJECTS="lld" \
+      -DCMAKE_CXX_VISIBILITY_PRESET=protected
 
 cmake --build /catalyst/llvm-build --target lld
