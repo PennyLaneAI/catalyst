@@ -371,7 +371,7 @@ def qjit(
 
     if fn is None:
         return functools.partial(qjit, **kwargs)
-    start_after_pass
+
     return QJIT(fn, CompileOptions(**kwargs))
 
 
