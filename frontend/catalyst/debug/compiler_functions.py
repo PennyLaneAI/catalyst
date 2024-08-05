@@ -174,8 +174,6 @@ def get_pipeline_output(fn, pass_name):
         str: output ir from the target compiler pass
     """
 
-    if pass_name in [n[0] for n in DEFAULT_PIPELINES]:
-        return fn.compiler.get_output_of(pass_name)
     if pass_name == "mlir":
         file_path = str(fn.workspace) + "/0_" + fn.__name__ + ".mlir"
         with open(file_path, "r", encoding="utf-8") as file:
@@ -191,7 +189,9 @@ def get_pipeline_output(fn, pass_name):
         with open(file_path, "r", encoding="utf-8") as file:
             data = file.read()
             return data
-    raise NotImplementedError
+    if pass_name == "last":
+        return fn.compiler.last_compiler_output.get_output_ir()
+    return fn.compiler.get_output_of(pass_name)
 
 
 @debug_logger
