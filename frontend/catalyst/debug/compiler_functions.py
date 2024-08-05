@@ -200,7 +200,7 @@ def replace_ir(fn, start_after_pass, new_ir):
 
     Args:
         fn (QJIT): a qjit-decorated function
-        pass_start_after (str): name of a pass. Recompilation happens after his pass.
+        start_after_pass (str): name of a pass. Recompilation happens after his pass.
         new_ir (str): new ir in the string format
     """
     if start_after_pass and new_ir:
