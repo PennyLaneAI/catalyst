@@ -380,6 +380,10 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
                                 std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
+    if (options.startAfterPass != "" && !output.reachStartingPass) {
+        output.reachStartingPass = options.startAfterPass == "CoroOpt";
+        return success();
+    }
 
     auto &outputs = output.pipelineOutputs;
 
@@ -424,6 +428,10 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
+    if (options.startAfterPass != "" && !output.reachStartingPass) {
+        output.reachStartingPass = options.startAfterPass == "O2Opt";
+        return success();
+    }
 
     auto &outputs = output.pipelineOutputs;
     // Create the analysis managers.
@@ -463,6 +471,11 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
 LogicalResult runEnzymePasses(const CompilerOptions &options,
                               std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
+    if (options.startAfterPass != "" && !output.reachStartingPass) {
+        output.reachStartingPass = options.startAfterPass == "Enzyme";
+        return success();
+    }
+
     auto &outputs = output.pipelineOutputs;
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
@@ -518,12 +531,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
-        if (options.startAfterPass != "" && options.startAfterPass != pipeline.name &&
-            !output.reachStartingPass) {
-            continue;
-        }
-        if (options.startAfterPass == pipeline.name) {
-            output.reachStartingPass = true;
+        if (options.startAfterPass != "" && !output.reachStartingPass) {
+            output.reachStartingPass = options.startAfterPass == pipeline.name;
             continue;
         }
         size_t existingPasses = pm.size();

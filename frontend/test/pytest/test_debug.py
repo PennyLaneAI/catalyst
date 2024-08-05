@@ -10,6 +10,7 @@
 # limitations under the License.
 
 import platform
+import os
 import re
 import shutil
 
@@ -19,7 +20,7 @@ import pennylane as qml
 import pytest
 from jax.tree_util import register_pytree_node_class
 
-from catalyst import debug, for_loop, qjit
+from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
 from catalyst.debug.compiler_functions import get_pipeline_output, replace_ir
@@ -485,6 +486,31 @@ class TestCProgramGeneration:
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(f.workspace), ignore_errors=True)
         assert old_result * data == new_result
+
+    @pytest.mark.parametrize(
+        "pass_name", ["HLOLoweringPass", "Enzyme"]
+    )
+    def test_modify_ir_file_generation(self, pass_name):
+        """Test if recompilation rerun the same pass."""
+
+        @qjit
+        def f1(x: float):
+            """Square function."""
+            return x ** 2
+
+        grad_f = qjit(value_and_grad(f1), keep_intermediate=True)
+        grad_f(3.0)
+        ir = get_pipeline_output(grad_f, pass_name)
+        old_workspace = str(grad_f.workspace)
+
+        replace_ir(grad_f, pass_name, ir)
+        grad_f(3.0)
+        file_list = os.listdir(str(grad_f.workspace))
+        res = [i for i in file_list if pass_name in i]
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(grad_f.workspace), ignore_errors=True)
+        assert len(res) == 0
 
 
 if __name__ == "__main__":
