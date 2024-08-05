@@ -103,21 +103,21 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
       uses: actions/cache@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
       uses: actions/cache@v4
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
@@ -222,7 +222,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -239,7 +239,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -256,7 +256,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime

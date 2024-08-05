@@ -43,11 +43,11 @@ jobs:
         os: [ubuntu-latest]
         arch: [x86_64]
         python_version: [3.9]
-        container_img: ["quay.io/pypa/manylinux_2_28_x86_64"]
+        container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
-    container: ${{ matrix.container_img }}
+    container: quay.io/pypa/${{ matrix.container_img }}
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -117,21 +117,21 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
       uses: actions/cache@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
       uses: actions/cache@v4
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
     - name: Install dependencies (AlmaLinux)
       if: |
@@ -232,11 +232,11 @@ jobs:
         os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         arch: [x86_64]
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
-        container_img: ["quay.io/pypa/manylinux_2_28_x86_64"]
+        container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container_img }}
+    container: quay.io/pypa/${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -271,7 +271,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -288,7 +288,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -305,7 +305,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
