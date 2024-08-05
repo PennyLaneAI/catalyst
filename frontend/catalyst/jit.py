@@ -576,9 +576,11 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
-        def closure(*args, **kwargs):
-            st_argnums = kwargs.pop("static_argnums", static_argnums)
-            return QFunc.__call__(*args, static_argnums=st_argnums, **kwargs)
+        def closure(qnode, *args, **kwargs):
+            params = {}
+            params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
+            params["out_tree_expected"] = kwargs.pop("out_tree_expected", [])
+            return QFunc.__call__(qnode, params, *args, **kwargs)
 
         with Patcher(
             (qml.QNode, "__call__", closure),

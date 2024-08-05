@@ -110,7 +110,7 @@ class QFunc:
 
     # pylint: disable=no-member
     @debug_logger
-    def __call__(self, *args, **kwargs):
+    def __call__(self, params={}, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
         # Mid-circuit measurement configuration/execution
@@ -122,7 +122,7 @@ class QFunc:
 
             if mcm_config.mcm_method == "one-shot":
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
-                return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
+                return dynamic_one_shot(self, mcm_config=mcm_config, **kwargs)(*args, **kwargs)
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
@@ -138,12 +138,19 @@ class QFunc:
         else:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
-        static_argnums = kwargs.pop("static_argnums", ())
+        static_argnums = params.pop("static_argnums", ())
 
         def _eval_quantum(*args):
-            closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, qjit_device, args, kwargs, self, static_argnums
+            closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
+                self.func,
+                qjit_device,
+                args,
+                kwargs,
+                self,
+                static_argnums,
             )
+            if "out_tree_expected" in params:
+                params["out_tree_expected"].append(out_tree_exp)
             dynamic_args = filter_static_args(args, static_argnums)
             args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -258,11 +265,14 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode.device = new_dev
 
     def one_shot_wrapper(*args, **kwargs):
-        def wrap_single_shot_qnode(*_):
+        def wrap_single_shot_qnode(*args, **kwargs):
             return single_shot_qnode(*args, **kwargs)
 
         arg_vmap = jnp.empty((total_shots,), dtype=float)
-        results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
+        out_tree_expected = []
+        results = catalyst.vmap(wrap_single_shot_qnode)(
+            arg_vmap, out_tree_expected=out_tree_expected, **kwargs
+        )
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
         results = list(results) if isinstance(results, tuple) else results
