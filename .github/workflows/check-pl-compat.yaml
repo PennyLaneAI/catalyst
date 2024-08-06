@@ -54,7 +54,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v4
@@ -67,7 +67,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v4
