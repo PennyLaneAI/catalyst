@@ -15,7 +15,8 @@ set(TEST_SUITES
     Quantum
     Gradient
     Mitigation
-    Catalyst)
+    Catalyst
+    PluginTest)
 
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
