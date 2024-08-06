@@ -37,6 +37,7 @@ from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.passes import _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -584,8 +585,24 @@ class QJIT:
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
+
+            def fn_with_transform_named_sequence(*args, **kwargs):
+                """
+                This function behaves exactly like the user function being jitted,
+                taking in the same arguments and producing the same results, except
+                it injects a transform_named_sequence jax primitive at the beginning
+                of the jaxpr when being traced.
+
+                Note that we do not overwrite self.original_function and self.user_function;
+                this fn_with_transform_named_sequence is ONLY used here to produce tracing
+                results with a transform_named_sequence primitive at the beginning of the
+                jaxpr. It is never executed or used anywhere, except being traced here.
+                """
+                _inject_transform_named_sequence()
+                return self.user_function(*args, **kwargs)
+
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                self.user_function, static_argnums, abstracted_axes, full_sig, {}
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, {}
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
