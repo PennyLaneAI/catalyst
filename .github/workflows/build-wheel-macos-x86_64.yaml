@@ -208,7 +208,7 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
@@ -217,7 +217,7 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
@@ -225,7 +225,7 @@ jobs:
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
@@ -234,7 +234,7 @@ jobs:
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
@@ -242,7 +242,7 @@ jobs:
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
@@ -251,7 +251,7 @@ jobs:
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
