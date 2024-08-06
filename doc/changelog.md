@@ -38,7 +38,7 @@
 
   ```python
   from catalyst import debug_assert
-  
+
   @qjit
   def f(x):
       debug_assert(x < 5, "x was greater than 5")
@@ -59,7 +59,7 @@
   @qjit(disable_assertions=True)
   def g(x):
       debug_assert(x < 5, "x was greater than 5")
-      return x * 8      
+      return x * 8
   ```
 
   ```pycon
@@ -70,9 +70,9 @@
 * A `qjit` run for `lightning.qubit` and `lightning.kokkos` can now be seeded.
   [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
 
-  The `qjit` decorator now can take in an argument `seed`, which is an unsigned 32-bit integer. 
+  The `qjit` decorator now can take in an argument `seed`, which is an unsigned 32-bit integer.
   Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
-  will return the same sequence of measurement results everytime. 
+  will return the same sequence of measurement results everytime.
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
@@ -107,7 +107,7 @@
   print(workflow())
   print(workflow_another())
 
-  >>> 
+  >>>
   (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
   (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
   (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
@@ -132,9 +132,9 @@
   [(#911)](https://github.com/PennyLaneAI/catalyst/pull/911)
 
   A new module, `catalyst.passes` (file `frontend/catalyst/passes.py`), is added to
-  provide UI access for pass decorators. This PR adds the `cancel_inverses` decorator, 
-  which runs the `-removed-chained-self-inverse` mlir pass that cancels two neighbouring 
-  Hadamard gates. 
+  provide UI access for pass decorators. This PR adds the `cancel_inverses` decorator,
+  which runs the `-removed-chained-self-inverse` mlir pass that cancels two neighbouring
+  Hadamard gates.
 
   ```python
   from catalyst.debug import print_compilation_stage
@@ -235,8 +235,8 @@
   >>> qjit(vmap(circuit), autograph=True)(x)
   Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
   ```
-  
-* Verification is now performed before compilation to confirm that the measurements included in the quantum tape 
+
+* Verification is now performed before compilation to confirm that the measurements included in the quantum tape
   are compatible with the device.
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
   [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
@@ -263,6 +263,11 @@
 
 <h3>Bug fixes</h3>
 
+* Catalyst no longer generates a `QubitUnitary` operation during decomposition if a device doesn't
+  support it. Instead, the operation that would lead to a `QubitUnitary` is either decomposed or
+  raises an error.
+  [(#1002)](https://github.com/PennyLaneAI/catalyst/pull/1002)
+
 * Fix a bug where scatter did not work correctly with list indices.
   [(#982)](https://github.com/PennyLaneAI/catalyst/pull/982)
 
@@ -287,7 +292,7 @@
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qjit(static_argnums=(1,))
   @qml.qnode(dev)
   def circuit(x, c):
@@ -318,7 +323,7 @@
   QNode configuration settings when Autograph was enabled.
   [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
 
-  
+
 * `pure_callback` will no longer cause a crash in the compiler if the return type
   signature is declared incorrectly and the callback function is differentiated.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
@@ -442,10 +447,10 @@ Paul Haochen Wang,
 
     ```python
     import logging
-  
+
     log = logging.getLogger(__name__)
     log.setLevel(logging.INFO)
-  
+
     @qml.qjit
     @catalyst.grad
     def f(x):
@@ -454,7 +459,7 @@ Paul Haochen Wang,
         catalyst.debug.callback(lambda _: log.info("Value of y = %s", _))(y)
         return y ** 2
     ```
-  
+
     ```pycon
     >>> f(0.54)
     INFO:__main__:Value of y = 0.8577086813638242
@@ -580,7 +585,7 @@ Paul Haochen Wang,
 
   ```python
   dev = qml.device("lightning.qubit", wires=2, shots=10)
-  
+
   @qml.qjit
   @qml.qnode(dev, mcm_method="one-shot")
   def func(x):
@@ -705,13 +710,13 @@ Paul Haochen Wang,
           fac *= i
           num += 1. / fac
       return num
-  
+
   @qml.qjit(autograph=True)
   def g(x: float, N: int):
-  
+
       for i in range(N):
           x = x + catalyst.disable_autograph(approximate_e)(10) / x ** i
-  
+
       return x
   ```
 
@@ -730,11 +735,11 @@ Paul Haochen Wang,
   ```python
   @qml.qjit(autograph=True)
   def g(x: float, N: int):
-  
+
       for i in range(N):
           with catalyst.disable_autograph:
             x = x + approximate_e(10) / x ** i
-  
+
       return x
   ```
 
@@ -925,7 +930,7 @@ Paul Haochen Wang,
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
 * An issue in the Lightning backend for the Catalyst runtime has been fixed that would only compute
-  approximate probabilities when implementing mid-circuit measurements. As a result, low shot numbers 
+  approximate probabilities when implementing mid-circuit measurements. As a result, low shot numbers
   would lead to unexpected behaviours or projections on zero probability states.
   Probabilities for mid-circuit measurements are now always computed analytically.
   [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
