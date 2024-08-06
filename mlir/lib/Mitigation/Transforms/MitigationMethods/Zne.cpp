@@ -211,13 +211,12 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                                   Value numberQubitsValue, func::FuncOp fnWithMeasurementsOp,
                                   Value c0, Value c1)
 {
-    rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue);
+    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
     fnWithMeasurementsOp.walk([&](quantum::QubitUnitaryOp op) {
-        // TODO: Skip measurements and control structures.
         // Add scf for loop to create the folding
         rewriter.setInsertionPointAfter(op);
         rewriter.create<scf::ForOp>(
@@ -231,14 +230,21 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
             });
         return WalkResult::advance();
     });
+
+    std::vector<Value> argsAndQreg(fnWithMeasurementsOp.getArguments().begin(),
+                                   fnWithMeasurementsOp.getArguments().end());
+    argsAndQreg.pop_back();
+    argsAndQreg.push_back(allocQreg);
+    Value loopedQreg = rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
     // Remove device
     std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
                                              fnFoldedOp.getArguments().end());
     argsAndRegMeasurement.pop_back();
-    argsAndRegMeasurement.push_back(fnWithMeasurementsOp->getResult(0));
+    argsAndRegMeasurement.push_back(loopedQreg);
     ValueRange funcFolded =
         rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndRegMeasurement)
             .getResults();
+    // Remove device
     rewriter.create<quantum::DeviceReleaseOp>(loc);
     rewriter.create<func::ReturnOp>(loc, funcFolded);
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
