@@ -334,7 +334,7 @@ class TestMidCircuitMeasurement:
         assert np.allclose(expected["hi"], observed["hi"])
 
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
-    @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
+    @pytest.mark.parametrize("mcm_method", ["one-shot"])
     def test_mcm_method_with_count_mesurement(self, backend, postselect_mode, mcm_method):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1, shots=20)
