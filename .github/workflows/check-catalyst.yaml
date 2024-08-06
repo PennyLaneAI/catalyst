@@ -355,14 +355,12 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: true
 
-    - name: Cache CCache
-      id: cache-ccache
-      uses: actions/cache@v4
+    - name: Restore CCache on feature branches
+      id: restore-ccache
+      if: ${{ github.ref != 'refs/heads/main' }}
+      uses: actions/cache/restore@v4
       with:
         path: .ccache
-        # TODO: revisit once actions/cache has an update feature
-        #       https://github.com/actions/toolkit/issues/505
-        #       this will load the latest available cache and generate a new one at the end
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
@@ -385,6 +383,14 @@ jobs:
           quantum-build/bin
           quantum-build/python_packages/*
         retention-days: 1
+
+    - name: Cache CCache on main branch
+      id: save-ccache
+      if: ${{ github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@v4
+      with:
+        path: .ccache
+        key: ${{ runner.os }}-ccache-${{ github.run_id }}
 
   frontend-tests:
     name: Frontend Tests
