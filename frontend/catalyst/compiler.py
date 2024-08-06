@@ -250,13 +250,21 @@ MLIR_TO_LLVM_PASS = (
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
         "convert-quantum-to-llvm",
+        # There should be no identical code folding
+        # (`mergeIdenticalBlocks` in the MLIR source code)
+        # between convert-async-to-llvm and
+        # add-exception-handling.
+        # So, if there's a pass from the beginning
+        # of this list to here that does folding
+        # add-exception-handling will fail to add async.drop_ref
+        # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
+        "add-exception-handling",
         "emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "canonicalize",
         "reconcile-unrealized-casts",
         "gep-inbounds",
-        "add-exception-handling",
         "register-inactive-callback",
     ],
 )
