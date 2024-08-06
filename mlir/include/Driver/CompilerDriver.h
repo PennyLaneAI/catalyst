@@ -80,7 +80,7 @@ struct CompilerOptions {
     std::vector<Pipeline> pipelinesCfg;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool lowerToLLVM;
-    /// Specify last entry point.
+    /// Specify that the compiler should start after reaching the given pass.
     std::string startAfterPass;
 
     /// Get the destination of the object file at the end of compilation.
@@ -99,7 +99,7 @@ struct CompilerOutput {
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
     size_t pipelineCounter = 0;
-    /// if last entry point is reached.
+    /// if the compiler reach the pass specified by startAfterPass.
     bool reachTargetPass;
 
     // Gets the next pipeline dump file name, prefixed with number.
