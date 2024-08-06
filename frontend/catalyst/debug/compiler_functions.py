@@ -191,8 +191,5 @@ def replace_ir(fn, pass_name, new_ir):
     """
     if pass_name and new_ir:
         fn.overwrite_ir = new_ir
-        if pass_name == "mlir":
-            fn.compiler.options.start_after_pass = ""
-        else:
-            fn.compiler.options.start_after_pass = pass_name
+        fn.compiler.options.start_after_pass = pass_name
         fn.fn_cache.clear()
