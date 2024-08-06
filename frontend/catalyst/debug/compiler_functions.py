@@ -22,7 +22,7 @@ from jax.interpreters import mlir
 
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import DEFAULT_PIPELINES, Compiler
+from catalyst.compiler import Compiler
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments

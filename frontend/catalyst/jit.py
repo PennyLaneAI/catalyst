@@ -610,8 +610,8 @@ class QJIT:
         options.pipelines = [("0_canonicalize", ["canonicalize"])]
         options.lower_to_llvm = False
 
-        # If targeted pass is initial mlir or canonicalize, start_after_pass flag should be removed, or all subsequent
-        # pipelines will be blocked.
+        # If targeted pass is initial mlir or canonicalize, start_after_pass flag should be
+        # removed, or all subsequent pipelines will be blocked.
         if options.start_after_pass == "mlir":
             options.start_after_pass = ""
             self.compile_options.start_after_pass = ""
