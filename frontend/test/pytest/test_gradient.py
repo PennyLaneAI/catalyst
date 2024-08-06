@@ -1307,6 +1307,47 @@ def test_adj_qubitunitary(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+@pytest.mark.xfail(reason="Needs PR #332")
+def test_gradient_slice(backend):
+    """Test the differentation when the qnode generates memref with non identity layout."""
+    n_wires = 5
+    data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
+
+    weights = jnp.ones([n_wires, 3])
+
+    bias = jnp.array(0.0)
+    params = {"weights": weights, "bias": bias}
+
+    dev = qml.device(backend, wires=n_wires)
+
+    @qml.qnode(dev)
+    def circuit(data, weights):
+        """Quantum circuit ansatz"""
+
+        for i in range(n_wires):
+            qml.RY(data[i], wires=i)
+
+        for i in range(n_wires):
+            qml.RX(weights[i, 0], wires=i)
+            qml.RY(weights[i, 1], wires=i)
+            qml.RX(weights[i, 2], wires=i)
+            qml.CNOT(wires=[i, (i + 1) % n_wires])
+
+        return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
+
+    def my_model(data, weights, bias):
+        return circuit(data[:, 0], weights) + bias
+
+    cat_res = qjit(
+        jacobian(
+            my_model,
+            argnum=1,
+        )
+    )(data, params["weights"], params["bias"])
+    jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
+    assert np.allclose(cat_res, jax_res)
+
+
 class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""
