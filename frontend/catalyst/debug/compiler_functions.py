@@ -184,11 +184,6 @@ def get_pipeline_output(fn, pass_name):
         with open(file_path, "r", encoding="utf-8") as file:
             data = file.read()
             return data
-    if pass_name == "llvm":
-        file_path = str(fn.workspace) + "/5_llvm_ir.ll"
-        with open(file_path, "r", encoding="utf-8") as file:
-            data = file.read()
-            return data
     if pass_name == "last":
         return fn.compiler.last_compiler_output.get_output_ir()
     return fn.compiler.get_output_of(pass_name)

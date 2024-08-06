@@ -669,7 +669,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             catalyst::utils::LinesCount::Module(*llvmModule);
 
             if (options.keepIntermediate) {
-                dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
+                auto &outputs = output.pipelineOutputs;
+                llvm::raw_string_ostream rawStringOstream{outputs["llvm_ir"]};
+                llvmModule->print(rawStringOstream, nullptr);
+                auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
+                dumpToFile(options, outFile, outputs["llvm_ir"]);
             }
         }
     }
@@ -679,6 +683,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvm::SMDiagnostic err;
         llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", /* add_endl */ false,
                                   llvmContext, options.source, options.moduleName, err);
+        output.reachTargetPass = options.startAfterPass == "llvm_ir";
+
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);

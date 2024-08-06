@@ -458,7 +458,7 @@ class TestCProgramGeneration:
                 "%c = llvm.fmul %19, %20  : f64\n" + "    %21 = llvm.fmul %c, %20  : f64\n",
             ),
             (
-                "llvm",
+                "llvm_ir",
                 "store double %15, ptr %9, align 8\n",
                 "%x = load double, ptr %1, align 8\n"
                 + "   %cc = fmul double %15, %x\n"
