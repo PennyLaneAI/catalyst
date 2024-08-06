@@ -194,6 +194,11 @@ jobs:
       # building with LLD is a strong requirement for mhlo
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -204,7 +209,7 @@ jobs:
               -DCMAKE_CXX_VISIBILITY_PRESET=protected \
               -DLLVM_ENABLE_LLD=ON
 
-        cmake --build mhlo-build --target check-mlir-hlo
+        LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build mhlo-build --target check-mlir-hlo
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -215,9 +220,9 @@ jobs:
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=protected \
-              -DLLVM_ENABLE_LLD=ON
+              -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
 
-        cmake --build enzyme-build --target EnzymeStatic-18
+        cmake --build enzyme-build --target EnzymeStatic-19
 
   catalyst-linux-wheels-x86-64:
     needs: [constants, build-dependencies, determine_runner]

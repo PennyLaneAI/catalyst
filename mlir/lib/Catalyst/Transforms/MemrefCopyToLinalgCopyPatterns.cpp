@@ -14,7 +14,8 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
 
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -22,20 +23,20 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
-    using mlir::OpRewritePattern<LLVM::GEPOp>::OpRewritePattern;
+struct MemrefCopyToLinalgCopyRewritePattern : public mlir::OpRewritePattern<memref::CopyOp> {
+    using mlir::OpRewritePattern<memref::CopyOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(LLVM::GEPOp op,
+    mlir::LogicalResult matchAndRewrite(memref::CopyOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        auto defOp = op.getBase().getDefiningOp();
-        if (op.getInbounds() || (defOp && isa<LLVM::ZeroOp>(defOp))) {
-            return failure();
+        auto srcType = cast<BaseMemRefType>(op.getSource().getType());
+        auto srcMemRefType = dyn_cast<MemRefType>(srcType);
+        bool layoutIsIdentity = srcMemRefType.getLayout().isIdentity();
+        if (!layoutIsIdentity) {
+            rewriter.replaceOpWithNewOp<linalg::CopyOp>(op, op.getSource(), op.getTarget());
+            return success();
         }
-        rewriter.startOpModification(op);
-        op.setInbounds(true);
-        rewriter.finalizeOpModification(op);
-        return success();
+        return failure();
     }
 };
 
@@ -43,9 +44,9 @@ struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
 
 namespace catalyst {
 
-void populateGEPInboundsPatterns(RewritePatternSet &patterns)
+void populateMemrefCopyToLinalgCopyPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<GEPOpRewritePattern>(patterns.getContext());
+    patterns.add<MemrefCopyToLinalgCopyRewritePattern>(patterns.getContext());
 }
 
 } // namespace catalyst
