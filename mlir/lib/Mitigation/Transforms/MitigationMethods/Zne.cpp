@@ -217,17 +217,24 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
     fnWithMeasurementsOp.walk([&](quantum::QubitUnitaryOp op) {
-        // Add scf for loop to create the folding
+        // Insert a for loop immediately after every quantum::QubitUnitaryOp
+        auto innerLoc = op->getLoc();
         rewriter.setInsertionPointAfter(op);
         rewriter.create<scf::ForOp>(
-            loc, c0, size, c1, ValueRange(),
-            [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                // Call the function without measurements in an adjoint region
-                auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, op.getResult(0));
+            innerLoc, c0, size, c1, ValueRange(),
+            [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
+                // Set insertion point within the loop
+                builder.setInsertionPointToEnd(builder.getBlock());
+                // Repeat the adjoint and original operation, after the existing QubitUnitaryOp
+                auto adjointOp =
+                    builder.create<quantum::AdjointOp>(forLoc, qregType, op.getResult(0))
+                        .getResult();
                 auto origOp =
-                    builder.create<quantum::AdjointOp>(loc, qregType, adjointOp.getResult());
-                builder.create<scf::YieldOp>(loc, origOp.getResult());
+                    builder.create<quantum::AdjointOp>(forLoc, qregType, adjointOp).getResult();
+                // Yield operation
+                builder.create<scf::YieldOp>(forLoc, origOp);
             });
+
         return WalkResult::advance();
     });
 
@@ -235,7 +242,8 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                                    fnWithMeasurementsOp.getArguments().end());
     argsAndQreg.pop_back();
     argsAndQreg.push_back(allocQreg);
-    Value result = rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
+    Value result =
+        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
     // Remove device
     rewriter.create<quantum::DeviceReleaseOp>(loc);
     rewriter.create<func::ReturnOp>(loc, result);
