@@ -33,9 +33,7 @@ BACKENDS = ["lucy", "toshiko"]
 
 class OQCDevice(Device):
     """The OQC device allows to access the hardware devices from OQC using
-    Catalyst.
-    At the moment, OQC Client versions 3.6.0 and above have a dependecy error.
-    Install version 3.5.0 instead."""
+    Catalyst."""
 
     config = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/backend" + "/oqc.toml"
 
