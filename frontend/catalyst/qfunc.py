@@ -263,7 +263,7 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode.device = new_dev
 
     def one_shot_wrapper(*args, **kwargs):
-        def wrap_single_shot_qnode(*args, **kwargs):
+        def wrap_single_shot_qnode(*_, **kwargs):
             return single_shot_qnode(*args, **kwargs)
 
         arg_vmap = jnp.empty((total_shots,), dtype=float)
@@ -277,6 +277,7 @@ def dynamic_one_shot(qnode, **kwargs):
         out_flat = parse_native_mid_circuit_measurements(
             cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
         )
+        out_flat = list(out_flat) if isinstance(out_flat, tuple) else [out_flat]
         out = tree_unflatten(out_tree_expected[0], out_flat)
         return out
 
