@@ -632,7 +632,7 @@ def h():
 @qjit(autograph=True)
 def disable_autograph_context_manager_jax():
     """Checks that Autograph is disabled for a given context."""
-    # CHECK: { lambda ; . let  in (36.4,) }
+    # CHECK: { lambda ; . let transform_named_sequence in (36.4,) }
     x = 0.4
     with disable_autograph:
         x += h()

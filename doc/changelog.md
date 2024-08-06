@@ -128,6 +128,63 @@
   )
   ```
 
+* A frontend decorator can be applied to a qnode to signal a compiler pass run.
+  [(#911)](https://github.com/PennyLaneAI/catalyst/pull/911)
+
+  A new module, `catalyst.passes` (file `frontend/catalyst/passes.py`), is added to
+  provide UI access for pass decorators. This PR adds the `cancel_inverses` decorator, 
+  which runs the `-removed-chained-self-inverse` mlir pass that cancels two neighbouring 
+  Hadamard gates. 
+
+  ```python
+  from catalyst.debug import print_compilation_stage
+  from catalyst.passes import cancel_inverses
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(keep_intermediate=True)
+  def workflow():
+      @cancel_inverses
+      @qml.qnode(dev)
+      def f(x: float):
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+          qml.Hadamard(wires=0)
+          return qml.expval(qml.PauliZ(0))
+
+      @qml.qnode(dev)
+      def g(x: float):
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+          qml.Hadamard(wires=0)
+          return qml.expval(qml.PauliZ(0))
+
+      ff = f(1.0)
+      gg = g(1.0)
+
+      return ff, gg
+
+  >>> workflow()
+  (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
+  >>> print_compilation_stage(workflow, "QuantumCompilationPass")
+  func.func private @f {
+  ...
+      %out_qubits = quantum.custom "RX"(%extracted) %1 : !quantum.bit
+      %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
+      %3 = quantum.expval %2 : f64
+  ...
+  }
+  func.func private @g {
+  ...
+      %out_qubits = quantum.custom "RX"(%extracted) %1 : !quantum.bit
+      %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+      %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits_0 : !quantum.bit
+      %2 = quantum.namedobs %out_qubits_1[ PauliZ] : !quantum.obs
+      %3 = quantum.expval %2 : f64
+  ...
+  }
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`

@@ -43,6 +43,11 @@ from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from mlir_quantum.dialects._transform_ops_gen import (
+    ApplyRegisteredPassOp,
+    NamedSequenceOp,
+)
+from mlir_quantum.dialects._transform_ops_gen import YieldOp as TransformYieldOp
 from mlir_quantum.dialects.catalyst import (
     AssertionOp,
     CallbackCallOp,
@@ -184,6 +189,18 @@ def _obs_lowering(aval):
 
 
 #
+# Transform Module Type
+#
+class AbstractTransformMod(AbstractValue):
+    """Abstract transform module type."""
+
+
+def _transform_mod_lowering(aval):
+    assert isinstance(aval, AbstractTransformMod)
+    return (ir.OpaqueType.get("transform", 'op<"builtin.module">'),)
+
+
+#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -194,6 +211,9 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
+
+core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
+mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
 
 
 class Folding(Enum):
@@ -263,6 +283,9 @@ value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
+apply_registered_pass_p = core.Primitive("apply_registered_pass")
+transform_named_sequence_p = core.Primitive("transform_named_sequence")
+transform_named_sequence_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -384,6 +407,145 @@ def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
     return PrintOp(val=val, const_val=None, print_descriptor=memref).results
+
+
+#
+# transform dialect lowering
+#
+
+
+def get_named_sequence_in_module(mod):
+    for op in mod.body.operations:
+        if op.operation.name == "transform.named_sequence":
+            return op.operation
+    return None
+
+
+#
+# transform_named_sequence
+#
+@transform_named_sequence_p.def_abstract_eval
+def _transform_named_sequence_p_abstract_eval(*args):
+    return ()
+
+
+@transform_named_sequence_p.def_impl
+def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
+    module = jax_ctx.module_context.module
+
+    # We wish to generate the transformer module, and place it in the top-level module
+    # The transformer module must be marked with the "transform.with_named_sequence" attribute
+    # The transformer module has a single block, and the block contains the
+    # "transform.named_sequence @__transform_main" operation
+
+    with ir.InsertionPoint(module.body):
+        transformer_module = ir.Operation.create("builtin.module", regions=1)
+        with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
+        transformer_module.operation.attributes["transform.with_named_sequence"] = (
+            with_named_sequence_attr
+        )
+        bb_transformer = ir.Block.create_at_start(transformer_module.bodyRegion)
+
+    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
+    functype_attr = ir.TypeAttr.get(functype)
+
+    # Insert the transform.named_sequence op into the transformer module
+    # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
+    with ir.InsertionPoint(bb_transformer):
+        named_sequence_op = NamedSequenceOp(
+            sym_name="__transform_main",
+            function_type=functype_attr,
+        )
+
+        # transform.named_sequence op is the "main function" of the transform dialect
+        # and thus needs an entry block (which also should be its only block)
+        # The argument of the block is the payload module
+        bb_named_sequence = ir.Block.create_at_start(
+            named_sequence_op.body, arg_types=[transform_mod_type]
+        )
+
+        # The transform.named_sequence needs a terminator called "transform.yield"
+        with ir.InsertionPoint(bb_named_sequence):
+            transform_yield_op = TransformYieldOp(operands_=[])  # pylint: disable=unused-variable
+
+    return named_sequence_op.results
+
+
+#
+# apply_registered_pass
+#
+@apply_registered_pass_p.def_abstract_eval
+def _apply_registered_pass_abstract_eval(*args, pass_name, options=None):
+    return AbstractTransformMod()
+
+
+@apply_registered_pass_p.def_impl
+def _apply_registered_pass_def_impl(*args, pass_name, options=None):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _apply_registered_pass_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
+):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
+    module = jax_ctx.module_context.module
+    named_sequence_op = None
+    for op in reversed(module.body.operations):
+        # transformer module usually is at the end of the module, so look for it from the end
+        if op.operation.name == "builtin.module":
+            named_sequence_op = get_named_sequence_in_module(op)
+            break
+    assert (
+        named_sequence_op is not None
+    ), """
+            transform.apply_registered_pass must be placed in a transform.named_sequence, 
+            but none exist in the module.
+            """
+
+    # If there already is a apply_registered_pass,
+    # insert after the last pass in the existing pass sequence.
+    # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
+    named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
+    first_op_in_block = named_sequence_op_block.operations[0].operation
+
+    assert first_op_in_block.name in (
+        "transform.apply_registered_pass",
+        "transform.yield",
+    ), """
+            Unexpected operation in transform.named_sequence! 
+            Only transform.apply_registered_pass and transform.yield are allowed.
+        """
+
+    if first_op_in_block.name == "transform.apply_registered_pass":
+        _ = len(named_sequence_op_block.operations)
+        yield_op = named_sequence_op_block.operations[_ - 1].operation
+        current_last_pass = named_sequence_op_block.operations[_ - 2].operation
+        with ir.InsertionPoint(yield_op):
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_mod_type,
+                target=current_last_pass.result,
+                pass_name=pass_name,
+                options=options,
+            )
+
+    # otherwise it's the first pass, i.e. only a yield op is in the block
+    # so insert right before the yield op
+    else:
+        ip = named_sequence_op.regions[0].blocks[0]
+        with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_mod_type,
+                target=ip.arguments[0],
+                pass_name=pass_name,
+                options=options,
+            )
+
+    return apply_registered_pass_op.results
 
 
 #
@@ -1987,6 +2149,8 @@ mlir.register_lowering(print_p, _print_lowering)
 mlir.register_lowering(assert_p, _assert_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
+mlir.register_lowering(apply_registered_pass_p, _apply_registered_pass_lowering)
+mlir.register_lowering(transform_named_sequence_p, _transform_named_sequence_lowering)
 
 
 def _scalar_abstractify(t):

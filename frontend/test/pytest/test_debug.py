@@ -301,6 +301,11 @@ module @workflow {
     quantum.finalize
     return
   }
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
+      transform.yield
+    }
+  }
 }
 """
         )
@@ -325,6 +330,11 @@ module @workflow {
   func.func @teardown() {
     quantum.finalize
     return
+  }
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
+      transform.yield
+    }
   }
 }
 """
