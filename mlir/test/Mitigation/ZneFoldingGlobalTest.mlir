@@ -15,9 +15,9 @@
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: func.func private @simpleCircuit.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
-    // CHECK:      [[nQubits:%.+]] = arith.constant 1
-    // CHECK:      [[c0:%.+]] = index.constant 0
-    // CHECK:      [[c1:%.+]] = index.constant 1
+    // CHECK-DAG:      [[nQubits:%.+]] = arith.constant 1
+    // CHECK-DAG:      [[c0:%.+]] = index.constant 0
+    // CHECK-DAG:      [[c1:%.+]] = index.constant 1
     // CHECK:      quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     // CHECK:      [[qReg:%.+]] = call @simpleCircuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
     // CHECK:      [[outQregFor:%.+]]  = scf.for %arg2 = [[c0]] to %arg1 step [[c1]] iter_args([[inQreg:%.+]] = [[qReg]]) -> (!quantum.reg) {
@@ -54,7 +54,7 @@
     // CHECK:    quantum.dealloc [[q_4]] : !quantum.reg
     // CHECK:    return [[results]] : f64
 
-// CHECK-LABEL: func.func @simpleCircuit()
+// CHECK-LABEL: func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %c0 = arith.constant 0 : index
