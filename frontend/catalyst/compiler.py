@@ -248,13 +248,13 @@ MLIR_TO_LLVM_PASS = (
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
         "convert-quantum-to-llvm",
+        "add-exception-handling",
         "emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "canonicalize",
         "reconcile-unrealized-casts",
         "gep-inbounds",
-        "add-exception-handling",
         "register-inactive-callback",
     ],
 )

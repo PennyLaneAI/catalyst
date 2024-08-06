@@ -886,7 +886,12 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns1(context);
         patterns1.add<DetectCallsInAsyncRegionsTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1)))) {
+
+        GreedyRewriteConfig config;
+        config.strictMode = GreedyRewriteStrictness::ExistingOps;
+        config.enableRegionSimplification = false;
+
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();
         }
 
@@ -896,7 +901,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns2(context);
         patterns2.add<AddExceptionHandlingTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2), config))) {
             signalPassFailure();
         }
 
@@ -906,7 +911,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns3(context);
         patterns3.add<RemoveAbortInsertCallTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3), config))) {
             signalPassFailure();
         }
 
@@ -916,7 +921,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns4(context);
         patterns4.add<LivenessAnalysisDropRef>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4), config))) {
             signalPassFailure();
         }
 
@@ -926,7 +931,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns5(context);
         patterns5.add<CleanUpSourceTransform, BranchToUnreachableTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5), config))) {
             signalPassFailure();
         }
     }
