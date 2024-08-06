@@ -22,7 +22,7 @@ a unified user interface for all the passes will be available.
 .. note::
 
     Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
-    the QNode itself will not changed or transformed.
+    the QNode itself will not be changed or transformed.
 
     In other words, circuit inspection tools such as
     :func:`~.draw` will still
