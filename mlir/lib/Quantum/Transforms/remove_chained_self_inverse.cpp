@@ -53,16 +53,22 @@ struct RemoveChainedSelfInversePass
         Operation *module = getOperation();
         Operation *targetfunc;
 
-        module->walk([&](Operation *op) {
-            if (isa<func::FuncOp>(op)) {
-                StringRef funcName = cast<func::FuncOp>(op).getSymName();
+        WalkResult result = module->walk([&](func::FuncOp op) {
+            StringRef funcName = op.getSymName();
 
-                if (funcName != FuncNameOpt) {
-                    return; // not the function to run the pass on, so do nothing and exit
-                }
-                targetfunc = op;
+            if (funcName != FuncNameOpt) {
+                // not the function to run the pass on, visit the next function
+                return WalkResult::advance();
             }
+            targetfunc = op;
+            return WalkResult::interrupt();
         });
+
+        if (!result.wasInterrupted()) {
+            // Never met a target function
+            // Do nothing and exit!
+            return;
+        }
 
         RewritePatternSet patterns(&getContext());
         populateSelfInversePatterns(patterns);

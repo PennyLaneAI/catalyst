@@ -23,6 +23,8 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/Support/Debug.h"
 
+#include <cassert>
+
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
@@ -38,29 +40,28 @@ struct ApplyTransformSequencePass
 
     void runOnOperation() override
     {
-        // The top-level module is the payload
         // We need to remove the transformer module from the payload,
-        // without deleting the transformer module in memory.
-        // Then, apply the transformer module to the payload.
+        // then apply the transformer module to the payload.
+        // This is because we should not modify a module that contains
+        // the transformer.
 
+        // The top-level module is the payload.
         Operation *payload = getOperation();
         Operation *transformer;
 
         // Find the transformer module and remove it from payload
-        payload->walk([&](Operation *op) {
-            if (isa<ModuleOp>(op)) {
-                if (op->hasAttr("transform.with_named_sequence")) {
-                    transformer = op;
-                }
+        // Keep the transformer module in a deep copy clone
+        WalkResult result = payload->walk([&](ModuleOp op) {
+            if (op->hasAttr("transform.with_named_sequence")) {
+                transformer = op.clone();
+                op.erase();
+                return WalkResult::interrupt();
             }
+            return WalkResult::advance();
         });
 
-        // Note: operation.remove() will remove the operation from parent,
-        // but keep it in memory
-        // As opposed to operation.erase(), which removes from parent and
-        // deletes it completely.
-        // This nuanced detail enables our maneuvering here.
-        transformer->remove();
+        // Check that a transformer exists
+        assert(result.wasInterrupted());
 
         // The transformer module itself is a builtin.module, not
         // a valid transform with the transform dialect
@@ -80,8 +81,8 @@ struct ApplyTransformSequencePass
             return signalPassFailure();
         };
 
-        // All done, erase the transformer module
-        transformer->erase();
+        // The cloned transformer is created in this function so it will
+        // automatically get destroyed when exiting.
     }
 };
 
