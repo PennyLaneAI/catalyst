@@ -277,7 +277,8 @@ def dynamic_one_shot(qnode, **kwargs):
         out_flat = parse_native_mid_circuit_measurements(
             cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
         )
-        out_flat = list(out_flat) if isinstance(out_flat, tuple) else [out_flat]
+        if len(cpy_tape.measurements) == 1:
+            out_flat = (out_flat,)
         out = tree_unflatten(out_tree_expected[0], out_flat)
         return out
 
