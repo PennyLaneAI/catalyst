@@ -69,7 +69,7 @@ jobs:
 
 
       - name: Upload Catalyst-Runtime Artifact
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4
         with:
           name: runtime-build-${{ matrix.compiler }}
           path: |
@@ -78,7 +78,7 @@ jobs:
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4
         with:
           name: oqc-build-${{ matrix.compiler }}
           path: |
@@ -378,7 +378,7 @@ jobs:
         make dialects
 
     - name: Upload Quantum Build Artifact
-      uses: actions/upload-artifact@v4.3.4
+      uses: actions/upload-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: |
