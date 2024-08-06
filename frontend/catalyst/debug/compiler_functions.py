@@ -181,18 +181,18 @@ def get_pipeline_output(fn, pass_name):
 
 
 @debug_logger
-def replace_ir(fn, start_after_pass, new_ir):
+def replace_ir(fn, pass_name, new_ir):
     """Specify new IR that will be used for future compilation.
 
     Args:
         fn (QJIT): a qjit-decorated function
-        start_after_pass (str): name of a pass. Recompilation happens after his pass.
+        pass_name (str): name of a pass. Recompilation happens after his pass.
         new_ir (str): new ir in the string format
     """
-    if start_after_pass and new_ir:
+    if pass_name and new_ir:
         fn.overwrite_ir = new_ir
-        if start_after_pass == "mlir":
+        if pass_name == "mlir":
             fn.compiler.options.start_after_pass = ""
         else:
-            fn.compiler.options.start_after_pass = start_after_pass
+            fn.compiler.options.start_after_pass = pass_name
         fn.fn_cache.clear()
