@@ -73,8 +73,8 @@ PYBIND11_MODULE(compiler_driver, m)
              [](const CompilerOutput &co) -> FunctionAttributes { return co.inferredAttributes; })
         .def("get_diagnostic_messages",
              [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; })
-        .def("get_reach_starting_pass",
-             [](const CompilerOutput &co) -> bool { return co.reachStartingPass; });
+        .def("get_reach_target_pass",
+             [](const CompilerOutput &co) -> bool { return co.reachTargetPass; });
 
     m.def(
         "run_compiler_driver",

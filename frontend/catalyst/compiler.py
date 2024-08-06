@@ -594,7 +594,10 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if len(dict(self.options.get_pipelines()).get(pipeline, ["CoroOpt", "O2Opt", "Enzyme"])) == 0:
+        if (
+            len(dict(self.options.get_pipelines()).get(pipeline, ["CoroOpt", "O2Opt", "Enzyme"]))
+            == 0
+        ):
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"

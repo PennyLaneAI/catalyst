@@ -9,8 +9,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import platform
 import os
+import platform
 import re
 import shutil
 
@@ -487,16 +487,14 @@ class TestCProgramGeneration:
         shutil.rmtree(str(f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize(
-        "pass_name", ["HLOLoweringPass", "Enzyme"]
-    )
+    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "Enzyme"])
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
         @qjit
         def f1(x: float):
             """Square function."""
-            return x ** 2
+            return x**2
 
         grad_f = qjit(value_and_grad(f1), keep_intermediate=True)
         grad_f(3.0)
