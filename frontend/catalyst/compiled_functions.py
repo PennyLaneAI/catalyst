@@ -478,4 +478,4 @@ class CompilationCache:
 
     def clear(self):
         """Clear all previous compiled functions"""
-        self.cache = {}
+        self.cache.clear()
