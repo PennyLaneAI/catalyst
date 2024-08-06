@@ -174,7 +174,7 @@ def get_pipeline_output(fn, pass_name):
         str: output ir from the target compiler pass
     """
     if not fn.compiler.options.keep_intermediate:
-        raise RuntimeError("keep_intermediate must be set to True to get pipeline's output")
+        raise RuntimeError("keep_intermediate must be set to True to get pipeline's output.")
     if pass_name == "last":
         return fn.compiler.last_compiler_output.get_output_ir()
     return fn.compiler.get_output_of(pass_name)

@@ -468,6 +468,13 @@ class TestCProgramGeneration:
                 + "   %cc = fmul double %15, %x\n"
                 + "   store double %cc, ptr %9, align 8\n",
             ),
+            (
+                "last",
+                "store double %15, ptr %9, align 8\n",
+                "%x = load double, ptr %1, align 8\n"
+                + "   %cc = fmul double %15, %x\n"
+                + "   store double %cc, ptr %9, align 8\n",
+            ),
         ],
     )
     def test_modify_ir(self, pass_name, target, replacement):
@@ -496,11 +503,11 @@ class TestCProgramGeneration:
         """Test if recompilation rerun the same pass."""
 
         @qjit
-        def f1(x: float):
+        def f(x: float):
             """Square function."""
             return x**2
 
-        grad_f = qjit(value_and_grad(f1), keep_intermediate=True)
+        grad_f = qjit(value_and_grad(f), keep_intermediate=True)
         grad_f(3.0)
         ir = get_pipeline_output(grad_f, pass_name)
         old_workspace = str(grad_f.workspace)
@@ -513,6 +520,21 @@ class TestCProgramGeneration:
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(grad_f.workspace), ignore_errors=True)
         assert len(res) == 0
+
+    def test_get_pipeline_output_without_keep_intermediate(self):
+        """Test if error is raised when using get_pipeline_output without keep_intermediate."""
+
+        @qjit
+        def f(x: float):
+            """Square function."""
+            return x**2
+
+        f(2.0)
+
+        with pytest.raises(
+            RuntimeError, match="keep_intermediate must be set to True to get pipeline's output."
+        ):
+            get_pipeline_output(f, "mlir")
 
 
 if __name__ == "__main__":
