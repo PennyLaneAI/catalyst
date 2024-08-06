@@ -47,92 +47,16 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def check_alternative_control_support(op, capabilities):
-    """Verify that aliased controlled operations aren't supported via alternative definitions."""
-
-    if (
-        isinstance(op, qml.ControlledQubitUnitary)
-        and capabilities.native_ops.get("QubitUnitary")
-        and capabilities.native_ops.get("QubitUnitary").controllable
-    ):
-        decomp = qml.ops.Controlled(
-            qml.QubitUnitary(*op.data, wires=op.target_wires), op.control_wires, op.control_values
-        )
-    elif (
-        isinstance(op, qml.ControlledPhaseShift)
-        and capabilities.native_ops.get("PhaseShift")
-        and capabilities.native_ops.get("PhaseShift").controllable
-    ):
-        decomp = qml.ops.Controlled(
-            qml.PhaseShift(*op.data, wires=op.target_wires), op.control_wires
-        )
-    elif (
-        isinstance(op, (qml.CNOT, qml.Toffoli, qml.MultiControlledX))
-        and capabilities.native_ops.get("PauliX")
-        and capabilities.native_ops.get("PauliX").controllable
-    ):
-        decomp = qml.ops.Controlled(
-            qml.PauliX(wires=op.target_wires), op.control_wires, op.control_values, op.work_wires
-        )
-    elif (
-        isinstance(op, qml.CY)
-        and capabilities.native_ops.get("PauliY")
-        and capabilities.native_ops.get("PauliY").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.PauliY(wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, (qml.CZ, qml.CCZ))
-        and capabilities.native_ops.get("PauliZ")
-        and capabilities.native_ops.get("PauliZ").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.PauliZ(wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, qml.CRX)
-        and capabilities.native_ops.get("RX")
-        and capabilities.native_ops.get("RX").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.RX(*op.data, wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, qml.CRY)
-        and capabilities.native_ops.get("RY")
-        and capabilities.native_ops.get("RY").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.RY(*op.data, wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, qml.CRZ)
-        and capabilities.native_ops.get("RZ")
-        and capabilities.native_ops.get("RZ").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.RZ(*op.data, wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, qml.CRot)
-        and capabilities.native_ops.get("Rot")
-        and capabilities.native_ops.get("Rot").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.Rot(*op.data, wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, qml.CH)
-        and capabilities.native_ops.get("Hadamard")
-        and capabilities.native_ops.get("Hadamard").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.Hadamard(wires=op.target_wires), op.control_wires)
-    elif (
-        isinstance(op, qml.CSWAP)
-        and capabilities.native_ops.get("SWAP")
-        and capabilities.native_ops.get("SWAP").controllable
-    ):
-        decomp = qml.ops.Controlled(qml.SWAP(wires=op.target_wires), op.control_wires)
-    else:
-        decomp = None
-
-    return [decomp] if decomp else decomp
-
-
 def check_alternative_support(op, capabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
     if isinstance(op, qml.ops.Controlled):
-        return check_alternative_control_support(op, capabilities)
+        # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
+        if (
+            capabilities.native_ops.get(op.base.name)
+            and capabilities.native_ops.get(op.base.name).controllable
+        ):
+            return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
 
