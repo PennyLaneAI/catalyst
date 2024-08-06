@@ -552,7 +552,41 @@ class QJIT:
         if self.compile_options.autograph:
             processed_fn = run_autograph(self.original_function)
 
-        return processed_fn
+        #return processed_fn
+
+        breakpoint()
+
+        
+        if hasattr(processed_fn, "tape") and processed_fn.tape is not None:
+            dev = processed_fn.device
+            ops = processed_fn.tape.operations.copy()
+            tapes = []
+            for i in range(len(processed_fn.tape.measurements)):
+                tapes.append(qml.tape.QuantumTape(ops, [processed_fn.tape.measurements[i]]))
+
+
+            funcs = []
+            for tape in tapes:
+                @qml.qnode(dev)
+                def _wrapper(*args, tape=tape):
+                    for op in tape.operations:
+                        qml.apply(op)
+                    return qml.apply(tape.measurements[0])
+                funcs.append(_wrapper)
+            
+            #@qml.qnode(dev)
+            def _processed_fn_split_tape(*args):
+                out = []
+                for func in funcs:
+                    out.append(func())
+                return tuple(out)
+            #breakpoint()
+            return _processed_fn_split_tape
+
+        else:
+            return processed_fn
+        
+        
 
     @instrument(size_from=0)
     @debug_logger

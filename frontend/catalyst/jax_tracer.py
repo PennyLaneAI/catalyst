@@ -1061,7 +1061,141 @@ def trace_function(
 
         return res_expanded_tracers, in_sig, out_sig
 
+'''
+# main
+@debug_logger
+def trace_quantum_function(
+    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
+) -> Tuple[ClosedJaxpr, Any]:
+    """Trace quantum function in a way that allows building a nested quantum tape describing the
+    quantum algorithm.
 
+    The tracing is done as follows: (1) Classical tracing, producing the classical JAX tracers and
+    the quantum tape (2) Quantum tape tracing, producing the remaining quantum and classical JAX
+    tracers. With all the tracers in hands, the final JAXPR is produced. Note that caller can apply
+    tape transformations by using PennyLane's transformation API on the argument function.
+
+    Args:
+        f (Callable): a function to trace
+        device (QubitDevice): Quantum device to use for quantum computations
+        args: Positional arguments to pass to ``f``
+        kwargs: Keyword arguments to pass to ``f``
+        qnode: The quantum node to be traced, it contains user transforms.
+
+    Returns:
+        closed_jaxpr: JAXPR expression of the function ``f``.
+        out_type: JAXPR output type (list of abstract values with explicitness flags).
+        out_tree: PyTree shapen of the result
+    """
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        # (1) - Classical tracing
+        quantum_tape = QuantumTape(shots=device.shots)
+        with EvaluationContext.frame_tracing_context(ctx) as trace:
+            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
+                f, args, kwargs, static_argnums
+            )
+            in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            with QueuingManager.stop_recording(), quantum_tape:
+                # Quantum tape transformations happen at the end of tracing
+                in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
+                return_values_flat = wffa.call_wrapped(*in_classical_tracers)
+            # Ans contains the leaves of the pytree (empty for measurement without
+            # data https://github.com/PennyLaneAI/pennylane/pull/4607)
+            # Therefore we need to compute the tree with measurements as leaves and it comes
+            # with an extra computational cost
+
+            # 1. Recompute the original return
+            with QueuingManager.stop_recording():
+                return_values = tree_unflatten(out_tree_promise(), return_values_flat)
+
+            def is_leaf(obj):
+                return isinstance(obj, qml.measurements.MeasurementProcess)
+
+            # 2. Create a new tree that has measurements as leaves
+            return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
+                return_values, is_leaf=is_leaf
+            )
+            if isinstance(device, qml.devices.Device):
+                config = _make_execution_config(qnode)
+                device_program, config = device.preprocess(ctx, config)
+                device_modify_measurements = config.device_options["transforms_modify_measurements"]
+            else:
+                device_program = TransformProgram()
+                device_modify_measurements = False  # this is only for the new API transform program
+
+            qnode_program = qnode.transform_program if qnode else TransformProgram()
+
+            tapes, post_processing = apply_transform(
+                qnode_program,
+                device_program,
+                device_modify_measurements,
+                quantum_tape,
+                return_values_flat,
+            )
+            #breakpoint()
+
+        # (2) - Quantum tracing
+        transformed_results = []
+
+        with EvaluationContext.frame_tracing_context(ctx, trace):
+            # Set up same device and quantum register for all tapes in the program.
+            # We just need to ensure the qubits are reset in between each.
+            qdevice_p.bind(
+                rtd_lib=device.backend_lib,
+                rtd_name=device.backend_name,
+                rtd_kwargs=str(device.backend_kwargs),
+            )
+            qreg_in = qalloc_p.bind(len(device.wires))
+
+            qnode_transformed = len(qnode_program) > 0
+            for i, tape in enumerate(tapes):
+                # If the program is batched, that means that it was transformed.
+                # If it was transformed, that means that the program might have
+                # changed the output. See `split_non_commuting`
+                if qnode_transformed or device_modify_measurements:
+                    # TODO: In the future support arbitrary output from the user function.
+                    output = tape.measurements
+                    _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
+                else:
+                    output = return_values_flat
+                    trees = return_values_tree
+
+                mcm_config = qnode.execute_kwargs["mcm_config"]
+                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
+                qreg_out = qrp_out.actualize()
+
+                meas_tracers = [trace.full_raise(m) for m in meas]
+                meas_results = tree_unflatten(meas_trees, meas_tracers)
+
+                # TODO: Allow the user to return whatever types they specify.
+                if qnode_transformed or device_modify_measurements:
+                    assert isinstance(meas_results, list)
+                    if len(meas_results) == 1:
+                        transformed_results.append(meas_results[0])
+                    else:
+                        transformed_results.append(tuple(meas_results))
+                else:
+                    transformed_results.append(meas_results)
+
+                # Reset the qubits and update the register value for the next tape.
+                if len(tapes) > 1 and i < len(tapes) - 1:
+                    for w in device.wires:
+                        qreg_out = reset_qubit(qreg_out, w)
+                    qreg_in = qreg_out
+
+            # Deallocate the register before tracing the post-processing.
+            qdealloc_p.bind(qreg_out)
+
+        closed_jaxpr, out_type, out_tree = trace_post_processing(
+            ctx, trace, post_processing, transformed_results
+        )
+        # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+        # check_jaxpr(jaxpr)
+    return closed_jaxpr, out_type, out_tree
+'''
+
+# mine
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
