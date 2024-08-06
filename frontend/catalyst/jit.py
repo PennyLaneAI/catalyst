@@ -580,7 +580,7 @@ class QJIT:
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["out_tree_expected"] = kwargs.pop("out_tree_expected", [])
-            return QFunc.__call__(qnode, params, *args, **kwargs)
+            return QFunc.__call__(qnode, args, params, **kwargs)
 
         with Patcher(
             (qml.QNode, "__call__", closure),

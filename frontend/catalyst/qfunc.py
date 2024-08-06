@@ -108,7 +108,7 @@ class QFunc:
 
     # pylint: disable=no-member
     @debug_logger
-    def __call__(self, params={}, *args, **kwargs):
+    def __call__(self, args, params={}, **kwargs):
         assert isinstance(self, qml.QNode)
 
         # Mid-circuit measurement configuration/execution
@@ -120,7 +120,7 @@ class QFunc:
 
             if mcm_config.mcm_method == "one-shot":
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
-                return dynamic_one_shot(self, mcm_config=mcm_config, **kwargs)(*args, **kwargs)
+                return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
