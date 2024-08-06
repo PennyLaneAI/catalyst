@@ -62,9 +62,7 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - name: Get Cached MHLO Source
-      id: cache-mhlo-source
-      uses: actions/cache@v4
+    - uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
@@ -77,6 +75,12 @@ jobs:
         fail-on-cache-miss: True
     - uses: actions/cache@v4
       with:
+        path:  mlir/Enzyme
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+    - uses: actions/cache@v4
+      with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-gcc
         fail-on-cache-miss: True
@@ -85,13 +89,6 @@ jobs:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
-
-    - name: Clone Enzyme Submodule
-      uses: actions/checkout@v4
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
 
     - name: Install Catalyst (latest/stable/release-candidate)
       run: |
