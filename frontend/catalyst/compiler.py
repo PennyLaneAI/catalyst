@@ -594,7 +594,9 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if not self.last_compiler_output.get_pipeline_output(pipeline):
+        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
+            pipeline
+        ):
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
