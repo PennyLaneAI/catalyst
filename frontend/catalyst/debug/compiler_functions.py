@@ -189,7 +189,6 @@ def replace_ir(fn, pass_name, new_ir):
         pass_name (str): name of a pass. Recompilation happens after his pass.
         new_ir (str): new ir in the string format
     """
-    if pass_name and new_ir:
-        fn.overwrite_ir = new_ir
-        fn.compiler.options.start_after_pass = pass_name
-        fn.fn_cache.clear()
+    fn.overwrite_ir = new_ir
+    fn.compiler.options.start_after_pass = pass_name
+    fn.fn_cache.clear()
