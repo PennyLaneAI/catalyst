@@ -137,7 +137,7 @@ class QFunc:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
         static_argnums = kwargs.pop("static_argnums", ())
-        out_tree_expected = kwargs.pop("out_tree_expected", [])
+        out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
@@ -264,11 +264,11 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode.device = new_dev
 
     def one_shot_wrapper(*args, **kwargs):
-        def wrap_single_shot_qnode(*_, **kwargs):
+        def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 
         arg_vmap = jnp.empty((total_shots,), dtype=float)
-        results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap, **kwargs)
+        results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
 
@@ -277,7 +277,7 @@ def dynamic_one_shot(qnode, **kwargs):
         )
         if len(cpy_tape.measurements) == 1:
             out = (out,)
-        out_tree_expected = kwargs.pop("out_tree_expected", [])
+        out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
         return out
 
