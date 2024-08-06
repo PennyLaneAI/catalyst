@@ -282,10 +282,13 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     // Function without measurements: Create function without measurements and with qreg as last
     // argument
-    FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
-        getOrInsertFnWithoutMeasurements(loc, rewriter, op);
-    func::FuncOp fnWithoutMeasurementsOp =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
+    func::FuncOp fnWithoutMeasurementsOp;
+    if (foldingAlgorithm == Folding(1)) {
+        FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
+            getOrInsertFnWithoutMeasurements(loc, rewriter, op);
+        fnWithoutMeasurementsOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
+    }
 
     // Function with measurements: Modify the original function to take a quantum register as last
     // arg and keep measurements
