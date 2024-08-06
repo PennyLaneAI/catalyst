@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
-// CHECK:   func.func private @circuit.folded(%arg0: index) -> tensor<f64> {
+// CHECK-LABEL:   func.func private @circuit.folded(%arg0: index) -> tensor<f64> {
     // CHECK:   [[nQubits:%.+]] = arith.constant 2
     // CHECK:   [[c0:%.+]] = index.constant 0
     // CHECK:   [[c1:%.+]] = index.constant 1
@@ -41,11 +41,11 @@
     // CHECK:   quantum.device_release
     // CHECK:   return [[tensorRes]]
 
-// CHECK:    func.func private @simpleCircuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
+// CHECK-LABEL:    func.func private @circuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
     // CHECK:    [[allocQreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
     // CHECK:    return [[allocQreg]] : !quantum.reg
 
-//CHECK-LABEL: func.func @circuit
+//CHECK-LABEL: func.func @circuit -> tensor<f64> attributes {qnode} {
 func.func @circuit() -> tensor<f64> attributes {qnode} {
     quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -62,7 +62,6 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
     quantum.device_release
     return %from_elements : tensor<f64>
 }
-
 
 //CHECK-LABEL: func.func @mitigated_circuit()
     //CHECK:    [[c0:%.+]] = index.constant 0
