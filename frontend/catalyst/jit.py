@@ -609,27 +609,12 @@ class QJIT:
         options = copy.deepcopy(self.compile_options)
         options.pipelines = [("0_canonicalize", ["canonicalize"])]
         options.lower_to_llvm = False
-
-        # If targeted pass is initial mlir or canonicalize, start_after_pass flag should be
-        # removed, or all subsequent pipelines will be blocked.
-        if options.start_after_pass == "mlir":
-            options.start_after_pass = ""
-            self.compile_options.start_after_pass = ""
-        if options.start_after_pass == "canonicalize":
-            options.start_after_pass = "0_canonicalize"
-            self.compile_options.start_after_pass = ""
+        options.start_after_pass = ""
 
         canonicalizer = Compiler(options)
 
-        if self.overwrite_ir:
-            _, mlir_string, _ = canonicalizer.run_from_ir(
-                self.overwrite_ir,
-                str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
-                self.workspace,
-            )
-        else:
-            # TODO: the in-memory and textual form are different after this, consider unification
-            _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
+        # TODO: the in-memory and textual form are different after this, consider unification
+        _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
 
         return mlir_module, mlir_string
 

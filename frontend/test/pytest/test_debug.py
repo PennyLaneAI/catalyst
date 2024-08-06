@@ -427,12 +427,6 @@ class TestCProgramGeneration:
         [
             (
                 "mlir",
-                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>    ",
-                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>    "
-                + "%0 = stablehlo.multiply %x, %arg0 : tensor<f64>    ",
-            ),
-            (
-                "canonicalize",
                 "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
                 "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
                 + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
@@ -487,7 +481,7 @@ class TestCProgramGeneration:
         shutil.rmtree(str(f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "Enzyme"])
+    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 

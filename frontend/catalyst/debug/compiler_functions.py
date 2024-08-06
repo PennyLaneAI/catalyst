@@ -173,17 +173,6 @@ def get_pipeline_output(fn, pass_name):
     Returns:
         str: output ir from the target compiler pass
     """
-
-    if pass_name == "mlir":
-        file_path = str(fn.workspace) + "/0_" + fn.__name__ + ".mlir"
-        with open(file_path, "r", encoding="utf-8") as file:
-            data = file.read().replace("\n", "")
-            return data
-    if pass_name == "canonicalize":
-        file_path = str(fn.workspace) + "/1_0_canonicalize.mlir"
-        with open(file_path, "r", encoding="utf-8") as file:
-            data = file.read()
-            return data
     if pass_name == "last":
         return fn.compiler.last_compiler_output.get_output_ir()
     return fn.compiler.get_output_of(pass_name)
@@ -200,5 +189,8 @@ def replace_ir(fn, start_after_pass, new_ir):
     """
     if start_after_pass and new_ir:
         fn.overwrite_ir = new_ir
-        fn.compiler.options.start_after_pass = start_after_pass
+        if start_after_pass == "mlir":
+            fn.compiler.options.start_after_pass = ""
+        else:
+            fn.compiler.options.start_after_pass = start_after_pass
         fn.fn_cache.clear()

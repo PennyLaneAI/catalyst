@@ -550,12 +550,11 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     }
 
-    if (options.keepIntermediate) {
-        std::string tmp;
-        llvm::raw_string_ostream s{tmp};
+    if (options.keepIntermediate && options.startAfterPass == "") {
+        llvm::raw_string_ostream s{outputs["mlir"]};
         s << moduleOp;
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
-                   tmp);
+                   outputs["mlir"]);
     }
 
     catalyst::utils::Timer timer{};
@@ -647,6 +646,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> op =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
     catalyst::utils::LinesCount::ModuleOp(*op);
+    output.reachTargetPass = options.startAfterPass == "mlir";
+
     bool enzymeRun = false;
     if (op) {
         enzymeRun = containsGradients(*op);
