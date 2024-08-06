@@ -111,6 +111,7 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
@@ -118,6 +119,7 @@ jobs:
       with:
         path: enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Setup Python version
       # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already

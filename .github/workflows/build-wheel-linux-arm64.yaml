@@ -118,6 +118,7 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
@@ -125,6 +126,7 @@ jobs:
       with:
         path: enzyme-build
         key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Build LLD
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'

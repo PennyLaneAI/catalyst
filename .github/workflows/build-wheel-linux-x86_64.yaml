@@ -123,6 +123,7 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
@@ -130,6 +131,7 @@ jobs:
       with:
         path:  enzyme-build
         key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Install dependencies (AlmaLinux)
       if: |

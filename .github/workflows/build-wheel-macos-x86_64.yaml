@@ -109,6 +109,7 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
@@ -116,6 +117,7 @@ jobs:
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
