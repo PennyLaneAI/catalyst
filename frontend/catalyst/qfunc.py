@@ -108,7 +108,7 @@ class QFunc:
 
     # pylint: disable=no-member
     @debug_logger
-    def __call__(self, args, params={}, **kwargs):
+    def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
         # Mid-circuit measurement configuration/execution
@@ -136,7 +136,8 @@ class QFunc:
         else:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
-        static_argnums = params.pop("static_argnums", ())
+        static_argnums = kwargs.pop("static_argnums", ())
+        out_tree_expected = kwargs.pop("out_tree_expected", [])
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
@@ -147,8 +148,8 @@ class QFunc:
                 self,
                 static_argnums,
             )
-            if "out_tree_expected" in params:
-                params["out_tree_expected"].append(out_tree_exp)
+
+            out_tree_expected.append(out_tree_exp)
             dynamic_args = filter_static_args(args, static_argnums)
             args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -267,19 +268,17 @@ def dynamic_one_shot(qnode, **kwargs):
             return single_shot_qnode(*args, **kwargs)
 
         arg_vmap = jnp.empty((total_shots,), dtype=float)
-        out_tree_expected = []
-        results = catalyst.vmap(wrap_single_shot_qnode)(
-            arg_vmap, out_tree_expected=out_tree_expected, **kwargs
-        )
+        results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap, **kwargs)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
 
-        out_flat = parse_native_mid_circuit_measurements(
+        out = parse_native_mid_circuit_measurements(
             cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
         )
         if len(cpy_tape.measurements) == 1:
-            out_flat = (out_flat,)
-        out = tree_unflatten(out_tree_expected[0], out_flat)
+            out = (out,)
+        out_tree_expected = kwargs.pop("out_tree_expected", [])
+        out = tree_unflatten(out_tree_expected[0], out)
         return out
 
     return one_shot_wrapper
