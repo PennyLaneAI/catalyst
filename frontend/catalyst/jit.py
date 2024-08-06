@@ -580,7 +580,7 @@ class QJIT:
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
-            params["_out_tree_expected"] = kwargs.pop("_out_tree_expected", [])
+            params["_out_tree_expected"] = []
             return QFunc.__call__(qnode, *args, **dict(params, **kwargs))
 
         with Patcher(
