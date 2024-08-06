@@ -184,7 +184,9 @@
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
   [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
 
-* Update JAX to `v0.4.28`. [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
+* Update JAX to `v0.4.28`.
+  [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
+  [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
 
 <h3>Breaking changes</h3>
 
