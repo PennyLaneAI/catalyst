@@ -554,12 +554,13 @@ class QJIT:
 
         #return processed_fn
 
-        breakpoint()
+        #breakpoint()
 
         
-        if hasattr(processed_fn, "tape") and processed_fn.tape is not None:
+        if hasattr(processed_fn, "tape") and processed_fn.tape is not None and len(processed_fn.transform_program) != 0:
             dev = processed_fn.device
-            ops = processed_fn.tape.operations.copy()
+            #ops = processed_fn.tape.operations.copy()
+            '''
             tapes = []
             for i in range(len(processed_fn.tape.measurements)):
                 tapes.append(qml.tape.QuantumTape(ops, [processed_fn.tape.measurements[i]]))
@@ -573,13 +574,55 @@ class QJIT:
                         qml.apply(op)
                     return qml.apply(tape.measurements[0])
                 funcs.append(_wrapper)
+            '''
             
+            #breakpoint()
+            # only works for one transform now
+            post_processing_fn = processed_fn.transform_program[0].transform(processed_fn.tape)[1]
+            tapes_ = processed_fn.transform_program[0].transform(processed_fn.tape)[0]
+
+            funcs_ = []
+            for j in range(len(tapes_)):
+                #print("j=",j)
+                tapes = []
+                for i in range(len(tapes_[j].measurements)):
+                    tapes.append(qml.tape.QuantumTape(tapes_[j].operations.copy(), [tapes_[j].measurements[i]]))
+
+
+                funcs = []
+                for tape in tapes:
+                    #print(tape.operations, tape.measurements)
+                    @qml.qnode(dev)
+                    def _wrapper(*args, tape=tape):
+                        for op in tape.operations:
+                            qml.apply(op)
+                        return qml.apply(tape.measurements[0])
+                    funcs.append(_wrapper)
+
+                funcs_.append(funcs)
+
+            #breakpoint()
             #@qml.qnode(dev)
             def _processed_fn_split_tape(*args):
-                out = []
-                for func in funcs:
-                    out.append(func())
-                return tuple(out)
+                original_tape = []
+                for func in funcs_[0]:
+                    original_tape.append(func())
+                #breakpoint()
+                if len(original_tape) == 1:
+                    original_tape_results = original_tape[0]
+                else:
+                    original_tape_results = tuple(original_tape)
+
+                post_processing_tape = []
+                for func in funcs_[1]:
+                    post_processing_tape.append(func())
+                #breakpoint()
+                if len(post_processing_tape) == 1:
+                    post_processing_tape_results = post_processing_tape[0]
+                else:
+                    post_processing_tape_results = tuple(post_processing_tape)
+
+                return post_processing_fn((original_tape_results, post_processing_tape_results))
             #breakpoint()
             return _processed_fn_split_tape
 

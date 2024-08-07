@@ -938,6 +938,7 @@ def apply_transform(
         total_program = device_program
 
     tapes, post_processing = total_program([tape])
+    #breakpoint()
     if not is_valid_for_batch and len(tapes) > 1:
         msg = "Multiple tapes are generated, but each run might produce different results."
         raise CompileError(msg)
@@ -984,16 +985,24 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         # The input to the post_processing function is going to be a list of values One for each
         # tape. The tracers are all flat in pp_args.
 
+        #breakpoint()
+
         # We need to deduce the type/shape/tree of the post_processing.
         wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
         in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
+        #breakpoint()
         out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
+        #breakpoint()
         jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+        #_, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+        #jaxpr = jax.make_jaxpr(post_processing)(in_tracers).jaxpr
+        #breakpoint()
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
+        #return jaxpr, out_type, out_tree_promise()
 
 
 @debug_logger
@@ -1061,7 +1070,8 @@ def trace_function(
 
         return res_expanded_tracers, in_sig, out_sig
 
-'''
+
+
 # main
 @debug_logger
 def trace_quantum_function(
@@ -1193,8 +1203,10 @@ def trace_quantum_function(
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree
-'''
 
+
+
+'''
 # mine
 @debug_logger
 def trace_quantum_function(
@@ -1270,7 +1282,11 @@ def trace_quantum_function(
         transformed_results = []
         jaxpr_each_tape = []
 
+
         with EvaluationContext.frame_tracing_context(ctx, trace):
+            save_frame = EvaluationContext.find_jaxpr_frame().eqns
+            print("save_frame", save_frame)
+            #breakpoint()
             # Set up same device and quantum register for all tapes in the program.
 
             qnode_transformed = len(qnode_program) > 0
@@ -1322,16 +1338,27 @@ def trace_quantum_function(
                 EvaluationContext.find_jaxpr_frame().eqns.clear()
         
 
+            EvaluationContext.find_jaxpr_frame().eqns = save_frame
+            #breakpoint()
+
+        # trace post processing
+        #breakpoint()
+        post_processing_jaxpr, out_type, out_tree = trace_post_processing(
+            ctx, trace, post_processing, transformed_results
+        )
+        #breakpoint()
+
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # jaxpr_each_tape holds the (open)jaxprs of each tape
             # we create a big jaxpr that calls each tape's jaxpr
 
             jaxpr = jaxpr_each_tape[0][0]
-            in_ = jaxpr.invars # input is shared across all tapes
-            out_ = []
+            in_ = jaxpr.invars # input is shared across all tapes (NO!)
+            #out_ = []
+            out_ = post_processing_jaxpr.outvars
             const_ = []
             for jaxpr_ in jaxpr_each_tape:
-                out_ += jaxpr_[0].outvars
+                #out_ += jaxpr_[0].outvars
                 const_ += jaxpr_[0].constvars
 
             # an initially empty jaxpr to hold the calls to each tape's jaxpr
@@ -1339,6 +1366,7 @@ def trace_quantum_function(
 
 
             from jax._src.core import new_jaxpr_eqn, no_effects
+            post_processing_invars = []
             for jaxpr in jaxpr_each_tape:
                 def _f(*args, **kwargs):
                     return f(args, kwargs)
@@ -1351,11 +1379,26 @@ def trace_quantum_function(
                         effects=no_effects,
                     )
                 )
+                post_processing_invars += jaxpr[0].outvars
 
-        # only need out type and tree from post processing
-        _, out_type, out_tree = trace_post_processing(
-            ctx, trace, post_processing, transformed_results
+
+
+        #breakpoint()
+        def _f(*args, **kwargs):
+            return f(args, kwargs)
+        big_jaxpr.eqns.append(
+            new_jaxpr_eqn(
+                invars=post_processing_invars,
+                outvars=post_processing_jaxpr.outvars,
+                primitive=func_p,
+                params={'fn':_f, 'call_jaxpr':post_processing_jaxpr},
+                effects=no_effects,
+            )
         )
+
+        breakpoint()
+
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return jax.core.ClosedJaxpr(big_jaxpr, const_), out_type, out_tree
+'''
