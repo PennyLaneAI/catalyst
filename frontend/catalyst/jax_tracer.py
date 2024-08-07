@@ -1190,4 +1190,4 @@ def trace_quantum_function(
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree
+    return closed_jaxpr, out_type, out_tree, return_values_tree
