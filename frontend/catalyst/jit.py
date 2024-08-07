@@ -451,7 +451,7 @@ class QJIT:
 
             return self.user_function(*args, **kwargs)
 
-        requires_promotion = self.jit_compile(args)
+        requires_promotion = self.jit_compile(args, **kwargs)
 
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
@@ -491,7 +491,7 @@ class QJIT:
             )
 
     @debug_logger
-    def jit_compile(self, args):
+    def jit_compile(self, args, **kwargs):
         """Compile Python function on invocation using the provided arguments.
 
         Args:
@@ -522,7 +522,7 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args)
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -556,7 +556,7 @@ class QJIT:
 
     @instrument(size_from=0)
     @debug_logger
-    def capture(self, args):
+    def capture(self, args, **kwargs):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
         Args:
@@ -585,7 +585,7 @@ class QJIT:
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                self.user_function, static_argnums, abstracted_axes, full_sig, {}
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
@@ -659,7 +659,7 @@ class QJIT:
             Any: results of the execution arranged into the original function's output PyTrees
         """
 
-        results = self.compiled_function(*args, **kwargs)
+        results = self.compiled_function(*(*args,kwargs), {})
 
         # TODO: Move this to the compiled function object.
         return tree_unflatten(self.out_treedef, results)
