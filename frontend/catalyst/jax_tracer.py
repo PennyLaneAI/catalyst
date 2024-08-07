@@ -579,7 +579,9 @@ def trace_state_prep(op, qrp):
     assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
 
     qubits = qrp.extract(op.wires)
-    qubits2 = set_state_p.bind(*qubits, op.parameters[0])
+    partial_sv = op.parameters[0]
+    partial_sv = jax.lax.convert_element_type(partial_sv, jnp.dtype(jnp.complex128))
+    qubits2 = set_state_p.bind(*qubits, partial_sv)
     qrp.insert(op.wires, qubits2)
 
 
@@ -594,8 +596,10 @@ def trace_basis_state(op, qrp):
     assert isinstance(op, qml.BasisState), "qml.BasisState expected"
 
     qubits = qrp.extract(op.wires)
-    qubits2 = set_basis_state_p.bind(*qubits, op.parameters[0])
-    qrp.insert(range(num_wires), qubits2)
+    basis_state = op.parameters[0]
+    basis_state = jax.lax.convert_element_type(basis_state, jnp.dtype(jnp.bool))
+    qubits2 = set_basis_state_p.bind(*qubits, basis_state)
+    qrp.insert(op.wires, qubits2)
 
 
 # pylint: disable=too-many-arguments
