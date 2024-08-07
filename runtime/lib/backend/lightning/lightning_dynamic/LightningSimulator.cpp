@@ -112,9 +112,8 @@ void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data, std::
     this->device_sv->setStateVector(count, data_vector);
 }
 
-void LightningSimulator::SetBasisState(const std::size_t index)
+void LightningSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
 {
-    this->device_sv->setBasisState(index);
 }
 
 auto LightningSimulator::Zero() const -> Result

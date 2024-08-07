@@ -129,9 +129,8 @@ void LightningKokkosSimulator::PrintState()
 void LightningKokkosSimulator::SetState(DataView<std::complex<double>, 1> &data, std::vector<QubitIdType> &wires) {}
 
 
-void LightningKokkosSimulator::SetBasisState(const std::size_t index)
+void LightningKokkosSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
 {
-    this->device_sv->setBasisState(index);
 }
 
 auto LightningKokkosSimulator::Zero() const -> Result
