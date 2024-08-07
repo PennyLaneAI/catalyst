@@ -116,8 +116,6 @@ void OpenQasmDevice::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void OpenQasmDevice::SetBasisState(const std::size_t index) {}
-
 auto OpenQasmDevice::Zero() const -> Result
 {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);

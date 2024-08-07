@@ -478,6 +478,9 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, int numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
 
+    DataView<int8_t, 1> data_view(data->data_aligned, data->offset, data->sizes,
+                                                data->strides);
+
     va_list args;
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
@@ -485,6 +488,8 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, int numQubits, ...)
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
+
+    getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
