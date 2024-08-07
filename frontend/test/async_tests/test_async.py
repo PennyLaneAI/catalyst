@@ -26,7 +26,6 @@ from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
 # pylint: disable=missing-function-docstring
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
     dev = qml.device(backend, wires=2)
@@ -68,7 +67,6 @@ def test_qnode_execution(backend):
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_gradient(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
@@ -92,7 +90,6 @@ def test_gradient(inp, diff_methods, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception(backend):
     "Test exception."
 
@@ -111,7 +108,6 @@ def test_exception(backend):
         wrapper()
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception2(backend):
     "Test exception in multiple async executions."
 
@@ -130,7 +126,6 @@ def test_exception2(backend):
         wrapper()
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception3(backend):
     "Test exception when not used in python."
 
@@ -150,7 +145,6 @@ def test_exception3(backend):
         wrapper()
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception4(backend):
     "Test exception happening on two different circuits."
 
@@ -176,7 +170,6 @@ def test_exception4(backend):
         wrapper()
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_adjoint(backend):
     "Test exception happening on two different circuits both adjointed."
 
@@ -205,7 +198,6 @@ def test_exception_adjoint(backend):
         wrapper()
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_conditional(backend):
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
@@ -230,7 +222,6 @@ def test_exception_conditional(backend):
         wrapper(0)
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_conditional_1(backend):
     "Test exception happening in else and outside else."
 
@@ -259,7 +250,6 @@ def test_exception_conditional_1(backend):
         wrapper(0)
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_conditional_2(backend):
     "Test exception happening in the presence of an if statement but in another."
 
@@ -288,7 +278,6 @@ def test_exception_conditional_2(backend):
         wrapper(0)
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 @pytest.mark.parametrize(
     "order", [(0, 0, 1), (0, 1, 0), (1, 0, 0), (0, 1, 1), (1, 1, 0), (1, 0, 1), (1, 1, 1)]
 )
@@ -332,7 +321,6 @@ def test_qnode_exception_dependency(order, backend):
 
 # TODO: add the following diff_methods once issue #419 is fixed:
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0)])
 def test_gradient_exception(inp, diff_methods, backend):
@@ -354,7 +342,6 @@ def test_gradient_exception(inp, diff_methods, backend):
         compiled(inp)
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_in_loop(backend):
     "Test exception happening in a loop."
 
@@ -381,7 +368,6 @@ def test_exception_in_loop(backend):
         circuit(2)
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_in_for_loop(backend):
     "Test exception happening in a loop."
 
@@ -400,7 +386,6 @@ def test_exception_in_for_loop(backend):
         circuit(1)
 
 
-@pytest.mark.skip(reason="Skip mlir async destruction errors.")
 def test_exception_in_loop2(backend):
     "Test exception happening in a loop while one qnode succeeds."
 

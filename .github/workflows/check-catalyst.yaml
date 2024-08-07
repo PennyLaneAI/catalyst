@@ -69,7 +69,7 @@ jobs:
 
 
       - name: Upload Catalyst-Runtime Artifact
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4
         with:
           name: runtime-build-${{ matrix.compiler }}
           path: |
@@ -78,7 +78,7 @@ jobs:
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4
         with:
           name: oqc-build-${{ matrix.compiler }}
           path: |
@@ -106,7 +106,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
@@ -162,7 +162,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: true
 
     - name: Clone MHLO Submodule
@@ -186,7 +186,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -232,7 +232,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: true
 
     - name: Clone Enzyme Submodule
@@ -256,7 +256,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -309,7 +309,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -326,7 +326,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -343,7 +343,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -378,7 +378,7 @@ jobs:
         make dialects
 
     - name: Upload Quantum Build Artifact
-      uses: actions/upload-artifact@v4.3.4
+      uses: actions/upload-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: |

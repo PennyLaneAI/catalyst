@@ -212,8 +212,16 @@ struct EmitCatalystPyInterfacePass
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<EmitCatalystPyInterfaceTransform>(context);
+        GreedyRewriteConfig config;
+        config.strictMode = GreedyRewriteStrictness::ExistingOps;
+        config.enableRegionSimplification = false;
+        config.maxIterations = 1;
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        auto op = getOperation();
+        SmallVector<Operation *> targets;
+        op->walk([&](LLVM::LLVMFuncOp func) { targets.push_back(func); });
+
+        if (failed(applyOpPatternsAndFold(targets, std::move(patterns), config))) {
             signalPassFailure();
         }
     }
