@@ -47,7 +47,7 @@ struct ApplyTransformSequencePass
 
         // The top-level module is the payload.
         Operation *payload = getOperation();
-        Operation *transformer;
+        ModuleOp transformer;
 
         // Find the transformer module and remove it from payload
         // Keep the transformer module in a deep copy clone
@@ -83,8 +83,7 @@ struct ApplyTransformSequencePass
             return signalPassFailure();
         };
 
-        // The cloned transformer is created in this function so it will
-        // automatically get destroyed when exiting.
+        transformer.erase();
     }
 };
 
