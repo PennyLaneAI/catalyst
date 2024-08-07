@@ -523,7 +523,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    args, **kwargs
+                )
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -678,7 +680,7 @@ class QJIT:
             Any: results of the execution arranged into the original function's output PyTrees
         """
 
-        results = self.compiled_function(*(*args,kwargs), {})
+        results = self.compiled_function(*(*args, kwargs), {})
 
         # TODO: Move this to the compiled function object.
         return tree_unflatten(self.out_treedef, results)
