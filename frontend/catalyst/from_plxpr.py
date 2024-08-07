@@ -269,12 +269,14 @@ class QFuncPlxprInterpreter:
                 f"Operator {eqn.primitive.name} not yet supported for catalyst conversion."
             )
         n_wires = eqn.params["n_wires"]
-        split = None if n_wires == 0 else -n_wires
-
-        wire_values = [self.read(w) for w in eqn.invars[split:]]
-        wires = [self._get_wire(w) for w in wire_values]
-
-        invals = [self.read(invar) for invar in eqn.invars[:split]]
+        if n_wires == 0:
+            wires = []
+            wire_values = []
+            invals = [self.read(invar) for invar in eqn.invars]
+        else:
+            wire_values = [self.read(w) for w in eqn.invars[-n_wires:]]
+            wires = [self._get_wire(w) for w in wire_values]
+            invals = [self.read(invar) for invar in eqn.invars[:-n_wires]]
 
         kwargs = {
             "qubits_len": eqn.params["n_wires"],

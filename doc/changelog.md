@@ -186,6 +186,10 @@
 
 * Update JAX to `v0.4.28`. [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
 
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a 
+  Catalyst variant jaxpr.
+  [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
@@ -333,6 +337,7 @@ This release contains contributions from (in alphabetical order):
 Alessandro Cosentino,
 Lillian M. A. Frederiksen,
 Josh Izaac,
+Christina Lee,
 Kunwar Maheep Singh,
 Mehrdad Malekmohammadi,
 Romain Moyard,
@@ -851,10 +856,6 @@ Paul Haochen Wang,
   [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
   (array([0.5, 0. , 0.5, 0. ]),)
   ```
-
-* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a 
-  Catalyst variant jaxpr.
-  [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Breaking changes</h3>
 
