@@ -456,20 +456,14 @@ void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data)
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, int n, ...)
 {
-    // Data guaranteed to be only one dimension by the type system.
-    // But what is not guaranteed is the strided.
-    MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
-    DataView<std::complex<double>, 1> data_view(data_p->data_aligned, data_p->offset, data_p->sizes,
-                                                data_p->strides);
-    getQuantumDevicePtr()->SetState(data_view);
+        std::cout << "SetState" << std::endl;
 }
 
-void __catalyst__qis__SetBasisState(uint64_t index)
+void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, int n, ...)
 {
-    std::size_t index_cast = static_cast<std::size_t>(index);
-    getQuantumDevicePtr()->SetBasisState(index_cast);
+        std::cout << "SetBasisState" << std::endl;
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
