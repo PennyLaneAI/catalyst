@@ -530,3 +530,8 @@ class TestHybridPrograms:
         expected = -np.sin(0.5) + np.cos(1.2)
 
         assert qml.math.allclose(results, expected)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
+
