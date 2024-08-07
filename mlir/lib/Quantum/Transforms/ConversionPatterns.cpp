@@ -347,63 +347,6 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
     }
 };
 
-struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
-    using OpConversionPattern::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(SetStateOp op, SetStateOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        bool isVarArg = false;
-        MLIRContext *ctx = rewriter.getContext();
-        auto voidTy = LLVM::LLVMVoidType::get(ctx);
-        auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState", {ptrTy},
-                                                 voidTy, isVarArg);
-
-        auto structTy = adaptor.getInState().getType();
-
-        Location loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
-        auto allocaOp = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structTy, c1);
-        auto allocaPtr = allocaOp.getResult();
-
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getInState(), allocaPtr);
-
-        SmallVector<Value> values;
-        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::CallOp>(loc, func, ValueRange{allocaPtr});
-        rewriter.replaceOp(op, values);
-        return success();
-    }
-};
-
-struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
-    using OpConversionPattern::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(SetBasisStateOp op, SetBasisStateOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        bool isVarArg = false;
-        MLIRContext *ctx = rewriter.getContext();
-        auto voidTy = LLVM::LLVMVoidType::get(ctx);
-        auto indexVal = op.getIndex();
-        auto indexTy = indexVal.getType();
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState",
-                                                 {indexTy}, voidTy, isVarArg);
-
-        Location loc = op.getLoc();
-
-        SmallVector<Value> values;
-        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::CallOp>(loc, func, ValueRange{indexVal});
-        rewriter.replaceOp(op, values);
-        return success();
-    }
-};
 
 ///////////////////
 // Quantum Gates //
@@ -972,8 +915,6 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<SetBasisStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
