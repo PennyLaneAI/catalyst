@@ -61,7 +61,9 @@ struct ApplyTransformSequencePass
         });
 
         // Check that a transformer exists
-        assert(result.wasInterrupted());
+        if (!result.wasInterrupted()) {
+            return;
+        }
 
         // The transformer module itself is a builtin.module, not
         // a valid transform with the transform dialect
