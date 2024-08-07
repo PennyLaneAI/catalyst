@@ -323,6 +323,7 @@ class QFuncPlxprInterpreter:
         return compbasis_p.bind(*wires)
 
     def interpret_measurement_eqn(self, eqn: jax.core.JaxprEqn):
+        """Interpret a measurement equation as a catalyst equation."""
         if eqn.primitive.name not in measurement_map:
             raise NotImplementedError(
                 f"measurement {eqn.primitive.name} not yet supported for conversion."

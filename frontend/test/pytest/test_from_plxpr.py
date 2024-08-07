@@ -216,7 +216,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_globalphase(self):
@@ -242,7 +242,8 @@ class TestCatalystCompareJaxpr:
 
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_expval(self):
         """Test comparison and execution of the jaxpr for a simple qnode."""
@@ -269,7 +270,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -301,7 +302,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -340,7 +341,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(phi)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         # confused by the weak_types error here
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
@@ -375,7 +376,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -407,7 +408,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -449,7 +450,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(x, y, z)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
