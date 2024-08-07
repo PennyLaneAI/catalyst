@@ -160,3 +160,8 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
+
+@debug_logger
+def compile_cmain(fn, *args):
+    with open(str(fn.workspace) + "/main.c", "w", encoding="utf-8") as c_file:
+        c_file.write(get_cmain(fn, *args))
