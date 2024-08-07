@@ -1134,19 +1134,19 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
+        jaxpr_each_tape = []
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up same device and quantum register for all tapes in the program.
-            # We just need to ensure the qubits are reset in between each.
-            qdevice_p.bind(
-                rtd_lib=device.backend_lib,
-                rtd_name=device.backend_name,
-                rtd_kwargs=str(device.backend_kwargs),
-            )
-            qreg_in = qalloc_p.bind(len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
+                qdevice_p.bind(
+                    rtd_lib=device.backend_lib,
+                    rtd_name=device.backend_name,
+                    rtd_kwargs=str(device.backend_kwargs),
+                )
+                qreg_in = qalloc_p.bind(len(device.wires))
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
@@ -1176,18 +1176,52 @@ def trace_quantum_function(
                 else:
                     transformed_results.append(meas_results)
 
-                # Reset the qubits and update the register value for the next tape.
-                if len(tapes) > 1 and i < len(tapes) - 1:
-                    for w in device.wires:
-                        qreg_out = reset_qubit(qreg_out, w)
-                    qreg_in = qreg_out
+                # Deallocate the register after each tape
+                qdealloc_p.bind(qreg_out)
 
-            # Deallocate the register before tracing the post-processing.
-            qdealloc_p.bind(qreg_out)
+                # Get the jaxpr for this tape and clear the tracing frame for next tape
+                if type(transformed_results[i]) is not tuple:
+                    jp = EvaluationContext.find_jaxpr_frame().to_jaxpr([transformed_results[i]])
+                else:
+                    jp = EvaluationContext.find_jaxpr_frame().to_jaxpr([_ for _ in transformed_results[i]])
+                jaxpr_each_tape.append(jp)
+                EvaluationContext.find_jaxpr_frame().eqns.clear()
+        
 
-        closed_jaxpr, out_type, out_tree = trace_post_processing(
+        with EvaluationContext.frame_tracing_context(ctx, trace):
+            # jaxpr_each_tape holds the (open)jaxprs of each tape
+            # we create a big jaxpr that calls each tape's jaxpr
+
+            jaxpr = jaxpr_each_tape[0][0]
+            in_ = jaxpr.invars # input is shared across all tapes
+            out_ = []
+            const_ = []
+            for jaxpr_ in jaxpr_each_tape:
+                out_ += jaxpr_[0].outvars
+                const_ += jaxpr_[0].constvars
+
+            # an initially empty jaxpr to hold the calls to each tape's jaxpr
+            big_jaxpr = jax.core.Jaxpr(const_, in_, out_, [])
+
+
+            from jax._src.core import new_jaxpr_eqn, no_effects
+            for jaxpr in jaxpr_each_tape:
+                def _f(*args, **kwargs):
+                    return f(args, kwargs)
+                big_jaxpr.eqns.append(
+                    new_jaxpr_eqn(
+                        invars=big_jaxpr.invars,
+                        outvars=jaxpr[0].outvars,
+                        primitive=func_p,
+                        params={'fn':_f, 'call_jaxpr':jaxpr[0]},
+                        effects=no_effects,
+                    )
+                )
+
+        # only need out type and tree from post processing
+        _, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree
+    return jax.core.ClosedJaxpr(big_jaxpr, const_), out_type, out_tree
