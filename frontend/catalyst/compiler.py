@@ -403,6 +403,13 @@ class LinkerDriver:
         return default_flags
 
     @staticmethod
+    @debug_logger
+    def get_executable_default_flags(options):
+        original_flags = LinkerDriver.get_default_flags(options)
+        test = [fs for fs in original_flags if fs != "-shared"]
+        return ["-fuse-ld=lld"] + test
+
+    @staticmethod
     def _get_compiler_fallback_order(fallback_compilers):
         """Compiler fallback order"""
         preferred_compiler = os.environ.get("CATALYST_CC", None)
@@ -443,6 +450,26 @@ class LinkerDriver:
             return False
 
     @staticmethod
+    def _executable_attempt_link(compiler, flags, infile, outfile, options):
+        try:
+            file_name = os.path.basename(infile)
+            func_name, _ = os.path.splitext(file_name)
+            command = (
+                [compiler]
+                + flags
+                + [infile, "-o", outfile, "-e", "jit_" + func_name, "-nostartfiles"]
+            )
+            run_writing_command(command, options)
+            return True
+        except subprocess.CalledProcessError as e:
+            # Only warn in verbose mode, as users might see it otherwise in regular use.
+            if options.verbose:
+                msg = f"Compiler {compiler} failed to link executable and returned with exit code "
+                msg += f"{e.returncode}. Output was: {e.output}.\nCommand: {command}"
+                warnings.warn(msg, UserWarning)
+            return False
+
+    @staticmethod
     @debug_logger
     def get_output_filename(infile):
         """Rename object file to shared object
@@ -455,6 +482,20 @@ class LinkerDriver:
         if not infile_path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
         return str(infile_path.with_suffix(".so"))
+
+    @staticmethod
+    @debug_logger
+    def get_executable_output_filename(infile):
+        """Rename object file to shared object
+
+        Args:
+            infile (str): input file name
+            outfile (str): output file name
+        """
+        infile_path = pathlib.Path(infile)
+        if not infile_path.exists():
+            raise FileNotFoundError(f"Cannot find {infile}.")
+        return str(infile_path.with_suffix(".out"))
 
     @staticmethod
     @debug_logger
@@ -482,6 +523,11 @@ class LinkerDriver:
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
+                executable_flags = LinkerDriver.get_executable_default_flags(options)
+                executable_outfile = LinkerDriver.get_executable_output_filename(infile)
+                LinkerDriver._executable_attempt_link(
+                    compiler, executable_flags, infile, executable_outfile, options
+                )
                 return outfile
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
         msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
