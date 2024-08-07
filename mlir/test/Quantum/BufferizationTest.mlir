@@ -63,3 +63,15 @@ module @set_state {
     return
   }
 }
+
+// -----
+
+// CHECK-LABEL: @set_basis_state
+module @set_basis_state {
+  func.func @foo(%arg0: tensor<2xi1>, %q0 : !quantum.bit) {
+    // CHECK: quantum.set_basis_state(%{{.*}}) %{{.*}} : (memref<2xi1>, !quantum.bit) -> !quantum.bit
+    %0 = quantum.set_basis_state(%arg0) %q0 : (tensor<2xi1>, !quantum.bit) -> !quantum.bit
+    return
+  }
+}
+

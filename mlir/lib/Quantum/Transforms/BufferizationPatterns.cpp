@@ -145,6 +145,23 @@ struct BufferizeSetStateOp : public OpConversionPattern<SetStateOp> {
     }
 };
 
+struct BufferizeSetBasisStateOp : public OpConversionPattern<SetBasisStateOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(SetBasisStateOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Type tensorType = op.getBasisState().getType();
+        MemRefType memrefType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
+        auto toMemrefOp =
+            rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, op.getBasisState());
+        auto memref = toMemrefOp.getResult();
+        rewriter.replaceOpWithNewOp<SetBasisStateOp>(op, op.getOutQubits().getTypes(), memref,
+                                                adaptor.getInQubits());
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -166,6 +183,7 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<ProbsOp>([&](ProbsOp op) { return op.isBufferized(); });
     target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) { return op.isBufferized(); });
     target.addDynamicallyLegalOp<SetStateOp>([&](SetStateOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<SetBasisStateOp>([&](SetBasisStateOp op) { return op.isBufferized(); });
 }
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
@@ -178,6 +196,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<BufferizeProbsOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeCountsOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeSetStateOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeSetBasisStateOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace quantum
