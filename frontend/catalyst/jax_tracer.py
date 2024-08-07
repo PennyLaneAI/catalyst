@@ -578,40 +578,9 @@ def trace_state_prep(op, qrp):
     """
     assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
 
-    sv = jnp.array(op.parameters[0], dtype=jnp.dtype(jnp.complex128))
-    norm = jnp.linalg.norm(sv, axis=-1, ord=2)
-    is_valid = jnp.allclose(norm, 1.0, atol=1e-10)
-    err_msg = "Sum of amplitudes-squared does not equal one."
-    catalyst.debug.assertion.debug_assert(is_valid, err_msg)
-
-    # TODO: Implement at runtime.
-    # Current limitation is given by jnp.transpose/swapaxes/moveaxes
-    for wire in op.wires.tolist():
-        if isinstance(wire, DynamicJaxprTracer):
-            raise TypeError("wires must be static")
-
-    wires = np.array(op.wires.tolist(), dtype=np.int64)
-    sv = jnp.reshape(sv, (2,) * len(wires))
-
-    # use numpy as we need concrete values.
-    all_wires = np.array(list(range(0, qrp.base.length)), dtype=np.int64)
-    extra_wires = np.delete(all_wires, wires)
-    for _ in extra_wires:
-        sv = jnp.stack([sv, jnp.zeros_like(sv)], axis=-1)
-
-    current_wires = np.concatenate([wires, extra_wires])
-    transpose_axes = [np.where(current_wires == wire)[0][0] for wire in all_wires]
-    # This is the reason we need concrete values:
-    # for jnp.transpose
-    # On August 1st, 2024 I was unable to find any jax numpy API
-    # that allowed me to move axes which are not known at compile
-    # time.
-    sv = jnp.transpose(sv, axes=transpose_axes)
-
-    qubits = qrp.extract(range(qrp.base.length))
-    sv = jnp.reshape(sv, (2**qrp.base.length))
-    qubits2 = set_state_p.bind(*qubits, sv)
-    qrp.insert(range(qrp.base.length), qubits2)
+    qubits = qrp.extract(op.wires)
+    qubits2 = set_state_p.bind(*qubits, op.parameters[0])
+    qrp.insert(op.wires, qubits2)
 
 
 def trace_basis_state(op, qrp):
@@ -622,70 +591,10 @@ def trace_basis_state(op, qrp):
     Postcondition:
         qrp is updated to hold the output qubits from qml.StatePrep
     """
-    assert isinstance(op, qml.BasisState), "qml.StatePrep expected"
+    assert isinstance(op, qml.BasisState), "qml.BasisState expected"
 
-    # TODO: Also, would be good to jax.jit
-    # qml.BasisState(x, 0).state_vector(wire_order) to avoid
-    # duplication
-    num_wires = qrp.base.length
-    params = op.parameters
-    param_array = params[0]
-    size = jnp.size(param_array)
-    if size != len(op.wires):
-        raise ValueError("BasisState parameter and wires must be of equal length.")
-
-    zeros_full = jnp.zeros((num_wires,), jnp.dtype(jnp.int64))
-    wires = jnp.array(op.wires.tolist())
-    # TODO:
-    # On Aug 1, 2024 @erick-xanadu I attempted to use
-    # array indexing when the index is an ndarray.
-    # Recently, it has been fixed as long as
-    # indices_are_sorted = True and unique_indices = True.
-    # I would like to guarantee that this is the case.
-    # So, I am sorting the indices
-    sorted_wires = jnp.sort(wires)
-    # and I also want to make sure that they are unique.
-    # This must happen at run-time because the wires may be dynamic.
-    # However, I am unable to make it work correctly.
-    # @rmoyard mentioned that we can comment out a couple
-    # of lines in ScatterPatterns to have it succeed.
-    # I was able to confirm that my particular example succeeded
-    # but I have not tested it to all cases.
-    #
-    # At the time being, I will leave the code here
-    # for checking for unique-ness. But maybe we can enable
-    # it in the future
-    #
-    #   unique, counts = jnp.unique(sorted_wires, size=len(wires), return_counts=True)
-    #   wires_are_unique = jnp.all(jnp.equal(counts, 1))
-    #   err_msg = "Wires are not unique"
-    #   catalyst.debug.assertion.debug_assert(wires_are_unique, err_msg)
-    #   basis_state = zeros_full.at[unique].set(param_array[unique], \
-    #       indices_are_sorted=True, unique_indices=True)
-    user_wires_sorted = zeros_full.at[sorted_wires]
-    kwargs = {"indices_are_sorted": True, "unique_indices": True}
-    sorted_basis_state = param_array.at[sorted_wires].get()
-    basis_state = user_wires_sorted.set(sorted_basis_state, **kwargs)
-
-    qubits = qrp.extract(range(num_wires))
-
-    ones = jnp.ones(basis_state.shape, param_array.dtype)
-    zeros = jnp.zeros(basis_state.shape, param_array.dtype)
-    is_one = jnp.equal(basis_state, ones)
-    is_zero = jnp.equal(basis_state, zeros)
-    zeros_or_ones = jnp.logical_or(is_one, is_zero)
-    err_msg = "BasisState parameter must consist of 0 or 1 integers"
-    is_valid = jnp.all(zeros_or_ones)
-    catalyst.debug.assertion.debug_assert(is_valid, err_msg)
-
-    zero_to_n_minus_1 = jnp.linspace(0, num_wires - 1, num_wires, dtype=jnp.dtype(jnp.int64))
-    twos = jnp.array([2] * num_wires, dtype=jnp.dtype(jnp.int64))
-    two_to_the_ns = jnp.power(twos, zero_to_n_minus_1)
-    # endian-ness
-    basis_state = jnp.flip(basis_state)
-    runtime_index = jnp.sum(two_to_the_ns * basis_state)
-
-    qubits2 = set_basis_state_p.bind(*qubits, runtime_index)
+    qubits = qrp.extract(op.wires)
+    qubits2 = set_basis_state_p.bind(*qubits, op.parameters[0])
     qrp.insert(range(num_wires), qubits2)
 
 
