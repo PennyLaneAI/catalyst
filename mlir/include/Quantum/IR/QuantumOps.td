@@ -242,7 +242,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state", []> {
+def SetStateOp : Quantum_Op<"set_state", []> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -265,61 +265,15 @@ def SetStateOp : Gate_Op<"set_state", []> {
         `(` $in_state `)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
-    code extraBaseClassDeclaration = [{
+    let extraClassDeclaration = [{
         bool isBufferized() {
             return mlir::isa<mlir::MemRefType>(getInState().getType());
-        }
-
-        std::vector<mlir::Value> getQubitOperands() {
-            std::vector<mlir::Value> values;
-            values.insert(values.end(), getInQubits().begin(),
-                          getInQubits().end());
-            return values;
-        }
-
-        std::vector<mlir::Value> getQubitResults() {
-            std::vector<mlir::Value> values;
-            values.insert(values.end(), getOutQubits().begin(),
-                          getOutQubits().end());
-            return values;
-        }
-
-        bool getAdjointFlag() {
-            emitOpError() << "SetStateOp cannot be adjointed";
-            llvm::report_fatal_error("SetStateOp cannot be adjointed");
-            return false;
-        }
-        void setAdjointFlag(bool adjoint) {
-            emitOpError() << "SetStateOp cannot be adjointed";
-            llvm::report_fatal_error("SetStateOp cannot be adjointed");
-        };
-
-        mlir::ValueRange getCtrlValueOperands() {
-            emitOpError() << "SetStateOp cannot be controlled";
-            llvm::report_fatal_error("SetStateOp cannot be controlled");
-            return mlir::ValueRange();
-        }
-        mlir::ValueRange getNonCtrlQubitOperands() {
-            return getInQubits();
-        }
-        mlir::ValueRange getCtrlQubitOperands() {
-            emitOpError() << "SetStateOp cannot be controlled";
-            llvm::report_fatal_error("SetStateOp cannot be controlled");
-            return mlir::ValueRange();
-        }
-        mlir::ValueRange getNonCtrlQubitResults() {
-            return getOutQubits();
-        }
-        mlir::ValueRange getCtrlQubitResults() {
-            emitOpError() << "SetStateOp cannot be controlled";
-            llvm::report_fatal_error("SetStateOp cannot be controlled");
-            return mlir::ValueRange();
         }
     }];
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
+def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -343,56 +297,9 @@ def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
         `(` $basis_state`)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
-    code extraBaseClassDeclaration = [{
-
+    let extraClassDeclaration = [{
         bool isBufferized() {
             return mlir::isa<mlir::MemRefType>(getBasisState().getType());
-        }
-
-        std::vector<mlir::Value> getQubitOperands() {
-            std::vector<mlir::Value> values;
-            values.insert(values.end(), getInQubits().begin(),
-                          getInQubits().end());
-            return values;
-        }
-
-        std::vector<mlir::Value> getQubitResults() {
-            std::vector<mlir::Value> values;
-            values.insert(values.end(), getOutQubits().begin(),
-                          getOutQubits().end());
-            return values;
-        }
-
-        bool getAdjointFlag() {
-            emitOpError() << "SetStateOp cannot be adjointed";
-            llvm::report_fatal_error("SetStateOp cannot be adjointed");
-            return false;
-        }
-        void setAdjointFlag(bool adjoint) {
-            emitOpError() << "SetStateOp cannot be adjointed";
-            llvm::report_fatal_error("SetStateOp cannot be adjointed");
-        };
-
-        mlir::ValueRange getCtrlValueOperands() {
-            emitOpError() << "SetStateOp cannot be controlled";
-            llvm::report_fatal_error("SetStateOp cannot be controlled");
-            return mlir::ValueRange();
-        }
-        mlir::ValueRange getNonCtrlQubitOperands() {
-            return getInQubits();
-        }
-        mlir::ValueRange getCtrlQubitOperands() {
-            emitOpError() << "SetStateOp cannot be controlled";
-            llvm::report_fatal_error("SetStateOp cannot be controlled");
-            return mlir::ValueRange();
-        }
-        mlir::ValueRange getNonCtrlQubitResults() {
-            return getOutQubits();
-        }
-        mlir::ValueRange getCtrlQubitResults() {
-            emitOpError() << "SetStateOp cannot be controlled";
-            llvm::report_fatal_error("SetStateOp cannot be controlled");
-            return mlir::ValueRange();
         }
     }];
 
