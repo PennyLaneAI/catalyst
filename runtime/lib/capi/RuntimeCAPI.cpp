@@ -456,14 +456,35 @@ void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, int n, ...)
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, int numQubits, ...)
 {
-        std::cout << "SetState" << std::endl;
+    RT_ASSERT(numQubits >= 0);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
+    DataView<std::complex<double>, 1> data_view(data_p->data_aligned, data_p->offset, data_p->sizes,
+                                                data_p->strides);
+    getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
-void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, int n, ...)
+void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, int numQubits, ...)
 {
-        std::cout << "SetBasisState" << std::endl;
+    RT_ASSERT(numQubits >= 0);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)

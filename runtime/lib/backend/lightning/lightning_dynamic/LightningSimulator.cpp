@@ -104,7 +104,7 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data)
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data, std::vector<QubitIdType> &wires)
 {
     std::vector<std::complex<double>> data_vector(data.begin(), data.end());
     std::vector<std::size_t> count(data_vector.size());

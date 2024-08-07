@@ -116,7 +116,6 @@ void OpenQasmDevice::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void OpenQasmDevice::SetState(DataView<std::complex<double>, 1> &) {}
 void OpenQasmDevice::SetBasisState(const std::size_t index) {}
 
 auto OpenQasmDevice::Zero() const -> Result
