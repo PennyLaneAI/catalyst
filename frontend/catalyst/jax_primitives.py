@@ -2111,7 +2111,6 @@ def _set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_para
     param = qubits_or_params.pop()
     qubits = qubits_or_params
     out_qubits = [qubit.type for qubit in qubits]
-    param = TensorExtractOp(ir.IntegerType.get_signless(64), param, []).result
     return SetBasisStateOp(out_qubits, param, qubits).results
 
 
