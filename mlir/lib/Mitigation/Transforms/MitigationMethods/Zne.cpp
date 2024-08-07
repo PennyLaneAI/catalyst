@@ -211,42 +211,48 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                                   Value numberQubitsValue, func::FuncOp fnWithMeasurementsOp,
                                   Value c0, Value c1)
 {
+    // Allocate qubits
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
-    fnWithMeasurementsOp.walk([&](quantum::QubitUnitaryOp op) {
-        // Insert a for loop immediately after every quantum::QubitUnitaryOp
+    // Walk through the operations in fnWithMeasurementsOp
+    fnWithMeasurementsOp.walk([&](quantum::QuantumGate op) {
+        // Insert a for loop immediately before each quantum::QuantumGate
         auto innerLoc = op->getLoc();
-        rewriter.setInsertionPointAfter(op);
+        rewriter.setInsertionPoint(op);
         rewriter.create<scf::ForOp>(
             innerLoc, c0, size, c1, ValueRange(),
             [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
                 // Set insertion point within the loop
                 builder.setInsertionPointToEnd(builder.getBlock());
-                // Repeat the adjoint and original operation, after the existing QubitUnitaryOp
-                auto adjointOp =
-                    builder.create<quantum::AdjointOp>(forLoc, qregType, op.getResult(0))
-                        .getResult();
-                auto origOp =
-                    builder.create<quantum::AdjointOp>(forLoc, qregType, adjointOp).getResult();
-                // Yield operation
-                builder.create<scf::YieldOp>(forLoc, origOp);
+                // Create adjoint and original operations
+                auto origOp = builder.clone(*op)->getResult(0);
+                auto adjointOp = builder.create<quantum::AdjointOp>(forLoc, qregType, origOp).getResult();
+                // Yield the result of the original operation
+                builder.create<scf::YieldOp>(forLoc, adjointOp);
             });
 
         return WalkResult::advance();
     });
 
+    // Prepare the arguments for the final call
     std::vector<Value> argsAndQreg(fnWithMeasurementsOp.getArguments().begin(),
                                    fnWithMeasurementsOp.getArguments().end());
     argsAndQreg.pop_back();
     argsAndQreg.push_back(allocQreg);
-    Value result =
-        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
-    // Remove device
+
+    // Insert the call to fnWithMeasurementsOp
+    rewriter.setInsertionPointAfter(fnWithMeasurementsOp.getBody().front().getTerminator());
+    Value result = rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
+
+    // Insert the device release operation
     rewriter.create<quantum::DeviceReleaseOp>(loc);
+    // Return
     rewriter.create<func::ReturnOp>(loc, result);
+
+    // Return the function symbol reference
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
