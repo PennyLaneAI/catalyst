@@ -137,11 +137,19 @@ class QFunc:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
         static_argnums = kwargs.pop("static_argnums", ())
+        out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
         def _eval_quantum(*args):
-            closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, qjit_device, args, kwargs, self, static_argnums
+            closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
+                self.func,
+                qjit_device,
+                args,
+                kwargs,
+                self,
+                static_argnums,
             )
+
+            out_tree_expected.append(out_tree_exp)
             dynamic_args = filter_static_args(args, static_argnums)
             args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -263,8 +271,14 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        return parse_native_mid_circuit_measurements(
+
+        out = parse_native_mid_circuit_measurements(
             cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
         )
+        if len(cpy_tape.measurements) == 1:
+            out = (out,)
+        out_tree_expected = kwargs.pop("_out_tree_expected", [])
+        out = tree_unflatten(out_tree_expected[0], out)
+        return out
 
     return one_shot_wrapper
