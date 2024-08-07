@@ -16,6 +16,7 @@
 
 import functools
 
+import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
@@ -44,6 +45,19 @@ class TestKeywordArguments:
 
         result = functools.partial(f, y=2)(3)
         assert result == f(2, 3)
+
+    def test_qnode_with_kwargs(self, backend):
+        """Test that a qnode works with keyword argeument."""
+        dev = qml.device(backend, wires=1)
+
+        @qjit()
+        @qml.qnode(dev)
+        def circuit(x, c):
+            qml.RY(c, 0)
+            qml.RX(x, 0)
+            return qml.expval(qml.PauliZ(0))
+
+        assert jnp.allclose(circuit(0.5, c=0.5), circuit(0.5, 0.5))
 
 
 if __name__ == "__main__":
