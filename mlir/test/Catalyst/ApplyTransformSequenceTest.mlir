@@ -16,15 +16,16 @@
 
 // This file tests that the --apply-transform-sequence:
 // 1. Correctly removes the transformer module from the payload module
-// 2. Correctly applies the transformer module 
+// 2. Correctly applies the transformer module
 // (using -remove-chained-self-inverse as the example)
+// 3. Silently passes on modules with no transform program
 
 module @workflow {
 
   module attributes {transform.with_named_sequence} {
     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
       %0 = transform.apply_registered_pass "remove-chained-self-inverse" to %arg0 {options = "func-name=f"} : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-      transform.yield 
+      transform.yield
     }
   }
 
@@ -57,9 +58,16 @@ module @workflow {
 // CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
 // CHECK-NOT: transform.yield
 
-// CHECK-LABEL: f 
+// CHECK-LABEL: f
 // CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
 
 // CHECK-LABEL: g
 // CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
 // CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+
+// -----
+
+// CHECK-LABEL: @empty_workflow
+module @empty_workflow {
+
+}
