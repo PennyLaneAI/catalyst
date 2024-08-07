@@ -5,4 +5,4 @@ llvm=3a8316216807d64a586b971f51695e23883331f7
 enzyme=v0.0.130
 
 # Always remove custom PL/LQ versions before release.
-pennylane=0.38.0.dev8
+pennylane=0.38.0.dev11
