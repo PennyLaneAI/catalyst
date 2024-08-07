@@ -97,6 +97,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.gradient",
     "mlir_quantum.dialects.catalyst",
     "mlir_quantum.dialects.mitigation",
+    "mlir_quantum.dialects._transform_ops_gen",
     "mlir_quantum.compiler_driver",
     "pybind11",
     "cudaq",
