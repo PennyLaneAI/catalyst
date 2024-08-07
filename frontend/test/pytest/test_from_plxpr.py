@@ -222,7 +222,7 @@ class TestCatalystCompareJaxpr:
     def test_globalphase(self):
         """Test conversion of a global phase."""
 
-        dev = qml.device('lightning.qubit', wires=1)
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qml.qnode(dev)
         def circuit(phi):
@@ -243,7 +243,6 @@ class TestCatalystCompareJaxpr:
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
         call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
-
 
     def test_expval(self):
         """Test comparison and execution of the jaxpr for a simple qnode."""
