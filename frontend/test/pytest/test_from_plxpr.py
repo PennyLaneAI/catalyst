@@ -495,7 +495,7 @@ class TestHybridPrograms:
         qjit_obj(0.5)
 
         call_jaxpr_pl = converted.eqns[1].params["call_jaxpr"]
-        call_jaxpr_c = qjit_obj.jaxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = qjit_obj.jaxpr.eqns[2].params["call_jaxpr"]
 
         # qubit extraction and classical equations in a slightly different order
         # thus cant check specific equations and have to discard comparing counts
