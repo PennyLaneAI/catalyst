@@ -187,6 +187,6 @@ def compile_cmain(fn, *args):
     # configure flags
     default_flags = LinkerDriver.get_default_flags(options)
     no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
-    link_so_flags = no_shared_flags + ["-Wl,-rpath," + workspace, "-L" + workspace, "-l"+f_name, "-lpython3.10"]
+    link_so_flags = no_shared_flags + ["-Wl,-rpath," + workspace, "-L" + workspace, "-l"+f_name, "-lpython3.10", "-g"]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
     # requiring export LD_LIBRARY_PATH=/home/tzung-han.juang/.conda/envs/xanadu-update/lib/python3.12/site-packages/scipy.libs:$LD_LIBRARY_PATH to run the binary
