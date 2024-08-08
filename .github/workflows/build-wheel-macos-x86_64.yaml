@@ -96,26 +96,28 @@ jobs:
         path: mlir/Enzyme
 
     # Cache external project builds
-    - name: Cache LLVM Build
+    - name: Restore LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
-    - name: Cache MHLO Build
+    - name: Restore MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
-    - name: Cache Enzyme Build
+    - name: Restore Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
@@ -149,6 +151,14 @@ jobs:
         # This tests fails on CI/CD not locally.
         LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
 
+    - name: Save LLVM Build
+      id: save-llvm-build
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
@@ -170,6 +180,14 @@ jobs:
 
         cmake --build mhlo-build --target check-mlir-hlo
 
+    - name: Save MHLO Build
+      id: save-mhlo-build
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
@@ -180,6 +198,14 @@ jobs:
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         cmake --build enzyme-build --target EnzymeStatic-19
+
+    - name: Save Enzyme Build
+      id: save-enzyme-build
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
   catalyst-macos-wheels-x86-64:
     needs: [constants, build-dependencies]
@@ -206,7 +232,7 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
@@ -215,7 +241,7 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
@@ -223,7 +249,7 @@ jobs:
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
@@ -232,7 +258,7 @@ jobs:
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
@@ -240,7 +266,7 @@ jobs:
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
@@ -249,7 +275,7 @@ jobs:
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
