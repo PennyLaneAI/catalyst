@@ -163,6 +163,16 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 @debug_logger
 def compile_cmain(fn, *args):
+    """Generate and compile a C program that calls a jitted function with the provided arguments.
+
+        Args:
+            fn (QJIT): a qjit-decorated function
+            *args: argument values to use in the C program when invoking ``fn``
+
+        Returns:
+            TBD
+        """
+
     main_c_file = str(fn.workspace) + "/main.c"
     output_file = str(fn.workspace) + "/" + str(fn.__name__) + ".out"
     with open(main_c_file, "w", encoding="utf-8") as file:
