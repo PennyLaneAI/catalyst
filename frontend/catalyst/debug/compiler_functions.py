@@ -193,7 +193,6 @@ def compile_cmain(fn, *args):
         "-Wl,-rpath," + workspace,
         "-L" + workspace,
         "-l" + f_name,
-        "-lpython3.10",
         "-g",
     ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
@@ -204,6 +203,7 @@ def compile_cmain(fn, *args):
     command = ld_prefix + " " + output_file
     return command
 
+
 @debug_logger
 def run_cmain_executable(command):
     """Running c executable.
@@ -213,5 +213,5 @@ def run_cmain_executable(command):
     Returns:
         results of the command.
     """
-    result = subprocess.run(command,  shell=True, capture_output=True, text=True)
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result
