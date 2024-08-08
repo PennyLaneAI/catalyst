@@ -623,7 +623,6 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_OPENQASM=OFF \
           ENABLE_ASAN=ON \
           make test-runtime
@@ -645,7 +644,6 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_ASAN=ON \
           make test-runtime
 
