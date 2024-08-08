@@ -552,29 +552,14 @@ class QJIT:
         if self.compile_options.autograph:
             processed_fn = run_autograph(self.original_function)
 
-        #return processed_fn
+        return processed_fn
 
         #breakpoint()
 
-        
+        '''
         if hasattr(processed_fn, "tape") and processed_fn.tape is not None and len(processed_fn.transform_program) != 0:
             dev = processed_fn.device
             #ops = processed_fn.tape.operations.copy()
-            '''
-            tapes = []
-            for i in range(len(processed_fn.tape.measurements)):
-                tapes.append(qml.tape.QuantumTape(ops, [processed_fn.tape.measurements[i]]))
-
-
-            funcs = []
-            for tape in tapes:
-                @qml.qnode(dev)
-                def _wrapper(*args, tape=tape):
-                    for op in tape.operations:
-                        qml.apply(op)
-                    return qml.apply(tape.measurements[0])
-                funcs.append(_wrapper)
-            '''
             
             #breakpoint()
             # only works for one transform now
@@ -628,7 +613,7 @@ class QJIT:
 
         else:
             return processed_fn
-        
+        '''
         
 
     @instrument(size_from=0)

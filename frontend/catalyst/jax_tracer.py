@@ -996,13 +996,16 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         #breakpoint()
         out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
         #breakpoint()
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
-        #_, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
-        #jaxpr = jax.make_jaxpr(post_processing)(in_tracers).jaxpr
+        #jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+        _, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
         #breakpoint()
-        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        return closed_jaxpr, out_type, out_tree_promise()
-        #return jaxpr, out_type, out_tree_promise()
+        jaxpr = jax.make_jaxpr(post_processing)(pp_args).jaxpr
+        #breakpoint()
+
+        #closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        #return closed_jaxpr, out_type, out_tree_promise()
+
+        return jaxpr, out_type, out_tree_promise()
 
 
 @debug_logger
@@ -1071,7 +1074,7 @@ def trace_function(
         return res_expanded_tracers, in_sig, out_sig
 
 
-
+'''
 # main
 @debug_logger
 def trace_quantum_function(
@@ -1203,10 +1206,10 @@ def trace_quantum_function(
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree
-
-
-
 '''
+
+
+
 # mine
 @debug_logger
 def trace_quantum_function(
@@ -1284,8 +1287,8 @@ def trace_quantum_function(
 
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            save_frame = EvaluationContext.find_jaxpr_frame().eqns
-            print("save_frame", save_frame)
+            #save_frame = EvaluationContext.find_jaxpr_frame().eqns
+            #print("save_frame", save_frame)
             #breakpoint()
             # Set up same device and quantum register for all tapes in the program.
 
@@ -1338,7 +1341,7 @@ def trace_quantum_function(
                 EvaluationContext.find_jaxpr_frame().eqns.clear()
         
 
-            EvaluationContext.find_jaxpr_frame().eqns = save_frame
+            #EvaluationContext.find_jaxpr_frame().eqns = save_frame
             #breakpoint()
 
         # trace post processing
@@ -1363,7 +1366,7 @@ def trace_quantum_function(
 
             # an initially empty jaxpr to hold the calls to each tape's jaxpr
             big_jaxpr = jax.core.Jaxpr(const_, in_, out_, [])
-
+            #breakpoint()
 
             from jax._src.core import new_jaxpr_eqn, no_effects
             post_processing_invars = []
@@ -1384,21 +1387,21 @@ def trace_quantum_function(
 
 
         #breakpoint()
-        def _f(*args, **kwargs):
-            return f(args, kwargs)
+        #def _f(*args, **kwargs):
+        #    return f(args, kwargs)
         big_jaxpr.eqns.append(
             new_jaxpr_eqn(
                 invars=post_processing_invars,
                 outvars=post_processing_jaxpr.outvars,
                 primitive=func_p,
-                params={'fn':_f, 'call_jaxpr':post_processing_jaxpr},
+                params={'fn':f, 'call_jaxpr':post_processing_jaxpr},
                 effects=no_effects,
             )
         )
 
-        breakpoint()
+        #breakpoint()
 
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return jax.core.ClosedJaxpr(big_jaxpr, const_), out_type, out_tree
-'''
+
