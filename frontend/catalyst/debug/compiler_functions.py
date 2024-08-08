@@ -18,6 +18,7 @@ This module contains debug functions to interact with the compiler and compiled 
 import logging
 import os
 import shutil
+import subprocess
 
 from jax.interpreters import mlir
 
@@ -202,3 +203,15 @@ def compile_cmain(fn, *args):
     ld_prefix = "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + ":".join(lib_strings)
     command = ld_prefix + " " + output_file
     return command
+
+@debug_logger
+def run_cmain_executable(command):
+    """Running c executable.
+
+        Args:
+            command (str): a string that represents the command for running .out file.
+    Returns:
+        results of the command.
+    """
+    result = subprocess.run(command,  shell=True, capture_output=True, text=True)
+    return result
