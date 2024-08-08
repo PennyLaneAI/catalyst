@@ -162,17 +162,18 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
 
+
 @debug_logger
 def compile_cmain(fn, *args):
     """Generate and compile a C program that calls a jitted function with the provided arguments.
 
-        Args:
-            fn (QJIT): a qjit-decorated function
-            *args: argument values to use in the C program when invoking ``fn``
+    Args:
+        fn (QJIT): a qjit-decorated function
+        *args: argument values to use in the C program when invoking ``fn``
 
-        Returns:
-            TBD
-        """
+    Returns:
+        a command to run the generated binary.
+    """
     f_name = str(fn.__name__)
     workspace = str(fn.workspace)
     main_c_file = workspace + "/main.c"
@@ -187,6 +188,17 @@ def compile_cmain(fn, *args):
     # configure flags
     default_flags = LinkerDriver.get_default_flags(options)
     no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
-    link_so_flags = no_shared_flags + ["-Wl,-rpath," + workspace, "-L" + workspace, "-l"+f_name, "-lpython3.10", "-g"]
+    link_so_flags = no_shared_flags + [
+        "-Wl,-rpath," + workspace,
+        "-L" + workspace,
+        "-l" + f_name,
+        "-lpython3.10",
+        "-g",
+    ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
-    # requiring export LD_LIBRARY_PATH=/home/tzung-han.juang/.conda/envs/xanadu-update/lib/python3.12/site-packages/scipy.libs:$LD_LIBRARY_PATH to run the binary
+
+    # generate command
+    lib_strings = [s[2:] for s in link_so_flags if s.startswith("-L")]
+    ld_prefix = "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + ":".join(lib_strings)
+    command = ld_prefix + " " + output_file
+    return command
