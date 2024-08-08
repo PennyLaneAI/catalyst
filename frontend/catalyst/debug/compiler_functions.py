@@ -22,7 +22,7 @@ from jax.interpreters import mlir
 
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler
+from catalyst.compiler import Compiler, LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
@@ -163,5 +163,11 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 @debug_logger
 def compile_cmain(fn, *args):
-    with open(str(fn.workspace) + "/main.c", "w", encoding="utf-8") as c_file:
-        c_file.write(get_cmain(fn, *args))
+    main_c_file = str(fn.workspace) + "/main.c"
+    output_file = str(fn.workspace) + "/" + str(fn.__name__) + ".out"
+    with open(main_c_file, "w", encoding="utf-8") as file:
+        file.write(get_cmain(fn, *args))
+
+    # configure flags
+    default_flags = LinkerDriver.get_default_flags(fn.compiler.options)
+    no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
