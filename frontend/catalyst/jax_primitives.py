@@ -1301,7 +1301,7 @@ def _qunitary_lowering(
         f64_type = ir.F64Type.get()
         complex_f64_type = ir.ComplexType.get(f64_type)
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
-        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).results
+        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).result
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -2112,7 +2112,7 @@ def safe_cast_to_f64(value, op, kind="parameter"):
     if not ir.F64Type.isinstance(baseType):
         targetBaseType = ir.F64Type.get()
         targetTensorType = ir.RankedTensorType.get(shape, targetBaseType)
-        value = StableHLOConvertOp(targetTensorType, value).results
+        value = StableHLOConvertOp(targetTensorType, value).result
 
     return value
 
