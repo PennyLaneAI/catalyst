@@ -1038,18 +1038,14 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg.type).data == "reg"
 
-    if ir.RankedTensorType.isinstance(qubit_idx.type):
-        baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        if ir.RankedTensorType(qubit_idx.type).shape == []:
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
-        elif ir.RankedTensorType(qubit_idx.type).shape == [1]:
-            c0 = ConstantOp(ir.IndexType.get(), 0)
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
-    assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for extract op!"
+    qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+    if not ir.IntegerType.isinstance(qubit_idx.type):
+        raise TypeError(f"Operator wires expected to be integers, got {qubit_idx.type}!")
 
     if ir.IntegerType(qubit_idx.type).width < 64:
         qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
-    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for extract op!"
+    elif not ir.IntegerType(qubit_idx.type).width == 64:
+        raise TypeError(f"Operator wires expected to be 64-bit integers, got {qubit_idx.type}!")
 
     qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
     return ExtractOp(qubit_type, qreg, idx=qubit_idx).results
@@ -1081,18 +1077,14 @@ def _qinsert_lowering(
     assert ir.OpaqueType(qreg_old.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg_old.type).data == "reg"
 
-    if ir.RankedTensorType.isinstance(qubit_idx.type):
-        baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        if ir.RankedTensorType(qubit_idx.type).shape == []:
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
-        elif ir.RankedTensorType(qubit_idx.type).shape == [1]:
-            c0 = ConstantOp(ir.IndexType.get(), 0)
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
-    assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for insert op!"
+    qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+    if not ir.IntegerType.isinstance(qubit_idx.type):
+        raise TypeError(f"Operator wires expected to be integers, got {qubit_idx.type}!")
 
     if ir.IntegerType(qubit_idx.type).width < 64:
         qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
-    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for insert op!"
+    elif not ir.IntegerType(qubit_idx.type).width == 64:
+        raise TypeError(f"Operator wires expected to be 64-bit integers, got {qubit_idx.type}!")
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
     return InsertOp(qreg_type, qreg_old, qubit, idx=qubit_idx).results
