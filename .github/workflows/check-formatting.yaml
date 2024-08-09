@@ -11,11 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check_not_draft_pr:
-    uses: ./.github/workflows/check-for-draft-pr.yaml
-
   format-python:
-    needs: check_not_draft_pr
+    if: github.event.pull_request.draft == 'false'
     name: Python Formatting & Linting
     runs-on: ubuntu-latest
 
@@ -36,7 +33,7 @@ jobs:
         run: pylint --errors-only frontend
 
   format-cpp:
-    needs: check_not_draft_pr
+    if: github.event.pull_request.draft == 'false'
     name: C++ Formatting
     runs-on: ubuntu-latest
 

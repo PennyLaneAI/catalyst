@@ -7,11 +7,8 @@ on:
 name: Changelog Reminder
 
 jobs:
-  check_not_draft_pr:
-    uses: ./.github/workflows/check-for-draft-pr.yaml
-
   remind:
-    needs: check_not_draft_pr
+    if: github.event.pull_request.draft == 'false'
     name: Changelog Reminder
     runs-on: ubuntu-latest
     steps:

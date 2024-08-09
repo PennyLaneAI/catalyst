@@ -21,11 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check_not_draft_pr:
-    uses: ./.github/workflows/check-for-draft-pr.yaml
-
   check_if_wheel_build_required:
-    needs: check_not_draft_pr
+    if: github.event.pull_request.draft == 'false'
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:

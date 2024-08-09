@@ -13,11 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check_not_draft_pr:
-    uses: ./.github/workflows/check-for-draft-pr.yaml
-
   determine_runner:
-    needs: check_not_draft_pr
+    if: github.event.pull_request.draft == 'false'
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
