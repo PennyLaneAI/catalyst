@@ -69,7 +69,7 @@ jobs:
 
 
       - name: Upload Catalyst-Runtime Artifact
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4
         with:
           name: runtime-build-${{ matrix.compiler }}
           path: |
@@ -78,7 +78,7 @@ jobs:
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4
         with:
           name: oqc-build-${{ matrix.compiler }}
           path: |
@@ -106,7 +106,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
@@ -162,7 +162,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: true
 
     - name: Clone MHLO Submodule
@@ -186,7 +186,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -232,7 +232,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: true
 
     - name: Clone Enzyme Submodule
@@ -256,7 +256,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
@@ -306,16 +306,16 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
@@ -323,16 +323,16 @@ jobs:
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
     - name: Get Cached MHLO Build
       id: cache-mhlo
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
@@ -340,29 +340,27 @@ jobs:
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: true
         fail-on-cache-miss: true
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: true
 
-    - name: Cache CCache
-      id: cache-ccache
-      uses: actions/cache@v4
+    - name: Restore CCache on feature branches
+      id: restore-ccache
+      if: ${{ github.ref != 'refs/heads/main' }}
+      uses: actions/cache/restore@v4
       with:
         path: .ccache
-        # TODO: revisit once actions/cache has an update feature
-        #       https://github.com/actions/toolkit/issues/505
-        #       this will load the latest available cache and generate a new one at the end
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
@@ -378,13 +376,21 @@ jobs:
         make dialects
 
     - name: Upload Quantum Build Artifact
-      uses: actions/upload-artifact@v4.3.4
+      uses: actions/upload-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: |
           quantum-build/bin
           quantum-build/python_packages/*
         retention-days: 1
+
+    - name: Cache CCache on main branch
+      id: save-ccache
+      if: ${{ github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@v4
+      with:
+        path: .ccache
+        key: ${{ runner.os }}-ccache-${{ github.run_id }}
 
   frontend-tests:
     name: Frontend Tests
@@ -617,7 +623,6 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_OPENQASM=OFF \
           ENABLE_ASAN=ON \
           make test-runtime
@@ -639,7 +644,6 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_ASAN=ON \
           make test-runtime
 

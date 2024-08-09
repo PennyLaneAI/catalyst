@@ -126,7 +126,6 @@ RUNTIME_OBSERVABLES = {
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
     "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
-    "lightning.kokkos": ("LightningKokkosSimulator", "librtd_lightning"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
 }

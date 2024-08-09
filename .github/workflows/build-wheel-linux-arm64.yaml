@@ -61,7 +61,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/llvm-project
-        key: ${{ runner.os }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Source
@@ -69,7 +69,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache Enzyme Source
@@ -77,7 +77,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: ${{ runner.os }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -105,26 +105,28 @@ jobs:
         path: mlir/Enzyme
 
     # Cache external project builds
-    - name: Cache LLVM Build
+    - name: Restore LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
 
-    - name: Cache MHLO Build
+    - name: Restore MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
-    - name: Cache Enzyme Build
+    - name: Restore Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Build LLD
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -150,6 +152,14 @@ jobs:
             -i ${{ matrix.container_img }} \
             bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
 
+    - name: Save LLVM Build
+      id: save-llvm-build
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  llvm-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
@@ -161,6 +171,14 @@ jobs:
             -i ${{ matrix.container_img }} \
             bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
 
+    - name: Save MHLO Build
+      id: save-mhlo-build
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  mhlo-build
+        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
@@ -171,6 +189,14 @@ jobs:
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
             bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+
+    - name: Save Enzyme Build
+      id: save-enzyme-build
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: enzyme-build
+        key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
   catalyst-linux-wheels-arm64:
     needs: [constants, build-dependencies]
@@ -201,52 +227,53 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/Enzyme
-        key: ${{ runner.os }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
     # Build Catalyst Wheel
@@ -261,7 +288,7 @@ jobs:
             bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v4.3.4
+      uses: actions/upload-artifact@v4
       with:
         name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.official}}.zip
         path: wheel/
@@ -307,7 +334,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Run Python Pytest Tests

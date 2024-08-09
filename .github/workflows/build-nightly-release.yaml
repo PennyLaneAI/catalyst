@@ -52,7 +52,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, linux-aarch, macos-arm, macos-x86]
+    needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing

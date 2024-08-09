@@ -71,12 +71,6 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let constructor = "catalyst::createAdjointLoweringPass()";
 }
 
-def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
-    let summary = "Perform removal of chained operations that are self inverses.";
-
-    let constructor = "catalyst::createRemoveChainedSelfInversePass()";
-}
-
 def AnnotateFunctionPass : Pass<"annotate-function"> {
     let summary = "Annotate functions that contain a measurement operation.";
 
@@ -87,5 +81,24 @@ def AnnotateFunctionPass : Pass<"annotate-function"> {
 
     let constructor = "catalyst::createAnnotateFunctionPass()";
 }
+
+// ----- Quantum circuit transformation passes begin ----- //
+// For example, automatic compiler peephole opts, etc.
+
+class QuantumCircuitTransformationPass<string CmdlineName> : Pass<CmdlineName> {
+    let options = [
+    Option<"FuncNameOpt", "func-name",
+           "std::string", /*default=*/"\"\"",
+           "The name of the function (or qnode) to run the quantum circuit transformation pass on.">,
+    ];
+}
+
+def RemoveChainedSelfInversePass : QuantumCircuitTransformationPass<"remove-chained-self-inverse"> {
+    let summary = "Perform removal of chained operations that are self inverses.";
+
+    let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+}
+
+// ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES

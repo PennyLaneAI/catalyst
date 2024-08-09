@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for mid-circuit measurements in Catalyst"""
 
-import os
 from dataclasses import asdict
 from functools import reduce
 from typing import Iterable, Sequence
@@ -22,14 +21,13 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.tree_util import tree_flatten
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
 from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
-os.environ["OMP_PROC_BIND"] = "false"
-os.environ["OMP_NUM_THREADS"] = "2"
 
 # pylint: disable=too-many-public-methods
 
@@ -314,6 +312,81 @@ class TestMidCircuitMeasurement:
         _ = circuit(1.8)
         expected_call_count = 1 if postselect_mode == "hw-like" else 0
         assert spy.call_count == expected_call_count
+
+    @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
+    @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
+    def test_mcm_method_with_dict_output(self, backend, postselect_mode, mcm_method):
+        """Test that the correct default mcm_method is chosen based on postselect_mode"""
+        dev = qml.device(backend, wires=1, shots=20)
+
+        @qml.qjit
+        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            measure(0, postselect=1)
+            return {"hi": qml.expval(qml.Z(0))}
+
+        observed = circuit(0.9)
+        expected = {"hi": jnp.array(-1.0, dtype=jnp.float64)}
+        assert np.allclose(expected["hi"], observed["hi"])
+
+    @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
+    @pytest.mark.parametrize("mcm_method", ["one-shot"])
+    def test_mcm_method_with_count_mesurement(self, backend, postselect_mode, mcm_method):
+        """Test that the correct default mcm_method is chosen based on postselect_mode"""
+        dev = qml.device(backend, wires=1, shots=20)
+
+        @qml.qjit
+        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            measure(0, postselect=1)
+            return {"hi": qml.counts()}, {"bye": qml.expval(qml.Z(0))}, {"hi": qml.counts()}
+
+        observed = circuit(0.9)
+        expected = (
+            {"hi": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            {"bye": jnp.array(-1, dtype=jnp.float64)},
+            {"hi": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+    @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
+    @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
+    def test_mcm_method_with_dict_output_used_measurements(
+        self, backend, postselect_mode, mcm_method
+    ):
+        """Test that the correct default mcm_method is chosen based on postselect_mode"""
+        dev = qml.device(backend, wires=1, shots=5)
+
+        @qml.qjit
+        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            m_0 = measure(0, postselect=1)
+            return (
+                {"1": qml.probs(wires=[0])},
+                {"2": qml.probs(wires=[0])},
+                {"3": qml.probs(op=m_0)},
+                {"4": qml.sample(op=m_0)},
+            )
+
+        observed = circuit(0.9)
+        expected = (
+            {"1": jnp.array((0, 1), dtype=jnp.float64)},
+            {"2": jnp.array((0, 1), dtype=jnp.float64)},
+            {"3": jnp.array((0, 1), dtype=jnp.float64)},
+            {
+                "4": jnp.array(
+                    (-2147483648, -2147483648, -2147483648, 1, -2147483648), dtype=jnp.int64
+                )
+            },
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):

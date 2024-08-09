@@ -159,4 +159,10 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
+def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
+    let summary = "Apply the passes scheduled with the transform dialect.";
+
+    let constructor = "catalyst::createApplyTransformSequencePass()";
+}
+
 #endif // CATALYST_PASSES
