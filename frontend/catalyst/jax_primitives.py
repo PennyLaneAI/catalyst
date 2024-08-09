@@ -503,7 +503,7 @@ def _apply_registered_pass_lowering(
     assert (
         named_sequence_op is not None
     ), """
-            transform.apply_registered_pass must be placed in a transform.named_sequence, 
+            transform.apply_registered_pass must be placed in a transform.named_sequence,
             but none exist in the module.
             """
 
@@ -517,7 +517,7 @@ def _apply_registered_pass_lowering(
         "transform.apply_registered_pass",
         "transform.yield",
     ), """
-            Unexpected operation in transform.named_sequence! 
+            Unexpected operation in transform.named_sequence!
             Only transform.apply_registered_pass and transform.yield are allowed.
         """
 
@@ -1102,7 +1102,7 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len=0, adjoint=False):
+def _gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
@@ -1122,7 +1122,7 @@ def _gphase_def_impl(*args, **kwargs):
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, op=None, ctrl_len=0, adjoint=False
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
