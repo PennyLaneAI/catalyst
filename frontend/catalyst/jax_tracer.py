@@ -1469,7 +1469,6 @@ def trace_quantum_function(
                                 break
 
                         # go through the invars to the primitive
-                        # breakpoint()
                         for j, invar in enumerate(eqn.invars):
                             # if the primitive uses one of the jaxpr's invars,
                             # this invar use should be replaced by the corresponding new invar
