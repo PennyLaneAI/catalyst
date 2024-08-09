@@ -162,14 +162,16 @@ struct QuantumDevice {
     /**
      * @brief Function to set state to vector of complex variables.
      */
-    virtual void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires) {
+    virtual void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires)
+    {
         RT_ASSERT(false);
     }
 
     /**
      * @brief Function to set state to vector of complex variables.
      */
-    virtual void SetBasisState(DataView<int8_t, 1>&, std::vector<QubitIdType> &wires) {
+    virtual void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires)
+    {
         RT_ASSERT(false);
     }
 
