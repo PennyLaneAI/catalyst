@@ -7,6 +7,7 @@ on:
       - reopened
       - synchronize
       - labeled
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -20,11 +21,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_not_draft_pr:
+    uses: ./.github/workflows/check-for-draft-pr.yaml
+
   check_if_wheel_build_required:
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
-    needs: [check_if_wheel_build_required]
+    needs: [check_not_draft_pr, check_if_wheel_build_required]
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml

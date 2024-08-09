@@ -1,0 +1,9 @@
+name: Check Draft PR
+on:
+  workflow_call:
+jobs:
+  check_if_draft:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Fail if Draft
+      run: if [[ ${{ github.event.pull_request.draft }} == true ]]; then exit 1; fi

@@ -7,7 +7,11 @@ on:
 name: Changelog Reminder
 
 jobs:
+  check_not_draft_pr:
+    uses: ./.github/workflows/check-for-draft-pr.yaml
+
   remind:
+    needs: check_not_draft_pr
     name: Changelog Reminder
     runs-on: ubuntu-latest
     steps:

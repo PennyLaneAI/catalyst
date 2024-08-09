@@ -2,6 +2,8 @@ name: Check Catalyst Build
 
 on:
   pull_request:
+    types:
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -11,6 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_not_draft_pr:
+    uses: ./.github/workflows/check-for-draft-pr.yaml
+
   determine_runner:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
@@ -20,7 +25,7 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
-    needs: [determine_runner]
+    needs: [check_not_draft_pr, determine_runner]
     with:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
       runs_on: ${{ needs.determine_runner.outputs.runner_group }}
