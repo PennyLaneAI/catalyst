@@ -17,12 +17,14 @@ This module contains debug functions to interact with the compiler and compiled 
 """
 import logging
 import os
+import shutil
+import subprocess
 
 from jax.interpreters import mlir
 
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler
+from catalyst.compiler import Compiler, LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
@@ -160,3 +162,59 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
+
+
+@debug_logger
+def compile_cmain(fn, *args):
+    """Generate and compile a C program that calls a jitted function with the provided arguments.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        *args: argument values to use in the C program when invoking ``fn``
+
+    Returns:
+        (str): the paths that should be included in LD_LIBRARY_PATH.
+        (str): the path of output binary.
+    """
+    f_name = str(fn.__name__)
+    workspace = str(fn.workspace)
+    main_c_file = workspace + "/main.c"
+    output_file = workspace + "/" + f_name + ".out"
+    shared_object_file = workspace + "/" + f_name + ".so"
+    lib_shared_object_file = workspace + "/lib" + f_name + ".so"
+    options = fn.compiler.options
+    with open(main_c_file, "w", encoding="utf-8") as file:
+        file.write(get_cmain(fn, *args))
+    shutil.copy(shared_object_file, lib_shared_object_file)
+
+    # configure flags
+    default_flags = LinkerDriver.get_default_flags(options)
+    no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
+    link_so_flags = no_shared_flags + [
+        "-Wl,-rpath," + workspace,
+        "-L" + workspace,
+        "-l" + f_name,
+        "-g",
+    ]
+    LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
+
+    # generate command
+    lib_strings = [s[2:] for s in link_so_flags if s.startswith("-L")]
+    ld_env = "$LD_LIBRARY_PATH:" + ":".join(lib_strings)
+    return ld_env, output_file
+
+
+@debug_logger
+def run_cmain_executable(ld_env, binary_file):
+    """Running c executable.
+
+        Args:
+            ld_env (str): the paths that should be included in LD_LIBRARY_PATH.
+            binary_file (str): the path of a binary.
+    Returns:
+        results of the command.
+    """
+    env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
+
+    result = subprocess.run(binary_file, env=env, capture_output=True, text=True, check=True)
+    return result

@@ -117,8 +117,7 @@ class ResultVar(Variable):
         dependencies = []
         for dtype, mlir_type in zip(numpyTypes, resultType):
             typ = np.dtype(dtype)
-            rank = len(ir.RankedTensorType(mlir_type).shape)
-            dependencies.append(CType(typ, rank))
+            dependencies.append(CType(typ, ir.RankedTensorType(mlir_type).shape))
 
         type_decl = ResultVar._result_type_definition(dependencies)
         self._dependencies = set(typ for typ in dependencies)
@@ -171,30 +170,42 @@ class CType(Type):
     This class will be printed to a memref type.
     """
 
-    def __init__(self, typ, rank):
-        name = CType._get_name(typ, rank)
-        decl = CType._get_definition(name, typ, rank)
+    def __init__(self, typ, shape):
+        name = CType._get_name(typ, shape)
+        decl = CType._get_definition(name, typ, shape)
         super().__init__(name, decl)
 
     @staticmethod
-    def _get_template_for_sizes_and_strides(rank):
+    def _get_template_for_sizes_and_strides(shape):
+        rank = len(shape) if hasattr(shape, "__iter__") else 0
         rank_0 = ""
         rank_n_bt_0 = f"""size_t sizes[{rank}];
  \tsize_t strides[{rank}];"""
         return rank_n_bt_0 if rank else rank_0
 
     @staticmethod
-    def _get_name(typ, rank):
-        return f"struct memref_{typ}x{rank}_t"
+    def _get_name(typ, shape):
+        if hasattr(shape, "__iter__"):
+            shape_str = "x".join([str(i) for i in shape])
+        else:
+            shape_str = str(shape)
+        return f"struct memref_{typ}x{shape_str}_t"
 
     @staticmethod
-    def _get_definition(name, typ, rank):
-        sizes_and_strides = CType._get_template_for_sizes_and_strides(rank)
+    def _get_definition(name, typ, shape):
+        sizes_and_strides = CType._get_template_for_sizes_and_strides(shape)
+        pointer_shape = shape[1:] if hasattr(shape, "__iter__") else []
+        allocated_str = "*allocated"
+        aligned_str = "*aligned"
+        if pointer_shape:
+            pointer_shape_str = "".join(["[" + str(i) + "]" for i in pointer_shape])
+            allocated_str = "(" + allocated_str + ")" + pointer_shape_str
+            aligned_str = "(" + aligned_str + ")" + pointer_shape_str
         return f"""
 {name}
 {{
-\t{typ}* allocated;
-\t{typ}* aligned;
+\t{typ} {allocated_str};
+\t{typ} {aligned_str};
 \tsize_t offset;
 \t{sizes_and_strides}
 }};"""
@@ -204,8 +215,7 @@ class CVariable(Variable):
     """Memref variables used in the C program."""
 
     def __init__(self, array, arg_idx):
-        rank = len(array.shape)
-        typ = CType(array.dtype, rank)
+        typ = CType(array.dtype, array.shape)
         name = CVariable._get_variable_name(arg_idx)
         init = CVariable._get_initialization(array, arg_idx)
         super().__init__(name, typ, init)
@@ -221,12 +231,13 @@ class CVariable(Variable):
     @staticmethod
     def _get_buffer_size(array):
         rank = len(array.shape)
-        return len(array.data.tolist()) if rank > 0 else 0
+        size_str_list = ["[" + str(i) + "]" for i in array.shape]
+        return "".join(size_str_list) if rank > 0 else 0
 
     @staticmethod
     def _get_initialization(array, idx):
         rank = len(array.shape)
-        typ = CType(array.dtype, rank)
+        typ = CType(array.dtype, array.shape)
         buff_name = CVariable._get_buffer_name(idx)
         var_name = CVariable._get_variable_name(idx)
         sizes = CVariable._get_sizes(array)
@@ -234,7 +245,7 @@ class CVariable(Variable):
         buff_size = CVariable._get_buffer_size(array)
         elements = CVariable._get_array_data(array)
         fmt_rank_bt_0 = f"""
-\t{array.dtype} {buff_name}[{buff_size}] = {{ { elements } }};
+\t{array.dtype} {buff_name}{buff_size} =  {elements};
 \t{typ.name} {var_name} = {{ {buff_name}, {buff_name}, 0, {{ {sizes} }}, {{ {strides} }}, }};
         """
         fmt_rank_0 = f"""
@@ -248,8 +259,7 @@ class CVariable(Variable):
         rank = len(array.shape)
         if rank == 0:
             return array
-        elements = [str(element) for element in array.data.tolist()]
-        elements_str = ",".join(elements)
+        elements_str = str(array.tolist()).replace("[", "{").replace("]", "}")
         return elements_str
 
     @staticmethod

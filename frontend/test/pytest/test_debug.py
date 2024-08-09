@@ -21,6 +21,7 @@ from jax.tree_util import register_pytree_node_class
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
+from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -428,6 +429,30 @@ class TestCProgramGeneration:
 
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
+
+    @pytest.mark.parametrize(
+        "arg",
+        [
+            5,
+            np.ones(5, dtype=int),
+            np.ones((5, 2), dtype=int),
+        ],
+    )
+    def test_executable_generation(self, arg):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """Square function with debugging print."""
+            y = x * x
+            debug.print_memref(y)
+            return y
+
+        ans = str(f(arg).tolist()).replace(" ", "")
+        ld_env, binary = compile_cmain(f, arg)
+        result = run_cmain_executable(ld_env, binary).stdout.replace(" ", "").replace("\n", "")
+
+        assert ans in result
 
 
 if __name__ == "__main__":
