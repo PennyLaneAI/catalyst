@@ -322,3 +322,59 @@ And finally some LLVMIR that is inspired by QIR.
 The LLVMIR code is compiled to an object file using the LLVM static compiler and linked to the
 runtime libraries. The generated shared object is stored by the caching mechanism in Catalyst
 for future calls.
+
+C Executable Generation
+=================
+
+Catalyst provides a way to generate a c binary file that calls the shared object of the given
+qjit-decorated function.
+In ``debug.compiler_functions``, ``compile_cmain(fn: QJIT, *args) -> str, str`` takes a qjit-
+decorated function and arguments for that function.
+It returns a string of LD_LIBRARY_PATH and the path to the output binary file.
+
+``run_cmain_executable(ld_env: str, binary_file: str) -> str`` is mainly used for testing.
+It takes a string of LD_LIBRARY_PATH and the path to the output binary file.
+It returns a string the contains the console outputs introduced by `debug.print_memref`.
+
+The following example is a square function.
+Here we are using debug.print_memref to print the information of the result from ``y``.
+Note that ``keep_intermediate=True`` help us to keep the generated files so that we
+can re-run the executable latter.
+
+.. code-block:: python
+
+    @qjit(keep_intermediate=True)
+    def f(x):
+        y = x*x
+        debug.print_memref(y)
+        return y
+    f(5)
+
+>>> MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+... 25
+... 25
+
+The compiled qjit-decorated function can be fed to ``compile_cmain`` to get the required
+ld libraries and binary.
+``run_cmain_executable`` helps us to test if the command works properly.
+
+.. code-block:: python
+
+    from debug.compiler_functions import compile_cmain, run_cmain_executable
+
+    ld_env, binary = compile_cmain(f, 1)
+    result = run_cmain_executable(ld_env, binary)
+    result.stdout
+
+>>> MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+... 25
+
+To run the program in terminal, we need to export ``LD_LIBRARY_PATH`` with the contents
+in ``ld_env`` and run the binary file.
+
+.. code-block:: bash
+
+   export LD_LIBRARY_PATH=/paths/in/ld_env
+   /path/to/binary
+
+
