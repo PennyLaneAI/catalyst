@@ -347,7 +347,6 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
     }
 };
 
-
 ///////////////////
 // Quantum Gates //
 ///////////////////
@@ -912,8 +911,8 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState", {ptrTy, i64},
-                                                 voidTy, isVarArg);
+        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
+                                                 {ptrTy, i64}, voidTy, isVarArg);
 
         SmallVector<Value> args;
 
@@ -981,8 +980,6 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         return success();
     }
 };
-
-
 
 } // namespace
 
