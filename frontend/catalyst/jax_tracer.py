@@ -938,7 +938,7 @@ def apply_transform(
         total_program = device_program
 
     tapes, post_processing = total_program([tape])
-    #breakpoint()
+    # breakpoint()
     if not is_valid_for_batch and len(tapes) > 1:
         msg = "Multiple tapes are generated, but each run might produce different results."
         raise CompileError(msg)
@@ -985,28 +985,28 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args, single
         # The input to the post_processing function is going to be a list of values One for each
         # tape. The tracers are all flat in pp_args.
 
-        #breakpoint()
+        # breakpoint()
 
         # We need to deduce the type/shape/tree of the post_processing.
         wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
-        #breakpoint()
+        # breakpoint()
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
         in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
-        #breakpoint()
+        # breakpoint()
         out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
-        #breakpoint()
+        # breakpoint()
 
         if not single_tape:
-            #jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+            # jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
             _, out_type, _ = ctx.frames[trace].to_jaxpr2(out_tracers)
-            #breakpoint()
+            # breakpoint()
             jaxpr = jax.make_jaxpr(post_processing)(pp_args).jaxpr
-            #breakpoint()
+            # breakpoint()
 
-            #closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-            #return closed_jaxpr, out_type, out_tree_promise()
-            #breakpoint()
+            # closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+            # return closed_jaxpr, out_type, out_tree_promise()
+            # breakpoint()
             return jaxpr, out_type, out_tree_promise()
 
         else:
@@ -1216,8 +1216,60 @@ def trace_quantum_function(
 '''
 
 
-
 # mine
+from jax._src.core import new_jaxpr_eqn, no_effects
+
+
+def cut_through_tapes(eqns):
+    """
+    Takes in a list of jaxpr eqns containing multiple _tape_cut primitives,
+    and returns the list split at these primitives.
+
+    e.g. eqns = [1, 2, 3, tapecut, 4, 5, tapecut]
+    returns [[1,2,3], [4,5]]
+    """
+    cut_results = []
+    cut_locations = []
+    for i in range(len(eqns)):
+        if eqns[i].primitive.name == "_tape_cut":
+            cut_locations.append(i)
+
+    for i, loc in enumerate(cut_locations):
+        if i == 0:
+            cut_results.append(eqns[0:loc])
+        else:
+            cut_results.append(eqns[cut_locations[i - 1] + 1 : loc])
+    return cut_results
+
+
+def replace_jp_invar_with_new_invar(jaxpr_frame, new_invar):
+    """
+    Replace all uses of jaxpr's own invar with new invars.
+    new_invar is a list of invars, in correspondence with jaxpr's own invar's order
+    e.g. if jaxpr's invars are of type (i32, f64, c128),
+    then new_invar is a list of vars with type (i32, f64, c128)
+    """
+    jaxpr_invars = jaxpr_frame.invars  # list of Var
+
+    # go through the primitives of the jaxpr
+    for i, eqn in enumerate(jaxpr_frame.eqns):
+        # go through the invars to the primitive
+        for j, invar in enumerate(eqn.invars):
+            # if the primitive uses one of the jaxpr's invars,
+            # this invar use should be replaced by the corresponding new invar
+            if invar in jaxpr_invars:
+                eqn.invars[j] = new_invar[jaxpr_invars.index(invar)]
+
+
+from jax._src.interpreters.partial_eval import (
+    _const_folding_and_forwarding,
+    _inline_literals,
+    get_states,
+    make_jaxpr_effects,
+)
+from jax._src.util import unzip2
+
+
 @debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
@@ -1250,14 +1302,16 @@ def trace_quantum_function(
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
                 f, args, kwargs, static_argnums
             )
-            #breakpoint()
+            # breakpoint()
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
                 return_values_flat = wffa.call_wrapped(*in_classical_tracers)
-                big_invars = EvaluationContext.find_jaxpr_frame().to_jaxpr(in_classical_tracers)[0].invars
-                #breakpoint()
+                big_invars = (
+                    EvaluationContext.find_jaxpr_frame().to_jaxpr(in_classical_tracers)[0].invars
+                )
+                # breakpoint()
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
             # Therefore we need to compute the tree with measurements as leaves and it comes
@@ -1292,26 +1346,25 @@ def trace_quantum_function(
                 return_values_flat,
             )
 
-
-        #breakpoint()
+        # breakpoint()
         if len(tapes) > 1:
             print("multiple tapes")
             # (2) - Quantum tracing
             transformed_results = []
-            jaxpr_each_tape = []
-
+            jaxpr_info_each_tape = []
 
             with EvaluationContext.frame_tracing_context(ctx, trace):
                 # Set up same device and quantum register for all tapes in the program.
 
                 qnode_transformed = len(qnode_program) > 0
-                #trace = EvaluationContext.frame_tracing_context(ctx)
+                # trace = EvaluationContext.frame_tracing_context(ctx)
                 for i, tape in enumerate(tapes):
                     qdevice_p.bind(
                         rtd_lib=device.backend_lib,
                         rtd_name=device.backend_name,
                         rtd_kwargs=str(device.backend_kwargs),
                     )
+                    # breakpoint()
                     qreg_in = qalloc_p.bind(len(device.wires))
                     # If the program is batched, that means that it was transformed.
                     # If it was transformed, that means that the program might have
@@ -1325,7 +1378,9 @@ def trace_quantum_function(
                         trees = return_values_tree
 
                     mcm_config = qnode.execute_kwargs["mcm_config"]
-                    qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                    qrp_out = trace_quantum_operations(
+                        tape, device, qreg_in, ctx, trace, mcm_config
+                    )
                     meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                     qreg_out = qrp_out.actualize()
 
@@ -1346,77 +1401,163 @@ def trace_quantum_function(
                     qdealloc_p.bind(qreg_out)
 
                     # Get the jaxpr for this tape and clear the tracing frame for next tape
+                    # breakpoint()
                     if type(transformed_results[i]) is not tuple:
-                        jp = EvaluationContext.find_jaxpr_frame().to_jaxpr([transformed_results[i]])
+                        out_tracers = [transformed_results[i]]
                     else:
-                        jp = EvaluationContext.find_jaxpr_frame().to_jaxpr([_ for _ in transformed_results[i]])
-                    jaxpr_each_tape.append(jp)
-                    EvaluationContext.find_jaxpr_frame().eqns.clear()
-                    #print(i, jp)
-                    #trace = EvaluationContext.frame_tracing_context(ctx)
-            
+                        out_tracers = [_ for _ in transformed_results[i]]
+                    jp = EvaluationContext.find_jaxpr_frame().to_jaxpr(out_tracers)
 
+                    # EvaluationContext.find_jaxpr_frame().eqns.clear()
+                    EvaluationContext.find_jaxpr_frame().eqns.append(
+                        new_jaxpr_eqn([], [], jax.core.Primitive("_tape_cut"), [], no_effects)
+                    )
+                    # breakpoint()
+
+                    # get the eqn that should be the outvar for this tape's jaxpr
+                    # taken from
+                    # https://github.com/google/jax/blob/77afe251e70500d6e505449242b4343cb86c402f/jax/_src/interpreters/partial_eval.py#L1808
+                    invars = EvaluationContext.find_jaxpr_frame().invars
+                    frame = EvaluationContext.find_jaxpr_frame()
+                    state_ans, end_trees = unzip2(
+                        tree_flatten(t) for t in get_states(frame.attrs_tracked)
+                    )
+                    state_outvars = [
+                        frame.tracer_to_var[id(trace.full_raise(x))] for xs in state_ans for x in xs
+                    ]
+                    explicit_outvars = [frame.tracer_to_var[id(t)] for t in out_tracers]
+                    outvars = state_outvars + explicit_outvars
+                    constvars, constvals = unzip2(frame.constvar_to_val.items())
+                    jaxpr_effects = make_jaxpr_effects(
+                        constvars, invars, explicit_outvars, frame.eqns
+                    )
+
+                    jaxpr_info_each_tape.append(
+                        (
+                            [
+                                jax.core.Var("", _.aval) for _ in jp[0].invars
+                            ],  # maybe use frame here too?
+                            explicit_outvars,
+                            constvars,
+                            constvals,
+                            jaxpr_effects,
+                        )
+                    )
+
+                last_cut = False
+                for i, eqn in enumerate(EvaluationContext.find_jaxpr_frame().eqns):
+                    if eqn.primitive.name == "_tape_cut":
+                        if i == len(EvaluationContext.find_jaxpr_frame().eqns) - 1:
+                            last_cut = True
+                        break
+
+                while not last_cut:
+                    i = 0
+                    # replace_jp_invar_with_new_invar(EvaluationContext.find_jaxpr_frame(), var_each_tape[i][0])
+
+                    jaxpr_frame = EvaluationContext.find_jaxpr_frame()
+                    jaxpr_invars = jaxpr_frame.invars  # list of Var
+
+                    # go through the primitives of the jaxpr
+                    for k, eqn in enumerate(jaxpr_frame.eqns):
+                        # print(k)
+                        if eqn.primitive.name == "_tape_cut":
+                            i += 1
+                            # breakpoint()
+                            if k == len(EvaluationContext.find_jaxpr_frame().eqns) - 1:
+                                last_cut = True
+                                break
+
+                        # go through the invars to the primitive
+                        # breakpoint()
+                        for j, invar in enumerate(eqn.invars):
+                            # if the primitive uses one of the jaxpr's invars,
+                            # this invar use should be replaced by the corresponding new invar
+                            if invar in jaxpr_invars:
+                                # breakpoint()
+                                eqn.invars[j] = jaxpr_info_each_tape[i][0][
+                                    jaxpr_invars.index(invar)
+                                ]
+
+                jaxpr_cut_result_eqns = cut_through_tapes(EvaluationContext.find_jaxpr_frame().eqns)
+                # breakpoint()
+                jaxpr_each_tape = []
+                for i, eqns in enumerate(jaxpr_cut_result_eqns):
+                    jaxpr = jax.core.Jaxpr(
+                        jaxpr_info_each_tape[i][2],  # constvars
+                        jaxpr_info_each_tape[i][0],  # invars
+                        jaxpr_info_each_tape[i][1],  # outvars
+                        eqns,
+                        jaxpr_info_each_tape[i][4],  # effects
+                    )
+                    jaxpr, constvals = _const_folding_and_forwarding(
+                        jaxpr, jaxpr_info_each_tape[i][3]  # constvals
+                    )
+                    jaxpr, constvals = _inline_literals(jaxpr, constvals)
+                    jaxpr_each_tape.append(jaxpr)
+                # breakpoint()
+                # print("break here!")
 
             # trace post processing
-            #breakpoint()
+            # breakpoint()
             post_processing_jaxpr, out_type, out_tree = trace_post_processing(
                 ctx, trace, post_processing, transformed_results, single_tape=False
             )
-            #breakpoint()
+            # breakpoint()
 
             with EvaluationContext.frame_tracing_context(ctx, trace):
                 # jaxpr_each_tape holds the (open)jaxprs of each tape
                 # we create a big jaxpr that calls each tape's jaxpr
 
-                jaxpr = jaxpr_each_tape[0][0]
+                # jaxpr = jaxpr_each_tape[0][0]
                 out_ = post_processing_jaxpr.outvars
                 const_ = []
                 for jaxpr_ in jaxpr_each_tape:
-                    const_ += jaxpr_[0].constvars
+                    const_ += jaxpr_.constvars
 
                 # an initially empty jaxpr to hold the calls to each tape's jaxpr
                 big_jaxpr = jax.core.Jaxpr(const_, big_invars, out_, [])
-                #breakpoint()
+                # breakpoint()
 
-                from jax._src.core import new_jaxpr_eqn, no_effects
                 post_processing_invars = []
                 for jaxpr in jaxpr_each_tape:
+                    out = [jax.core.Var("", _.aval) for _ in jaxpr.outvars]
+
                     def _f(*args, **kwargs):
                         return f(args, kwargs)
+
+                    # breakpoint()
                     big_jaxpr.eqns.append(
                         new_jaxpr_eqn(
                             invars=big_jaxpr.invars,
-                            outvars=jaxpr[0].outvars,
+                            outvars=out,
                             primitive=func_p,
-                            params={'fn':_f, 'call_jaxpr':jaxpr[0]},
+                            params={"fn": _f, "call_jaxpr": jaxpr},
                             effects=no_effects,
                         )
                     )
-                    post_processing_invars += jaxpr[0].outvars
+                    post_processing_invars += out
 
-
-
-            #breakpoint()
-            #def _f(*args, **kwargs):
+            # breakpoint()
+            # def _f(*args, **kwargs):
             #    return f(args, kwargs)
             big_jaxpr.eqns.append(
                 new_jaxpr_eqn(
                     invars=post_processing_invars,
                     outvars=post_processing_jaxpr.outvars,
                     primitive=func_p,
-                    params={'fn':f, 'call_jaxpr':post_processing_jaxpr},
+                    params={"fn": f, "call_jaxpr": post_processing_jaxpr},
                     effects=no_effects,
                 )
             )
 
-            #breakpoint()
+            # breakpoint()
 
             # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
             return jax.core.ClosedJaxpr(big_jaxpr, const_), out_type, out_tree
 
-
-        else: 
+        else:
             print("one tape!")
             # if len(tapes) == 1
             # (2) - Quantum tracing
@@ -1446,7 +1587,9 @@ def trace_quantum_function(
                         trees = return_values_tree
 
                     mcm_config = qnode.execute_kwargs["mcm_config"]
-                    qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                    qrp_out = trace_quantum_operations(
+                        tape, device, qreg_in, ctx, trace, mcm_config
+                    )
                     meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                     qreg_out = qrp_out.actualize()
 
@@ -1464,7 +1607,7 @@ def trace_quantum_function(
                         transformed_results.append(meas_results)
 
                     # Reset the qubits and update the register value for the next tape.
-                    #if len(tapes) > 1 and i < len(tapes) - 1:
+                    # if len(tapes) > 1 and i < len(tapes) - 1:
                     #    for w in device.wires:
                     #        qreg_out = reset_qubit(qreg_out, w)
                     #    qreg_in = qreg_out
@@ -1473,9 +1616,8 @@ def trace_quantum_function(
                 qdealloc_p.bind(qreg_out)
 
             closed_jaxpr, out_type, out_tree = trace_post_processing(
-                ctx, trace, post_processing, transformed_results, single_tape = True
+                ctx, trace, post_processing, transformed_results, single_tape=True
             )
             # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
             return closed_jaxpr, out_type, out_tree
-

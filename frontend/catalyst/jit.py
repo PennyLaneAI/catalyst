@@ -554,9 +554,9 @@ class QJIT:
 
         return processed_fn
 
-        #breakpoint()
+        # breakpoint()
 
-        '''
+        """
         if hasattr(processed_fn, "tape") and processed_fn.tape is not None and len(processed_fn.transform_program) != 0:
             dev = processed_fn.device
             #ops = processed_fn.tape.operations.copy()
@@ -613,8 +613,7 @@ class QJIT:
 
         else:
             return processed_fn
-        '''
-        
+        """
 
     @instrument(size_from=0)
     @debug_logger

@@ -275,16 +275,10 @@ class TestBroadcastExpand:
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
-        #breakpoint()
-        qj = qjit(qnode_backend)
-        #breakpoint()
-        observed = qj(*params, obs)
-        #observed = qjit(qnode_backend)(*params, obs)
-        breakpoint()
+        observed = qjit(qnode_backend)(*params, obs)
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
-        breakpoint()
         # TODO: expected is tuple, observed is list
         assert expected_shape.num_leaves == observed_shape.num_leaves
 
