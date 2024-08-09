@@ -245,7 +245,7 @@
   [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
   [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
 
-* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a 
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
@@ -267,6 +267,10 @@
 
 <h3>Bug fixes</h3>
 
+* Catalyst no longer silently converts complex parameters to floats where floats are expected,
+  instead an error is raised.
+  [(#1008)](https://github.com/PennyLaneAI/catalyst/pull/1008)
+
 * Catalyst no longer generates a `QubitUnitary` operation during decomposition if a device doesn't
   support it. Instead, the operation that would lead to a `QubitUnitary` is either decomposed or
   raises an error.
@@ -286,7 +290,7 @@
       m_0 = catalyst.measure(0, postselect=1)
       return {"hi": qml.expval(qml.Z(0))}
   ```
-  
+
   ```pycon
   >>> func(0.9)
   {'hi': Array(-1., dtype=float64)}
