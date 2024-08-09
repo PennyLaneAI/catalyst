@@ -9,8 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import platform
 import re
+import shutil
 
 import jax.numpy as jnp
 import numpy as np
@@ -18,9 +20,10 @@ import pennylane as qml
 import pytest
 from jax.tree_util import register_pytree_node_class
 
-from catalyst import debug, for_loop, qjit
+from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
+from catalyst.debug.compiler_functions import get_pipeline_output, replace_ir
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -428,6 +431,110 @@ class TestCProgramGeneration:
 
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
+
+    @pytest.mark.parametrize(
+        ("pass_name", "target", "replacement"),
+        [
+            (
+                "mlir",
+                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
+                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
+                + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
+            ),
+            (
+                "HLOLoweringPass",
+                "%2 = arith.mulf %in, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %c, %in_0 : f64\n",
+            ),
+            (
+                "QuantumCompilationPass",
+                "%2 = arith.mulf %in, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %c, %in_0 : f64\n",
+            ),
+            (
+                "BufferizationPass",
+                "%6 = arith.mulf %in, %in_0 : f64\n",
+                "%c = arith.mulf %in, %in_0 : f64\n" + "    %6 = arith.mulf %c, %in_0 : f64\n",
+            ),
+            (
+                "MLIRToLLVMDialect",
+                "%21 = llvm.fmul %19, %20  : f64\n",
+                "%c = llvm.fmul %19, %20  : f64\n" + "    %21 = llvm.fmul %c, %20  : f64\n",
+            ),
+            (
+                "llvm_ir",
+                "store double %15, ptr %9, align 8\n",
+                "%x = load double, ptr %1, align 8\n"
+                + "   %cc = fmul double %15, %x\n"
+                + "   store double %cc, ptr %9, align 8\n",
+            ),
+            (
+                "last",
+                "store double %15, ptr %9, align 8\n",
+                "%x = load double, ptr %1, align 8\n"
+                + "   %cc = fmul double %15, %x\n"
+                + "   store double %cc, ptr %9, align 8\n",
+            ),
+        ],
+    )
+    def test_modify_ir(self, pass_name, target, replacement):
+        """Turn a square function in IRs into a cubic one."""
+
+        @qjit(keep_intermediate=True)
+        def f(x):
+            """Square function."""
+            return x**2
+
+        data = 2.0
+        old_result = f(data)
+        old_ir = get_pipeline_output(f, pass_name)
+        old_workspace = str(f.workspace)
+
+        new_ir = old_ir.replace(target, replacement)
+        replace_ir(f, pass_name, new_ir)
+        new_result = f(data)
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(f.workspace), ignore_errors=True)
+        assert old_result * data == new_result
+
+    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
+    def test_modify_ir_file_generation(self, pass_name):
+        """Test if recompilation rerun the same pass."""
+
+        @qjit
+        def f(x: float):
+            """Square function."""
+            return x**2
+
+        grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        grad_f(3.0)
+        ir = get_pipeline_output(grad_f, pass_name)
+        old_workspace = str(grad_f.workspace)
+
+        replace_ir(grad_f, pass_name, ir)
+        grad_f(3.0)
+        file_list = os.listdir(str(grad_f.workspace))
+        res = [i for i in file_list if pass_name in i]
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(grad_f.workspace), ignore_errors=True)
+        assert len(res) == 0
+
+    def test_get_pipeline_output_without_keep_intermediate(self):
+        """Test if error is raised when using get_pipeline_output without keep_intermediate."""
+
+        @qjit
+        def f(x: float):
+            """Square function."""
+            return x**2
+
+        f(2.0)
+
+        with pytest.raises(
+            RuntimeError, match="keep_intermediate must be set to True to get pipeline's output."
+        ):
+            get_pipeline_output(f, "mlir")
 
 
 if __name__ == "__main__":

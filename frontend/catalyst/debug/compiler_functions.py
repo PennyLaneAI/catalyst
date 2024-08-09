@@ -160,3 +160,35 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
+
+
+@debug_logger
+def get_pipeline_output(fn, pass_name):
+    """Capture IR string from the given compiler pass.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        pass_name (str): target compiler pass name
+
+    Returns:
+        str: output ir from the target compiler pass
+    """
+    if not fn.compiler.options.keep_intermediate:
+        raise RuntimeError("keep_intermediate must be set to True to get pipeline's output.")
+    if pass_name == "last":
+        return fn.compiler.last_compiler_output.get_output_ir()
+    return fn.compiler.get_output_of(pass_name)
+
+
+@debug_logger
+def replace_ir(fn, pass_name, new_ir):
+    """Specify new IR that will be used for future compilation.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        pass_name (str): name of a pass. Recompilation happens after his pass.
+        new_ir (str): new ir in the string format
+    """
+    fn.overwrite_ir = new_ir
+    fn.compiler.options.start_after_pass = pass_name
+    fn.fn_cache.clear()

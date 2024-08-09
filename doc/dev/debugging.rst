@@ -234,6 +234,9 @@ The compilation process of a QJITed quantum function moves through various stage
 - **Bufferized MLIR**: All tensors are `converted <https://mlir.llvm.org/docs/Bufferization>`_ to memory buffer allocations at this step.
 - **LLVM Dialect**: Lowering the code to the `LLVM Dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_ in MLIR simplifies the translation to LLVMIR by providing a one-to-one mapping.
 - **QIR (LLVMIR)**: a `specification <https://learn.microsoft.com/en-us/azure/quantum/concepts-qir>`_ for quantum programs in LLVMIR
+- **CoroOPt**: `Coroutine lowering <https://llvm.org/docs/Coroutines.html>`_ only happens when ``AsyncQnode`` is involved.
+- **O2Opt**: `O2 optimization <https://llvm.org/doxygen/classllvm_1_1OptimizationLevel.html#a9c0836ff9219a0b737a11979991c3389>`_ only happens when gradient presents.
+- **Enzyme**: `Automatic differentiation <https://github.com/EnzymeAD/Enzyme>`_ only happens when gradient presents.
 
 To ensure that you have access to all the stages, the ``keep_intermediate=True`` flag must be specified in the ``qjit`` decorator.
 In the following example, we also compile ahead-of-time so that there is no requirements to pass actual parameters:
@@ -322,3 +325,83 @@ And finally some LLVMIR that is inspired by QIR.
 The LLVMIR code is compiled to an object file using the LLVM static compiler and linked to the
 runtime libraries. The generated shared object is stored by the caching mechanism in Catalyst
 for future calls.
+
+Recompiling a Function
+=================
+Catalyst offers a way to extract IRs from pipeline stages and feed modified IRs back for recompilation.
+To enable this feature, ``qjit`` decorated function must be compiled with the option ``keep_intermediate=True``.
+
+The following example creates a square function decorated with ``@qjit(keep_intermediate=True)``.
+The function must be compiled first so that the IR from each pipeline stage can be accessed.
+
+.. code-block:: python
+
+    @qjit(keep_intermediate=True)
+    def f(x):
+        return x**2
+    f(2.0)
+    >> 4.0
+
+After compilation, we can use ``catalyst.debug.compiler_functions.get_pipeline_output`` to get the IR from the given
+compiler pass.
+``get_pipeline_output`` accepts a ``qjit`` decorated function and a pass name in string. It return the IR after the
+given pass.
+
+The available options are ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``,
+``BufferizationPass``, ``MLIRToLLVMDialect``, ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
+Note that compiled functions might not always have ``CoroOpt``, ``O2Opt``, and ``Enzyme`` passes.
+The option ``last`` will provide the IR right before generating its object file.
+
+In this example, we request for the IR after ``HLOLoweringPass``.
+
+.. code-block:: python
+
+    from catalyst.debug.compiler_functions import get_pipeline_output
+
+    old_ir = get_pipeline_output(f, "HLOLoweringPass")
+
+The output IR is
+
+.. code-block:: c++
+
+    module @f {
+        func.func public @jit_f(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+            %0 = tensor.empty() : tensor<f64>
+            %1 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%arg0, %arg0 : tensor<f64>, tensor<f64>) outs(%0 : tensor<f64>) {
+            ^bb0(%in: f64, %in_0: f64, %out: f64):
+                %2 = arith.mulf %in, %in_0 : f64
+                linalg.yield %2 : f64
+            } -> tensor<f64>
+            return %1 : tensor<f64>
+        }
+        func.func @setup() {
+            quantum.init
+            return
+        }
+        func.func @teardown() {
+            quantum.finalize
+            return
+        }
+    }
+
+Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one.
+
+.. code-block:: python
+
+    new_ir = old_ir.replace(
+        "%2 = arith.mulf %in, %in_0 : f64\n",
+        "%c = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %c, %in_0 : f64\n"
+        )
+
+After that, we can use ``catalyst.debug.compiler_functions.replace_ir`` to make the compile use the modified
+IR for recompilation.
+``replace_ir`` accepts a ``qjit`` decorated function, a pass name in string, and a IR in string.
+The compiler will execute the passes after the given pass (excluded).
+
+.. code-block:: python
+
+    from catalyst.debug.compiler_functions import replace_ir
+
+    replace_ir(f, "HLOLoweringPass", new_ir)
+    f(2.0)
+    >> 8.0
