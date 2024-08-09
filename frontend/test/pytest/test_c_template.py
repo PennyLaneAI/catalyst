@@ -71,7 +71,7 @@ class TestCVariable:
         """Test get buffer size for non-zero rank."""
         x = np.array([1])
         # pylint: disable=protected-access
-        assert CVariable._get_buffer_size(x) == 1
+        assert CVariable._get_buffer_size(x) == "[1]"
 
     def test_get_array_data_zero_rank(self):
         """Test get array data for zero rank."""
@@ -83,7 +83,7 @@ class TestCVariable:
         """Test get array data for non-zero rank."""
         x = np.array([1])
         # pylint: disable=protected-access
-        assert CVariable._get_array_data(x) == "1"
+        assert CVariable._get_array_data(x) == "{1}"
 
     def test_get_sizes_zero_rank(self):
         """Test get sizes for zero rank."""
