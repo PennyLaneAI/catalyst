@@ -94,26 +94,28 @@ class TestExamplesFromWebsite:
 class TestDynamicWires:
     """Test dynamic wires"""
 
-    def test_state_prep(self):
+    @pytest.mark.parametrize("inp", [(0), (1)])
+    def test_state_prep(self, inp):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
         as of July 31st 2024.
 
         Modified to use jax.numpy and a non trivial StatePrep
         Modified to use dynamic wires.
-        Dynamic wires is not currently supported.
 
         Limit this test to lightning.qubit since kokkos is old device
         and this optimization does not yet work for it.
         """
 
-        with pytest.raises(TypeError, match="wires must be static"):
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def example_circuit(a: int):
+            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
+            return qml.state()
 
-            @qml.qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
-            def example_circuit(a: int):
-                qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
-                return qml.state()
+        expected = example_circuit(inp)
+        observed = qml.qjit(example_circuit)(inp)
+        assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("inp", [(0), (1)])
     def test_basis_state(self, inp, backend):
