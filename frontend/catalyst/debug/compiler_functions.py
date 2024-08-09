@@ -173,7 +173,8 @@ def compile_cmain(fn, *args):
         *args: argument values to use in the C program when invoking ``fn``
 
     Returns:
-        a command to run the generated binary.
+        (str): the paths that should be included in LD_LIBRARY_PATH.
+        (str): the path of output binary.
     """
     f_name = str(fn.__name__)
     workspace = str(fn.workspace)
@@ -199,19 +200,21 @@ def compile_cmain(fn, *args):
 
     # generate command
     lib_strings = [s[2:] for s in link_so_flags if s.startswith("-L")]
-    ld_prefix = "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + ":".join(lib_strings)
-    command = ld_prefix + " " + output_file
-    return command
+    ld_env = "$LD_LIBRARY_PATH:" + ":".join(lib_strings)
+    return ld_env, output_file
 
 
 @debug_logger
-def run_cmain_executable(command):
+def run_cmain_executable(ld_env, binary_file):
     """Running c executable.
 
         Args:
-            command (str): a string that represents the command for running .out file.
+            ld_env (str): the paths that should be included in LD_LIBRARY_PATH.
+            binary_file (str): the path of a binary.
     Returns:
         results of the command.
     """
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
+
+    result = subprocess.run(binary_file, env=env, capture_output=True, text=True, check=True)
     return result
