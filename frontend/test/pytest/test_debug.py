@@ -420,21 +420,29 @@ class TestCProgramGeneration:
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
 
-    def test_executable_generation(self):
-        """Test C Program generation"""
+    @pytest.mark.parametrize(
+        "arg",
+        [
+            5,
+            np.ones(5, dtype=int),
+            np.ones((5, 2), dtype=int),
+        ],
+    )
+    def test_executable_generation(self, arg):
+        """Test if generated C Program produces correct results."""
 
-        @qjit(keep_intermediate=True)
-        def f(x: float):
+        @qjit
+        def f(x):
             """Square function with debugging print."""
             y = x * x
             debug.print_memref(y)
             return y
 
-        ans = str(f(0.3))
-        command = compile_cmain(f, 0.3)
-        result = run_cmain_executable(command)
+        ans = str(f(arg).tolist()).replace(" ", "")
+        command = compile_cmain(f, arg)
+        result = run_cmain_executable(command).stdout.replace(" ", "").replace("\n", "")
 
-        assert ans in result.stdout
+        assert ans in result
 
 
 if __name__ == "__main__":
