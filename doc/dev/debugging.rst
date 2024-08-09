@@ -326,14 +326,14 @@ for future calls.
 C Executable Generation
 =================
 
-Catalyst provides a way to generate a c binary file that calls the shared object of the given
+Catalyst provides a way to generate a c executable that calls the shared object of the given
 qjit-decorated function.
-In ``debug.compiler_functions``, ``compile_cmain(fn: QJIT, *args) -> str, str`` takes a qjit-
-decorated function and arguments for that function.
-It returns a string of LD_LIBRARY_PATH and the path to the output binary file.
+In ``catalyst.debug.compiler_functions``, ``compile_cmain(fn: QJIT, *args) -> str, str`` takes
+a qjit-decorated function and arguments for that function.
+It returns a string of LD_LIBRARY_PATH and the path to the output executable file.
 
 ``run_cmain_executable(ld_env: str, binary_file: str) -> str`` is mainly used for testing.
-It takes a string of LD_LIBRARY_PATH and the path to the output binary file.
+It takes a string of LD_LIBRARY_PATH and the path to the output executable file.
 It returns a string the contains the console outputs introduced by `debug.print_memref`.
 
 The following example is a square function.
@@ -355,12 +355,12 @@ can re-run the executable latter.
 ... 25
 
 The compiled qjit-decorated function can be fed to ``compile_cmain`` to get the required
-ld libraries and binary.
+ld libraries and the executable file.
 ``run_cmain_executable`` helps us to test if the command works properly.
 
 .. code-block:: python
 
-    from debug.compiler_functions import compile_cmain, run_cmain_executable
+    from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
 
     ld_env, binary = compile_cmain(f, 1)
     result = run_cmain_executable(ld_env, binary)
@@ -370,7 +370,7 @@ ld libraries and binary.
 ... 25
 
 To run the program in terminal, we need to export ``LD_LIBRARY_PATH`` with the contents
-in ``ld_env`` and run the binary file.
+in ``ld_env`` and run the executable file.
 
 .. code-block:: bash
 

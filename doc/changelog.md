@@ -128,6 +128,32 @@
   )
   ```
 
+* Catalyst now supports c executable generation with `catalyst.debug.compiler_functions.compile_cmain`.
+  It also supports mutti-dimensional arrays as function's inputs.
+  `catalyst.debug.compiler_functions.run_cmain_executabl` provides the example to run the c executable.
+  [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+
+  ```py
+  from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
+  
+  @qjit
+  def f(x):
+      y = x*x
+      debug.print_memref(y)
+      return y
+  f(5)
+  ld_env, binary = compile_cmain(f, 1)
+  result = run_cmain_executable(ld_env, binary)
+  result.stdout
+  ```
+  
+  ```pycon
+  >>> MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
