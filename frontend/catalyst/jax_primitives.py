@@ -1131,15 +1131,8 @@ def _gphase_lowering(
     ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
     ctrl_values = qubits_or_params[1 + ctrl_len :]
 
-    if ir.RankedTensorType.isinstance(param.type) and ir.RankedTensorType(param.type).shape == []:
-        baseType = ir.RankedTensorType(param.type).element_type
-
-    if not ir.F64Type.isinstance(baseType):
-        baseType = ir.F64Type.get()
-        resultTensorType = ir.RankedTensorType.get((), baseType)
-        param = StableHLOConvertOp(resultTensorType, param).results
-
-    param = TensorExtractOp(baseType, param, []).result
+    param = safe_cast_to_f64(param, "GlobalPhase")
+    param = extract_scalar(param, "GlobalPhase")
 
     assert ir.F64Type.isinstance(
         param.type
@@ -1208,15 +1201,8 @@ def _qinst_lowering(
 
     float_params = []
     for p in params:
-        if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
-            baseType = ir.RankedTensorType(p.type).element_type
-
-        if not ir.F64Type.isinstance(baseType):
-            baseType = ir.F64Type.get()
-            resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = StableHLOConvertOp(resultTensorType, p).results
-
-        p = TensorExtractOp(baseType, p, []).result
+        p = safe_cast_to_f64(p, op)
+        p = extract_scalar(p, op)
 
         assert ir.F64Type.isinstance(
             p.type
@@ -1503,12 +1489,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    baseType = ir.RankedTensorType(coeffs.type).element_type
-    shape = ir.RankedTensorType(coeffs.type).shape
-    if not ir.F64Type.isinstance(baseType):
-        baseType = ir.F64Type.get()
-        resultTensorType = ir.RankedTensorType.get(shape, baseType)
-        coeffs = StableHLOConvertOp(resultTensorType, coeffs).results
+    coeffs = safe_cast_to_f64(coeffs, "Hamiltonian", "coefficient")
 
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
@@ -2110,6 +2091,43 @@ def _adjoint_lowering(
         QYieldOp([a[0] for a in out[-1:]])
 
     return op.results
+
+
+def safe_cast_to_f64(value, op, kind="parameter"):
+    """Utility function to allow upcasting from integers and floats, while preventing downcasting
+    from larger bitwidths or complex numbers."""
+    assert ir.RankedTensorType.isinstance(value.type)
+
+    baseType = ir.RankedTensorType(value.type).element_type
+    if ir.ComplexType.isinstance(baseType) or (
+        ir.FloatType.isinstance(baseType) and ir.FloatType(baseType).width > 64
+    ):
+        raise TypeError(f"Operator {op} expected a float64 {kind}, got {baseType}")
+
+    shape = ir.RankedTensorType(value.type).shape
+    if not ir.F64Type.isinstance(baseType):
+        targetBaseType = ir.F64Type.get()
+        targetTensorType = ir.RankedTensorType.get(shape, targetBaseType)
+        value = StableHLOConvertOp(targetTensorType, value).results
+
+    return value
+
+
+def extract_scalar(value, op, kind="parameter"):
+    """Utility function to extract real scalars from scalar tensors or one-element 1-D tensors."""
+    assert ir.RankedTensorType.isinstance(value.type)
+
+    baseType = ir.RankedTensorType(value.type).element_type
+    shape = ir.RankedTensorType(value.type).shape
+    if shape == []:
+        value = TensorExtractOp(baseType, value, []).result
+    elif shape == [1]:
+        c0 = ConstantOp(ir.IndexType.get(), 0)
+        value = TensorExtractOp(baseType, value, [c0]).result
+    else:
+        raise TypeError(f"Operator {op} expected a scalar {kind}, got tensor of shape {shape}")
+
+    return value
 
 
 #
