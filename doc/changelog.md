@@ -187,6 +187,9 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now supports keyword arguments for qjit-compiled functions.
+  [(#1004)](https://github.com/PennyLaneAI/catalyst/pull/1004)
+
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 

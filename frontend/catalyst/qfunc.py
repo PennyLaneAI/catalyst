@@ -151,7 +151,7 @@ class QFunc:
 
             out_tree_expected.append(out_tree_exp)
             dynamic_args = filter_static_args(args, static_argnums)
-            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
+            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args, **kwargs)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
