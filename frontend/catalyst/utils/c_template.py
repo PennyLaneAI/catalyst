@@ -177,7 +177,7 @@ class CType(Type):
 
     @staticmethod
     def _get_template_for_sizes_and_strides(shape):
-        rank = len(shape)
+        rank = len(shape) if hasattr(shape, '__iter__') else 0
         rank_0 = ""
         rank_n_bt_0 = f"""size_t sizes[{rank}];
  \tsize_t strides[{rank}];"""
@@ -185,17 +185,20 @@ class CType(Type):
 
     @staticmethod
     def _get_name(typ, shape):
-        shape_str = "x".join([str(i) for i in shape])
+        if hasattr(shape, '__iter__'):
+            shape_str = "x".join([str(i) for i in shape])
+        else:
+            shape_str = str(shape)
         return f"struct memref_{typ}x{shape_str}_t"
 
     @staticmethod
     def _get_definition(name, typ, shape):
         sizes_and_strides = CType._get_template_for_sizes_and_strides(shape)
-        pointer_shape = shape[1:]
-        pointer_shape_str = "".join(["[" + str(i) + "]" for i in pointer_shape])
+        pointer_shape = shape[1:] if hasattr(shape, '__iter__') else []
         allocated_str = "*allocated"
         aligned_str = "*aligned"
         if pointer_shape:
+            pointer_shape_str = "".join(["[" + str(i) + "]" for i in pointer_shape])
             allocated_str = "(" + allocated_str + ")" + pointer_shape_str
             aligned_str = "(" + aligned_str + ")" + pointer_shape_str
         return f"""

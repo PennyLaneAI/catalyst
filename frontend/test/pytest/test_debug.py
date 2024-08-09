@@ -439,8 +439,8 @@ class TestCProgramGeneration:
             return y
 
         ans = str(f(arg).tolist()).replace(" ", "")
-        command = compile_cmain(f, arg)
-        result = run_cmain_executable(command).stdout.replace(" ", "").replace("\n", "")
+        ld_env, binary = compile_cmain(f, arg)
+        result = run_cmain_executable(ld_env, binary).stdout.replace(" ", "").replace("\n", "")
 
         assert ans in result
 
