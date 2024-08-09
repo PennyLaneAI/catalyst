@@ -2102,7 +2102,11 @@ def safe_cast_to_f64(value, op, kind="parameter"):
     if ir.ComplexType.isinstance(baseType) or (
         ir.FloatType.isinstance(baseType) and ir.FloatType(baseType).width > 64
     ):
-        raise TypeError(f"Operator {op} expected a float64 {kind}, got {baseType}")
+        raise TypeError(
+            f"Operator {op} expected a float64 {kind}, got {baseType}.\n"
+            "If you didn't specify this operator directly, it may have come from the decomposition "
+            "of a non-Unitary operator, such as an exponential with real exponent."
+        )
 
     shape = ir.RankedTensorType(value.type).shape
     if not ir.F64Type.isinstance(baseType):
