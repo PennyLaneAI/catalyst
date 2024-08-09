@@ -29,8 +29,6 @@ import catalyst
 from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
-os.environ["OMP_PROC_BIND"] = "false"
-os.environ["OMP_NUM_THREADS"] = "2"
 
 # pylint: disable=too-many-public-methods
 

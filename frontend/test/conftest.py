@@ -14,6 +14,13 @@
 """
 Pytest configuration file for Catalyst test suite.
 """
+
+import os
+
+# OMP env vars have to be set before importing numpy in order to have an effect
+os.environ["OMP_PROC_BIND"] = "false"
+os.environ["OMP_NUM_THREADS"] = "2"
+
 # pylint: disable=unused-import
 import platform
 
