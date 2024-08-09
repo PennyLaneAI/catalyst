@@ -192,6 +192,8 @@
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
   ```py
+  import os
+  import subprocess
   from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
   
   @qjit
@@ -201,7 +203,9 @@
       return y
   f(5)
   ld_env, binary = compile_cmain(f, 1)
-  result = run_cmain_executable(ld_env, binary)
+  
+  env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
+  result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
   result.stdout
   ```
   

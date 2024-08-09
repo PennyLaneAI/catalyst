@@ -9,8 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import platform
 import re
+import subprocess
 
 import jax.numpy as jnp
 import numpy as np
@@ -450,9 +452,11 @@ class TestCProgramGeneration:
 
         ans = str(f(arg).tolist()).replace(" ", "")
         ld_env, binary = compile_cmain(f, arg)
-        result = run_cmain_executable(ld_env, binary).stdout.replace(" ", "").replace("\n", "")
 
-        assert ans in result
+        env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
+        result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
+
+        assert ans in result.stdout.replace(" ", "").replace("\n", "")
 
 
 if __name__ == "__main__":

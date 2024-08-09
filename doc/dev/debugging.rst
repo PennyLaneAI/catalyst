@@ -331,10 +331,7 @@ qjit-decorated function.
 In ``catalyst.debug.compiler_functions``, ``compile_cmain(fn: QJIT, *args) -> str, str`` takes
 a qjit-decorated function and arguments for that function.
 It returns a string of LD_LIBRARY_PATH and the path to the output executable file.
-
-``run_cmain_executable(ld_env: str, binary_file: str) -> str`` is mainly used for testing.
-It takes a string of LD_LIBRARY_PATH and the path to the output executable file.
-It returns a string the contains the console outputs introduced by `debug.print_memref`.
+Users can use `debug.print_memref` to add information to stdout.
 
 The following example is a square function.
 Here we are using debug.print_memref to print the information of the result from ``y``.
@@ -356,14 +353,17 @@ can re-run the executable latter.
 
 The compiled qjit-decorated function can be fed to ``compile_cmain`` to get the required
 ld libraries and the executable file.
-``run_cmain_executable`` helps us to test if the command works properly.
+Here we use ``subprocess.run`` to test if the command works properly.
 
 .. code-block:: python
 
+    import os
+    import subprocess
     from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
 
     ld_env, binary = compile_cmain(f, 1)
-    result = run_cmain_executable(ld_env, binary)
+    env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
+    result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
     result.stdout
 
 >>> MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =

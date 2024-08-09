@@ -198,23 +198,7 @@ def compile_cmain(fn, *args):
     ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
-    # generate command
+    # generate ld library paths
     lib_strings = [s[2:] for s in link_so_flags if s.startswith("-L")]
     ld_env = "$LD_LIBRARY_PATH:" + ":".join(lib_strings)
     return ld_env, output_file
-
-
-@debug_logger
-def run_cmain_executable(ld_env, binary_file):
-    """Running c executable.
-
-        Args:
-            ld_env (str): the paths that should be included in LD_LIBRARY_PATH.
-            binary_file (str): the path of a binary.
-    Returns:
-        results of the command.
-    """
-    env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
-
-    result = subprocess.run(binary_file, env=env, capture_output=True, text=True, check=True)
-    return result
