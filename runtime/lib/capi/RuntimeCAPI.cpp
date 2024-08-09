@@ -489,7 +489,8 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, int numQubits, ...)
     va_end(args);
     std::unordered_set<QubitIdType> wire_set(wires.begin(), wires.end());
     RT_FAIL_IF(wire_set.size() != numQubits, "Wires must be unique");
-    RT_FAIL_IF(data->sizes[0] != numQubits, "BasisState parameter and wires must be of equal length.");
+    RT_FAIL_IF(data->sizes[0] != numQubits,
+               "BasisState parameter and wires must be of equal length.");
 
     getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }

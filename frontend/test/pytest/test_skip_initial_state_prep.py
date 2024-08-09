@@ -156,6 +156,18 @@ class TestPossibleErrors:
 
             example_circuit()
 
+    def test_different_shape_state_prep(self):
+        """Test that the same error is raised"""
+        with pytest.raises(ValueError, match="State vector must have shape"):
+
+            @qml.qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def example_circuit():
+                qml.StatePrep(jnp.array([0]), wires=[0])
+                return qml.state()
+
+            example_circuit()
+
     def test_domain_invalid_basis_state(self):
         """Test what happens when BasisState operand is not between {0, 1}.
         This is the same error message, but different error class.

@@ -126,7 +126,6 @@ struct MemRefT_int64_1d {
     size_t strides[1];
 };
 
-
 // MemRefT<int64_t, dimension=1> type
 struct MemRefT_int8_1d {
     int8_t *data_allocated;

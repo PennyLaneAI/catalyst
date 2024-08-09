@@ -585,8 +585,13 @@ def trace_state_prep(op, qrp):
     # so it is ok to do this.
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     partial_sv = jax.lax.convert_element_type(partial_sv, jnp.dtype(jnp.complex128))
+    # The frontend guarantees that partial_sv.shape == (2**wires,)
+    # We have a test for that, and just if in the future this changes:
+    err_msg = "State vector must have shape (2**wires,)"
+    assert partial_sv.shape == (2 ** len(qubits),), err_msg
     qubits2 = set_state_p.bind(*qubits, partial_sv)
     qrp.insert(op.wires, qubits2)
+
 
 def trace_basis_state(op, qrp):
     """Trace qml.BasisState
@@ -608,6 +613,7 @@ def trace_basis_state(op, qrp):
     is_basis_state_invalid = jnp.any(basis_state_invalid_bits)
     is_basis_state_valid = jnp.logical_not(is_basis_state_invalid)
     debug_assert(is_basis_state_valid, err_msg)
+
     basis_state = jax.lax.convert_element_type(basis_state, jnp.dtype(jnp.bool))
     qubits2 = set_basis_state_p.bind(*qubits, basis_state)
     qrp.insert(op.wires, qubits2)
