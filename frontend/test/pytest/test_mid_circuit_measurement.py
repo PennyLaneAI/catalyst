@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for mid-circuit measurements in Catalyst"""
 
-import os
 from dataclasses import asdict
 from functools import reduce
 from typing import Iterable, Sequence

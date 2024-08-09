@@ -21,7 +21,7 @@ import os
 os.environ["OMP_PROC_BIND"] = "false"
 os.environ["OMP_NUM_THREADS"] = "2"
 
-# pylint: disable=unused-import
+# pylint: disable=unused-import,wrong-import-position
 import platform
 
 import numpy as np
