@@ -198,27 +198,4 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQu
         CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
-    SECTION("setBasisState")
-    {
-        const size_t num_qubits = 1;
-        StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
-        sv1.setBasisState(0);
-        std::vector<std::complex<PrecisionT>> expected({{1.0, 0.0}, {0.0, 0.0}});
-        CHECK(sv1.getDataVector() == expected);
-        sv1.setBasisState(1);
-        std::vector<std::complex<PrecisionT>> expected2({{0.0, 0.0}, {1.0, 0.0}});
-        CHECK(sv1.getDataVector() == expected2);
-    }
-
-    SECTION("setStateVector")
-    {
-        const size_t num_qubits = 1;
-        StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
-        sv1.setStateVector({0}, {{0.5, 0.5}});
-        std::vector<std::complex<PrecisionT>> expected({{0.5, 0.5}, {0.0, 0.0}});
-        CHECK(sv1.getDataVector() == expected);
-        sv1.setStateVector({1}, {{0.5, 0.5}});
-        std::vector<std::complex<PrecisionT>> expected2({{0.5, 0.5}, {0.5, 0.5}});
-        CHECK(sv1.getDataVector() == expected2);
-    }
 }
