@@ -393,7 +393,7 @@ Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function 
         "%c = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %c, %in_0 : f64\n"
         )
 
-After that, we can use ``catalyst.debug.compiler_functions.replace_ir`` to make the compile use the modified
+After that, we can use :func:`~.debug.replace_ir` to make the compiler use the modified
 IR for recompilation.
 ``replace_ir`` accepts a ``qjit`` decorated function, a pass name in string, and a IR in string.
 The compiler will execute the passes after the given pass (excluded).
