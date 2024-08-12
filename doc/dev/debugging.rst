@@ -362,7 +362,7 @@ In this example, we request for the IR after ``HLOLoweringPass``.
 
 The output IR is
 
-.. code-block:: c++
+.. code-block:: mlir
 
     module @f {
         func.func public @jit_f(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
