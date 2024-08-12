@@ -183,7 +183,6 @@
       %3 = quantum.expval %2 : f64
   ...
   }
-
   ```
   
 * Catalyst now supports c executable generation with `catalyst.debug.compiler_functions.compile_cmain`.
