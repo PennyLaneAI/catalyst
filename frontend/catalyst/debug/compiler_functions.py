@@ -187,7 +187,7 @@ def replace_ir(fn, pass_name, new_ir):
     Args:
         fn (QJIT): a qjit-decorated function
         pass_name (str): Recompilation picks up after this pass.
-        new_ir (str): new ir in the string format
+        new_ir (str): The replacement IR to use for recompilation.
     """
     fn.overwrite_ir = new_ir
     fn.compiler.options.start_after_pass = pass_name
