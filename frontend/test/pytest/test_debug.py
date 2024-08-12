@@ -22,8 +22,12 @@ from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
-from catalyst.debug.compiler_functions import get_pipeline_output, replace_ir
+from catalyst.debug import (
+    compile_from_mlir,
+    get_cmain,
+    get_compilation_stage,
+    replace_ir,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -234,7 +238,7 @@ class TestPrintStage:
         def func():
             return 0
 
-        print_compilation_stage(func, "HLOLoweringPass")
+        print(get_compilation_stage(func, "HLOLoweringPass"))
 
         out, _ = capsys.readouterr()
         assert "@jit_func() -> tensor<i64>" in out
@@ -249,7 +253,7 @@ class TestPrintStage:
             return 0
 
         with pytest.raises(TypeError, match="needs to be a 'QJIT' object"):
-            print_compilation_stage(func, "HLOLoweringPass")
+            print(get_compilation_stage(func, "HLOLoweringPass"))
 
 
 class TestCompileFromIR:
@@ -487,7 +491,7 @@ class TestCProgramGeneration:
 
         data = 2.0
         old_result = f(data)
-        old_ir = get_pipeline_output(f, pass_name)
+        old_ir = get_compilation_stage(f, pass_name)
         old_workspace = str(f.workspace)
 
         new_ir = old_ir.replace(target, replacement)
@@ -509,7 +513,7 @@ class TestCProgramGeneration:
 
         grad_f = qjit(value_and_grad(f), keep_intermediate=True)
         grad_f(3.0)
-        ir = get_pipeline_output(grad_f, pass_name)
+        ir = get_compilation_stage(grad_f, pass_name)
         old_workspace = str(grad_f.workspace)
 
         replace_ir(grad_f, pass_name, ir)
@@ -534,7 +538,7 @@ class TestCProgramGeneration:
         with pytest.raises(
             RuntimeError, match="keep_intermediate must be set to True to get pipeline's output."
         ):
-            get_pipeline_output(f, "mlir")
+            get_compilation_stage(f, "mlir")
 
 
 if __name__ == "__main__":

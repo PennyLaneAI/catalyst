@@ -33,7 +33,7 @@ logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def print_compilation_stage(fn, stage):
+def get_compilation_stage(fn, stage):
     """Print one of the recorded compilation stages for a JIT-compiled function.
 
     The stages are indexed by their Catalyst compilation pipeline name, which are either provided
@@ -45,6 +45,9 @@ def print_compilation_stage(fn, stage):
         fn (QJIT): a qjit-decorated function
         stage (str): string corresponding with the name of the stage to be printed
 
+    Returns:
+        str: output ir from the target compiler pass
+
     .. seealso:: :doc:`/dev/debugging`
 
     **Example**
@@ -55,7 +58,7 @@ def print_compilation_stage(fn, stage):
         def func(x: float):
             return x
 
-    >>> debug.print_compilation_stage(func, "HLOLoweringPass")
+    >>> print(debug.get_compilation_stage(func, "HLOLoweringPass"))
     module @func {
       func.func public @jit_func(%arg0: tensor<f64>)
       -> tensor<f64> attributes {llvm.emit_c_interface} {
@@ -76,7 +79,9 @@ def print_compilation_stage(fn, stage):
     if not isinstance(fn, catalyst.QJIT):
         raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
 
-    print(fn.compiler.get_output_of(stage))
+    if stage == "last":
+        return fn.compiler.last_compiler_output.get_output_ir()
+    return fn.compiler.get_output_of(stage)
 
 
 @debug_logger
@@ -160,24 +165,6 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
-
-
-@debug_logger
-def get_pipeline_output(fn, pass_name):
-    """Capture IR string from the given compiler pass.
-
-    Args:
-        fn (QJIT): a qjit-decorated function
-        pass_name (str): target compiler pass name
-
-    Returns:
-        str: output ir from the target compiler pass
-    """
-    if not fn.compiler.options.keep_intermediate:
-        raise RuntimeError("keep_intermediate must be set to True to get pipeline's output.")
-    if pass_name == "last":
-        return fn.compiler.last_compiler_output.get_output_ir()
-    return fn.compiler.get_output_of(pass_name)
 
 
 @debug_logger
