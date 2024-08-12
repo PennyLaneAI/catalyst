@@ -113,7 +113,9 @@ def test_batch_params(backend):
     jax_jit = jax.jit(qnode_control)
     compiled = qjit(qnode_backend)
     expected = jax_jit(data, x, weights)
+    #breakpoint()
     observed = compiled(data, x, weights)
+    #breakpoint()
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
