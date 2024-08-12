@@ -164,7 +164,7 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 
 @debug_logger
-def compile_cmain(fn, *args):
+def compile_executable(fn, *args):
     """Generate and compile a C program that calls a jitted function with the provided arguments.
 
     Args:
