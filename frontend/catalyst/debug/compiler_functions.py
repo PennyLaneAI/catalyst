@@ -192,7 +192,4 @@ def compile_executable(fn, *args):
     ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
-    # generate ld library paths
-    lib_strings = [s[2:] for s in link_so_flags if s.startswith("-L")]
-    ld_env = "$LD_LIBRARY_PATH:" + ":".join(lib_strings)
-    return ld_env, output_file
+    return output_file

@@ -361,20 +361,9 @@ Here we use ``subprocess.run`` to test if the command works properly.
     import subprocess
     from catalyst.debug.compiler_functions import compile_executable
 
-    ld_env, binary = compile_executable(f, 1)
-    env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
-    result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
+    binary = compile_executable(f, 1)
+    result = subprocess.run(binary, capture_output=True, text=True, check=True)
     result.stdout
 
 >>> MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
 ... 25
-
-To run the program in terminal, we need to export ``LD_LIBRARY_PATH`` with the contents
-in ``ld_env`` and run the executable file.
-
-.. code-block:: bash
-
-   export LD_LIBRARY_PATH=/paths/in/ld_env
-   /path/to/binary
-
-

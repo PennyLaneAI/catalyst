@@ -451,10 +451,9 @@ class TestCProgramGeneration:
             return y
 
         ans = str(f(arg).tolist()).replace(" ", "")
-        ld_env, binary = compile_executable(f, arg)
 
-        env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
-        result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
 
         assert ans in result.stdout.replace(" ", "").replace("\n", "")
 
