@@ -197,5 +197,4 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQu
 
         CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
-
 }

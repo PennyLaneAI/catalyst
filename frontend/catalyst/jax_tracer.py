@@ -24,7 +24,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
@@ -581,7 +580,7 @@ def trace_state_prep(op, qrp):
 
     qubits = qrp.extract(op.wires)
     partial_sv = op.parameters[0]
-    # jnp.complex128 is the uppermost element in the type promotion lattice
+    # jnp.complex128 is the top element in the type promotion lattice
     # so it is ok to do this.
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     partial_sv = jax.lax.convert_element_type(partial_sv, jnp.dtype(jnp.complex128))
