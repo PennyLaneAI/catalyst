@@ -23,7 +23,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import sysconfig
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
