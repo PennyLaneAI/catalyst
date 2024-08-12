@@ -189,9 +189,8 @@
   It also supports mutti-dimensional arrays as function's inputs. [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
   ```py
-  import os
   import subprocess
-  from catalyst.debug.compiler_functions import compile_executable, run_cmain_executable
+  from catalyst.debug import compile_executable, run_cmain_executable
   
   @qjit
   def f(x):

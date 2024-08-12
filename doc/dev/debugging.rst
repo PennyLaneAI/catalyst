@@ -357,9 +357,8 @@ Here we use ``subprocess.run`` to test if the command works properly.
 
 .. code-block:: python
 
-    import os
     import subprocess
-    from catalyst.debug.compiler_functions import compile_executable
+    from catalyst.debug import compile_executable
 
     binary = compile_executable(f, 1)
     result = subprocess.run(binary, capture_output=True, text=True, check=True)
