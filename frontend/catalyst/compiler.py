@@ -419,8 +419,9 @@ class LinkerDriver:
             f"-l{openblas_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
-            gfortran_so_file,
-            quadmath_so_file,
+            #gfortran_so_file,
+            #quadmath_so_file,
+            "-Wl,--disable-new-dtags",
         ]
         return default_flags
 
