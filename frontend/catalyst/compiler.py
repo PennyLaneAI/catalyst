@@ -173,7 +173,7 @@ HLO_LOWERING_PASS = (
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
-        "func.func(linalg-detensorize{aggressive-mode}))",
+        "func.func(linalg-detensorize{aggressive-mode})",
     ],
 )
 
