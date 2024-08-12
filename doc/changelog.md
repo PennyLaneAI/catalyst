@@ -190,7 +190,7 @@
 
   ```py
   import subprocess
-  from catalyst.debug import compile_executable, run_cmain_executable
+  from catalyst.debug import compile_executable
   
   @qjit
   def f(x):
