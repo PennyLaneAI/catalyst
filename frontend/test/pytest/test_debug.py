@@ -21,8 +21,7 @@ from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
-from catalyst.debug.compiler_functions import compile_executable
+from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage, compile_executable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
