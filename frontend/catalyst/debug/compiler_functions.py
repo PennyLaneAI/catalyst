@@ -180,20 +180,16 @@ def compile_executable(fn, *args):
     main_c_file = workspace + "/main.c"
     output_file = workspace + "/" + f_name + ".out"
     shared_object_file = workspace + "/" + f_name + ".so"
-    lib_shared_object_file = workspace + "/lib" + f_name + ".so"
     options = fn.compiler.options
     with open(main_c_file, "w", encoding="utf-8") as file:
         file.write(get_cmain(fn, *args))
-    shutil.copy(shared_object_file, lib_shared_object_file)
 
     # configure flags
     default_flags = LinkerDriver.get_default_flags(options)
     no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
     link_so_flags = no_shared_flags + [
         "-Wl,-rpath," + workspace,
-        "-L" + workspace,
-        "-l" + f_name,
-        "-g",
+        shared_object_file,
     ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
