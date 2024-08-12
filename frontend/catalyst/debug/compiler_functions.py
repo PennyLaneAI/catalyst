@@ -17,7 +17,6 @@ This module contains debug functions to interact with the compiler and compiled 
 """
 import logging
 import os
-import shutil
 
 from jax.interpreters import mlir
 
