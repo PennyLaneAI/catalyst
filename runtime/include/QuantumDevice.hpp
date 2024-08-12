@@ -164,7 +164,7 @@ struct QuantumDevice {
      */
     virtual void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires)
     {
-        RT_ASSERT(false);
+        RT_FAIL("Unsupported functionality");
     }
 
     /**
@@ -172,7 +172,7 @@ struct QuantumDevice {
      */
     virtual void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires)
     {
-        RT_ASSERT(false);
+        RT_FAIL("Unsupported functionality");
     }
 
     /**
