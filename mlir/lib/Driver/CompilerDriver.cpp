@@ -380,8 +380,8 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
                                 std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
-    if (options.startAfterPass != "" && !output.reachTargetPass) {
-        output.reachTargetPass = options.startAfterPass == "CoroOpt";
+    if (options.checkpointStage != "" && !output.isCheckpointFound) {
+        output.isCheckpointFound = options.checkpointStage == "CoroOpt";
         return success();
     }
 
@@ -428,8 +428,8 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
-    if (options.startAfterPass != "" && !output.reachTargetPass) {
-        output.reachTargetPass = options.startAfterPass == "O2Opt";
+    if (options.checkpointStage != "" && !output.isCheckpointFound) {
+        output.isCheckpointFound = options.checkpointStage == "O2Opt";
         return success();
     }
 
@@ -471,8 +471,8 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
 LogicalResult runEnzymePasses(const CompilerOptions &options,
                               std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
-    if (options.startAfterPass != "" && !output.reachTargetPass) {
-        output.reachTargetPass = options.startAfterPass == "Enzyme";
+    if (options.checkpointStage != "" && !output.isCheckpointFound) {
+        output.isCheckpointFound = options.checkpointStage == "Enzyme";
         return success();
     }
 
@@ -531,8 +531,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
-        if (options.startAfterPass != "" && !output.reachTargetPass) {
-            output.reachTargetPass = options.startAfterPass == pipeline.name;
+        if (options.checkpointStage != "" && !output.isCheckpointFound) {
+            output.isCheckpointFound = options.checkpointStage == pipeline.name;
             continue;
         }
         size_t existingPasses = pm.size();
@@ -550,7 +550,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     }
 
-    if (options.keepIntermediate && options.startAfterPass == "") {
+    if (options.keepIntermediate && options.checkpointStage == "") {
         llvm::raw_string_ostream s{outputs["mlir"]};
         s << moduleOp;
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
@@ -646,7 +646,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> op =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
     catalyst::utils::LinesCount::ModuleOp(*op);
-    output.reachTargetPass = options.startAfterPass == "mlir";
+    output.isCheckpointFound = options.checkpointStage == "mlir";
 
     bool enzymeRun = false;
     if (op) {
@@ -684,7 +684,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvm::SMDiagnostic err;
         llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", /* add_endl */ false,
                                   llvmContext, options.source, options.moduleName, err);
-        output.reachTargetPass = options.startAfterPass == "llvm_ir";
+        output.isCheckpointFound = options.checkpointStage == "llvm_ir";
 
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.

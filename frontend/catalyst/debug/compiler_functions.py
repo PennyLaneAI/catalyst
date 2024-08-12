@@ -168,14 +168,14 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 
 @debug_logger
-def replace_ir(fn, pass_name, new_ir):
+def replace_ir(fn, stage, new_ir):
     """Specify new IR that will be used for future compilation.
 
     Args:
         fn (QJIT): a qjit-decorated function
-        pass_name (str): Recompilation picks up after this pass.
+        stage (str): Recompilation picks up after this stage.
         new_ir (str): The replacement IR to use for recompilation.
     """
     fn.overwrite_ir = new_ir
-    fn.compiler.options.start_after_pass = pass_name
+    fn.compiler.options.checkpoint_stage = stage
     fn.fn_cache.clear()
