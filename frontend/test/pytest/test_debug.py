@@ -525,7 +525,7 @@ class TestCProgramGeneration:
         shutil.rmtree(str(grad_f.workspace), ignore_errors=True)
         assert len(res) == 0
 
-    def test_get_pipeline_output_without_keep_intermediate(self):
+    def test_get_compilation_stage_without_keep_intermediate(self):
         """Test if error is raised when using get_pipeline_output without keep_intermediate."""
 
         @qjit
@@ -536,7 +536,9 @@ class TestCProgramGeneration:
         f(2.0)
 
         with pytest.raises(
-            RuntimeError, match="keep_intermediate must be set to True to get pipeline's output."
+            CompileError,
+            match="Attempting to get output for pipeline: mlir, "
+            "but no file was found.\nAre you sure the file exists?",
         ):
             get_compilation_stage(f, "mlir")
 
