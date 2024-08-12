@@ -351,15 +351,6 @@ class LinkerDriver:
             f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
         ]
 
-        # Add lib dir path for conda
-        lib_dir_path = sysconfig.get_config_var("LIBDIR")
-        lib_path_flags += [
-            f"-Wl,-rpath,{lib_dir_path}",
-            f"-L{lib_dir_path}",
-        ]
-        version_info = sys.version_info
-        version_str = f"{version_info.major}.{version_info.minor}"
-
         # Discover the LAPACK library provided by scipy & add link against it.
         # Doing this here ensures we will always have the correct library name.
 
@@ -429,7 +420,6 @@ class LinkerDriver:
             f"-l{openblas_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
-            "-lpython" + version_str,
             gfortran_so_file,
             quadmath_so_file,
         ]

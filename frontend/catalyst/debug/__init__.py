@@ -16,10 +16,10 @@
 
 from catalyst.debug.callback import callback
 from catalyst.debug.compiler_functions import (
+    compile_executable,
     compile_from_mlir,
     get_cmain,
     print_compilation_stage,
-    compile_executable,
 )
 from catalyst.debug.instruments import instrumentation
 from catalyst.debug.printing import (  # pylint: disable=redefined-builtin

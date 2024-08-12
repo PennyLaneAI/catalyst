@@ -17,6 +17,8 @@ This module contains debug functions to interact with the compiler and compiled 
 """
 import logging
 import os
+import sys
+import sysconfig
 
 from jax.interpreters import mlir
 
@@ -174,6 +176,16 @@ def compile_executable(fn, *args):
         (str): the paths that should be included in LD_LIBRARY_PATH.
         (str): the path of output binary.
     """
+    # get python version
+    lib_dir_path = sysconfig.get_config_var("LIBDIR")
+    version_info = sys.version_info
+    version_str = f"{version_info.major}.{version_info.minor}"
+    lib_path_flags = [
+        f"-Wl,-rpath,{lib_dir_path}",
+        f"-L{lib_dir_path}",
+        "-lpython" + version_str,
+    ]
+
     f_name = str(fn.__name__)
     workspace = str(fn.workspace)
     main_c_file = workspace + "/main.c"
@@ -186,10 +198,14 @@ def compile_executable(fn, *args):
     # configure flags
     default_flags = LinkerDriver.get_default_flags(options)
     no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
-    link_so_flags = no_shared_flags + [
-        "-Wl,-rpath," + workspace,
-        shared_object_file,
-    ]
+    link_so_flags = (
+        no_shared_flags
+        + [
+            "-Wl,-rpath," + workspace,
+            shared_object_file,
+        ]
+        + lib_path_flags
+    )
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
     return output_file
