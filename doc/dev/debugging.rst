@@ -342,7 +342,7 @@ The function must be compiled first so that the IR from each pipeline stage can 
     f(2.0)
     >> 4.0
 
-After compilation, we can use ``catalyst.debug.compiler_functions.get_pipeline_output`` to get the IR from the given
+After compilation, we can use :func:`~.debug.get_pipeline_output`  to get the IR from the given
 compiler pass.
 ``get_pipeline_output`` accepts a ``qjit`` decorated function and a pass name in string. It return the IR after the
 given pass.
