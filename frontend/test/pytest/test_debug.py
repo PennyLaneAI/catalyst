@@ -14,8 +14,8 @@ import platform
 import re
 import subprocess
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import register_pytree_node_class
