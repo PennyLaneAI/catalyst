@@ -8,7 +8,6 @@ name: Changelog Reminder
 
 jobs:
   remind:
-    if: github.event.pull_request.draft == false
     name: Changelog Reminder
     runs-on: ubuntu-latest
     steps:
