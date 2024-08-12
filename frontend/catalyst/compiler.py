@@ -388,6 +388,26 @@ class LinkerDriver:
         openblas_so_file = search_result[0]
         openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
 
+        file_prefix = "libgfortran"
+        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}*")
+        search_result = glob.glob(search_pattern)
+        if not search_result:
+            raise CompileError(
+                f'Unable to find GFortran library at "{search_pattern}". '
+                "Please ensure that SciPy is installed and available via pip."
+            )
+        gfortran_so_file = search_result[0]
+
+        file_prefix = "libquadmath"
+        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}*")
+        search_result = glob.glob(search_pattern)
+        if not search_result:
+            raise CompileError(
+                f'Unable to find Guadmath library at "{search_pattern}". '
+                "Please ensure that SciPy is installed and available via pip."
+            )
+        quadmath_so_file = search_result[0]
+
         lib_path_flags += [
             f"-Wl,-rpath,{scipy_lib_path}",
             f"-L{scipy_lib_path}",
@@ -418,7 +438,10 @@ class LinkerDriver:
             f"-l{openblas_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lgfortran",
             "-lpython" + version_str,
+            gfortran_so_file,
+            quadmath_so_file,
         ]
         return default_flags
 
