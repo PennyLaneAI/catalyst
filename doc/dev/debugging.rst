@@ -234,9 +234,6 @@ The compilation process of a QJITed quantum function moves through various stage
 - **Bufferized MLIR**: All tensors are `converted <https://mlir.llvm.org/docs/Bufferization>`_ to memory buffer allocations at this step.
 - **LLVM Dialect**: Lowering the code to the `LLVM Dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_ in MLIR simplifies the translation to LLVMIR by providing a one-to-one mapping.
 - **QIR (LLVMIR)**: a `specification <https://learn.microsoft.com/en-us/azure/quantum/concepts-qir>`_ for quantum programs in LLVMIR
-- **CoroOPt**: `Coroutine lowering <https://llvm.org/docs/Coroutines.html>`_ only happens when ``AsyncQnode`` is involved.
-- **O2Opt**: `O2 optimization <https://llvm.org/doxygen/classllvm_1_1OptimizationLevel.html#a9c0836ff9219a0b737a11979991c3389>`_ only happens when gradient presents.
-- **Enzyme**: `Automatic differentiation <https://github.com/EnzymeAD/Enzyme>`_ only happens when gradient presents.
 
 To ensure that you have access to all the stages, the ``keep_intermediate=True`` flag must be specified in the ``qjit`` decorator.
 In the following example, we also compile ahead-of-time so that there is no requirements to pass actual parameters:
