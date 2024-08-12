@@ -328,7 +328,7 @@ C Executable Generation
 
 Catalyst provides a way to generate a c executable that calls the shared object of the given
 qjit-decorated function.
-In ``catalyst.debug.compiler_functions``, ``compile_cmain(fn: QJIT, *args) -> str, str`` takes
+In ``catalyst.debug.compiler_functions``, ``compile_executable(fn: QJIT, *args) -> str, str`` takes
 a qjit-decorated function and arguments for that function.
 It returns a string of LD_LIBRARY_PATH and the path to the output executable file.
 Users can use `debug.print_memref` to add information to stdout.
@@ -351,7 +351,7 @@ can re-run the executable latter.
 ... 25
 ... 25
 
-The compiled qjit-decorated function can be fed to ``compile_cmain`` to get the required
+The compiled qjit-decorated function can be fed to ``compile_executable`` to get the required
 ld libraries and the executable file.
 Here we use ``subprocess.run`` to test if the command works properly.
 
@@ -359,9 +359,9 @@ Here we use ``subprocess.run`` to test if the command works properly.
 
     import os
     import subprocess
-    from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
+    from catalyst.debug.compiler_functions import compile_executable
 
-    ld_env, binary = compile_cmain(f, 1)
+    ld_env, binary = compile_executable(f, 1)
     env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
     result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
     result.stdout

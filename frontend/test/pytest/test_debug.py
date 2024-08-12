@@ -23,7 +23,7 @@ from jax.tree_util import register_pytree_node_class
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
-from catalyst.debug.compiler_functions import compile_cmain
+from catalyst.debug.compiler_functions import compile_executable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -451,7 +451,7 @@ class TestCProgramGeneration:
             return y
 
         ans = str(f(arg).tolist()).replace(" ", "")
-        ld_env, binary = compile_cmain(f, arg)
+        ld_env, binary = compile_executable(f, arg)
 
         env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
         result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)

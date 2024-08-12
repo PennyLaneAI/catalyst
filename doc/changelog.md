@@ -185,7 +185,7 @@
   }
   ```
   
-* Catalyst now supports c executable generation with `catalyst.debug.compiler_functions.compile_cmain`.
+* Catalyst now supports c executable generation with `catalyst.debug.compiler_functions.compile_executable`.
   It also supports mutti-dimensional arrays as function's inputs.
   `catalyst.debug.compiler_functions.run_cmain_executabl` provides the example to run the c executable.
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
@@ -193,7 +193,7 @@
   ```py
   import os
   import subprocess
-  from catalyst.debug.compiler_functions import compile_cmain, run_cmain_executable
+  from catalyst.debug.compiler_functions import compile_executable, run_cmain_executable
   
   @qjit
   def f(x):
@@ -201,7 +201,7 @@
       debug.print_memref(y)
       return y
   f(5)
-  ld_env, binary = compile_cmain(f, 1)
+  ld_env, binary = compile_executable(f, 1)
   
   env = {"LD_LIBRARY_PATH": ld_env, **os.environ}  # Include existing environment variables
   result = subprocess.run(binary, env=env, capture_output=True, text=True, check=True)
