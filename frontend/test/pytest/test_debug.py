@@ -448,36 +448,36 @@ class TestCProgramGeneration:
             (
                 "HLOLoweringPass",
                 "%2 = arith.mulf %in, %in_0 : f64\n",
-                "%c = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %c, %in_0 : f64\n",
+                "%t = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %t, %in_0 : f64\n",
             ),
             (
                 "QuantumCompilationPass",
                 "%2 = arith.mulf %in, %in_0 : f64\n",
-                "%c = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %c, %in_0 : f64\n",
+                "%t = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %t, %in_0 : f64\n",
             ),
             (
                 "BufferizationPass",
                 "%6 = arith.mulf %in, %in_0 : f64\n",
-                "%c = arith.mulf %in, %in_0 : f64\n" + "    %6 = arith.mulf %c, %in_0 : f64\n",
+                "%t = arith.mulf %in, %in_0 : f64\n" + "    %6 = arith.mulf %t, %in_0 : f64\n",
             ),
             (
                 "MLIRToLLVMDialect",
                 "%21 = llvm.fmul %19, %20  : f64\n",
-                "%c = llvm.fmul %19, %20  : f64\n" + "    %21 = llvm.fmul %c, %20  : f64\n",
+                "%t = llvm.fmul %19, %20  : f64\n" + "    %21 = llvm.fmul %t, %20  : f64\n",
             ),
             (
                 "llvm_ir",
                 "store double %15, ptr %9, align 8\n",
-                "%x = load double, ptr %1, align 8\n"
-                + "   %cc = fmul double %15, %x\n"
-                + "   store double %cc, ptr %9, align 8\n",
+                "%t1 = load double, ptr %1, align 8\n"
+                + "   %t2 = fmul double %15, %t1\n"
+                + "   store double %t2, ptr %9, align 8\n",
             ),
             (
                 "last",
                 "store double %15, ptr %9, align 8\n",
-                "%x = load double, ptr %1, align 8\n"
-                + "   %cc = fmul double %15, %x\n"
-                + "   store double %cc, ptr %9, align 8\n",
+                "%t1 = load double, ptr %1, align 8\n"
+                + "   %t2 = fmul double %15, %t1\n"
+                + "   store double %t2, ptr %9, align 8\n",
             ),
         ],
     )

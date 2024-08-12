@@ -185,8 +185,9 @@
   }
   ```
   
-* Catalyst now has debug interfaces `get_pipeline_output` and `replace_ir` to acquire and 
+* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and 
   recompile the IR from a given pipeline pass. They can only be used with `keep_intermediate=True`.
+  `get_compilation_stage` is renamed from `print_compilation_stage` and now returns a IR string.
   [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
 
   ```py
@@ -203,12 +204,12 @@
   ```
 
   ```py
-  from catalyst.debug.compiler_functions import get_pipeline_output, replace_ir
+  from catalyst.debug import get_pipeline_output, replace_ir
   
   old_ir = get_pipeline_output(f, "HLOLoweringPass")
   new_ir = old_ir.replace(
       "%2 = arith.mulf %in, %in_0 : f64\n",
-      "%c = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %c, %in_0 : f64\n"
+      "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
   )
   replace_ir(f, "HLOLoweringPass", new_ir)
   ```
