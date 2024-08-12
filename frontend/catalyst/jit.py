@@ -626,8 +626,6 @@ class QJIT:
         options = copy.deepcopy(self.compile_options)
         options.pipelines = [("0_canonicalize", ["canonicalize"])]
         options.lower_to_llvm = False
-        options.start_after_pass = ""
-
         canonicalizer = Compiler(options)
 
         # TODO: the in-memory and textual form are different after this, consider unification
