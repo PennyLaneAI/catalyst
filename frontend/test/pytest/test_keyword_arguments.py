@@ -59,6 +59,23 @@ class TestKeywordArguments:
 
         assert jnp.allclose(circuit(0.5, c=0.5), circuit(0.5, 0.5))
 
+    def test_qnode_with_kwargs_swich_order(self, backend):
+        """Test that a qnode works with keyword argeument."""
+        dev = qml.device(backend, wires=1)
+
+        @qjit()
+        @qml.qnode(dev)
+        def circuit(x, c):
+            qml.RX(x, wires=0)
+            qml.RY(c, wires=0)
+            return qml.probs()
+
+        same_order = circuit(c=0.8, x=0.2)
+        switched_order = circuit(x=0.2, c=0.8)
+        expected = circuit(0.2, 0.8)
+        assert jnp.allclose(same_order, expected)
+        assert jnp.allclose(switched_order, expected)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
