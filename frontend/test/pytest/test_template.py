@@ -467,7 +467,7 @@ def test_qft(backend):
         return qml.probs()
 
     device = qml.device(backend, wires=3)
-    params = jnp.array([1.0, 0.0, 0.0])
+    params = jnp.array([1, 0, 0])
     interpreted_fn = qml.QNode(qft, device)
     jitted_fn = qjit(interpreted_fn)
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
