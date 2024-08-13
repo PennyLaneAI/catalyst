@@ -1199,8 +1199,10 @@ def test_pytrees_return_qnode(backend):
     assert isinstance(result[1], tuple)
     assert len(result[1]) == 2
 
+
 def test_calssical_kwargs():
     """Test the gradient on a classical function with keyword arguments"""
+
     @qjit
     def f1(x, y, z):
         return x * (y - z)
@@ -1209,8 +1211,10 @@ def test_calssical_kwargs():
     expected = qjit(grad(f1, argnum=0))(3.0, 1.0, 2.0)
     assert np.allclose(expected, result)
 
+
 def test_calssical_kwargs_switched_arg_order():
     """Test the gradient on classical function with keyword arguments and switched argument order"""
+
     @qjit
     def f1(x, y, z):
         return x * (y - z)
