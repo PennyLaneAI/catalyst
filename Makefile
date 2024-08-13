@@ -268,11 +268,11 @@ format-frontend:
 ifdef check
 	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
-	isort --check --diff .
+	isort --check --diff . --skip catalyst/mlir/llvm-project --skip frontend/catalyst/third_party
 else
 	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
-	isort .
+	isort . --skip catalyst/mlir/llvm-project --skip frontend/catalyst/third_party
 endif
 
 .PHONY: docs clean-docs
