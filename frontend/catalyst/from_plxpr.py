@@ -235,7 +235,7 @@ class QFuncPlxprInterpreter:
         resets the wire map.
         """
         qdevice_p.bind(**_get_device_kwargs(self._device))
-        self.qreg = qalloc_p.bind(len(self._device.wires))
+        self.qreg = qalloc_p.bind(len(self._device.wires), static_size=len(self._device.wires))
         self.wire_map = {}
 
     def cleanup(self):
