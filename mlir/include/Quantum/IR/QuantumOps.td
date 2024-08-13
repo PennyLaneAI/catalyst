@@ -289,6 +289,7 @@ def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
         ]>:$basis_state,
         Variadic<QubitType>:$in_qubits
     );
+
     let results = (outs
         Variadic<QubitType>:$out_qubits
     );
@@ -302,7 +303,6 @@ def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
             return mlir::isa<mlir::MemRefType>(getBasisState().getType());
         }
     }];
-
 }
 
 def CustomOp : Gate_Op<"custom", [DifferentiableGate,
