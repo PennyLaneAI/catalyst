@@ -1239,6 +1239,16 @@ def test_qnode_kwargs(backend):
     result = qjit(jacobian(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
     expected = qjit(jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
+    result = qjit(grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected, result)
+    result_val, result_grad = qjit(value_and_grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
+    expected_val = qjit(circuit)(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    print(result_val, result_grad)
+    print(expected_val, expected_grad)
+    assert np.allclose(expected_val, result_val)
+    assert np.allclose(expected_grad, result_grad)
 
 
 def test_qnode_kwargs_switched_arg_order(backend):
@@ -1256,6 +1266,16 @@ def test_qnode_kwargs_switched_arg_order(backend):
     switched_order = qjit(jacobian(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
     expected = qjit(jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
+    switched_order = qjit(grad(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected[0], switched_order[0])
+    switched_order_val, switched_order_grad = qjit(value_and_grad(circuit, argnum=[0]))(
+        0.1, z=0.3, y=0.2
+    )
+    expected_val = qjit(circuit)(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected_val, switched_order_val)
+    assert np.allclose(expected_grad, switched_order_grad)
 
 
 def test_pytrees_return_classical_function(backend):
