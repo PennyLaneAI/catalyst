@@ -270,7 +270,6 @@
   [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
 
 * The QuantumDevice API has now added the functions `SetState` and `SetBasisState`
-* The QuantumDevice API has now added the functions `SetState` and `SetBasisState`
   for simulators that may benefit from instructions that directly set the state.
   Implementing these methods is optional, and device support can be indicated via
   the `initial_state_prep` flag in the TOML configuration file.
