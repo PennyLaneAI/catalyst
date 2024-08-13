@@ -177,7 +177,18 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 @debug_logger
 def replace_ir(fn, stage, new_ir):
-    """Specify new IR that will be used for future compilation.
+    """Replace the IR at any compilation stage that will be used the next time the function runs.
+
+    It is important that the function signature (inputs & outputs) for the next execution matches
+    that of the provided IR, or else the behaviour is undefined.
+
+    All the available stages are:
+        - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and
+                MLIRToLLVMDialect.
+        - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
+    differentiation) passes do not always happen. `last` denotes the stage right before object file
+    generation.
 
     Args:
         fn (QJIT): a qjit-decorated function
