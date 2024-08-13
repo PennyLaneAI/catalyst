@@ -17,8 +17,8 @@ from dataclasses import asdict
 from functools import reduce
 from typing import Iterable, Sequence
 
-import jax.numpy as jnp
 import numpy as np
+import jax.numpy as jnp
 import pennylane as qml
 import pytest
 from jax.tree_util import tree_flatten
