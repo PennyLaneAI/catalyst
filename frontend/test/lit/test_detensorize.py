@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=missing-module-docstring,missing-function-docstring
+
 import shutil
 from pathlib import Path
 
