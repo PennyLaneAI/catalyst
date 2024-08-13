@@ -165,4 +165,10 @@ def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
+def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
+    let summary = "Split each tape into its own function.";
+
+    let constructor = "catalyst::createSplitMultipleTapesPass()";
+}
+
 #endif // CATALYST_PASSES
