@@ -70,14 +70,14 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
     //CHECK:    [[dense3:%.+]] = arith.constant dense<[1, 2, 3]>
     //CHECK:    [[emptyRes:%.+]] = tensor.empty() : tensor<3xf64>
     //CHECK:    [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c3]] step [[c1]] iter_args(%arg1 = [[emptyRes]]) -> (tensor<3xf64>) {
-        //CHECK:    [[scaleFactor:%.+]] = tensor.extract [[dense3]][[[idx]]] : tensor<3xindex>
-        //CHECK:    [[intermediateRes:%.+]] = func.call @circuit.folded([[scaleFactor]]) : (index) -> tensor<f64>
-        //CHECK:    [[tensorRes:%.+]] = tensor.from_elements [[intermediateRes]] : tensor<1xf64>
-        //CHECK:    [[resultsFor:%.+]] = scf.for %arg2 = [[c0]] to [[c1]] step [[c1]] iter_args(%arg3 = %arg1) -> (tensor<3xf64>) {
-            //CHECK:    [[extracted:%.+]] = tensor.extract [[tensorRes]][%arg3] : tensor<1xf64>
-            //CHECK:    [[insertedRes:%.+]] = tensor.insert [[extracted]] into %arg3[%arg1] : tensor<5xf64>
-            //CHECK:    scf.yield [[insertedRes]]
-        //CHECK:    scf.yield [[resultsFor]]
+    //CHECK:        [[scaleFactor:%.+]] = tensor.extract [[dense3]][[[idx]]] : tensor<3xindex>
+    //CHECK:        [[intermediateRes:%.+]] = func.call @circuit.folded([[scaleFactor]]) : (index) -> tensor<f64>
+    //CHECK:        [[tensorRes:%.+]] = tensor.from_elements [[intermediateRes]] : tensor<1xf64>
+    //CHECK:        [[resultsFor:%.+]] = scf.for %arg2 = [[c0]] to [[c1]] step [[c1]] iter_args(%arg3 = %arg1) -> (tensor<3xf64>) {
+    //CHECK:            [[extracted:%.+]] = tensor.extract [[tensorRes]][%arg3] : tensor<1xf64>
+    //CHECK:            [[insertedRes:%.+]] = tensor.insert [[extracted]] into %arg3[%arg1] : tensor<5xf64>
+    //CHECK:            scf.yield [[insertedRes]]
+    //CHECK:        scf.yield [[resultsFor]]
     //CHECK:    return [[results]]
 func.func @mitigated_circuit() -> tensor<3xf64> {
     %scaleFactors = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
