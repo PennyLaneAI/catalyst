@@ -417,6 +417,9 @@
   (only `global` value is supported to date.)
   [(#946)](https://github.com/PennyLaneAI/catalyst/pull/946)
 
+* Catalyst's implementation of Lightning Kokkos plugin has been removed in favor of Lightning's one.
+  [(#974)](https://github.com/PennyLaneAI/catalyst/pull/974)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):

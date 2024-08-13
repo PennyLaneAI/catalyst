@@ -51,29 +51,29 @@ jobs:
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path:  mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
@@ -84,7 +84,7 @@ jobs:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
@@ -122,7 +122,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=latest_release \
-        ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
 
@@ -134,7 +133,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=v0.37.0_rc \
-        ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
 

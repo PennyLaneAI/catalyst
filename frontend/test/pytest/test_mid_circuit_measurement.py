@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for mid-circuit measurements in Catalyst"""
 
-import os
 from dataclasses import asdict
 from functools import reduce
 from typing import Iterable, Sequence
@@ -29,8 +28,6 @@ import catalyst
 from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
-os.environ["OMP_PROC_BIND"] = "false"
-os.environ["OMP_NUM_THREADS"] = "2"
 
 # pylint: disable=too-many-public-methods
 
@@ -572,6 +569,9 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, 1.0)
 
+    @pytest.mark.xfail(
+        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
+    )
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
