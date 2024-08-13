@@ -569,6 +569,7 @@ def trace_quantum_operations(
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
     mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
+    #in_classical_tracers_ = None
 ) -> QRegPromise:
     """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
     Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
@@ -661,6 +662,7 @@ def trace_quantum_operations(
         assert qrp2 is not None
         qrp = qrp2
 
+    #breakpoint()
     ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns, FORCED_ORDER_PRIMITIVES)  # [1]
     return qrp
 
@@ -1087,7 +1089,7 @@ def trace_function(
         return res_expanded_tracers, in_sig, out_sig
 
 
-'''
+
 # main
 @debug_logger
 def trace_quantum_function(
@@ -1187,7 +1189,10 @@ def trace_quantum_function(
                     trees = return_values_tree
 
                 mcm_config = qnode.execute_kwargs["mcm_config"]
-                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                #print("hi!")
+                #breakpoint()
+                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)#, in_classical_tracers_=in_classical_tracers)
+                #print("hi too!")
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
@@ -1220,8 +1225,9 @@ def trace_quantum_function(
         #breakpoint()
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
+    #breakpoint()
     return closed_jaxpr, out_type, out_tree
-'''
+
 
 
 # mine
@@ -1260,7 +1266,7 @@ from jax._src.util import unzip2
 import copy
 
 @debug_logger
-def trace_quantum_function(
+def trace_quantum_function_(
     f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
@@ -1299,7 +1305,7 @@ def trace_quantum_function(
                 big_invars = (
                     EvaluationContext.find_jaxpr_frame().to_jaxpr(in_classical_tracers)[0].invars
                 )
-                # breakpoint()
+                #breakpoint()
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
             # Therefore we need to compute the tree with measurements as leaves and it comes
@@ -1333,6 +1339,7 @@ def trace_quantum_function(
                 quantum_tape,
                 return_values_flat,
             )
+            #breakpoint()
 
         if len(tapes) > 1:
             # (2) - Quantum tracing
@@ -1392,6 +1399,7 @@ def trace_quantum_function(
                         out_tracers = [_ for _ in transformed_results[i]]
 
                     jp = EvaluationContext.find_jaxpr_frame().to_jaxpr(out_tracers)
+                    breakpoint()
 
                     EvaluationContext.find_jaxpr_frame().eqns.append(
                         new_jaxpr_eqn([], [], jax.core.Primitive("_tape_cut"), [], no_effects)
