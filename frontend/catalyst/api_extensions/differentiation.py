@@ -597,21 +597,22 @@ class Grad:
             if EvaluationContext.is_tracing():
                 fn = _ensure_differentiable(self.fn)
 
-                args_data, in_tree = tree_flatten(args)
+                args_data, in_arg_tree = tree_flatten(args)
                 grad_params = _check_grad_params(
                     self.grad_params.method,
                     self.grad_params.scalar_out,
                     self.grad_params.h,
                     self.grad_params.argnum,
                     len(args_data),
-                    in_tree,
+                    in_arg_tree,
                     self.grad_params.with_value,
                 )
-                jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+                input_data_flat, _ = tree_flatten((args, kwargs))
+                jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args, **kwargs)
                 if self.grad_params.with_value:  # use value_and_grad
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
-                        *args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # value_and_grad returns two results: the values and the gradients,
@@ -621,35 +622,37 @@ class Grad:
 
                     vals = tree_unflatten(out_tree, vals)
                     gradients = _unflatten_derivatives(
-                        gradients, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
+                        gradients, in_arg_tree, out_tree, grad_params, len(jaxpr.out_avals)
                     )
                     results = (vals, gradients)
                 else:  # use grad
                     args_argnum = tuple(args[i] for i in grad_params.argnum)
-                    _, in_tree = tree_flatten(args_argnum)
+                    _, in_arg_tree = tree_flatten(args_argnum)
 
                     # It always returns list as required by catalyst control-flows
-                    results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+                    results = grad_p.bind(
+                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                    )
 
                     # grad returns only the gradients,
                     # so there is no need to split the results.
 
                     results = _unflatten_derivatives(
-                        results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
+                        results, in_arg_tree, out_tree, grad_params, len(jaxpr.out_avals)
                     )
             else:
                 if argnums := self.grad_params.argnum is None:
                     argnums = 0
                 if self.grad_params.scalar_out:
                     if self.grad_params.with_value:
-                        results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
+                        results = jax.value_and_grad(self.fn, argnums=argnums)(*args, **kwargs)
                     else:
-                        results = jax.grad(self.fn, argnums=argnums)(*args)
+                        results = jax.grad(self.fn, argnums=argnums)(*args, **kwargs)
                 else:
                     assert (
                         not self.grad_params.with_value
                     ), "value_and_grad cannot be used with a Jacobian"
-                    results = jax.jacobian(self.fn, argnums=argnums)(*args)
+                    results = jax.jacobian(self.fn, argnums=argnums)(*args, **kwargs)
 
             return results
 
@@ -734,12 +737,14 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 
-def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
+def _make_jaxpr_check_differentiable(
+    f: Differentiable, grad_params: GradParams, *args, **kwargs
+) -> Jaxpr:
     """Gets the jaxpr of a differentiable function. Perform the required additional checks and
     return the output tree."""
     method = grad_params.method
     with mark_gradient_tracing(method):
-        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args, **kwargs)
     _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
