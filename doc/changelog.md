@@ -249,9 +249,8 @@
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
-* Allows for simulators to specify the optimization of setting the initial state directly
-  via `qml.StatePrep` and `qml.BasisState` when using the `initial_state_prep` flag in the
-  TOML file.
+* On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
+  are no longer decomposed when using Catalyst, improving compilation & runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
 <h3>Breaking changes</h3>
