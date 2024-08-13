@@ -212,6 +212,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
             pass
         # Don't check StatePrep since StatePrep is not in the list of device capabilities.
+        # It is only valid when the TOML file has the initial_state_prep_flag.
         elif (
             isinstance(op, StatePrepBase) and qjit_device.qjit_capabilities.initial_state_prep_flag
         ):
