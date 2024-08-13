@@ -160,17 +160,23 @@ struct QuantumDevice {
     virtual void PrintState() = 0;
 
     /**
-     * @brief Function to set state to vector of complex variables.
+     * @brief Prepare subsystems using the given ket vector in the computational basis.
+     *
+     * @param state A state vector of size 2**len(wires)
+     * @param wires The wire(s) the operation acts on
      */
-    virtual void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires)
+    virtual void SetState(DataView<std::complex<double>, 1> &state, std::vector<QubitIdType> &wires)
     {
         RT_FAIL("Unsupported functionality");
     }
 
     /**
-     * @brief Function to set state to vector of complex variables.
+     * @brief Prepares a single computational basis state.
+     *
+     * @param n Prepares the basis state |n>, where n is an array of integers from the set {0, 1}
+     * @param wires The wire(s) the operation acts on
      */
-    virtual void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires)
+    virtual void SetBasisState(DataView<int8_t, 1> &n, std::vector<QubitIdType> &wires)
     {
         RT_FAIL("Unsupported functionality");
     }
