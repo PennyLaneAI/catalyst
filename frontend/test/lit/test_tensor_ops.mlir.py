@@ -18,7 +18,7 @@ import pennylane as qml
 from jax import numpy as jnp
 
 from catalyst import measure, qjit
-from catalyst.debug import print_compilation_stage
+from catalyst.debug import get_compilation_stage
 
 # Test methodology:
 # Each mathematical function found in numpy
@@ -43,7 +43,7 @@ def test_ewise_arctan2(x, y):
 
 
 test_ewise_arctan2(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_arctan2, "BufferizationPass")
+print(get_compilation_stage(test_ewise_arctan2, "BufferizationPass"))
 
 # Need more time to test
 # jnp.ldexp
@@ -76,7 +76,7 @@ def test_ewise_add(x, y):
 
 
 test_ewise_add(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_add, "BufferizationPass")
+print(get_compilation_stage(test_ewise_add, "BufferizationPass"))
 
 
 # CHECK-LABEL: test_ewise_mult
@@ -91,7 +91,7 @@ def test_ewise_mult(x, y):
 
 
 test_ewise_mult(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_mult, "BufferizationPass")
+print(get_compilation_stage(test_ewise_mult, "BufferizationPass"))
 
 
 # CHECK-LABEL: test_ewise_div
@@ -106,7 +106,7 @@ def test_ewise_div(x, y):
 
 
 test_ewise_div(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_div, "BufferizationPass")
+print(get_compilation_stage(test_ewise_div, "BufferizationPass"))
 
 
 # CHECK-LABEL: test_ewise_power
@@ -121,7 +121,7 @@ def test_ewise_power(x, y):
 
 
 test_ewise_power(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_power, "BufferizationPass")
+print(get_compilation_stage(test_ewise_power, "BufferizationPass"))
 
 
 # CHECK-LABEL: test_ewise_sub
@@ -136,7 +136,7 @@ def test_ewise_sub(x, y):
 
 
 test_ewise_sub(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_sub, "BufferizationPass")
+print(get_compilation_stage(test_ewise_sub, "BufferizationPass"))
 
 
 @qjit(keep_intermediate=True)
@@ -151,7 +151,7 @@ def test_ewise_true_div(x, y):
 
 
 test_ewise_true_div(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_true_div, "BufferizationPass")
+print(get_compilation_stage(test_ewise_true_div, "BufferizationPass"))
 
 # Not sure why the following ops are not working
 # perhaps they rely on another function?
@@ -170,7 +170,7 @@ def test_ewise_float_power(x, y):
 
 
 test_ewise_float_power(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_float_power, "BufferizationPass")
+print(get_compilation_stage(test_ewise_float_power, "BufferizationPass"))
 
 
 # Not sure why the following ops are not working
@@ -195,7 +195,7 @@ def test_ewise_maximum(x, y):
 
 
 test_ewise_maximum(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_maximum, "BufferizationPass")
+print(get_compilation_stage(test_ewise_maximum, "BufferizationPass"))
 
 # Only single function support
 # * jnp.fmax
@@ -213,7 +213,7 @@ def test_ewise_minimum(x, y):
 
 
 test_ewise_minimum(jnp.array(1.0), jnp.array(2.0))
-print_compilation_stage(test_ewise_minimum, "BufferizationPass")
+print(get_compilation_stage(test_ewise_minimum, "BufferizationPass"))
 
 # Only single function support
 # * jnp.fmin

@@ -421,6 +421,7 @@ class QJIT:
         self.mlir_module = None
         self.qir = None
         self.out_type = None
+        self.overwrite_ir = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
@@ -658,7 +659,15 @@ class QJIT:
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+        if self.overwrite_ir:
+            shared_object, llvm_ir, _ = self.compiler.run_from_ir(
+                self.overwrite_ir,
+                str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+                self.workspace,
+            )
+        else:
+            shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
