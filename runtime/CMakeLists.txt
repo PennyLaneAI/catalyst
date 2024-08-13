@@ -62,8 +62,7 @@ function(fetch_pybind11)
     else()
         message(STATUS "Could not find existing pybind11-dev package. Building from source.")
         set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
-        
-        find_package(Python COMPONENTS Interpreter Development)
+
         FetchContent_Declare(pybind11
             GIT_REPOSITORY https://github.com/pybind/pybind11.git
             GIT_TAG        v2.10.1
@@ -108,10 +107,6 @@ endif()
 add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
-
-find_package(PythonLibs REQUIRED)
-include_directories(${PYTHON_INCLUDE_DIRS})
-target_link_libraries(catalyst_qir_runtime INTERFACE ${PYTHON_LIBRARIES})
 
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}
