@@ -7,6 +7,7 @@ on:
       - reopened
       - synchronize
       - labeled
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -21,6 +22,7 @@ concurrency:
 
 jobs:
   check_if_wheel_build_required:
+    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
