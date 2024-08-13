@@ -680,7 +680,7 @@ class QJIT:
             Any: results of the execution arranged into the original function's output PyTrees
         """
 
-        results = self.compiled_function(*(*args, kwargs), {})
+        results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
         return tree_unflatten(self.out_treedef, results)
