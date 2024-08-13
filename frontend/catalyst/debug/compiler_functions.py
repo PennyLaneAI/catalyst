@@ -40,9 +40,11 @@ def get_compilation_stage(fn, stage):
     by the user as a compilation option, or predefined in ``catalyst.compiler``.
 
     All the available stages are:
-        - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and
-                MLIRToLLVMDialect.
-        - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+
+    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect
+
+    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+
     Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
     differentiation) passes do not always happen. `last` denotes the stage right before object file
     generation.
@@ -54,7 +56,7 @@ def get_compilation_stage(fn, stage):
         stage (str): string corresponding with the name of the stage to be printed
 
     Returns:
-        str: output ir from the target compiler pass
+        str: output ir from the target compiler stage
 
     .. seealso:: :doc:`/dev/debugging`
 
@@ -183,9 +185,11 @@ def replace_ir(fn, stage, new_ir):
     that of the provided IR, or else the behaviour is undefined.
 
     All the available stages are:
-        - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and
-                MLIRToLLVMDialect.
-        - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+
+    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect.
+
+    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+
     Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
     differentiation) passes do not always happen. `last` denotes the stage right before object file
     generation.
