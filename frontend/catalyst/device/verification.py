@@ -209,8 +209,10 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # is handled in _inv_op_checker and _ctrl_op_checker.
         # Specialed control op classes (e.g. CRZ) should be checked directly though, which is why we
         # can't use isinstance(op, Controlled).
+        if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
+            pass
         # Don't check StatePrep since StatePrep is not in the list of device capabilities.
-        if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint, StatePrepBase)):
+        elif isinstance(op, StatePrepBase):
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
             raise CompileError(
