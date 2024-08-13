@@ -185,7 +185,8 @@ elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
     # Here we need to switch the deault to MacOs dynamic lib
     variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
-    variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
+    if "LDCXXSHARED" in variables:
+        variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
