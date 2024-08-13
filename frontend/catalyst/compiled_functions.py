@@ -475,3 +475,7 @@ class CompilationCache:
         key = CacheKey(treedef, static_args)
         entry = CacheEntry(fn, signature, out_treedef, workspace)
         self.cache[key] = entry
+
+    def clear(self):
+        """Clear all previous compiled functions"""
+        self.cache.clear()
