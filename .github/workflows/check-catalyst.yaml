@@ -2,6 +2,11 @@ name: Check Catalyst Build
 
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -12,6 +17,7 @@ concurrency:
 
 jobs:
   determine_runner:
+    if: github.event.pull_request.draft == false
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
