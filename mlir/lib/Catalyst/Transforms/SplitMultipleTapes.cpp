@@ -31,41 +31,48 @@ namespace catalyst {
 struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass> {
     using impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass>::SplitMultipleTapesPassBase;
 
-    bool isProgram(func::FuncOp func){
-        bool result = false;
-        WalkResult _ = func->walk([&](Operation *op){
-            llvm::errs() << op->getName() << "\n";
+    unsigned int countTapes(func::FuncOp func){
+        // Count the number of quantum.device operations in a function
+        unsigned int count = 0;
+        func->walk([&](Operation *op){
+            //llvm::errs() << op->getName() << "\n";
             if (op->getName().getStringRef() == "quantum.device"){
-                result = true;
-                return WalkResult::interrupt();
+                count++;
             }
-            return WalkResult::advance();
         });
-        return result;
+        return count;
     }
 
     void runOnOperation() override { 
         Operation *module = getOperation();
-        llvm::errs() << *module << "Hello world!\n"; 
+        //llvm::errs() << *module << "Hello world!\n"; 
 
-        // 1. Identify the function with the circuits
-        // Usually it is the only private function
-        // And its name is the same as the top level python qnode name
-        // e.g. if the qnode name is "circuit", then the entry function
-        // is "public @jit_circuit", and it calls the "private @circuit"
-        // that actually has the tapes
-
-        // Another way to identify the target function is 
-        // just walk through it and find that it is the function with
-        // the device. This won't be costly since quantum.device 
-        // is usually one of the first instructions
-        func::FuncOp MultiTapeFunc;
-        WalkResult result = module->walk([&](func::FuncOp Func){
-            llvm::errs() << "visiting " << Func.getSymName() << "\n";
-            bool IsProgram = isProgram(Func);
-            llvm::errs() << IsProgram << "\n";
-            return WalkResult::advance();
+        // 1. Identify the functions with multiple tapes
+        // Walk through each function and count the number of devices.
+        // In frontend when tracing (jax_tracers.py/trace_quantum_function), 
+        // each tape has its own quantum.device operation attached to it
+        SmallVector<func::FuncOp> MultitapePrograms;
+        module->walk([&](func::FuncOp func){
+            //llvm::errs() << "visiting " << func.getSymName() << "\n";
+            if (countTapes(func) >= 2){
+                MultitapePrograms.push_back(func);
+            }
         });
+
+        // Do nothing and exit for classical and single-tape programs
+        if (MultitapePrograms.empty()){
+            return;
+        }
+
+        llvm::errs() << "program function is: \n";
+        for (auto _ : MultitapePrograms){
+            llvm::errs() << _;
+        }
+
+        // 2. Count the number of tapes
+
+
+
     }
 };
 
