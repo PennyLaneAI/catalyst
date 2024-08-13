@@ -80,6 +80,8 @@ struct CompilerOptions {
     std::vector<Pipeline> pipelinesCfg;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool lowerToLLVM;
+    /// Specify that the compiler should start after reaching the given pass.
+    std::string checkpointStage;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
@@ -97,6 +99,8 @@ struct CompilerOutput {
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
     size_t pipelineCounter = 0;
+    /// if the compiler reach the pass specified by startAfterPass.
+    bool isCheckpointFound;
 
     // Gets the next pipeline dump file name, prefixed with number.
     std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir")
