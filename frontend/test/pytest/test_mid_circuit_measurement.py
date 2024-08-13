@@ -569,7 +569,7 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, 1.0)
 
-    @pytest.mark.skip(
+    @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
     )
     @pytest.mark.parametrize("shots", [10000])
