@@ -18,6 +18,9 @@ This module contains debug functions to interact with the compiler and compiled 
 import logging
 import os
 import platform
+import re
+import shutil
+import subprocess
 import sys
 import sysconfig
 
@@ -213,5 +216,25 @@ def compile_executable(fn, *args):
         + lib_path_flags
     )
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
+
+    if platform.system() == "Darwin":
+        otool_path = shutil.which("otool")
+        install_name_tool_path = shutil.which("install_name_tool")
+        otool_result = subprocess.run(
+            [otool_path, "-l", output_file], capture_output=True, text=True, check=True
+        )
+
+        dlc_pattern = r"/DLC[^)]+\.dylib"
+        dlc_matches = re.findall(dlc_pattern, otool_result.stdout)
+        for entry in dlc_matches:
+            dylib_pattern = r"/([^/]+\.dylib)$"
+            dylib_file_name = re.findall(dylib_pattern, entry)[-1]
+            new_entry = f"@rpath/{dylib_file_name}"
+            subprocess.run(
+                [install_name_tool_path, "-change", entry, new_entry, output_file],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
 
     return output_file
