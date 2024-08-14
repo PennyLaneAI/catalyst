@@ -184,7 +184,41 @@
   ...
   }
   ```
+
+* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and 
+  recompile the IR from a given pipeline pass. They can only be used with `keep_intermediate=True`.
+  `get_compilation_stage` is renamed from `print_compilation_stage` and now returns a IR string.
+  [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
+
+  ```py
+  from catalyst import qjit
+
+  @qjit(keep_intermediate=True)
+  def f(x):
+      return x**2
+  ```
   
+  ```pycon
+  >>> f(2.0)
+  4.0
+  ```
+
+  ```py
+  from catalyst.debug import get_pipeline_output, replace_ir
+  
+  old_ir = get_pipeline_output(f, "HLOLoweringPass")
+  new_ir = old_ir.replace(
+      "%2 = arith.mulf %in, %in_0 : f64\n",
+      "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
+  )
+  replace_ir(f, "HLOLoweringPass", new_ir)
+  ```
+  
+  ```pycon
+  >>> f(2.0)
+   8.0
+  ```
+
 * Catalyst now supports c executable generation with `catalyst.debug.compiler_functions.compile_executable`.
   It also supports mutti-dimensional arrays as function's inputs. [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
@@ -212,6 +246,9 @@
   ```
 
 <h3>Improvements</h3>
+
+* Catalyst now supports keyword arguments for qjit-compiled functions.
+  [(#1004)](https://github.com/PennyLaneAI/catalyst/pull/1004)
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
@@ -275,6 +312,10 @@
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
+* On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
+  are no longer decomposed when using Catalyst, improving compilation & runtime performance.
+  [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
@@ -290,6 +331,12 @@
   function is valid. Keyword arguments can be passed to this function using the
   `extrapolate_kwargs` keyword argument in `mitigate_with_zne`.
   [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
+
+* The QuantumDevice API has now added the functions `SetState` and `SetBasisState`
+  for simulators that may benefit from instructions that directly set the state.
+  Implementing these methods is optional, and device support can be indicated via
+  the `initial_state_prep` flag in the TOML configuration file.
+  [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
 <h3>Bug fixes</h3>
 
