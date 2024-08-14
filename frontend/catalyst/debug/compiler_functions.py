@@ -223,17 +223,21 @@ def compile_executable(fn, *args):
         (str): the path of output binary.
     """
     # get python version
-    lib_dir_path = sysconfig.get_config_var("LIBDIR")
+    python_lib_dir_path = sysconfig.get_config_var("LIBDIR")
     version_info = sys.version_info
     version_str = f"{version_info.major}.{version_info.minor}"
 
-    lib_dir_rpath = lib_dir_path
+    # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
+    python_lib_dir_rpath_fix = ""
     if platform.system() == "Darwin":
-        lib_dir_rpath = lib_dir_path.split("Python3.framework")[0]
+        python_lib_dir_rpath_fix = (
+            f"-Wl,-rpath,{python_lib_dir_path.split("Python3.framework")[0]}",
+        )
 
     lib_path_flags = [
-        f"-Wl,-rpath,{lib_dir_rpath}",
-        f"-L{lib_dir_path}",
+        f"-Wl,-rpath,{python_lib_dir_path}",
+        python_lib_dir_rpath_fix,
+        f"-L{python_lib_dir_path}",
         "-lpython" + version_str,
     ]
 
@@ -259,6 +263,7 @@ def compile_executable(fn, *args):
     )
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
+    # Patch DLC prefix related to openblas
     if platform.system() == "Darwin":
         otool_path = shutil.which("otool")
         install_name_tool_path = shutil.which("install_name_tool")
