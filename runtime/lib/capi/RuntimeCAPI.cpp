@@ -156,7 +156,6 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    // void *ptr = malloc(size);
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -455,6 +454,45 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
 void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits > 0);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (uint64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
+    DataView<std::complex<double>, 1> data_view(data_p->data_aligned, data_p->offset, data_p->sizes,
+                                                data_p->strides);
+    getQuantumDevicePtr()->SetState(data_view, wires);
+}
+
+void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits > 0);
+
+    DataView<int8_t, 1> data_view(data->data_aligned, data->offset, data->sizes, data->strides);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (uint64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+    std::unordered_set<QubitIdType> wire_set(wires.begin(), wires.end());
+    RT_FAIL_IF(wire_set.size() != numQubits, "Wires must be unique");
+    RT_FAIL_IF(data->sizes[0] != numQubits,
+               "BasisState parameter and wires must be of equal length.");
+
+    getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
