@@ -37,11 +37,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [{official: "3.9",  subversion: "19", package: "python39"}]
+        python_version: [{major_minor: "3.9",  patch: "19", package: "python39"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
-    name: Build Dependencies (Python ${{ matrix.python_version.official }})
+    name: Build Dependencies (Python ${{ matrix.python_version.major_minor }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
 
@@ -55,7 +55,7 @@ jobs:
       id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
-        python_version: ${{ matrix.python_version.official }}
+        python_version: ${{ matrix.python_version.major_minor }}
 
     # Cache external project sources
     - name: Cache LLVM Source
@@ -140,7 +140,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_lld.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_lld.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -152,7 +152,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
 
     - name: Save LLVM Build
       id: save-llvm-build
@@ -171,7 +171,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
 
     - name: Save MHLO Build
       id: save-mhlo-build
@@ -190,7 +190,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}
 
     - name: Save Enzyme Build
       id: save-enzyme-build
@@ -206,14 +206,14 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        python_version: [{official: "3.9",  subversion: "19", package: "python39",   alternative: "39"},
-                         {official: "3.10", subversion: "14", package: "python3.10", alternative: "310"},
-                         {official: "3.11", subversion: "9",  package: "python3.11", alternative: "311"},
-                         {official: "3.12", subversion: "3",  package: "python3.12", alternative: "312"}]
+        python_version: [{major_minor: "3.9",  patch: "19", package: "python39",   alternative: "39"},
+                         {major_minor: "3.10", patch: "14", package: "python3.10", alternative: "310"},
+                         {major_minor: "3.11", patch: "9",  package: "python3.11", alternative: "311"},
+                         {major_minor: "3.12", patch: "3",  package: "python3.12", alternative: "312"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
-    name: Build Wheels (Python ${{ matrix.python_version.official }})
+    name: Build Wheels (Python ${{ matrix.python_version.major_minor }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
 
@@ -225,7 +225,7 @@ jobs:
       id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
-        python_version: ${{ matrix.python_version.official }}
+        python_version: ${{ matrix.python_version.major_minor }}
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -287,12 +287,12 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.official}}.zip
+        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.major_minor}}.zip
         path: wheel/
         retention-days: 14
 
@@ -302,15 +302,15 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        python_version: [{official: "3.9",  subversion: "19", package: "python39"},
-                         {official: "3.10", subversion: "14", package: "python3.10"},
-                         {official: "3.11", subversion: "9",  package: "python3.11"},
-                         {official: "3.12", subversion: "3",  package: "python3.12"}]
+        python_version: [{major_minor: "3.9",  patch: "19", package: "python39"},
+                         {major_minor: "3.10", patch: "14", package: "python3.10"},
+                         {major_minor: "3.11", patch: "9",  package: "python3.11"},
+                         {major_minor: "3.12", patch: "3",  package: "python3.12"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version.official }})
+    name: Test Wheels (Python ${{ matrix.python_version.major_minor }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
 
@@ -322,12 +322,12 @@ jobs:
       id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
-        python_version: ${{ matrix.python_version.official }}
+        python_version: ${{ matrix.python_version.major_minor }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
-        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.official }}.zip
+        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.major_minor }}.zip
         path: dist
 
     # Needed for accessing llvm-symbolizer
@@ -347,4 +347,4 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/test_wheels.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/test_wheels.sh $GCC_VERSION ${{ matrix.python_version.major_minor }} ${{ matrix.python_version.patch }} ${{ matrix.python_version.package }}

@@ -289,6 +289,10 @@
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
+* On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
+  are no longer decomposed when using Catalyst, improving compilation & runtime performance.
+  [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
@@ -304,6 +308,12 @@
   function is valid. Keyword arguments can be passed to this function using the
   `extrapolate_kwargs` keyword argument in `mitigate_with_zne`.
   [(#806)](https://github.com/PennyLaneAI/catalyst/pull/806)
+
+* The QuantumDevice API has now added the functions `SetState` and `SetBasisState`
+  for simulators that may benefit from instructions that directly set the state.
+  Implementing these methods is optional, and device support can be indicated via
+  the `initial_state_prep` flag in the TOML configuration file.
+  [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
 <h3>Bug fixes</h3>
 
