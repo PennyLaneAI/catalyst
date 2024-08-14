@@ -52,7 +52,12 @@ restore_catalyst_config(){
 
 report_changed_files(){
     cd $CATALYST_DIR
-    git status
+    export STATUS=$(git status | grep "nothing to commit, working tree clean")
+    if [ -z "${STATUS}" ]; then
+        echo "Warning: some files might have changed. Use 'git status' to list them"
+    else
+        echo "Success: Wheel sources and repository sources match"
+    fi
 }
 
 overwrite_env(){
