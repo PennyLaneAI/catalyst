@@ -648,7 +648,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     catalyst::utils::LinesCount::ModuleOp(*op);
     output.isCheckpointFound = options.checkpointStage == "mlir";
 
-    bool enzymeRun = false;
+    bool enzymeRun = options.checkpointStage == "O2Opt";
     if (op) {
         enzymeRun = containsGradients(*op);
         if (failed(runLowering(options, &ctx, *op, output))) {
