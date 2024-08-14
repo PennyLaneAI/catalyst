@@ -234,9 +234,8 @@ def compile_executable(fn, *args):
     # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
     python_lib_dir_rpath_fix = ""
     if platform.system() == "Darwin":
-        python_lib_dir_rpath_fix = (
-            f"-Wl,-rpath,{python_lib_dir_path.split("Python3.framework")[0]}",
-        )
+        python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
+        python_lib_dir_rpath_fix = (f"-Wl,-rpath,{python_lib_dir_rpath}",)
 
     lib_path_flags = [
         f"-Wl,-rpath,{python_lib_dir_path}",
