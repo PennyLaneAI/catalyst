@@ -453,7 +453,7 @@ class QJIT:
 
             return self.user_function(*args, **kwargs)
 
-        requires_promotion = self.jit_compile(args)
+        requires_promotion = self.jit_compile(args, **kwargs)
 
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
@@ -493,7 +493,7 @@ class QJIT:
             )
 
     @debug_logger
-    def jit_compile(self, args):
+    def jit_compile(self, args, **kwargs):
         """Compile Python function on invocation using the provided arguments.
 
         Args:
@@ -524,7 +524,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args)
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    args, **kwargs
+                )
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -558,7 +560,7 @@ class QJIT:
 
     @instrument(size_from=0)
     @debug_logger
-    def capture(self, args):
+    def capture(self, args, **kwargs):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
         Args:
@@ -605,7 +607,7 @@ class QJIT:
                 return self.user_function(*args, **kwargs)
 
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, {}
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
             )
 
         return jaxpr, out_type, treedef, dynamic_sig

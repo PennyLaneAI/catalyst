@@ -167,12 +167,12 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args, **kwargs)
 
-        def _eval_jaxpr(*args):
-            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+        def _eval_jaxpr(*args, **kwargs):
+            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
-        args, _ = jax.tree_util.tree_flatten(args)
+        args, _ = jax.tree_util.tree_flatten((args, kwargs))
         retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(out_tree, retval)
 
