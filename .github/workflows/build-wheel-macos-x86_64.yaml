@@ -391,7 +391,7 @@ jobs:
 
     - name: Install PennyLane Plugins
       run: |
-        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos==0.38.0-dev32 --extra-index-url https://test.pypi.org/simple
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
     - name: Install OQC client
@@ -406,7 +406,7 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         # TODO: Uncomment after fixing https://github.com/PennyLaneAI/pennylane-lightning/issues/552
-        # python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
