@@ -23,7 +23,7 @@ checkout_nightly_build(){
     git fetch
     git pull
     # Search for the corresponding commit to the Wheel
-    git log --grep="bump nightly version" | grep "commit" | cut -d " " -f 2 | while read NIGHTLY_BUMP; do
+    git log --grep="bump nightly version" | grep "commit" | cut -d " " -f 2 | while read -r NIGHTLY_BUMP; do
         git checkout $NIGHTLY_BUMP^1; 
         export DIFF=$(diff $SITEPKGS/catalyst/_version.py $CATALYST_FRONTEND_DIR/_version.py)
         if [ -z "${DIFF}" ]; then
