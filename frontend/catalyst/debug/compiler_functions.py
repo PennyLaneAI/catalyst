@@ -235,7 +235,7 @@ def compile_executable(fn, *args):
     python_lib_dir_rpath_fix = ""
     if platform.system() == "Darwin":
         python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
-        python_lib_dir_rpath_fix = (f"-Wl,-rpath,{python_lib_dir_rpath}",)
+        python_lib_dir_rpath_fix = f"-Wl,-rpath,{python_lib_dir_rpath}"
 
     lib_path_flags = [
         f"-Wl,-rpath,{python_lib_dir_path}",
