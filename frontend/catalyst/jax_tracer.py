@@ -1137,11 +1137,11 @@ def trace_quantum_function(
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up device
-            #qdevice_p.bind(
+            # qdevice_p.bind(
             #    rtd_lib=device.backend_lib,
             #    rtd_name=device.backend_name,
             #    rtd_kwargs=str(device.backend_kwargs),
-            #)
+            # )
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
                 # Set up quantum register for the current tape.
@@ -1183,7 +1183,7 @@ def trace_quantum_function(
                     transformed_results.append(meas_results)
 
                 # Reset the qubits and update the register value for the next tape.
-                #if len(tapes) > 1 and i < len(tapes) - 1:
+                # if len(tapes) > 1 and i < len(tapes) - 1:
                 #    for w in device.wires:
                 #        qreg_out = reset_qubit(qreg_out, w)
                 #    qreg_in = qreg_out
@@ -1193,12 +1193,12 @@ def trace_quantum_function(
                 qdealloc_p.bind(qreg_out)
 
             # Deallocate the register before tracing the post-processing.
-            #qdealloc_p.bind(qreg_out)
+            # qdealloc_p.bind(qreg_out)
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
         )
-        #breakpoint()
+        # breakpoint()
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree, return_values_tree
