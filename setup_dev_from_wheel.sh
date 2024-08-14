@@ -4,7 +4,7 @@ set -e
 git config --local advice.detachedHead false
 export CATALYST_DIR=$PWD
 export CATALYST_FRONTEND_DIR=$CATALYST_DIR/frontend/catalyst
-export CATALYST_PYTHON_ENV_DIR=$CATALYST_DIR/.catalyst_python_env
+export CATALYST_PYTHON_ENV_DIR=/tmp/.catalyst_python_env
 
 install_CPL_wheels(){
     echo "Installing CPL Wheels..."
