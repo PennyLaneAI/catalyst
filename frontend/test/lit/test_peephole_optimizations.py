@@ -29,7 +29,7 @@ import shutil
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.debug import print_compilation_stage
+from catalyst.debug import get_compilation_stage
 from catalyst.passes import cancel_inverses
 
 
@@ -41,7 +41,7 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
     to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
-    print_compilation_stage(QJIT, "QuantumCompilationPass")
+    print(get_compilation_stage(QJIT, "QuantumCompilationPass"))
     shutil.rmtree(QJIT.__name__)
 
 

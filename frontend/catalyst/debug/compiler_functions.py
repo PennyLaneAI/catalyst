@@ -33,17 +33,30 @@ logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def print_compilation_stage(fn, stage):
+def get_compilation_stage(fn, stage):
     """Print one of the recorded compilation stages for a JIT-compiled function.
 
     The stages are indexed by their Catalyst compilation pipeline name, which are either provided
     by the user as a compilation option, or predefined in ``catalyst.compiler``.
+
+    All the available stages are:
+
+    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect
+
+    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+
+    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
+    differentiation) passes do not always happen. `last` denotes the stage right before object file
+    generation.
 
     Requires ``keep_intermediate=True``.
 
     Args:
         fn (QJIT): a qjit-decorated function
         stage (str): string corresponding with the name of the stage to be printed
+
+    Returns:
+        str: output ir from the target compiler stage
 
     .. seealso:: :doc:`/dev/debugging`
 
@@ -55,7 +68,7 @@ def print_compilation_stage(fn, stage):
         def func(x: float):
             return x
 
-    >>> debug.print_compilation_stage(func, "HLOLoweringPass")
+    >>> print(debug.get_compilation_stage(func, "HLOLoweringPass"))
     module @func {
       func.func public @jit_func(%arg0: tensor<f64>)
       -> tensor<f64> attributes {llvm.emit_c_interface} {
@@ -76,7 +89,9 @@ def print_compilation_stage(fn, stage):
     if not isinstance(fn, catalyst.QJIT):
         raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
 
-    print(fn.compiler.get_output_of(stage))
+    if stage == "last":
+        return fn.compiler.last_compiler_output.get_output_ir()
+    return fn.compiler.get_output_of(stage)
 
 
 @debug_logger
@@ -160,3 +175,30 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
+
+
+@debug_logger
+def replace_ir(fn, stage, new_ir):
+    """Replace the IR at any compilation stage that will be used the next time the function runs.
+
+    It is important that the function signature (inputs & outputs) for the next execution matches
+    that of the provided IR, or else the behaviour is undefined.
+
+    All the available stages are:
+
+    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect.
+
+    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+
+    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
+    differentiation) passes do not always happen. `last` denotes the stage right before object file
+    generation.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        stage (str): Recompilation picks up after this stage.
+        new_ir (str): The replacement IR to use for recompilation.
+    """
+    fn.overwrite_ir = new_ir
+    fn.compiler.options.checkpoint_stage = stage
+    fn.fn_cache.clear()

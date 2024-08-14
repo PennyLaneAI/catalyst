@@ -31,7 +31,7 @@ a unified user interface for all the passes will be available.
     workflow from Python and lowers it into MLIR, performing compiler
     optimizations at the MLIR level.
     To inspect the compiled MLIR from Catalyst, use
-    :func:`~.print_compilation_stage`,
+    :func:`~.get_compilation_stage`,
     where ``stage="QuantumCompilationPass"``, and with ``keep_intermediate=True``
     in the ``qjit`` decorator.
 
@@ -64,7 +64,7 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
     .. code-block:: python
 
-        from catalyst.debug import print_compilation_stage
+        from catalyst.debug import get_compilation_stage
         from catalyst.passes import cancel_inverses
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -93,7 +93,7 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
     >>> workflow()
     (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
-    >>> print_compilation_stage(workflow, "QuantumCompilationPass")
+    >>> print(get_compilation_stage(workflow, "QuantumCompilationPass"))
 
     .. code-block:: mlir
 
