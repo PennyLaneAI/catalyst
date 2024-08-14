@@ -222,6 +222,10 @@ def compile_executable(fn, *args):
         (str): the paths that should be included in LD_LIBRARY_PATH.
         (str): the path of output binary.
     """
+    # if fn is not compiled, compile it first.
+    if not fn.compiled_function:
+        fn(*args)
+
     # get python version
     python_lib_dir_path = sysconfig.get_config_var("LIBDIR")
     version_info = sys.version_info
