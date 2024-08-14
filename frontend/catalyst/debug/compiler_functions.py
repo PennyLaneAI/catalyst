@@ -246,10 +246,16 @@ def compile_executable(fn, *args):
     ]
 
     f_name = str(fn.__name__)
-    workspace = str(fn.workspace)
+    workspace = str(fn.workspace) if fn.compile_options.keep_intermediate else os.getcwd()
     main_c_file = workspace + "/main.c"
     output_file = workspace + "/" + f_name + ".out"
     shared_object_file = workspace + "/" + f_name + ".so"
+
+    # copy shared object to current directory
+    if not fn.compile_options.keep_intermediate:
+        original_shared_object_file = str(fn.workspace) + "/" + f_name + ".so"
+        shutil.copy(original_shared_object_file, shared_object_file)
+
     options = fn.compiler.options
     with open(main_c_file, "w", encoding="utf-8") as file:
         file.write(get_cmain(fn, *args))
