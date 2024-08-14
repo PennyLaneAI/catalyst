@@ -17,6 +17,7 @@ This module contains debug functions to interact with the compiler and compiled 
 """
 import logging
 import os
+import platform
 import sys
 import sysconfig
 
@@ -180,8 +181,13 @@ def compile_executable(fn, *args):
     lib_dir_path = sysconfig.get_config_var("LIBDIR")
     version_info = sys.version_info
     version_str = f"{version_info.major}.{version_info.minor}"
+
+    lib_dir_rpath = lib_dir_path
+    if platform.system() == "Darwin":
+        lib_dir_rpath = lib_dir_path.split("Python3.framework")[0]
+
     lib_path_flags = [
-        f"-Wl,-rpath,{lib_dir_path}",
+        f"-Wl,-rpath,{lib_dir_rpath}",
         f"-L{lib_dir_path}",
         "-lpython" + version_str,
     ]
