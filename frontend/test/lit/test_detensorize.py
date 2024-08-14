@@ -33,8 +33,8 @@ def a_plus_b_times_2(a, b):
 
 
 a_plus_b_times_2(1.0, 2.0)
-a_plus_b_times_2.workspace.cleanup()
 print(get_compilation_stage(a_plus_b_times_2, "HLOLoweringPass"))
+a_plus_b_times_2.workspace.cleanup()
 
 
 # CHECK-LABEL: public @jit_f_with_cond
@@ -62,8 +62,8 @@ def f_with_cond(a, b):
 
 
 f_with_cond(1.0, 2.0)
-f_with_cond.workspace.cleanup()
 print(get_compilation_stage(f_with_cond, "HLOLoweringPass"))
+f_with_cond.workspace.cleanup()
 
 
 # CHECK-LABEL: public @jit_f_with_for_loop
@@ -87,5 +87,5 @@ def f_with_for_loop(a, b):
 
 
 f_with_for_loop(1.0, 2.0)
-f_with_for_loop.workspace.cleanup()
 print(get_compilation_stage(f_with_for_loop, "HLOLoweringPass"))
+f_with_for_loop.workspace.cleanup()
