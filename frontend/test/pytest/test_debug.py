@@ -12,8 +12,8 @@
 import os
 import platform
 import re
-import subprocess
 import shutil
+import subprocess
 
 import jax.numpy as jnp
 import numpy as np
