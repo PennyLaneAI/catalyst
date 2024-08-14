@@ -25,12 +25,15 @@ from catalyst.debug import print_compilation_stage
 def a_plus_b_times_2(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
+    # CHECK: arith.addf
+    # CHECK-NOT: linalg.generic
     c = a + b
     # CHECK: tensor.from_elements
     return c + c
 
 
 a_plus_b_times_2(1.0, 2.0)
+a_plus_b_times_2.workspace.cleanup()
 print_compilation_stage(a_plus_b_times_2, "HLOLoweringPass")
 
 
@@ -39,20 +42,27 @@ print_compilation_stage(a_plus_b_times_2, "HLOLoweringPass")
 def f_with_cond(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
+    # CHECK: arith.addf
+    # CHECK-NOT: linalg.generic
     a2 = a + a
     if a2 > b:
+        # CHECK: arith.subf
         a = a - 2.0
+        # CHECK: arith.mulf
         b = b * 2.0
-        # CHECK: tensor.from_elements
         c = a + b
     else:
+        # CHECK: arith.mulf
         a = a * 2.0
+        # CHECK: arith.subf
         b = b - 2.0
         c = a + b
+    # CHECK: tensor.from_elements
     return c * 2.0
 
 
 f_with_cond(1.0, 2.0)
+f_with_cond.workspace.cleanup()
 print_compilation_stage(f_with_cond, "HLOLoweringPass")
 
 
@@ -61,16 +71,21 @@ print_compilation_stage(f_with_cond, "HLOLoweringPass")
 def f_with_for_loop(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
-    # CHECK: tensor.from_elements
+    # CHECK-NOT: linalg.generic
+    # CHECK: arith.addf
     b = a + b
     for _ in range(10):
         if b % 2:
+            # CHECK: arith.subf
             b = b - b
         else:
             b = b + 1
+    # CHECK: tensor.from_elements
+    # CHECK: arith.mulf
     c = a * b
     return c
 
 
 f_with_for_loop(1.0, 2.0)
+f_with_for_loop.workspace.cleanup()
 print_compilation_stage(f_with_for_loop, "HLOLoweringPass")
