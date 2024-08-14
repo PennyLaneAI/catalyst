@@ -36,7 +36,6 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // Count the number of quantum.device operations in a function
         unsigned int count = 0;
         func->walk([&](Operation *op) {
-            // llvm::errs() << op->getName() << "\n";
             if (op->getName().getStringRef() == "quantum.device") {
                 count++;
             }
@@ -51,6 +50,23 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // This means each tape starts with a quantum.device
         // and ends with a quantum.device_release
 
+        // The structure of the FuncOp looks like the following:
+        // func.func @circuit(...) -> ... {...} {
+        // preprocessing
+        // quantum.device[...]
+        // tape 1
+        // quantum.device_release
+        // quantum.device[...]
+        // tape 2
+        // quantum.device_release
+        // ... more tapes
+        // post processing and return
+        // }
+
+        // This function parses the operations in the funcop and puts them into
+        // the container as 
+        // OpsEachTape = [[preprocessing ops], [tape1 ops], [tape2 ops], ..., [postprocessing ops]]
+
         for (size_t i = 0; i < OpsEachTape.size(); i++) {
             OpsEachTape[i] =
                 new SmallVector<Operation *>; // todo: use smart ptrs instead of manually
@@ -60,7 +76,6 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         unsigned int cur_tape = 0;
 
         func->walk([&](Operation *op) {
-            // llvm::errs() << "hi! " << *op << "\n";
             if (op == func) {
                 return; // don't visit the funcop itself
             }
