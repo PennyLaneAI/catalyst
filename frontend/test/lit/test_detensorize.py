@@ -16,20 +16,8 @@
 
 # pylint: disable=missing-module-docstring,missing-function-docstring
 
-import shutil
-from pathlib import Path
-
 from catalyst import qjit
 from catalyst.debug import print_compilation_stage
-
-
-def clean_path(filename):
-    path = Path(filename)
-    if path.exists():
-        shutil.rmtree(path)
-
-
-clean_path("a_plus_b_times_2")
 
 
 # CHECK-LABEL: public @jit_a_plus_b_times_2
@@ -44,8 +32,6 @@ def a_plus_b_times_2(a, b):
 
 a_plus_b_times_2(1.0, 2.0)
 print_compilation_stage(a_plus_b_times_2, "HLOLoweringPass")
-
-clean_path("f_with_cond")
 
 
 # CHECK-LABEL: public @jit_f_with_cond
@@ -68,8 +54,6 @@ def f_with_cond(a, b):
 
 f_with_cond(1.0, 2.0)
 print_compilation_stage(f_with_cond, "HLOLoweringPass")
-
-clean_path("f_with_for_loop")
 
 
 # CHECK-LABEL: public @jit_f_with_for_loop
