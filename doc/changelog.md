@@ -184,8 +184,45 @@
   ...
   }
   ```
+  
+* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and 
+  recompile the IR from a given pipeline pass. They can only be used with `keep_intermediate=True`.
+  `get_compilation_stage` is renamed from `print_compilation_stage` and now returns a IR string.
+  [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
+
+  ```py
+  from catalyst import qjit
+
+  @qjit(keep_intermediate=True)
+  def f(x):
+      return x**2
+  ```
+  
+  ```pycon
+  >>> f(2.0)
+  4.0
+  ```
+
+  ```py
+  from catalyst.debug import get_pipeline_output, replace_ir
+  
+  old_ir = get_pipeline_output(f, "HLOLoweringPass")
+  new_ir = old_ir.replace(
+      "%2 = arith.mulf %in, %in_0 : f64\n",
+      "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
+  )
+  replace_ir(f, "HLOLoweringPass", new_ir)
+  ```
+  
+  ```pycon
+  >>> f(2.0)
+   8.0
+  ```
 
 <h3>Improvements</h3>
+
+* Catalyst now supports keyword arguments for qjit-compiled functions.
+  [(#1004)](https://github.com/PennyLaneAI/catalyst/pull/1004)
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
