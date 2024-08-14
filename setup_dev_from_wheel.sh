@@ -28,13 +28,13 @@ checkout_nightly_build(){
         export DIFF=$(diff $SITEPKGS/catalyst/_version.py $CATALYST_FRONTEND_DIR/_version.py)
         if [ -z "${DIFF}" ]; then
             export WHEEL_COMMIT=$(git log -1 --format="%h")
-            echo "Success: the commit $WHEEL_COMMIT corresponding to the Wheel was found"
+            echo "Success: The commit $WHEEL_COMMIT corresponding to the Wheel was found"
             break
         fi
         echo "Discarding commit, still searching for the corresponding commit to the Wheel..."
     done
     if [ ! -z "${DIFF}" ]; then
-        echo "Could not find the corresponding commit for the Wheel"
+        echo "Error: Could not find the corresponding commit for the Wheel"
         exit
     fi
 }
@@ -54,7 +54,7 @@ report_changed_files(){
     cd $CATALYST_DIR
     export STATUS=$(git status | grep "nothing to commit, working tree clean")
     if [ -z "${STATUS}" ]; then
-        echo "Warning: some files might have changed. Use 'git status' to list them"
+        echo "Warning: Some files might have changed. Use 'git status' to list them"
     else
         echo "Success: Wheel sources and repository sources match"
     fi
