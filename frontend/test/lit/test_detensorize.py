@@ -17,7 +17,7 @@
 # pylint: disable=missing-module-docstring,missing-function-docstring
 
 from catalyst import qjit
-from catalyst.debug import print_compilation_stage
+from catalyst.debug import get_compilation_stage
 
 
 # CHECK-LABEL: public @jit_a_plus_b_times_2
@@ -34,7 +34,7 @@ def a_plus_b_times_2(a, b):
 
 a_plus_b_times_2(1.0, 2.0)
 a_plus_b_times_2.workspace.cleanup()
-print_compilation_stage(a_plus_b_times_2, "HLOLoweringPass")
+print(get_compilation_stage(a_plus_b_times_2, "HLOLoweringPass"))
 
 
 # CHECK-LABEL: public @jit_f_with_cond
@@ -63,7 +63,7 @@ def f_with_cond(a, b):
 
 f_with_cond(1.0, 2.0)
 f_with_cond.workspace.cleanup()
-print_compilation_stage(f_with_cond, "HLOLoweringPass")
+print(get_compilation_stage(f_with_cond, "HLOLoweringPass"))
 
 
 # CHECK-LABEL: public @jit_f_with_for_loop
@@ -88,4 +88,4 @@ def f_with_for_loop(a, b):
 
 f_with_for_loop(1.0, 2.0)
 f_with_for_loop.workspace.cleanup()
-print_compilation_stage(f_with_for_loop, "HLOLoweringPass")
+print(get_compilation_stage(f_with_for_loop, "HLOLoweringPass"))
