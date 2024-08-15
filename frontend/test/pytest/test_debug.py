@@ -569,6 +569,21 @@ class TestCProgramGeneration:
 
         assert ans in result.stdout.replace(" ", "").replace("\n", "")
 
+    def test_executable_generation_without_precompiled_function(self):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """identity function with debugging print."""
+            debug.print_memref(x)
+            return x
+
+        arg = 5
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
