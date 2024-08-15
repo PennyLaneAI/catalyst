@@ -214,7 +214,7 @@ struct EmitCatalystPyInterfacePass
         patterns.add<EmitCatalystPyInterfaceTransform>(context);
         GreedyRewriteConfig config;
         config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = false;
+        config.enableRegionSimplification = GreedySimplifyRegionLevel::Disabled;
         config.maxIterations = 1;
 
         auto op = getOperation();
