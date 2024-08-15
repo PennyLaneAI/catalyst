@@ -484,45 +484,49 @@ class TestCProgramGeneration:
     def test_modify_ir(self, pass_name, target, replacement):
         """Turn a square function in IRs into a cubic one."""
 
-        @qjit(keep_intermediate=True)
         def f(x):
             """Square function."""
             return x**2
 
+        f.__name__ = f.__name__ + pass_name
+
+        jit_f = qjit(f, keep_intermediate=True)
         data = 2.0
-        old_result = f(data)
-        old_ir = get_compilation_stage(f, pass_name)
-        old_workspace = str(f.workspace)
+        old_result = jit_f(data)
+        old_ir = get_compilation_stage(jit_f, pass_name)
+        old_workspace = str(jit_f.workspace)
 
         new_ir = old_ir.replace(target, replacement)
-        replace_ir(f, pass_name, new_ir)
-        new_result = f(data)
+        replace_ir(jit_f, pass_name, new_ir)
+        new_result = jit_f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
-        shutil.rmtree(str(f.workspace), ignore_errors=True)
+        shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
     @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
-        @qjit
         def f(x: float):
             """Square function."""
             return x**2
 
-        grad_f = qjit(value_and_grad(f), keep_intermediate=True)
-        grad_f(3.0)
-        ir = get_compilation_stage(grad_f, pass_name)
-        old_workspace = str(grad_f.workspace)
+        f.__name__ = f.__name__ + pass_name
 
-        replace_ir(grad_f, pass_name, ir)
-        grad_f(3.0)
-        file_list = os.listdir(str(grad_f.workspace))
+        jit_f = qjit(f)
+        jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
+        jit_grad_f(3.0)
+        ir = get_compilation_stage(jit_grad_f, pass_name)
+        old_workspace = str(jit_grad_f.workspace)
+
+        replace_ir(jit_grad_f, pass_name, ir)
+        jit_grad_f(3.0)
+        file_list = os.listdir(str(jit_grad_f.workspace))
         res = [i for i in file_list if pass_name in i]
 
         shutil.rmtree(old_workspace, ignore_errors=True)
-        shutil.rmtree(str(grad_f.workspace), ignore_errors=True)
+        shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)
         assert len(res) == 0
 
     def test_get_compilation_stage_without_keep_intermediate(self):
