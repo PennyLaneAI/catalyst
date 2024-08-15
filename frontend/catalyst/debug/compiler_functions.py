@@ -231,18 +231,16 @@ def compile_executable(fn, *args):
     version_info = sys.version_info
     version_str = f"{version_info.major}.{version_info.minor}"
 
-    # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
-    python_lib_dir_rpath_fix = ""
-    if platform.system() == "Darwin":  # pragma: nocover
-        python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
-        python_lib_dir_rpath_fix = f"-Wl,-rpath,{python_lib_dir_rpath}"
-
     lib_path_flags = [
         f"-Wl,-rpath,{python_lib_dir_path}",
-        python_lib_dir_rpath_fix,
         f"-L{python_lib_dir_path}",
         "-lpython" + version_str,
     ]
+
+    # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
+    if platform.system() == "Darwin":  # pragma: nocover
+        python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
+        lib_path_flags.insert(1, f"-Wl,-rpath,{python_lib_dir_rpath}")
 
     f_name = str(fn.__name__)
     workspace = str(fn.workspace) if fn.compile_options.keep_intermediate else os.getcwd()
