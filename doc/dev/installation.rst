@@ -426,6 +426,8 @@ makes use of the shared libraries already shipped with the TestPyPI Catalyst Whe
 Essential steps
 ^^^^^^^^^^^^^^^
 
+Open a Terminal and issue the following commands:
+
 .. code-block:: console
 
   # Clone the Catalyst repository  
@@ -435,10 +437,88 @@ Essential steps
   cd catalyst
   . ./activate_dev_from_wheel.sh
 
-How does it work
-^^^^^^^^^^^^^^^^
+To exit the virtual environment, type:
 
-TODO:...
+.. code-block:: console
 
+  deactivate
 
+How does it work?
+^^^^^^^^^^^^^^^^^
 
+The `activate_dev_from_wheel.sh` script acts as a wrapper of the `setup_dev_from_wheel.sh` script,
+which performs the following steps:
+
+- It creates (if not created yet) and activates a Python virtual environment in the `/tmp` folder
+  with the provided name. This way the system python configurations do not get affected, nor
+  other virtual environments:
+
+  .. code-block:: console
+
+    python3 -m venv /tmp/myenv
+    source /tmp/myenv/bin/activate
+
+- As a clean-up measure, it uninstalls any previous Catalyst instances in that particular virtual
+  environment:
+
+  .. code-block:: console
+
+    python -m pip uninstall -y pennylane-catalyst
+
+- It installs the latest CPL suite Wheels from the TestPyPI server:
+
+  .. code-block:: console
+
+    python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane pennylane-lightning pennylane-catalyst --pre --upgrade
+
+- It searches for the lastest commit in the Git the repository whose version corresponds to the 
+  Wheel version. This will leave the repository in a "detached head" state.
+
+- Once the Wheel and the repository are at the same version, it creates hard links from the Wheel
+  code to the frontend code of the repository, in order to allow working directly with the 
+  frontend repository codebase and at the same time test the changes while using the installed 
+  Wheel libraries, hence avoiding compilation:
+
+  .. code-block:: console
+
+    export SITEPKGS=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+    export CATALYST_WHEEL=$SITEPKGS/catalyst
+    cp -lrf $CATALYST_WHEEL .frontend/
+
+Further steps
+^^^^^^^^^^^^^
+
+If everything goes well, `git status` should not report any changed files. 
+
+Before making changes to the frontend, make sure you create a new branch:
+
+.. code-block:: console
+
+  git checkout -b new-branch-name
+
+Once in the new branch, make the wanted changes. Use the IDE of your preference.
+
+You can test the changes by executing your sample code under the same virtual environment of the
+scripts. You will see there is no need for compilation, as you are using the shared libraries
+provided by the Wheels, because you are also changing the code stored at the Python site-packages
+folder.
+
+When you are ready, commit you changes as usual. 
+
+As your branch was created from a detached head, you can rebase your branch according to the main branch:
+
+.. code-block:: console
+  
+  git fetch
+  git rebase -i origin/main
+
+Resolve any conflicts and once ready, push the new branch to the remote repository:
+
+.. code-block:: console
+  
+  git push -u origin new-branch-name
+
+Now you can go to GitHub and issue a PR based on the new branch.
+
+As you can see, setting up a development environment from a Wheel is simple, and specially useful 
+when you want to avoid the burden of compiling and debugging.
