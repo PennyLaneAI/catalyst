@@ -317,6 +317,28 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         }
     }
 
+    std::vector<Type> tanTypes;
+    {
+        auto tanOperands = OperandRange(
+            this->operand_begin() + callee.getFunctionType().getNumInputs(), this->operand_end());
+        for (auto c : tanOperands) {
+            tanTypes.push_back(c.getType());
+        }
+    }
+
+    auto calleeInputTypes = callee.getFunctionType().getInputs();
+
+    // Check that callee inputs have the same types as tangent inputs
+    for (size_t i = 0; i < tanTypes.size(); i++) {
+        auto tanType = tanTypes[i];
+        auto cIType = calleeInputTypes[i];
+        if (tanType != cIType) {
+            return this->emitOpError("callee input type does not match the tangent type")
+                   << " callee input " << i << " was expected to be of type " << tanType
+                   << " but got " << cIType;
+        }
+    }
+
     return success();
 }
 
