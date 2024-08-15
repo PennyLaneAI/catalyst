@@ -233,7 +233,7 @@ def compile_executable(fn, *args):
 
     # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
     python_lib_dir_rpath_fix = ""
-    if platform.system() == "Darwin":
+    if platform.system() == "Darwin":  # pragma: nocover
         python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
         python_lib_dir_rpath_fix = f"-Wl,-rpath,{python_lib_dir_rpath}"
 
@@ -273,7 +273,7 @@ def compile_executable(fn, *args):
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
     # Patch DLC prefix related to openblas
-    if platform.system() == "Darwin":
+    if platform.system() == "Darwin":  # pragma: nocover
         otool_path = shutil.which("otool")
         install_name_tool_path = shutil.which("install_name_tool")
         otool_result = subprocess.run(
