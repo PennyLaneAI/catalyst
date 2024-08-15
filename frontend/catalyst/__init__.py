@@ -23,7 +23,7 @@ from os.path import dirname
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.4.28"
+_jaxlib_version = "0.4.31"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
