@@ -414,3 +414,31 @@ To generate html files for the documentation for Catalyst:
   make docs
 
 The generated files are located in ``doc/_build/html``
+
+Install Environment from TestPyPI Wheels for Frontend Development
+-----------------------------------------------------------------
+
+It is possible to contribute with changes to the code base without having to compile 
+Catalyst from source. This is ideal for situations where the changes do not target the 
+runtime or the MLIR infrastructure, and only concern to the frontend. It basically 
+makes use of the shared libraries already shipped with the TestPyPI Catalyst Wheels.
+
+Essential steps
+^^^^^^^^^^^^^^^
+
+.. code-block:: console
+
+  # Clone the Catalyst repository  
+  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+  # Activate the development environment based on the latest TestPyPI Wheel
+  cd catalyst
+  . ./activate_dev_from_wheel.sh
+
+How does it work
+^^^^^^^^^^^^^^^^
+
+TODO:...
+
+
+
