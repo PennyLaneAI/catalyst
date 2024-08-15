@@ -217,25 +217,32 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
-    // Walk through the operations in fnWithMeasurementsOp
-    fnWithMeasurementsOp.walk([&](quantum::QuantumGate op) {
-        // Insert a for loop immediately before each quantum::QuantumGate
-        auto innerLoc = op->getLoc();
-        rewriter.setInsertionPoint(op);
-        rewriter.create<scf::ForOp>(
-            innerLoc, c0, size, c1, ValueRange(),
-            [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
-                // Set insertion point within the loop
-                builder.setInsertionPointToEnd(builder.getBlock());
-                // Create adjoint and original operations
-                auto origOp = builder.clone(*op)->getResult(0);
-                auto adjointOp = builder.create<quantum::AdjointOp>(forLoc, qregType, origOp).getResult();
-                // Yield the result of the original operation
-                builder.create<scf::YieldOp>(forLoc, adjointOp);
-            });
+    if (true) {
+        // Save the current insertion point
+        PatternRewriter::InsertionGuard guard(rewriter);
 
-        return WalkResult::advance();
-    });
+        // Walk through the operations in fnWithMeasurementsOp
+        fnWithMeasurementsOp.walk([&](quantum::QuantumGate op) {
+            // Insert a for loop immediately before each quantum::QuantumGate
+            auto innerLoc = op->getLoc();
+            rewriter.setInsertionPoint(op);
+            rewriter.create<scf::ForOp>(
+                innerLoc, c0, size, c1, ValueRange(),
+                [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
+                    // Set insertion point within the loop
+                    builder.setInsertionPointToEnd(builder.getBlock());
+                    // Create adjoint and original operations
+                    auto origOp = builder.clone(*op)->getResult(0);
+                    auto adjointOp = builder.create<quantum::AdjointOp>(forLoc, qregType, origOp).getResult();
+                    // Yield the result of the original operation
+                    builder.create<scf::YieldOp>(forLoc, adjointOp);
+                });
+
+            return WalkResult::advance();
+        });
+
+        // Restore original insertion point when PatternRewriter::InsertionGuard goes out of scope
+    }
 
     // Prepare the arguments for the final call
     std::vector<Value> argsAndQreg(fnWithMeasurementsOp.getArguments().begin(),
@@ -244,7 +251,6 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     argsAndQreg.push_back(allocQreg);
 
     // Insert the call to fnWithMeasurementsOp
-    rewriter.setInsertionPointAfter(fnWithMeasurementsOp.getBody().front().getTerminator());
     Value result = rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
 
     // Insert the device release operation
