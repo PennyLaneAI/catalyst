@@ -293,6 +293,11 @@
   are no longer decomposed when using Catalyst, improving compilation & runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
+* Improve error messaging for `catalyst.jvp` when the callee input type and the tangent
+  type are not compatible by performing type-checking at the MLIR level. Note that the
+  equivalent type checking is already performed in `catalyst.vjp`.
+  [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
@@ -471,6 +476,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Alessandro Cosentino,
 Lillian M. A. Frederiksen,
 Josh Izaac,
