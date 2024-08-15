@@ -649,7 +649,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     output.isCheckpointFound = options.checkpointStage == "mlir";
 
     // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
-    // true so that te enzyme pass can be executed.
+    // true so that the enzyme pass can be executed.
     bool enzymeRun = options.checkpointStage == "O2Opt";
     if (op) {
         enzymeRun = containsGradients(*op);
