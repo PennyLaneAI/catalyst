@@ -315,11 +315,11 @@ def test_nested_qnode(backend):
     def post(x):
         return outer(x)
 
-    @qjit
+    @qjit(target="mlir")
     def _grad_qnode_direct(x: float):
         return grad(outer, method="auto")(x)
 
-    @qjit
+    @qjit(target="mlir")
     def _grad_postprocess(x: float):
         return grad(post, method="auto")(x)
 

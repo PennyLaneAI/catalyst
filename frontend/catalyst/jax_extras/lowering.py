@@ -34,6 +34,8 @@ from jax.interpreters.mlir import (
     lower_jaxpr_to_fun,
     lowerable_effects,
 )
+from jaxlib.mlir.dialects.builtin import ModuleOp
+from jaxlib.mlir.dialects.func import FuncOp
 
 from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
@@ -151,11 +153,16 @@ def custom_lower_jaxpr_to_module(
             name_stack=name_stack,
         )
 
-        for op in ctx.module.body.operations:
+        worklist = [*ctx.module.body.operations]
+        while worklist:
+            op = worklist.pop()
             func_name = str(op.name)
             is_entry_point = func_name.startswith('"jit_')
             if is_entry_point:
                 continue
-            op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+            if isinstance(op, FuncOp):
+                op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+            if isinstance(op, ModuleOp):
+                worklist += [*op.body.operations]
 
     return ctx.module, ctx.context

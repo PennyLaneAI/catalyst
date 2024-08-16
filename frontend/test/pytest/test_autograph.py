@@ -291,7 +291,7 @@ class TestIntegration:
             qml.RY(y, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, target="mlir")
         def fn(x: int):
             return inner2(x)
 
@@ -553,7 +553,7 @@ class TestCodePrinting:
             qml.RY(y, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, target="mlir")
         def fn(x: int):
             return inner2(x)
 

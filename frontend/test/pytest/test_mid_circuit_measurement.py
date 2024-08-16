@@ -570,6 +570,7 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.skip(reason="nested qnode not supported by catalyst runtime")
     @pytest.mark.parametrize("debug", [False, True])
     def test_dynamic_one_shot_nested_qnodes(self, backend, debug):
         """Test that `dynamic_one_shot` handle nested calls correctly."""

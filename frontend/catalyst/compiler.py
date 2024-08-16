@@ -178,6 +178,8 @@ TAPE_SPLITTING_PASS = (
     "QuantumTapeSplittingPass",
     [
         "split-multiple-tapes",
+        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
+        "inline-nested-module",
     ],
 )
 
@@ -203,7 +205,6 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",

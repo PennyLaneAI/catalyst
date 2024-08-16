@@ -25,7 +25,10 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.dispatch import jaxpr_replicas
+from jax._src.lax.lax import xla
 from jax._src.lib.mlir import ir
+from jax._src.sharding_impls import ReplicaAxisContext
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -39,6 +42,7 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
+from jaxlib.mlir.dialects.builtin import Module, ModuleOp
 from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
@@ -52,6 +56,7 @@ from mlir_quantum.dialects.catalyst import (
     AssertionOp,
     CallbackCallOp,
     CallbackOp,
+    CallNestedModuleOp,
     PrintOp,
 )
 from mlir_quantum.dialects.gradient import (
@@ -203,6 +208,23 @@ def _transform_mod_lowering(aval):
 
 
 #
+# ModuleType
+#
+class AbstractModule(AbstractValue):
+    """Abstract module type."""
+
+    def __init__(self, jaxpr_module):
+        self.jaxpr_module = jaxpr_module
+
+    def __call__(self, *args, **kwargs):
+        return self.jaxpr_module(*args, **kwargs)
+
+
+def _module_lowering(aval):
+    return Module()
+
+
+#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -216,6 +238,9 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
+
+core.raise_to_shaped_mappings[AbstractModule] = lambda aval, _: aval
+mlir.ir_type_handlers[AbstractModule] = _module_lowering
 
 
 class Folding(Enum):
@@ -292,6 +317,8 @@ set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
+module_p = core.CallPrimitive("module_with_implicit_entry_point")
+module_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -446,12 +473,12 @@ def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args)
     # "transform.named_sequence @__transform_main" operation
 
     with ir.InsertionPoint(module.body):
-        transformer_module = ir.Operation.create("builtin.module", regions=1)
+        transformer_module = ModuleOp()
         with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
         transformer_module.operation.attributes["transform.with_named_sequence"] = (
             with_named_sequence_attr
         )
-        bb_transformer = ir.Block.create_at_start(transformer_module.bodyRegion)
+        bb_transformer = transformer_module.body
 
     functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
     functype_attr = ir.TypeAttr.get(functype)
@@ -497,11 +524,12 @@ def _apply_registered_pass_lowering(
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
     named_sequence_op = None
-    for op in reversed(module.body.operations):
+    for op in reversed(module.parent.regions[0].blocks[0].operations):
         # transformer module usually is at the end of the module, so look for it from the end
         if op.operation.name == "builtin.module":
             named_sequence_op = get_named_sequence_in_module(op)
-            break
+            if named_sequence_op:
+                break
     assert (
         named_sequence_op is not None
     ), """
@@ -551,13 +579,75 @@ def _apply_registered_pass_lowering(
 
 
 #
-# func
+# module
 #
-mlir_fn_cache: Dict["catalyst.jax_tracer.Function", Any] = {}
+
+mlir_fn_cache: Dict[Any, Any] = {}
+
+
+@module_p.def_impl
+def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _module_to_mlir(ctx, *args, call_jaxpr, fn):
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+
+    if mlir_fn_cache.get(fn):
+        func_op = mlir_fn_cache[fn]
+        symbol_name = ir.SymbolRefAttr.get(["module_" + fn.__name__, func_op.name.value])
+        call = CallNestedModuleOp(
+            flat_output_types,
+            symbol_name,
+            mlir.flatten_lowering_ir_args(args),
+        )
+
+        return call.results
+
+    ctx.allow_unregistered_dialects = True
+    root = ctx.module_context.module
+    with ir.InsertionPoint(root.body):
+        module = ModuleOp()
+        symbol_attr = ir._symbolNameAttr("module_" + fn.__name__, ctx.module_context.context)
+        module.operation.attributes["sym_name"] = symbol_attr
+    nrep = jaxpr_replicas(call_jaxpr)
+    ctx_params = {}
+    ctx_params["backend_or_name"] = "cpu"
+    ctx_params["platforms"] = ["cpu"]
+    ctx_params["axis_context"] = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+    ctx_params["keepalives"] = []
+    ctx_params["channel_iterator"] = 1
+    ctx_params["host_callbacks"] = []
+    ctx_params["lowering_parameters"] = mlir.LoweringParameters()
+    ctx_params["module"] = module
+    ctx_params["context"] = ctx.module_context.context
+
+    with ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        ctx_params["ip"] = ip
+
+        nested_context = mlir.ModuleContext(**ctx_params)
+        nested_context.allow_unregistered_dialects = True
+        func_op = _func_def_lowering(nested_context, fn, call_jaxpr, name_stack=ctx.name_stack)
+        func_op.sym_visibility = ir.StringAttr.get("private")
+        func_op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+
+    symbol_name = ir.SymbolRefAttr.get(
+        [module.operation.attributes["sym_name"].value, func_op.name.value]
+    )
+
+    call = CallNestedModuleOp(
+        flat_output_types,
+        symbol_name,
+        mlir.flatten_lowering_ir_args(args),
+    )
+
+    return call.results
 
 
 @func_p.def_impl
-def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
+def _func_def_impl(*args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -576,6 +666,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
         diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
+    mlir_fn_cache[fn] = func_op
     return func_op
 
 
@@ -608,7 +699,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
         func_op = mlir_fn_cache[fn]
     else:
         func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr, name_stack=ctx.name_stack)
-        mlir_fn_cache[fn] = func_op
 
     symbol_name = func_op.name.value
 
@@ -659,7 +749,7 @@ def _get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
-        if primitive is func_p:
+        if primitive is func_p or primitive is module_p:
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
@@ -2220,6 +2310,7 @@ mlir.register_lowering(while_p, _while_loop_lowering)
 mlir.register_lowering(for_p, _for_loop_lowering)
 mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
+mlir.register_lowering(module_p, _module_to_mlir)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
