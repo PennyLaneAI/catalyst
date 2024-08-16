@@ -185,7 +185,7 @@
   }
   ```
 
-* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and 
+* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and
   recompile the IR from a given pipeline pass. They can only be used with `keep_intermediate=True`.
   `get_compilation_stage` is renamed from `print_compilation_stage` and now returns a IR string.
   [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
@@ -197,7 +197,7 @@
   def f(x):
       return x**2
   ```
-  
+
   ```pycon
   >>> f(2.0)
   4.0
@@ -205,7 +205,7 @@
 
   ```py
   from catalyst.debug import get_pipeline_output, replace_ir
-  
+
   old_ir = get_pipeline_output(f, "HLOLoweringPass")
   new_ir = old_ir.replace(
       "%2 = arith.mulf %in, %in_0 : f64\n",
@@ -213,7 +213,7 @@
   )
   replace_ir(f, "HLOLoweringPass", new_ir)
   ```
-  
+
   ```pycon
   >>> f(2.0)
    8.0
@@ -246,6 +246,9 @@
   ```
 
 <h3>Improvements</h3>
+
+* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
+  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
 
 * Catalyst now supports keyword arguments for qjit-compiled functions.
   [(#1004)](https://github.com/PennyLaneAI/catalyst/pull/1004)
@@ -308,7 +311,7 @@
   [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
   [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
 
-* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a 
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
@@ -364,7 +367,7 @@
       m_0 = catalyst.measure(0, postselect=1)
       return {"hi": qml.expval(qml.Z(0))}
   ```
-  
+
   ```pycon
   >>> func(0.9)
   {'hi': Array(-1., dtype=float64)}
