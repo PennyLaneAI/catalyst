@@ -55,6 +55,8 @@ def test_split_multiple_tapes():
     circuit = qjit(circuit, keep_intermediate=True)
     qjit_results = circuit([0.1, 0.2])
 
+    assert np.allclose(expected, qjit_results)
+
     split_tape_mlir = """module @circuit {
   func.func public @jit_circuit(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
     %0 = call @circuit(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
