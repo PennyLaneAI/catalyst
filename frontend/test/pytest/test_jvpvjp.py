@@ -832,5 +832,111 @@ def test_vjp_multi_return(diff_method):
         assert_allclose(r_j, r_c)
 
 
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvpvjp_argument_type_checks(diff_method):
+    """Tests error handling of Catalyst's jvp and vjp when given incorrect types."""
+
+    def f(x):
+        return 2 * x, x * x
+
+    def g(n, x):
+        # `n` is a dummy, non-differentiable parameter
+        return jnp.stack([1 + x[0] + 2 * x[1] + 3 * x[2], 1 + x[0] + 2 * x[1] ** 2 + 3 * x[2] ** 3])
+
+    @qjit
+    def C_workflow_jvp_good_f():
+        x = (1.0,)
+        tangents = (1.0,)
+        return C_jvp(f, x, tangents, method=diff_method, argnum=[0])
+
+    @qjit
+    def C_workflow_jvp_good_g():
+        x = jnp.array([2.0, 3.0, 4.0])
+        tangents = jnp.ones([3], dtype=float)
+        return C_jvp(g, [1, x], [tangents], method=diff_method, argnum=[1])
+
+    with pytest.raises(
+        TypeError,
+        match="number of tangent operands and number of differentiable parameters in catalyst.jvp do not match",
+    ):
+
+        @qjit
+        def C_workflow_jvp_incompatible_n_inputs():
+            # If `f` takes one differentiable param (argnum=[0]), then `tangents` must have length 1
+            x = (1.0,)
+            tangents = (1.0, 1.0)
+            return C_jvp(f, x, tangents, method=diff_method, argnum=[0])
+
+    with pytest.raises(
+        TypeError, match="function params and tangents arguments to catalyst.jvp do not match"
+    ):
+
+        @qjit
+        def C_workflow_jvp_incompatible_input_types():
+            # If `x` has type float, then `tangents` should also have type float
+            x = (1.0,)
+            tangents = (1,)
+            return C_jvp(f, x, tangents, method=diff_method, argnum=[0])
+
+    with pytest.raises(
+        ValueError, match="catalyst.jvp called with different function params and tangent shapes"
+    ):
+
+        @qjit
+        def C_workflow_jvp_incompatible_input_shapes():
+            # If `x` has shape (3,), then `tangents` must also have shape (3,), but it has shape (4,)
+            x = jnp.array([2.0, 3.0, 4.0])
+            tangents = jnp.ones([4], dtype=float)
+            return C_jvp(g, [1, x], [tangents], method=diff_method, argnum=[1])
+
+    @qjit
+    def C_workflow_vjp_good_f():
+        x = (1.0,)
+        cotangents = (1.0, 1.0)
+        return C_vjp(f, x, cotangents, method=diff_method, argnum=[0])
+
+    @qjit
+    def C_workflow_vjp_good_g():
+        x = jnp.array([2.0, 3.0, 4.0])
+        cotangents = jnp.ones([2], dtype=float)
+        return C_vjp(g, [1, x], [cotangents], method=diff_method, argnum=[1])
+
+    with pytest.raises(
+        TypeError,
+        match="number of cotangent operands and number of function output parameters in catalyst.vjp do not match",
+    ):
+
+        @qjit
+        def C_workflow_vjp_incompatible_n_inputs():
+            # If `f` returns two outputs, then `cotangents` must have length 2
+            x = (1.0,)
+            cotangents = (1.0,)
+            return C_vjp(f, x, cotangents, method=diff_method, argnum=[0])
+
+    with pytest.raises(
+        TypeError,
+        match="function output params and cotangents arguments to catalyst.vjp do not match",
+    ):
+
+        @qjit
+        def C_workflow_vjp_incompatible_input_types():
+            # If `x` has type float, then `cotangents` should also have type float
+            x = (1.0,)
+            cotangents = (1, 1)
+            return C_vjp(f, x, cotangents, method=diff_method, argnum=[0])
+
+    with pytest.raises(
+        ValueError,
+        match="catalyst.vjp called with different function output params and cotangent shapes",
+    ):
+
+        @qjit
+        def C_workflow_vjp_incompatible_input_shapes():
+            # If `f` returns object with shape (2,), then `cotangents` must also have shape (2,), but it has shape (3,)
+            x = jnp.array([2.0, 3.0, 4.0])
+            cotangents = jnp.ones([3], dtype=float)
+            return C_vjp(g, [1, x], [cotangents], method=diff_method, argnum=[1])
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
