@@ -39,7 +39,10 @@ from catalyst import (
     jvp,
     measure,
     qjit,
+    run_autograph,
     vjp,
+    vmap,
+    while_loop,
 )
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
@@ -158,7 +161,20 @@ class TestIntegration:
 
     def test_unsupported_object(self):
         """Check the error produced when attempting to convert an unsupported object (neither of
-        QNode, function, or method)."""
+        QNode, function, method or callable)."""
+
+        class FN:
+            """Test object."""
+
+            __name__ = "unknown"
+
+        fn = FN()
+
+        with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
+            run_autograph(fn)
+
+    def test_callable_object(self):
+        """Test qjit applied to a callable object."""
 
         class FN:
             """Test object."""
@@ -170,8 +186,7 @@ class TestIntegration:
 
         fn = FN()
 
-        with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
-            qjit(autograph=True)(fn)
+        assert qjit(autograph=True)(fn)(3) == 9
 
     def test_lambda(self):
         """Test autograph on a lambda function."""
@@ -1918,6 +1933,129 @@ class TestJaxIndexAssignment:
         assert jnp.allclose(
             jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
         )
+
+    def test_slice_assignment_start_stop(self):
+        """Test slice (start, stop, None) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            result[1:4] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 5, 3, 4, 0, 0]))
+
+    def test_slice_assignment_start_stop_step(self):
+        """Test slice (start, stop, step) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            result[1:5:2] = x[0:2]
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 5, 0, 3, 0, 0]))
+
+    def test_slice_assignment_start_only(self):
+        """Test slice (start, None, None) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            # Size (starting from 3) must match with x.
+            result[3::] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([0, 0, 0, 5, 3, 4]))
+
+    def test_slice_assignment_stop_only(self):
+        """Test slice (None, stop, None) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            # Size (ending before 3) must match with x.
+            result[:3] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 3, 4, 0, 0, 0]))
+
+    def test_slice_assignment_step_only(self):
+        """Test slice (None, None, step) assignment for Jax arrays."""
+
+        @qjit(autograph=True)
+        def expand_by_two(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
+
+            # Size (len(result) / 2) must match with x.
+            result[::2] = x
+            return result
+
+        assert jnp.allclose(expand_by_two(jnp.array([5, 3, 4])), jnp.array([5, 0, 3, 0, 4, 0]))
+
+
+class TestDecorators:
+    """Test if Autograph works when applied to a decorated function"""
+
+    def test_vmap(self):
+        """Test if Autograph works when applied to a decorated function with vmap"""
+
+        def workflow(axes_dct):
+            return axes_dct["x"] + axes_dct["y"]
+
+        expected = jnp.array([1, 2, 3, 4, 5])
+
+        result = qjit(vmap(workflow, in_axes=({"x": None, "y": 0},)), autograph=True)(
+            {"x": 1, "y": jnp.arange(5)}
+        )
+        assert jnp.allclose(result, expected)
+
+    def test_cond(self):
+        """Test if Autograph works when applied to a decorated function with cond"""
+
+        n = 6
+
+        @cond(n > 4)
+        def cond_fn():
+            return n**2
+
+        @cond_fn.otherwise
+        def else_fn():
+            return n
+
+        assert qjit(cond_fn, autograph=True)() == 36
+
+    def test_for_loop(self):
+        """Test if Autograph works when applied to a decorated function with for_loop"""
+
+        x = 5
+        n = 6
+
+        @for_loop(0, n, 1)
+        def loop(_, agg):
+            return agg + x
+
+        assert qjit(loop, autograph=True)(0) == 30
+
+    def test_while_loop(self):
+        """Test if Autograph works when applied to a decorated function with while_loop"""
+
+        n = 6
+
+        @while_loop(lambda i: i < n)
+        def loop(i):
+            return i + 1
+
+        assert qjit(loop, autograph=True)(0) == n
 
 
 if __name__ == "__main__":

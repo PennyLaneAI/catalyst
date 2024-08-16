@@ -67,6 +67,7 @@ Catalyst
 
    dev/installation
    dev/quick_start
+   dev/devices
    dev/autograph
    dev/sharp_bits
    dev/jax_integration
@@ -81,6 +82,7 @@ Catalyst
    dev/architecture
    PennyLane Frontend <modules/frontend>
    Compiler Core <modules/mlir>
+   MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
    Quantum Runtime <modules/runtime>
    dev/debugging

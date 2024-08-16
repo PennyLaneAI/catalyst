@@ -40,8 +40,9 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 
 .. warning::
 
-    The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-    ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud`` but future plans include the addition of more.
+    Not all PennyLane devices currently work with Catalyst. Supported backend devices include
+    ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+    a full of supported devices, please see :doc:`/dev/devices`.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
 way you are used to, as long as you ensure that all operations are added to the main tape.
@@ -67,7 +68,7 @@ The :func:`.qjit` decorator can be used to jit a workflow of quantum functions:
     jitted_circuit = qjit(circuit)
 
 >>> jitted_circuit(0.7)
-array(0.)
+Array(0., dtype=float64)
 
 In Catalyst, dynamic wire values are fully supported for operations, observables and measurements.
 For example, the following circuit can be jitted with wires as arguments:
@@ -83,7 +84,7 @@ For example, the following circuit can be jitted with wires as arguments:
         return qml.probs(wires=[arg1 + 1])
 
 >>> circuit(jnp.pi / 3, 1, 2)
-array([0.625, 0.375])
+Array([0.625, 0.375], dtype=float64)
 
 
 Operations
@@ -101,101 +102,19 @@ PennyLane are also supported via the decomposition mechanism in Catalyst. For ex
         qml.adjoint(qml.SingleExcitation(jnp.pi / 3, wires=[0, 1]))
         return qml.state()
 
-In addition, you can jit most of :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
-more complex quantum circuits; see below for the list of currently supported operations and templates.
+In addition, you can qjit most :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
+more complex quantum circuits.
 
 .. important::
 
    Decomposition will generally happen in accordance with the specification provided by devices,
-   which can vary from device to device (e.g. ``default.qubit`` and ``lightning.qubit`` might
-   decompose quite differently.)
+   which can vary from device to device (e.g., ``default.qubit`` and ``lightning.qubit`` might
+   decompose quite differently).
    However, Catalyst's decomposition logic will differ in the following cases:
 
    1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
    2. The set of operations supported by Catalyst itself can in some instances lead to additional decompositions compared to the device itself.
 
-.. raw:: html
-
-    <div class="summary-table">
-
-.. details::
-    :title: List of supported native operations
-
-    .. autosummary::
-        :nosignatures:
-
-        ~pennylane.Identity
-        ~pennylane.PauliX
-        ~pennylane.PauliY
-        ~pennylane.PauliZ
-        ~pennylane.Hadamard
-        ~pennylane.S
-        ~pennylane.T
-        ~pennylane.PhaseShift
-        ~pennylane.RX
-        ~pennylane.RY
-        ~pennylane.RZ
-        ~pennylane.CNOT
-        ~pennylane.CY
-        ~pennylane.CZ
-        ~pennylane.SWAP
-        ~pennylane.IsingXX
-        ~pennylane.IsingYY
-        ~pennylane.IsingXY
-        ~pennylane.IsingZZ
-        ~pennylane.ControlledPhaseShift
-        ~pennylane.CRX
-        ~pennylane.CRY
-        ~pennylane.CRZ
-        ~pennylane.CRot
-        ~pennylane.CSWAP
-        ~pennylane.MultiRZ
-        ~pennylane.QubitUnitary
-
-.. raw:: html
-
-    </div>
-    <div class="summary-table">
-
-.. details::
-    :title: List of supported templates
-
-    .. autosummary::
-        :nosignatures:
-
-        ~pennylane.AllSinglesDoubles
-        ~pennylane.AmplitudeEmbedding
-        ~pennylane.AngleEmbedding
-        ~pennylane.ApproxTimeEvolution
-        ~pennylane.ArbitraryStatePreparation
-        ~pennylane.BasicEntanglerLayers
-        ~pennylane.BasisEmbedding
-        ~pennylane.BasisStatePreparation
-        ~pennylane.broadcast
-        ~pennylane.FermionicDoubleExcitation
-        ~pennylane.FermionicSingleExcitation
-        ~pennylane.FlipSign
-        ~pennylane.GateFabric
-        ~pennylane.GroverOperator
-        ~pennylane.IQPEmbedding
-        ~pennylane.kUpCCGSD
-        ~pennylane.MERA
-        ~pennylane.MottonenStatePreparation
-        ~pennylane.MPS
-        ~pennylane.Permute
-        ~pennylane.QAOAEmbedding
-        ~pennylane.QFT
-        ~pennylane.QuantumMonteCarlo
-        ~pennylane.QuantumPhaseEstimation
-        ~pennylane.RandomLayers
-        ~pennylane.SimplifiedTwoDesign
-        ~pennylane.StronglyEntanglingLayers
-        ~pennylane.TTN
-        ~pennylane.UCCSD
-
-.. raw:: html
-
-    </div>
 
 Observables
 -----------
@@ -217,28 +136,6 @@ a tensor product of a :class:`qml.PauliX <pennylane.PauliX>`, :class:`qml.Hadama
             [complex(2.0, 0.0), complex(-1.0, 0.0)]]
         )
         return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(h_matrix, 2))
-
-.. raw:: html
-
-    <div class="summary-table">
-
-.. details::
-    :title: List of supported observables
-
-    .. autosummary::
-        :nosignatures:
-
-        ~pennylane.Identity
-        ~pennylane.PauliX
-        ~pennylane.PauliY
-        ~pennylane.PauliZ
-        ~pennylane.Hadamard
-        ~pennylane.Hermitian
-        ~pennylane.Hamiltonian
-
-.. raw:: html
-
-    </div>
 
 Measurements
 ------------
@@ -311,22 +208,22 @@ In the following example, the number of shots is set to :math:`500` in the devic
         )
 
 >>> circuit([0.3, 0.5, 0.7])
-[array([[0., 0., 0.],
-        [0., 0., 0.],
-        [0., 0., 0.],
+(Array([[0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
         ...,
-        [0., 0., 0.],
-        [0., 0., 0.],
-        [0., 0., 0.]]),
-array([0., 1., 2., 3., 4., 5., 6., 7.]),
-array([458,   7,  35,   0,   0,   0,   0,   0]),
-array(0.95533649),
-array(0.08733219),
-array([0.91782642, 0.05984182, 0.02096486, 0.0013669 ]),
-array([ 0.89994966-0.32850727j,  0.        +0.j        ,
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0]], dtype=int64),
+ (Array([0, 1, 2, 3, 4, 5, 6, 7], dtype=int64),
+  Array([453,   0,  31,   0,  16,   0,   0,   0], dtype=int64)),
+ Array(0.936, dtype=float64),
+ Array(0.138816, dtype=float64),
+ Array([0.926, 0.048, 0.026, 0.   ], dtype=float64),
+ Array([ 0.89994966-0.32850727j,  0.        +0.j        ,
         -0.08388168-0.22979488j,  0.        +0.j        ,
         -0.04964902-0.13601409j,  0.        +0.j        ,
-        -0.0347301 +0.01267748j,  0.        +0.j        ])]
+        -0.0347301 +0.01267748j,  0.        +0.j        ],      dtype=complex128))
 
 The PennyLane projective mid-circuit measurement is also supported in Catalyst.
 :func:`.measure` is a QJIT compatible mid-circuit measurement for Catalyst that only
@@ -352,9 +249,9 @@ In the following example, ``m`` will be equal to ``True`` if wire :math:`0` is r
         return m
 
 >>> circuit(jnp.pi)
-True
+Array(True, dtype=bool)
 >>> circuit(0.0)
-False
+Array(False, dtype=bool)
 
 Compilation Modes
 =================
@@ -379,9 +276,9 @@ the quantum function is executed. For example, ``circuit`` is compiled as early 
         return qml.expval(qml.PauliZ(wires=1))
 
 >>> circuit(0.5)  # the first call, compilation occurs here
-array(0.)
+Array(0., dtype=float64)
 >>> circuit(0.5)  # the precompiled quantum function is called
-array(0.)
+Array(0., dtype=float64)
 
 .. _ahead_of_time:
 
@@ -407,8 +304,8 @@ and data type of a tensor:
         return qml.state()
 
 >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
-array([0.75634905-0.52801002j, 0. +0.j,
-   0.35962678+0.14074839j, 0. +0.j])
+Array([0.75634905-0.52801002j, 0. +0.j,
+   0.35962678+0.14074839j, 0. +0.j], dtype=complex128)
 
 At this stage the compilation already happened, so the execution of ``circuit`` calls the compiled function directly on
 the first call, resulting in faster initial execution. Note that implicit type promotion for most datatypes are allowed
@@ -574,7 +471,7 @@ This decorator accepts the function to differentiate, a differentiation strategy
         return g(x)
 
 >>> workflow(2.0)
-array(-3.14159265)
+Array(-3.14159265, dtype=float64)
 
 To specify the differentiation strategy, the ``method`` argument can be passed
 to the ``grad`` function:
@@ -619,7 +516,7 @@ also feasible.
         return grad(circuit, argnum=0)(params)
 
 >>> workflow(jnp.array([2.0, 3.0]))
-array([-2.88051099, -1.92034063])
+Array([-2.88051099, -1.92034063], dtype=float64)
 
 The :func:`.grad` decorator works for functions that return a scalar value. You can also use the :func:`.jacobian`
 decorator to compute Jacobian matrices of general hybrid functions with multiple or multivariate results.
@@ -638,10 +535,10 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
         return g(x)
 
 >>> workflow(jnp.array([2.0, 1.0]))
-array([[ 3.48786850e-16 -4.20735492e-01]
-       [-8.71967125e-17  4.20735492e-01]])
+Array([[ 3.48786850e-16 -4.20735492e-01]
+       [-8.71967125e-17  4.20735492e-01]], dtype=float64)
 
-This decorator has the same methods and API as `grad`. See the documentation for more details.
+This decorator has the same methods and API as ``grad``. See the documentation for more details.
 
 Optimizers
 ----------
@@ -697,7 +594,7 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
         return param
 
 >>> workflow()
-array(1.57079633)
+Array(1.57079633, dtype=float64)
 
 JAX Integration
 ===============

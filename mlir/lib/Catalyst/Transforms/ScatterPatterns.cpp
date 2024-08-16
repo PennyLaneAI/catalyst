@@ -125,7 +125,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         if (updatesIndices) {
                             if (isa<RankedTensorType>(updatesIndices.getType())) {
                                 RankedTensorType updateType =
-                                    updatesIndices.getType().cast<RankedTensorType>();
+                                    cast<RankedTensorType>(updatesIndices.getType());
 
                                 for (int64_t index = 0; index < updateType.getShape()[0]; ++index) {
                                     Value indexValue =
@@ -203,12 +203,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         UpdateData data;
         // Get the inputs and updates values
         data.resultsValue = op.getInputs().front();
-        data.inputsShape = data.resultsValue.getType().cast<RankedTensorType>().getShape();
+        data.inputsShape = cast<RankedTensorType>(data.resultsValue.getType()).getShape();
 
         data.updatesValue = op.getUpdates().front();
 
         // Get the shape of the updates
-        data.updatesShape = data.updatesValue.getType().cast<TensorType>().getShape();
+        data.updatesShape = cast<TensorType>(data.updatesValue.getType()).getShape();
         int64_t updatesSize = data.updatesShape.size();
         std::vector<int64_t> updatesShapeVector(data.updatesShape.begin(), data.updatesShape.end());
 
@@ -228,16 +228,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         int64_t start = 0;
         std::vector<int64_t> dimensions;
 
-        for (int64_t i = start; i <= updatesSize; ++i) {
+        for (int64_t i = start; i < updatesSize; ++i) {
             dimensions.push_back(i);
         }
         if (!data.updatedWindowsDims.empty()) {
-            std::copy_if(data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
-                         std::back_inserter(data.updatedScatterDims),
-                         [&dimensions](int64_t element) {
-                             return std::find(dimensions.begin(), dimensions.end(), element) !=
-                                    dimensions.end();
-                         });
+            std::set_difference(dimensions.begin(), dimensions.end(),
+                                data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
+                                std::back_inserter(data.updatedScatterDims));
         }
         else {
             data.updatedScatterDims = dimensions;
@@ -364,9 +361,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, i);
+                    int innerIndex = std::distance(scatterDimsToOperandDims.begin(), itScatter);
+                    Value indexConstantOp = builder.create<index::ConstantOp>(loc, innerIndex);
                     auto indexScatter =
-                        builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                        builder.create<tensor::ExtractOp>(loc, scatterIndices, indexConstantOp);
                     auto indexUpdateCasted =
                         builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                     Value addValue =
@@ -388,9 +386,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, i);
+                    int innerIndex = std::distance(scatterDimsToOperandDims.begin(), itScatter);
+                    Value indexConstantOp = builder.create<index::ConstantOp>(loc, innerIndex);
                     auto indexScatter =
-                        builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                        builder.create<tensor::ExtractOp>(loc, scatterIndices, indexConstantOp);
                     fullStartIndex.push_back(indexScatter);
                 }
                 else {
@@ -400,16 +399,16 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 }
             }
             // Full windows indices
-            SmallVector<Value> fullWindowIndex;
+            SmallVector<Value> fullWindowIndex = updateWindowsIndices;
             for (auto insertedDim : insertedWindowsDims) {
                 auto c0 = builder.create<index::ConstantOp>(loc, 0);
-                updateWindowsIndices.insert(updateWindowsIndices.begin() + insertedDim, c0);
+                fullWindowIndex.insert(fullWindowIndex.begin() + insertedDim, c0);
             }
             // Add
             SmallVector<Value> results;
-            for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
+            for (size_t i = 0; i < fullWindowIndex.size(); ++i) {
                 Value indexScatter = fullStartIndex[i];
-                auto indexUpdate = updateWindowsIndices[i];
+                Value indexUpdate = fullWindowIndex[i];
                 auto indexUpdateCasted =
                     builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                 Value addValue =
@@ -426,7 +425,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     Value extractScatterIndices(SmallVector<Value> updateScatterIndices, Value scatterIndices,
                                 int64_t indexVectorDim, Location loc, OpBuilder builder) const
     {
-        auto scatterIndicesTensorType = scatterIndices.getType().cast<RankedTensorType>();
+        auto scatterIndicesTensorType = cast<RankedTensorType>(scatterIndices.getType());
         // Get the rank and shape of scatter indices
         int64_t rank = scatterIndicesTensorType.getRank();
         auto shape = scatterIndicesTensorType.getShape();
@@ -468,7 +467,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     Value extractUpdateIndices(Value allUpdatesIndicesTensor, Value i, Location loc,
                                OpBuilder builder) const
     {
-        RankedTensorType updateType = allUpdatesIndicesTensor.getType().cast<RankedTensorType>();
+        RankedTensorType updateType = cast<RankedTensorType>(allUpdatesIndicesTensor.getType());
 
         auto rank = updateType.getRank();
         auto shape = updateType.getShape();

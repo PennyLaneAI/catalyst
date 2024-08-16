@@ -51,47 +51,44 @@ jobs:
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - name: Get Cached MHLO Source
-      id: cache-mhlo-source
-      uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-gcc
+        fail-on-cache-miss: True
+    - uses: actions/cache/restore@v4
+      with:
+        path:  mlir/Enzyme
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v4
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
-
-    - name: Clone Enzyme Submodule
-      uses: actions/checkout@v4
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
 
     - name: Install Catalyst (latest/stable/release-candidate)
       run: |
@@ -125,7 +122,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=latest_release \
-        ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
 
@@ -137,7 +133,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=v0.37.0_rc \
-        ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
 
@@ -198,5 +193,6 @@ jobs:
         make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
-      run: |
-        make test-demos
+      run: | # Do not run demos in parallel, seems to cause package issues with numpy.
+        MDD_BENCHMARK_PRECISION=1 \
+        python3 -m pytest demos --nbmake

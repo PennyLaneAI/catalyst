@@ -17,8 +17,106 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, measure, qjit, while_loop
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst import cond, grad, jacobian, measure, qjit, while_loop
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode, GradContext
+
+
+# pylint: disable=protected-access
+class TestGradContextUnitTests:
+    """Unit tests for grad context"""
+
+    def test_error_cannot_pop_from_empty_context(self):
+        """Check that impossible state raises an assertion"""
+        msg = "This is an impossible state."
+        with pytest.raises(AssertionError, match=msg):
+            GradContext._pop()
+
+    def test_peek_base_case(self):
+        """Test peek"""
+        assert GradContext._peek() == 0
+
+    def test_push_peek_pop(self):
+        """Test push"""
+        GradContext._push()
+        assert GradContext._peek() == 1
+        GradContext._pop()
+
+    def test_context_management_nested_0(self):
+        """Test nested"""
+        assert GradContext._peek() == 0
+        with GradContext():
+            assert GradContext._peek() == 1
+        assert GradContext._peek() == 0
+
+    def test_context_management_nested_1(self):
+        """Test nested twice"""
+        assert GradContext._peek() == 0
+        with GradContext():
+            assert GradContext._peek() == 1
+            with GradContext():
+                assert GradContext._peek() == 2
+            assert GradContext._peek() == 1
+        assert GradContext._peek() == 0
+
+    def test_context_manager_user_interface(self):
+        """Test all"""
+        assert not GradContext.am_inside_grad()
+        with GradContext():
+            assert GradContext.am_inside_grad()
+        assert not GradContext.am_inside_grad()
+
+    def test_peel(self):
+        """Test peel"""
+        assert not GradContext.am_inside_grad()
+        with GradContext():
+            assert GradContext.am_inside_grad()
+            with GradContext(peel=True):
+                assert not GradContext.am_inside_grad()
+            assert GradContext.am_inside_grad()
+        assert not GradContext.am_inside_grad()
+
+
+class TestGradContextIntegration:
+    """Test integration with qjit"""
+
+    def test_assert_inside_grad(self):
+        """Test assertion of grad context with grad"""
+
+        @qjit
+        @grad
+        def identity(x: float):
+            assert GradContext.am_inside_grad()
+            return x
+
+        identity(1.0)
+
+    def test_assert_inside_jacobian(self):
+        """Test assertion of grad context with jacobian"""
+
+        arg = jnp.array([[1.0, 1.0], [1.0, 1.0]])
+
+        @qjit
+        @jacobian
+        def identity(x):
+            assert GradContext.am_inside_grad()
+            return x
+
+        identity(arg)
+
+    def test_assert_inside_grad_negative(self):
+        """Test negative"""
+
+        msg = "verified fail"
+
+        @qjit
+        @grad
+        def identity(x: float):
+            assert not GradContext.am_inside_grad(), msg
+            return x
+
+        with pytest.raises(AssertionError, match=msg):
+
+            identity(1.0)
 
 
 class TestEvaluationModes:

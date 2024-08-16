@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
-from pennylane.transforms import split_non_commuting
+from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -37,7 +37,7 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
 )
 from catalyst.device.verification import (
-    validate_observables,
+    validate_measurements,
     validate_observables_adjoint_diff,
     validate_observables_parameter_shift,
     verify_no_state_variance_returns,
@@ -126,7 +126,6 @@ RUNTIME_OBSERVABLES = {
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
     "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
-    "lightning.kokkos": ("LightningKokkosSimulator", "librtd_lightning"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
 }
@@ -466,14 +465,14 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """
 
         _, config = self.original_device.preprocess(execution_config)
+
         program = TransformProgram()
 
-        # measurement transforms (these may change operations on the tape to accommodate
-        # measurement transformations, so must occur before decomposition of measurements)
-        if self.qjit_capabilities.non_commuting_observables_flag is False:
-            program.add_transform(split_non_commuting)
-        if self.measurement_processes == {"Counts"}:
-            program.add_transform(measurements_from_counts)
+        # measurement transforms may change operations on the tape to accommodate
+        # measurement transformations, so must occur before decomposition
+        measurement_transforms = self._measurement_transform_program()
+        config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
+        program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
@@ -489,7 +488,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
             verify_operations, grad_method=config.gradient_method, qjit_device=self
         )
         program.add_transform(
-            validate_observables, self.qjit_capabilities, self.original_device.name
+            validate_measurements,
+            self.qjit_capabilities,
+            self.original_device.name,
+            self.original_device.shots,
         )
 
         if config.gradient_method is not None:
@@ -500,6 +502,24 @@ class QJITDeviceNewAPI(qml.devices.Device):
             program.add_transform(validate_observables_parameter_shift)
 
         return program, config
+
+    def _measurement_transform_program(self):
+
+        measurement_program = TransformProgram()
+
+        supports_sum_observables = any(
+            obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
+        )
+
+        if self.qjit_capabilities.non_commuting_observables_flag is False:
+            measurement_program.add_transform(split_non_commuting)
+        elif not supports_sum_observables:
+            measurement_program.add_transform(split_to_single_terms)
+
+        if self.measurement_processes == {"Counts"}:
+            measurement_program.add_transform(measurements_from_counts)
+
+        return measurement_program
 
     def execute(self, circuits, execution_config):
         """
@@ -624,13 +644,12 @@ def get_device_capabilities(
         return device.qjit_capabilities
     else:
         program_features = (
-            program_features if program_features else ProgramFeatures(device.shots is not None)
-        )
-        device_name = (
-            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+            program_features
+            if program_features
+            else ProgramFeatures(shots_present=bool(device.shots))
         )
         device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features, device_name)
+        return load_device_capabilities(device_config, program_features)
 
 
 def check_device_wires(wires):

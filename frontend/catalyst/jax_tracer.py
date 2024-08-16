@@ -34,6 +34,7 @@ from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
+from catalyst.debug.assertion import debug_assert
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -84,6 +85,8 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
+    set_state_p,
     state_p,
     tensorobs_p,
     var_p,
@@ -167,12 +170,12 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args, **kwargs)
 
-        def _eval_jaxpr(*args):
-            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+        def _eval_jaxpr(*args, **kwargs):
+            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
-        args, _ = jax.tree_util.tree_flatten(args)
+        args, _ = jax.tree_util.tree_flatten((args, kwargs))
         retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(out_tree, retval)
 
@@ -242,7 +245,7 @@ def _apply_result_type_conversion(
         OutputSignature: new output signature of the function
     """
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
-    args = [AbstractQreg()] if with_qreg else []
+    args = [AbstractQreg(target_types[-1].length)] if with_qreg else []
 
     def _fun(*in_tracers):
         out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
@@ -282,9 +285,12 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
     if all_ends_with_qreg:  # [1]
+        length = types[-1][-1].length
         types = [t[:-1] for t in types]
+    else:
+        length = None
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
+    return results + ([AbstractQreg(length)] if all_ends_with_qreg else [])
 
 
 @debug_logger
@@ -560,6 +566,58 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     return mlir_module, ctx
 
 
+def trace_state_prep(op, qrp):
+    """Trace qml.StatePrep
+
+    Args:
+        op: StatePrep op being traced
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
+
+    Postcondition:
+        qrp is updated to hold the output qubits from qml.StatePrep
+    """
+    assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
+
+    qubits = qrp.extract(op.wires)
+    partial_sv = op.parameters[0]
+    # jnp.complex128 is the top element in the type promotion lattice
+    # so it is ok to do this.
+    # https://jax.readthedocs.io/en/latest/type_promotion.html
+    partial_sv = jax.lax.convert_element_type(partial_sv, jnp.dtype(jnp.complex128))
+    # The frontend guarantees that partial_sv.shape == (2**wires,)
+    # We have a test for that, and just if in the future this changes:
+    err_msg = "State vector must have shape (2**wires,)"
+    assert partial_sv.shape == (2 ** len(qubits),), err_msg
+    qubits2 = set_state_p.bind(*qubits, partial_sv)
+    qrp.insert(op.wires, qubits2)
+
+
+def trace_basis_state(op, qrp):
+    """Trace qml.BasisState
+    Args:
+        op: qml.BasisState op being traced
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
+    Postcondition:
+        qrp is updated to hold the output qubits from qml.StatePrep
+    """
+    assert isinstance(op, qml.BasisState), "qml.BasisState expected"
+
+    qubits = qrp.extract(op.wires)
+    basis_state = op.parameters[0]
+    err_msg = "BasisState parameter must consist of 0 or 1 integers."
+    if not jnp.can_cast(basis_state.dtype, jnp.dtype(jnp.int64)):
+        raise ValueError(err_msg)
+
+    basis_state_invalid_bits = jax.lax.bitwise_and(basis_state, ~0b1)
+    is_basis_state_invalid = jnp.any(basis_state_invalid_bits)
+    is_basis_state_valid = jnp.logical_not(is_basis_state_invalid)
+    debug_assert(is_basis_state_valid, err_msg)
+
+    basis_state = jax.lax.convert_element_type(basis_state, jnp.dtype(jnp.bool))
+    qubits2 = set_basis_state_p.bind(*qubits, basis_state)
+    qrp.insert(op.wires, qubits2)
+
+
 # pylint: disable=too-many-arguments
 @debug_logger
 def trace_quantum_operations(
@@ -620,6 +678,10 @@ def trace_quantum_operations(
                 adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
+        elif isinstance(op, qml.StatePrep):
+            trace_state_prep(op, qrp)
+        elif isinstance(op, qml.BasisState):
+            trace_basis_state(op, qrp)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -705,10 +767,13 @@ def trace_observables(
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
-        terms = obs.terms()
-        coeffs = jax.numpy.array(terms[0])
-        nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
-        obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
+        coeffs, terms = obs.terms()
+        coeffs = jax.numpy.array(coeffs)
+        nested_obs = []
+        for term in terms:
+            obs = trace_observables(term, qrp, m_wires)[0]
+            nested_obs.append(obs)
+        obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
@@ -804,7 +869,7 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                if shots is None:
+                if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
@@ -826,7 +891,7 @@ def trace_quantum_measurements(
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
-                if shots is None:
+                if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
@@ -922,13 +987,11 @@ def apply_transform(
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_program_transformed = qnode_program
-
-    if is_program_transformed and qnode_program.is_informative:
+    if qnode_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    if is_program_transformed or device_modify_measurements:
+    if qnode_program or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         total_program = qnode_program + device_program
     else:
@@ -1063,7 +1126,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode
+    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -1089,7 +1152,9 @@ def trace_quantum_function(
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
+            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
+                f, args, kwargs, static_argnums
+            )
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
@@ -1114,14 +1179,12 @@ def trace_quantum_function(
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
+                device_modify_measurements = config.device_options["transforms_modify_measurements"]
             else:
                 device_program = TransformProgram()
+                device_modify_measurements = False  # this is only for the new API transform program
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
-
-            device_modify_measurements = "measurements_from_counts" in [
-                t.transform.__name__ for t in device_program
-            ]
 
             tapes, post_processing = apply_transform(
                 qnode_program,
@@ -1142,7 +1205,7 @@ def trace_quantum_function(
                 rtd_name=device.backend_name,
                 rtd_kwargs=str(device.backend_kwargs),
             )
-            qreg_in = qalloc_p.bind(len(device.wires))
+            qreg_in = qalloc_p.bind(len(device.wires), static_size=len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
@@ -1189,4 +1252,4 @@ def trace_quantum_function(
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree
+    return closed_jaxpr, out_type, out_tree, return_values_tree

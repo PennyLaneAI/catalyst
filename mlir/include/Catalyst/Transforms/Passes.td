@@ -93,6 +93,12 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
     let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
 
+def DisableAssertionPass : Pass<"disable-assertion"> {
+    let summary = "Disable all catalyst_assertions.";
+
+    let constructor = "catalyst::createDisableAssertionPass()";
+}
+
 def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
     let summary = "Adds exception handling for async qnodes.";
 
@@ -131,6 +137,17 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let constructor = "catalyst::GEPInboundsPass()";
 }
 
+def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
+    let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
+    
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "linalg::LinalgDialect"
+    ];
+
+    let constructor = "catalyst::MemrefCopyToLinalgCopyPass()";
+}
+
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
     let summary = "Register `__catalyst_inactive_callback` as inactive with Enzyme";
 
@@ -140,6 +157,12 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
     let constructor = "catalyst::createRegisterInactiveCallbackPass()";
 
+}
+
+def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
+    let summary = "Apply the passes scheduled with the transform dialect.";
+
+    let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
 #endif // CATALYST_PASSES

@@ -42,7 +42,7 @@ def circuit(n: int):
     @cond_fn.otherwise
     def otherwise():
         # CHECK:       [[r0:%[a-zA-Z0-9_a-z]+]] = stablehlo.multiply %arg0, %arg0
-        # CHECK:       [[r1:%[a-zA-Z0-9_a-z]+]] = stablehlo.multiply %arg0, [[r0]]
+        # CHECK:       [[r1:%[a-zA-Z0-9_a-z]+]] = stablehlo.multiply [[r0]], %arg0
         # CHECK:       scf.yield [[r1]], [[qreg_0]]
         return n**3
 

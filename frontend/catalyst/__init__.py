@@ -23,7 +23,7 @@ from os.path import dirname
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.4.23"
+_jaxlib_version = "0.4.28"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
@@ -87,6 +87,7 @@ from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
+from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.utils.exceptions import (
     AutoGraphError,
@@ -182,6 +183,7 @@ __all__ = (
     "AutoGraphError",
     "CompileError",
     "DifferentiableCompileError",
+    "debug_assert",
     "CompileOptions",
     "debug",
     *_api_extension_list,

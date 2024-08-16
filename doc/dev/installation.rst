@@ -350,7 +350,7 @@ them, but using the ``test-runtime`` target instead:
 
 .. code-block:: console
 
-  make test-runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
+  make test-runtime ENABLE_OPENQASM=ON
 
 .. note::
 

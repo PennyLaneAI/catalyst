@@ -17,7 +17,6 @@ option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
-option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos backend device" OFF)
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -49,6 +48,13 @@ FetchContent_Declare(
     SOURCE_DIR          mlir/ExecutionEngine
 )
 
+FetchContent_Declare(
+    MLIRFloat16Bits
+    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/Float16bits.h
+    DOWNLOAD_NO_EXTRACT True
+    SOURCE_DIR          mlir/ExecutionEngine
+)
+
 function(fetch_pybind11)
     find_package(pybind11 CONFIG)
     if (pybind11_FOUND)
@@ -72,20 +78,14 @@ if(RUNTIME_ENABLE_WARNINGS)
 endif()
 
 message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
-message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
 list(APPEND devices_list rtd_dummy)
 
-if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
+if(ENABLE_LIGHTNING)
     list(APPEND devices_list pennylane_lightning rtd_lightning)
-    if(ENABLE_LIGHTNING)
-        list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_dynamic")
-    endif()
-    if(ENABLE_LIGHTNING_KOKKOS)
-        list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_kokkos")
-    endif()
+    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_dynamic")
 endif()
 
 if(ENABLE_OPENQASM)

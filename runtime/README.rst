@@ -98,23 +98,8 @@ Installation
 
 By default, the runtime builds all supported backend devices.
 You can build the runtime with custom devices from the list of Backend Devices.
-You can use ``ENABLE_LIGHTNING_KOKKOS=OFF`` to disable building the runtime with
-`lightning.kokkos <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`_:
 
-.. code-block:: console
-
-    make runtime ENABLE_LIGHTNING_KOKKOS=OFF
-
-Lightning-Kokkos provides support for other Kokkos backends including OpenMP, HIP and CUDA.
-Please refer to `the installation guideline <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/installation.html>`_ for the requirements.
-You can further use the ``CMAKE_ARGS`` flag to issue any additional compiler arguments or override the preset ones in the make commands.
-To build the runtime with the ``Kokkos::OpenMP`` backend execution space:
-
-.. code-block:: console
-
-    make runtime CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON"
-
-You can also use ``ENABLE_OPENQASM=OFF`` to disable building the runtime with `Amazon-Braket-OpenQasm <https://aws.amazon.com/braket/>`_:
+You can use ``ENABLE_OPENQASM=OFF`` to disable building the runtime with `Amazon-Braket-OpenQasm <https://aws.amazon.com/braket/>`_:
 
 .. code-block:: console
 

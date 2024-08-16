@@ -46,7 +46,7 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
     -DENABLE_LIGHTNING_KOKKOS=ON \
-    -DLIGHTNING_GIT_TAG=latest_release \
+    -DLIGHTNING_GIT_TAG=dcb2e79 \
     -DENABLE_LAPACK=ON \
     -DKokkos_ENABLE_SERIAL=ON \
     -DKokkos_ENABLE_OPENMP=ON \
@@ -77,7 +77,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DENZYME_SRC_DIR=/catalyst/mlir/Enzyme \
     -DLLVM_ENABLE_ZLIB=OFF \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
-    -DLLVM_ENABLE_LLD=OFF \
+    -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
 cmake --build quantum-build --target check-dialects compiler_driver
 

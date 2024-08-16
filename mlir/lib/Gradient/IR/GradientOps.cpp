@@ -88,7 +88,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         if (auto tensorType = dyn_cast<ShapedType>(diffArgBaseType))
             diffArgBaseType = tensorType.getElementType();
 
-        if (!diffArgBaseType.isa<FloatType>())
+        if (!isa<FloatType>(diffArgBaseType))
             return op_state->emitOpError("invalid numeric base type: callee operand at position ")
                    << idx << " must be floating point to be differentiable";
     }
@@ -314,6 +314,28 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
                    << " was expected to match the type " << jvpRtype << " but got " << calleeRtype;
+        }
+    }
+
+    std::vector<Type> tanTypes;
+    {
+        auto tanOperands = OperandRange(
+            this->operand_begin() + callee.getFunctionType().getNumInputs(), this->operand_end());
+        for (auto c : tanOperands) {
+            tanTypes.push_back(c.getType());
+        }
+    }
+
+    auto calleeInputTypes = callee.getFunctionType().getInputs();
+
+    // Check that callee inputs have the same types as tangent inputs
+    for (size_t i = 0; i < tanTypes.size(); i++) {
+        auto tanType = tanTypes[i];
+        auto cIType = calleeInputTypes[i];
+        if (tanType != cIType) {
+            return this->emitOpError("callee input type does not match the tangent type")
+                   << " callee input " << i << " was expected to be of type " << tanType
+                   << " but got " << cIType;
         }
     }
 

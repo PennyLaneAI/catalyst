@@ -539,6 +539,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.jacobian,
             catalyst.vjp,
             catalyst.jvp,
+            catalyst.vmap,
         ):
             assert args and callable(args[0])
             wrapped_fn = args[0]
@@ -596,7 +597,10 @@ def set_item(target, i, x):
     # Apply the 'at...set' transformation only to Jax arrays.
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].set(x)
+        if isinstance(i, slice):
+            target = target.at[i.start : i.stop : i.step].set(x)
+        else:
+            target = target.at[i].set(x)
     else:
         target[i] = x
 

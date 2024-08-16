@@ -1200,6 +1200,84 @@ def test_pytrees_return_qnode(backend):
     assert len(result[1]) == 2
 
 
+def test_calssical_kwargs():
+    """Test the gradient on a classical function with keyword arguments"""
+
+    @qjit
+    def f1(x, y, z):
+        return x * (y - z)
+
+    result = qjit(grad(f1, argnum=0))(3.0, y=1.0, z=2.0)
+    expected = qjit(grad(f1, argnum=0))(3.0, 1.0, 2.0)
+    assert np.allclose(expected, result)
+
+
+def test_calssical_kwargs_switched_arg_order():
+    """Test the gradient on classical function with keyword arguments and switched argument order"""
+
+    @qjit
+    def f1(x, y, z):
+        return x * (y - z)
+
+    result = qjit(grad(f1, argnum=0))(3.0, z=2.0, y=1.0)
+    expected = qjit(grad(f1, argnum=0))(3.0, 1.0, 2.0)
+    assert np.allclose(expected, result)
+
+
+def test_qnode_kwargs(backend):
+    """Test the gradient on a qnode with keyword arguments"""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(x, y, z):
+        qml.RY(x, wires=0)
+        qml.RX(y, wires=0)
+        qml.RX(z, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    result = qjit(jacobian(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected, result)
+    result = qjit(grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected, result)
+    result_val, result_grad = qjit(value_and_grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
+    expected_val = qjit(circuit)(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    print(result_val, result_grad)
+    print(expected_val, expected_grad)
+    assert np.allclose(expected_val, result_val)
+    assert np.allclose(expected_grad, result_grad)
+
+
+def test_qnode_kwargs_switched_arg_order(backend):
+    """Test the gradient on a qnode with keyword arguments and switched argument order"""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(x, y, z):
+        qml.RY(x, wires=0)
+        qml.RX(y, wires=0)
+        qml.RX(z, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    switched_order = qjit(jacobian(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected[0], switched_order[0])
+    switched_order = qjit(grad(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected[0], switched_order[0])
+    switched_order_val, switched_order_grad = qjit(value_and_grad(circuit, argnum=[0]))(
+        0.1, z=0.3, y=0.2
+    )
+    expected_val = qjit(circuit)(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    assert np.allclose(expected_val, switched_order_val)
+    assert np.allclose(expected_grad, switched_order_grad)
+
+
 def test_pytrees_return_classical_function(backend):
     """Test the jacobian on a qnode with a return including list and dictionnaries."""
     num_wires = 1
@@ -1305,6 +1383,47 @@ def test_adj_qubitunitary(inp, backend):
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
+
+
+@pytest.mark.xfail(reason="Needs PR #332")
+def test_gradient_slice(backend):
+    """Test the differentation when the qnode generates memref with non identity layout."""
+    n_wires = 5
+    data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
+
+    weights = jnp.ones([n_wires, 3])
+
+    bias = jnp.array(0.0)
+    params = {"weights": weights, "bias": bias}
+
+    dev = qml.device(backend, wires=n_wires)
+
+    @qml.qnode(dev)
+    def circuit(data, weights):
+        """Quantum circuit ansatz"""
+
+        for i in range(n_wires):
+            qml.RY(data[i], wires=i)
+
+        for i in range(n_wires):
+            qml.RX(weights[i, 0], wires=i)
+            qml.RY(weights[i, 1], wires=i)
+            qml.RX(weights[i, 2], wires=i)
+            qml.CNOT(wires=[i, (i + 1) % n_wires])
+
+        return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
+
+    def my_model(data, weights, bias):
+        return circuit(data[:, 0], weights) + bias
+
+    cat_res = qjit(
+        jacobian(
+            my_model,
+            argnum=1,
+        )
+    )(data, params["weights"], params["bias"])
+    jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
+    assert np.allclose(cat_res, jax_res)
 
 
 class TestGradientErrors:

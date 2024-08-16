@@ -44,7 +44,7 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
-from jax._src.lax.lax import _abstractify
+from jax._src.lax.lax import _abstractify, cos_p, sin_p
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
@@ -80,6 +80,7 @@ from jax.core import (
     new_jaxpr_eqn,
     thread_local_state,
 )
+from jax.extend.linear_util import transformation_with_aux, wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -87,7 +88,6 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.linear_util import transformation_with_aux, wrap_init
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -97,8 +97,14 @@ from jax.tree_util import (
 )
 from jaxlib.xla_extension import PyTreeRegistry
 
-from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
+from catalyst.jax_extras.patches import (
+    _cos_lowering2,
+    _gather_shape_rule_dynamic,
+    _sin_lowering2,
+    get_aval2,
+)
 from catalyst.logging import debug_logger
+from catalyst.tracing.type_signatures import verify_static_argnums_type
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
@@ -287,7 +293,7 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     the same constants."""
-    newvar = gensym(jaxprs, suffix="_")
+    newvar = gensym("_")
 
     # List of constant variables of all jaxprs, preprended with '_'
     all_mangled_constvars: List[List[Var]] = []
@@ -440,17 +446,21 @@ def deduce_signatures(
     )
 
 
-def deduce_avals(f: Callable, args, kwargs):
+def deduce_avals(f: Callable, args, kwargs, static_argnums=None):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     # TODO: deprecate in favor of `deduce_signatures`
+    wf = wrap_init(f)
+    if static_argnums:
+        verify_static_argnums_type(static_argnums)
+        dynamic_argnums = [i for i in range(len(args)) if i not in static_argnums]
+        wf, args = jax._src.api_util.argnums_partial(wf, dynamic_argnums, args)
     flat_args, in_tree = tree_flatten((args, kwargs))
     abstracted_axes = None
     axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
     in_type = infer_lambda_input_type(axes_specs, flat_args)
     in_avals, keep_inputs = unzip2(in_type)
-    wf = wrap_init(f)
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
     return wffa, in_avals, keep_inputs, out_tree_promise
@@ -481,7 +491,7 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
 def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     """Get implicit arguments from explicit arguments and abstracted_axes."""
     axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
-    explicit_args, _ = tree_flatten(args)
+    explicit_args, _ = tree_flatten((args, kwargs))
     in_type = infer_lambda_input_type(axes_specs, explicit_args)
     implicit_args = _extract_implicit_args(in_type, explicit_args)
     args_flat = [*implicit_args, *explicit_args]
@@ -514,6 +524,10 @@ def make_jaxpr2(
     )
     register_lowering(gather2_p, _gather_lower)
 
+    # TBD
+    register_lowering(sin_p, _sin_lowering2)
+    register_lowering(cos_p, _cos_lowering2)
+
     primitive_batchers2 = jax._src.interpreters.batching.primitive_batchers.copy()
     for primitive in jax._src.interpreters.batching.primitive_batchers.keys():
         if primitive.name == "gather":
@@ -527,6 +541,8 @@ def make_jaxpr2(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
             (jax._src.interpreters.batching, "primitive_batchers", primitive_batchers2),
+            (jax._src.lax.lax, "_sin_lowering", _sin_lowering2),
+            (jax._src.lax.lax, "_cos_lowering", _cos_lowering2),
         ), ExitStack():
             f = wrap_init(fun)
             if static_argnums:

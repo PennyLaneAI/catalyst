@@ -18,7 +18,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import CompileError, qjit
 
 
 class TestExpval:
@@ -502,11 +502,16 @@ class TestOtherMeasurements:
     def test_missing_shots_value(self, backend, meas_fun):
         """Test error for missing shots value."""
 
-        @qml.qnode(qml.device(backend, wires=1))
+        dev = qml.device(backend, wires=1)
+
+        @qml.qnode(dev)
         def circuit():
             return meas_fun(wires=0)
 
-        with pytest.raises(ValueError, match="cannot work with shots=None"):
+        # ValueError is legacy behaviour with the old device API
+        error_type = ValueError if isinstance(dev, qml.devices.LegacyDevice) else CompileError
+
+        with pytest.raises(error_type, match="cannot work with shots=None"):
             qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):

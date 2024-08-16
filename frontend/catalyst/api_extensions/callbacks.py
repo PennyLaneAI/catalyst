@@ -22,6 +22,7 @@ import copy
 import ctypes
 import functools
 import inspect
+from abc import ABC, abstractmethod
 from typing import Any, Callable
 
 import jax
@@ -37,7 +38,7 @@ from jax._src.tree_util import (
 
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
-from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
@@ -46,17 +47,24 @@ from catalyst.utils.jnp_to_memref import (
 )
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
+# This is needed to avoid autograph conversion.
+# Autograph uses the __module__ field to decide what to transform and what not
+# to transform. If __module__ is something catalyst related, it won't transform
+# it by default. There are some other ones.
+# However, by using wraps and update_wrapper, __module__ is copied over
+# from the wrapped function to the wrapper. This means that if a user
+# provides a function from their module, here, we wrap some Catalyst
+# functions here and copy over the __module__ field, then autograph
+# will attempt to transform it. To avoid this, we just remove
+# the __module__ string from the original functools.WRAPPER_ASSIGNMENTS.
+WRAPPER_ASSIGNMENTS = list(filter(lambda x: x != "__module__", functools.WRAPPER_ASSIGNMENTS))
+
 
 ## API ##
 def accelerate(func=None, *, dev=None):
     """Execute a ``jax.jit`` accelerated function on classical
     accelerators such as GPUs from within a qjit-compiled function.
 
-    .. note::
-
-        ``catalyst.accelerate`` doses not currently support
-        differentiation, and cannot be used inside functions that
-        :func:`catalyst.grad` is applied to.
 
     Args:
         func (Callable or PjitFunction): The function to be classically
@@ -99,6 +107,22 @@ def accelerate(func=None, *, dev=None):
         def hybrid_fn(x):
             y = accelerate(classical_fn)(x) # will be executed on a GPU
             return jnp.cos(y)
+
+    Accelerated functions also fully support autodifferentiation with
+    :func:`~.grad`, :func:`~.jacobian`, and other Catalyst differentiation functions:
+
+    .. code-block:: python
+
+        @qjit
+        @grad
+        def f(x):
+            expm = accelerate(jax.scipy.linalg.expm)
+            return jnp.sum(expm(jnp.sin(x)) ** 2)
+
+    >>> x = jnp.array([[0.1, 0.2], [0.3, 0.4]])
+    >>> f(x)
+    Array([[2.80120452, 1.67518663],
+           [1.61605839, 4.42856163]], dtype=float64)
     """
     # Setting default parameters
     if dev is None:
@@ -163,7 +187,7 @@ def pure_callback(callback_fn, result_type=None):
             return jnp.cos(callback_fn(x ** 2))
 
     >>> fn(0.654)
-    array(0.9151995)
+    Array(0.9151995, dtype=float64)
 
     It can also be used functionally:
 
@@ -171,7 +195,7 @@ def pure_callback(callback_fn, result_type=None):
     >>> def add_one(x):
     ...     return catalyst.pure_callback(lambda x: x + 1, int)(x)
     >>> add_one(2)
-    array(3)
+    Array(3, dtype=int64)
 
     For callback functions that return arrays, a ``jax.ShapeDtypeStruct``
     object can be created to specify the expected return shape and data type:
@@ -192,7 +216,7 @@ def pure_callback(callback_fn, result_type=None):
             return x
 
     >>> fn(jnp.array([0.1, 0.2]))
-    array([1.97507074+0.j, 0.01493759+0.j])
+    Array([1.97507074+0.j, 0.01493759+0.j], dtype=complex128)
 
     .. details::
         :title: Differentiating callbacks with custom VJP rules
@@ -234,7 +258,7 @@ def pure_callback(callback_fn, result_type=None):
         ...     y = jnp.array([jnp.cos(x[0]), x[1]])
         ...     return jnp.sin(callback_fn(y))
         >>> f(jnp.array([0.1, 0.2]))
-        array([-0.01071923,  0.82698717])
+        Array([-0.01071923,  0.82698717], dtype=float64)
     """
 
     # Verify inputs
@@ -251,19 +275,28 @@ def pure_callback(callback_fn, result_type=None):
     # Nicer inputs for the implementation.
     # The implementation expects a function
     # to be annotated with the correct result types
-    annotated = AnnotatedFunction(callback_fn, result_type)
+    annotated = AnnotatedFunctionImpl(callback_fn, result_type)
 
     return pure_callback_impl(annotated)
 
 
 ## IMPL ##
-class AnnotatedFunction:
+class AnnotatedFunction(ABC):
+    """Defining an interface for methods with result types."""
+
+    @abstractmethod
+    def getResultTypes(self):
+        """Get result type of function"""
+        ...  # pragma: nocover
+
+
+class AnnotatedFunctionImpl(AnnotatedFunction):
     """Callable with result_type field."""
 
     def __init__(self, func, result_type):
         self.func = func
         self.result_type = result_type
-        functools.update_wrapper(self, func)
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -284,7 +317,7 @@ def base_callback(func):
     signature = inspect.signature(func)
     result_type = signature.return_annotation
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
-    wrapper = AnnotatedFunction(func, result_type)
+    wrapper = AnnotatedFunctionImpl(func, result_type)
     return base_callback_impl(wrapper, device=None, custom_grad=None)
 
 
@@ -312,7 +345,7 @@ def accelerate_impl(users_func=None, *, dev=None):
     if is_partial:
         context = tree_leaves(users_func)
 
-    @functools.wraps(users_func)
+    @functools.wraps(users_func, assigned=WRAPPER_ASSIGNMENTS)
     def total(context, *args, **kwargs):
         nonlocal users_func
         if is_partial:
@@ -323,25 +356,41 @@ def accelerate_impl(users_func=None, *, dev=None):
             return users_func(*args, **kwargs)
 
     with transient_jax_config({"jax_dynamic_shapes": False}):
-        # jax.jit will wrap total which
+        # jax.jit will wrap total and total wraps the user_function
+        # which means jitted_fn has the user_function's identifier
         jitted_fn = jax.jit(total)
 
     # wraps total which wraps user
-    @functools.wraps(total)
+    @functools.wraps(total, assigned=WRAPPER_ASSIGNMENTS)
     def back_to_user(*args, **kwargs):
         absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
             # Find the shape of the return value
             with transient_jax_config({"jax_dynamic_shapes": False}):
-                _, returnshape = jax.make_jaxpr(total, return_shape=True)(
+                _, returnshape = jax.make_jaxpr(jitted_fn, return_shape=True)(
                     absextra, *absargs, **abskwargs
                 )
         except Exception as e:
             name = users_func.__name__
             msg = f"Function {name} must be jax.jit-able."
+            msg += f"But failed with error message {str(e)}."
             raise ValueError(msg) from e
-        annotated = AnnotatedFunction(jitted_fn, returnshape)
-        return jax_jit_callback(annotated, device=dev)(context, *args, **kwargs)
+        annotated = AnnotatedFunctionImpl(jitted_fn, returnshape)
+        with_custom_grad = CallbackWithPotentialCustomGrad(annotated, dev)
+
+        if GradContext.am_inside_grad():
+
+            @with_custom_grad.fwd
+            @accelerate(dev=dev)
+            def vjp_wrapper(context, *args, **kwargs):
+                return jax.vjp(jitted_fn, context, *args, **kwargs)
+
+            @with_custom_grad.bwd
+            @accelerate(dev=dev)
+            def reverse(vjp_func, dy):
+                return vjp_func(dy)
+
+        return with_custom_grad(context, *args, **kwargs)
 
     return back_to_user
 
@@ -351,19 +400,25 @@ def pure_callback_impl(callback_fn: AnnotatedFunction):
     return CallbackWithPotentialCustomGrad(callback_fn)
 
 
-class CallbackWithCustomGrad:
+# pylint: disable=too-many-instance-attributes)
+class CallbackWithCustomGrad(AnnotatedFunction):
     """A callback with a custom grad"""
 
-    def __init__(self, func, forward, reverse):
-        assert isinstance(func, AnnotatedFunction)
+    def __init__(self, func, forward, reverse, device):
         assert func and forward and reverse
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.func = func
+        assert isinstance(func, AnnotatedFunction)
         self.restype = func.getResultTypes()
         self._fwd = forward
         self._fwd_jaxpr = None
         self._bwd = reverse
         self._bwd_jaxpr = None
         self.callback = None
+        self.device = device
+
+    def getResultTypes(self):
+        return self.restype
 
     def __call__(self, *args, **kwargs):
         if self.callback:
@@ -373,15 +428,16 @@ class CallbackWithCustomGrad:
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = base_callback_impl(self.func, custom_grad=self)
+        self.callback = base_callback_impl(self.func, device=self.device, custom_grad=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-        cotangents = tree_map(shaped_abstractify, self.restype)
+        cotangents = tree_map(shaped_abstractify, self.getResultTypes())
 
         # The forward pass must have the same input types as the original function
-        with transient_jax_config({"jax_dynamic_shapes": False}):
+        no_dyn_shapes = {"jax_dynamic_shapes": False}
+        with transient_jax_config(no_dyn_shapes), GradContext(peel=True):
             self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(
                 *absargs, **abskwargs
             )
@@ -390,7 +446,7 @@ class CallbackWithCustomGrad:
         _primal, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        with transient_jax_config({"jax_dynamic_shapes": False}):
+        with transient_jax_config(no_dyn_shapes), GradContext(peel=True):
             self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
@@ -402,12 +458,19 @@ class CallbackWithPotentialCustomGrad:
     to have a custom grad if it is never differentiated, but a user
     may register one. A debug.callback will never have a custom grad."""
 
-    def __init__(self, func):
+    def __init__(self, func, device=None):
         self.func = func
+        # TODO: Investigate why we can't just use update_wrapper here
+        # It doesn't matter too much since we just use it for the name.
+        # But having update_wrapper here would change the type
+        # of self (or of self.func?) to just a function
+        # as opposed to an AnnotatedFunction
+        self.__name__ = func.__name__
         self.restype = func.getResultTypes()
         self._fwd = None
         self._bwd = None
         self.callback = None
+        self.device = device
 
     def fwd(self, func):
         """Save forward pass as implemented by the user"""
@@ -418,6 +481,10 @@ class CallbackWithPotentialCustomGrad:
         self._bwd = func
 
     def __call__(self, *args, **kwargs):
+        if not EvaluationContext.is_tracing():
+            # If we are not in the tracing context, just evaluate the function.
+            return self.func(*args, **kwargs)
+
         incomplete_grad = bool(self._fwd) != bool(self._bwd)
         if incomplete_grad:
             # If we are here, then we have either _fwd and _bwd but not both
@@ -430,17 +497,11 @@ class CallbackWithPotentialCustomGrad:
             return self.callback(*args, **kwargs)
 
         if self._fwd and self._bwd:
-            self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd)
+            self.callback = CallbackWithCustomGrad(self.func, self._fwd, self._bwd, self.device)
             return self.callback(*args, **kwargs)
 
-        self.callback = base_callback_impl(self.func)
+        self.callback = base_callback_impl(self.func, device=self.device)
         return self.callback(*args, **kwargs)
-
-
-def jax_jit_callback(callback_fn: AnnotatedFunction, device=None):
-    """Wrapper around base callback that can accept a device as a parameter"""
-
-    return base_callback_impl(callback_fn, device=device)
 
 
 def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
@@ -448,7 +509,7 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
-    @functools.wraps(func)
+    @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
@@ -467,7 +528,7 @@ class FlatCallable:
 
     def __init__(self, func, *params, **kwparams):
         self.func = func
-        functools.update_wrapper(self, func)
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
