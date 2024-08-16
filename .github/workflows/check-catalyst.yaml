@@ -40,19 +40,14 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.9'
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install make clang libomp-dev
-          python -m pip install cmake scipy ninja pybind11 scipy
+          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+          python -m pip install scipy pybind11
 
       - name: Build Catalyst-Runtime
         run: |
@@ -107,11 +102,6 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -145,8 +135,9 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang lld
-        python -m pip install cmake ninja numpy pybind11 scipy
+        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install numpy pybind11 scipy
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -170,11 +161,6 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -224,8 +210,7 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang lld
-        python -m pip install cmake ninja pybind11 scipy
+        sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -246,11 +231,6 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -300,8 +280,7 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang lld
-        python -m pip install cmake ninja pybind11 scipy
+        sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -322,19 +301,15 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y ccache clang lld
-        python -m pip install cmake numpy pybind11 ninja scipy
+        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install numpy pybind11 scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -433,25 +408,21 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
-        python -m pip install -r requirements.txt
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
-        python -m pip install cuda-quantum==0.6.0
-        python -m pip install oqc-qcaas-client
-        PYTHON=$(which python3) make frontend
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -482,14 +453,12 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        python -m pip install lit
-        lit -sv frontend/test/lit -j$(nproc)
+        llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
       run: |
-        python -m pip install --upgrade attrs
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        PYTHON=$(which python) make coverage-frontend
+        make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
@@ -514,11 +483,6 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
-    
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
 
     - name: Install lightning.kokkos used in Python tests
       run: |
@@ -527,8 +491,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
-        python -m pip install -r requirements.txt
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
         make frontend
 
     - name: Get Cached LLVM Build
@@ -570,11 +535,6 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -586,8 +546,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
-        python -m pip install -r requirements.txt
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
         make frontend
 
     - name: Get Cached LLVM Build
@@ -633,11 +594,6 @@ jobs:
     steps:
     #   - name: Collect Workflow Telemetry
     #     uses: catchpoint/workflow-telemetry-action@v2
-    
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.9'
 
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -645,8 +601,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install  libomp-dev lcov libasan5
-          python -m pip install cmake ninja pybind11 scipy
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan6
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -713,19 +668,13 @@ jobs:
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
     steps:
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.9'
-          
       - name: Checkout the repo
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install libomp-dev lcov
-          python -m pip install cmake ninja pybind11 scipy
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
 
       - name: Build Runtime test suite for Lightning simulator
         run: |

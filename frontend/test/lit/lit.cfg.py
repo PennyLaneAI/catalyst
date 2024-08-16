@@ -36,8 +36,7 @@ config.test_exec_root = getattr(config, "frontend_test_dir", ".lit")
 config.environment["ASAN_OPTIONS"] = "detect_leaks=0,detect_container_overflow=0"
 
 # Define substitutions used at the top of lit test files, e.g. %PYTHON.
-#python_executable = getattr(config, "python_executable", "python3.10")
-python_executable = "python"
+python_executable = getattr(config, "python_executable", "python3.10")
 
 if "Address" in getattr(config, "llvm_use_sanitizer", ""):
     # With sanitized builds, Python tests require some preloading magic to run.

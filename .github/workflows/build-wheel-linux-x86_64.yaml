@@ -341,11 +341,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DENABLE_LAPACK=ON \
               -DLIGHTNING_GIT_TAG=6c50b77 \
-              -DKokkos_ENABLE_SERIAL=ON \
-              -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
@@ -418,12 +414,7 @@ jobs:
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
-    steps:  
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
-
+    steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 

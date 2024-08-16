@@ -1,7 +1,7 @@
-PYTHON?=$(shell which python)
+PYTHON?=$(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
-NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
