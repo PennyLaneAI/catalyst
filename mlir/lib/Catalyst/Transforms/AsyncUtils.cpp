@@ -207,7 +207,7 @@ std::optional<LLVM::LLVMFuncOp> AsyncUtils::getCalleeSafe(LLVM::CallOp callOp)
 bool AsyncUtils::isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName)
 {
     llvm::StringRef observedName = funcOp.getSymName();
-    return observedName.compare(expectedName) == 0;
+    return observedName == expectedName;
 }
 
 bool AsyncUtils::isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp)
