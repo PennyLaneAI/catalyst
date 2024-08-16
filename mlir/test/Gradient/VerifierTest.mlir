@@ -294,8 +294,41 @@ func.func @foo(%arg0: tensor<f64>) -> (tensor<f64>, tensor<f64>) {
 
 %cst0 = arith.constant dense<1.0> : tensor<f64>
 %cst1 = arith.constant dense<1> : tensor<i64>
-// expected-error@+1 {{callee input type does not match the tangent type}}
+// expected-error@+1 {{callee input and tangent arguments to jvp do not match}}
 gradient.jvp "auto" @foo(%cst0) tangents(%cst1) : (tensor<f64>, tensor<i64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
+
+// -----
+
+func.func @foo(%arg0: tensor<i64>, %arg1: tensor<f64>) -> (tensor<f64>, tensor<f64>) {
+
+    %cst = stablehlo.constant dense<2.000000e+00> : tensor<f64>
+    %0 = stablehlo.multiply %cst, %arg1 : tensor<f64>
+    %1 = stablehlo.multiply %arg1, %arg1 : tensor<f64>
+    return %0, %1 : tensor<f64>, tensor<f64>
+
+}
+
+%cst0 = arith.constant dense<1> : tensor<i64>
+%cst1 = arith.constant dense<1.0> : tensor<f64>
+%cst2 = arith.constant dense<1.0> : tensor<f64>
+gradient.jvp "auto" @foo(%cst0, %cst1) tangents(%cst2) {diffArgIndices = dense<1> : tensor<1xi64>} : (tensor<i64>, tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
+
+// -----
+
+func.func @foo(%arg0: tensor<i64>, %arg1: tensor<f64>) -> (tensor<f64>, tensor<f64>) {
+
+    %cst = stablehlo.constant dense<2.000000e+00> : tensor<f64>
+    %0 = stablehlo.multiply %cst, %arg1 : tensor<f64>
+    %1 = stablehlo.multiply %arg1, %arg1 : tensor<f64>
+    return %0, %1 : tensor<f64>, tensor<f64>
+
+}
+
+%cst0 = arith.constant dense<1> : tensor<i64>
+%cst1 = arith.constant dense<1.0> : tensor<f64>
+%cst2 = arith.constant dense<1> : tensor<i64>
+// expected-error@+1 {{callee input and tangent arguments to jvp do not match}}
+gradient.jvp "auto" @foo(%cst0, %cst1) tangents(%cst2) {diffArgIndices = dense<1> : tensor<1xi64>} : (tensor<i64>, tensor<f64>, tensor<i64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
 
 // -----
 
@@ -362,7 +395,7 @@ func.func @foo(%arg0: tensor<f64>) -> (tensor<f64>, tensor<f64>) {
 %cst0 = arith.constant dense<1.0> : tensor<f64>
 %cst1 = arith.constant dense<1> : tensor<i64>
 %cst2 = arith.constant dense<1> : tensor<i64>
-// expected-error@+1 {{callee result type does not match the cotangent type}}
+// expected-error@+1 {{callee result and cotangent argument to vjp do not match}}
 gradient.vjp "auto" @foo(%cst0) cotangents(%cst1, %cst2) {resultSegmentSizes = array<i32: 2, 1>} : (tensor<f64>, tensor<i64>, tensor<i64>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
 
 // -----
