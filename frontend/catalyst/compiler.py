@@ -198,13 +198,13 @@ BUFFERIZATION_PASS = (
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        "arith-bufferize",
+        #"arith-bufferize",
         "empty-tensor-to-alloc-tensor",
-        "func.func(bufferization-bufferize)",
-        "func.func(tensor-bufferize)",
+        #"func.func(bufferization-bufferize)",
+        #"func.func(tensor-bufferize)",
         "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        "func.func(linalg-bufferize)",
-        "func.func(tensor-bufferize)",
+        #"func.func(linalg-bufferize)",
+        #"func.func(tensor-bufferize)",
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
