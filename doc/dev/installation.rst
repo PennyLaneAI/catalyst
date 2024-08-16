@@ -426,47 +426,35 @@ makes use of the shared libraries already shipped with the TestPyPI Catalyst whe
 Essential Steps
 ^^^^^^^^^^^^^^^
 
-.. tabs::
+To activate the development environment, open a terminal and issue the following commands:
 
-   .. group-tab:: Full CPL Suite
+.. code-block:: console
 
-      To activate the development environment, open a terminal and issue the following commands:
+  # Clone the Catalyst repository  
+  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
-      .. code-block:: console
-
-        # Clone the Catalyst repository  
-        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
-
-        # Activate the development environment based on the latest TestPyPI wheels.
-        # First argument is the name of the Python environment
-        # Second argument is the type of Wheel installation. 
-        # 'full' installs the whole CPL suite
-        cd catalyst
-        . ./activate_dev_from_wheel.sh myenv full
-
-   .. group-tab:: Catalyst-Only
-
-    Sometimes the developer has a custom installation of Pennylane or Lightning and would prefer to use
-    those ones instead of the ones provided by the TestPyPI Wheels. In that case, to activate the
-    development environment, open a terminal and issue the following commands:
-
-      .. code-block:: console
-
-        # Clone the Catalyst repository  
-        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
-
-        # Activate the development environment based on the latest TestPyPI wheels.
-        # First argument is the name of the Python environment
-        # Second argument is the type of Wheel installation. 
-        # 'catalyst-only' only installs the Catalyst wheels
-        cd catalyst
-        . ./activate_dev_from_wheel.sh myenv catalyst-only
+  # Activate the development environment based on the latest TestPyPI wheels.
+  # Please provide a name for the Python virtual environment
+  cd catalyst
+  . ./activate_dev_from_wheel.sh myenv
 
 To exit the Python virtual environment, type:
 
 .. code-block:: console
 
   deactivate
+
+Special Considerations
+^^^^^^^^^^^^^^^^^^^^^^
+
+Catalyst dev wheels are tied to fixed versions of PennyLane and Lightning, which are installed
+together as a bundle. If you want to use different versions of Pennylane or Lightning, reinstall the
+desired versions after having run the script:
+
+.. code-block:: console
+
+  python -m pip install pennylane==0.*.*
+  python -m pip install pennylane-lightning==0.*.*
 
 How Does it Work?
 ^^^^^^^^^^^^^^^^^
@@ -476,7 +464,7 @@ configurations do not get affected, nor other virtual environments.
 
 In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard 
 links from the wheel code to the frontend code of the repository, in order to allow working
-directly with the frontend repository codebase and at the same time test the changes while
+directly with the frontend code of the repository and at the same time test the changes while
 using the installed Catalyst wheel libraries, hence avoiding compilation.
 
 Further Steps
