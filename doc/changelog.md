@@ -299,6 +299,9 @@
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
   [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
 
+* Add type checking and improve error messaging in the frontend `catalyst.jvp` and
+  `catalyst.vjp` functions.
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
