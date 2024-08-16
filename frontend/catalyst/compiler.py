@@ -162,6 +162,7 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
 HLO_LOWERING_PASS = (
     "HLOLoweringPass",
     [
+        "split-multiple-tapes",
         "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",

@@ -634,7 +634,6 @@ class QJIT:
 
         # TODO: the in-memory and textual form are different after this, consider unification
         _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
-        #breakpoint()
 
         return mlir_module, mlir_string
 
