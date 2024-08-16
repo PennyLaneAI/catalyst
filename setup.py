@@ -78,7 +78,7 @@ requirements = [
     f"jaxlib=={jax_version}",
     "tomlkit; python_version < '3.11'",
     "scipy<1.13",
-    "numpy",
+    "numpy>2",
     "diastatic-malt>=2.15.2",
 ]
 
