@@ -229,7 +229,12 @@ def compile_executable(fn, *args):
     # get python version
     python_lib_dir_path = sysconfig.get_config_var("LIBDIR")
     version_info = sys.version_info
-    version_str = f"{version_info.major}.{version_info.minor}"
+
+    # If libpython3.so exists, link to that instead of libpython3.x.so
+    if os.path.isfile(python_lib_dir_path + f"/libpython{version_info.major}.so"):
+        version_str = f"{version_info.major}"
+    else:
+        version_str = f"{version_info.major}.{version_info.minor}"
 
     lib_path_flags = [
         f"-Wl,-rpath,{python_lib_dir_path}",
