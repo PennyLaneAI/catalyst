@@ -56,6 +56,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Set Ownership in Container
       run: |
         # To fix the git issue with the owner of the checkout dir

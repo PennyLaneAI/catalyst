@@ -48,6 +48,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
