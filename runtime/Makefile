@@ -1,8 +1,8 @@
-PYTHON := $(shell which python)
+PYTHON?=$(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
-NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
@@ -14,7 +14,7 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?=6c50b77
+LIGHTNING_GIT_TAG_VALUE?=352e7d1
 
 BUILD_TARGETS := rt_capi rtd_dummy
 TEST_TARGETS := ""
