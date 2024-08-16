@@ -301,6 +301,7 @@
 
 * Add type checking and improve error messaging in the frontend `catalyst.jvp` and
   `catalyst.vjp` functions.
+  [(#1031)](https://github.com/PennyLaneAI/catalyst/pull/1031)
 
 <h3>Breaking changes</h3>
 
