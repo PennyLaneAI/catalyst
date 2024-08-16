@@ -426,18 +426,43 @@ makes use of the shared libraries already shipped with the TestPyPI Catalyst whe
 Essential Steps
 ^^^^^^^^^^^^^^^
 
-To activate the development environment, open a terminal and issue the following commands:
+.. tabs::
 
-.. code-block:: console
+   .. group-tab:: Full CPL Suite
 
-  # Clone the Catalyst repository  
-  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+      To activate the development environment, open a terminal and issue the following commands:
 
-  # Activate the development environment based on the latest TestPyPI wheels (please provide a name)
-  cd catalyst
-  . ./activate_dev_from_wheel.sh myenv
+      .. code-block:: console
 
-To exit the virtual environment, type:
+        # Clone the Catalyst repository  
+        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+        # Activate the development environment based on the latest TestPyPI wheels.
+        # First argument is the name of the Python environment
+        # Second argument is the type of Wheel installation. 
+        # 'full' installs the whole CPL suite
+        cd catalyst
+        . ./activate_dev_from_wheel.sh myenv full
+
+   .. group-tab:: Catalyst-Only
+
+    Sometimes the developer has a custom installation of Pennylane or Lightning and would prefer to use
+    those ones instead of the ones provided by the TestPyPI Wheels. In that case, to activate the
+    development environment, open a terminal and issue the following commands:
+
+      .. code-block:: console
+
+        # Clone the Catalyst repository  
+        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+        # Activate the development environment based on the latest TestPyPI wheels.
+        # First argument is the name of the Python environment
+        # Second argument is the type of Wheel installation. 
+        # 'catalyst-only' only installs the Catalyst wheels
+        cd catalyst
+        . ./activate_dev_from_wheel.sh myenv catalyst-only
+
+To exit the Python virtual environment, type:
 
 .. code-block:: console
 
@@ -446,44 +471,13 @@ To exit the virtual environment, type:
 How Does it Work?
 ^^^^^^^^^^^^^^^^^
 
-The ``activate_dev_from_wheel.sh`` script acts as a wrapper of the ``setup_dev_from_wheel.sh`` script,
-which performs the following steps:
+The provided script first creates and activates a Python virtual environment, so the system Python
+configurations do not get affected, nor other virtual environments.
 
-- Create (if not created yet) and activate a Python virtual environment in the ``/tmp`` folder
-  with the provided name. This way the system Python configurations do not get affected, nor
-  other virtual environments:
-
-  .. code-block:: console
-
-    python3 -m venv /tmp/myenv
-    source /tmp/myenv/bin/activate
-
-- As a clean-up measure, Uninstall any previous Catalyst instances of that particular virtual
-  environment:
-
-  .. code-block:: console
-
-    python -m pip uninstall -y pennylane-catalyst
-
-- Install the latest CPL suite wheels from the TestPyPI server:
-
-  .. code-block:: console
-
-    python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane pennylane-lightning pennylane-catalyst --pre --upgrade
-
-- Search in the Git repository for the latest commit whose version corresponds to the 
-  Catalyst wheel version. This will leave the repository at a "detached head" state.
-
-- Once the Catalyst wheel and the repository are at the same version, create hard links from 
-  the Catalyst wheel code to the frontend code of the repository, in order to allow working
-  directly with the frontend repository codebase and at the same time test the changes while
-  using the installed Catalyst wheel libraries, hence avoiding compilation:
-
-  .. code-block:: console
-
-    export SITEPKGS=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-    export CATALYST_WHEEL=$SITEPKGS/catalyst
-    cp -lrf $CATALYST_WHEEL .frontend/
+In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard 
+links from the wheel code to the frontend code of the repository, in order to allow working
+directly with the frontend repository codebase and at the same time test the changes while
+using the installed Catalyst wheel libraries, hence avoiding compilation.
 
 Further Steps
 ^^^^^^^^^^^^^
@@ -503,34 +497,11 @@ with the scripts. As you are actually directly changing the code stored at the P
 folder, you will be automatically using the shared libraries provided by the Python wheels. Again,
 there is no need to compile Catalyst from source.
 
-When you are ready, commit your changes as usual. As your branch was created from a detached head,
-you can choose to rebase your branch according to the ``main`` branch:
-
-.. code-block:: console
-  
-  git fetch
-  git rebase -i origin/main
-
-Resolve any conflicts and once ready, push the new branch to the remote repository:
+Commit your changes as usual. Once ready, push the new branch to the remote
+repository:
 
 .. code-block:: console
   
   git push -u origin new-branch-name
 
 Now you can go to GitHub and issue a Pull Request based on the new branch.
-
-Special Considerations
-^^^^^^^^^^^^^^^^^^^^^^
-
-Due to the fact that the scripts are part of the Git repository, when going backwards in the commit history
-the scripts might have also changed to a previous version. Therefore, if you want to run the scripts again,
-first, make sure you have commited your changes to a branch (as suggested in the previous section), and 
-second, return back to the latest state of the main branch:
-
-.. code-block:: console
-  
-  git switch main
-  git fetch
-  git pull
-
-Now you can run the latest version of the scripts.
