@@ -415,8 +415,8 @@ To generate html files for the documentation for Catalyst:
 
 The generated files are located in ``doc/_build/html``
 
-Install a Frontend Development Environment from TestPyPI Wheels
----------------------------------------------------------------
+Install a Frontend-Only Development Environment from TestPyPI Wheels
+--------------------------------------------------------------------
 
 It is possible to work on the source code repository and test the changes without 
 having to compile Catalyst. This is ideal for situations where the changes do not target the 
