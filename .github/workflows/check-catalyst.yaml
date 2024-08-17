@@ -675,7 +675,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install python3 python3-pip python3-scipy cmake ninja-build libomp-dev lcov
+          sudo apt-get -y -q install python3 python3-pip cmake ninja-build libomp-dev lcov
+          python3 -m pip install scipy
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
