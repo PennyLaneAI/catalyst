@@ -343,7 +343,7 @@ jobs:
               -DPYTHON_INCLUDE_DIR=$(python${{ matrix.python_version }} -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
               -DPYTHON_LIBRARY=$(python3${{ matrix.python_version }} -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LIBRARY')))") \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=35c3bd4 \
+              -DLIGHTNING_GIT_TAG=07626e5 \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
