@@ -292,7 +292,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=2355a0a \
+              -DLIGHTNING_GIT_TAG=7d47297 \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
