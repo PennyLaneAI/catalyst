@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install python3 ninja-build make cmake clang libomp-dev
+          sudo apt-get -y -q install python3 python3-pip ninja-build make cmake clang libomp-dev
           python3 -m pip install pybind11 scipy
 
       - name: Build Catalyst-Runtime
@@ -601,7 +601,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install python3 cmake ninja-build libomp-dev lcov libasan6
+          sudo apt-get -y -q install python3 python3-pip cmake ninja-build libomp-dev lcov libasan6
           python3 -m pip pybind11 scipy
 
       - name: Install additional dependencies (OpenQasm device)
@@ -675,7 +675,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install python3 cmake ninja-build libomp-dev lcov
+          sudo apt-get -y -q install python3 python3-pip cmake ninja-build libomp-dev lcov
           python3 -m pip pybind11 scipy
 
       - name: Build Runtime test suite for Lightning simulator

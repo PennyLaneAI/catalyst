@@ -48,11 +48,6 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     # Cache external project sources
     # Hopefully these can be shared with the main check-catalyst action since we don't run this
     # build in a container.
@@ -137,7 +132,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy pybind11 scipy PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'

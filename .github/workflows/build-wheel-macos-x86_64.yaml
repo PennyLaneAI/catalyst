@@ -48,11 +48,6 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v5
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
@@ -235,7 +230,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy pybind11 scipy PyYAML cmake ninja delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
