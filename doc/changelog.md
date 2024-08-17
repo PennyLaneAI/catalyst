@@ -67,65 +67,103 @@
   Array(48, dtype=int64)
   ```
 
-* A `qjit` run for `lightning.qubit` and `lightning.kokkos` can now be seeded.
+* Mid-circuit measurement results when using `lightning.qubit` and `lightning.kokkos`
+  can now be seeded via the new `seed` argument of the `qjit` decorator.
   [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
 
-  The `qjit` decorator now can take in an argument `seed`, which is an unsigned 32-bit integer.
+  The seed argument accepts an unsigned 32-bit integer.
   Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
-  will return the same sequence of measurement results everytime.
+  will always return the same sequence of mid-circuit measurement results.
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
 
-  @qjit(seed=37)
-  def workflow():
-      @qml.qnode(dev)
-      def circuit():
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      m = measure(0)
+
+      if m:
           qml.Hadamard(0)
-          m = measure(0)
-          @cond(m)
-          def cfun0():
-              qml.Hadamard(0)
-          cfun0()
-          return qml.probs()
-      return circuit(), circuit(), circuit(), circuit()
 
-  @qjit(seed=37)
-  def workflow_another():
-      @qml.qnode(dev)
-      def circuit():
-          qml.Hadamard(0)
-          m = measure(0)
-          @cond(m)
-          def cfun0():
-              qml.Hadamard(0)
-          cfun0()
-          return qml.probs()
-      return circuit(), circuit(), circuit(), circuit()
+      return qml.probs()
 
-  print(workflow())
-  print(workflow())
-  print(workflow_another())
-
-  >>>
-  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
-  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
-  (Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([1., 0.], dtype=float64), Array([0.5, 0.5], dtype=float64))
-
+  @qjit(seed=37, autograph=True)
+  def workflow(x):
+      return jnp.stack([circuit(x) for i in range(4)])
   ```
 
-* Exponential extrapolation is now a supported method of extrapolation when using `mitigate_with_zne`.
+  Repeatedly calling the `workflow` function above will always
+  result in the same values:
+
+  ```pycon
+  >>> workflow(1.8)
+  Array([[1. , 0. ],
+       [1. , 0. ],
+       [1. , 0. ],
+       [0.5, 0.5]], dtype=float64)
+  >>> workflow(1.8)
+  Array([[1. , 0. ],
+       [1. , 0. ],
+       [1. , 0. ],
+       [0.5, 0.5]], dtype=float64)
+  ```
+
+  Note that setting the seed will *not* avoid shot-noise stochasticity in terminal measurement
+  statistics such as `sample` or `expval`:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1, shots=10)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      m = measure(0)
+
+      if m:
+          qml.Hadamard(0)
+
+      return qml.expval(qml.PauliZ(0))
+
+  @qjit(seed=37, autograph=True)
+  def workflow(x):
+      return jnp.stack([circuit(x) for i in range(4)])
+  ```
+  ```pycon
+  >>> workflow(1.8)
+  Array([1. , 1. , 1. , 0.4], dtype=float64)
+  >>> workflow(1.8)
+  Array([ 1. ,  1. ,  1. , -0.2], dtype=float64)
+  ```
+
+* Exponential extrapolation is now a supported method of zero-noise extrapolation when performing
+  error mitigation in Catalyst using `mitigate_with_zne`.
   [(#953)](https://github.com/PennyLaneAI/catalyst/pull/953)
 
   This new functionality fits the data from noise-scaled circuits with an exponential function,
-  and returns the zero-noise value. This functionality is available through the pennylane module
-  as follows
+  and returns the zero-noise value:
+
   ```py
   from pennylane.transforms import exponential_extrapolate
+  from catalyst import mitigate_with_zne
 
-  catalyst.mitigate_with_zne(
-      circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=exponential_extrapolate
-  )
+  dev = qml.device("lightning.qubit", wires=2, shots=100000)
+
+  @qml.qnode(dev)
+  def circuit(weights):
+      qml.StronglyEntanglingLayers(weights, wires=[0, 1])
+      return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+  @qjit
+  def workflow(weights, s):
+      zne_circuit = mitigate_with_zne(circuit, scale_factors=s, extrapolate=exponential_extrapolate)
+      return zne_circuit(weights)
+  ```
+
+  ```pycon
+  weights = jnp.ones([3, 2, 3])
+  scale_factors = jnp.array([1, 2, 3])
+  workflow(weights, scale_factors)
   ```
 
 * A frontend decorator can be applied to a qnode to signal a compiler pass run.
@@ -163,7 +201,9 @@
       gg = g(1.0)
 
       return ff, gg
+  ```
 
+  ```pycon
   >>> workflow()
   (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
   >>> print_compilation_stage(workflow, "QuantumCompilationPass")
@@ -430,7 +470,7 @@ Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa Lopez,
 Mudit Pandey,
-nate stemen,
+Nate Stemen,
 Raul Torres,
 Tzung-Han Juang,
 Paul Haochen Wang,
