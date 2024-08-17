@@ -43,16 +43,11 @@ jobs:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.9'
-
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
-          python -m pip install scipy pybind11
+          sudo apt-get -y -q install python3 ninja-build make cmake clang libomp-dev
+          python3 -m pip install pybind11 scipy
 
       - name: Build Catalyst-Runtime
         run: |
@@ -603,16 +598,11 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.9'
-
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan6
-          python -m pip install scipy pybind11
+          sudo apt-get -y -q install python3 cmake ninja-build libomp-dev lcov libasan6
+          python3 -m pip pybind11 scipy
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -682,16 +672,11 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.9'
-
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-          python -m pip install scipy pybind11
+          sudo apt-get -y -q install python3 cmake ninja-build libomp-dev lcov
+          python3 -m pip pybind11 scipy
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
