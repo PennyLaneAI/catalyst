@@ -139,7 +139,7 @@ class QFunc:
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
-        def _eval_quantum(*args):
+        def _eval_quantum(*args, **kwargs):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
                 self.func,
                 qjit_device,
@@ -151,17 +151,17 @@ class QFunc:
 
             out_tree_expected.append(out_tree_exp)
             dynamic_args = filter_static_args(args, static_argnums)
-            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
+            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args, **kwargs)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 
         flattened_fun, _, _, out_tree_promise = deduce_avals(
-            _eval_quantum, args, {}, static_argnums
+            _eval_quantum, args, kwargs, static_argnums
         )
         dynamic_args = filter_static_args(args, static_argnums)
-        args_flat = tree_flatten(dynamic_args)[0]
+        args_flat = tree_flatten((dynamic_args, kwargs))[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 

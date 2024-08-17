@@ -34,6 +34,7 @@ from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
+from catalyst.debug.assertion import debug_assert
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -84,6 +85,8 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     qunitary_p,
     sample_p,
+    set_basis_state_p,
+    set_state_p,
     state_p,
     tensorobs_p,
     var_p,
@@ -167,12 +170,12 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args, **kwargs)
 
-        def _eval_jaxpr(*args):
-            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+        def _eval_jaxpr(*args, **kwargs):
+            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
-        args, _ = jax.tree_util.tree_flatten(args)
+        args, _ = jax.tree_util.tree_flatten((args, kwargs))
         retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(out_tree, retval)
 
@@ -242,7 +245,7 @@ def _apply_result_type_conversion(
         OutputSignature: new output signature of the function
     """
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
-    args = [AbstractQreg()] if with_qreg else []
+    args = [AbstractQreg(target_types[-1].length)] if with_qreg else []
 
     def _fun(*in_tracers):
         out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
@@ -282,9 +285,12 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
     if all_ends_with_qreg:  # [1]
+        length = types[-1][-1].length
         types = [t[:-1] for t in types]
+    else:
+        length = None
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
+    return results + ([AbstractQreg(length)] if all_ends_with_qreg else [])
 
 
 @debug_logger
@@ -560,6 +566,58 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     return mlir_module, ctx
 
 
+def trace_state_prep(op, qrp):
+    """Trace qml.StatePrep
+
+    Args:
+        op: StatePrep op being traced
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
+
+    Postcondition:
+        qrp is updated to hold the output qubits from qml.StatePrep
+    """
+    assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
+
+    qubits = qrp.extract(op.wires)
+    partial_sv = op.parameters[0]
+    # jnp.complex128 is the top element in the type promotion lattice
+    # so it is ok to do this.
+    # https://jax.readthedocs.io/en/latest/type_promotion.html
+    partial_sv = jax.lax.convert_element_type(partial_sv, jnp.dtype(jnp.complex128))
+    # The frontend guarantees that partial_sv.shape == (2**wires,)
+    # We have a test for that, and just if in the future this changes:
+    err_msg = "State vector must have shape (2**wires,)"
+    assert partial_sv.shape == (2 ** len(qubits),), err_msg
+    qubits2 = set_state_p.bind(*qubits, partial_sv)
+    qrp.insert(op.wires, qubits2)
+
+
+def trace_basis_state(op, qrp):
+    """Trace qml.BasisState
+    Args:
+        op: qml.BasisState op being traced
+        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
+    Postcondition:
+        qrp is updated to hold the output qubits from qml.StatePrep
+    """
+    assert isinstance(op, qml.BasisState), "qml.BasisState expected"
+
+    qubits = qrp.extract(op.wires)
+    basis_state = op.parameters[0]
+    err_msg = "BasisState parameter must consist of 0 or 1 integers."
+    if not jnp.can_cast(basis_state.dtype, jnp.dtype(jnp.int64)):
+        raise ValueError(err_msg)
+
+    basis_state_invalid_bits = jax.lax.bitwise_and(basis_state, ~0b1)
+    is_basis_state_invalid = jnp.any(basis_state_invalid_bits)
+    is_basis_state_valid = jnp.logical_not(is_basis_state_invalid)
+    debug_assert(is_basis_state_valid, err_msg)
+
+    basis_state = jax.lax.convert_element_type(basis_state, jnp.dtype(jnp.bool))
+    qubits2 = set_basis_state_p.bind(*qubits, basis_state)
+    qrp.insert(op.wires, qubits2)
+
+
 # pylint: disable=too-many-arguments
 @debug_logger
 def trace_quantum_operations(
@@ -620,6 +678,10 @@ def trace_quantum_operations(
                 adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
+        elif isinstance(op, qml.StatePrep):
+            trace_state_prep(op, qrp)
+        elif isinstance(op, qml.BasisState):
+            trace_basis_state(op, qrp)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -1143,7 +1205,7 @@ def trace_quantum_function(
                 rtd_name=device.backend_name,
                 rtd_kwargs=str(device.backend_kwargs),
             )
-            qreg_in = qalloc_p.bind(len(device.wires))
+            qreg_in = qalloc_p.bind(len(device.wires), static_size=len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):

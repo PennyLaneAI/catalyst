@@ -7,6 +7,7 @@ on:
       - reopened
       - synchronize
       - labeled
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -18,12 +19,14 @@ concurrency:
 
 jobs:
   determine_runner:
+    if: github.event.pull_request.draft == false
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
       default_runner: ubuntu-latest
 
   check_if_wheel_build_required:
+    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
@@ -339,7 +342,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=8f517d24c71c6c7765f5c1bf29b0264b951de96a \
+              -DLIGHTNING_GIT_TAG=c6b86a5 \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \

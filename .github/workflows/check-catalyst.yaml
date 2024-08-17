@@ -2,6 +2,11 @@ name: Check Catalyst Build
 
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -12,6 +17,7 @@ concurrency:
 
 jobs:
   determine_runner:
+    if: github.event.pull_request.draft == false
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
@@ -479,7 +485,7 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        pip install PennyLane-Lightning-Kokkos
+        pip install PennyLane-Lightning-Kokkos==0.38.0-dev32 --extra-index-url https://test.pypi.org/simple
 
     - name: Install Deps
       run: |

@@ -87,6 +87,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
 
@@ -173,6 +174,7 @@ HLO_LOWERING_PASS = (
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
+        "func.func(linalg-detensorize{aggressive-mode})",
     ],
 )
 
@@ -545,6 +547,7 @@ class Compiler:
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
+                checkpoint_stage=self.options.checkpoint_stage,
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e
@@ -601,7 +604,9 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
+        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
+            pipeline
+        ):
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
