@@ -257,3 +257,65 @@ def test_cancel_inverses_lowering_transform_applied():
 
 
 test_cancel_inverses_lowering_transform_applied()
+
+
+def test_cancel_inverses_keep_original():
+    """
+    Test cancel_inverses does not unexpectedly mutate the original qnode.
+    """
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(x: float):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    g = cancel_inverses(f)
+
+    # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow0
+    # CHECK: {{%.+}} = call @f({{%.+}})
+    # CHECK-NOT: {{%.+}} = call @f_cancel_inverses({{%.+}})
+    # CHECK-LABEL: private @f({{%.+}})
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: private @f_cancel_inverses
+    @qjit(keep_intermediate=True)
+    def test_cancel_inverses_keep_original_workflow0():
+        return f(1.0)
+    test_cancel_inverses_keep_original_workflow0()
+    flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow0)
+
+    # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow1
+    # CHECK: {{%.+}} = call @f_cancel_inverses({{%.+}})
+    # CHECK-NOT: {{%.+}} = call @f({{%.+}})
+    # CHECK-LABEL: private @f_cancel_inverses({{%.+}})
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: private @f
+    @qjit(keep_intermediate=True)
+    def test_cancel_inverses_keep_original_workflow1():
+        return g(1.0)
+    test_cancel_inverses_keep_original_workflow1()
+    flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow1)
+
+    # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow2
+    # CHECK: {{%.+}} = call @f({{%.+}})
+    # CHECK: {{%.+}} = call @f_cancel_inverses({{%.+}})
+    # CHECK-LABEL: private @f({{%.+}})
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-LABEL: private @f_cancel_inverses({{%.+}})
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    @qjit(keep_intermediate=True)
+    def test_cancel_inverses_keep_original_workflow2():
+        return f(1.0), g(1.0)
+    test_cancel_inverses_keep_original_workflow2()
+    flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow2)  
+
+test_cancel_inverses_keep_original()
