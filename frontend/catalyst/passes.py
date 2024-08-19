@@ -37,6 +37,8 @@ a unified user interface for all the passes will be available.
 
 """
 
+import copy
+
 import pennylane as qml
 
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
@@ -144,8 +146,9 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
         )
         return wrapped_qnode_function(*args, **kwrags)
 
-    fn.func = wrapper
-    return fn
+    fn_clone = copy.copy(fn)
+    fn_clone.func = wrapper
+    return fn_clone
 
 
 ## IMPL and helpers ##
