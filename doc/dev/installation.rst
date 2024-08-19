@@ -420,7 +420,7 @@ Install a Frontend-Only Development Environment from TestPyPI Wheels
 
 It is possible to work on the source code repository and test the changes without 
 having to compile Catalyst. This is ideal for situations where the changes do not target the 
-runtime or the MLIR infrastructure, and only concern to the frontend. It basically 
+runtime or the MLIR infrastructure, and only concern the frontend. It basically 
 makes use of the shared libraries already shipped with the TestPyPI Catalyst wheels.
 
 Essential Steps
@@ -430,13 +430,14 @@ To activate the development environment, open a terminal and issue the following
 
 .. code-block:: console
 
-  # Clone the Catalyst repository  
-  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+  # Clone the Catalyst repository without submodules, as they are not needed for frontend
+  # development
+  git clone https://github.com/PennyLaneAI/catalyst.git
 
   # Activate the development environment based on the latest TestPyPI wheels.
-  # Please provide a name for the Python virtual environment
+  # Please provide a path for the Python virtual environment
   cd catalyst
-  . ./activate_dev_from_wheel.sh myenv
+  . ./activate_dev_from_wheel.sh /path/to/virtual/env
 
 To exit the Python virtual environment, type:
 
@@ -455,6 +456,12 @@ desired versions after having run the script:
 
   python -m pip install pennylane==0.*.*
   python -m pip install pennylane-lightning==0.*.*
+
+If you require the Catalyst repository with all its submodules, clone it this way:
+
+.. code-block:: console
+
+  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
 How Does it Work?
 ^^^^^^^^^^^^^^^^^
@@ -481,11 +488,12 @@ Before making changes to the frontend, make sure you create a new branch:
 Once in the new branch, make the wanted changes. Use the IDE of your preference.
 
 You can test the changes by executing your sample code under the same virtual environment you used
-with the scripts. As you are actually directly changing the code stored at the Python ``site-packages``
-folder, you will be automatically using the shared libraries provided by the Python wheels. Again,
-there is no need to compile Catalyst from source.
+with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually 
+changing the code stored at the Python ``site-packages`` folder as well, and you will be automatically
+using the shared libraries provided by the Python wheels. Again, there is no need to compile Catalyst
+from source.
 
-Commit your changes as usual. Once ready, push the new branch to the remote
+You can commit your changes as usual. Once ready, push the new branch to the remote
 repository:
 
 .. code-block:: console

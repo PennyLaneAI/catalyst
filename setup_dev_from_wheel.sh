@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Python environment name
-PYTHON_ENV_NAME=$1
+# Python environment path
+PYTHON_ENV_PATH=$1
 
 # Exit on any error
 set -e
@@ -11,22 +11,20 @@ git config --local advice.detachedHead false
 
 export CATALYST_DIR=$PWD
 export CATALYST_FRONTEND_SRC=$CATALYST_DIR/frontend/catalyst
-export CATALYST_PYTHON_ENV_DIR=/tmp/$PYTHON_ENV_NAME
 
-install_CPL_wheels(){
-    echo "Installing CPL Wheels..."
+install_catalyst_wheel(){
+    echo "Installing Catalyst Wheel..."
 
     # Create (if not created yet) and activate the virtual environment 
-    python3 -m venv $CATALYST_PYTHON_ENV_DIR
-    source $CATALYST_PYTHON_ENV_DIR/bin/activate
-    echo "Success: The Python virtual environment located at '$CATALYST_PYTHON_ENV_DIR' was activated"
+    python3 -m venv $PYTHON_ENV_PATH
+    source $PYTHON_ENV_PATH/bin/activate
+    echo "Success: The Python virtual environment located at '$PYTHON_ENV_PATH' was activated"
 
     # Clean the Catalyst installation
     python -m pip uninstall -y pennylane-catalyst
 
-    # Install the CPL suite
-    python -m pip install --extra-index-url https://test.pypi.org/simple/ \
-    pennylane pennylane-lightning pennylane-catalyst --pre --upgrade
+    # Install Catalyst from TestPyPI
+    python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst --pre --upgrade
 }
 
 checkout_nightly_build(){
@@ -92,7 +90,7 @@ report_changed_files(){
 overwrite_env(){
     echo "Overwriting the existing environment..."
 
-    install_CPL_wheels
+    install_catalyst_wheel
     checkout_nightly_build
     link_repo_to_wheel
     restore_catalyst_config
