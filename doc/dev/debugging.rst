@@ -409,8 +409,6 @@ C Executable Generation
 
 Catalyst provides a way to generate a c executable that calls the shared object of the given
 qjit-decorated function.
-Let's use cross references :)
-```suggestion
 The function :func:`~.debug.compile_executable` takes a qjit-decorated function and
 concrete arguments to that function as input.
 It returns the path to the output executable file.
