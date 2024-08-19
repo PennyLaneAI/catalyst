@@ -612,7 +612,7 @@ class Grad:
                 if self.grad_params.with_value:  # use value_and_grad
                     args_argnum = tuple(args[i] for i in grad_params.argnum)
                     _, in_arg_tree = tree_flatten(args_argnum)
-                    
+
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
                         *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
