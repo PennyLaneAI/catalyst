@@ -269,6 +269,15 @@ def test_value_and_grad_on_qjit_classical():
     expected = (140, 100)
     assert np.allclose(result, expected)
 
+    @qjit
+    def f5(x: float, y: float, z: float):
+        return 100 * x + 200 * y + 300 * z
+
+    result = qjit(value_and_grad(f5, argnum=(0, 1, 2)))(0.1, 0.2, 0.3)
+    expected = (140, (100, 200, 300))
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1], expected[1])
+
 
 def test_value_and_grad_on_qjit_classical_vector():
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
@@ -346,6 +355,32 @@ def test_value_and_grad_on_qjit_quantum_variant():
     result = qjit(value_and_grad(qjit(workflow_variant)))(1.1)
     expected = (workflow_variant(1.1), qjit(grad(workflow_variant))(1.1))
     assert np.allclose(result, expected)
+
+
+def test_value_and_grad_on_qjit_quantum_variant_argnum():
+    """
+    Check that value_and_grad works when called on an qjit object that does wrap a QNode
+    with multiple trainable parameters.
+    """
+
+    def workflow_variant(x: float, y: float, z: float):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(xx, yy, zz):
+            qml.PauliX(wires=0)
+            qml.RX(xx, wires=0)
+            qml.RY(yy, wires=0)
+            qml.RZ(zz, wires=0)
+            return qml.probs()
+
+        return circuit(x, y, z)[0]
+
+    result = qjit(value_and_grad(qjit(workflow_variant), argnum=[0, 1, 2]))(1.1, 2.2, 3.3)
+    expected = (
+        workflow_variant(1.1, 2.2, 3.3),
+        qjit(grad(workflow_variant, argnum=[0, 1, 2]))(1.1, 2.2, 3.3),
+    )
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1], expected[1])
 
 
 def test_value_and_grad_on_qjit_quantum_variant_tree():
