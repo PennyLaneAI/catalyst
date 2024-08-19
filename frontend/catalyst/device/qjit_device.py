@@ -133,7 +133,7 @@ SUPPORTED_RT_DEVICES = {
 
 def get_device_shots(dev):
     """Helper function to get device shots."""
-    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+    return dev.shots.total_shots if isinstance(dev, qml.devices.Device) else dev.shots
 
 
 @dataclass
@@ -200,7 +200,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
             )
 
     for k, v in capabilities.options.items():
-        if hasattr(device, v):
+        if hasattr(device, v) and not k in device_kwargs:
             device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
