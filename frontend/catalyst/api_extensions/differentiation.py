@@ -457,16 +457,16 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnums
         tangents_flatten, _ = tree_flatten(tangents)
         grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
 
-        if len(tangents_flatten) != len(grad_params.expanded_argnum):
+        if len(tangents_flatten) != len(grad_params.expanded_argnums):
             raise TypeError(
                 "number of tangent and number of differentiable parameters in catalyst.jvp do not "
                 "match; the number of parameters must be equal. "
-                f"Got {len(grad_params.expanded_argnum)} differentiable parameters and so expected "
+                f"Got {len(grad_params.expanded_argnums)} differentiable parameters and so expected "
                 f"as many tangents, but got {len(tangents_flatten)} instead."
             )
 
         # Only check dtypes and shapes of parameters marked as differentiable by the `argnum` param
-        args_to_check = [args_flatten[i] for i in grad_params.argnum]
+        args_to_check = [args_flatten[i] for i in grad_params.argnums]
 
         for p, t in zip(args_to_check, tangents_flatten):
             if _dtype(p) != _dtype(t):
@@ -662,7 +662,7 @@ class Grad:
                 input_data_flat, _ = tree_flatten((args, kwargs))
                 jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args, **kwargs)
                 if self.grad_params.with_value:  # use value_and_grad
-                    args_argnum = tuple(args[i] for i in grad_params.argnum)
+                    args_argnum = tuple(args[i] for i in grad_params.argnums)
                     _, in_arg_tree = tree_flatten(args_argnum)
 
                     # It always returns list as required by catalyst control-flows
