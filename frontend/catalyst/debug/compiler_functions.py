@@ -211,7 +211,7 @@ def replace_ir(fn, stage, new_ir):
 
     **Example**
 
-    >>> from catalyst.debug import get_pipeline_output, replace_ir
+    >>> from catalyst.debug import get_compilation_stage, replace_ir
     >>> @qjit(keep_intermediate=True)
     >>> def f(x):
     ...     return x**2
@@ -220,7 +220,7 @@ def replace_ir(fn, stage, new_ir):
 
     Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one:
 
-    >>> old_ir = get_pipeline_output(f, "HLOLoweringPass")
+    >>> old_ir = get_compilation_stage(f, "HLOLoweringPass")
     >>> new_ir = old_ir.replace(
     ...   "%2 = arith.mulf %in, %in_0 : f64\n",
     ...   "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"

@@ -194,12 +194,14 @@
       return circuit(x), optimized_circuit(x)
   ```
 
-* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and
-  recompile the IR from a given pipeline pass. They can only be used with `keep_intermediate=True`.
-  `get_compilation_stage` is renamed from `print_compilation_stage` and now returns a IR string.
+* Catalyst now has debug functions `get_compilation_stage` and `replace_ir` to acquire and
+  recompile the IR from a given pipeline pass for functions compiled with
+  `keep_intermediate=True`.
   [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
 
-  ```py
+  For example, consider the following function:
+
+  ```python
   @qjit(keep_intermediate=True)
   def f(x):
       return x**2
@@ -210,16 +212,22 @@
   4.0
   ```
 
-  ```py
-  from catalyst.debug import get_pipeline_output, replace_ir
+  Here we use `get_compilation_stage` to acquire the IR, and then modify
+  `%2 = arith.mulf %in, %in_0 : f64` to turn the square function into a cubic one
+  via `replace_ir`:
 
-  old_ir = get_pipeline_output(f, "HLOLoweringPass")
+  ```python
+  from catalyst.debug import get_compilation_stage, replace_ir
+
+  old_ir = get_compilation_stage(f, "HLOLoweringPass")
   new_ir = old_ir.replace(
       "%2 = arith.mulf %in, %in_0 : f64\n",
       "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
   )
   replace_ir(f, "HLOLoweringPass", new_ir)
   ```
+
+  The recompilation starts after the given checkpoint stage:
 
   ```pycon
   >>> f(2.0)
@@ -228,14 +236,24 @@
 
 <h3>Improvements</h3>
 
-* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
-  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
+* Catalyst has been updated to support JAX v0.4.28.
+  [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
+  [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
 
 * Catalyst now supports keyword arguments for qjit-compiled functions.
   [(#1004)](https://github.com/PennyLaneAI/catalyst/pull/1004)
 
-* Catalyst is now compatible with Enzyme `v0.0.130`
-  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
+  ```pycon
+  >>> @qjit
+  ... @grad
+  ... def f(x, y):
+  ...     return x * y
+  >>> f(3., y=2.)
+  Array(2., dtype=float64)
+  ```
+
+  Note that the `static_argnums` argument to the `qjit` decorator
+  is not supported when passing argument values as keyword arguments.
 
 * Support has been added for the `jax.numpy.argsort`
   function within qjit-compiled functions.
@@ -283,22 +301,32 @@
   Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
   ```
 
-* Verification is now performed before compilation to confirm that the measurements included in the quantum tape
-  are compatible with the device.
+* Verification is now performed before compilation to confirm that the measurements included in QNodes
+  are compatible with the specified device and settings.
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
   [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
 
-* Update JAX to `v0.4.28`.
-  [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
-  [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
-
-* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
-  Catalyst variant jaxpr.
-  [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
+  ```pycon
+  >>> dev = qml.device("lightning.qubit", wires=2, shots=None)
+  >>> @qjit
+  ... @qml.qnode(dev)
+  ... def circuit(params):
+  ...     qml.RX(params[0], wires=0)
+  ...     qml.RX(params[1], wires=1)
+  ...     return {
+  ...         "sample": qml.sample(wires=[0, 1]),
+  ...         "expval": qml.expval(qml.PauliZ(0))
+  ...     }
+  >>> circuit([0.1, 0.2])
+  CompileError: Sample-based measurements like sample(wires=[0, 1])
+  cannot work with shots=None. Please specify a finite number of shots.
 
 * On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
-  are no longer decomposed when using Catalyst, improving compilation & runtime performance.
+  are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
+
+* Catalyst is now compatible with Enzyme `v0.0.130`
+  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
 * Improve error messaging for `catalyst.jvp` when the callee input type and the tangent
   type are not compatible by performing type-checking at the MLIR level. Note that the
@@ -306,12 +334,45 @@
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
   [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
 
+* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
+  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
+
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
+  Catalyst variant jaxpr.
+  [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
   `jax.Array` instead. This should have minimal impact, but code that depends on the output of
   qjit-compiled function being NumPy arrays will need to be updated.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
+
+* The `print_compilation_stage` function has been renamed `get_compilation_stage`.
+  It no longer prints the IR to the standard output, instead it simply returns
+  the IR as a string.
+  [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
+
+  ```pycon
+  >>> @qjit(keep_intermediate=True)
+  ... def func(x: float):
+  ...     return x
+  >>> print(get_compilation_stage(func, "HLOLoweringPass"))
+  module @func {
+    func.func public @jit_func(%arg0: tensor<f64>)
+    -> tensor<f64> attributes {llvm.emit_c_interface} {
+      return %arg0 : tensor<f64>
+    }
+    func.func @setup() {
+      quantum.init
+      return
+    }
+    func.func @teardown() {
+      quantum.finalize
+      return
+    }
+  }
+  ```
 
 * Support for TOML files in Schema 1 has been disabled.
   [(#960)](https://github.com/PennyLaneAI/catalyst/pull/960)
@@ -355,7 +416,7 @@
   {'hi': Array(-1., dtype=float64)}
   ```
 
-* Fix a bug where scatter did not work correctly with list indices.
+* Fixes a bug where scatter did not work correctly with list indices.
   [(#982)](https://github.com/PennyLaneAI/catalyst/pull/982)
 
   ```python
@@ -410,10 +471,30 @@
   QNode configuration settings when Autograph was enabled.
   [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
 
-
 * `pure_callback` will no longer cause a crash in the compiler if the return type
   signature is declared incorrectly and the callback function is differentiated.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
+
+  Instead, this is caught early and an useful error message returned:
+
+  ```python
+  @catalyst.pure_callback
+  def callback_fn(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
+      return np.array([np.sin(x), np.cos(x)])
+  
+  callback_fn.fwd(lambda x: (callback_fn(x), x))
+  callback_fn.bwd(lambda x, dy: (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,))
+  
+  @qjit
+  @catalyst.grad
+  def f(x):
+      return jnp.sum(callback_fn(jnp.sin(x)))
+  ```
+
+  ```pycon
+  >>> f(0.54)
+  TypeError: Callback callback_fn expected type ShapedArray(float32[2]) but observed ShapedArray(float64[2]) in its return value
+  ```
 
 * AutoGraph will now correctly convert conditional statements where the condition is a non-boolean
   static value.
