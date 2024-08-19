@@ -412,7 +412,7 @@ qjit-decorated function.
 The function :func:`~.debug.compile_executable` takes a qjit-decorated function and
 concrete arguments to that function as input.
 It returns the path to the output executable file.
-Users can also use `debug.print_memref` to add information to stdout.
+Users can also use ``debug.print_memref`` to add information to stdout.
 
 The following example is a square function.
 Here we are using debug.print_memref to print the information of the result from ``y``.
