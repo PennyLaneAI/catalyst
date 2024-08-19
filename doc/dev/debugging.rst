@@ -436,10 +436,12 @@ ld libraries and the executable file.
 Here we use ``subprocess.run`` to test if the command works properly.
 
 .. code-block:: python
+
     import subprocess
     from catalyst.debug import compile_executable
     binary = compile_executable(f, 1)
     result = subprocess.run(binary, capture_output=True, text=True, check=True)
-    result.stdout
->>> MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
-... 25
+    
+>>> result.stdout
+MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+25
