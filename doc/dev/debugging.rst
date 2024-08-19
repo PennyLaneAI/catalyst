@@ -420,15 +420,16 @@ The executable will be saved in the directory for intermediate results if ``keep
 Otherwise, the executable will appear in the Catalyst project root
 
 .. code-block:: python
+
     @qjit
     def f(x):
         y = x*x
         debug.print_memref(y)
         return y
-    f(5)
->>> MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
-... 25
-... 25
+
+>>> f(5)
+MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+25
 
 The compiled qjit-decorated function can be fed to ``compile_executable`` to get the required
 ld libraries and the executable file.
