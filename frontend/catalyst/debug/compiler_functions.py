@@ -34,22 +34,26 @@ logger.addHandler(logging.NullHandler())
 
 @debug_logger
 def get_compilation_stage(fn, stage):
-    """Print one of the recorded compilation stages for a JIT-compiled function.
+    """Returns the intermediate representation of one of the recorded compilation
+    stages for a JIT-compiled function.
 
     The stages are indexed by their Catalyst compilation pipeline name, which are either provided
     by the user as a compilation option, or predefined in ``catalyst.compiler``.
 
     All the available stages are:
 
-    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``, and ``MLIRToLLVMDialect``.
 
-    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
-    differentiation) passes do not always happen. `last` denotes the stage right before object file
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme`` (Automatic
+    differentiation) passes do not always happen. ``last`` denotes the stage right before object file
     generation.
 
-    Requires ``keep_intermediate=True``.
+    .. note::
+
+        In order to use this function, ``keep_intermediate=True`` must be
+        set in the :func:`~.qjit` decorator of the input function.
 
     Args:
         fn (QJIT): a qjit-decorated function

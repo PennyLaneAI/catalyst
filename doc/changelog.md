@@ -161,9 +161,10 @@
   ```
 
   ```pycon
-  weights = jnp.ones([3, 2, 3])
-  scale_factors = jnp.array([1, 2, 3])
-  workflow(weights, scale_factors)
+  >>> weights = jnp.ones([3, 2, 3])
+  >>> scale_factors = jnp.array([1, 2, 3])
+  >>> workflow(weights, scale_factors)
+  Array(-0.19946598, dtype=float64)
   ```
 
 * A frontend decorator can be applied to a qnode to signal a compiler pass run.
@@ -175,54 +176,22 @@
   Hadamard gates.
 
   ```python
-  from catalyst.debug import print_compilation_stage
+  from catalyst.debug import get_compilation_stage
   from catalyst.passes import cancel_inverses
 
   dev = qml.device("lightning.qubit", wires=1)
 
+  @qml.qnode(dev)
+  def circuit(x: float):
+      qml.RX(x, wires=0)
+      qml.Hadamard(wires=0)
+      qml.Hadamard(wires=0)
+      return qml.expval(qml.PauliZ(0))
+
   @qjit(keep_intermediate=True)
-  def workflow():
-      @cancel_inverses
-      @qml.qnode(dev)
-      def f(x: float):
-          qml.RX(x, wires=0)
-          qml.Hadamard(wires=0)
-          qml.Hadamard(wires=0)
-          return qml.expval(qml.PauliZ(0))
-
-      @qml.qnode(dev)
-      def g(x: float):
-          qml.RX(x, wires=0)
-          qml.Hadamard(wires=0)
-          qml.Hadamard(wires=0)
-          return qml.expval(qml.PauliZ(0))
-
-      ff = f(1.0)
-      gg = g(1.0)
-
-      return ff, gg
-  ```
-
-  ```pycon
-  >>> workflow()
-  (Array(0.54030231, dtype=float64), Array(0.54030231, dtype=float64))
-  >>> print_compilation_stage(workflow, "QuantumCompilationPass")
-  func.func private @f {
-  ...
-      %out_qubits = quantum.custom "RX"(%extracted) %1 : !quantum.bit
-      %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
-      %3 = quantum.expval %2 : f64
-  ...
-  }
-  func.func private @g {
-  ...
-      %out_qubits = quantum.custom "RX"(%extracted) %1 : !quantum.bit
-      %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-      %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits_0 : !quantum.bit
-      %2 = quantum.namedobs %out_qubits_1[ PauliZ] : !quantum.obs
-      %3 = quantum.expval %2 : f64
-  ...
-  }
+  def workflow(x):
+      optimized_circuit = cancel_inverses(circuit)
+      return circuit(x), optimized_circuit(x)
   ```
 
 * Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and
