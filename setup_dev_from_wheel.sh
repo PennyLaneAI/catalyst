@@ -15,19 +15,24 @@ export CATALYST_FRONTEND_SRC=$CATALYST_DIR/frontend/catalyst
 install_catalyst_wheel(){
     echo "Installing Catalyst Wheel..."
 
-    # Create (if not created yet) and activate the virtual environment 
-    python3 -m venv $PYTHON_ENV_PATH
-    source $PYTHON_ENV_PATH/bin/activate
-    echo "Success: The Python virtual environment located at '$PYTHON_ENV_PATH' was activated"
+    if [ -z "${PYTHON_ENV_PATH}" ]; then
+        echo "Error: Please provide a path for the Python virtual environment"
+        exit
+    else
+        # Create (if not created yet) and activate the virtual environment 
+        python3 -m venv $PYTHON_ENV_PATH
+        source $PYTHON_ENV_PATH/bin/activate
+        echo "Success: The Python virtual environment located at '$PYTHON_ENV_PATH' was activated"
 
-    # Clean the Catalyst installation
-    python -m pip uninstall -y pennylane-catalyst
+        # Clean the Catalyst installation
+        python -m pip uninstall -y pennylane-catalyst
 
-    # Install Catalyst requirements
-    python -m pip install -r requirements.txt
+        # Install Catalyst requirements
+        python -m pip install -r requirements.txt
 
-    # Install Catalyst from TestPyPI
-    python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst --pre --upgrade
+        # Install Catalyst from TestPyPI
+        python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst --pre --upgrade
+    fi
 }
 
 checkout_nightly_build(){

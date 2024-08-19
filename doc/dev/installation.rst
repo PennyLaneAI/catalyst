@@ -434,10 +434,13 @@ To activate the development environment, open a terminal and issue the following
   # development
   git clone https://github.com/PennyLaneAI/catalyst.git
 
-  # Activate the development environment based on the latest TestPyPI wheels.
+  # Setup the development environment based on the latest TestPyPI wheels.
   # Please provide a path for the Python virtual environment
   cd catalyst
-  . ./activate_dev_from_wheel.sh /path/to/virtual/env
+  bash ./setup_dev_from_wheel.sh /path/to/virtual/env
+
+  # Activate the Python virtual environment
+  source /path/to/virtual/env/bin/activate
 
 To exit the Python virtual environment, type:
 
