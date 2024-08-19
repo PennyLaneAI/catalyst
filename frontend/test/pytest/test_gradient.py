@@ -357,7 +357,10 @@ def test_value_and_grad_on_qjit_quantum_variant():
     assert np.allclose(result, expected)
 
 
-def test_value_and_grad_on_qjit_quantum_variant_argnum():
+@pytest.mark.parametrize(
+    "argnum", [(0, 1, 2), (0), (1), (2), (0, 1), (0, 2), (1, 2), (1, 0, 2), (2, 0, 1)]
+)
+def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum):
     """
     Check that value_and_grad works when called on an qjit object that does wrap a QNode
     with multiple trainable parameters.
@@ -374,10 +377,10 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum():
 
         return circuit(x, y, z)[0]
 
-    result = qjit(value_and_grad(qjit(workflow_variant), argnum=[0, 1, 2]))(1.1, 2.2, 3.3)
+    result = qjit(value_and_grad(qjit(workflow_variant), argnum=argnum))(1.1, 2.2, 3.3)
     expected = (
         workflow_variant(1.1, 2.2, 3.3),
-        qjit(grad(workflow_variant, argnum=[0, 1, 2]))(1.1, 2.2, 3.3),
+        qjit(grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3),
     )
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
