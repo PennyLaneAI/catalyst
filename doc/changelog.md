@@ -299,6 +299,28 @@
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
   [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
 
+* Add type checking and improve error messaging in the frontend `catalyst.jvp` and
+  `catalyst.vjp` functions.
+  [(#1031)](https://github.com/PennyLaneAI/catalyst/pull/1031)
+
+  ```python
+  from catalyst import qjit, jvp
+
+  def foo(x):
+      return 2 * x, x * x
+
+  @qjit()
+  def workflow(x: float):
+      return jvp(foo, (x,), (1,))
+  #                          ^
+  #                          Expected tangent dtype float, but got int
+  ```
+
+  ```
+  TypeError: function params and tangents arguments to catalyst.jvp do not match;
+  dtypes must be equal. Got function params dtype float64 and so expected tangent
+  dtype float64, but got tangent dtype int64 instead.
+
 * Add a script for setting up a Frontend-Only Development Environment that does not require
   compilation, as it uses the TestPyPI wheel shared libraries.
   [(#1022)](https://github.com/PennyLaneAI/catalyst/pull/1022)
