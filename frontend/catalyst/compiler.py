@@ -369,21 +369,35 @@ class LinkerDriver:
         package_directory = path.dirname(scipy_package.origin)
         scipy_lib_path = path.join(package_directory, file_path_within_package)
 
-        file_prefix = "libopenblas"
-        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that SciPy is installed and available via pip."
-            )
-        openblas_so_file = search_result[0]
-        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
+        scipy_libs = [
+            ("libopenblas", "OpenBLAS"),
+            ("libgfortran", "GFortran"),
+            ("libquadmath", "Quadmath"),
+        ]
+        search_results = []
 
+        for file_prefix, lib_name in scipy_libs:
+            search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}*")
+            search_result = glob.glob(search_pattern)
+            if not search_result:
+                raise CompileError(
+                    f'Unable to find {lib_name} library at "{search_pattern}". '
+                    "Please ensure that SciPy is installed and available via pip."
+                )
+            search_results.append(search_result)
+
+        openblas_so_file = search_results[0][0]
+        openblas_lib_name = path.basename(openblas_so_file)[3: -len(file_extension)]
+        gfortran_so_file = search_results[1][0]
+        quadmath_so_file = search_results[2][0]
+
+        # Neede to include gfortran and quadmath here so that compiling c main can
+        # find them.
         lib_path_flags += [
             f"-Wl,-rpath,{scipy_lib_path}",
             f"-L{scipy_lib_path}",
-            "-lgfortran",
+            gfortran_so_file,
+            quadmath_so_file,
         ]
 
         system_flags = []
