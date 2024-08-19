@@ -1982,3 +1982,78 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, IsingZZ", "[CoreQIS]")
         __catalyst__rt__finalize();
     }
 }
+
+TEST_CASE("Test __catalyst__qis__SetState", "[CoreQIS]")
+{
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__initialize(nullptr);
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+        QUBIT **wire0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+
+        MemRefT_CplxT_double_1d state = getState(2);
+        state.data_aligned[0] = {0.5, 0.5};
+        state.data_aligned[1] = {0.0, 0.0};
+
+        __catalyst__qis__SetState(&state, 1, *wire0);
+
+        MemRefT_CplxT_double_1d result = getState(2);
+
+        __catalyst__qis__State(&result, 0);
+        CplxT_double *buffer = result.data_allocated;
+
+        CHECK(buffer[0].real == Approx(0.5).margin(1e-5));
+        CHECK(buffer[0].imag == Approx(0.5).margin(1e-5));
+        CHECK(buffer[1].real == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].imag == Approx(0.0).margin(1e-5));
+
+        freeState(state);
+        freeState(result);
+        __catalyst__rt__qubit_release_array(qs);
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+}
+
+TEST_CASE("Test __catalyst__qis__SetBasisState", "[CoreQIS]")
+{
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__initialize(nullptr);
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+        QUBIT **wire0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+
+        std::array<int8_t, 1> buffer_i1 = {0};
+        MemRefT_int8_1d buff{buffer_i1.data(), buffer_i1.data(), 0, {1}, {1}};
+        __catalyst__qis__SetBasisState(&buff, 1, *wire0);
+        MemRefT_CplxT_double_1d result = getState(2);
+
+        __catalyst__qis__State(&result, 0);
+        CplxT_double *buffer = result.data_allocated;
+
+        CHECK(buffer[0].real == Approx(1.0).margin(1e-5));
+        CHECK(buffer[0].imag == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].real == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].imag == Approx(0.0).margin(1e-5));
+
+        buffer_i1 = {1};
+        buff = {buffer_i1.data(), buffer_i1.data(), 0, {1}, {1}};
+        __catalyst__qis__SetBasisState(&buff, 1, *wire0);
+
+        __catalyst__qis__State(&result, 0);
+
+        CHECK(buffer[0].real == Approx(0.0).margin(1e-5));
+        CHECK(buffer[0].imag == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].real == Approx(1.0).margin(1e-5));
+        CHECK(buffer[1].imag == Approx(0.0).margin(1e-5));
+
+        freeState(result);
+        __catalyst__rt__qubit_release_array(qs);
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+}

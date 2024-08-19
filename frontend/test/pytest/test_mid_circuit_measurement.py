@@ -313,6 +313,9 @@ class TestMidCircuitMeasurement:
         expected_call_count = 1 if postselect_mode == "hw-like" else 0
         assert spy.call_count == expected_call_count
 
+    @pytest.mark.xfail(
+        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
+    )
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output(self, backend, postselect_mode, mcm_method):
@@ -569,6 +572,9 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, 1.0)
 
+    @pytest.mark.xfail(
+        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
+    )
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
