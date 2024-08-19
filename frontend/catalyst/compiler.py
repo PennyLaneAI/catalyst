@@ -358,13 +358,11 @@ class LinkerDriver:
         if platform.system() == "Linux":
             file_path_within_package = "../scipy.libs/"
             file_extension = ".so"
-            rpath_flag = "-Wl,--disable-new-dtags"
         else:  # pragma: nocover
             msg = "Attempting to use catalyst on an unsupported system"
             assert platform.system() == "Darwin", msg
             file_path_within_package = ".dylibs/"
             file_extension = ".dylib"
-            rpath_flag = ""
 
         package_name = "scipy"
         scipy_package = importlib.util.find_spec(package_name)
@@ -389,7 +387,10 @@ class LinkerDriver:
 
         system_flags = []
         if platform.system() == "Linux":
-            system_flags += ["-Wl,-no-as-needed"]
+            # --disable-new-dtags makes the linker use RPATH instead of RUNPATH.
+            # RPATH influences search paths globally while RUNPATH only works for
+            # a single file, but not its dependencies.
+            system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
         elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
 
@@ -412,7 +413,6 @@ class LinkerDriver:
             f"-l{openblas_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
-            rpath_flag,
         ]
         return default_flags
 
