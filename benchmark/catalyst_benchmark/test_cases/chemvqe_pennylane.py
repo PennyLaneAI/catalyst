@@ -136,7 +136,7 @@ def run_default_qubit(N=6):
     """Test problem entry point"""
     p = ProblemCVQE(
         qml.device("default.qubit", wires=N, shots=SHOTS),
-        grad=partial(qml.grad, argnum=0),
+        grad=partial(qml.grad, argnums=0),
         nsteps=NSTEPS,
         diff_method=DIFFMETHOD,
     )
@@ -154,7 +154,7 @@ def run_lightning_qubit(N=6):
     """Test problem entry point"""
     p = ProblemCVQE(
         qml.device("lightning.qubit", wires=N, shots=SHOTS),
-        grad=partial(qml.grad, argnum=0),
+        grad=partial(qml.grad, argnums=0),
         nsteps=NSTEPS,
         diff_method=DIFFMETHOD,
     )

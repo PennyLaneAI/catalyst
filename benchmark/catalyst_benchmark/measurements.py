@@ -493,7 +493,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            grad=partial(qml.grad, argnums=0),
             diff_method=a.vqe_diff_method,
             expansion_strategy="device",
         )
@@ -511,7 +511,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            grad=partial(qml.grad, argnums=0),
             diff_method=a.vqe_diff_method,
             expansion_strategy="device",
         )
@@ -574,7 +574,7 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            grad=partial(qml.grad, argnums=0),
             diff_method=a.vqe_diff_method,
         )
     elif a.problem == "chemvqe-hybrid":
@@ -591,7 +591,7 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            grad=partial(qml.grad, argnums=0),
             diff_method=a.vqe_diff_method,
         )
     elif a.problem == "qft":

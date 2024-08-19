@@ -83,7 +83,7 @@ def test_gradient(inp, diff_methods, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
     assert "async_execute_fn" in compiled.qir
@@ -334,7 +334,7 @@ def test_gradient_exception(inp, diff_methods, backend):
     @qjit(async_qnodes=True)
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
-        h = grad(g, method=diff_methods[1], argnum=[0])
+        h = grad(g, method=diff_methods[1], argnums=[0])
         return h(x, 0)
 
     msg = "Unrecoverable error"

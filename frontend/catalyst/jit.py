@@ -771,7 +771,7 @@ class JAX_QJIT:
             updated_params.append(param.replace(annotation=annotations[arg_name]))
 
         def deriv_wrapper(*args, **kwargs):
-            return catalyst.jacobian(self.qjit_function, argnum=argnums)(*args, **kwargs)
+            return catalyst.jacobian(self.qjit_function, argnums=argnums)(*args, **kwargs)
 
         deriv_wrapper.__name__ = "deriv_" + self.qjit_function.__name__
         deriv_wrapper.__annotations__ = annotations
