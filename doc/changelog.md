@@ -320,6 +320,7 @@
   >>> circuit([0.1, 0.2])
   CompileError: Sample-based measurements like sample(wires=[0, 1])
   cannot work with shots=None. Please specify a finite number of shots.
+  ```
 
 * On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
@@ -529,8 +530,8 @@
   a better compatibility with Enzyme.
   [(#917)](https://github.com/PennyLaneAI/catalyst/pull/917)
 
-* llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes triggers now triggers a
-   Coroutine lowering pass.
+* llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes
+  triggers now triggers a Coroutine lowering pass.
   [(#968)](https://github.com/PennyLaneAI/catalyst/pull/968)
 
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.

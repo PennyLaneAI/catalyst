@@ -83,7 +83,7 @@ def cancel_inverses(fn=None):
             qml.Hadamard(wires=0)
             return qml.expval(qml.PauliZ(0))
 
-    >>>circuit(0.54)
+    >>> circuit(0.54)
     Array(0.85770868, dtype=float64)
 
     Note that the QNode will be unchanged in Python, and will continue
