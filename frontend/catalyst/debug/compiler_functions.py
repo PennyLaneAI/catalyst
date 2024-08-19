@@ -262,10 +262,18 @@ def compile_executable(fn, *args):
     with open(main_c_file, "w", encoding="utf-8") as file:
         file.write(get_cmain(fn, *args))
 
+    # Set search path mainly for gfortran and quadmath, which are located in the same
+    # directory as openblas from scipy.
+    if platform.system() == "Linux":
+        object_directory = "$ORIGIN"
+    else:  # pragma: nocover
+        object_directory = "@loader_path"
+
     # configure flags
     link_so_flags = [
         "-Wl,-rpath," + workspace,
         shared_object_file,
+        f"-Wl,-rpath,{object_directory}",
     ] + lib_path_flags
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
