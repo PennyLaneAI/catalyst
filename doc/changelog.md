@@ -320,7 +320,10 @@
   TypeError: function params and tangents arguments to catalyst.jvp do not match;
   dtypes must be equal. Got function params dtype float64 and so expected tangent
   dtype float64, but got tangent dtype int64 instead.
-  ```
+
+* Add a script for setting up a Frontend-Only Development Environment that does not require
+  compilation, as it uses the TestPyPI wheel shared libraries.
+  [(#1022)](https://github.com/PennyLaneAI/catalyst/pull/1022)
 
 <h3>Breaking changes</h3>
 
