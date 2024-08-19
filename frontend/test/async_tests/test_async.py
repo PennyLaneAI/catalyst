@@ -83,7 +83,7 @@ def test_gradient(inp, diff_methods, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnums=0)
+        h = qml.grad(g, argnum=0)
         return h(x)
 
     assert "async_execute_fn" in compiled.qir
