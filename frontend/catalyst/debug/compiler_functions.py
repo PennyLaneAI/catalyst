@@ -63,7 +63,7 @@ def get_compilation_stage(fn, stage):
     Returns:
         str: output ir from the target compiler stage
 
-    .. seealso:: :doc:`/dev/debugging`
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`, :func:`~.compile_from_mlir`.
 
     **Example**
 
@@ -127,7 +127,7 @@ def get_cmain(fn, *args):
 # pylint: disable=line-too-long
 @debug_logger
 def compile_from_mlir(ir, compiler=None, compile_options=None):
-    """Compile a Catalyst function to binary code from the provided MLIR.
+    r"""Compile a Catalyst function to binary code from the provided MLIR.
 
     Args:
         ir (str): the MLIR to compile in string form
@@ -135,6 +135,8 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
     Returns:
         CompiledFunction: A callable that manages the compiled shared library and its invocation.
+
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.replace_ir`.
 
     **Example**
 
@@ -184,25 +186,51 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 @debug_logger
 def replace_ir(fn, stage, new_ir):
-    """Replace the IR at any compilation stage that will be used the next time the function runs.
+    r"""Replace the IR at any compilation stage that will be used the next time the function runs.
 
-    It is important that the function signature (inputs & outputs) for the next execution matches
+    It is important that the function signature (inputs and outputs) for the next execution matches
     that of the provided IR, or else the behaviour is undefined.
 
-    All the available stages are:
+    Available stages include:
 
-    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect.
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``,
+      and ``MLIRToLLVMDialect``.
 
-    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
-    differentiation) passes do not always happen. `last` denotes the stage right before object file
-    generation.
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+    (automatic differentiation) passes do not always happen. ``last`` denotes the stage
+    right before object file generation.
 
     Args:
         fn (QJIT): a qjit-decorated function
         stage (str): Recompilation picks up after this stage.
         new_ir (str): The replacement IR to use for recompilation.
+
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.compile_from_mlir`.
+
+    **Example**
+
+    >>> from catalyst.debug import get_pipeline_output, replace_ir
+    >>> @qjit(keep_intermediate=True)
+    >>> def f(x):
+    ...     return x**2
+    >>> f(2.0)  # just-in-time compile the function
+    4.0
+
+    Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one:
+
+    >>> old_ir = get_pipeline_output(f, "HLOLoweringPass")
+    >>> new_ir = old_ir.replace(
+    ...   "%2 = arith.mulf %in, %in_0 : f64\n",
+    ...   "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
+    ... )
+
+    The recompilation starts after the given checkpoint stage:
+
+    >>> replace_ir(f, "HLOLoweringPass", new_ir)
+    >>> f(2.0)
+    8.0
     """
     fn.overwrite_ir = new_ir
     fn.compiler.options.checkpoint_stage = stage

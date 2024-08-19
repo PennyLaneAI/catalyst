@@ -200,8 +200,6 @@
   [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
 
   ```py
-  from catalyst import qjit
-
   @qjit(keep_intermediate=True)
   def f(x):
       return x**2
@@ -225,7 +223,7 @@
 
   ```pycon
   >>> f(2.0)
-   8.0
+  8.0
   ```
 
 <h3>Improvements</h3>
