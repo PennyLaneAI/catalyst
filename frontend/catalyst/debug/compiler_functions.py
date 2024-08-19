@@ -259,32 +259,30 @@ def compile_executable(fn, *args):
         25
 
     """
-    # pylint: disable=too-many-statements
 
     # if fn is not compiled, compile it first.
     if not fn.compiled_function:
         fn(*args)
 
     # Try default library paths in case the targeted python-dev is shipped with OS.
-    python_lib_dir_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
+    path_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
     version_info = sys.version_info
+    # If libpython3.so exists, link to that instead of libpython3.x.so
+    version_candidates = [f"{version_info.major}", f"{version_info.major}.{version_info.minor}"]
+
     python_lib_dir_path = ""
     version_str = ""
 
-    for candidate in python_lib_dir_candidates:
-        # If libpython3.so exists, link to that instead of libpython3.x.so
-        if os.path.isfile(candidate + f"/libpython{version_info.major}.so"):
-            version_str = f"{version_info.major}"
-            python_lib_dir_path = candidate
-            break
-        if os.path.isfile(candidate + f"/libpython{version_info.major}.{version_info.minor}.so"):
-            version_str = f"{version_info.major}.{version_info.minor}"
-            python_lib_dir_path = candidate
-            break
+    for path_candidate in path_candidates:
+        for version_candidate in version_candidates:
+            if os.path.isfile(path_candidate + f"/{version_candidate}.so"):
+                version_str = version_candidate
+                python_lib_dir_path = path_candidate
+                break
 
     if not python_lib_dir_path or not version_str:
         raise CompileError(
-            f'Unable to find Python library at "{python_lib_dir_candidates}". '
+            f'Unable to find Python library {version_candidates} at "{path_candidates}". '
             "Please ensure that python-dev or python-devel is installed and available via pip."
         )
 
@@ -306,8 +304,8 @@ def compile_executable(fn, *args):
     shared_object_file = workspace + "/" + f_name + ".so"
 
     # copy shared object to current directory
+    original_shared_object_file = str(fn.workspace) + "/" + f_name + ".so"
     if not fn.compile_options.keep_intermediate:
-        original_shared_object_file = str(fn.workspace) + "/" + f_name + ".so"
         shutil.copy(original_shared_object_file, shared_object_file)
 
     options = fn.compiler.options
@@ -352,7 +350,6 @@ def compile_executable(fn, *args):
 
         # Update the path of shared library if copy happens.
         if not fn.compile_options.keep_intermediate:
-            original_shared_object_file = str(fn.workspace) + "/" + f_name + ".so"
             subprocess.run(
                 [
                     install_name_tool_path,
