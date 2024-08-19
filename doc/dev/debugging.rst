@@ -409,8 +409,10 @@ C Executable Generation
 
 Catalyst provides a way to generate a c executable that calls the shared object of the given
 qjit-decorated function.
-In ``catalyst.debug.compiler_functions``, ``compile_executable(fn: QJIT, *args) -> str, str`` takes
-a qjit-decorated function and arguments for that function.
+Let's use cross references :)
+```suggestion
+The function :func:`~.debug.compile_executable` takes a qjit-decorated function and
+concrete arguments to that function as input.
 It returns a string of LD_LIBRARY_PATH and the path to the output executable file.
 Users can use `debug.print_memref` to add information to stdout.
 
