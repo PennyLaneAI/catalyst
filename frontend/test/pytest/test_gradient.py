@@ -339,8 +339,7 @@ def test_value_and_grad_on_qjit_quantum():
 
 def test_value_and_grad_on_qjit_quantum_variant():
     """
-    Check that value_and_grad works when called on an qjit object that does wrap a QNode
-    with trainable parameters.
+    Check that value_and_grad works when called on a QNode with trainable parameters.
     """
 
     def workflow_variant(x: float):
@@ -352,7 +351,7 @@ def test_value_and_grad_on_qjit_quantum_variant():
 
         return circuit(x)[0]
 
-    result = qjit(value_and_grad(qjit(workflow_variant)))(1.1)
+    result = qjit(value_and_grad(workflow_variant))(1.1)
     expected = (workflow_variant(1.1), qjit(grad(workflow_variant))(1.1))
     assert np.allclose(result, expected)
 
@@ -362,8 +361,7 @@ def test_value_and_grad_on_qjit_quantum_variant():
 )
 def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum):
     """
-    Check that value_and_grad works when called on an qjit object that does wrap a QNode
-    with multiple trainable parameters.
+    Check that value_and_grad works when called on a QNode with multiple trainable parameters.
     """
 
     def workflow_variant(x: float, y: float, z: float):
@@ -377,7 +375,7 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum):
 
         return circuit(x, y, z)[0]
 
-    result = qjit(value_and_grad(qjit(workflow_variant), argnum=argnum))(1.1, 2.2, 3.3)
+    result = qjit(value_and_grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3)
     expected = (
         workflow_variant(1.1, 2.2, 3.3),
         qjit(grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3),
