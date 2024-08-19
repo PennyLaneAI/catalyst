@@ -24,6 +24,8 @@ import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
 import jax
+import jax.numpy as jnp
+from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
@@ -455,6 +457,32 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         tangents_flatten, _ = tree_flatten(tangents)
         grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
+        if len(tangents_flatten) != len(grad_params.expanded_argnum):
+            raise TypeError(
+                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "match; the number of parameters must be equal. "
+                f"Got {len(grad_params.expanded_argnum)} differentiable parameters and so expected "
+                f"as many tangents, but got {len(tangents_flatten)} instead."
+            )
+
+        # Only check dtypes and shapes of parameters marked as differentiable by the `argnum` param
+        args_to_check = [args_flatten[i] for i in grad_params.argnum]
+
+        for p, t in zip(args_to_check, tangents_flatten):
+            if _dtype(p) != _dtype(t):
+                raise TypeError(
+                    "function params and tangents arguments to catalyst.jvp do not match; "
+                    "dtypes must be equal. "
+                    f"Got function params dtype {_dtype(p)} and so expected tangent dtype "
+                    f"{_dtype(p)}, but got tangent dtype {_dtype(t)} instead."
+                )
+
+            if jnp.shape(p) != jnp.shape(t):
+                raise ValueError(
+                    "catalyst.jvp called with different function params and tangent shapes; "
+                    f"got function params shape {jnp.shape(p)} and tangent shape {jnp.shape(t)}"
+                )
+
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         results = jvp_p.bind(
@@ -541,6 +569,30 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         _, in_tree = tree_flatten(args_argnum)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        if len(jaxpr.out_avals) != len(cotangents_flatten):
+            raise TypeError(
+                "number of cotangent and number of function output parameters in catalyst.vjp do "
+                "not match; the number of parameters must be equal. "
+                f"Got {len(jaxpr.out_avals)} function output parameters and so expected as many "
+                f"cotangents, but got {len(cotangents_flatten)} instead."
+            )
+
+        for p, t in zip(jaxpr.out_avals, cotangents_flatten):
+            if _dtype(p) != _dtype(t):
+                raise TypeError(
+                    "function output params and cotangents arguments to catalyst.vjp do not match; "
+                    "dtypes must be equal. "
+                    f"Got function output params dtype {_dtype(p)} and so expected cotangent dtype "
+                    f"{_dtype(p)}, but got cotangent dtype {_dtype(t)} instead."
+                )
+
+            if jnp.shape(p) != jnp.shape(t):
+                raise ValueError(
+                    "catalyst.vjp called with different function output params and cotangent "
+                    f"shapes; got function output params shape {jnp.shape(p)} and cotangent shape "
+                    f"{jnp.shape(t)}"
+                )
 
         cotangents, _ = tree_flatten(cotangents)
 
