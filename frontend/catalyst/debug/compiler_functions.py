@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+from itertools import product
 
 from jax.interpreters import mlir
 
@@ -270,12 +271,13 @@ def compile_executable(fn, *args):
     # If libpython3.so exists, link to that instead of libpython3.x.so
     version_candidates = [f"{version_info.major}", f"{version_info.major}.{version_info.minor}"]
 
+    file_extension = ".so" if platform.system() == "Linux" else ".dylib"
     python_lib_dir_path = ""
     version_str = ""
 
-    for candidate in zip(path_candidates, version_candidates):
+    for candidate in list(product(path_candidates, version_candidates)):
         path_candidate, version_candidate = candidate
-        if os.path.isfile(path_candidate + f"/libpython{version_candidate}.so"):
+        if os.path.isfile(path_candidate + f"/libpython{version_candidate}{file_extension}"):
             version_str = version_candidate
             python_lib_dir_path = path_candidate
             break
