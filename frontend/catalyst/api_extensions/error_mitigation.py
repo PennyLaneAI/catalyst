@@ -102,13 +102,20 @@ def mitigate_with_zne(
 
         @qml.qnode(dev)
         def circuit(weights):
-          qml.StronglyEntanglingLayers(weights, wires=[0, 1])
-          return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            qml.StronglyEntanglingLayers(weights, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
         @qjit
         def workflow(weights, s):
-          zne_circuit = mitigate_with_zne(circuit, scale_factors=s, extrapolate=exponential_extrapolate)
-          return zne_circuit(weights)
+            zne_circuit = mitigate_with_zne(
+                circuit, scale_factors=s, extrapolate=exponential_extrapolate
+            )
+            return zne_circuit(weights)
+
+    >>> weights = jnp.ones([3, 2, 3])
+    >>> scale_factors = jnp.array([1, 2, 3])
+    >>> workflow(weights, scale_factors)
+    Array(-0.19946598, dtype=float64)
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")

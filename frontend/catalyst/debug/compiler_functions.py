@@ -42,13 +42,14 @@ def get_compilation_stage(fn, stage):
 
     All the available stages are:
 
-    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``, and ``MLIRToLLVMDialect``.
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``,
+      and ``MLIRToLLVMDialect``.
 
     - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme`` (Automatic
-    differentiation) passes do not always happen. ``last`` denotes the stage right before object file
-    generation.
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+    (automatic differentiation) passes do not always happen. ``last`` denotes the stage
+    right before object file generation.
 
     .. note::
 

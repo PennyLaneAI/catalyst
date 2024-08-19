@@ -37,7 +37,7 @@ enable=useless-suppression
 # it should appear only once).
 # Cyclical import checks are disabled for now as they are frequently used in
 # the code base, but this can be removed in the future once cycles are resolved.
-disable=too-few-public-methods,invalid-name,too-many-locals,cyclic-import,import-error,no-else-return,unnecessary-ellipsis,duplicate-code,abstract-method,no-name-in-module
+disable=line-too-long,too-few-public-methods,invalid-name,too-many-locals,cyclic-import,import-error,no-else-return,unnecessary-ellipsis,duplicate-code,abstract-method,no-name-in-module
 
 [MISCELLANEOUS]
 

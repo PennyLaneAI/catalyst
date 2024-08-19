@@ -134,8 +134,8 @@ def qjit(
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
             Note that seeding samples on simulator devices is not yet supported. As such,
-            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or ``expval``
-            will remain.
+            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
+            ``expval`` will remain.
 
     Returns:
         QJIT object.

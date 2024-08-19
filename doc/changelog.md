@@ -167,13 +167,13 @@
   Array(-0.19946598, dtype=float64)
   ```
 
-* A frontend decorator can be applied to a qnode to signal a compiler pass run.
+* A new module is available, `catalyst.passes`, which provides Python decorators
+  for enabling and configuring Catalyst MLIR compiler passes.
   [(#911)](https://github.com/PennyLaneAI/catalyst/pull/911)
 
-  A new module, `catalyst.passes` (file `frontend/catalyst/passes.py`), is added to
-  provide UI access for pass decorators. This PR adds the `cancel_inverses` decorator,
-  which runs the `-removed-chained-self-inverse` mlir pass that cancels two neighbouring
-  Hadamard gates.
+  The first pass available is `catalyst.passes.cancel_inverses`,
+  which enables the `-removed-chained-self-inverse` MLIR pass that
+  cancels two neighbouring Hadamard gates.
 
   ```python
   from catalyst.debug import get_compilation_stage
