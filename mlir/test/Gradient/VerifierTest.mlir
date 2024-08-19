@@ -441,7 +441,7 @@ func.func @measure(%arg0: f64) -> f64 {
 
 %f0 = arith.constant 0.0 : f64
 // expected-error@+1 {{An operation without a valid gradient was found}}
-gradient.value_and_grad "auto" @measure(%f0) : (f64) -> (f64, f64)
+gradient.value_and_grad "auto" @measure(%f0) {resultSegmentSizes = array<i32: 1, 1>} : (f64) -> (f64, f64)
 
 // -----
 
@@ -457,5 +457,5 @@ func.func @measure(%arg0: f64) -> f64 {
 }
 
 %f0 = arith.constant 0.0 : f64
-gradient.value_and_grad "fd" @measure(%f0) : (f64) -> (f64, f64)
+gradient.value_and_grad "fd" @measure(%f0) {resultSegmentSizes = array<i32: 1, 1>} : (f64) -> (f64, f64)
 
