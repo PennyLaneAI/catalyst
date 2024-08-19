@@ -413,16 +413,16 @@ Let's use cross references :)
 ```suggestion
 The function :func:`~.debug.compile_executable` takes a qjit-decorated function and
 concrete arguments to that function as input.
-It returns a string of LD_LIBRARY_PATH and the path to the output executable file.
-Users can use `debug.print_memref` to add information to stdout.
+It returns the path to the output executable file.
+Users can also use `debug.print_memref` to add information to stdout.
 
 The following example is a square function.
 Here we are using debug.print_memref to print the information of the result from ``y``.
-Note that ``keep_intermediate=True`` help us to keep the generated files so that we
-can re-run the executable latter.
+The executable will be saved in the directory for intermediate results if ``keep_intermediate=True``.
+Otherwise, the executable will appear in the Catalyst project root
 
 .. code-block:: python
-    @qjit(keep_intermediate=True)
+    @qjit
     def f(x):
         y = x*x
         debug.print_memref(y)
