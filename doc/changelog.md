@@ -219,7 +219,7 @@
    8.0
   ```
 
-* Catalyst now supports c executable generation with `catalyst.debug.compiler_functions.compile_executable`.
+* Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
   It also supports mutti-dimensional arrays as function's inputs. [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
   ```py
