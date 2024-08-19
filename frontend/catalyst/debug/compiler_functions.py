@@ -32,6 +32,7 @@ from catalyst.compiler import Compiler, LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 
 logger = logging.getLogger(__name__)
@@ -262,15 +263,28 @@ def compile_executable(fn, *args):
     if not fn.compiled_function:
         fn(*args)
 
-    # get python version
-    python_lib_dir_path = sysconfig.get_config_var("LIBDIR")
+    # get python version. Search for possible directories.
+    python_lib_dir_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
     version_info = sys.version_info
+    python_lib_dir_path = ""
+    version_str = ""
 
-    # If libpython3.so exists, link to that instead of libpython3.x.so
-    if os.path.isfile(python_lib_dir_path + f"/libpython{version_info.major}.so"):
-        version_str = f"{version_info.major}"
-    else:
-        version_str = f"{version_info.major}.{version_info.minor}"
+    for candidate in python_lib_dir_candidates:
+        # If libpython3.so exists, link to that instead of libpython3.x.so
+        if os.path.isfile(candidate + f"/libpython{version_info.major}.so"):
+            version_str = f"{version_info.major}"
+            python_lib_dir_path = candidate
+            break
+        if os.path.isfile(candidate + f"/libpython{version_info.major}.{version_info.minor}.so"):
+            version_str = f"{version_info.major}.{version_info.minor}"
+            python_lib_dir_path = candidate
+            break
+
+    if not python_lib_dir_path or not version_str:
+        raise CompileError(
+            f'Unable to find Python library at "{python_lib_dir_candidates}". '
+            "Please ensure that python-dev or python-devel is installed and available via pip."
+        )
 
     lib_path_flags = [
         f"-Wl,-rpath,{python_lib_dir_path}",
