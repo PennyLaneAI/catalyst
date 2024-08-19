@@ -139,23 +139,23 @@ def test_cancel_inverses_tracing_and_lowering():
 
     # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   options=func-name=f
+    # CHECK:   options=func-name=f_cancel_inverses
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   options=func-name=g
+    # CHECK:   options=func-name=g_cancel_inverses
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     # CHECK-NOT: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK-NOT:   options=func-name=h
+    # CHECK-NOT:   options=func-name=h_cancel_inverses
     # CHECK-NOT:   pass_name=remove-chained-self-inverse
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g"}
-    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f_cancel_inverses"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g_cancel_inverses"}
+    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h_cancel_inverses"}
     # CHECK-NEXT: transform.yield
     print_mlir(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
@@ -183,14 +183,14 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
 
     # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   options=func-name=f
+    # CHECK:   options=func-name=f_cancel_inverses
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f_cancel_inverses"}
     # CHECK-NEXT: transform.yield
     print_mlir(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 

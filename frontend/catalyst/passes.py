@@ -153,13 +153,13 @@ def cancel_inverses(fn=None):  # pylint: disable=line-too-long
 
         apply_registered_pass_p.bind(
             pass_name="remove-chained-self-inverse",
-            options=f"func-name={funcname}" + "_cancel_inverse",
+            options=f"func-name={funcname}" + "_cancel_inverses",
         )
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone = copy.copy(fn)
     fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_cancel_inverse"
+    fn_clone.__name__ = funcname + "_cancel_inverses"
 
     return fn_clone
 
