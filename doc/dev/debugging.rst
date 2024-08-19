@@ -406,7 +406,7 @@ The recompilation starts after the given checkpoint stage.
     >> 8.0
 
 C Executable Generation
-=================
+=======================
 
 Catalyst provides a way to generate a c executable that calls the shared object of the given
 qjit-decorated function.
