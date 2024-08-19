@@ -459,10 +459,10 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
         if len(tangents_flatten) != len(grad_params.expanded_argnum):
             raise TypeError(
-                "number of tangent operands and number of differentiable parameters in catalyst.jvp "
-                "do not match; number of parameters must be equal. "
-                f"Got {len(grad_params.expanded_argnum)} differentiable parameters and so expected as "
-                f"many tangent operands, but got {len(tangents_flatten)} instead."
+                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "match; the number of parameters must be equal. "
+                f"Got {len(grad_params.expanded_argnum)} differentiable parameters and so expected "
+                f"as many tangents, but got {len(tangents_flatten)} instead."
             )
 
         # Only check dtypes and shapes of parameters marked as differentiable by the `argnum` param
@@ -572,10 +572,10 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
         if len(jaxpr.out_avals) != len(cotangents_flatten):
             raise TypeError(
-                "number of cotangent operands and number of function output parameters in catalyst.vjp "
-                "do not match; number of parameters must be equal. "
-                f"Got {len(jaxpr.out_avals)} function output parameters and so expected as "
-                f"many cotangent operands, but got {len(cotangents_flatten)} instead."
+                "number of cotangent and number of function output parameters in catalyst.vjp do "
+                "not match; the number of parameters must be equal. "
+                f"Got {len(jaxpr.out_avals)} function output parameters and so expected as many "
+                f"cotangents, but got {len(cotangents_flatten)} instead."
             )
 
         for p, t in zip(jaxpr.out_avals, cotangents_flatten):
@@ -589,8 +589,9 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
             if jnp.shape(p) != jnp.shape(t):
                 raise ValueError(
-                    "catalyst.vjp called with different function output params and cotangent shapes; "
-                    f"got function output params shape {jnp.shape(p)} and cotangent shape {jnp.shape(t)}"
+                    "catalyst.vjp called with different function output params and cotangent "
+                    f"shapes; got function output params shape {jnp.shape(p)} and cotangent shape "
+                    f"{jnp.shape(t)}"
                 )
 
         cotangents, _ = tree_flatten(cotangents)

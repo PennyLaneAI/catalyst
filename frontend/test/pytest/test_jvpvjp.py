@@ -39,6 +39,15 @@ def circuit_rx(x1, x2):
     return qml.expval(qml.PauliY(0))
 
 
+def f(x):
+    return 2 * x, x * x
+
+
+def g(_n, x):
+    # `_n` is a dummy, non-differentiable parameter
+    return jnp.stack([1 + x[0] + 2 * x[1] + 3 * x[2], 1 + x[0] + 2 * x[1] ** 2 + 3 * x[2] ** 3])
+
+
 diff_methods = ["auto", "fd"]
 
 
@@ -833,85 +842,125 @@ def test_vjp_multi_return(diff_method):
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvpvjp_argument_type_checks(diff_method):
-    """Tests error handling of Catalyst's jvp and vjp when given incorrect types."""
-
-    def f(x):
-        return 2 * x, x * x
-
-    def g(n, x):
-        # `n` is a dummy, non-differentiable parameter
-        return jnp.stack([1 + x[0] + 2 * x[1] + 3 * x[2], 1 + x[0] + 2 * x[1] ** 2 + 3 * x[2] ** 3])
+def test_jvp_argument_type_checks_correct_inputs(diff_method):
+    """Test that Catalyst's jvp can JIT compile when given the correct types."""
 
     @qjit
-    def C_workflow_jvp_good_f():
+    def C_workflow_f():
         x = (1.0,)
         tangents = (1.0,)
         return C_jvp(f, x, tangents, method=diff_method, argnum=[0])
 
     @qjit
-    def C_workflow_jvp_good_g():
+    def C_workflow_g():
         x = jnp.array([2.0, 3.0, 4.0])
         tangents = jnp.ones([3], dtype=float)
         return C_jvp(g, [1, x], [tangents], method=diff_method, argnum=[1])
 
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
+    """Tests error handling of Catalyst's jvp when the number of differentiable params
+    and tangent arguments are incompatible.
+    """
+
     with pytest.raises(
         TypeError,
-        match="number of tangent operands and number of differentiable parameters in catalyst.jvp do not match",
+        match=(
+            "number of tangent and number of differentiable parameters in catalyst.jvp "
+            "do not match"
+        ),
     ):
 
         @qjit
-        def C_workflow_jvp_incompatible_n_inputs():
+        def C_workflow():
             # If `f` takes one differentiable param (argnum=[0]), then `tangents` must have length 1
             x = (1.0,)
             tangents = (1.0, 1.0)
             return C_jvp(f, x, tangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_incompatible_input_types(diff_method):
+    """Tests error handling of Catalyst's jvp when the types of the differentiable
+    params and tangent arguments are incompatible.
+    """
 
     with pytest.raises(
         TypeError, match="function params and tangents arguments to catalyst.jvp do not match"
     ):
 
         @qjit
-        def C_workflow_jvp_incompatible_input_types():
+        def C_workflow():
             # If `x` has type float, then `tangents` should also have type float
             x = (1.0,)
             tangents = (1,)
             return C_jvp(f, x, tangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method):
+    """Tests error handling of Catalyst's jvp when the shapes of the differentiable
+    params and tangent arguments are incompatible.
+    """
 
     with pytest.raises(
         ValueError, match="catalyst.jvp called with different function params and tangent shapes"
     ):
 
         @qjit
-        def C_workflow_jvp_incompatible_input_shapes():
-            # If `x` has shape (3,), then `tangents` must also have shape (3,), but it has shape (4,)
+        def C_workflow():
+            # If `x` has shape (3,), then `tangents` must also have shape (3,),
+            # but it has shape (4,)
             x = jnp.array([2.0, 3.0, 4.0])
             tangents = jnp.ones([4], dtype=float)
             return C_jvp(g, [1, x], [tangents], method=diff_method, argnum=[1])
 
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_correct_inputs(diff_method):
+    """Test that Catalyst's vjp can JIT compile when given the correct types."""
+
     @qjit
-    def C_workflow_vjp_good_f():
+    def C_workflow_f():
         x = (1.0,)
         cotangents = (1.0, 1.0)
         return C_vjp(f, x, cotangents, method=diff_method, argnum=[0])
 
     @qjit
-    def C_workflow_vjp_good_g():
+    def C_workflow_g():
         x = jnp.array([2.0, 3.0, 4.0])
         cotangents = jnp.ones([2], dtype=float)
         return C_vjp(g, [1, x], [cotangents], method=diff_method, argnum=[1])
 
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
+    """Tests error handling of Catalyst's vjp when the number of function output params
+    and cotangent arguments are incompatible.
+    """
+
     with pytest.raises(
         TypeError,
-        match="number of cotangent operands and number of function output parameters in catalyst.vjp do not match",
+        match=(
+            "number of cotangent and number of function output parameters in catalyst.vjp "
+            "do not match"
+        ),
     ):
 
         @qjit
-        def C_workflow_vjp_incompatible_n_inputs():
+        def C_workflow():
             # If `f` returns two outputs, then `cotangents` must have length 2
             x = (1.0,)
             cotangents = (1.0,)
             return C_vjp(f, x, cotangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_incompatible_input_types(diff_method):
+    """Tests error handling of Catalyst's vjp when the types of the function output params
+    and cotangent arguments are incompatible.
+    """
 
     with pytest.raises(
         TypeError,
@@ -919,11 +968,18 @@ def test_jvpvjp_argument_type_checks(diff_method):
     ):
 
         @qjit
-        def C_workflow_vjp_incompatible_input_types():
+        def C_workflow():
             # If `x` has type float, then `cotangents` should also have type float
             x = (1.0,)
             cotangents = (1, 1)
             return C_vjp(f, x, cotangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method):
+    """Tests error handling of Catalyst's vjp when the shapes of the function output params
+    and cotangent arguments are incompatible.
+    """
 
     with pytest.raises(
         ValueError,
@@ -931,8 +987,9 @@ def test_jvpvjp_argument_type_checks(diff_method):
     ):
 
         @qjit
-        def C_workflow_vjp_incompatible_input_shapes():
-            # If `f` returns object with shape (2,), then `cotangents` must also have shape (2,), but it has shape (3,)
+        def C_workflow():
+            # If `f` returns object with shape (2,), then `cotangents` must also have
+            # shape (2,), but it has shape (3,)
             x = jnp.array([2.0, 3.0, 4.0])
             cotangents = jnp.ones([3], dtype=float)
             return C_vjp(g, [1, x], [cotangents], method=diff_method, argnum=[1])
