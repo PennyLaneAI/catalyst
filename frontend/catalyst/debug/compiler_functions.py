@@ -273,12 +273,12 @@ def compile_executable(fn, *args):
     python_lib_dir_path = ""
     version_str = ""
 
-    for path_candidate in path_candidates:
-        for version_candidate in version_candidates:
-            if os.path.isfile(path_candidate + f"/{version_candidate}.so"):
-                version_str = version_candidate
-                python_lib_dir_path = path_candidate
-                break
+    for candidate in zip(path_candidates, version_candidates):
+        path_candidate, version_candidate = candidate
+        if os.path.isfile(path_candidate + f"/libpython{version_candidate}.so"):
+            version_str = version_candidate
+            python_lib_dir_path = path_candidate
+            break
 
     if not python_lib_dir_path or not version_str:
         raise CompileError(
