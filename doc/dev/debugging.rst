@@ -403,6 +403,7 @@ The recompilation starts after the given checkpoint stage.
 
     replace_ir(f, "HLOLoweringPass", new_ir)
     f(2.0)
+    >> 8.0
 
 C Executable Generation
 =================
