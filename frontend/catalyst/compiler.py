@@ -154,8 +154,8 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
         compile_options (Optional[CompileOptions]): compile options.
     """
 
-    if compile_options.verbose:
-        print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
+    # if compile_options.verbose:
+    print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
 
 
@@ -383,6 +383,7 @@ class LinkerDriver:
         lib_path_flags += [
             f"-Wl,-rpath,{scipy_lib_path}",
             f"-L{scipy_lib_path}",
+            "-lgfortran",
         ]
 
         system_flags = []

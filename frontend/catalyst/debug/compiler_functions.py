@@ -263,16 +263,10 @@ def compile_executable(fn, *args):
         file.write(get_cmain(fn, *args))
 
     # configure flags
-    default_flags = LinkerDriver.get_default_flags(options)
-    no_shared_flags = [fs for fs in default_flags if fs != "-shared"]
-    link_so_flags = (
-        no_shared_flags
-        + [
-            "-Wl,-rpath," + workspace,
-            shared_object_file,
-        ]
-        + lib_path_flags
-    )
+    link_so_flags = [
+        "-Wl,-rpath," + workspace,
+        shared_object_file,
+    ] + lib_path_flags
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
     # Patch DLC prefix related to openblas
