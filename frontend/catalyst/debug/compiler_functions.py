@@ -318,7 +318,7 @@ def compile_executable(fn, *args):
         otool_path = shutil.which("otool")
         install_name_tool_path = shutil.which("install_name_tool")
         otool_result = subprocess.run(
-            [otool_path, "-l", output_file], capture_output=True, text=True, check=True
+            [otool_path, "-l", shared_object_file], capture_output=True, text=True, check=True
         )
 
         dlc_pattern = r"/DLC[^)]+\.dylib"
@@ -328,7 +328,23 @@ def compile_executable(fn, *args):
             dylib_file_name = re.findall(dylib_pattern, entry)[-1]
             new_entry = f"@rpath/{dylib_file_name}"
             subprocess.run(
-                [install_name_tool_path, "-change", entry, new_entry, output_file],
+                [install_name_tool_path, "-change", entry, new_entry, shared_object_file],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+        # Update the path of shared library if copy happens.
+        if not fn.compile_options.keep_intermediate:
+            original_shared_object_file = str(fn.workspace) + "/" + f_name + ".so"
+            subprocess.run(
+                [
+                    install_name_tool_path,
+                    "-change",
+                    original_shared_object_file,
+                    shared_object_file,
+                    output_file,
+                ],
                 capture_output=True,
                 text=True,
                 check=True,
