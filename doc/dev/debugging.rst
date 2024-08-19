@@ -415,7 +415,7 @@ It returns the path to the output executable file.
 Users can also use ``debug.print_memref`` to add information to stdout.
 
 The following example is a square function.
-Here we are using debug.print_memref to print the information of the result from ``y``.
+Here we are using ``debug.print_memref`` to print the information of the result from ``y``.
 The executable will be saved in the directory for intermediate results if ``keep_intermediate=True``.
 Otherwise, the executable will appear in the Catalyst project root
 
