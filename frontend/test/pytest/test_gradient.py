@@ -273,7 +273,7 @@ def test_value_and_grad_on_qjit_classical():
     def f5(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
 
-    result = qjit(value_and_grad(f5, argnum=(0, 1, 2)))(0.1, 0.2, 0.3)
+    result = qjit(value_and_grad(f5, argnums=(0, 1, 2)))(0.1, 0.2, 0.3)
     expected = (140, (100, 200, 300))
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
@@ -375,10 +375,10 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum):
 
         return circuit(x, y, z)[0]
 
-    result = qjit(value_and_grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3)
+    result = qjit(value_and_grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3)
     expected = (
         workflow_variant(1.1, 2.2, 3.3),
-        qjit(grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3),
+        qjit(grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3),
     )
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
