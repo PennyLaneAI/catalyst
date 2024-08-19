@@ -220,7 +220,9 @@
   ```
 
 * Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
-  It also supports mutti-dimensional arrays as function's inputs. [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+  A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
+  function inputs. 
+  [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
   ```py
   import subprocess
