@@ -326,9 +326,6 @@
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
-* Catalyst is now compatible with Enzyme `v0.0.130`
-  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
-
 * Improve error messaging for `catalyst.jvp` when the callee input type and the tangent
   type are not compatible by performing type-checking at the MLIR level. Note that the
   equivalent type checking is already performed in `catalyst.vjp`.
@@ -524,6 +521,9 @@
   [(#966)](https://github.com/PennyLaneAI/catalyst/pull/966)
 
 <h3>Internal changes</h3>
+
+* Catalyst is now compatible with Enzyme `v0.0.130`
+  [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
 * When memrefs have no identity layout, memrefs copy operations are replaced by the linalg copy operation.
   It does not use a runtime function but instead lowers to scf and standard dialects. It also ensures
