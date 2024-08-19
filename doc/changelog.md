@@ -325,6 +325,7 @@
   type are not compatible by performing type-checking at the MLIR level. Note that the
   equivalent type checking is already performed in `catalyst.vjp`.
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
+  [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
 
 <h3>Breaking changes</h3>
 
