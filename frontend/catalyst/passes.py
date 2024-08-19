@@ -38,7 +38,8 @@ from catalyst.jax_primitives import apply_registered_pass_p, transform_named_seq
 
 
 ## API ##
-def cancel_inverses(fn=None):  # pylint: disable=line-too-long
+# pylint: disable=line-too-long
+def cancel_inverses(fn=None):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
