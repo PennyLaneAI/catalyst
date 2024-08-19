@@ -303,6 +303,25 @@
   `catalyst.vjp` functions.
   [(#1031)](https://github.com/PennyLaneAI/catalyst/pull/1031)
 
+  ```python
+  from catalyst import qjit, jvp
+
+  def foo(x):
+      return 2 * x, x * x
+
+  @qjit()
+  def workflow(x: float):
+      return jvp(foo, (x,), (1,))
+  #                          ^
+  #                          Expected tangent dtype float, but got int
+  ```
+
+  ```
+  TypeError: function params and tangents arguments to catalyst.jvp do not match;
+  dtypes must be equal. Got function params dtype float64 and so expected tangent
+  dtype float64, but got tangent dtype int64 instead.
+  ```
+
 <h3>Breaking changes</h3>
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
