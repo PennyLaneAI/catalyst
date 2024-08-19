@@ -408,41 +408,24 @@ The recompilation starts after the given checkpoint stage.
 C Executable Generation
 =======================
 
-Catalyst provides a way to generate a c executable that calls the shared object of the given
-qjit-decorated function.
-The function :func:`~.debug.compile_executable` takes a qjit-decorated function and
-concrete arguments to that function as input.
-It returns the path to the output executable file.
-Users can also use ``debug.print_memref`` to add information to stdout.
-
-The following example is a square function.
-Here we are using ``debug.print_memref`` to print the information of the result from ``y``.
-The executable will be saved in the directory for intermediate results if ``keep_intermediate=True``.
-Otherwise, the executable will appear in the Catalyst project root
+Catalyst provides :func:`~.debug.compile_executable` to generate a c executable with a given function and the
+corresponding arguments.
 
 .. code-block:: python
+
+    from catalyst.debug import compile_executable
 
     @qjit
     def f(x):
-        y = x*x
-        debug.print_memref(y)
-        return y
+        return x*x
 
->>> f(5)
-MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
-25
-
-The compiled qjit-decorated function can be fed to ``compile_executable`` to get the required
-ld libraries and the executable file.
-Here we use ``subprocess.run`` to test if the command works properly.
-
-.. code-block:: python
-
-    import subprocess
-    from catalyst.debug import compile_executable
     binary = compile_executable(f, 1)
-    result = subprocess.run(binary, capture_output=True, text=True, check=True)
-    
->>> result.stdout
-MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
-25
+
+>>> print(binary)
+/path/to/executable
+
+.. code-block:: shell
+
+    $ /path/to/executable
+    MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+    25

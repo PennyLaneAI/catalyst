@@ -214,6 +214,7 @@ def replace_ir(fn, stage, new_ir):
 def compile_executable(fn, *args):
     """Generate and compile a C program that calls a jitted function with the provided arguments.
 
+
     Args:
         fn (QJIT): a qjit-decorated function
         *args: argument values to use in the C program when invoking ``fn``
@@ -221,6 +222,41 @@ def compile_executable(fn, *args):
     Returns:
         (str): the paths that should be included in LD_LIBRARY_PATH.
         (str): the path of output binary.
+
+    **Example**
+
+    The following example is a square function.
+    Here we are using ``debug.print_memref`` to print the information of the result from ``y``.
+
+    .. code-block:: python
+
+        @qjit
+        def f(x):
+            y = x*x
+            debug.print_memref(y)
+            return y
+
+    >>> f(5)
+    MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+    25
+
+    The executable will be saved in the directory for intermediate results if ``keep_intermediate=True``.
+    Otherwise, the executable will appear in the Catalyst project root.
+
+    .. code-block:: python
+
+        from catalyst.debug import compile_executable
+        binary = compile_executable(f, 1)
+
+    >>> print(binary)
+    /path/to/executable
+
+    .. code-block:: shell
+
+        $ /path/to/executable
+        MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+        25
+
     """
     # if fn is not compiled, compile it first.
     if not fn.compiled_function:
