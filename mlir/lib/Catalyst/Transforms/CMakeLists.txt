@@ -23,6 +23,7 @@ file(GLOB SRC
     TBAATagsPass.cpp
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
+    ApplyTransformSequencePass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

@@ -37,6 +37,7 @@ from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.passes import _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -420,6 +421,7 @@ class QJIT:
         self.mlir_module = None
         self.qir = None
         self.out_type = None
+        self.overwrite_ir = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
@@ -451,7 +453,7 @@ class QJIT:
 
             return self.user_function(*args, **kwargs)
 
-        requires_promotion = self.jit_compile(args)
+        requires_promotion = self.jit_compile(args, **kwargs)
 
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
@@ -491,7 +493,7 @@ class QJIT:
             )
 
     @debug_logger
-    def jit_compile(self, args):
+    def jit_compile(self, args, **kwargs):
         """Compile Python function on invocation using the provided arguments.
 
         Args:
@@ -522,7 +524,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args)
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    args, **kwargs
+                )
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -556,7 +560,7 @@ class QJIT:
 
     @instrument(size_from=0)
     @debug_logger
-    def capture(self, args):
+    def capture(self, args, **kwargs):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
         Args:
@@ -576,16 +580,34 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
-        def closure(*args, **kwargs):
-            st_argnums = kwargs.pop("static_argnums", static_argnums)
-            return QFunc.__call__(*args, static_argnums=st_argnums, **kwargs)
+        def closure(qnode, *args, **kwargs):
+            params = {}
+            params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
+            params["_out_tree_expected"] = []
+            return QFunc.__call__(qnode, *args, **dict(params, **kwargs))
 
         with Patcher(
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
+
+            def fn_with_transform_named_sequence(*args, **kwargs):
+                """
+                This function behaves exactly like the user function being jitted,
+                taking in the same arguments and producing the same results, except
+                it injects a transform_named_sequence jax primitive at the beginning
+                of the jaxpr when being traced.
+
+                Note that we do not overwrite self.original_function and self.user_function;
+                this fn_with_transform_named_sequence is ONLY used here to produce tracing
+                results with a transform_named_sequence primitive at the beginning of the
+                jaxpr. It is never executed or used anywhere, except being traced here.
+                """
+                _inject_transform_named_sequence()
+                return self.user_function(*args, **kwargs)
+
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                self.user_function, static_argnums, abstracted_axes, full_sig, {}
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
@@ -639,7 +661,15 @@ class QJIT:
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+        if self.overwrite_ir:
+            shared_object, llvm_ir, _ = self.compiler.run_from_ir(
+                self.overwrite_ir,
+                str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+                self.workspace,
+            )
+        else:
+            shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )

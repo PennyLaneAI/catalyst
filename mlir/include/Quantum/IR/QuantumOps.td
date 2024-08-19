@@ -126,6 +126,7 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     }];
 }
 
+
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate a quantum register.";
     let description = [{
@@ -239,6 +240,69 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def SetStateOp : Quantum_Op<"set_state", []> {
+    let summary = "Set state to a complex vector.";
+    let description = [{
+        This operation is useful for simulators implementing state preparation.
+        Instead of decomposing state preparation into multiple operations, this
+        operation shortcuts all of that into a single operation.
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[
+            1DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [1]>
+        ]>:$in_state,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $in_state `)` $in_qubits attr-dict `:` functional-type(operands, results)
+    }];
+
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getInState().getType());
+        }
+    }];
+
+}
+
+def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
+    let summary = "Set basis state.";
+    let description = [{
+        This operation is useful for simulators implementing set basis state.
+        Instead of decomposing basis state into multiple operations, this
+        operation shortcuts all of that into a single operation.
+        This signature matches the one in pennylane-lightning which expects
+        only a single integer as opposed to a binary digit.
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[
+            1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>
+        ]>:$basis_state,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $basis_state`)` $in_qubits attr-dict `:` functional-type(operands, results)
+    }];
+
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getBasisState().getType());
+        }
+    }];
 }
 
 def CustomOp : Gate_Op<"custom", [DifferentiableGate,
@@ -923,5 +987,6 @@ def StateOp : Measurement_Op<"state"> {
 
     let hasVerifier = 1;
 }
+
 
 #endif // QUANTUM_OPS

@@ -87,6 +87,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
 
@@ -173,12 +174,14 @@ HLO_LOWERING_PASS = (
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
+        "func.func(linalg-detensorize{aggressive-mode})",
     ],
 )
 
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
@@ -249,13 +252,21 @@ MLIR_TO_LLVM_PASS = (
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
         "convert-quantum-to-llvm",
+        # There should be no identical code folding
+        # (`mergeIdenticalBlocks` in the MLIR source code)
+        # between convert-async-to-llvm and
+        # add-exception-handling.
+        # So, if there's a pass from the beginning
+        # of this list to here that does folding
+        # add-exception-handling will fail to add async.drop_ref
+        # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
+        "add-exception-handling",
         "emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "canonicalize",
         "reconcile-unrealized-casts",
         "gep-inbounds",
-        "add-exception-handling",
         "register-inactive-callback",
     ],
 )
@@ -537,6 +548,7 @@ class Compiler:
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
+                checkpoint_stage=self.options.checkpoint_stage,
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e
@@ -593,7 +605,9 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
+        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
+            pipeline
+        ):
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"

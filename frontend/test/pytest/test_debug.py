@@ -9,8 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import platform
 import re
+import shutil
 
 import jax.numpy as jnp
 import numpy as np
@@ -18,9 +20,14 @@ import pennylane as qml
 import pytest
 from jax.tree_util import register_pytree_node_class
 
-from catalyst import debug, for_loop, qjit
+from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
+from catalyst.debug import (
+    compile_from_mlir,
+    get_cmain,
+    get_compilation_stage,
+    replace_ir,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -231,7 +238,7 @@ class TestPrintStage:
         def func():
             return 0
 
-        print_compilation_stage(func, "HLOLoweringPass")
+        print(get_compilation_stage(func, "HLOLoweringPass"))
 
         out, _ = capsys.readouterr()
         assert "@jit_func() -> tensor<i64>" in out
@@ -246,7 +253,7 @@ class TestPrintStage:
             return 0
 
         with pytest.raises(TypeError, match="needs to be a 'QJIT' object"):
-            print_compilation_stage(func, "HLOLoweringPass")
+            print(get_compilation_stage(func, "HLOLoweringPass"))
 
 
 class TestCompileFromIR:
@@ -298,6 +305,11 @@ module @workflow {
     quantum.finalize
     return
   }
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
+      transform.yield
+    }
+  }
 }
 """
         )
@@ -322,6 +334,11 @@ module @workflow {
   func.func @teardown() {
     quantum.finalize
     return
+  }
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
+      transform.yield
+    }
   }
 }
 """
@@ -418,6 +435,114 @@ class TestCProgramGeneration:
 
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
+
+    @pytest.mark.parametrize(
+        ("pass_name", "target", "replacement"),
+        [
+            (
+                "mlir",
+                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
+                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
+                + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
+            ),
+            (
+                "HLOLoweringPass",
+                "%0 = arith.mulf %extracted, %extracted : f64\n",
+                "%t = arith.mulf %extracted, %extracted : f64\n"
+                + "    %0 = arith.mulf %t, %extracted : f64\n",
+            ),
+            (
+                "QuantumCompilationPass",
+                "%0 = arith.mulf %extracted, %extracted : f64\n",
+                "%t = arith.mulf %extracted, %extracted : f64\n"
+                + "    %0 = arith.mulf %t, %extracted : f64\n",
+            ),
+            (
+                "BufferizationPass",
+                "%2 = arith.mulf %1, %1 : f64",
+                "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
+            ),
+            (
+                "MLIRToLLVMDialect",
+                "%5 = llvm.fmul %4, %4  : f64\n",
+                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
+            ),
+            (
+                "llvm_ir",
+                "%5 = fmul double %4, %4\n",
+                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
+            ),
+            (
+                "last",
+                "%5 = fmul double %4, %4\n",
+                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
+            ),
+        ],
+    )
+    def test_modify_ir(self, pass_name, target, replacement):
+        """Turn a square function in IRs into a cubic one."""
+
+        def f(x):
+            """Square function."""
+            return x**2
+
+        f.__name__ = f.__name__ + pass_name
+
+        jit_f = qjit(f, keep_intermediate=True)
+        data = 2.0
+        old_result = jit_f(data)
+        old_ir = get_compilation_stage(jit_f, pass_name)
+        old_workspace = str(jit_f.workspace)
+
+        new_ir = old_ir.replace(target, replacement)
+        replace_ir(jit_f, pass_name, new_ir)
+        new_result = jit_f(data)
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
+        assert old_result * data == new_result
+
+    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
+    def test_modify_ir_file_generation(self, pass_name):
+        """Test if recompilation rerun the same pass."""
+
+        def f(x: float):
+            """Square function."""
+            return x**2
+
+        f.__name__ = f.__name__ + pass_name
+
+        jit_f = qjit(f)
+        jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
+        jit_grad_f(3.0)
+        ir = get_compilation_stage(jit_grad_f, pass_name)
+        old_workspace = str(jit_grad_f.workspace)
+
+        replace_ir(jit_grad_f, pass_name, ir)
+        jit_grad_f(3.0)
+        file_list = os.listdir(str(jit_grad_f.workspace))
+        res = [i for i in file_list if pass_name in i]
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)
+        assert len(res) == 0
+
+    def test_get_compilation_stage_without_keep_intermediate(self):
+        """Test if error is raised when using get_pipeline_output without keep_intermediate."""
+
+        @qjit
+        def f(x: float):
+            """Square function."""
+            return x**2
+
+        f(2.0)
+
+        with pytest.raises(
+            CompileError,
+            match="Attempting to get output for pipeline: mlir, "
+            "but no file was found.\nAre you sure the file exists?",
+        ):
+            get_compilation_stage(f, "mlir")
 
 
 if __name__ == "__main__":

@@ -82,7 +82,7 @@ mhlo:
 	@echo "build MLIR-HLO"
 	# Patch MHLO cmake dependency
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
-	@if patch --dry-run -p1 $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
+	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \

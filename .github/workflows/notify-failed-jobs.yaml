@@ -6,6 +6,7 @@ on:
     types:
       - completed
     workflows:
+      - Build Catalyst Wheel on Linux (arm64)
       - Build Catalyst Wheel on Linux (x86_64)
       - Build Catalyst Wheel on macOS (arm64)
       - Build Catalyst Wheel on macOS (x86_64)
