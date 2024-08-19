@@ -284,6 +284,7 @@ def test_cancel_inverses_keep_original():
     @qjit(keep_intermediate=True)
     def test_cancel_inverses_keep_original_workflow0():
         return f(1.0)
+
     test_cancel_inverses_keep_original_workflow0()
     flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow0)
 
@@ -298,6 +299,7 @@ def test_cancel_inverses_keep_original():
     @qjit(keep_intermediate=True)
     def test_cancel_inverses_keep_original_workflow1():
         return g(1.0)
+
     test_cancel_inverses_keep_original_workflow1()
     flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow1)
 
@@ -315,7 +317,9 @@ def test_cancel_inverses_keep_original():
     @qjit(keep_intermediate=True)
     def test_cancel_inverses_keep_original_workflow2():
         return f(1.0), g(1.0)
+
     test_cancel_inverses_keep_original_workflow2()
-    flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow2)  
+    flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow2)
+
 
 test_cancel_inverses_keep_original()
