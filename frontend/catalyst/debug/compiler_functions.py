@@ -264,7 +264,7 @@ def compile_executable(fn, *args):
     if not fn.compiled_function:
         fn(*args)
 
-    # get python version. Search for possible directories.
+    # Try default library paths in case the targeted python-dev is shipped with OS.
     python_lib_dir_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
     version_info = sys.version_info
     python_lib_dir_path = ""
