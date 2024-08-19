@@ -211,7 +211,6 @@ def replace_ir(fn, stage, new_ir):
     fn.fn_cache.clear()
 
 
-# pylint: disable=line-too-long
 @debug_logger
 def compile_executable(fn, *args):
     """Generate and compile a C program that calls a jitted function with the provided arguments.
@@ -260,6 +259,8 @@ def compile_executable(fn, *args):
         25
 
     """
+    # pylint: disable=too-many-statements
+
     # if fn is not compiled, compile it first.
     if not fn.compiled_function:
         fn(*args)
