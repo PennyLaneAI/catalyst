@@ -245,8 +245,8 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     }
 
     // Prepare the arguments for the final call
-    std::vector<Value> argsAndQreg(fnWithMeasurementsOp.getArguments().begin(),
-                                   fnWithMeasurementsOp.getArguments().end());
+    std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
+                                   fnFoldedOp.getArguments().end());
     argsAndQreg.pop_back();
     argsAndQreg.push_back(allocQreg);
 
