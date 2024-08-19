@@ -23,6 +23,9 @@ install_catalyst_wheel(){
     # Clean the Catalyst installation
     python -m pip uninstall -y pennylane-catalyst
 
+    # Install Catalyst requirements
+    python -m pip install -r requirements.txt
+
     # Install Catalyst from TestPyPI
     python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst --pre --upgrade
 }
