@@ -142,10 +142,4 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
-def MyHelloWorldPass : Pass<"my-hello-world"> {
-    let summary = "An empty pass boilerplate that prints out hello world.";
-
-    let constructor = "catalyst::createMyHelloWorldPass()";
-}
-
 #endif // CATALYST_PASSES

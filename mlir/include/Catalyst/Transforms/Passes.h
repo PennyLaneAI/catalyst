@@ -29,7 +29,6 @@ std::unique_ptr<mlir::Pass> createQnodeToAsyncLoweringPass();
 std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();
 std::unique_ptr<mlir::Pass> createGEPInboundsPass();
 std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
-std::unique_ptr<mlir::Pass> createMyHelloWorldPass();
 
 void registerAllCatalystPasses();
 
