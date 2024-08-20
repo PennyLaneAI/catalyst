@@ -801,8 +801,6 @@ def _make_jaxpr_check_differentiable(
     with mark_gradient_tracing(method):
         jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args, **kwargs)
     _, out_tree = tree_flatten(shape)
-    assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
-    assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
