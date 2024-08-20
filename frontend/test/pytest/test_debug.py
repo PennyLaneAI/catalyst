@@ -13,6 +13,7 @@ import os
 import platform
 import re
 import shutil
+import subprocess
 
 import jax.numpy as jnp
 import numpy as np
@@ -23,6 +24,7 @@ from jax.tree_util import register_pytree_node_class
 from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import (
+    compile_executable,
     compile_from_mlir,
     get_cmain,
     get_compilation_stage,
@@ -447,37 +449,35 @@ class TestCProgramGeneration:
             ),
             (
                 "HLOLoweringPass",
-                "%2 = arith.mulf %in, %in_0 : f64\n",
-                "%t = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %t, %in_0 : f64\n",
+                "%0 = arith.mulf %extracted, %extracted : f64\n",
+                "%t = arith.mulf %extracted, %extracted : f64\n"
+                + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
                 "QuantumCompilationPass",
-                "%2 = arith.mulf %in, %in_0 : f64\n",
-                "%t = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %t, %in_0 : f64\n",
+                "%0 = arith.mulf %extracted, %extracted : f64\n",
+                "%t = arith.mulf %extracted, %extracted : f64\n"
+                + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
                 "BufferizationPass",
-                "%6 = arith.mulf %in, %in_0 : f64\n",
-                "%t = arith.mulf %in, %in_0 : f64\n" + "    %6 = arith.mulf %t, %in_0 : f64\n",
+                "%2 = arith.mulf %1, %1 : f64",
+                "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
                 "MLIRToLLVMDialect",
-                "%21 = llvm.fmul %19, %20  : f64\n",
-                "%t = llvm.fmul %19, %20  : f64\n" + "    %21 = llvm.fmul %t, %20  : f64\n",
+                "%5 = llvm.fmul %4, %4  : f64\n",
+                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
             ),
             (
                 "llvm_ir",
-                "store double %15, ptr %9, align 8\n",
-                "%t1 = load double, ptr %1, align 8\n"
-                + "   %t2 = fmul double %15, %t1\n"
-                + "   store double %t2, ptr %9, align 8\n",
+                "%5 = fmul double %4, %4\n",
+                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
             (
                 "last",
-                "store double %15, ptr %9, align 8\n",
-                "%t1 = load double, ptr %1, align 8\n"
-                + "   %t2 = fmul double %15, %t1\n"
-                + "   store double %t2, ptr %9, align 8\n",
+                "%5 = fmul double %4, %4\n",
+                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
         ],
     )
@@ -545,6 +545,46 @@ class TestCProgramGeneration:
             "but no file was found.\nAre you sure the file exists?",
         ):
             get_compilation_stage(f, "mlir")
+
+    @pytest.mark.parametrize(
+        "arg",
+        [
+            5,
+            np.ones(5, dtype=int),
+            np.ones((5, 2), dtype=int),
+        ],
+    )
+    def test_executable_generation(self, arg):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """Square function with debugging print."""
+            y = x * x
+            debug.print_memref(y)
+            return y
+
+        ans = str(f(arg).tolist()).replace(" ", "")
+
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        assert ans in result.stdout.replace(" ", "").replace("\n", "")
+
+    def test_executable_generation_without_precompiled_function(self):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """identity function with debugging print."""
+            debug.print_memref(x)
+            return x
+
+        arg = 5
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
 
 
 if __name__ == "__main__":

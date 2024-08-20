@@ -1057,7 +1057,7 @@ def test_tuple_array_in_tuple_array_out():
         return (vjp0, vjp1)
 
     @qml.qjit
-    @partial(grad, argnum=[0, 1])  # We just use argnum instead of argnums?
+    @partial(grad, argnums=[0, 1])
     def result(x, y):
         return jnp.dot(*some_func(x, y**2))
 
@@ -1281,7 +1281,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
 
 
 def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
-    """Matrix multiply argnum=0"""
+    """Matrix multiply argnums=0"""
 
     A = jax.numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
 
@@ -1374,7 +1374,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
         return matrix_multiply_vjp(cotangents)
 
     @qml.qjit
-    @jacobian(argnum=[0, 1])
+    @jacobian(argnums=[0, 1])
     def mul(X, Y):
         return matrix_multiply_callback(X, Y)
 

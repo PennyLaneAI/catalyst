@@ -184,8 +184,8 @@
   ...
   }
   ```
-  
-* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and 
+
+* Catalyst now has debug interfaces `get_compilation_stage` and `replace_ir` to acquire and
   recompile the IR from a given pipeline pass. They can only be used with `keep_intermediate=True`.
   `get_compilation_stage` is renamed from `print_compilation_stage` and now returns a IR string.
   [(#981)](https://github.com/PennyLaneAI/catalyst/pull/981)
@@ -197,7 +197,7 @@
   def f(x):
       return x**2
   ```
-  
+
   ```pycon
   >>> f(2.0)
   4.0
@@ -205,7 +205,7 @@
 
   ```py
   from catalyst.debug import get_pipeline_output, replace_ir
-  
+
   old_ir = get_pipeline_output(f, "HLOLoweringPass")
   new_ir = old_ir.replace(
       "%2 = arith.mulf %in, %in_0 : f64\n",
@@ -213,13 +213,44 @@
   )
   replace_ir(f, "HLOLoweringPass", new_ir)
   ```
-  
+
   ```pycon
   >>> f(2.0)
    8.0
   ```
 
+* Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
+  A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
+  function inputs. 
+  [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+
+  ```py
+  import subprocess
+  from catalyst import qjit
+  from catalyst.debug import compile_executable, print_memref
+  
+  @qjit
+  def f(x):
+      y = x*x
+      print_memref(y)
+      return y
+  f(5)
+  binary = compile_executable(f, 5)
+  result = subprocess.run(binary, capture_output=True, text=True, check=True)
+  result.stdout
+  ```
+  
+  ```pycon
+  >>> MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  ```
+
 <h3>Improvements</h3>
+
+* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
+  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
 
 * Catalyst now supports keyword arguments for qjit-compiled functions.
   [(#1004)](https://github.com/PennyLaneAI/catalyst/pull/1004)
@@ -282,7 +313,7 @@
   [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
   [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
 
-* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a 
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
@@ -294,8 +325,40 @@
   type are not compatible by performing type-checking at the MLIR level. Note that the
   equivalent type checking is already performed in `catalyst.vjp`.
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
+  [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
+
+* Add type checking and improve error messaging in the frontend `catalyst.jvp` and
+  `catalyst.vjp` functions.
+  [(#1031)](https://github.com/PennyLaneAI/catalyst/pull/1031)
+
+  ```python
+  from catalyst import qjit, jvp
+
+  def foo(x):
+      return 2 * x, x * x
+
+  @qjit()
+  def workflow(x: float):
+      return jvp(foo, (x,), (1,))
+  #                          ^
+  #                          Expected tangent dtype float, but got int
+  ```
+
+  ```
+  TypeError: function params and tangents arguments to catalyst.jvp do not match;
+  dtypes must be equal. Got function params dtype float64 and so expected tangent
+  dtype float64, but got tangent dtype int64 instead.
+  ```
+
+* Add a script for setting up a Frontend-Only Development Environment that does not require
+  compilation, as it uses the TestPyPI wheel shared libraries.
+  [(#1022)](https://github.com/PennyLaneAI/catalyst/pull/1022)
 
 <h3>Breaking changes</h3>
+
+* The `argnum` keyword argument in the `grad`, `jacobian`, `value_and_grad`,
+  `vjp`, and `jvp` functions has been renamed to `argnums` to better match JAX.
+  [(#1036)](https://github.com/PennyLaneAI/catalyst/pull/1036)
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
   `jax.Array` instead. This should have minimal impact, but code that depends on the output of
@@ -338,7 +401,7 @@
       m_0 = catalyst.measure(0, postselect=1)
       return {"hi": qml.expval(qml.Z(0))}
   ```
-  
+
   ```pycon
   >>> func(0.9)
   {'hi': Array(-1., dtype=float64)}
@@ -424,6 +487,13 @@
       return y
   ```
 
+* `value_and_grad` will now correctly differentiate functions with multiple arguments.
+  [(#1034)](https://github.com/PennyLaneAI/catalyst/pull/1034)
+
+* `cancel_inverses` will now no longer mutate the original qnode, and instead it will perform
+  the mlir pass on a cloned copy of the qnode.
+  [(#1037)](https://github.com/PennyLaneAI/catalyst/pull/1037)
+
 <h3>Documentation</h3>
 
 * A page has been added to the documentation, listing devices that are
@@ -483,7 +553,7 @@ Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa Lopez,
 Mudit Pandey,
-nate stemen,
+Nate Stemen,
 Raul Torres,
 Tzung-Han Juang,
 Paul Haochen Wang,

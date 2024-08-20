@@ -174,6 +174,7 @@ HLO_LOWERING_PASS = (
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
+        "func.func(linalg-detensorize{aggressive-mode})",
     ],
 )
 
@@ -386,7 +387,10 @@ class LinkerDriver:
 
         system_flags = []
         if platform.system() == "Linux":
-            system_flags += ["-Wl,-no-as-needed"]
+            # --disable-new-dtags makes the linker use RPATH instead of RUNPATH.
+            # RPATH influences search paths globally while RUNPATH only works for
+            # a single file, but not its dependencies.
+            system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
         elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
 
