@@ -193,33 +193,7 @@ QUANTUM_COMPILATION_PASS = (
 BUFFERIZATION_PASS = (
     "BufferizationPass",
     [
-        "one-shot-bufferize{dialect-filter=memref}",
-        "inline",
-        "gradient-bufferize",
-        "scf-bufferize",
-        "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        # "arith-bufferize",
-        "empty-tensor-to-alloc-tensor",
-        # "func.func(bufferization-bufferize)",
-        # "func.func(tensor-bufferize)",
-        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        # "func.func(linalg-bufferize)",
-        # "func.func(tensor-bufferize)",
-        "quantum-bufferize",
-        "func-bufferize",
-        # "func.func(finalizing-bufferize)",
-        "canonicalize",  # Remove dead memrefToTensorOp's
-        # introduced during gradient-bufferize of callbacks
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
-        "func.func(buffer-deallocation)",
-        "convert-arraylist-to-memref",
-        "convert-bufferization-to-memref",
-        "canonicalize",  # Must be after convert-bufferization-to-memref
-        # otherwise there are issues in lowering of dynamic tensors.
-        # "cse",
-        "cp-global-memref",
+        "one-shot-bufferize{bufferize-function-boundaries}",
     ],
 )
 
@@ -275,6 +249,8 @@ DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
+    #BUFFERIZATION_PASS2,
+    #BUFFERIZATION_PASS3,
     MLIR_TO_LLVM_PASS,
 ]
 
@@ -290,6 +266,8 @@ DEFAULT_ASYNC_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
+    #BUFFERIZATION_PASS2,
+    #BUFFERIZATION_PASS3,
     MLIR_TO_LLVM_ASYNC_PASS,
 ]
 
