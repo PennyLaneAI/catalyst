@@ -2,7 +2,7 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) 
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) 
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
 Python versions 3.9 and higher. To install it, simply run the following ``pip`` command:
 
@@ -350,7 +350,7 @@ them, but using the ``test-runtime`` target instead:
 
 .. code-block:: console
 
-  make test-runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
+  make test-runtime ENABLE_OPENQASM=ON
 
 .. note::
 
@@ -411,6 +411,96 @@ To generate html files for the documentation for Catalyst:
 
 .. code-block:: console
 
-  pip install -r doc/requirements.txt
+  make docs
 
 The generated files are located in ``doc/_build/html``
+
+Install a Frontend-Only Development Environment from TestPyPI Wheels
+--------------------------------------------------------------------
+
+It is possible to work on the source code repository and test the changes without 
+having to compile Catalyst. This is ideal for situations where the changes do not target the 
+runtime or the MLIR infrastructure, and only concern the frontend. It basically 
+makes use of the shared libraries already shipped with the TestPyPI Catalyst wheels.
+
+Essential Steps
+^^^^^^^^^^^^^^^
+
+To activate the development environment, open a terminal and issue the following commands:
+
+.. code-block:: console
+
+  # Clone the Catalyst repository without submodules, as they are not needed for frontend
+  # development
+  git clone git@github.com:PennyLaneAI/catalyst.git
+
+  # Setup the development environment based on the latest TestPyPI wheels.
+  # Please provide a path for the Python virtual environment
+  cd catalyst
+  bash ./setup_dev_from_wheel.sh /path/to/virtual/env
+
+  # Activate the Python virtual environment
+  source /path/to/virtual/env/bin/activate
+
+To exit the Python virtual environment, type:
+
+.. code-block:: console
+
+  deactivate
+
+Special Considerations
+^^^^^^^^^^^^^^^^^^^^^^
+
+Catalyst dev wheels are tied to fixed versions of PennyLane and Lightning, which are installed
+together as a bundle. If you want to use different versions of Pennylane or Lightning, reinstall the
+desired versions after having run the script:
+
+.. code-block:: console
+
+  python -m pip install pennylane==0.*.*
+  python -m pip install pennylane-lightning==0.*.*
+
+If you require the Catalyst repository with all its submodules, clone it this way:
+
+.. code-block:: console
+
+  git clone --recurse-submodules --shallow-submodules git@github.com:PennyLaneAI/catalyst.git
+
+How Does it Work?
+^^^^^^^^^^^^^^^^^
+
+The provided script first creates and activates a Python virtual environment, so the system Python
+configurations do not get affected, nor other virtual environments.
+
+In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard 
+links from the wheel code to the frontend code of the repository, in order to allow working
+directly with the frontend code of the repository and at the same time test the changes while
+using the installed Catalyst wheel libraries, hence avoiding compilation.
+
+Further Steps
+^^^^^^^^^^^^^
+
+If everything goes well, ``git status`` should not report any changed files. 
+
+Before making changes to the frontend, make sure you create a new branch:
+
+.. code-block:: console
+
+  git checkout -b new-branch-name
+
+Once in the new branch, make the wanted changes. Use the IDE of your preference.
+
+You can test the changes by executing your sample code under the same virtual environment you used
+with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually 
+changing the code stored at the Python ``site-packages`` folder as well, and you will be automatically
+using the shared libraries provided by the Python wheels. Again, there is no need to compile Catalyst
+from source.
+
+You can commit your changes as usual. Once ready, push the new branch to the remote
+repository:
+
+.. code-block:: console
+  
+  git push -u origin new-branch-name
+
+Now you can go to GitHub and issue a Pull Request based on the new branch.

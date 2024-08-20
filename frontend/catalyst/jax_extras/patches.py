@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import jax
+from jax._src.lax.lax import _nary_lower_hlo
 from jax._src.lax.slicing import (
     _gather_shape_computation,
     _is_sorted,
@@ -25,12 +26,15 @@ from jax._src.lax.slicing import (
     _rank,
     _sorted_dims_in_range,
 )
+from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue, Tracer, concrete_aval
 
 __all__ = (
     "get_aval2",
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
+    "_sin_lowering2",
+    "_cos_lowering2",
 )
 
 
@@ -180,3 +184,13 @@ def _gather_shape_rule_dynamic(
             )
 
     return _gather_shape_computation(indices, dimension_numbers, slice_sizes)
+
+
+def _sin_lowering2(ctx, x):
+    """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
+    return _nary_lower_hlo(hlo.sine, ctx, x)
+
+
+def _cos_lowering2(ctx, x):
+    """Use hlo.cosine lowering instead of the new cosine lowering from jax 0.4.28"""
+    return _nary_lower_hlo(hlo.cosine, ctx, x)

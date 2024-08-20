@@ -42,15 +42,15 @@ module @test1 {
 
   // CHECK: llvm.mlir.global external @__enzyme_inactivefn
   // CHECK: [[undef:%.+]] = llvm.mlir.undef
-  // CHECK: [[ptr:%.+]] = llvm.mlir.addressof @inactive_callback
+  // CHECK: [[ptr:%.+]] = llvm.mlir.addressof @__catalyst_inactive_callback
   // CHECK: [[retval:%.+]] = llvm.insertvalue [[ptr]], [[undef]][0]
   // CHECK: llvm.return [[retval]]
 
-  llvm.func @inactive_callback(i64, i64, i64, ...)
+  llvm.func @__catalyst_inactive_callback(i64, i64, i64, ...)
   llvm.func @wrapper() {
     %0 = llvm.mlir.constant(139935726668624 : i64) : i64
     %1 = llvm.mlir.constant(0 : i64) : i64
-    llvm.call @inactive_callback(%0, %1, %1) vararg(!llvm.func<void (i64, i64, i64, ...)>) : (i64, i64, i64) -> ()
+    llvm.call @__catalyst_inactive_callback(%0, %1, %1) vararg(!llvm.func<void (i64, i64, i64, ...)>) : (i64, i64, i64) -> ()
     llvm.return
   }
 }

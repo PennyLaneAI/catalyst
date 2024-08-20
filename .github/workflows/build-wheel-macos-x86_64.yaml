@@ -7,19 +7,22 @@ on:
       - reopened
       - synchronize
       - labeled
+      - ready_for_review
   push:
     branches: [ main ]
   workflow_dispatch:
+  workflow_call:
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 12
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: Build Catalyst Wheel on macOS (x86_64)-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   check_if_wheel_build_required:
+    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
@@ -34,8 +37,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
         python_version: [3.9]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -53,7 +54,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Source
@@ -61,7 +62,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache Enzyme Source
@@ -69,7 +70,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
-        key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -97,26 +98,28 @@ jobs:
         path: mlir/Enzyme
 
     # Cache external project builds
-    - name: Cache LLVM Build
+    - name: Restore LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
-    - name: Cache MHLO Build
+    - name: Restore MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
 
-    - name: Cache Enzyme Build
+    - name: Restore Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
 
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
@@ -150,10 +153,23 @@ jobs:
         # This tests fails on CI/CD not locally.
         LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
 
+    - name: Save LLVM Build
+      id: save-llvm-build
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -166,6 +182,14 @@ jobs:
 
         cmake --build mhlo-build --target check-mlir-hlo
 
+    - name: Save MHLO Build
+      id: save-mhlo-build
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
@@ -175,19 +199,25 @@ jobs:
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
-        cmake --build enzyme-build --target EnzymeStatic-18
+        cmake --build enzyme-build --target EnzymeStatic-19
+
+    - name: Save Enzyme Build
+      id: save-enzyme-build
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
   catalyst-macos-wheels-x86-64:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-12
 
     steps:
     - name: Checkout Catalyst repo
@@ -204,52 +234,53 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: mlir/mlir-hlo
-        key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  mlir/Enzyme
-        key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
@@ -261,13 +292,8 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=476cac2e39f79c122b8751a77aad8139b39296db \
-              -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DLIGHTNING_GIT_TAG=c6b86a5 \
               -DENABLE_LAPACK=OFF \
-              -DKokkos_ENABLE_SERIAL=ON \
-              -DKokkos_ENABLE_OPENMP=OFF \
-              -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
-              -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
@@ -338,13 +364,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Mac x86
+    runs-on: macos-12
 
     steps:
     - name: Checkout Catalyst repo
@@ -371,19 +395,18 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
     - name: Install OQC client
-      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
+        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         # TODO: Uncomment after fixing https://github.com/PennyLaneAI/pennylane-lightning/issues/552
-        # python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/test_oqc/oqc -n auto
+        # python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/async_tests
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto

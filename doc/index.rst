@@ -53,8 +53,12 @@ Catalyst
    <br>
 
 .. mdinclude:: ../README.md
-  :start-line: 19
-  :end-line: 72
+  :start-line: 20
+  :end-line: 73
+
+.. mdinclude:: ../README.md
+  :start-line: 142
+  :end-line: 163
 
 .. toctree::
    :maxdepth: 2
@@ -63,8 +67,11 @@ Catalyst
 
    dev/installation
    dev/quick_start
+   dev/devices
    dev/autograph
    dev/sharp_bits
+   dev/jax_integration
+   dev/callbacks
    dev/release_notes
 
 .. toctree::
@@ -75,6 +82,7 @@ Catalyst
    dev/architecture
    PennyLane Frontend <modules/frontend>
    Compiler Core <modules/mlir>
+   MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
    Quantum Runtime <modules/runtime>
    dev/debugging

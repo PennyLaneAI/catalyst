@@ -1,0 +1,66 @@
+cff-version: "1.2.0"
+authors:
+- family-names: Ittah
+  given-names: David
+  orcid: "https://orcid.org/0000-0003-0975-6448"
+- family-names: Asadi
+  given-names: Ali
+- family-names: Ochoa Lopez
+  given-names: Erick
+- family-names: Mironov
+  given-names: Sergei
+- family-names: Banning
+  given-names: Samuel
+- family-names: Moyard
+  given-names: Romain
+  orcid: "https://orcid.org/0000-0003-0837-6451"
+- family-names: Peng
+  given-names: Mai Jacob
+  orcid: "https://orcid.org/0000-0002-2377-264X"
+- family-names: Izaac
+  given-names: Josh
+  orcid: "https://orcid.org/0000-0003-2640-0734"
+contact:
+- family-names: Izaac
+  given-names: Josh
+  orcid: "https://orcid.org/0000-0003-2640-0734"
+doi: 10.5281/zenodo.12696447
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Ittah
+    given-names: David
+    orcid: "https://orcid.org/0000-0003-0975-6448"
+  - family-names: Asadi
+    given-names: Ali
+  - family-names: Ochoa Lopez
+    given-names: Erick
+  - family-names: Mironov
+    given-names: Sergei
+  - family-names: Banning
+    given-names: Samuel
+  - family-names: Moyard
+    given-names: Romain
+    orcid: "https://orcid.org/0000-0003-0837-6451"
+  - family-names: Peng
+    given-names: Mai Jacob
+    orcid: "https://orcid.org/0000-0002-2377-264X"
+  - family-names: Izaac
+    given-names: Josh
+    orcid: "https://orcid.org/0000-0003-2640-0734"
+  date-published: 2024-07-09
+  doi: 10.21105/joss.06720
+  issn: 2475-9066
+  issue: 99
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 6720
+  title: "Catalyst: a Python JIT compiler for auto-differentiable hybrid
+    quantum programs"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.06720"
+  volume: 9
+title: "Catalyst: a Python JIT compiler for auto-differentiable hybrid
+  quantum programs"

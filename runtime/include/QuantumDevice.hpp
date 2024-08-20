@@ -17,6 +17,7 @@
 #include <complex>
 #include <memory>
 #include <optional>
+#include <random>
 #include <vector>
 
 #include "DataView.hpp"
@@ -104,6 +105,26 @@ struct QuantumDevice {
     [[nodiscard]] virtual auto GetDeviceShots() const -> size_t = 0;
 
     /**
+     * @brief Set the PRNG of the device.
+     *
+     * The Catalyst runtime enables seeded program execution on non-hardware devices.
+     * A random number generator instance is managed by the runtime to predictably
+     * generate results for non-deterministic programs, such as those involving `Measure`
+     * calls.
+     * Devices implementing support for this feature do not need to use the provided
+     * PRNG instance as their sole source of random numbers, but it is expected that the
+     * the same instance state will predictable and reproducibly generate the same
+     * program results. It is also expected that the provided PRNG state is evolved
+     * sufficiently so that two device executions sharing the same instance do not produce
+     * identical results.
+     * The provided PRNG instance is not thread-locked, and devices wishing to share it
+     * across threads will need to provide their own thread-safety.
+     *
+     * @param gen The std::mt19937 PRNG object.
+     */
+    virtual void SetDevicePRNG([[maybe_unused]] std::mt19937 *gen){};
+
+    /**
      * @brief Start recording a quantum tape if provided.
      *
      * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
@@ -137,6 +158,28 @@ struct QuantumDevice {
      * @brief A helper method to print the state vector of a device.
      */
     virtual void PrintState() = 0;
+
+    /**
+     * @brief Prepare subsystems using the given ket vector in the computational basis.
+     *
+     * @param state A state vector of size 2**len(wires)
+     * @param wires The wire(s) the operation acts on
+     */
+    virtual void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &)
+    {
+        RT_FAIL("Unsupported functionality");
+    }
+
+    /**
+     * @brief Prepares a single computational basis state.
+     *
+     * @param n Prepares the basis state |n>, where n is an array of integers from the set {0, 1}
+     * @param wires The wire(s) the operation acts on
+     */
+    virtual void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &)
+    {
+        RT_FAIL("Unsupported functionality");
+    }
 
     /**
      * @brief Apply a single gate to the state vector of a device with its name if this is

@@ -71,5 +71,31 @@ class TestExpmInCircuit:
         assert np.allclose(res, expected)
 
 
+class TestArgsortNumerical:
+    """Test jax.numpy.argsort sort arrays correctly when being qjit compiled"""
+
+    @pytest.mark.parametrize(
+        "inp",
+        [
+            jnp.array([1.2, 0.1, 2.7, 0.6]),
+            jnp.array([-1.2, -0.1, -2.7, -0.6]),
+            jnp.array([[0.1, 0.2], [5.3, 1.2]]),
+            jnp.array([[1, 2], [-3, -4]]),
+            jnp.array([[1.0, -1.0, 1.0], [1.0, -1.0, -1.0]]),
+        ],
+    )
+    def test_expm_numerical(self, inp):
+        """jax.numpy.argsort sort arrays correctly when being qjit compiled"""
+
+        @qjit
+        def f(x):
+            return jnp.argsort(x)
+
+        observed = f(inp)
+        expected = jnp.argsort(inp)
+
+        assert np.allclose(observed, expected)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

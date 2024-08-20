@@ -84,8 +84,10 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
                             ? cast<RankedTensorType>(activeResultType).getElementType()
                             : activeResultType);
 
-    Value zero = builder.create<arith::ConstantFloatOp>(loc, APFloat(0.0), elementType);
-    Value one = builder.create<arith::ConstantFloatOp>(loc, APFloat(1.0), elementType);
+    Value zero = builder.create<arith::ConstantFloatOp>(
+        loc, APFloat(elementType.getFloatSemantics(), 0), elementType);
+    Value one = builder.create<arith::ConstantFloatOp>(
+        loc, APFloat(elementType.getFloatSemantics(), 1), elementType);
 
     Value zeroTensor;
     if (auto activeResultTensor = dyn_cast<RankedTensorType>(activeResultType)) {
@@ -353,7 +355,8 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
         numGradients = op->getNumResults();
     }
     else if (isa<ValueAndGradOp>(op)) {
-        numGradients = cast<ValueAndGradOp>(&op)->getGradients().size();
+        // one of the results is the value; the remaining ones are grad
+        numGradients = op->getNumResults() - 1;
 
         // Collect value types
         for (auto &&val : cast<ValueAndGradOp>(&op)->getVals()) {

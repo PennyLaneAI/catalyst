@@ -29,6 +29,8 @@ from catalyst.device import (
     QJITDeviceNewAPI,
     extract_backend_info,
     get_device_capabilities,
+    get_device_toml_config,
+    qjit_device,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import ProgramFeatures
@@ -93,7 +95,7 @@ def test_qjit_device():
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
     backend_info = extract_backend_info(device, capabilities)
     device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
 
@@ -107,7 +109,7 @@ def test_qjit_device():
     assert transform_program
     assert len(transform_program) == 3
     assert transform_program[-2]._transform.__name__ == "verify_operations"
-    assert transform_program[-1]._transform.__name__ == "validate_observables"
+    assert transform_program[-1]._transform.__name__ == "validate_measurements"
 
     # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
@@ -131,7 +133,7 @@ def test_qjit_device_no_wires():
     device = DummyDeviceNoWires(shots=2032)
 
     # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
     backend_info = extract_backend_info(device, capabilities)
 
     with pytest.raises(
@@ -154,13 +156,55 @@ def test_qjit_device_invalid_wires(wires):
     device._wires = wires
 
     # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
     backend_info = extract_backend_info(device, capabilities)
 
     with pytest.raises(
         AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
     ):
         QJITDeviceNewAPI(device, capabilities, backend_info)
+
+
+@pytest.mark.parametrize("shots", [2048, None])
+def test_qjit_device_measurements(shots, mocker):
+    """Test that the list of measurements that are supported is correctly
+    updated based on shots provided to the device"""
+
+    spy = mocker.spy(qjit_device, "get_device_capabilities")
+
+    dev = qml.device("lightning.qubit", wires=2, shots=shots)
+    state_measurements = {"State"}
+    finite_shot_measurements = {"Counts", "Sample"}
+
+    config = get_device_toml_config(dev)
+    all_measurements = set(config["measurement_processes"])
+
+    assert state_measurements.issubset(all_measurements)
+    assert finite_shot_measurements.issubset(all_measurements)
+
+    dev_capabilities = get_device_capabilities(dev)
+    expected_measurements = dev_capabilities.measurement_processes
+
+    if shots is None:
+        # state measurements are present in expected_measurements, finite shot measurements are not
+        assert state_measurements.issubset(expected_measurements)
+        assert finite_shot_measurements.intersection(expected_measurements) == set()
+    else:
+        # finite shot measurements are present in expected_measurements, state measurements are not
+        assert finite_shot_measurements.issubset(expected_measurements)
+        assert state_measurements.intersection(expected_measurements) == set()
+
+    spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit():
+        qml.X(0)
+        return qml.expval(qml.PauliZ(0))
+
+    circuit()
+
+    assert spy.spy_return.measurement_processes == expected_measurements
 
 
 def test_simple_circuit():

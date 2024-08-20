@@ -71,6 +71,9 @@ class CompileOptions:
         static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
+        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
+        seed (Optional[int]) : the seed for random operations in a qjit call.
+            Default is None.
     """
 
     verbose: Optional[bool] = False
@@ -84,14 +87,37 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
+    checkpoint_stage: Optional[str] = ""
+    disable_assertions: Optional[bool] = False
+    seed: Optional[int] = None
 
     def __post_init__(self):
+        # Check that async runs must not be seeded
+        if self.async_qnodes and self.seed != None:
+            raise CompileError(
+                """
+                Seeding has no effect on asyncronous qnodes,
+                as the execution order of parallel runs is not guaranteed.
+                As such, seeding an asynchronous run is not supported.
+                """
+            )
+
+        # Check that seed is 32-bit unsigned int
+        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
+            raise ValueError(
+                """
+                Seed must be an unsigned 32-bit integer!
+                """
+            )
+
         # Make the format of static_argnums easier to handle.
         static_argnums = self.static_argnums
         if static_argnums is None:
             self.static_argnums = ()
         elif isinstance(static_argnums, int):
             self.static_argnums = (static_argnums,)
+        elif isinstance(static_argnums, Iterable):
+            self.static_argnums = tuple(static_argnums)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -110,6 +136,12 @@ class CompileOptions:
             return self.pipelines
         elif self.async_qnodes:
             return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
+        if self.disable_assertions:
+            if "disable-assertion" not in QUANTUM_COMPILATION_PASS[1]:
+                QUANTUM_COMPILATION_PASS[1].append("disable-assertion")
+        else:
+            if "disable-assertion" in QUANTUM_COMPILATION_PASS[1]:
+                QUANTUM_COMPILATION_PASS[1].remove("disable-assertion")
         return DEFAULT_PIPELINES
 
 
@@ -134,24 +166,27 @@ HLO_LOWERING_PASS = (
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
         "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-shapeops-to-standard)",
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
+        "func.func(hlo-legalize-sort)",
         "convert-to-signless",
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",
+        "func.func(linalg-detensorize{aggressive-mode})",
     ],
 )
 
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
+        "disable-assertion",
     ],
 )
 
@@ -174,13 +209,15 @@ BUFFERIZATION_PASS = (
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
-        "canonicalize",
+        "canonicalize",  # Remove dead memrefToTensorOp's
+        # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
-        "canonicalize",
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
         # "cse",
         "cp-global-memref",
     ],
@@ -192,6 +229,7 @@ MLIR_TO_LLVM_PASS = (
     [
         "expand-realloc",
         "convert-gradient-to-llvm",
+        "memrefcpy-to-linalgcpy",
         "func.func(convert-linalg-to-loops)",
         "convert-scf-to-cf",
         # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
@@ -213,13 +251,21 @@ MLIR_TO_LLVM_PASS = (
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
         "convert-quantum-to-llvm",
+        # There should be no identical code folding
+        # (`mergeIdenticalBlocks` in the MLIR source code)
+        # between convert-async-to-llvm and
+        # add-exception-handling.
+        # So, if there's a pass from the beginning
+        # of this list to here that does folding
+        # add-exception-handling will fail to add async.drop_ref
+        # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
+        "add-exception-handling",
         "emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "canonicalize",
         "reconcile-unrealized-casts",
         "gep-inbounds",
-        "add-exception-handling",
         "register-inactive-callback",
     ],
 )
@@ -497,9 +543,11 @@ class Compiler:
                 str(workspace),
                 module_name,
                 keep_intermediate=self.options.keep_intermediate,
+                async_qnodes=self.options.async_qnodes,
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
+                checkpoint_stage=self.options.checkpoint_stage,
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e
@@ -556,7 +604,9 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
+        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
+            pipeline
+        ):
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"

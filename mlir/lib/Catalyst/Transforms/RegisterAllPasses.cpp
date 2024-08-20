@@ -34,6 +34,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createCatalystConversionPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
+    mlir::registerPass(catalyst::createDisableAssertionPass);
     mlir::registerPass(catalyst::createTestPass);
     mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
     mlir::registerPass(catalyst::createAddExceptionHandlingPass);
@@ -41,4 +42,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
+    mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
+    mlir::registerPass(catalyst::createApplyTransformSequencePass);
 }

@@ -374,7 +374,7 @@ class TestJAXAD:
             assert jnp.allclose(a, b, rtol=1e-6, atol=1e-6)
 
     def test_efficient_Jacobian(self, backend):
-        """Test a jax.grad function does not compute Jacobians for arguments not in argnum."""
+        """Test a jax.grad function does not compute Jacobians for arguments not in argnums."""
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -394,7 +394,7 @@ class TestJAXAD:
         assert len(circuit.jaxed_function.derivative_functions["0"].jaxpr.out_avals) == 1
 
     def test_jit_and_grad(self, backend):
-        """Test that argnum determination works correctly when combining jax.jit with jax.grad.
+        """Test that argnums determination works correctly when combining jax.jit with jax.grad.
         This was fixed by the introduction of symbolic zero detection for tangent vectors."""
 
         @qjit

@@ -18,6 +18,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -33,7 +34,7 @@ extern void callbackCall(int64_t, int64_t, int64_t, va_list);
 
 namespace Catalyst::Runtime {
 
-extern "C" void inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
+extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
 
 class MemoryManager final {
   private:
@@ -262,10 +263,19 @@ class ExecutionContext final {
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
+    // PRNG
+    uint32_t *seed;
+    std::mt19937 gen;
+
   public:
-    explicit ExecutionContext() : initial_tape_recorder_status(false)
+    explicit ExecutionContext(uint32_t *seed = nullptr)
+        : initial_tape_recorder_status(false), seed(seed)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
+
+        if (this->seed) {
+            this->gen = std::mt19937(*seed);
+        }
     }
 
     ~ExecutionContext() = default;
@@ -303,6 +313,12 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
+        if (this->seed) {
+            device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
+        }
+        else {
+            device->getQuantumDevicePtr()->SetDevicePRNG(nullptr);
+        }
         device_pool.push_back(device);
 
 #ifdef __build_with_pybind11

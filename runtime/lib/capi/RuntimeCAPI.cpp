@@ -108,7 +108,7 @@ extern "C" {
 using namespace Catalyst::Runtime;
 using timer = catalyst::utils::Timer;
 
-void inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
+void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
     // We need to guard calls to callback.
     // These are implemented in Python.
@@ -156,7 +156,6 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    // void *ptr = malloc(size);
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -192,6 +191,8 @@ void __catalyst__rt__print_string(char *string)
     }
     std::cout << string << std::endl;
 }
+
+void __catalyst__rt__assert_bool(bool p, char *s) { RT_FAIL_IF(!p, s); }
 
 void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 {
@@ -234,7 +235,7 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 
 void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
-void __catalyst__rt__initialize() { CTX = std::make_unique<ExecutionContext>(); }
+void __catalyst__rt__initialize(uint32_t *seed) { CTX = std::make_unique<ExecutionContext>(seed); }
 
 void __catalyst__rt__finalize()
 {
@@ -453,6 +454,45 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
 void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
 {
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits > 0);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (uint64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    MemRefT<std::complex<double>, 1> *data_p = (MemRefT<std::complex<double>, 1> *)data;
+    DataView<std::complex<double>, 1> data_view(data_p->data_aligned, data_p->offset, data_p->sizes,
+                                                data_p->strides);
+    getQuantumDevicePtr()->SetState(data_view, wires);
+}
+
+void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits > 0);
+
+    DataView<int8_t, 1> data_view(data->data_aligned, data->offset, data->sizes, data->strides);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (uint64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+    std::unordered_set<QubitIdType> wire_set(wires.begin(), wires.end());
+    RT_FAIL_IF(wire_set.size() != numQubits, "Wires must be unique");
+    RT_FAIL_IF(data->sizes[0] != numQubits,
+               "BasisState parameter and wires must be of equal length.");
+
+    getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)

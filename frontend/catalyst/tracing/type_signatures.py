@@ -28,6 +28,7 @@ from jax.api_util import shaped_abstractify
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from catalyst.jax_extras import get_aval2
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 
@@ -70,6 +71,44 @@ def get_abstract_signature(args):
     abstract_args = [shaped_abstractify(arg) for arg in flat_args]
 
     return tree_unflatten(treedef, abstract_args)
+
+
+def verify_static_argnums_type(static_argnums):
+    """Verify that static_argnums have correct type.
+
+    Args:
+        static_argnums (Iterable[int]): indices to verify
+
+    Returns:
+        None
+    """
+    is_tuple = isinstance(static_argnums, tuple)
+    is_valid = is_tuple and all(isinstance(arg, int) for arg in static_argnums)
+    if not is_valid:
+        raise TypeError(
+            "The `static_argnums` argument to `qjit` must be an int or convertable to a"
+            f"tuple of ints, but got value {static_argnums}"
+        )
+    return None
+
+
+def verify_static_argnums(args, static_argnums):
+    """Verify that static_argnums have correct type and range.
+
+    Args:
+        args (Iterable): arguments to a compiled function
+        static_argnums (Iterable[int]): indices to verify
+
+    Returns:
+        None
+    """
+    verify_static_argnums_type(static_argnums)
+
+    for argnum in static_argnums:
+        if argnum < 0 or argnum >= len(args):
+            msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
+            raise CompileError(msg)
+    return None
 
 
 def filter_static_args(args, static_argnums):

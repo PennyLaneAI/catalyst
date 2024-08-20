@@ -19,10 +19,14 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from MLIRLexer import MLIRLexer
+from sphinx.highlighting import lexers
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath(""))
+sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("_ext"))
 sys.path.insert(0, os.path.join(os.getcwd(), "doc"))
 
@@ -93,6 +97,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.gradient",
     "mlir_quantum.dialects.catalyst",
     "mlir_quantum.dialects.mitigation",
+    "mlir_quantum.dialects._transform_ops_gen",
     "mlir_quantum.compiler_driver",
     "pybind11",
     "cudaq",
@@ -132,6 +137,9 @@ extensions = [
 ]
 
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
+
+# add the custom MLIR Lexer
+lexers["mlir"] = MLIRLexer(startinline=True)
 
 # OpenGraph Metadata
 ogp_use_first_image = True  # set to False for autocards

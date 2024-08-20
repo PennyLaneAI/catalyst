@@ -49,7 +49,7 @@ bool hasMemRefReturnTypes(func::FuncOp op)
 
     bool isMemRefType = false;
     for (auto type : types) {
-        isMemRefType |= type.isa<MemRefType>();
+        isMemRefType |= isa<MemRefType>(type);
     }
 
     return isMemRefType;
@@ -73,7 +73,7 @@ llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
     llvm::SmallVector<Value> memrefs;
     for (auto value : values) {
         Type ty = value.getType();
-        if (!ty.isa<MemRefType>())
+        if (!isa<MemRefType>(ty))
             continue;
 
         memrefs.push_back(value);
@@ -87,7 +87,7 @@ llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
  */
 Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
 {
-    auto memrefType = memref.getType().cast<MemRefType>();
+    auto memrefType = cast<MemRefType>(memref.getType());
     llvm::SmallVector<Value> dynDims;
     {
         llvm::SmallVector<int64_t> dynIndices;

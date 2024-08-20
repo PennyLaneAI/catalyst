@@ -88,7 +88,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         if (auto tensorType = dyn_cast<ShapedType>(diffArgBaseType))
             diffArgBaseType = tensorType.getElementType();
 
-        if (!diffArgBaseType.isa<FloatType>())
+        if (!isa<FloatType>(diffArgBaseType))
             return op_state->emitOpError("invalid numeric base type: callee operand at position ")
                    << idx << " must be floating point to be differentiable";
     }
@@ -213,13 +213,6 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         return r1;
     }
 
-    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
-        return this->emitOpError(
-                   "invalid number of results: must be twice the number of callee results")
-               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
-               << this->getNumResults();
-    }
-
     std::vector<Type> grad_types;
     {
         for (auto s : this->getGradients()) {
@@ -228,12 +221,17 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
     }
 
     for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
-        auto calleeRtype = callee.getFunctionType().getResult(i);
-        auto gradRtype = grad_types[i];
-        if (calleeRtype != gradRtype) {
+        // callee (function to be differentiated) always returns a single float
+        // grad type and shape should match the callee's argument's type and shape
+        // match from the tail because constant inputs will have types in the front
+        auto calleeInputType =
+            callee.getFunctionType().getInput(callee.getFunctionType().getNumInputs() - 1 - i);
+        auto gradRtype = grad_types[grad_types.size() - 1 - i];
+        if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got " << calleeRtype;
+                   << " was expected to match the type " << gradRtype << " but got "
+                   << calleeInputType;
         }
     }
 
@@ -319,6 +317,31 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         }
     }
 
+    std::vector<Type> tanTypes;
+    tanTypes.reserve(this->getTangents().size());
+    {
+        for (const auto &tanOps : this->getTangents()) {
+            tanTypes.push_back(tanOps.getType());
+        }
+    }
+
+    const auto calleeInputTypes = callee.getFunctionType().getInputs();
+
+    // Check that the differentiable callee inputs have the same types as their
+    // corresponding tangent inputs
+    for (size_t i = 0; i < diffArgIndices.size(); i++) {
+        const auto tanType = tanTypes[i];
+        const auto cIType = calleeInputTypes[diffArgIndices[i]];
+
+        if (tanType != cIType) {
+            return this->emitOpError("callee input and tangent arguments to jvp do not match; ")
+                   << "dtypes must be equal. "
+                   << "Got callee input type " << cIType << " for argument " << diffArgIndices[i]
+                   << " and so expected corresponding tangent type " << cIType << " but got "
+                   << tanType;
+        }
+    }
+
     return success();
 }
 
@@ -392,12 +415,14 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     // Check that callee results have the same types as cotangent inputs
     for (size_t i = 0; i < cotTypes.size(); i++) {
-        auto cotType = cotTypes[i];
-        auto crType = calleeResultTypes[i];
-        if (cotType != crType) {
-            return this->emitOpError("callee result type does not match the cotangent type")
-                   << " callee result " << i << " was expected to be of type " << cotType
-                   << " but got " << crType;
+        const auto cotType = cotTypes[i];
+        const auto cRType = calleeResultTypes[i];
+        if (cotType != cRType) {
+            return this->emitOpError("callee result and cotangent argument to vjp do not match; ")
+                   << "dtypes must be equal. "
+                   << "Got callee result type " << cRType << " for output " << i
+                   << " and so expected "
+                   << "corresponding cotangent type " << cRType << " but got " << cotType;
         }
     }
 

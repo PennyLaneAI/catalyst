@@ -1,0 +1,84 @@
+name: Build nightly Catalyst releases for TestPyPI
+
+on:
+  schedule:
+    # Run every weekday at 23:40 EDT (cron is in UTC)
+    - cron: "40 3 * * 2-6"
+  workflow_dispatch:
+
+jobs:
+  setup:
+    name: Setup the release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+      with:
+        ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
+
+    - name: Bump dev version
+      run: |
+        python $GITHUB_WORKSPACE/.github/workflows/set_nightly_version.py
+
+    - name: Push new version
+      run: |
+        git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
+        git config --global user.name "ringo-but-quantum"
+        git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
+        git commit -m "[no ci] bump nightly version"
+        git push
+
+  # Only build the most popular configurations on a nightly schedule to save PyPI storage.
+
+  linux-x86:
+    name: Build on Linux x86-64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+
+  # linux-aarch:
+  #   name: Build on Linux aarch64
+  #   needs: [setup]
+  #   uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+
+  macos-arm:
+    name: Build on macOS arm64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+
+  # macos-x86:
+  #   name: Build on macOS x86-64
+  #   needs: [setup]
+  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
+
+  upload:
+    name: Prepare & Upload wheels to TestPyPI
+    needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+        path: dist
+
+    - name: Install rename
+      run: |
+        sudo apt install rename
+
+    - name: Prepare wheels
+      run: |
+        rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_12_0_universal2/macosx_12_0_x86_64/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
+        # Discard the 3.9 wheels to save space on nightly builds.
+        rm dist/PennyLane_Catalyst-*-cp39-cp39-*
+
+    - name: Upload wheels
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist

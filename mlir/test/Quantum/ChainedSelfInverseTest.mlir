@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --remove-chained-self-inverse --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(remove-chained-self-inverse{func-name=test_chained_self_inverse})" --split-input-file -verify-diagnostics %s | FileCheck %s
 
+// test chained Hadamard
 // CHECK-LABEL: test_chained_self_inverse
 func.func @test_chained_self_inverse() -> !quantum.bit {
     // CHECK: quantum.alloc
@@ -26,8 +27,11 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
     return %3 : !quantum.bit
 }
 
-// CHECK-LABEL: test_chained_self_inverse_from_block_arg
-func.func @test_chained_self_inverse_from_block_arg(%arg: !quantum.bit) -> !quantum.bit {
+// -----
+
+// test chained Hadamard from block arg
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse(%arg: !quantum.bit) -> !quantum.bit {
     // CHECK-NOT: quantum.custom
     %0 = quantum.custom "Hadamard"() %arg : !quantum.bit
     %1 = quantum.custom "Hadamard"() %0 : !quantum.bit

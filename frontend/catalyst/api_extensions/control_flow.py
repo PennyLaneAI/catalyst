@@ -21,6 +21,7 @@ with control flow, including conditionals, for loops, and while loops.
 
 from typing import Any, Callable, List
 
+import jax
 import jax.numpy as jnp
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
@@ -124,9 +125,9 @@ def cond(pred: DynamicJaxprTracer):
             return qml.expval(qml.PauliZ(0))
 
     >>> circuit(1.4)
-    array(0.16996714)
+    Array(0.16996714, dtype=float64)
     >>> circuit(1.6)
-    array(0.)
+    Array(0., dtype=float64)
 
     Additional 'else-if' clauses can also be included via the ``else_if`` method:
 
@@ -204,7 +205,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return 6.  # float
         ...     return cond_fn()
         >>> f(1.5)
-        array(6.)
+        Array(6., dtype=float64)
 
         Similarly, the else (``my_cond_fn.otherwise``) may be omitted **as long as
         other branches do not return any values**. If other branches do return values,
@@ -231,7 +232,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return x
         ...     return cond_fn()
         >>> f(1.6)
-        array(2.56)
+        Array(2.56, dtype=float64)
     """
 
     def _decorator(true_fn: Callable):
@@ -242,7 +243,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=True):
+def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -283,6 +284,13 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=Tr
         lower_bound (int): starting value of the iteration index
         upper_bound (int): (exclusive) upper bound of the iteration index
         step (int): increment applied to the iteration index at the end of each iteration
+        allow_array_resizing (bool): Whether to allow arrays to change shape/size within
+            the for loop. By default this is ``False``; this will allow out-of-scope
+            dynamical-shaped arrays to be captured by the for loop, and binary operations
+            to be applied to arrays of the same shape. Set this to ``True``
+            to modify dimension sizes within the for loop, however outer-scope
+            dynamically-shaped arrays will no longer be captured, and arrays of the same shape
+            cannot be used in binary operations.
 
     Returns:
         Callable[[int, ...], ...]: A wrapper around the loop body function.
@@ -315,18 +323,65 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=Tr
             return qml.expval(qml.PauliZ(0)), final_x
 
     >>> circuit(7, 1.6)
-    [array(0.97926626), array(0.55395718)]
+    (Array(0.97926626, dtype=float64), Array(0.55395718, dtype=float64))
+
+    Note that using dynamically-shaped arrays within for loops, while loops, and
+    conditional statements, are also supported:
+
+    >>> @qjit
+    ... def f(shape):
+    ...     a = jnp.ones([shape], dtype=float)
+    ...     @for_loop(0, 10, 2)
+    ...     def loop(i, a):
+    ...         return a + i
+    ...     return loop(a)
+    >>> f(5)
+    Array([21., 21., 21., 21., 21.], dtype=float64)
+
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
+    arrays from outside the for loop to be correctly captured, and arrays of the
+    same shape to be used in binary operations:
+
+    >>> @qjit(abstracted_axes={1: 'n'})
+    ... def g(x, y):
+    ...     @catalyst.for_loop(0, 10, 1)
+    ...     def loop(_, a):
+    ...         # Attempt to capture `x` from the outer scope,
+    ...         # and apply a binary operation '*' between the two arrays.
+    ...         return a * x
+    ...     return jnp.sum(loop(y))
+    >>> a = jnp.ones([1,3], dtype=float)
+    >>> b = jnp.ones([1,3], dtype=float)
+    >>> g(a, b)
+    Array(3., dtype=float64)
+
+    However, if you wish to have the for loop return differently sized arrays
+    at each iteration, set ``allow_array_resizing`` to ``True``:
+
+    >>> @qjit()
+    ... def f(N):
+    ...     a = jnp.ones([N], dtype=float)
+    ...     @for_loop(0, 10, 1, allow_array_resizing=True)
+    ...     def loop(i, _):
+    ...         return jnp.ones([i], dtype=float) # return array of new dimensions
+    ...     return loop(a)
+    >>> f(5)
+    Array([1., 1., 1., 1., 1., 1., 1., 1., 1.], dtype=float64)
+
+    Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
+    can no longer be captured from outer-scopes by the for loop, and binary operations
+    between arrays of the same size are not supported.
+
+    For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
 
     def _decorator(body_fn):
-        return ForLoopCallable(
-            lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
-        )
+        return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
 
     return _decorator
 
 
-def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
+def while_loop(cond_fn, allow_array_resizing: bool = False):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
     This decorator provides a functional version of the traditional while
@@ -357,6 +412,13 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
 
     Args:
         cond_fn (Callable): the condition function in the while loop
+        allow_array_resizing (bool): Whether to allow arrays to change shape/size within
+            the loop. By default this is ``False``; this will allow out-of-scope
+            dynamically-shaped arrays to be captured by the loop, and binary operations
+            to be applied to arrays of the same shape. Set this to ``True``
+            to modify dimension sizes within the loop, however outer-scope
+            dynamically-shaped arrays will no longer be captured, and arrays of the same shape
+            cannot be used in binary operations.
 
     Returns:
         Callable: A wrapper around the while-loop function.
@@ -386,11 +448,50 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
             return qml.expval(qml.PauliZ(0)), final_x
 
     >>> circuit(1.6)
-    [array(-0.02919952), array(2.56)]
+    (Array(-0.02919952, dtype=float64), Array(2.56, dtype=float64))
+
+    By default, ``allow_array_resizing`` is ``False``, allowing dynamically-shaped
+    arrays from outside the for loop to be correctly captured, and arrays of the
+    same shape to be used in binary operations:
+
+    >>> @qjit(abstracted_axes={0: 'n'})
+    ... def g(x, y):
+    ...     @catalyst.while_loop(lambda i: jnp.sum(i) > 2., allow_array_resizing=False)
+    ...     def loop(a):
+    ...         # Attempt to capture `x` from the outer scope,
+    ...         # and apply a binary operation '*' between the two arrays.
+    ...         return a * x
+    ...     return loop(y)
+    >>> x = jnp.array([0.1, 0.2, 0.3])
+    >>> y = jnp.array([5.2, 10.3, 2.4])
+    >>> g(x, y)
+    Array([0.052, 0.412, 0.216], dtype=float64)
+
+    However, if you wish to have the for loop return differently sized arrays
+    at each iteration, set ``allow_array_resizing`` to ``True``:
+
+    >>> @qjit
+    ... def f(N):
+    ...     a0 = jnp.ones([N])
+    ...     b0 = jnp.ones([N])
+    ...     @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+    ...     def loop(a, _, i):
+    ...         i += 1
+    ...         b = jnp.ones([i + 1])
+    ...         return (a, b, i) # return array of new dimensions
+    ...     return loop(a0, b0, 0)
+    >>> f(2)
+    (Array([1., 1.], dtype=float64), Array([1., 1., 1., 1.], dtype=float64), Array(3, dtype=int64))
+
+    Note that when ``allow_array_resizing=True``, dynamically-shaped arrays
+    can no longer be captured from outer-scopes by the for loop, and binary operations
+    between arrays of the same size are not supported.
+
+    For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
     """
 
     def _decorator(body_fn):
-        return WhileLoopCallable(cond_fn, body_fn, experimental_preserve_dimensions)
+        return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)
 
     return _decorator
 
@@ -445,11 +546,11 @@ class CondCallable:
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
     [Hadamard(wires=[0]), Cond(tapes=[[Hadamard(wires=[1])], [T(wires=[0])]])]
-    (array([0.25, 0.25, 0.25, 0.25]),)
+    (Array([0.25, 0.25, 0.25, 0.25], dtype=float64),)
     """
 
     def __init__(self, pred, true_fn):
-        self.preds = [pred]
+        self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda: None
         self._operation = None
@@ -487,7 +588,7 @@ class CondCallable:
                 raise TypeError(
                     "Conditional 'else if' function is not allowed to have any arguments"
                 )
-            self.preds.append(pred)
+            self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
             return self
 
@@ -506,6 +607,33 @@ class CondCallable:
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
+
+    def _convert_predicate_to_bool(self, pred):
+        """Convert predicate to bool if necessary."""
+
+        if isinstance(pred, jax.Array) and pred.shape not in ((), (1,)):
+            raise TypeError("Array with multiple elements is not a valid predicate")
+
+        if not self._is_any_boolean(pred):
+            try:
+                pred = jnp.astype(pred, bool, copy=False)
+            except TypeError as e:
+                raise TypeError(
+                    "Conditional predicates are required to be of bool, integer or float type"
+                ) from e
+
+        return pred
+
+    def _is_any_boolean(self, pred):
+        """Check if a variable represents a type of boolean"""
+
+        if isinstance(pred, bool):
+            return True
+
+        if hasattr(pred, "dtype"):
+            return pred.dtype == bool
+
+        return False
 
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace
@@ -653,7 +781,7 @@ class ForLoopCallable:
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
     [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
-    (array([0.5, 0. , 0.5, 0. ]),)
+    (Array([0.5, 0. , 0.5, 0. ], dtype=float64),)
     """
 
     def __init__(
@@ -828,7 +956,7 @@ class WhileLoopCallable:
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
     [X(0), WhileLoop(tapes=[[X(0)]])]
-    (array([0., 0., 1., 0.]),)
+    (Array([0., 0., 1., 0.], dtype=float64),)
     """
 
     def __init__(self, cond_fn, body_fn, experimental_preserve_dimensions):
@@ -979,7 +1107,9 @@ class Cond(HybridOp):
         op = self
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
+                reg_len = qrp.base.length
+                new_qreg = AbstractQreg(reg_len)
+                qreg_in = _input_type_to_tracers(region.trace.new_arg, [new_qreg])[0]
                 qreg_out = trace_quantum_operations(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 ).actualize()
@@ -1037,7 +1167,9 @@ class ForLoop(HybridOp):
         expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
-            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
+            reg_len = qrp.base.length
+            new_qreg = AbstractQreg(reg_len)
+            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
 
@@ -1117,7 +1249,7 @@ class WhileLoop(HybridOp):
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
-            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
+            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg(qrp.base.length)])
             cond_jaxpr, _, cond_consts = trace_to_jaxpr(
                 cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
@@ -1128,7 +1260,7 @@ class WhileLoop(HybridOp):
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             region = self.regions[1]
             res_classical_tracers = region.res_classical_tracers
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg(qrp.base.length)])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(

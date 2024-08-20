@@ -67,9 +67,9 @@ our :func:`@qjit <~.qjit>` compiled function:
 ...     return x ** 2
 >>> f(2.)
 x = Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
-array(4.)
+Array(4., dtype=float64)
 >>> f(3.)
-array(9.)
+Array(9., dtype=float64)
 
 We can see that on the first execution, program capture/tracing occurs, and we
 can see the dynamic variable is printed (tracers capture *type*
@@ -144,9 +144,9 @@ Instead, we can use Catalyst control flow :func:`~.cond` here:
 ...         return x
 ...     return g() ** 2
 >>> f(2.)
-array(4.)
+Array(4., dtype=float64)
 >>> f(6.)
-array(9.)
+Array(9., dtype=float64)
 
 Here, both conditional branches are compiled, and only evaluated at runtime
 when the value of ``x`` is known.
@@ -166,7 +166,7 @@ Let's consider an example where a for loop is evaluated at compile time:
 >>> f(2.)
 0 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
 1 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
-array(0.25)
+Array(0.25, dtype=float64)
 
 Here, the for loop is evaluated at compile time (notice the multiple tracers
 that have been printed out during program capture --- one for each loop!),
@@ -186,9 +186,9 @@ rather than runtime.
     ...         x = x / 2
     ...     return x ** 2
     >>> Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
-    ... array(4.)
+    ... Array(4., dtype=float64)
     >>> f(6.)
-    ... array(9.)
+    ... Array(9., dtype=float64)
 
     For more details, see the :doc:`AutoGraph guide <autograph>`.
 
@@ -210,7 +210,14 @@ If we wish to print the value of variables at *runtime*, we can instead use the
 ...     return x ** 2
 >>> g(2.)
 Value of x = 2.0
-array(4.)
+Array(4., dtype=float64)
+
+Similarly, Python-based exceptions (via ``raise``) and assertions (via ``assert``)
+will always be evaluated at program capture time, before certain runtime information
+may be available.
+
+Instead, use :func:`~.debug_assert` to instead raise assertions at runtime, including assertions
+that depend on values of dynamic variables.
 
 Avoiding recompilation
 ----------------------
@@ -227,9 +234,9 @@ For example, consider the following:
 ...     return x ** 2 + y
 >>> f(0.4, 1)
 Tracing occurring
-array(1.16)
+Array(1.16, dtype=float64)
 >>> f(0.2, 3)
-array(3.04)
+Array(3.04, dtype=float64)
 
 However, if we change the argument types in a way where Catalyst can't perform
 auto-type promotion before passing the argument to the compiled function
@@ -237,23 +244,23 @@ auto-type promotion before passing the argument to the compiled function
 
 >>> f(0.15, 0.65)
 Tracing occurring
-array(0.6725)
+Array(0.6725, dtype=float64)
 
 However, changing a float to an integer will not cause recompilation:
 
 >>> f(2, 4.65)
-array(8.65)
+Array(8.65, dtype=float64)
 
 Similarly, changing the shape of an array will also trigger recompilation:
 
 >>> f(jnp.array([0.2]), jnp.array([0.6]))
 Tracing occurring
-array([0.64])
+Array([0.64], dtype=float64)
 >>> f(jnp.array([0.8]), jnp.array([1.6]))
-array([2.24])
+Array([2.24], dtype=float64)
 >>> f(jnp.array([0.8, 0.1]), jnp.array([1.6, -2.0]))
 Tracing occurring
-array([ 2.24, -1.99])
+Array([ 2.24, -1.99], dtype=float64)
 
 This is something to be aware of, especially when porting existing PennyLane
 code to work with Catalyst. For example, consider the following, where the
@@ -279,10 +286,10 @@ function execution:
 
 >>> circuit(jnp.array([0.1, 0.2]))
 Tracing occurring
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 >>> circuit(jnp.array([0.1, 0.2, 0.3]))
 Tracing occurring
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 
 To be explicitly warned about recompilation, you can use ahead-of-time
 (AOT) mode, by specifying types and shapes in the function signature
@@ -303,16 +310,16 @@ the compiled function as long as the arguments match the specified shapes and
 type:
 
 >>> circuit(jnp.array([0.1, 0.2, 0.3]))
-array(0.99500417)
+Array(0.99500417, dtype=float64)
 >>> circuit(jnp.array([1.4, 1.4, 0.3]))
-array(0.16996714)
+Array(0.16996714, dtype=float64)
 
 However, deviating from this will result in recompilation and a warning message:
 
 >>> circuit(jnp.array([1.4, 1.4, 0.3, 0.1]))
 UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
-array(0.16996714)
+Array(0.16996714, dtype=float64)
 
 Specifying compile-time constants
 ---------------------------------
@@ -330,12 +337,12 @@ Otherwise, re-using previous static argument values will result in no re-compila
 ...   return x + y
 >>> f(0.5, 0.3)
 Compiling with y=0.3
-array(0.8)
+Array(0.8, dtype=float64)
 >>> f(0.1, 0.3)  # no re-compilation occurs
-array(0.4)
+Array(0.4, dtype=float64)
 >>> f(0.1, 0.4)  # y changes, re-compilation
 Compiling with y=0.4
-array(0.5)
+Array(0.5, dtype=float64)
 
 This functionality can be used to support passing arbitrary Python objects to QJIT-compiled
 functions, as long as they are hashable:
@@ -346,21 +353,21 @@ functions, as long as they are hashable:
 
     @dataclass
     class MyClass:
-      val: int
+        val: int
 
-      def __hash__(self):
-          return hash(str(self))
+        def __hash__(self):
+            return hash(str(self))
 
     @qjit(static_argnums=(1,))
     def f(x: int, y: MyClass):
-      return x + y.val
+        return x + y.val
 
 >>> f(1, MyClass(5))
-array(6)
+Array(6, dtype=int64)
 >>> f(1, MyClass(6))  # re-compilation
-array(7)
+Array(7, dtype=int64)
 >>> f(2, MyClass(5))  # no re-compilation
-array(7)
+Array(7, dtype=int64)
 
 Note that when ``static_argnums`` is used in conjunction with type hinting,
 ahead-of-time compilation will not be possible since the static argument values
@@ -489,11 +496,11 @@ optimization to take place within Catalyst:
     @qjit
     def optimize(init_weights, data, steps):
         def loss(x):
-            dy = grad(cost, argnum=0)(x, data)
+            dy = grad(cost, argnums=0)(x, data)
             return (cost(x, data), dy)
 
         opt = optax.sgd(learning_rate=0.4)
-    
+
         def update_step(i, params, state):
             (_, gradient) = loss(params)
             (updates, state) = opt.update(gradient, state)
@@ -509,125 +516,14 @@ The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
 Note that, to compute hybrid quantum-classical gradients within a qjit-compiled function,
 the :func:`catalyst.grad` function must be used.
 
-JAX support and restrictions
+JAX functions and transforms
 ----------------------------
 
-Catalyst utilizes JAX for program capture, which means you are able to
-leverage the many functions accessible in ``jax`` and ``jax.numpy`` to write
-code that supports :func:`@qjit <~.qjit>` and dynamic variables.
+.. note::
 
-Currently, we are aiming to support as many JAX functions as possible, however
-there may be cases where there is missing coverage. Known JAX functionality
-that doesn't work with Catalyst includes:
-
-- ``jax.numpy.polyfit``
-- ``jax.numpy.fft``
-- ``jax.numpy.argsort``
-- ``jax.debug``
-- ``jax.scipy.linalg.expm``
-- ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
-  indices.
-
-If you come across any other JAX functions that don't work with Catalyst
-(and don't already have a Catalyst equivalent), please let us know by opening
-a `GitHub issue <https://github.com/PennyLaneAI/catalyst/issues>`__.
-
-While leveraging ``jax.numpy`` makes it easy to port over NumPy-based
-PennyLane workflows to Catalyst, we also inherit `various restrictions
-and 'gotchas' from JAX
-<https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
-This includes:
-
-* **Pure functions**: Compilation is primarily designed to only work on pure
-  functions. That is, functions that do not have any side-effects; the
-  output is purely dependent only on function inputs.
-
-* **In-place array updates**: Rather than using in-place array updates, the
-  syntax ``new_array = jax_array.at[index].set(value)`` should be used. For
-  more details, see `jax.numpy.ndarray.at
-  <https://jax.readthedocs.io/en/latest/_autosummary /jax.numpy.ndarray.at.html>`__.
-
-* **Lack of stateful random number generators**: In JAX, random number
-  generators are stateless, and the key state must be explicitly updated each time you want to compute a random number. For more details, see the `JAX documentation <https://jax.readthedocs.io/en/latest/jax-101/05-random-numbers.html>`__.
-
-* **Dynamic-shaped arrays:** Functions that create or return arrays with
-  dynamic shape --- that is, arrays where their shape is determined by a
-  dynamic variable at runtime -- are currently not supported in JAX nor
-  Catalyst. Typically, workarounds involve rewriting the code to utilize
-  ``jnp.where`` where possible.
-
-For more details, please see the `JAX documentation
-<https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
-
-Callbacks
----------
-
-When coming across functionality that is not yet supported by Catalyst, such as functions like
-``jax.scipy.linalg.expm``, Python callbacks can be used to call arbitrary Python code within
-a qjit-compiled function, as long as the return shape and type is known:
-
-.. code-block:: python
-
-    @qjit
-    def fn(x):
-
-        A = jnp.sin(x) * jnp.array([0.23, 0.2], [0.43, -0.54.])
-
-        @catalyst.pure_callback
-        @jax.jit # since the callback function is pure JAX, we can jit it
-        def callback_fn(A) -> jax.ShapeDtypeStruct(A.shape, A.dtype):
-            # here we call non-Catalyst compatible code
-            return jax.scipy.linalg.expm(A)
-
-        return jnp.cos(callback_fn(A))
-
->>> fn(0.654)
-array([[0.39385058, 0.99369752],
-       [0.97097762, 0.74283208]])
-
-Catalyst provides two callback functions:
-
-- :func:`~.pure_callback` supports callbacks of **pure** functions. That is, functions with no
-  side-effects that accept parameters and return values. However, the return type and shape of the
-  function must be known in advance, and is provided as a type signature.
-
-- :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
-  an easy entry point for debugging, for example via printing or logging at runtime.
-
-Note that callbacks do not currently support differentiation, and cannot be used inside
-functions that :func:`~.grad` is applied to.
-
-JAX integration
----------------
-
-Compiled functions remain JAX compatible, and you can call JAX transformations
-on them, such as ``jax.grad`` and ``jax.vmap``. You can even call ``jax.jit``
-on functions that call qjit-compiled functions:
-
->>> dev = qml.device("lightning.qubit", wires=2)
->>> @qjit
-... @qml.qnode(dev)
-... def circuit(x):
-...     qml.RX(x, wires=0)
-...     return qml.expval(qml.PauliZ(0))
->>> @jax.jit
-... def workflow(y):
-...     return jax.grad(circuit)(jnp.sin(y))
->>> workflow(0.6)
-Array(-0.53511382, dtype=float64, weak_type=True)
-
-However, a ``jax.jit`` function calling a ``qjit`` function will always result
-in a callback to Python, so will be slower than if the function was purely compiled
-using ``jax.jit`` or ``qjit``.
-
-If you want to compile some functionality that is not currently Catalyst
-compatible, or you want to make use of JAX-supported hardware such as TPUs
-for classical processing, mixing ``jax.jit`` and ``qjit`` will allow this.
-However, if possible, try to always use ``qjit`` to compile your entire
-workflow.
-
-Internal QJIT transformations
------------------------------
+    For more details on JAX integrations and support, as well as details on
+    'sharp bits' that we inherit from JAX, please see
+    :doc:`jax_integration`.
 
 Inside of a qjit-compiled function, JAX transformations
 (``jax.grad``, ``jax.jacobian``, ``jax.vmap``, etc.)
@@ -639,7 +535,7 @@ can be used **as long as they are not applied to quantum processing**.
 ...         return -jnp.sin(y) ** 2
 ...     return jax.grad(g)(x)
 >>> f(0.4)
-array(-0.71735609)
+Array(-0.71735609, dtype=float64)
 
 If they are applied to quantum processing, an error will occur:
 
@@ -664,7 +560,7 @@ quantum-classical processing:
 ...         return qml.expval(qml.PauliZ(0))
 ...     return grad(lambda y: g(y) ** 2)(x)
 >>> f(0.4)
-array(-0.71735609)
+Array(-0.71735609, dtype=float64)
 
 Always use the equivalent Catalyst transformation
 (:func:`catalyst.grad`, :func:`catalyst.jacobian`, :func:`catalyst.vjp`, :func:`catalyst.jvp`)
@@ -744,7 +640,7 @@ when working with classical control in Catalyst.
   ...         return 6.  # float
   ...     return cond_fn()
   >>> f(1.5)
-  array(6.)
+  Array(6., dtype=float64)
 
 - There may be some cases where automatic type promotion cannot be applied; for example,
   omitting a return value in one branch (e.g., which by default in Python is equivalent
@@ -772,7 +668,7 @@ when working with classical control in Catalyst.
   ...         return x
   ...     return cond_fn()
   >>> f(1.6)
-  array(2.56)
+  Array(2.56, dtype=float64)
 
 - Finally, a reminder that conditional functions provided to :func:`~.cond` cannot
   accept any arguments.
@@ -810,7 +706,7 @@ This includes transforms that generate many circuits,
         return [qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))]
 
 >>> circuit(0.4)
-[array(-0.51413599), array(0.85770868)]
+(Array(-0.38941834, dtype=float64), Array(0.92106099, dtype=float64))
 
 as well as transforms that simply map the circuit to another:
 
@@ -825,7 +721,7 @@ as well as transforms that simply map the circuit to another:
         return qml.expval(qml.PauliZ(0))
 
 >>> circuit(0.5)
-array(0.73168887)
+Array(0.73168887, dtype=float64)
 
 We can inspect the jaxpr representation of the compiled program, to verify that only
 a single RX gate is being applied due to the rotation gate merger:
@@ -928,7 +824,7 @@ Instead, Catalyst control flow (such as :func:`~.cond` and :func:`.for_loop`) mu
         return qml.expval(qml.PauliZ(0))
 
 >>> circuit(0.3)
-array(0.95533649)
+Array(0.95533649, dtype=float64)
 
 Note that here we make sure to include the Catalyst control flow within a ``QuantumTape`` context.
 This is because :func:`~.cond` cannot return operations, only capture queued/instantiated
@@ -962,10 +858,15 @@ the decomposition as follows:
             return tape.operations
 
 
-Directly accessing QNode for PennyLane
---------------------------------------
+Directly accessing the QNode object
+-----------------------------------
 
-In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNode object, it can be useful to retrieve the wrapped entity when interacting with PennyLane functions. Note that the :func:`@qjit <~.qjit>` decorator changes the type of the wrapped object, for example from ``function`` to :class:`QJIT <~.QJIT>`, or in this case from ``QNode`` to :class:`QJIT <~.QJIT>`. The original entity is accessible via the ``.original_function`` attribute on the compiled function, and can be used as follows:
+In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNode object, it can be
+useful to retrieve the wrapped entity when interacting with PennyLane functions. Note that
+the :func:`@qjit <~.qjit>` decorator changes the type of the wrapped object, for example from
+``function`` to :class:`QJIT <~.QJIT>`, or in this case from ``QNode`` to :class:`QJIT <~.QJIT>`.
+The original entity is accessible via the ``.original_function`` attribute on the compiled
+function, and can be used as follows:
 
 .. code-block:: python
 
@@ -980,7 +881,7 @@ In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNo
         return qml.state()
 
     # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
-    g = qml.transforms.cancel_inverses(f.original_function)  
+    g = qml.transforms.cancel_inverses(f.original_function)
 
 
 >>> f
@@ -1001,7 +902,7 @@ Note that some PennyLane functions may be able to extract the QNode automaticall
  [ 0.70710678 -0.70710678]]
 >>> qml.draw(f)()
 0: ──X──X──H─┤  State
->>> g = qjit(g)   # Compile the transformed QNode again with qjit 
+>>> g = qjit(g)   # Compile the transformed QNode again with qjit
 >>> g
 <catalyst.jit.QJIT object at ...>
 >>> qml.draw(g)()
@@ -1032,7 +933,8 @@ dictionaries as input to the compiled function:
 >>> x = qml.RX(0.4, wires=0)
 >>> y = {"apple": (True, jnp.array([0.1, 0.2, 0.3]))}
 >>> f(x, y)
-(RX(array(0.4), wires=[0]), {'apple': (array(True), array([0.1, 0.2, 0.3]))})
+(RX(Array(0.4, dtype=float64), wires=[0]),
+ {'apple': (Array(True, dtype=bool), Array([0.1, 0.2, 0.3], dtype=float64))}))
 
 Arbitrary objects cannot be passed as function arguments, unless they
 are registered as Pytrees with compatible data types.
@@ -1069,12 +971,12 @@ dynamic part of the custom object (``MyObject.x``) changes:
 ...     return my_object.x
 >>> f(MyObject(jnp.array(0.1), name="test1"))
 Compiling: name=test1
-array(0.1)
+Array(0.1, dtype=float64)
 >>> f(MyObject(jnp.array(0.2), name="test1"))
-array(0.2)
+Array(0.2, dtype=float64)
 >>> f(MyObject(jnp.array(0.2), name="test2"))
 Compiling: name=test2
-array(0.2)
+Array(0.2, dtype=float64)
 
 .. note::
 
@@ -1084,6 +986,8 @@ array(0.2)
     re-compilation.
 
     The Catalyst ``@qjit`` decorator doesn't yet support this functionality.
+
+.. _dynamic-arrays:
 
 Dynamically-shaped arrays
 -------------------------
@@ -1101,14 +1005,19 @@ of a tensor created within (or returned by) the compiled function:
 ...     return jax.numpy.ones([size, size], dtype=float)
 >>> func(3)
 Compiling
-array([[1., 1., 1.],
+Array([[1., 1., 1.],
        [1., 1., 1.],
-       [1., 1., 1.]])
+       [1., 1., 1.]], dtype=float64)
 >>> func(4)
-array([[1., 1., 1., 1.],
+Array([[1., 1., 1., 1.],
        [1., 1., 1., 1.],
        [1., 1., 1., 1.],
-       [1., 1., 1., 1.]])
+       [1., 1., 1., 1.]], dtype=float64)
+
+Dynamic arrays can be created using ``jnp.ones``, ``jnp.zeros``. Note that ``jnp.arange``
+and ``jnp.linspace`` do not currently support generating dynamically-shaped arrays (however, unlike
+``jnp.arange``, ``jnp.linspace`` *does* support dynamic variables for its ``start`` and ``stop``
+arguments).
 
 We can also pass tensors of variable shape directly as arguments to compiled
 functions, however we need to provide the ``abstracted_axes`` argument,
@@ -1120,9 +1029,9 @@ to specify which axes of the tensors should be considered dynamic during compila
 ...     return jnp.sum(x)
 >>> sum_fn(jnp.array([1., 0.5]))
 Compiling
-array(1.5)
+Array(1.5, dtype=float64)
 >>> sum_fn(jnp.array([1., 0.5, 0.6]))
-array(2.1)
+Array(2.1, dtype=float64)
 
 Note that failure to specify this argument will cause re-compilation each time
 input tensor arguments change shape:
@@ -1133,26 +1042,79 @@ input tensor arguments change shape:
 ...     return jnp.sum(x)
 >>> sum_fn(jnp.array([1., 0.5]))
 Compiling
-array(1.5)
+Array(1.5, dtype=float64)
 >>> sum_fn(jnp.array([1., 0.5, 0.6]))
 Compiling
-array(2.1)
+Array(2.1, dtype=float64)
 
 For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
 
+Dynamic-arrays and control flow
+-------------------------------
+
 Note that using dynamically-shaped arrays within for loops, while loops, and
-conditional statements, is not currently supported:
+conditional statements, are also supported:
 
 >>> @qjit
-... def f(size):
-...     a = jnp.ones([size], dtype=float)
-...     for i in range(10):
-...         a = a
+... def f(shape):
+...     a = jnp.ones([shape], dtype=float)
 ...     @for_loop(0, 10, 2)
-...     def loop(_, a):
-...         return a
+...     def loop(i, a):
+...         return a + i
 ...     return loop(a)
-KeyError: 137774138140016
+>>> f(5)
+Array([21., 21., 21., 21., 21.], dtype=float64)
+
+By default, Catalyst for loops and while loops will automatically
+
+- capture dynamically-shaped arrays from outside their scope for use within the loop, and
+- allow binary operations (such as ``a + b``, ``a * b`` ) between arrays of the same shape,
+
+however the input and output type and shape across iterations of a loop need to remain
+the same:
+
+>>> @qjit()
+... def f(N):
+...     a = jnp.ones([N], dtype=float)
+...     @for_loop(0, 10, 1)
+...     def loop(i, _):
+...         return jnp.ones([i], dtype=float) # return array of new dimensions
+...     return loop(a)
+>>> f(5)
+AssertionError:
+result_types=[RankedTensorType(tensor<?xf64>)] doesn't match
+jax_ctx.avals_out=[ShapedArray(int64[], weak_type=True), f64[c]]
+
+In order to support modifying of array dimension size across loop
+iterations, the ``allow_array_resizing`` argument can be used:
+
+>>> @qjit()
+... def f(N):
+...     a = jnp.ones([N], dtype=float)
+...     @for_loop(0, 10, 1, allow_array_resizing=True)
+...     def loop(i, _):
+...         return jnp.ones([i], dtype=float) # return array of new dimensions
+...     return loop(a)
+>>> f(5)
+Array([1., 1., 1., 1., 1., 1., 1., 1., 1.], dtype=float64)
+
+However, outer-scope dynamically-shaped arrays can no longer be captured and used
+within the loop in this mode:
+
+>>> @qjit(abstracted_axes={1: 'n'})
+... def g(x, y):
+...     @catalyst.for_loop(0, 10, 1, allow_array_resizing=True)
+...     def loop(_, a):
+...         # Attempt to capture `x` from the outer scope.
+...         return a * x
+...     return jnp.sum(loop(y))
+>>> a = jnp.ones([1,3], dtype=float)
+>>> b = jnp.ones([1,3], dtype=float)
+>>> g(a, b)
+ValueError: Incompatible shapes for broadcasting: shapes=[(1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>), (1, Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/0)>)]
+
+For more details, please see the :func:`~.for_loop`
+and :func:`~.while_loop` documentation.
 
 Returning multiple measurements
 -------------------------------
@@ -1206,17 +1168,17 @@ returned, or alternatively using a single return statement with multiple measure
 ...     qml.RX(x, wires=0)
 ...     return {"samples": qml.sample(), "expval": qml.expval(qml.PauliZ(0))}
 >>> circuit(0.3)
-{'expval': array(-0.9899925),
- 'samples': array([[1., 0.],
-        [1., 0.],
-        [1., 0.],
-        [1., 0.],
-        [1., 0.],
-        [1., 0.],
-        [1., 0.],
-        [0., 0.],
-        [1., 0.],
-        [1., 0.]])}
+{'expval': Array(1., dtype=float64),
+ 'samples': Array([[0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [1, 0],
+        [0, 0]], dtype=int64)}
 
 
 Recursion
@@ -1259,7 +1221,7 @@ we can use a while loop:
         return result
 
 >>> fibonacci(10)
-array(89)
+Array(89, dtype=int64)
 
 Compatibility with broadcasting
 -------------------------------

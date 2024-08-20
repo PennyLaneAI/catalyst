@@ -56,7 +56,7 @@ def test_batch_input(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.batch_input, argnum=1)
+        @partial(qml.batch_input, argnums=1)
         @qml.qnode(qml.device(device_name, wires=2), interface="jax", diff_method="parameter-shift")
         def qfunc(inputs, weights):
             """Example taken from tests"""

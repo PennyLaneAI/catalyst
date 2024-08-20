@@ -14,6 +14,24 @@
 
 // RUN: quantum-opt --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
+//////////////////////////
+// Catalyst AssertionOp //
+//////////////////////////
+
+// CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Test Message")
+// CHECK-DAG: llvm.func @__catalyst__rt__assert_bool(i1, !llvm.ptr)
+
+func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
+    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
+    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr inbounds [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<12 x i8>
+    // CHECK: llvm.call @__catalyst__rt__assert_bool(%arg0, [[char_ptr]])
+    "catalyst.assert"(%arg0) <{error = "Test Message"}> : (i1) -> ()
+    
+    return
+}
+
+// -----
+
 //////////////////////
 // Catalyst PrintOp //
 //////////////////////
@@ -125,7 +143,7 @@ module @test0 {
   // CHECK-DAG: [[argc:%.+]] = llvm.mlir.constant(2
   // CHECK-DAG: [[resc:%.+]] = llvm.mlir.constant(3
 
-  // CHECK: llvm.call @inactive_callback([[id]], [[argc]], [[resc]]
+  // CHECK: llvm.call @__catalyst_inactive_callback([[id]], [[argc]], [[resc]]
   catalyst.callback @callback_4(memref<f64>, memref<f64>) attributes {argc = 2 : i64, id = 4 : i64, resc = 3 : i64}
 }
 
@@ -134,6 +152,7 @@ module @test0 {
 // CHECK-LABEL: @test1
 module @test1 {
   catalyst.callback @callback_1(memref<f64>, memref<f64>) attributes {argc = 1 : i64, id = 1 : i64, resc = 1 : i64}
+  // CHECK: __catalyst_inactive_callback(i64, i64, i64, ...) attributes {passthrough = ["nofree"]}
   // CHECK-LABEL: func.func private @foo(
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>
   // CHECK-SAME:)

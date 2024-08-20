@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -71,13 +72,13 @@ class TestReturnValues:
 
         @qjit()
         def order1(params):
-            diff = grad(circuit, argnum=0)
+            diff = grad(circuit, argnums=0)
             h = diff(params)
             return h[0], params
 
         @qjit()
         def order2(params):
-            diff = grad(circuit, argnum=0)
+            diff = grad(circuit, argnums=0)
             h = diff(params)
             return params, h[0]
 
@@ -105,6 +106,15 @@ class TestReturnValues:
             return jnp.array(0, dtype=dtype)
 
         assert jnp.allclose(return_scalar(), complex(0, 0))
+
+    def test_returns_jax_array(self):
+        """Tests that the return value is a jax array"""
+
+        @qjit
+        def identity(x):
+            return x
+
+        assert isinstance(identity(1.0), jax.Array)
 
     @pytest.mark.parametrize("dtype", [(jnp.float16)])
     def test_types_which_are_unhandled(self, dtype):

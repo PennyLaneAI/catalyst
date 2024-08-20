@@ -260,6 +260,42 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     }
 };
 
+struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(AssertionOp op, AssertionOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        StringRef qirName = "__catalyst__rt__assert_bool";
+
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        Type int1Type = IntegerType::get(ctx, 1);
+        Type charPtrType = LLVM::LLVMPointerType::get(ctx);
+
+        SmallVector<Type> argTypes{int1Type, charPtrType};
+        Type assertSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
+
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        LLVM::LLVMFuncOp assertFunc =
+            ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
+
+        Value assertionDescriptor = adaptor.getAssertion();
+
+        StringRef errorMessage = op.getError();
+        std::string symbolName = std::to_string(std::hash<std::string>()(errorMessage.str()));
+        Value globalString = getGlobalString(loc, rewriter, symbolName, errorMessage, mod);
+
+        SmallVector<Value> callArgs{assertionDescriptor, globalString};
+        rewriter.create<LLVM::CallOp>(loc, assertFunc, callArgs);
+
+        rewriter.eraseOp(op);
+
+        return success();
+    }
+};
+
 // Encodes memref as LLVM struct value:
 //
 // {
@@ -341,7 +377,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         SmallVector<LLVM::AllocaOp> encodedArgs;
         for (auto tuple : llvm::zip(args, argsConverted)) {
-            auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
+            auto memref_type = cast<MemRefType>(std::get<0>(tuple).getType());
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
@@ -379,7 +415,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Encode all returns as a set of pointers
         SmallVector<LLVM::AllocaOp> encodedRess;
         for (auto tuple : llvm::zip(res, resConverted)) {
-            auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
+            auto memref_type = cast<MemRefType>(std::get<0>(tuple).getType());
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedRes =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
@@ -435,7 +471,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
                  ConversionPatternRewriter &rewriter) const override
     {
         Block *entry;
-        rewriter.updateRootInPlace(op, [&] { entry = op.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { entry = op.addEntryBlock(); });
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(entry);
 
@@ -458,10 +494,13 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         bool isVarArg = true;
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto typeConverter = getTypeConverter();
-        LLVM::LLVMFuncOp customCallFnOp =
-            mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
-                                         /*ret_type=*/voidType, isVarArg);
-
+        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
+            mod, "__catalyst_inactive_callback", {/*args=*/i64, i64, i64},
+            /*ret_type=*/voidType, isVarArg);
+        SmallVector<Attribute> passthroughs;
+        auto keyAttr = StringAttr::get(ctx, "nofree");
+        passthroughs.push_back(keyAttr);
+        customCallFnOp.setPassthroughAttr(ArrayAttr::get(ctx, passthroughs));
         // TODO: remove redundant alloca+store since ultimately we'll receive struct*
         for (auto arg : op.getArguments()) {
             Type structTy = typeConverter->convertType(arg.getType());
@@ -582,6 +621,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
+        patterns.add<AssertionOpPattern>(typeConverter, context);
         patterns.add<DefineCallbackOpPattern>(typeConverter, context);
         patterns.add<ReplaceCallbackOpWithFuncOp>(typeConverter, context);
         patterns.add<CallbackCallOpPattern>(typeConverter, context);

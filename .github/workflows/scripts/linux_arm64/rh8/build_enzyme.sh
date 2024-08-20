@@ -10,7 +10,7 @@ export PYTHON_SUBVERSION=$3
 export PYTHON_PACKAGE=$4
 
 # Install system dependencies
-dnf update -y 
+dnf update -y
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION}
 if [ "$PYTHON_VERSION" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
@@ -18,13 +18,13 @@ fi
 dnf clean all -y
 
 # Make GCC the default compiler
-source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
-export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc 
+source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y
+export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc
 export CXX_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/g++
 
 # Set the right Python interpreter
 rm -rf /usr/bin/python3
-ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3 
+ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3
 export PYTHON=/usr/bin/python3
 
 # Add LLVM, Python and GCC to the PATH env var
@@ -38,5 +38,7 @@ cmake -S /catalyst/mlir/Enzyme/enzyme -B /catalyst/enzyme-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm \
     -DENZYME_STATIC_LIB=ON \
-    -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-cmake --build /catalyst/enzyme-build --target EnzymeStatic-18
+    -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+    -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
+
+cmake --build /catalyst/enzyme-build --target EnzymeStatic-19

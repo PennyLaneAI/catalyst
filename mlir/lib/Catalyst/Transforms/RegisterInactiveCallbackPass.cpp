@@ -33,7 +33,7 @@ struct RegisterInactiveCallbackPass
     void runOnOperation() final
     {
         auto mod = getOperation();
-        StringRef inactive_callbackFnName = "inactive_callback";
+        StringRef inactive_callbackFnName = "__catalyst_inactive_callback";
         auto fnDecl = mod.lookupSymbol<LLVM::LLVMFuncOp>(inactive_callbackFnName);
         if (!fnDecl) {
             return;
