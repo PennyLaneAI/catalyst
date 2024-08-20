@@ -432,7 +432,7 @@ To activate the development environment, open a terminal and issue the following
 
   # Clone the Catalyst repository without submodules, as they are not needed for frontend
   # development
-  git clone https://github.com/PennyLaneAI/catalyst.git
+  git clone git@github.com:PennyLaneAI/catalyst.git
 
   # Setup the development environment based on the latest TestPyPI wheels.
   # Please provide a path for the Python virtual environment
@@ -464,7 +464,7 @@ If you require the Catalyst repository with all its submodules, clone it this wa
 
 .. code-block:: console
 
-  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+  git clone --recurse-submodules --shallow-submodules git@github.com:PennyLaneAI/catalyst.git
 
 How Does it Work?
 ^^^^^^^^^^^^^^^^^
