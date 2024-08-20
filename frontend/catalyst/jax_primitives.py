@@ -663,12 +663,12 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
 
 
 def _get_call_jaxpr(jaxpr):
+    """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
         if primitive is func_p:
-            call_jaxpr = eqn.params.get("call_jaxpr")
-    assert call_jaxpr is not None
-    return call_jaxpr
+            return eqn.params.get("call_jaxpr")
+    raise AssertionError("No call_jaxpr found in the JAXPR.")
 
 
 def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
