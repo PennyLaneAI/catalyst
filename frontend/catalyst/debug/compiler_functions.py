@@ -268,8 +268,8 @@ def compile_executable(fn, *args):
     # Try default library paths in case the targeted python-dev is shipped with OS.
     path_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
     version_info = sys.version_info
-    # If libpython3.so exists, link to that instead of libpython3.x.so
-    version_candidates = [f"{version_info.major}", f"{version_info.major}.{version_info.minor}"]
+    # Check libpython3.x.so first because libpython3.so might not link to it.
+    version_candidates = [f"{version_info.major}.{version_info.minor}", f"{version_info.major}"]
 
     file_extension = ".so" if platform.system() == "Linux" else ".dylib"
     python_lib_dir_path = ""
