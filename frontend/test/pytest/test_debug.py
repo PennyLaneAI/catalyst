@@ -13,6 +13,7 @@ import os
 import platform
 import re
 import shutil
+import subprocess
 
 import jax.numpy as jnp
 import numpy as np
@@ -23,6 +24,7 @@ from jax.tree_util import register_pytree_node_class
 from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import (
+    compile_executable,
     compile_from_mlir,
     get_cmain,
     get_compilation_stage,
@@ -447,82 +449,84 @@ class TestCProgramGeneration:
             ),
             (
                 "HLOLoweringPass",
-                "%2 = arith.mulf %in, %in_0 : f64\n",
-                "%t = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %t, %in_0 : f64\n",
+                "%0 = arith.mulf %extracted, %extracted : f64\n",
+                "%t = arith.mulf %extracted, %extracted : f64\n"
+                + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
                 "QuantumCompilationPass",
-                "%2 = arith.mulf %in, %in_0 : f64\n",
-                "%t = arith.mulf %in, %in_0 : f64\n" + "    %2 = arith.mulf %t, %in_0 : f64\n",
+                "%0 = arith.mulf %extracted, %extracted : f64\n",
+                "%t = arith.mulf %extracted, %extracted : f64\n"
+                + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
                 "BufferizationPass",
-                "%6 = arith.mulf %in, %in_0 : f64\n",
-                "%t = arith.mulf %in, %in_0 : f64\n" + "    %6 = arith.mulf %t, %in_0 : f64\n",
+                "%2 = arith.mulf %1, %1 : f64",
+                "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
                 "MLIRToLLVMDialect",
-                "%21 = llvm.fmul %19, %20  : f64\n",
-                "%t = llvm.fmul %19, %20  : f64\n" + "    %21 = llvm.fmul %t, %20  : f64\n",
+                "%5 = llvm.fmul %4, %4  : f64\n",
+                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
             ),
             (
                 "llvm_ir",
-                "store double %15, ptr %9, align 8\n",
-                "%t1 = load double, ptr %1, align 8\n"
-                + "   %t2 = fmul double %15, %t1\n"
-                + "   store double %t2, ptr %9, align 8\n",
+                "%5 = fmul double %4, %4\n",
+                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
             (
                 "last",
-                "store double %15, ptr %9, align 8\n",
-                "%t1 = load double, ptr %1, align 8\n"
-                + "   %t2 = fmul double %15, %t1\n"
-                + "   store double %t2, ptr %9, align 8\n",
+                "%5 = fmul double %4, %4\n",
+                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
         ],
     )
     def test_modify_ir(self, pass_name, target, replacement):
         """Turn a square function in IRs into a cubic one."""
 
-        @qjit(keep_intermediate=True)
         def f(x):
             """Square function."""
             return x**2
 
+        f.__name__ = f.__name__ + pass_name
+
+        jit_f = qjit(f, keep_intermediate=True)
         data = 2.0
-        old_result = f(data)
-        old_ir = get_compilation_stage(f, pass_name)
-        old_workspace = str(f.workspace)
+        old_result = jit_f(data)
+        old_ir = get_compilation_stage(jit_f, pass_name)
+        old_workspace = str(jit_f.workspace)
 
         new_ir = old_ir.replace(target, replacement)
-        replace_ir(f, pass_name, new_ir)
-        new_result = f(data)
+        replace_ir(jit_f, pass_name, new_ir)
+        new_result = jit_f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
-        shutil.rmtree(str(f.workspace), ignore_errors=True)
+        shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
     @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
-        @qjit
         def f(x: float):
             """Square function."""
             return x**2
 
-        grad_f = qjit(value_and_grad(f), keep_intermediate=True)
-        grad_f(3.0)
-        ir = get_compilation_stage(grad_f, pass_name)
-        old_workspace = str(grad_f.workspace)
+        f.__name__ = f.__name__ + pass_name
 
-        replace_ir(grad_f, pass_name, ir)
-        grad_f(3.0)
-        file_list = os.listdir(str(grad_f.workspace))
+        jit_f = qjit(f)
+        jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
+        jit_grad_f(3.0)
+        ir = get_compilation_stage(jit_grad_f, pass_name)
+        old_workspace = str(jit_grad_f.workspace)
+
+        replace_ir(jit_grad_f, pass_name, ir)
+        jit_grad_f(3.0)
+        file_list = os.listdir(str(jit_grad_f.workspace))
         res = [i for i in file_list if pass_name in i]
 
         shutil.rmtree(old_workspace, ignore_errors=True)
-        shutil.rmtree(str(grad_f.workspace), ignore_errors=True)
+        shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)
         assert len(res) == 0
 
     def test_get_compilation_stage_without_keep_intermediate(self):
@@ -541,6 +545,46 @@ class TestCProgramGeneration:
             "but no file was found.\nAre you sure the file exists?",
         ):
             get_compilation_stage(f, "mlir")
+
+    @pytest.mark.parametrize(
+        "arg",
+        [
+            5,
+            np.ones(5, dtype=int),
+            np.ones((5, 2), dtype=int),
+        ],
+    )
+    def test_executable_generation(self, arg):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """Square function with debugging print."""
+            y = x * x
+            debug.print_memref(y)
+            return y
+
+        ans = str(f(arg).tolist()).replace(" ", "")
+
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        assert ans in result.stdout.replace(" ", "").replace("\n", "")
+
+    def test_executable_generation_without_precompiled_function(self):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """identity function with debugging print."""
+            debug.print_memref(x)
+            return x
+
+        arg = 5
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
 
 
 if __name__ == "__main__":

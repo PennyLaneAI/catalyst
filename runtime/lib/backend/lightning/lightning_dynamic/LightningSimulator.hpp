@@ -100,6 +100,8 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     ~LightningSimulator() override = default;
 
     void SetDevicePRNG(std::mt19937 *) override;
+    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) override;
+    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &) override;
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(LightningSimulator);
 

@@ -108,7 +108,7 @@ def catalyst_decompose(
     (toplevel_tape,), _ = decompose(
         tape,
         stopping_condition,
-        skip_initial_state_prep=False,
+        skip_initial_state_prep=capabilities.initial_state_prep_flag,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         max_expansion=max_expansion,
         name="catalyst on this device",

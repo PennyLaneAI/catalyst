@@ -404,3 +404,28 @@ The recompilation starts after the given checkpoint stage.
     replace_ir(f, "HLOLoweringPass", new_ir)
     f(2.0)
     >> 8.0
+
+C Executable Generation
+=======================
+
+Catalyst provides :func:`~.debug.compile_executable` to generate a c executable with a given function and the
+corresponding arguments.
+
+.. code-block:: python
+
+    from catalyst.debug import compile_executable
+
+    @qjit
+    def f(x):
+        return x*x
+
+    binary = compile_executable(f, 1)
+
+>>> print(binary)
+/path/to/executable
+
+.. code-block:: shell
+
+    $ /path/to/executable
+    MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+    25

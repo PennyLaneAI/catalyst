@@ -35,7 +35,7 @@ class TestCType:
     def test_get_sizes_and_strides_nonzero_rank(self):
         """Test non-zero sizes and strides."""
         # pylint: disable=protected-access
-        template = CType._get_template_for_sizes_and_strides(3)
+        template = CType._get_template_for_sizes_and_strides((3, 2, 1))
         assert "size_t sizes[3];" in template
         assert "size_t strides[3];" in template
 
@@ -44,8 +44,8 @@ class TestCType:
         # pylint: disable=protected-access
         template = CType._get_definition("struct foo", "mytype", 0)
         assert "struct foo" in template
-        assert "mytype* allocated;" in template
-        assert "mytype* aligned;" in template
+        assert "mytype *allocated;" in template
+        assert "mytype *aligned;" in template
 
 
 class TestCVariable:
@@ -71,7 +71,7 @@ class TestCVariable:
         """Test get buffer size for non-zero rank."""
         x = np.array([1])
         # pylint: disable=protected-access
-        assert CVariable._get_buffer_size(x) == 1
+        assert CVariable._get_buffer_size(x) == "[1]"
 
     def test_get_array_data_zero_rank(self):
         """Test get array data for zero rank."""
@@ -83,7 +83,7 @@ class TestCVariable:
         """Test get array data for non-zero rank."""
         x = np.array([1])
         # pylint: disable=protected-access
-        assert CVariable._get_array_data(x) == "1"
+        assert CVariable._get_array_data(x) == "{1}"
 
     def test_get_sizes_zero_rank(self):
         """Test get sizes for zero rank."""
