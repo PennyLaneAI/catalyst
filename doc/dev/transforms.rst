@@ -107,12 +107,13 @@ Writing and running your first Catalyst pass
 
     If you are encoutering issues, or would like to quickly try out the pass described in this
     guide, you can have a look at or cherry-pick this commit which includes all changes described
-    above: https://github.com/PennyLaneAI/catalyst/commit/a857655b2f7afef6de19cdc1faaa226243e0bb58
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/a857655b2f7afef6de19cdc1faaa226243e0bb58
 
 If this is your first time writing MLIR or LLVM passes, the boilerplate can be quite overwhelming. 
 Let's first set up the various boilerplate items required to register and run a new pass. 
 
-We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout. The full codelisting of the pass already exists in Catalyst as ``MyHelloWorldPass`` in the directories ``mlir/include/Catalyst/Transforms`` and ``mlir/lib/Catalyst/Transforms``, and we will go over it here. Note that the ``mlir/include`` (and ``mlir/lib``) directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect. 
+We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout.
+Note that the ``mlir/include`` (and ``mlir/lib``) directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect. 
 
 The first thing to do is to create the pass object in the tablegen ``mlir/include/Catalyst/Transforms/Passes.td``:
 
@@ -124,7 +125,8 @@ The first thing to do is to create the pass object in the tablegen ``mlir/includ
         let constructor = "catalyst::createMyHelloWorldPass()";
     }
 
-When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPassBase``, alongside the various necessary boilerplate methods in the MLIR infrastructure. Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
+When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPassBase``, alongside the various necessary boilerplate methods in the MLIR infrastructure. 
+Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
 
 Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/MyHelloWorldPass.cpp`` with the following content:
 
@@ -154,9 +156,11 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
 
     } // namespace catalyst
 
-We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase`` that tablegen will build in the namespace ``impl``. The function that determines what your pass actually does is the ``void runOnOperation()``. Here all the pass does is print out ``"Hello world!\n"``. 
+We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase`` that tablegen will build in the namespace ``impl``. 
+The function that determines what your pass actually does is the ``void runOnOperation()``. Here all the pass does is print out ``"Hello world!\n"``. 
 
-(A sidenote on printing messages in MLIR: there are two major printing options in LLVM. The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``, which only prints when a debug flag is set. The other option is the ``errs()`` used here, which will print no matter what.)
+(A sidenote on printing messages in MLIR: there are two major printing options in LLVM. The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``, which only prints when a debug flag is set. 
+The other option is the ``errs()`` used here, which will print no matter what.)
 
 This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file (or the CMakeLists.txt of whichever directory that has your new pass file): 
 
@@ -194,7 +198,8 @@ Now that we have written our shiny new pass, we can build it by going back to th
 
     make dialects
 
-The tool to run passes is built as ``mlir/build/bin/quantum-opt``. Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
+The tool to run passes is built as ``mlir/build/bin/quantum-opt``. 
+Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
 
 We can inspect by all the available passes by running ``quantum-opt --help``:
 
