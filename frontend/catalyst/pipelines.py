@@ -220,35 +220,7 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
 def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
-        "one-shot-bufferize{dialect-filter=memref}",
-        "inline",
-        "gradient-preprocess",
-        "gradient-bufferize",
-        "scf-bufferize",
-        "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        #"arith-bufferize",
-        "empty-tensor-to-alloc-tensor",
-        #"func.func(bufferization-bufferize)",
-        #"func.func(tensor-bufferize)",
-        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        #"func.func(linalg-bufferize)",
-        #"func.func(tensor-bufferize)",
-        "quantum-bufferize",
-        "func-bufferize",
-        #"func.func(finalizing-bufferize)",
-        "canonicalize",  # Remove dead memrefToTensorOp's
-        "gradient-postprocess",
-        # introduced during gradient-bufferize of callbacks
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
-        "func.func(buffer-deallocation)",
-        "convert-arraylist-to-memref",
-        "convert-bufferization-to-memref",
-        "canonicalize",  # Must be after convert-bufferization-to-memref
-        # otherwise there are issues in lowering of dynamic tensors.
-        # "cse",
-        "cp-global-memref",
+        "one-shot-bufferize{bufferize-function-boundaries}",
     ]
     return bufferization
 
