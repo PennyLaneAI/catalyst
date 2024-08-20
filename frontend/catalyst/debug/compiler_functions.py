@@ -282,7 +282,7 @@ def compile_executable(fn, *args):
             python_lib_dir_path = path_candidate
             break
 
-    if not python_lib_dir_path or not version_str:
+    if not python_lib_dir_path or not version_str:  # pragma: nocover
         raise CompileError(
             f'Unable to find Python library {version_candidates} at "{path_candidates}". '
             "Please ensure that python-dev or python-devel is installed and available via pip."
