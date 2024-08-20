@@ -105,7 +105,7 @@ Writing and running your first Catalyst pass
 
 .. note::
 
-    If you are encoutering issues, or would like to quickly try out the dialect described in this
+    If you are encoutering issues, or would like to quickly try out the pass described in this
     guide, you can have a look at or cherry-pick this commit which includes all changes described
     above: https://github.com/PennyLaneAI/catalyst/commit/a857655b2f7afef6de19cdc1faaa226243e0bb58
 
