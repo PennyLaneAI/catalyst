@@ -236,7 +236,7 @@ def get_bufferization_stage(_options: CompileOptions) -> List[str]:
         #"func.func(tensor-bufferize)",
         "quantum-bufferize",
         "func-bufferize",
-        "func.func(finalizing-bufferize)",
+        #"func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
