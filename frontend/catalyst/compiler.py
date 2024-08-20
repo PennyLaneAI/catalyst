@@ -207,7 +207,7 @@ BUFFERIZATION_PASS = (
         #"func.func(tensor-bufferize)",
         "quantum-bufferize",
         "func-bufferize",
-        "func.func(finalizing-bufferize)",
+        #"func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
