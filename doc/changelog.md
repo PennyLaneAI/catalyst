@@ -322,7 +322,15 @@
   dtype float64, but got tangent dtype int64 instead.
   ```
 
+* Add a script for setting up a Frontend-Only Development Environment that does not require
+  compilation, as it uses the TestPyPI wheel shared libraries.
+  [(#1022)](https://github.com/PennyLaneAI/catalyst/pull/1022)
+
 <h3>Breaking changes</h3>
+
+* The `argnum` keyword argument in the `grad`, `jacobian`, `value_and_grad`,
+  `vjp`, and `jvp` functions has been renamed to `argnums` to better match JAX.
+  [(#1036)](https://github.com/PennyLaneAI/catalyst/pull/1036)
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
   `jax.Array` instead. This should have minimal impact, but code that depends on the output of
@@ -454,6 +462,13 @@
       return y
   ```
 
+* `value_and_grad` will now correctly differentiate functions with multiple arguments.
+  [(#1034)](https://github.com/PennyLaneAI/catalyst/pull/1034)
+
+* `cancel_inverses` will now no longer mutate the original qnode, and instead it will perform
+  the mlir pass on a cloned copy of the qnode.
+  [(#1037)](https://github.com/PennyLaneAI/catalyst/pull/1037)
+
 <h3>Documentation</h3>
 
 * A page has been added to the documentation, listing devices that are
@@ -513,7 +528,7 @@ Mehrdad Malekmohammadi,
 Romain Moyard,
 Erick Ochoa Lopez,
 Mudit Pandey,
-nate stemen,
+Nate Stemen,
 Raul Torres,
 Tzung-Han Juang,
 Paul Haochen Wang,
