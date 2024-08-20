@@ -69,58 +69,47 @@ def test_split_multiple_tapes():
   }
   func.func private @circuit(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
     %0:2 = call @circuit_tape_0(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>)
+    %extracted = tensor.extract %0#0[] : tensor<f64>
     %1 = call @circuit_tape_1(%0#1) : (tensor<f64>) -> tensor<f64>
-    %2 = tensor.empty() : tensor<f64>
-    %3 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%0#0, %1 : tensor<f64>, tensor<f64>) outs(%2 : tensor<f64>) {
-    ^bb0(%in: f64, %in_0: f64, %out: f64):
-      %4 = arith.addf %in, %in_0 : f64
-      linalg.yield %4 : f64
-    } -> tensor<f64>
-    return %3 : tensor<f64>
+    %extracted_0 = tensor.extract %1[] : tensor<f64>
+    %2 = arith.addf %extracted, %extracted_0 : f64
+    %from_elements = tensor.from_elements %2 : tensor<f64>
+    return %from_elements : tensor<f64>
   }
   func.func private @circuit_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> (tensor<f64>, tensor<f64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    %cst = arith.constant dense<8.000000e-01> : tensor<f64>
+    %cst = arith.constant 8.000000e-01 : f64
+    %extracted = tensor.extract %arg1[] : tensor<f64>
     quantum.device["/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %extracted = tensor.extract %arg0[] : tensor<f64>
-    %out_qubits = quantum.custom "RY"(%extracted) %1 {adjoint} : !quantum.bit
+    %extracted_0 = tensor.extract %arg0[] : tensor<f64>
+    %out_qubits = quantum.custom "RY"(%extracted_0) %1 {adjoint} : !quantum.bit
     %2 = quantum.namedobs %out_qubits[ PauliX] : !quantum.obs
     %3 = quantum.expval %2 : f64
     %from_elements = tensor.from_elements %3 : tensor<f64>
     %4 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     %5 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %6 = tensor.empty() : tensor<f64>
-    %7 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%arg1, %cst : tensor<f64>, tensor<f64>) outs(%6 : tensor<f64>) {
-    ^bb0(%in: f64, %in_2: f64, %out: f64):
-      %9 = arith.addf %in, %in_2 : f64
-      linalg.yield %9 : f64
-    } -> tensor<f64>
-    %extracted_0 = tensor.extract %7[] : tensor<f64>
-    %out_qubits_1 = quantum.custom "RX"(%extracted_0) %5 : !quantum.bit
-    %8 = quantum.insert %4[ 1], %out_qubits_1 : !quantum.reg, !quantum.bit
-    quantum.dealloc %8 : !quantum.reg
+    %6 = arith.addf %extracted, %cst : f64
+    %from_elements_1 = tensor.from_elements %6 : tensor<f64>
+    %out_qubits_2 = quantum.custom "RX"(%6) %5 : !quantum.bit
+    %7 = quantum.insert %4[ 1], %out_qubits_2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %7 : !quantum.reg
     quantum.device_release
-    return %from_elements, %7 : tensor<f64>, tensor<f64>
+    return %from_elements, %from_elements_1 : tensor<f64>, tensor<f64>
   }
   func.func private @circuit_tape_1(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    %cst = arith.constant dense<4.000000e-01> : tensor<f64>
+    %cst = arith.constant 4.000000e-01 : f64
+    %extracted = tensor.extract %arg0[] : tensor<f64>
     quantum.device["/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = tensor.empty() : tensor<f64>
-    %3 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%arg0, %cst : tensor<f64>, tensor<f64>) outs(%2 : tensor<f64>) {
-    ^bb0(%in: f64, %in_0: f64, %out: f64):
-      %7 = arith.addf %in, %in_0 : f64
-      linalg.yield %7 : f64
-    } -> tensor<f64>
-    %extracted = tensor.extract %3[] : tensor<f64>
-    %out_qubits = quantum.custom "RY"(%extracted) %1 : !quantum.bit
-    %4 = quantum.namedobs %out_qubits[ PauliX] : !quantum.obs
-    %5 = quantum.expval %4 : f64
-    %from_elements = tensor.from_elements %5 : tensor<f64>
-    %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-    quantum.dealloc %6 : !quantum.reg
+    %2 = arith.addf %extracted, %cst : f64
+    %out_qubits = quantum.custom "RY"(%2) %1 : !quantum.bit
+    %3 = quantum.namedobs %out_qubits[ PauliX] : !quantum.obs
+    %4 = quantum.expval %3 : f64
+    %from_elements = tensor.from_elements %4 : tensor<f64>
+    %5 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    quantum.dealloc %5 : !quantum.reg
     quantum.device_release
     return %from_elements : tensor<f64>
   }
