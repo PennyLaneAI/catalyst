@@ -223,20 +223,40 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
 
         // Walk through the operations in fnWithMeasurementsOp
         fnWithMeasurementsOp.walk([&](quantum::QuantumGate op) {
-            // Insert a for loop immediately before each quantum::QuantumGate
-            auto innerLoc = op->getLoc();
             rewriter.setInsertionPoint(op);
-            rewriter.create<scf::ForOp>(
-                innerLoc, c0, size, c1, ValueRange(),
-                [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
-                    // Set insertion point within the loop
-                    builder.setInsertionPointToEnd(builder.getBlock());
-                    // Create adjoint and original operations
-                    auto origOp = builder.clone(*op)->getResult(0);
-                    auto adjointOp = builder.create<quantum::AdjointOp>(forLoc, qregType, origOp).getResult();
-                    // Yield the result of the original operation
-                    builder.create<scf::YieldOp>(forLoc, adjointOp);
-                });
+            auto innerLoc = op->getLoc();
+
+            std::vector<Value> opQubitArgs(op.getQubitOperands());
+            std::vector<Value> opArgs(op->getOperands().begin(), op->getOperands().end());
+
+            // Insert a for loop immediately before each quantum::QuantumGate
+            const auto forVal =
+                rewriter
+                    .create<scf::ForOp>(
+                        innerLoc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                        [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
+                            // Set insertion point within the loop
+                            builder.setInsertionPointToEnd(builder.getBlock());
+
+                            // When we clone the original operation,
+                            // we replace opQubitArgs with the current qubits in iterArgs
+                            IRMapping irm;
+                            irm.map(opQubitArgs, iterArgs);
+
+                            // Create adjoint and original operations
+                            auto origOp = builder.clone(*op, irm)->getResult(0);
+                            auto adjointOp =
+                                builder.create<quantum::AdjointOp>(forLoc, qregType, origOp)
+                                    .getResult();
+
+                            // Yield the result of the original operation
+                            builder.create<scf::YieldOp>(forLoc, adjointOp);
+                        })
+                    .getResult(0);
+
+            opArgs.pop_back();
+            opArgs.push_back(forVal);
+            op->setOperands(opArgs);
 
             return WalkResult::advance();
         });
@@ -251,7 +271,8 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     argsAndQreg.push_back(allocQreg);
 
     // Insert the call to fnWithMeasurementsOp
-    Value result = rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
+    Value result =
+        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
 
     // Insert the device release operation
     rewriter.create<quantum::DeviceReleaseOp>(loc);
