@@ -43,4 +43,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
+    mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
+    mlir::registerPass(catalyst::createApplyTransformSequencePass);
 }

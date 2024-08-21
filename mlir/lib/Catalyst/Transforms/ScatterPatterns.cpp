@@ -228,16 +228,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         int64_t start = 0;
         std::vector<int64_t> dimensions;
 
-        for (int64_t i = start; i <= updatesSize; ++i) {
+        for (int64_t i = start; i < updatesSize; ++i) {
             dimensions.push_back(i);
         }
         if (!data.updatedWindowsDims.empty()) {
-            std::copy_if(data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
-                         std::back_inserter(data.updatedScatterDims),
-                         [&dimensions](int64_t element) {
-                             return std::find(dimensions.begin(), dimensions.end(), element) !=
-                                    dimensions.end();
-                         });
+            std::set_difference(dimensions.begin(), dimensions.end(),
+                                data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
+                                std::back_inserter(data.updatedScatterDims));
         }
         else {
             data.updatedScatterDims = dimensions;
@@ -364,9 +361,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, i);
+                    int innerIndex = std::distance(scatterDimsToOperandDims.begin(), itScatter);
+                    Value indexConstantOp = builder.create<index::ConstantOp>(loc, innerIndex);
                     auto indexScatter =
-                        builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                        builder.create<tensor::ExtractOp>(loc, scatterIndices, indexConstantOp);
                     auto indexUpdateCasted =
                         builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                     Value addValue =
@@ -388,9 +386,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
-                    Value index = builder.create<index::ConstantOp>(loc, i);
+                    int innerIndex = std::distance(scatterDimsToOperandDims.begin(), itScatter);
+                    Value indexConstantOp = builder.create<index::ConstantOp>(loc, innerIndex);
                     auto indexScatter =
-                        builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                        builder.create<tensor::ExtractOp>(loc, scatterIndices, indexConstantOp);
                     fullStartIndex.push_back(indexScatter);
                 }
                 else {
@@ -400,16 +399,16 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 }
             }
             // Full windows indices
-            SmallVector<Value> fullWindowIndex;
+            SmallVector<Value> fullWindowIndex = updateWindowsIndices;
             for (auto insertedDim : insertedWindowsDims) {
                 auto c0 = builder.create<index::ConstantOp>(loc, 0);
-                updateWindowsIndices.insert(updateWindowsIndices.begin() + insertedDim, c0);
+                fullWindowIndex.insert(fullWindowIndex.begin() + insertedDim, c0);
             }
             // Add
             SmallVector<Value> results;
-            for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
+            for (size_t i = 0; i < fullWindowIndex.size(); ++i) {
                 Value indexScatter = fullStartIndex[i];
-                auto indexUpdate = updateWindowsIndices[i];
+                Value indexUpdate = fullWindowIndex[i];
                 auto indexUpdateCasted =
                     builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                 Value addValue =

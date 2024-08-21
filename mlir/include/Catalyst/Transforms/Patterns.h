@@ -35,4 +35,6 @@ void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
 
 void populateTBAATagsPatterns(TBAATree &, mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
 
+void populateMemrefCopyToLinalgCopyPatterns(mlir::RewritePatternSet &);
+
 } // namespace catalyst

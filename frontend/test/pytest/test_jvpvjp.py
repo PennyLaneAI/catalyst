@@ -39,6 +39,16 @@ def circuit_rx(x1, x2):
     return qml.expval(qml.PauliY(0))
 
 
+def f_R1_to_R2(x):
+    """A test function f : R1 -> R2"""
+    return 2 * x, x * x
+
+
+def g_R3_to_R2(_n, x):
+    """A test function g : R3 -> R2, where `_n` is a dummy, non-differentiable parameter"""
+    return jnp.stack([1 + x[0] + 2 * x[1] + 3 * x[2], 1 + x[0] + 2 * x[1] ** 2 + 3 * x[2] ** 3])
+
+
 diff_methods = ["auto", "fd"]
 
 
@@ -830,6 +840,160 @@ def test_vjp_multi_return(diff_method):
     assert tree_jax == tree_cat
     for r_j, r_c in zip(res_jax, res_cat):
         assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_correct_inputs(diff_method):
+    """Test that Catalyst's jvp can JIT compile when given the correct types."""
+
+    @qjit
+    def C_workflow_f():
+        x = (1.0,)
+        tangents = (1.0,)
+        return C_jvp(f_R1_to_R2, x, tangents, method=diff_method, argnum=[0])
+
+    @qjit
+    def C_workflow_g():
+        x = jnp.array([2.0, 3.0, 4.0])
+        tangents = jnp.ones([3], dtype=float)
+        return C_jvp(g_R3_to_R2, [1, x], [tangents], method=diff_method, argnum=[1])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
+    """Tests error handling of Catalyst's jvp when the number of differentiable params
+    and tangent arguments are incompatible.
+    """
+
+    with pytest.raises(
+        TypeError,
+        match=(
+            "number of tangent and number of differentiable parameters in catalyst.jvp "
+            "do not match"
+        ),
+    ):
+
+        @qjit
+        def C_workflow():
+            # If `f` takes one differentiable param (argnum=[0]), then `tangents` must have length 1
+            x = (1.0,)
+            tangents = (1.0, 1.0)
+            return C_jvp(f_R1_to_R2, x, tangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_incompatible_input_types(diff_method):
+    """Tests error handling of Catalyst's jvp when the types of the differentiable
+    params and tangent arguments are incompatible.
+    """
+
+    with pytest.raises(
+        TypeError, match="function params and tangents arguments to catalyst.jvp do not match"
+    ):
+
+        @qjit
+        def C_workflow():
+            # If `x` has type float, then `tangents` should also have type float
+            x = (1.0,)
+            tangents = (1,)
+            return C_jvp(f_R1_to_R2, x, tangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method):
+    """Tests error handling of Catalyst's jvp when the shapes of the differentiable
+    params and tangent arguments are incompatible.
+    """
+
+    with pytest.raises(
+        ValueError, match="catalyst.jvp called with different function params and tangent shapes"
+    ):
+
+        @qjit
+        def C_workflow():
+            # If `x` has shape (3,), then `tangents` must also have shape (3,),
+            # but it has shape (4,)
+            x = jnp.array([2.0, 3.0, 4.0])
+            tangents = jnp.ones([4], dtype=float)
+            return C_jvp(g_R3_to_R2, [1, x], [tangents], method=diff_method, argnum=[1])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_correct_inputs(diff_method):
+    """Test that Catalyst's vjp can JIT compile when given the correct types."""
+
+    @qjit
+    def C_workflow_f():
+        x = (1.0,)
+        cotangents = (1.0, 1.0)
+        return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnum=[0])
+
+    @qjit
+    def C_workflow_g():
+        x = jnp.array([2.0, 3.0, 4.0])
+        cotangents = jnp.ones([2], dtype=float)
+        return C_vjp(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnum=[1])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
+    """Tests error handling of Catalyst's vjp when the number of function output params
+    and cotangent arguments are incompatible.
+    """
+
+    with pytest.raises(
+        TypeError,
+        match=(
+            "number of cotangent and number of function output parameters in catalyst.vjp "
+            "do not match"
+        ),
+    ):
+
+        @qjit
+        def C_workflow():
+            # If `f` returns two outputs, then `cotangents` must have length 2
+            x = (1.0,)
+            cotangents = (1.0,)
+            return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_incompatible_input_types(diff_method):
+    """Tests error handling of Catalyst's vjp when the types of the function output params
+    and cotangent arguments are incompatible.
+    """
+
+    with pytest.raises(
+        TypeError,
+        match="function output params and cotangents arguments to catalyst.vjp do not match",
+    ):
+
+        @qjit
+        def C_workflow():
+            # If `x` has type float, then `cotangents` should also have type float
+            x = (1.0,)
+            cotangents = (1, 1)
+            return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnum=[0])
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method):
+    """Tests error handling of Catalyst's vjp when the shapes of the function output params
+    and cotangent arguments are incompatible.
+    """
+
+    with pytest.raises(
+        ValueError,
+        match="catalyst.vjp called with different function output params and cotangent shapes",
+    ):
+
+        @qjit
+        def C_workflow():
+            # If `f` returns object with shape (2,), then `cotangents` must also have
+            # shape (2,), but it has shape (3,)
+            x = jnp.array([2.0, 3.0, 4.0])
+            cotangents = jnp.ones([3], dtype=float)
+            return C_vjp(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnum=[1])
 
 
 if __name__ == "__main__":
