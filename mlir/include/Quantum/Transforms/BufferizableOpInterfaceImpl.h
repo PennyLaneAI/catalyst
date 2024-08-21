@@ -1,12 +1,13 @@
-#ifndef MLIR_DIALECT_QUANTUM_BUFFERIZABLEOPINTERFACEIMPL_H
-#define MLIR_DIALECT_QUANTUM_BUFFERIZABLEOPINTERFACEIMPL_H
+#pragma once
 
-namespace mlir {
-class DialectRegistry;
+using namespace mlir;
 
-namespace tensor {
-void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry);
-} // namespace tensor
-} // namespace mlir
+namespace catalyst {
 
-#endif // MLIR_DIALECT_QUANTUM_BUFFERIZABLEOPINTERFACEIMPL_H
+namespace quantum {
+
+void registerBufferizableOpInterfaceExternalModels(mlir::DialectRegistry &registry);
+
+}
+
+} // namespace catalyst
