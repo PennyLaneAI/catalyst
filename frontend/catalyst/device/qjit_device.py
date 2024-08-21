@@ -189,14 +189,14 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         device_kwargs["device_type"] = dname
         device_kwargs["backend"] = (
             # pylint: disable=protected-access
-            device._device._delegate.DEVICE_ID
+            device.target_device._device._delegate.DEVICE_ID
         )
     elif dname == "braket.aws.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
-        if device._s3_folder:  # pylint: disable=protected-access
+        if device.target_device._s3_folder:  # pylint: disable=protected-access
             device_kwargs["s3_destination_folder"] = str(
-                device._s3_folder  # pylint: disable=protected-access
+                device.target_device._s3_folder  # pylint: disable=protected-access
             )
 
     for k, v in capabilities.options.items():
