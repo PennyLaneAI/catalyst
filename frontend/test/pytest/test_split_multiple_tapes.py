@@ -25,6 +25,7 @@ from catalyst import qjit
 from catalyst.debug import get_compilation_stage
 
 
+@pytest.mark.skip("[WIP] change this to lit test")
 def test_split_multiple_tapes():
     dev = qml.device("lightning.qubit", wires=2)
 
