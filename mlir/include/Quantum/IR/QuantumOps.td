@@ -194,7 +194,7 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
+        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
         std::vector<mlir::Value> getQubitOperands() {
@@ -333,7 +333,7 @@ def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
     }];
 }
 
-def CustomOp : Gate_Op<"custom", [DifferentiableGate,
+def CustomOp : Gate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
                                   AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
@@ -402,7 +402,8 @@ def GlobalPhaseOp : Gate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegme
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments ]> {
+def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
+                                    AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -433,8 +434,8 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments,
-                                         AttrSizedResultSegments]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the

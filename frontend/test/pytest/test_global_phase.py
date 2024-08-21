@@ -74,3 +74,7 @@ def test_global_phase_control(backend):
     expected = qnn()
     observed = qjit(qnn)()
     assert np.allclose(expected, observed)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
