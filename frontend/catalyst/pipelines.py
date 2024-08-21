@@ -220,7 +220,14 @@ def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
 def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
+        "eliminate-empty-tensors",
         "one-shot-bufferize{bufferize-function-boundaries}",
+        "func.func(buffer-hoisting)",
+        "func.func(buffer-loop-hoisting)",
+        "buffer-results-to-out-params",
+        "drop-equivalent-buffer-results",
+        "func.func(promote-buffers-to-stack)",
+        #"buffer-deallocation-pipeline",
     ]
     return bufferization
 
