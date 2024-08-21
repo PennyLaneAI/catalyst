@@ -34,8 +34,14 @@ CSWAP = { properties = [ "invertible" ] }
 
 # Observables supported natively by the device
 [operators.observables]
+PauliZ = {}
 
 [measurement_processes]
+
+Expval                 = {}
+State                  = { condition = [ "analytic" ] }
+Sample                 = { condition = [ "finiteshots" ] }
+Counts                  = { condition = [ "finiteshots" ] }
 
 [compilation]
 # If the device is compatible with qjit
