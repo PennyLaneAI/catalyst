@@ -16,6 +16,7 @@
 
 from catalyst.debug.callback import callback
 from catalyst.debug.compiler_functions import (
+    compile_executable,
     compile_from_mlir,
     get_cmain,
     get_compilation_stage,
@@ -36,4 +37,5 @@ __all__ = (
     "compile_from_mlir",
     "instrumentation",
     "replace_ir",
+    "compile_executable",
 )

@@ -72,13 +72,13 @@ class TestReturnValues:
 
         @qjit()
         def order1(params):
-            diff = grad(circuit, argnum=0)
+            diff = grad(circuit, argnums=0)
             h = diff(params)
             return h[0], params
 
         @qjit()
         def order2(params):
-            diff = grad(circuit, argnum=0)
+            diff = grad(circuit, argnums=0)
             h = diff(params)
             return params, h[0]
 

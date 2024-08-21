@@ -496,7 +496,7 @@ optimization to take place within Catalyst:
     @qjit
     def optimize(init_weights, data, steps):
         def loss(x):
-            dy = grad(cost, argnum=0)(x, data)
+            dy = grad(cost, argnums=0)(x, data)
             return (cost(x, data), dy)
 
         opt = optax.sgd(learning_rate=0.4)
