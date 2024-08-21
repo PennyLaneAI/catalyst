@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
@@ -43,6 +44,8 @@ void QuantumDialect::initialize()
 #define GET_OP_LIST
 #include "Quantum/IR/QuantumOps.cpp.inc"
         >();
+
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface>();
 }
 
 //===----------------------------------------------------------------------===//
