@@ -825,12 +825,12 @@ class QJIT_CUDAQ:
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
             device_name = (
-                device.target_device.short_name
+                device.short_name
                 if isinstance(device, qml.devices.LegacyDeviceFacade)
                 else device.name
             )
             interface_name = (
-                device.target_device.name
+                device.name
                 if isinstance(device, qml.devices.LegacyDeviceFacade)
                 else device.name
             )
