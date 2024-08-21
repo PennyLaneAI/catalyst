@@ -1,6 +1,7 @@
 set(LIBRARY_NAME quantum-transforms)
 
 file(GLOB SRC
+    BufferizableOpInterfaceImpl.cpp
     BufferizationPatterns.cpp
     quantum_bufferize.cpp
     ConversionPatterns.cpp
