@@ -224,7 +224,7 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
         // Walk through the operations in fnWithMeasurementsOp
         fnWithMeasurementsOp.walk([&](quantum::QuantumGate op) {
             rewriter.setInsertionPoint(op);
-            auto innerLoc = op->getLoc();
+            auto loc = op->getLoc();
 
             std::vector<Value> opQubitArgs(op.getQubitOperands());
             std::vector<Value> opArgs(op->getOperands().begin(), op->getOperands().end());
@@ -233,8 +233,8 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
             const auto forVal =
                 rewriter
                     .create<scf::ForOp>(
-                        innerLoc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
-                        [&](OpBuilder &builder, Location forLoc, Value i, ValueRange iterArgs) {
+                        loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                        [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                             // Set insertion point within the loop
                             builder.setInsertionPointToEnd(builder.getBlock());
 
@@ -246,11 +246,11 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                             // Create adjoint and original operations
                             auto origOp = builder.clone(*op, irm)->getResult(0);
                             auto adjointOp =
-                                builder.create<quantum::AdjointOp>(forLoc, qregType, origOp)
+                                builder.create<quantum::AdjointOp>(loc, qregType, origOp)
                                     .getResult();
 
                             // Yield the result of the original operation
-                            builder.create<scf::YieldOp>(forLoc, adjointOp);
+                            builder.create<scf::YieldOp>(loc, adjointOp);
                         })
                     .getResult(0);
 
