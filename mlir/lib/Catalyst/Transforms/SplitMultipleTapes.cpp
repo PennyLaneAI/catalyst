@@ -16,11 +16,15 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 
 using namespace llvm;
@@ -94,212 +98,90 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         });
     }
 
-    unsigned int whichResult(Operation *op, Value v)
-    {
-        // Returns the index at which op's result is v
-        for (unsigned int i = 0; i < op->getNumResults(); i++) {
-            if (op->getResult(i) == v) {
-                return i;
-            }
-        }
-        assert(false); // failure
-    }
-
     void CreateTapeFunction(SmallVector<Operation *> *TapeOps,
-                            SmallVector<Operation *> &NecessaryOpsForPostProcessing,
-                            const ArrayRef<NamedAttribute> &FullOriginalFuncAttrs,
-                            OpBuilder &builder, Operation *module,
-                            func::FuncOp OriginalMultitapeFunc, unsigned int tape_number,
+                            SmallVector<Value> &NecessaryValuesForPostProcessing,
+                            IRRewriter &builder, Operation *module, unsigned int tape_number,
                             StringRef OriginalMultitapeFuncName)
     {
-        SmallVector<Operation *> ArgOps;
-        SmallVector<mlir::Type> ArgOpsTypes;
-        SmallVector<Value> CallArgs;
-        SmallVector<Value> VisitedOperands;
-        llvm::DenseMap<Value, unsigned int> FuncArg2BlockArg;
-        SmallVector<Operation *> RetOps;
-        SmallVector<mlir::Type> RetOpsTypes;
+        assert(TapeOps); // nullptr protection
 
-        unsigned int p = 0;
-        for (auto op : *TapeOps) {
+        // 1. Identify the necessary return values
+        SmallVector<Value> RetValues;
+        SmallVector<mlir::Type> RetTypes;
 
-            // If an op in tape uses something not defined in the tape,
-            // it must have come from preprocessing or a previous tape.
-            // In either case, take in it as an argument
-            // The i-th argument of the tapefunc will correspond to the i-th op in Argops
-            for (auto operand : op->getOperands()) {
-                if (std::find(VisitedOperands.begin(), VisitedOperands.end(), operand) !=
-                    VisitedOperands.end()) {
-                    // already recorded this value as an argument
-                    continue;
-                }
-                if (!isa<BlockArgument>(operand)) {
-                    Operation *OperandSource = operand.getDefiningOp();
-                    if (std::find(TapeOps->begin(), TapeOps->end(), OperandSource) ==
-                        TapeOps->end()) {
-                        ArgOps.push_back(OperandSource);
-                        ArgOpsTypes.push_back(operand.getType());
-                        CallArgs.push_back(operand);
-                        FuncArg2BlockArg[operand] = p;
-                        p++;
-                    }
-                }
-                else {
-                    ArgOpsTypes.push_back(operand.getType());
-                    CallArgs.push_back(operand);
-                    FuncArg2BlockArg[operand] = p;
-                    p++;
-                }
-            }
-
-            // If an op is needed by post processing, it should be returned
-            if (std::find(NecessaryOpsForPostProcessing.begin(),
-                          NecessaryOpsForPostProcessing.end(),
-                          op) != NecessaryOpsForPostProcessing.end()) {
-                RetOps.push_back(op);
-                for (size_t i = 0; i < op->getNumResults(); i++) {
-                    RetOpsTypes.push_back(op->getResultTypes()[i]);
-                }
+        for (Value v : NecessaryValuesForPostProcessing) {
+            Operation *VDefOp = v.getDefiningOp();
+            if (std::find(TapeOps->begin(), TapeOps->end(), VDefOp) != TapeOps->end()) {
+                // This Value needed for PP is in this tape!
+                RetValues.push_back(v);
+                RetTypes.push_back(v.getType());
             }
         }
 
         // We process the tapes in reverse order
         // Hence from the viewpoint of the earlier tapes,
-        // a processed later tape (which has become a call op) is also its "post processing"
+        // a processed later tape (which has become a call op) is also their "post processing"
         // The later tape's arguments need to be returned by the earlier tapes
-        for (auto op : ArgOps) {
-            NecessaryOpsForPostProcessing.push_back(op);
-        }
-
-        FunctionType fType = FunctionType::get(module->getContext(), ArgOpsTypes, RetOpsTypes);
-
-        // Create the tape function.
-        // Keep the original function's attributes
-        // We do not want the name and the type of the original multitape function:
-        // The type could be different, and we want different names for each tape
-        SmallVector<NamedAttribute> FuncAttrs;
-        for (auto attr : FullOriginalFuncAttrs) {
-            StringRef attrname = attr.getName();
-            if ((attrname != "sym_name") && (attrname != "function_type")) {
-                FuncAttrs.push_back(attr);
+        // Hence when processing a tape, it needs to ask for earlier tapes to return
+        // values it needs, just like how post processing asks for all tapes to return
+        // values it needs.
+        for (Operation *op : *TapeOps) {
+            for (auto operand : op->getOperands()) {
+                Operation *OperandSource = operand.getDefiningOp();
+                if (std::find(TapeOps->begin(), TapeOps->end(), OperandSource) == TapeOps->end()) {
+                    // A tape operand not produced in this tape itself,
+                    // must be from the tapes/preprocessing!
+                    // Need to be replaced by the previous tape functions' return values
+                    NecessaryValuesForPostProcessing.push_back(operand);
+                }
             }
         }
 
-        // The arguments don't need to carry attributes
-        builder.setInsertionPointAfter(OriginalMultitapeFunc);
-        func::FuncOp TapeFunc = builder.create<func::FuncOp>(
-            module->getLoc(),
-            OriginalMultitapeFuncName.str() + "_tape_" + std::to_string(tape_number), fType,
-            FuncAttrs);
-
-        // Call the newly made tape function in the original function
-        // The i-th argument corresponds to the i-th op in Argops
-        // The callop results should replace the retops in their users
-
+        // 2. Create a scf.execute_region and wrap it around the tape ops
+        // The scf.execute_region needs to yield (aka return) the values identified
         builder.setInsertionPoint(TapeOps->front());
-        func::CallOp callOp = builder.create<func::CallOp>(module->getLoc(), TapeFunc, CallArgs);
+        scf::ExecuteRegionOp executeRegionOp =
+            builder.create<scf::ExecuteRegionOp>(module->getLoc(), ArrayRef(RetTypes));
 
-        // Inject the tape's operations into the tape function
-        Block *entrybb = TapeFunc.addEntryBlock();
-        builder.setInsertionPointToEnd(entrybb);
-
-        //<< entrybb->getArgument(0) << entrybb->getArgument(1) << "\n";
-
-        std::map<Operation *, Operation *> ClonedOpShadows;
-        SmallVector<Value> ClonedRetValues;
+        builder.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
+        mlir::Block::iterator it = executeRegionOp.getRegion().front().end();
         for (auto op : *TapeOps) {
-            ClonedOpShadows[op] = op->clone();
-            builder.insert(ClonedOpShadows[op]);
+            op->moveBefore(&executeRegionOp.getRegion().front(), it);
         }
 
-        // for (auto op : *TapeOps) {
-        //     op->replaceAllUsesWith(ClonedOpShadows[op]);
-        // }
+        builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
+        Operation *y = builder.create<scf::YieldOp>(module->getLoc(), ArrayRef(RetValues));
 
-        for (auto it = ClonedOpShadows.begin(); it != ClonedOpShadows.end(); it++) {
-            for (size_t i = 0; i < it->second->getNumOperands(); i++) {
-                if (!isa<BlockArgument>(it->second->getOperand(i))) {
-                    Operation *OperandSource = it->second->getOperand(i).getDefiningOp();
-                    if (std::find(TapeOps->begin(), TapeOps->end(), OperandSource) !=
-                        TapeOps->end()) {
-                        it->second->replaceUsesOfWith(
-                            it->first->getOperand(i),
-                            ClonedOpShadows[OperandSource]->getResult(
-                                whichResult(OperandSource, it->first->getOperand(i))));
-                    }
-                }
-            }
-        }
+        // 3. The scf outliner automatically captures values not defined in the
+        // to-be-outlined function body and transforms them to the outlined function's
+        // arguments, but it does not automatically propagate the returned value
+        // downstream to replace the previously used values. This we need to do manually.
 
-        llvm::DenseMap<Value, Value> ResultMap;
-        unsigned int j = 0;
+        // At this stage, the scf.yield values ARE the ones to be replaced by
+        // the scf region's result values, since we never replaced anything yet
+        // Of course, don't replace the use in the region itself!
+
+        SmallPtrSet<Operation *, 16> exceptions;
+        exceptions.insert(y);
         for (auto op : *TapeOps) {
-            // Return the values needed
-            if (std::find(RetOps.begin(), RetOps.end(), op) != RetOps.end()) {
-                for (size_t i = 0; i < op->getNumResults(); i++) {
-                    ClonedRetValues.push_back(ClonedOpShadows[op]->getResult(i));
-                    ResultMap[op->getResult(i)] = callOp->getResult(j);
-                    j++;
-                }
-            }
-        }
-        builder.create<func::ReturnOp>(module->getLoc(), ArrayRef(ClonedRetValues));
-
-        for (auto op : RetOps) {
-            for (size_t i = 0; i < op->getNumResults(); i++) {
-                op->getResult(i).replaceAllUsesWith(ResultMap[op->getResult(i)]);
-            }
+            exceptions.insert(op);
         }
 
-        // Replace the cloned operation's operands
-        // for (auto op : *TapeOps) {
-        //    op->replaceAllUsesWith(ClonedOpShadows[op]);
-        //}
-
-        // If an operand is an argument, the i-th argument corresponds to the i-th op in Argops
-        for (auto it = ClonedOpShadows.begin(); it != ClonedOpShadows.end(); it++) {
-            for (size_t i = 0; i < it->first->getNumOperands(); i++) {
-                if (!isa<BlockArgument>(it->first->getOperand(i))) {
-                    Operation *OperandSource = it->first->getOperand(i).getDefiningOp();
-                    if (!(std::find(ArgOps.begin(), ArgOps.end(), OperandSource) == ArgOps.end())) {
-                        // An argop
-                        Value operand = it->first->getOperand(i);
-
-                        it->second->replaceUsesOfWith(
-                            it->second->getOperand(i),
-                            // entrybb->getArgument(
-                            //     std::find(ArgOps.begin(), ArgOps.end(), OperandSource) -
-                            //     ArgOps.begin()));
-                            entrybb->getArgument(FuncArg2BlockArg[operand]));
-                    }
-                }
-                else {
-                    Value operand = it->first->getOperand(i);
-
-                    it->second->replaceUsesOfWith(it->second->getOperand(i),
-                                                  entrybb->getArgument(FuncArg2BlockArg[operand]));
-                }
-            }
+        for (size_t i = 0; i < RetValues.size(); i++) {
+            RetValues[i].replaceAllUsesExcept(executeRegionOp->getResults()[i], exceptions);
         }
 
-        // Injection done, erase the original operations
-        // Note that some op in TapeOps are in NecessaryOpsForPostProcessing
-        // so remove them first
-        for (auto op : *TapeOps) {
-            auto where = std::find(NecessaryOpsForPostProcessing.begin(),
-                                   NecessaryOpsForPostProcessing.end(), op);
-            if (where != NecessaryOpsForPostProcessing.end()) {
-                NecessaryOpsForPostProcessing.erase(where);
-            }
-            op->dropAllUses();
-            op->erase();
-        }
+        // 4. Outline the region
+        func::CallOp call;
+        FailureOr<func::FuncOp> outlined = outlineSingleBlockRegion(
+            builder, module->getLoc(), executeRegionOp.getRegion(),
+            OriginalMultitapeFuncName.str() + "_tape_" + std::to_string(tape_number), &call);
     }
 
     void runOnOperation() override
     {
         Operation *module = getOperation();
-        OpBuilder builder(module->getContext());
+        mlir::IRRewriter builder(module->getContext());
 
         // 1. Identify the functions with multiple tapes
         // Walk through each function and count the number of devices.
@@ -331,18 +213,19 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
         // 3. Get the SSA values needed by the post processing (PP)
         // These need to be returned by the tapes
-        SmallVector<Operation *> NecessaryOpsForPostProcessing;
+        SmallVector<Value> NecessaryValuesForPostProcessing;
 
         // Go through all the operands of all the PP ops
         // Find the ones that are not produced in PP itself
         SmallVector<Operation *> PPOps = *(OpsEachTape.back());
+
         for (Operation *op : PPOps) {
             for (auto operand : op->getOperands()) {
                 Operation *OperandSource = operand.getDefiningOp();
                 if (std::find(PPOps.begin(), PPOps.end(), OperandSource) == PPOps.end()) {
                     // A PP operand not produced in PP itself, must be from the tapes/preprocessing!
                     // Need to be replaced by the tape functions' return values
-                    NecessaryOpsForPostProcessing.push_back(OperandSource);
+                    NecessaryValuesForPostProcessing.push_back(operand);
                 }
             }
         }
@@ -350,9 +233,10 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 4. Generate the functions for each tape
         unsigned int NumTapes = countTapes(func);
         for (unsigned int i = 0; i < NumTapes; i++) {
+
             CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                               NecessaryOpsForPostProcessing, func->getAttrs(), builder, module,
-                               func, OpsEachTape.size() - 3 - i, func.getSymName());
+                               NecessaryValuesForPostProcessing,
+                               builder, module, OpsEachTape.size() - 3 - i, func.getSymName());
         }
 
         // TODO: use smart ptrs instead of manually
