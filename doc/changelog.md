@@ -219,6 +219,34 @@
    8.0
   ```
 
+* Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
+  A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
+  function inputs. 
+  [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+
+  ```py
+  import subprocess
+  from catalyst import qjit
+  from catalyst.debug import compile_executable, print_memref
+  
+  @qjit
+  def f(x):
+      y = x*x
+      print_memref(y)
+      return y
+  f(5)
+  binary = compile_executable(f, 5)
+  result = subprocess.run(binary, capture_output=True, text=True, check=True)
+  result.stdout
+  ```
+  
+  ```pycon
+  >>> MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  ```
+
 <h3>Improvements</h3>
 
 * Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
