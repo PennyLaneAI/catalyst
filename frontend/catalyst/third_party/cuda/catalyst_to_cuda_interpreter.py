@@ -830,9 +830,7 @@ class QJIT_CUDAQ:
                 else device.name
             )
             interface_name = (
-                device.name
-                if isinstance(device, qml.devices.LegacyDeviceFacade)
-                else device.name
+                device.name if isinstance(device, qml.devices.LegacyDeviceFacade) else device.name
             )
             return BackendInfo(device_name, interface_name, "", {})
 
