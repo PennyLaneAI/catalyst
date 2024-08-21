@@ -8,7 +8,7 @@ enzyme=v0.0.130
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt
-pennylane=0.38.0.dev11
+pennylane=0.38.0.dev21
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'. Also, update the 'LIGHTNING_GIT_TAG' at

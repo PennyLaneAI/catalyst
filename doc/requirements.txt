@@ -32,4 +32,4 @@ lxml_html_clean
 --extra-index-url https://test.pypi.org/simple/
 pennylane-lightning-kokkos==0.38.0-dev34
 pennylane-lightning==0.38.0-dev34
-pennylane==0.38.0.dev11
+pennylane==0.38.0.dev21
