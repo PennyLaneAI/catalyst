@@ -32,6 +32,8 @@ for enabling and configuring individual Catalyst MLIR compiler passes.
 
 """
 
+import copy
+
 import pennylane as qml
 
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
@@ -136,15 +138,29 @@ def cancel_inverses(fn=None):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
     wrapped_qnode_function = fn.func
+    funcname = fn.__name__
 
     def wrapper(*args, **kwrags):
+        # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
+        # instead of the qnode name. That way the clone can have this attribute and
+        # the original can just not have it.
+        # We are not doing this right now and passing by name because this would
+        # be a discardable attribute (i.e. a user/developer wouldn't know that this
+        # attribute exists just by looking at qnode's documentation)
+        # But when we add the full peephole pipeline in the future, the attribute
+        # could get properly documented.
+
         apply_registered_pass_p.bind(
-            pass_name="remove-chained-self-inverse", options=f"func-name={fn.__name__}"
+            pass_name="remove-chained-self-inverse",
+            options=f"func-name={funcname}" + "_cancel_inverses",
         )
         return wrapped_qnode_function(*args, **kwrags)
 
-    fn.func = wrapper
-    return fn
+    fn_clone = copy.copy(fn)
+    fn_clone.func = wrapper
+    fn_clone.__name__ = funcname + "_cancel_inverses"
+
+    return fn_clone
 
 
 ## IMPL and helpers ##

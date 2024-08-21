@@ -3,6 +3,7 @@ build
 __pycache__
 pennylane_catalyst.egg-info
 *.so
+.dylibs
 
 # Testing files and directories
 .lit

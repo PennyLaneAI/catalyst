@@ -170,6 +170,7 @@
 * A new module is available, `catalyst.passes`, which provides Python decorators
   for enabling and configuring Catalyst MLIR compiler passes.
   [(#911)](https://github.com/PennyLaneAI/catalyst/pull/911)
+  [(#1037)](https://github.com/PennyLaneAI/catalyst/pull/1037)
 
   The first pass available is `catalyst.passes.cancel_inverses`,
   which enables the `-removed-chained-self-inverse` MLIR pass that
@@ -232,6 +233,34 @@
   ```pycon
   >>> f(2.0)
   8.0
+  ```
+
+* Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
+  A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
+  function inputs. 
+  [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+
+  ```py
+  import subprocess
+  from catalyst import qjit
+  from catalyst.debug import compile_executable, print_memref
+  
+  @qjit
+  def f(x):
+      y = x*x
+      print_memref(y)
+      return y
+  f(5)
+  binary = compile_executable(f, 5)
+  result = subprocess.run(binary, capture_output=True, text=True, check=True)
+  result.stdout
+  ```
+  
+  ```pycon
+  >>> MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
+  MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  25
   ```
 
 <h3>Improvements</h3>
@@ -326,20 +355,42 @@
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
-* Improve error messaging for `catalyst.jvp` when the callee input type and the tangent
-  type are not compatible by performing type-checking at the MLIR level. Note that the
-  equivalent type checking is already performed in `catalyst.vjp`.
+* Improved type validation and error messaging has been added to both the `catalyst.jvp`
+  and `catalyst.vjp` functions to ensure that the tangent and parameter types are compatible.
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
   [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
+  [(#1031)](https://github.com/PennyLaneAI/catalyst/pull/1031)
 
-* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
-  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
+  For example, using providing an integer tangent for a function with float64 parameters
+  will result in an error:
 
-* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
-  Catalyst variant jaxpr.
-  [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
+  ```pycon
+  >>> f = lambda x: (2 * x, x * x)
+  >>> f_jvp = lambda x: catalyst.jvp(f, params=(x,), tangents=(1,))
+  >>> qjit(f_jvp)(0.5)
+  TypeError: function params and tangents arguments to catalyst.jvp do not match;
+  dtypes must be equal. Got function params dtype float64 and so expected tangent
+  dtype float64, but got tangent dtype int64 instead.
+  ```
+
+  Ensuring that the types match will resolve the error:
+
+  ```pycon
+  >>> f_jvp = lambda x: catalyst.jvp(f, params=(x,), tangents=(1.0,))
+  >>> qjit(f_jvp)(0.5)
+  ((Array(1., dtype=float64), Array(0.25, dtype=float64)),
+   (Array(2., dtype=float64), Array(1., dtype=float64)))
+  ```
+
+* Add a script for setting up a Frontend-Only Development Environment that does not require
+  compilation, as it uses the TestPyPI wheel shared libraries.
+  [(#1022)](https://github.com/PennyLaneAI/catalyst/pull/1022)
 
 <h3>Breaking changes</h3>
+
+* The `argnum` keyword argument in the `grad`, `jacobian`, `value_and_grad`,
+  `vjp`, and `jvp` functions has been renamed to `argnums` to better match JAX.
+  [(#1036)](https://github.com/PennyLaneAI/catalyst/pull/1036)
 
 * Return values of qjit-compiled functions that were previously `numpy.ndarray` are now of type
   `jax.Array` instead. This should have minimal impact, but code that depends on the output of
@@ -514,6 +565,25 @@
       return y
   ```
 
+* `value_and_grad` will now correctly differentiate functions with multiple arguments.
+  Previously, attempting to differentiate functions with multiple arguments, or pass
+  the ``argnums`` argument, would result in an error.
+  [(#1034)](https://github.com/PennyLaneAI/catalyst/pull/1034)
+
+  ```python
+  @qjit
+  def g(x, y, z):
+      def f(x, y, z):
+          return x * y ** 2 * jnp.sin(z)
+      return catalyst.value_and_grad(f, argnums=[1, 2])(x, y, z)
+  ```
+
+  ```pycon
+  >>> g(0.4, 0.2, 0.6)
+  (Array(0.00903428, dtype=float64),
+   (Array(0.0903428, dtype=float64), Array(0.01320537, dtype=float64)))
+  ```
+
 <h3>Documentation</h3>
 
 * A page has been added to the documentation, listing devices that are
@@ -521,6 +591,10 @@
   [(#966)](https://github.com/PennyLaneAI/catalyst/pull/966)
 
 <h3>Internal changes</h3>
+
+* Adds `catalyst.from_plxpr.from_plxpr` for converting a PennyLane variant jaxpr into a
+  Catalyst variant jaxpr.
+  [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
 * Catalyst is now compatible with Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
@@ -561,6 +635,9 @@
 
 * Catalyst's implementation of Lightning Kokkos plugin has been removed in favor of Lightning's one.
   [(#974)](https://github.com/PennyLaneAI/catalyst/pull/974)
+
+* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
+  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
 
 <h3>Contributors</h3>
 
