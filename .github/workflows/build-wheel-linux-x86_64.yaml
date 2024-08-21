@@ -277,7 +277,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy pybind11 scipy PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
@@ -340,9 +340,11 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DUSE_PYTHON_HEADERS=ON \
+              -DPYTHON_INCLUDE_DIR=$(python${{ matrix.python_version }} -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
+              -DPYTHON_LIBRARY=$(python3${{ matrix.python_version }} -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LIBRARY')))") \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=c6b86a5 \
+              -DLIGHTNING_GIT_TAG=77a8b21 \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
