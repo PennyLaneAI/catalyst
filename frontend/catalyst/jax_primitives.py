@@ -667,7 +667,7 @@ def _get_call_jaxpr(jaxpr):
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
         if primitive is func_p:
-            return eqn.params.get("call_jaxpr")
+            return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
 
