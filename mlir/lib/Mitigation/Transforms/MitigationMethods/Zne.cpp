@@ -239,21 +239,19 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                             // Set insertion point within the loop
                             builder.setInsertionPointToEnd(builder.getBlock());
 
-                            // When we clone the original operation,
-                            // we replace opQubitArgs with the current qubits in iterArgs
-                            IRMapping irm;
-                            irm.map(opQubitArgs, iterArgs);
-
                             // Create adjoint and original operations
-                            auto origOp = builder.clone(*op, irm)->getResults();
+                            quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+                            origOp.setQubitOperands(iterArgs);
+                            auto origOpVal = origOp->getResults();
+
                             #if 0
-                            auto adjointOp =
-                                builder.create<quantum::AdjointOp>(loc, qregType, origOp)
+                            auto adjointOpVal =
+                                builder.create<quantum::AdjointOp>(loc, qregType, origOpVal)
                                     .getResults();
                             #endif
 
                             // Yield the qubits.
-                            builder.create<scf::YieldOp>(loc, origOp);
+                            builder.create<scf::YieldOp>(loc, origOpVal);
                         })
                     .getResults();
 
