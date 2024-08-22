@@ -17,6 +17,11 @@ if [ "$PYTHON_VERSION" != "3.10" ]; then
 fi
 dnf clean all -y
 
+# Patch libpython version since we do not install python-devel for 3.10.
+if [ "$PYTHON_VERSION" == "3.10" ]; then
+    ln -s /usr/lib64/libpython3.11.so.1.0 /usr/lib64/libpython3.10.so
+fi
+
 # Make GCC the default compiler
 source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
 export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc 

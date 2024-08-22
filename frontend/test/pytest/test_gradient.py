@@ -94,8 +94,8 @@ def test_value_and_grad_outside_qjit():
     assert np.allclose(expected_grad, result_grad)
 
 
-@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
-def test_grad_outside_qjit_argnum(argnum):
+@pytest.mark.parametrize("argnums", (None, 0, [1], (0, 1)))
+def test_grad_outside_qjit_argnum(argnums):
     """Test that argnums work correctly outside of a jitting context."""
 
     def f(x, y):
@@ -103,14 +103,14 @@ def test_grad_outside_qjit_argnum(argnum):
 
     x, y = 4.0, 4.0
 
-    expected = jax.grad(f, argnums=argnum if argnum is not None else 0)(x, y)
-    result = grad(f, argnum=argnum)(x, y)
+    expected = jax.grad(f, argnums=argnums if argnums is not None else 0)(x, y)
+    result = grad(f, argnums=argnums)(x, y)
 
     assert np.allclose(expected, result)
 
 
-@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
-def test_value_and_grad_outside_qjit_argnum(argnum):
+@pytest.mark.parametrize("argnums", (None, 0, [1], (0, 1)))
+def test_value_and_grad_outside_qjit_argnum(argnums):
     """Test that argnums work correctly outside of a jitting context."""
 
     def f(x, y):
@@ -119,9 +119,9 @@ def test_value_and_grad_outside_qjit_argnum(argnum):
     x, y = 4.0, 4.0
 
     expected_val, expected_grad = jax.value_and_grad(
-        f, argnums=argnum if argnum is not None else 0
+        f, argnums=argnums if argnums is not None else 0
     )(x, y)
-    result_val, result_grad = value_and_grad(f, argnum=argnum)(x, y)
+    result_val, result_grad = value_and_grad(f, argnums=argnums)(x, y)
 
     assert np.allclose(expected_val, result_val)
     assert np.allclose(expected_grad, result_grad)
@@ -143,8 +143,8 @@ def test_jacobian_outside_qjit():
     assert np.allclose(expected[1], result[1])
 
 
-@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
-def test_jacobian_outside_qjit_argnum(argnum):
+@pytest.mark.parametrize("argnums", (None, 0, [1], (0, 1)))
+def test_jacobian_outside_qjit_argnums(argnums):
     """Test that argnums work correctly outside of a jitting context."""
 
     def f(x, y):
@@ -152,8 +152,8 @@ def test_jacobian_outside_qjit_argnum(argnum):
 
     x, y = jnp.array([4.0, 5.0]), jnp.array([4.0, 5.0])
 
-    expected = jax.jacobian(f, argnums=argnum if argnum is not None else 0)(x, y)
-    result = jacobian(f, argnum=argnum)(x, y)
+    expected = jax.jacobian(f, argnums=argnums if argnums is not None else 0)(x, y)
+    result = jacobian(f, argnums=argnums)(x, y)
 
     assert len(expected) == len(result) == 2
     assert np.allclose(expected[0], result[0])
@@ -273,7 +273,7 @@ def test_value_and_grad_on_qjit_classical():
     def f5(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
 
-    result = qjit(value_and_grad(f5, argnum=(0, 1, 2)))(0.1, 0.2, 0.3)
+    result = qjit(value_and_grad(f5, argnums=(0, 1, 2)))(0.1, 0.2, 0.3)
     expected = (140, (100, 200, 300))
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
@@ -375,10 +375,10 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum):
 
         return circuit(x, y, z)[0]
 
-    result = qjit(value_and_grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3)
+    result = qjit(value_and_grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3)
     expected = (
         workflow_variant(1.1, 2.2, 3.3),
-        qjit(grad(workflow_variant, argnum=argnum))(1.1, 2.2, 3.3),
+        qjit(grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3),
     )
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
@@ -464,7 +464,7 @@ def test_finite_diff_in_loop(inp, backend):
 
     @qjit
     def compiled_grad_default(params, ntrials):
-        diff = grad(f, argnum=0, method="fd")
+        diff = grad(f, argnums=0, method="fd")
 
         def fn(i, g):
             return diff(params)
@@ -537,7 +537,7 @@ def test_adj_in_loop(inp, backend):
 
     @qjit()
     def compiled_grad_default(params, ntrials):
-        diff = grad(f, argnum=0, method="auto")
+        diff = grad(f, argnums=0, method="auto")
 
         def fn(i, g):
             return diff(params)
@@ -602,7 +602,7 @@ def test_ps_conditionals(inp, backend):
     @qjit()
     def compiled(x: float, y: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
-        h = grad(g, method="auto", argnum=0)
+        h = grad(g, method="auto", argnums=0)
         return h(x, y)
 
     def interpreted(x, y):
@@ -635,7 +635,7 @@ def test_ps_for_loops(inp, backend):
     @qjit()
     def compiled(x: float, y: int):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
-        h = grad(g, method="auto", argnum=0)
+        h = grad(g, method="auto", argnums=0)
         return h(x, y)
 
     def interpreted(x, y):
@@ -677,7 +677,7 @@ def test_ps_for_loops_entangled(inp, backend):
     @qjit()
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(f_compiled)
-        h = grad(g, method="auto", argnum=0)
+        h = grad(g, method="auto", argnums=0)
         return h(x, y, z)
 
     def interpreted(x, y, z):
@@ -735,7 +735,7 @@ def test_ps_qft(inp, backend):
     @qjit()
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(qft_compiled)
-        h = grad(g, method="auto", argnum=0)
+        h = grad(g, method="auto", argnums=0)
         return h(x, y, z)
 
     def interpreted(x, y, z):
@@ -799,7 +799,7 @@ def test_finite_diff_argnum(inp, backend):
     @qjit()
     def compiled_grad_argnum(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, method="fd", argnum=1)
+        h = grad(g, method="fd", argnums=1)
         return h(x, 2.0)
 
     def interpretted_grad_argnum(x):
@@ -822,17 +822,17 @@ def test_finite_diff_argnum_list(inp, backend):
     @qjit()
     def compiled_grad_argnum_list(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, method="fd", argnum=[1])
+        h = grad(g, method="fd", argnums=[1])
         return h(x, 2.0)
 
     def interpretted_grad_argnum_list(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f2, device, diff_method="finite-diff")
         h = qml.grad(g, argnum=[1])
-        # Slightly different behaviour. If argnum is a list
+        # Slightly different behaviour. If argnums is a list
         # it doesn't matter if it is a single number,
         # the return value will be a n-tuple of size of the
-        # argnum list.
+        # argnums list.
         return h(x, 2.0)[0]
 
     assert np.allclose(compiled_grad_argnum_list(inp), interpretted_grad_argnum_list(inp))
@@ -849,7 +849,7 @@ def test_finite_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, method="fd", argnum=[0, 1])
+        h = grad(g, method="fd", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -872,7 +872,7 @@ def test_ps_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
-        h = grad(g, method="auto", argnum=[0, 1])
+        h = grad(g, method="auto", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -895,7 +895,7 @@ def test_ps_tensorinp(inp, backend):
     @qjit()
     def compiled(x: jax.core.ShapedArray([1], float)):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
-        h = grad(g, method="auto", argnum=[0, 1])
+        h = grad(g, method="auto", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted(x):
@@ -919,7 +919,7 @@ def test_adjoint_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f2)
-        h = grad(g, method="auto", argnum=[0, 1])
+        h = grad(g, method="auto", argnums=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -1117,12 +1117,12 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
 
     @qjit()
     def compiled_grad_default(params, ntrials):
-        d_f = grad(f, argnum=0, method=diff_method)
+        d_f = grad(f, argnums=0, method=diff_method)
 
         def fn_f(_i, _g):
             return d_f(params)
 
-        d_g = grad(g, argnum=0, method=diff_method)
+        d_g = grad(g, argnums=0, method=diff_method)
 
         def fn_g(_i, _g):
             return d_g(params)
@@ -1178,8 +1178,8 @@ def test_multiple_grad_invocations(backend):
 
     @qjit
     def compiled(x: float, y: float):
-        g1 = grad(f, argnum=0, method="auto")(x, y)
-        g2 = grad(f, argnum=1, method="auto")(x, y)
+        g1 = grad(f, argnums=0, method="auto")(x, y)
+        g2 = grad(f, argnums=1, method="auto")(x, y)
         return jnp.array([g1, g2])
 
     actual = compiled(0.1, 0.2)
@@ -1233,7 +1233,7 @@ def test_pytrees_return_qnode(backend):
 
     psi = 0.1
     phi = 0.2
-    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+    result = qjit(jacobian(circuit, argnums=[0, 1]))(psi, phi)
 
     assert isinstance(result, list)
     assert len(result) == 2
@@ -1251,8 +1251,8 @@ def test_calssical_kwargs():
     def f1(x, y, z):
         return x * (y - z)
 
-    result = qjit(grad(f1, argnum=0))(3.0, y=1.0, z=2.0)
-    expected = qjit(grad(f1, argnum=0))(3.0, 1.0, 2.0)
+    result = qjit(grad(f1, argnums=0))(3.0, y=1.0, z=2.0)
+    expected = qjit(grad(f1, argnums=0))(3.0, 1.0, 2.0)
     assert np.allclose(expected, result)
 
 
@@ -1263,8 +1263,8 @@ def test_calssical_kwargs_switched_arg_order():
     def f1(x, y, z):
         return x * (y - z)
 
-    result = qjit(grad(f1, argnum=0))(3.0, z=2.0, y=1.0)
-    expected = qjit(grad(f1, argnum=0))(3.0, 1.0, 2.0)
+    result = qjit(grad(f1, argnums=0))(3.0, z=2.0, y=1.0)
+    expected = qjit(grad(f1, argnums=0))(3.0, 1.0, 2.0)
     assert np.allclose(expected, result)
 
 
@@ -1280,15 +1280,15 @@ def test_qnode_kwargs(backend):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    result = qjit(jacobian(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
-    expected = qjit(jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    result = qjit(jacobian(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(jacobian(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
-    result = qjit(grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
-    expected = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    result = qjit(grad(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
+    expected = qjit(grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
-    result_val, result_grad = qjit(value_and_grad(circuit, argnum=[0]))(0.1, y=0.2, z=0.3)
+    result_val, result_grad = qjit(value_and_grad(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
     expected_val = qjit(circuit)(0.1, 0.2, 0.3)
-    expected_grad = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     print(result_val, result_grad)
     print(expected_val, expected_grad)
     assert np.allclose(expected_val, result_val)
@@ -1307,17 +1307,17 @@ def test_qnode_kwargs_switched_arg_order(backend):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    switched_order = qjit(jacobian(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
-    expected = qjit(jacobian(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    switched_order = qjit(jacobian(circuit, argnums=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(jacobian(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
-    switched_order = qjit(grad(circuit, argnum=[0]))(0.1, z=0.3, y=0.2)
-    expected = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    switched_order = qjit(grad(circuit, argnums=[0]))(0.1, z=0.3, y=0.2)
+    expected = qjit(grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
-    switched_order_val, switched_order_grad = qjit(value_and_grad(circuit, argnum=[0]))(
+    switched_order_val, switched_order_grad = qjit(value_and_grad(circuit, argnums=[0]))(
         0.1, z=0.3, y=0.2
     )
     expected_val = qjit(circuit)(0.1, 0.2, 0.3)
-    expected_grad = qjit(grad(circuit, argnum=[0]))(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
     assert np.allclose(expected_val, switched_order_val)
     assert np.allclose(expected_grad, switched_order_grad)
 
@@ -1335,7 +1335,7 @@ def test_pytrees_return_classical_function(backend):
 
     psi = 0.1
     phi = 0.2
-    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+    result = qjit(jacobian(circuit, argnums=[0, 1]))(psi, phi)
 
     assert isinstance(result, list)
     assert len(result) == 2
@@ -1356,7 +1356,7 @@ def test_pytrees_return_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnums=[0, 1]))(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1375,7 +1375,7 @@ def test_pytrees_args_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnums=[0, 1]))(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1394,7 +1394,7 @@ def test_pytrees_args_return_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnums=[0, 1]))(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1463,7 +1463,7 @@ def test_gradient_slice(backend):
     cat_res = qjit(
         jacobian(
             my_model,
-            argnum=1,
+            argnums=1,
         )
     )(data, params["weights"], params["bias"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])

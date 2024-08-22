@@ -641,9 +641,9 @@ class GradParams:
     method: str
     scalar_out: bool
     h: float
-    argnum: Union[int, List]
-    scalar_argnum: bool = None
-    expanded_argnum: List[int] = None
+    argnums: Union[int, List]
+    scalar_argnums: bool = None
+    expanded_argnums: List[int] = None
     with_value: bool = False  # if true it calls value_and_grad instead of grad
 
 
@@ -657,8 +657,8 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.expanded_argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    new_argnums = [num + offset for num in grad_params.expanded_argnums]
+    transformed_signature = calculate_grad_shape(signature, new_argnums)
     return tuple(transformed_signature.get_results())
 
 
@@ -680,18 +680,18 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         fn(Grad): the function to be differentiated
         method: the method used for differentiation
         h: the difference for finite difference. May be None when fn is not finite difference.
-        argnum: argument indices which define over which arguments to
+        argnums: argument indices which define over which arguments to
             differentiate.
     """
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:
         f64 = ir.F64Type.get(mlir_ctx)
         finiteDiffParam = ir.FloatAttr.get(f64, h)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in argnum]
-    argnum_numpy = np.array(new_argnum)
+    new_argnums = [num + offset for num in argnums]
+    argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     _func_lowering(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
@@ -737,8 +737,8 @@ def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=
 
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.expanded_argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    new_argnums = [num + offset for num in grad_params.expanded_argnums]
+    transformed_signature = calculate_grad_shape(signature, new_argnums)
     return tuple(jaxpr.out_avals + transformed_signature.get_results())
 
 
@@ -748,9 +748,9 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
-    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+    new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -766,8 +766,8 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts_and_args = constants + args
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
-    val_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
-    gradient_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
+    val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
     _func_lowering(
         ctx,
@@ -785,7 +785,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
-        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
@@ -811,9 +811,9 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
-    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+    new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -846,7 +846,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(tang_args),
-        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
@@ -860,7 +860,7 @@ def _vjp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 # pylint: disable=unused-argument
 def _vjp_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
-    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.expanded_argnum]
+    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.expanded_argnums]
 
 
 def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -869,9 +869,9 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
-    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+    new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -883,8 +883,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
-    func_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
-    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
+    func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
     _func_lowering(
         ctx,
@@ -903,7 +903,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(cotang_args),
-        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 

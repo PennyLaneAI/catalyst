@@ -781,7 +781,7 @@ class TestBraketGradient:
         def interpreted(x):
             device = qml.device("default.qubit", wires=1)
             g = qml.QNode(f, device, diff_method="finite-diff")
-            h = qml.grad(g, argnum=0)
+            h = qml.grad(g, argnums=0)
             return h(x)
 
         assert np.allclose(compiled(inp), interpreted(inp), rtol=1e-3)
@@ -814,7 +814,7 @@ class TestBraketGradient:
         def interpreted(x, y):
             device = qml.device("default.qubit", wires=2)
             g = qml.QNode(f, device, diff_method="finite-diff")
-            h = qml.grad(g, argnum=0)
+            h = qml.grad(g, argnums=0)
             return h(x, y)
 
         assert np.allclose(compiled(*inp), interpreted(*inp), rtol=1e-3)
@@ -847,8 +847,8 @@ class TestBraketGradient:
         def interpretted_grad_default(x):
             device = qml.device("default.qubit", wires=1)
             g = qml.QNode(f, device, diff_method="backprop", max_diff=2)
-            h = qml.grad(g, argnum=0)
-            i = qml.grad(h, argnum=0)
+            h = qml.grad(g, argnums=0)
+            i = qml.grad(h, argnums=0)
             return i(x)
 
         assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp), rtol=0.1)
