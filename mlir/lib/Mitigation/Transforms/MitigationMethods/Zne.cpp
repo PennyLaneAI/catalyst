@@ -212,6 +212,7 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                                   Value numberQubitsValue, func::FuncOp fnWithMeasurementsOp,
                                   Value c0, Value c1)
 {
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
     // Allocate qubits
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
@@ -227,8 +228,7 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
             rewriter.setInsertionPoint(op);
             auto loc = op->getLoc();
 
-            std::vector<Value> opQubitArgs(op.getQubitOperands());
-            std::vector<Value> opArgs(op->getOperands().begin(), op->getOperands().end());
+            const std::vector<Value> opQubitArgs = op.getQubitOperands();
 
             // Insert a for loop immediately before each quantum::QuantumGate
             const auto forVal =
@@ -245,19 +245,19 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                             irm.map(opQubitArgs, iterArgs);
 
                             // Create adjoint and original operations
-                            auto origOp = builder.clone(*op, irm)->getResult(0);
+                            auto origOp = builder.clone(*op, irm)->getResults();
+                            #if 0
                             auto adjointOp =
-                                builder.create<quantum::AdjointOp>(loc, origOp.getType(), origOp)
-                                    .getResult();
+                                builder.create<quantum::AdjointOp>(loc, qregType, origOp)
+                                    .getResults();
+                            #endif
 
-                            // Yield the result of the original operation
-                            builder.create<scf::YieldOp>(loc, adjointOp);
+                            // Yield the qubits.
+                            builder.create<scf::YieldOp>(loc, origOp);
                         })
-                    .getResult(0);
+                    .getResults();
 
-            opArgs.pop_back();
-            opArgs.push_back(forVal);
-            op->setOperands(opArgs);
+            op.setQubitOperands(forVal);
 
             return WalkResult::advance();
         });
