@@ -34,6 +34,7 @@ CSWAP = { properties = [ "invertible" ] }
 
 # Observables supported natively by the device
 [operators.observables]
+PauliX = {}
 PauliZ = {}
 
 [measurement_processes]
