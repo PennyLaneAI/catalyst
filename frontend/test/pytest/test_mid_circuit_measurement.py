@@ -25,7 +25,7 @@ from jax.tree_util import tree_flatten
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
-from catalyst import CompileError, cond, measure, qjit
+from catalyst import CompileError, cond, measure, mitigate_with_zne, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -390,6 +390,27 @@ class TestMidCircuitMeasurement:
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
+
+    def test_mcm_method_with_zne(self, backend):
+        """Test that the dynamic_one_shot works with ZNE."""
+        dev = qml.device(backend, wires=1, shots=5)
+
+        def circuit():
+            return qml.expval(qml.PauliZ(0))
+
+        mcm_method = "one-shot"
+
+        @qjit
+        def mitigated_circuit():
+            s = jnp.array([1, 2])
+            g = qml.QNode(circuit, dev, mcm_method=mcm_method)
+            return mitigate_with_zne(g, scale_factors=s)()
+
+        observed = mitigated_circuit()
+        mcm_method = None
+        expected = mitigated_circuit()
+
+        assert np.allclose(expected, observed)
 
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):
