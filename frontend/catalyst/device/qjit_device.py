@@ -154,7 +154,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
 
     dname = device.name
     if isinstance(device, qml.devices.LegacyDevice):
-        dname = device.short_name
+        dname = device.target_device.short_name
 
     device_name = ""
     device_lpath = ""
