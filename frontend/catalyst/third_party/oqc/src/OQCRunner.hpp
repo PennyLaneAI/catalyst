@@ -132,7 +132,7 @@ struct OQCRunner : public OQCRunnerBase {
             R"(
             import os
             from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-            from scc.compiler.config import QuantumResultsFormat, Tket, TketOptimizations
+            from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
             optimisations = Tket()
             optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
 

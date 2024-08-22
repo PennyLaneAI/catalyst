@@ -93,7 +93,7 @@ def qcompile_hybrid(p: ProblemCVQE, weights):
 def qcompile(p: ProblemCVQE, weights):
     """Compile the quantum parts of the problem"""
     qcompile_hybrid(p, weights)
-    qgrad = catalyst.grad(p.qcircuit, argnum=0, method=p.diff_method)
+    qgrad = catalyst.grad(p.qcircuit, argnums=0, method=p.diff_method)
     p.qgrad = qgrad
     return p
 

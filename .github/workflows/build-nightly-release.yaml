@@ -52,7 +52,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, linux-aarch, macos-arm, macos-x86]
+    needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
@@ -71,10 +71,9 @@ jobs:
     - name: Prepare wheels
       run: |
         rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_12_0_universal2/macosx_12_0_x86_64/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
-        rename "s/_universal2/_x86_64/" dist/PennyLane_Catalyst-*
-        # Discard the 3.9 wheels to save space on nightly builds.
-        rm dist/PennyLane_Catalyst-*-cp39-cp39-*
 
     - name: Upload wheels
       uses: pypa/gh-action-pypi-publish@release/v1

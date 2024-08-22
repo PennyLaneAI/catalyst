@@ -5,4 +5,14 @@ llvm=3a8316216807d64a586b971f51695e23883331f7
 enzyme=v0.0.130
 
 # Always remove custom PL/LQ versions before release.
-pennylane=0.38.0.dev4
+
+# For a custom PL version, update the package version here and at
+# 'doc/requirements.txt
+pennylane=0.38.0.dev11
+
+# For a custom LQ/LK version, update the package version here and at
+# 'doc/requirements.txt'. Also, update the 'LIGHTNING_GIT_TAG' at
+# 'runtime/Makefile' and at all GitHub workflows, using the exact
+# commit hash corresponding to the merged PR that implements the
+# desired feature.
+lightning=0.38.0-dev34

@@ -17,6 +17,11 @@ if [ "$PYTHON_VERSION" != "3.10" ]; then
 fi
 dnf clean all -y
 
+# Patch libpython version since we do not install python-devel for 3.10.
+if [ "$PYTHON_VERSION" == "3.10" ]; then
+    ln -s /usr/lib64/libpython3.11.so.1.0 /usr/lib64/libpython3.10.so
+fi
+
 # Make GCC the default compiler
 source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
 export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc 
@@ -36,10 +41,7 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${
 
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja pytest pytest-xdist pytest-mock autoray PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1'
-
-if [ "$PYTHON_VERSION" == "3.9" ] || [ "$PYTHON_VERSION" == "3.10" ]; then
-    /usr/bin/python3 -m pip install oqc-qcaas-client
-fi
+/usr/bin/python3 -m pip install oqc-qcaas-client
 
 # Install Catalyst wheel
 /usr/bin/python3 -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple
