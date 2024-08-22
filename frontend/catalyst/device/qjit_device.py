@@ -153,7 +153,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
     to a valid TOML config file."""
 
     dname = device.name
-    if isinstance(device, qml.devices.LegacyDevice):
+    if isinstance(device, qml.devices.LegacyDeviceFacade):
         dname = device.target_device.short_name
 
     device_name = ""
