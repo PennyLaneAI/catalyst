@@ -24,61 +24,56 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
     {
         mlir::Operation *root = getOperation();
         IRRewriter rewriter(root->getContext());
-        mlir::Operation *ifop{nullptr};
-        mlir::Operation *yieldop{nullptr};
-        Type type;
-        auto isScalarTensor = [](Value v) {
+        auto isFromElementScalarTensor = [](Value v) {
             if (!::llvm::isa<TensorType>(v.getType())) {
                 return false;
             }
-            return dyn_cast<TensorType>(v.getType()).getRank() == 0;
+            if (dyn_cast<TensorType>(v.getType()).getRank() != 0) {
+                return false;
+            }
+            return isa<tensor::FromElementsOp>(*v.getDefiningOp());
         };
-        root->walk([&](scf::IfOp op) {
-            op->walk([&](scf::YieldOp yield) {
-                llvm::errs() << "........................................\n";
-                llvm::errs() << yield << '\n';
-                for (mlir::Value res : yield.getResults()) {
-                    llvm::errs() << res << '\n';
-                    llvm::errs() << res.getType() << '\n';
-
-                    if (isScalarTensor(res)) {
-                        auto *defop = res.getDefiningOp();
-                        llvm::errs() << *defop << '\n';
-                        llvm::errs() << isa<tensor::FromElementsOp>(*defop) << '\n';
-                        llvm::errs() << defop->getOperand(0) << '\n';
-                        rewriter.replaceAllUsesWith(res, defop->getOperand(0));
-                        rewriter.eraseOp(defop);
-                        type = defop->getOperand(0).getType();
-                        llvm::errs() << type << '\n';
+        // Find scf.if
+        root->walk([&](scf::IfOp if_op) {
+            bool first_yield = true;
+            // Find scf.yield
+            if_op->walk([&](scf::YieldOp yield_op) {
+                // Loop over results
+                std::size_t i_result = 0;
+                for (mlir::Value result : yield_op.getResults()) {
+                    if (isFromElementScalarTensor(result)) {
+                        // Remove from_element op and substitute operand
+                        mlir::Operation *from_element_op = result.getDefiningOp();
+                        rewriter.replaceAllUsesWith(result, from_element_op->getOperand(0));
+                        rewriter.modifyOpInPlace(if_op, [&]() {
+                            if_op.getResult(i_result).setType(
+                                from_element_op->getOperand(0).getType());
+                        });
+                        rewriter.eraseOp(from_element_op);
+                        if (first_yield) {
+                            // Create a from_element op after scf.if
+                            rewriter.setInsertionPointAfter(if_op);
+                            auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
+                                if_op->getLoc(),
+                                RankedTensorType::get({}, if_op->getResult(1).getType()),
+                                if_op->getResult(1));
+                            // Substitute scf.if results with from_element results
+                            rewriter.replaceUsesWithIf(
+                                if_op->getResult(1), from_elem_op->getResult(0),
+                                [&](OpOperand &operand) {
+                                    return operand.getOwner() != from_elem_op;
+                                });
+                        }
                     }
+                    i_result += 1;
                 }
-                llvm::errs() << "........................................\n";
-                yieldop = yield;
+                first_yield = false;
             });
-            llvm::errs() << type << '\n';
-
-            llvm::errs() << "---------------------------------------\n";
-            rewriter.modifyOpInPlace(op, [&]() {
-                op.getResult(0).setType(type);
-                llvm::errs() << op.getResult(0).getType() << '\n';
-                op.getResult(1).setType(type);
-                llvm::errs() << op.getResult(1).getType() << '\n';
-            });
-            llvm::errs() << "---------------------------------------\n";
-
-            rewriter.setInsertionPointAfter(op);
-            auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
-                op->getLoc(), RankedTensorType::get({}, op->getResult(1).getType()),
-                op->getResult(1));
-            rewriter.replaceUsesWithIf(
-                op->getResult(1), from_elem_op->getResult(0),
-                [&](OpOperand &operand) { return operand.getOwner() != from_elem_op; });
-            ifop = op;
         });
 
-        llvm::errs() << "|||||||||||||||||| Final IR ||||||||||||||||||\n";
-        root->walk([&](mlir::Operation *op) { llvm::errs() << *op << '\n'; });
-        llvm::errs() << "|||||||||||||||||| Final IR ||||||||||||||||||\n";
+        // llvm::errs() << "|||||||||||||||||| Final IR ||||||||||||||||||\n";
+        // root->walk([&](mlir::Operation *if_op) { llvm::errs() << *if_op << '\n'; });
+        // llvm::errs() << "|||||||||||||||||| Final IR ||||||||||||||||||\n";
     }
 };
 
