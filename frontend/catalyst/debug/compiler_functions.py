@@ -247,8 +247,8 @@ def replace_ir(fn, stage, new_ir):
 
 @debug_logger
 def compile_executable(fn, *args):
-    """Generate and compile a C program from a :func:`~.qjit` decorated function
-    with the provided arguments.
+    """Generate an executable binary for the native host architecture from a
+    :func:`~.qjit` decorated function with provided arguments.
 
     Args:
         fn (QJIT): a qjit-decorated function
