@@ -387,19 +387,22 @@ The recompilation starts after the given checkpoint stage:
 C Executable Generation
 =======================
 
-Catalyst provides :func:`~.debug.compile_executable` to generate a c executable with a given function and the
+Catalyst provides :func:`~.debug.compile_executable` to generate a C executable with a given function and the
 corresponding arguments.
 
 .. code-block:: python
 
-    from catalyst.debug import compile_executable
+    import subprocess
+    from catalyst import qjit
+    from catalyst.debug import compile_executable, print_memref
 
     @qjit
     def f(x):
-        return x * x
+        y = x * x
+        print_memref(y)
+        return y
 
-    binary = compile_executable(f, 1)
-
+>>> binary = compile_executable(f, 5)
 >>> print(binary)
 /path/to/executable
 

@@ -236,33 +236,39 @@
   8.0
   ```
 
-  Either function can also be used independently of each other.
+  Either function can also be used independently of each other. Note that
+  `get_compilation_stage` replaces the `print_compilation_stage` function;
+  please see the Breaking Changes section for more details.
 
-* Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
-  A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
-  function inputs. 
+* Catalyst now supports direct C executable generation with `catalyst.debug.compile_executable`.
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
-  ```py
-  import subprocess
-  from catalyst import qjit
-  from catalyst.debug import compile_executable, print_memref
-  
-  @qjit
-  def f(x):
-      y = x*x
-      print_memref(y)
-      return y
-  f(5)
-  binary = compile_executable(f, 5)
-  result = subprocess.run(binary, capture_output=True, text=True, check=True)
-  result.stdout
-  ```
-  
   ```pycon
-  >>> MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  >>> @qjit
+  ... def f(x):
+  ...     y = x * x
+  ...     catalyst.debug.print_memref(y)
+  ...     return y
+  >>> f(5)
+  MemRef: base@ = 0x31ac22580 rank = 0 offset = 0 sizes = [] strides = [] data =
   25
-  MemRef: base@ = 0x5df35987b780 rank = 0 offset = 0 sizes = [] strides = [] data =
+  Array(25, dtype=int64)
+  ```
+
+  We can use ``compile_executable`` to compile this function to a binary:
+
+  ```pycon
+  >>> from catalyst.debug import compile_executable
+  >>> binary = compile_executable(f, 5)
+  >>> print(binary)
+  /path/to/executable
+  ```
+
+  Executing this function from a shell environment:
+
+  ```console
+  $ /path/to/executable
+  MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
   25
   ```
 
@@ -586,6 +592,10 @@
   (Array(0.00903428, dtype=float64),
    (Array(0.0903428, dtype=float64), Array(0.01320537, dtype=float64)))
   ```
+
+* A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
+  function inputs.
+  [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
 <h3>Documentation</h3>
 
