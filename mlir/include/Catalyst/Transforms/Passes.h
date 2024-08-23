@@ -32,6 +32,7 @@ std::unique_ptr<mlir::Pass> createGEPInboundsPass();
 std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
 std::unique_ptr<mlir::Pass> createMemrefCopyToLinalgCopyPass();
 std::unique_ptr<mlir::Pass> createApplyTransformSequencePass();
+std::unique_ptr<mlir::Pass> createDetensorizeSCFPass();
 
 void registerAllCatalystPasses();
 

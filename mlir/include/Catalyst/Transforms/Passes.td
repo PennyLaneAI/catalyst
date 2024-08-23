@@ -17,6 +17,12 @@
 
 include "mlir/Pass/PassBase.td"
 
+def DetensorizeSCFPass : Pass<"detensorize-scf"> {
+    let summary = "An empty pass boilerplate that prints out hello world.";
+
+    let constructor = "catalyst::createDetensorizeSCFPass()";
+}
+
 def CatalystBufferizationPass : Pass<"catalyst-bufferize"> {
     let summary = "Bufferize tensors in catalyst utility ops.";
 
