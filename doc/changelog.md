@@ -137,7 +137,7 @@
   Array([ 1. ,  1. ,  1. , -0.2], dtype=float64)
   ```
 
-* Exponential extrapolation is now a supported method of zero-noise extrapolation when performing
+* Exponential fitting is now a supported method of zero-noise extrapolation when performing
   error mitigation in Catalyst using `mitigate_with_zne`.
   [(#953)](https://github.com/PennyLaneAI/catalyst/pull/953)
 
@@ -236,6 +236,8 @@
   8.0
   ```
 
+  Either function can also be used independently of each other.
+
 * Catalyst now supports c executable generation with `catalyst.debug.compile_executable`.
   A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
   function inputs. 
@@ -266,7 +268,7 @@
 
 <h3>Improvements</h3>
 
-* Catalyst has been updated to support JAX v0.4.28.
+* Catalyst has been updated to work with JAX v0.4.28 (exact version match required).
   [(#931)](https://github.com/PennyLaneAI/catalyst/pull/931)
   [(#995)](https://github.com/PennyLaneAI/catalyst/pull/995)
 
@@ -331,7 +333,7 @@
   Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
   ```
 
-* Verification is now performed before compilation to confirm that the measurements included in QNodes
+* Program verification is extended to confirm that the measurements included in QNodes
   are compatible with the specified device and settings.
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
   [(#962)](https://github.com/PennyLaneAI/catalyst/pull/962)
@@ -357,12 +359,12 @@
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
 * Improved type validation and error messaging has been added to both the `catalyst.jvp`
-  and `catalyst.vjp` functions to ensure that the tangent and parameter types are compatible.
+  and `catalyst.vjp` functions to ensure that the (co)tangent and parameter types are compatible.
   [(#1020)](https://github.com/PennyLaneAI/catalyst/pull/1020)
   [(#1030)](https://github.com/PennyLaneAI/catalyst/pull/1030)
   [(#1031)](https://github.com/PennyLaneAI/catalyst/pull/1031)
 
-  For example, using providing an integer tangent for a function with float64 parameters
+  For example, providing an integer tangent for a function with float64 parameters
   will result in an error:
 
   ```pycon
@@ -525,7 +527,7 @@
   signature is declared incorrectly and the callback function is differentiated.
   [(#916)](https://github.com/PennyLaneAI/catalyst/pull/916)
 
-  Instead, this is caught early and an useful error message returned:
+  Instead, this is caught early and a useful error message returned:
 
   ```python
   @catalyst.pure_callback
@@ -597,7 +599,7 @@
   Catalyst variant jaxpr.
   [(#837)](https://github.com/PennyLaneAI/catalyst/pull/837)
 
-* Catalyst is now compatible with Enzyme `v0.0.130`
+* Catalyst now uses Enzyme `v0.0.130`
   [(#898)](https://github.com/PennyLaneAI/catalyst/pull/898)
 
 * When memrefs have no identity layout, memrefs copy operations are replaced by the linalg copy operation.
@@ -605,8 +607,9 @@
   a better compatibility with Enzyme.
   [(#917)](https://github.com/PennyLaneAI/catalyst/pull/917)
 
-* llvm O2 and Enzyme passes are only run when needed (gradients presents). Async execution of QNodes
-  triggers now triggers a Coroutine lowering pass.
+* LLVM's O2 optimization pipeline and Enzyme's AD transformations are now only run in the presence
+  of gradients, significantly improving compilation times for programs without derivatives.
+  Similarly, LLVM's coroutine lowering passes only run when `async_qnodes` is enabled in the QJIT decorator.
   [(#968)](https://github.com/PennyLaneAI/catalyst/pull/968)
 
 * The function `inactive_callback` was renamed `__catalyst_inactive_callback`.
@@ -637,7 +640,8 @@
 * Catalyst's implementation of Lightning Kokkos plugin has been removed in favor of Lightning's one.
   [(#974)](https://github.com/PennyLaneAI/catalyst/pull/974)
 
-* Eliminate (some) scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering passes.
+* Eliminate some scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering pipeline.
+  This will reduce memory usage at runtime as well reduce compilation complexity.
   [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
 
 <h3>Contributors</h3>
