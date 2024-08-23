@@ -204,9 +204,9 @@
   ```
 
   ```py
-  from catalyst.debug import get_pipeline_output, replace_ir
+  from catalyst.debug import get_compilation_stage, replace_ir
 
-  old_ir = get_pipeline_output(f, "HLOLoweringPass")
+  old_ir = get_compilation_stage(f, "HLOLoweringPass")
   new_ir = old_ir.replace(
       "%2 = arith.mulf %in, %in_0 : f64\n",
       "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
