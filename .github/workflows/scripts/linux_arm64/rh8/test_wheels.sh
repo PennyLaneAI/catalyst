@@ -15,7 +15,7 @@ dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
 if [ "$PYTHON_VERSION" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
 else
-    # Patch libpython version since we do not install python-devel for 3.10.
+    # Install Python3.10 and Python3.10-devel from source because they cannot be found under this linux version.
     dnf groupinstall "Development Tools" -y
     dnf install openssl-devel bzip2-devel libffi-devel -y
     dnf install wget -y
