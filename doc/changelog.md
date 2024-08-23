@@ -539,6 +539,9 @@
 * Catalyst's implementation of Lightning Kokkos plugin has been removed in favor of Lightning's one.
   [(#974)](https://github.com/PennyLaneAI/catalyst/pull/974)
 
+* The `validate_device_capabilities` function is considered obsolete. Hence, it has been removed.
+  [(#1045)](https://github.com/PennyLaneAI/catalyst/pull/1045)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
