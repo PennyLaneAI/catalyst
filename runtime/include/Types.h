@@ -126,6 +126,15 @@ struct MemRefT_int64_1d {
     size_t strides[1];
 };
 
+// MemRefT<int64_t, dimension=1> type
+struct MemRefT_int8_1d {
+    int8_t *data_allocated;
+    int8_t *data_aligned;
+    size_t offset;
+    size_t sizes[1];
+    size_t strides[1];
+};
+
 // PairT<MemRefT<double, dimension=1>, MemRefT<int64, dimension=2>> type
 struct PairT_MemRefT_double_int64_1d {
     struct MemRefT_double_1d first;

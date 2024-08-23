@@ -43,6 +43,11 @@ from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from mlir_quantum.dialects._transform_ops_gen import (
+    ApplyRegisteredPassOp,
+    NamedSequenceOp,
+)
+from mlir_quantum.dialects._transform_ops_gen import YieldOp as TransformYieldOp
 from mlir_quantum.dialects.catalyst import (
     AssertionOp,
     CallbackCallOp,
@@ -80,6 +85,8 @@ from mlir_quantum.dialects.quantum import (
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
+    SetBasisStateOp,
+    SetStateOp,
     StateOp,
     TensorOp,
     VarianceOp,
@@ -138,6 +145,9 @@ class AbstractQreg(AbstractValue):
 
     hash_value = hash("AbstractQreg")
 
+    def __init__(self, length):
+        self.length = length
+
     def __eq__(self, other):
         return isinstance(other, AbstractQreg)
 
@@ -184,6 +194,18 @@ def _obs_lowering(aval):
 
 
 #
+# Transform Module Type
+#
+class AbstractTransformMod(AbstractValue):
+    """Abstract transform module type."""
+
+
+def _transform_mod_lowering(aval):
+    assert isinstance(aval, AbstractTransformMod)
+    return (ir.OpaqueType.get("transform", 'op<"builtin.module">'),)
+
+
+#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -194,6 +216,9 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
+
+core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
+mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
 
 
 class Folding(Enum):
@@ -263,6 +288,13 @@ value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
+apply_registered_pass_p = core.Primitive("apply_registered_pass")
+transform_named_sequence_p = core.Primitive("transform_named_sequence")
+transform_named_sequence_p.multiple_results = True
+set_state_p = jax.core.Primitive("state_prep")
+set_state_p.multiple_results = True
+set_basis_state_p = jax.core.Primitive("set_basis_state")
+set_basis_state_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -387,6 +419,145 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 
 
 #
+# transform dialect lowering
+#
+
+
+def get_named_sequence_in_module(mod):
+    for op in mod.body.operations:
+        if op.operation.name == "transform.named_sequence":
+            return op.operation
+    return None
+
+
+#
+# transform_named_sequence
+#
+@transform_named_sequence_p.def_abstract_eval
+def _transform_named_sequence_p_abstract_eval(*args):
+    return ()
+
+
+@transform_named_sequence_p.def_impl
+def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
+    module = jax_ctx.module_context.module
+
+    # We wish to generate the transformer module, and place it in the top-level module
+    # The transformer module must be marked with the "transform.with_named_sequence" attribute
+    # The transformer module has a single block, and the block contains the
+    # "transform.named_sequence @__transform_main" operation
+
+    with ir.InsertionPoint(module.body):
+        transformer_module = ir.Operation.create("builtin.module", regions=1)
+        with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
+        transformer_module.operation.attributes["transform.with_named_sequence"] = (
+            with_named_sequence_attr
+        )
+        bb_transformer = ir.Block.create_at_start(transformer_module.bodyRegion)
+
+    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
+    functype_attr = ir.TypeAttr.get(functype)
+
+    # Insert the transform.named_sequence op into the transformer module
+    # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
+    with ir.InsertionPoint(bb_transformer):
+        named_sequence_op = NamedSequenceOp(
+            sym_name="__transform_main",
+            function_type=functype_attr,
+        )
+
+        # transform.named_sequence op is the "main function" of the transform dialect
+        # and thus needs an entry block (which also should be its only block)
+        # The argument of the block is the payload module
+        bb_named_sequence = ir.Block.create_at_start(
+            named_sequence_op.body, arg_types=[transform_mod_type]
+        )
+
+        # The transform.named_sequence needs a terminator called "transform.yield"
+        with ir.InsertionPoint(bb_named_sequence):
+            transform_yield_op = TransformYieldOp(operands_=[])  # pylint: disable=unused-variable
+
+    return named_sequence_op.results
+
+
+#
+# apply_registered_pass
+#
+@apply_registered_pass_p.def_abstract_eval
+def _apply_registered_pass_abstract_eval(*args, pass_name, options=None):
+    return AbstractTransformMod()
+
+
+@apply_registered_pass_p.def_impl
+def _apply_registered_pass_def_impl(*args, pass_name, options=None):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _apply_registered_pass_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
+):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
+    module = jax_ctx.module_context.module
+    named_sequence_op = None
+    for op in reversed(module.body.operations):
+        # transformer module usually is at the end of the module, so look for it from the end
+        if op.operation.name == "builtin.module":
+            named_sequence_op = get_named_sequence_in_module(op)
+            break
+    assert (
+        named_sequence_op is not None
+    ), """
+            transform.apply_registered_pass must be placed in a transform.named_sequence, 
+            but none exist in the module.
+            """
+
+    # If there already is a apply_registered_pass,
+    # insert after the last pass in the existing pass sequence.
+    # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
+    named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
+    first_op_in_block = named_sequence_op_block.operations[0].operation
+
+    assert first_op_in_block.name in (
+        "transform.apply_registered_pass",
+        "transform.yield",
+    ), """
+            Unexpected operation in transform.named_sequence! 
+            Only transform.apply_registered_pass and transform.yield are allowed.
+        """
+
+    if first_op_in_block.name == "transform.apply_registered_pass":
+        _ = len(named_sequence_op_block.operations)
+        yield_op = named_sequence_op_block.operations[_ - 1].operation
+        current_last_pass = named_sequence_op_block.operations[_ - 2].operation
+        with ir.InsertionPoint(yield_op):
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_mod_type,
+                target=current_last_pass.result,
+                pass_name=pass_name,
+                options=options,
+            )
+
+    # otherwise it's the first pass, i.e. only a yield op is in the block
+    # so insert right before the yield op
+    else:
+        ip = named_sequence_op.regions[0].blocks[0]
+        with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_mod_type,
+                target=ip.arguments[0],
+                pass_name=pass_name,
+                options=options,
+            )
+
+    return apply_registered_pass_op.results
+
+
+#
 # func
 #
 mlir_fn_cache: Dict["catalyst.jax_tracer.Function", Any] = {}
@@ -470,9 +641,9 @@ class GradParams:
     method: str
     scalar_out: bool
     h: float
-    argnum: Union[int, List]
-    scalar_argnum: bool = None
-    expanded_argnum: List[int] = None
+    argnums: Union[int, List]
+    scalar_argnums: bool = None
+    expanded_argnums: List[int] = None
     with_value: bool = False  # if true it calls value_and_grad instead of grad
 
 
@@ -486,8 +657,8 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.expanded_argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    new_argnums = [num + offset for num in grad_params.expanded_argnums]
+    transformed_signature = calculate_grad_shape(signature, new_argnums)
     return tuple(transformed_signature.get_results())
 
 
@@ -500,18 +671,18 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         fn(Grad): the function to be differentiated
         method: the method used for differentiation
         h: the difference for finite difference. May be None when fn is not finite difference.
-        argnum: argument indices which define over which arguments to
+        argnums: argument indices which define over which arguments to
             differentiate.
     """
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:
         f64 = ir.F64Type.get(mlir_ctx)
         finiteDiffParam = ir.FloatAttr.get(f64, h)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in argnum]
-    argnum_numpy = np.array(new_argnum)
+    new_argnums = [num + offset for num in argnums]
+    argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
 
     _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
@@ -557,8 +728,8 @@ def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=
 
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.expanded_argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    new_argnums = [num + offset for num in grad_params.expanded_argnums]
+    transformed_signature = calculate_grad_shape(signature, new_argnums)
     return tuple(jaxpr.out_avals + transformed_signature.get_results())
 
 
@@ -568,9 +739,9 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
-    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+    new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -586,8 +757,8 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
-    val_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
-    gradient_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
+    val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
     _func_lowering(
         ctx,
@@ -605,7 +776,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
-        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
@@ -631,9 +802,9 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
-    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+    new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -666,7 +837,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(tang_args),
-        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
@@ -680,7 +851,7 @@ def _vjp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 # pylint: disable=unused-argument
 def _vjp_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
-    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.expanded_argnum]
+    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.expanded_argnums]
 
 
 def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -689,9 +860,9 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
+    method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
-    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+    new_argnums = np.array([len(jaxpr.consts) + num for num in argnums])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -703,8 +874,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
-    func_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
-    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
+    func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
     _func_lowering(
         ctx,
@@ -723,7 +894,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(cotang_args),
-        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
@@ -806,17 +977,17 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
 # qalloc
 #
 @qalloc_p.def_impl
-def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
+def _qalloc_def_impl(ctx, size_value, static_size=None):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qalloc_p.def_abstract_eval
-def _qalloc_abstract_eval(size):
+def _qalloc_abstract_eval(size, static_size=None):
     """This function is called with abstract arguments for tracing."""
-    return AbstractQreg()
+    return AbstractQreg(static_size)
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value, static_size=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -906,7 +1077,7 @@ def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
     assert isinstance(qubit, AbstractQbit)
-    return AbstractQreg()
+    return AbstractQreg(qreg_old.length)
 
 
 def _qinsert_lowering(
@@ -1892,6 +2063,58 @@ def _assert_lowering(jax_ctx: mlir.LoweringRuleContext, assertion, error):
 
 
 #
+# state_prep
+#
+@set_state_p.def_impl
+def set_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    """Concrete evaluation"""
+    raise NotImplementedError()
+
+
+@set_state_p.def_abstract_eval
+def set_state_abstract(*qubits_or_params):
+    """Abstract evaluation"""
+    length = len(qubits_or_params)
+    qubits_length = length - 1
+    return (AbstractQbit(),) * qubits_length
+
+
+def _set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set state"""
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    out_qubits = [qubit.type for qubit in qubits]
+    return SetStateOp(out_qubits, param, qubits).results
+
+
+#
+# set_basis_state
+#
+@set_basis_state_p.def_impl
+def set_basis_state_impl(ctx, *qubits_or_params):  # pragma: no cover
+    """Concrete evaluation"""
+    raise NotImplementedError()
+
+
+@set_basis_state_p.def_abstract_eval
+def set_basis_state_abstract(*qubits_or_params):
+    """Abstract evaluation"""
+    length = len(qubits_or_params)
+    qubits_length = length - 1
+    return (AbstractQbit(),) * qubits_length
+
+
+def _set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set basis state"""
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    out_qubits = [qubit.type for qubit in qubits]
+    return SetBasisStateOp(out_qubits, param, qubits).results
+
+
+#
 # adjoint
 #
 @adjoint_p.def_impl
@@ -1987,6 +2210,10 @@ mlir.register_lowering(print_p, _print_lowering)
 mlir.register_lowering(assert_p, _assert_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
+mlir.register_lowering(apply_registered_pass_p, _apply_registered_pass_lowering)
+mlir.register_lowering(transform_named_sequence_p, _transform_named_sequence_lowering)
+mlir.register_lowering(set_state_p, _set_state_lowering)
+mlir.register_lowering(set_basis_state_p, _set_basis_state_lowering)
 
 
 def _scalar_abstractify(t):

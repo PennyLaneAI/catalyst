@@ -24,7 +24,7 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
 include(CTest)
 include(Catch)
 
-if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
+if(ENABLE_LIGHTNING)
     add_executable(runner_tests_lightning runner_main.cpp)
     target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
 
@@ -65,11 +65,6 @@ if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
         Test_SVDynamicCPU_Core.cpp
         Test_SVDynamicCPU_Allocation.cpp
         )
-
-    if(KOKKOS_ENABLE_OPENMP)
-        find_package(OpenMP REQUIRED)
-        target_link_libraries(runner_tests_lightning INTERFACE OpenMP::OpenMP_CXX)
-    endif()
 
     if(PLKOKKOS_ENABLE_NATIVE)
         message(STATUS "ENABLE_NATIVE is ON. Use -march=native for cpptests.")

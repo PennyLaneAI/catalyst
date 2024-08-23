@@ -496,10 +496,10 @@ finite-difference and ``h``-value :math:`0.1` should be:
 
 .. code-block:: python
 
-    g_fd = grad(circuit, method="fd", argnum=1, h=0.1)
+    g_fd = grad(circuit, method="fd", argnums=1, h=0.1)
 
 Gradients of quantum functions can be calculated for a range or tensor of parameters.
-For example, ``grad(circuit, argnum=[0, 1])`` would calculate the gradient of
+For example, ``grad(circuit, argnums=[0, 1])`` would calculate the gradient of
 ``circuit`` using the finite-difference method for the first and second parameters.
 In addition, the gradient of the following circuit with a tensor of parameters is
 also feasible.
@@ -513,7 +513,7 @@ also feasible.
             qml.RX(params[0] * params[1], wires=0)
             return qml.expval(qml.PauliY(0))
 
-        return grad(circuit, argnum=0)(params)
+        return grad(circuit, argnums=0)(params)
 
 >>> workflow(jnp.array([2.0, 3.0]))
 Array([-2.88051099, -1.92034063], dtype=float64)
@@ -576,7 +576,7 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
     @qjit
     def workflow():
         def gd_fun(param):
-            diff = grad(circuit, argnum=0)
+            diff = grad(circuit, argnums=0)
             return circuit(param), diff(param)
 
         opt = optax.sgd(learning_rate=0.4)

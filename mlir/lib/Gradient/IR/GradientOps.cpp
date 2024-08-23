@@ -317,6 +317,31 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         }
     }
 
+    std::vector<Type> tanTypes;
+    tanTypes.reserve(this->getTangents().size());
+    {
+        for (const auto &tanOps : this->getTangents()) {
+            tanTypes.push_back(tanOps.getType());
+        }
+    }
+
+    const auto calleeInputTypes = callee.getFunctionType().getInputs();
+
+    // Check that the differentiable callee inputs have the same types as their
+    // corresponding tangent inputs
+    for (size_t i = 0; i < diffArgIndices.size(); i++) {
+        const auto tanType = tanTypes[i];
+        const auto cIType = calleeInputTypes[diffArgIndices[i]];
+
+        if (tanType != cIType) {
+            return this->emitOpError("callee input and tangent arguments to jvp do not match; ")
+                   << "dtypes must be equal. "
+                   << "Got callee input type " << cIType << " for argument " << diffArgIndices[i]
+                   << " and so expected corresponding tangent type " << cIType << " but got "
+                   << tanType;
+        }
+    }
+
     return success();
 }
 
@@ -390,12 +415,14 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     // Check that callee results have the same types as cotangent inputs
     for (size_t i = 0; i < cotTypes.size(); i++) {
-        auto cotType = cotTypes[i];
-        auto crType = calleeResultTypes[i];
-        if (cotType != crType) {
-            return this->emitOpError("callee result type does not match the cotangent type")
-                   << " callee result " << i << " was expected to be of type " << cotType
-                   << " but got " << crType;
+        const auto cotType = cotTypes[i];
+        const auto cRType = calleeResultTypes[i];
+        if (cotType != cRType) {
+            return this->emitOpError("callee result and cotangent argument to vjp do not match; ")
+                   << "dtypes must be equal. "
+                   << "Got callee result type " << cRType << " for output " << i
+                   << " and so expected "
+                   << "corresponding cotangent type " << cRType << " but got " << cotType;
         }
     }
 

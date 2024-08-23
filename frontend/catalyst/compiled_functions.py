@@ -268,7 +268,7 @@ class CompiledFunction:
         """
         return self.getCompiledReturnValueType(mlir_tensor_types)
 
-    def args_to_memref_descs(self, restype, args):
+    def args_to_memref_descs(self, restype, args, **kwargs):
         """Convert ``args`` to memref descriptors.
 
         Besides converting the arguments to memrefs, it also prepares the return value. To respect
@@ -293,7 +293,7 @@ class CompiledFunction:
 
         c_abi_args = []
 
-        args_data, args_shape = tree_flatten(args)
+        args_data, args_shape = tree_flatten((args, kwargs))
 
         for arg in args_data:
             numpy_arg = np.asarray(arg)
@@ -338,7 +338,7 @@ class CompiledFunction:
                 abstracted_axes, *dynamic_args, **kwargs
             )
 
-        abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args)
+        abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args, **kwargs)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
@@ -475,3 +475,7 @@ class CompilationCache:
         key = CacheKey(treedef, static_args)
         entry = CacheEntry(fn, signature, out_treedef, workspace)
         self.cache[key] = entry
+
+    def clear(self):
+        """Clear all previous compiled functions"""
+        self.cache.clear()
