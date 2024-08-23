@@ -107,9 +107,12 @@ void LightningSimulator::PrintState()
 void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data,
                                   std::vector<QubitIdType> &wires)
 {
+    std::cout << "setting state!\n";
     std::vector<std::complex<double>> data_vector(data.begin(), data.end());
     std::vector<std::size_t> wires_size_t(wires.begin(), wires.end());
+    std::cout << "begin setting state vector...\n";
     this->device_sv->setStateVector(data_vector, wires_size_t);
+    std::cout << "setting state vector successful!\n";
 }
 
 void LightningSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
