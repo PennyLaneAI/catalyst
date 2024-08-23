@@ -28,10 +28,10 @@ This module also uses the CUDA-quantum API. Here is the reference:
   https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 """
 
-import functools
 import json
 import operator
-from functools import reduce, wraps
+import warnings
+from functools import reduce
 from typing import Hashable
 
 import cudaq
@@ -39,6 +39,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
+import catalyst
 from catalyst.device import BackendInfo
 from catalyst.jax_primitives import (
     AbstractObs,
@@ -72,7 +73,6 @@ from catalyst.jax_primitives import (
     while_p,
     zne_p,
 )
-from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.qfunc import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
@@ -94,7 +94,7 @@ from .primitives import (
 
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
-# pylint: disable=protected-access
+# pylint: disable=protected-access,access-member-before-definition,attribute-defined-outside-init
 
 
 def remove_host_context(jaxpr):
@@ -794,30 +794,19 @@ def interpret_impl(ctx, jaxpr):
     return retvals
 
 
-class QJIT_CUDAQ:
-    """Class representing a just-in-time compiled hybrid quantum-classical function.
-
-    .. note::
-
-        ``QJIT_CUDAQ`` objects are created by the :func:`~.qjit` decorator. Please see
-        the :func:`~.qjit` documentation for more details.
+class QJIT_CUDAQ(catalyst.QJIT):
+    """Class representing a CUDA Quantum hybrid quantum-classical function.
 
     Args:
-        fn (Callable): the quantum or classical function
+        fn (Callable): the quantum or classical function to compile
+        compile_options (CompileOptions): compilation options to use
     """
 
-    def __init__(self, fn):
-        self.user_function = fn
-        functools.update_wrapper(self, fn)
-
-    def get_jaxpr(self, *args):
-        """Trace :func:`~.user_function`
-
-        Args:
-            *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
-
-        Returns:
-            an MLIR module
+    def capture(self, args):
+        """
+        Need to override the capture method for two reasons:
+        - We need to patch the allowed devices.
+        - the CUDAQ JAXPR interpreter requires the host context removed.
         """
 
         def cudaq_backend_info(device, _capabilities) -> BackendInfo:
@@ -833,75 +822,42 @@ class QJIT_CUDAQ:
             (QFunc, "extract_backend_info", cudaq_backend_info),
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            func = self.user_function
-            abs_axes = {}
-            static_args = None
-            # We could also pass abstract arguments here in *args
-            # the same way we do so in Catalyst.
-            # But I think that is redundant now given make_jaxpr2
-            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            jaxpr, out_type, treedef, dynamic_sig = super().capture(args)
 
-        # TODO(@erick-xanadu):
-        # What about static_args?
-        return jaxpr, out_treedef
+        # required because the CUDAQ interpretor requires host removed
+        jaxpr = remove_host_context(jaxpr)
+        jaxpr = jax._src.core.ClosedJaxpr(jaxpr, jaxpr.constvars)
 
+        return jaxpr, out_type, treedef, dynamic_sig
 
-def interpret(fun):
-    """Wrapper function that takes a function that will be interpretted with
-    the semantics in interpret_impl.
+    def jit_compile(self, args):
+        """
+        JIT compile needs to be overridden from the base class, for a couple of reasons:
 
-    Args:
-       fun: Function to be interpretted.
+        - It calls self.generate_ir() and self.compile(), none of which are applicable here
+          (for now).
+        - It tries to create a function cache and a CompiledFunction object, which will fail in
+          this case, because we have no compiled binary nor shared library.
+        """
 
-    Returns:
-       wrapped: A wrapped function that will do the tracing.
-    """
+        if self.jaxpr is None:
+            if self.user_sig and not self.compile_options.static_argnums:
+                msg = "Provided arguments did not match declared signature, recompiling..."
+                warnings.warn(msg, UserWarning)
 
-    # TODO(@erick-xanadu): kwargs?
+            self.jaxpr, _, self.out_treedef, self.c_sig = self.capture(args)
 
-    @wraps(fun)
-    def wrapped(*args, **_kwargs):
-        if _kwargs:
-            # TODO(@erick-xanadu):
-            raise NotImplementedError("CUDA tapes do not yet have kwargs.")  # pragma: no cover
-        # QJIT_CUDAQ(fun).get_jaxpr
-        # will return the JAXPR of the function fun.
-        # However, notice that *args are still concrete.
-        # This means that when we interpret the JAXPR, it will be a concrete interpretation.
-        # If we wanted an abstract interpretation, we could pass the abstract values that
-        # correspond to the return value of trace_to_jaxpr out_type2.
-        # If we did that, we could cache the result JAXPR from this function
-        # and evaluate it each time the function is called.
-        catalyst_jaxpr_with_host, out_tree = QJIT_CUDAQ(fun).get_jaxpr(*args)
+        # TODO: match the behaviour of qjit by determining the
+        # correct 'type promotion' value to return here.
+        return False  # no type promotion
 
-        # We need to keep track of the consts...
-        consts = catalyst_jaxpr_with_host.consts
-        catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
-        # TODO(@erick-xanadu): There was a discussion about removing as much as possible the
-        # reliance on unstable APIs.
-        # Here is jax._src.core.ClosedJaxpr which is another function in the unstable API.
-        # Its only use here is to create a new ClosedJaxpr from the variable catalyst_jaxpr typed
-        # Jaxpr.
-        # Please note that catalyst_jaxpr_with_host is a ClosedJaxpr.
-        # But to get it without the host context we need to "open" it up again.
-        # And then close it again.
-        # pylint: disable-next=line-too-long
-        # From the [documentation (paraphrased)](https://jax.readthedocs.io/en/latest/jaxpr.html#understanding-jaxprs)
-        #
-        #    a closed jaxpr is has two fields the jaxpr and a list of constants.
-        #
-        # So, a good solution to get rid of this call here is to just interpret the host context.
-        # This is not too difficult to do. The only changes would be that we now need to provide
-        # semantics for func_p.
-        closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
+    def run(self, args, _kwargs):
+        """
+        We need to override run, because it currently tries to call self.compiled_function,
+        which does not exist here.
+        """
 
-        # Because they become args...
-        args = list(args) + consts
-        args = tuple(args)
-        ctx = InterpreterContext(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
-        out = interpret_impl(ctx, closed_jaxpr.jaxpr)
+        ctx = InterpreterContext(self.jaxpr.jaxpr, self.jaxpr.literals, *args)
+        results = interpret_impl(ctx, self.jaxpr.jaxpr)
 
-        out = tree_unflatten(out_tree, out)
-        return out
-
-    return wrapped
+        return tree_unflatten(self.out_treedef, results)

@@ -365,6 +365,14 @@
   qjit-compiled function being NumPy arrays will need to be updated.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
+<h3>Internal changes</h3>
+
+* The `catalyst.cuda.cudaqjit` decorator has been refactored to inherit from the main
+  `catalyst.QJIT` class. This enables the functionality provided by the `QJIT` class to be
+  supported by the CUDA quantum QJIT, while reducing code duplication. Longer term, this will help
+  enable autograph support for `catalyst.cuda.cudaqjit`.
+  [(#926)](https://github.com/PennyLaneAI/catalyst/pull/926)
+
 * Support for TOML files in Schema 1 has been disabled.
   [(#960)](https://github.com/PennyLaneAI/catalyst/pull/960)
 

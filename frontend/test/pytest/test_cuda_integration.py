@@ -47,14 +47,22 @@ class TestCudaQ:
         with pytest.raises(ValueError, match="Unavailable target"):
             circuit_foo()
 
+    def test_qjit_catalyst_to_cuda_jaxpr(self):
+        """Assert that catalyst_to_cuda returns something."""
+
+        @catalyst.third_party.cuda.cudaqjit
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
+        def circuit_foo():
+            return qml.state()
+
+        res = circuit_foo()
+        assert isinstance(res, jax.Array)
+
     def test_measurement_return(self):
         """Test the measurement code is added."""
-
-        from catalyst.third_party.cuda import cudaqjit as cjit
-
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
-            @cjit
+            @catalyst.third_party.cuda.cudaqjit
             @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
@@ -65,9 +73,7 @@ class TestCudaQ:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalyst.third_party.cuda import cudaqjit as cjit
-
-        @cjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
@@ -232,7 +238,6 @@ class TestCudaQ:
         observed = cuda_compiled(jax.numpy.array([3.14, 0.0]))
         assert_allclose(expected, observed)
 
-    @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point(self):
         """Test the entry point for SoftwareQQPP"""
 
@@ -252,7 +257,6 @@ class TestCudaQ:
         observed = cuda_compiled(3.14)
         assert_allclose(expected["a"], observed["a"])
 
-    @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point_compiler(self):
         """Test the entry point for cudaq.qjit"""
 
@@ -475,6 +479,97 @@ class TestCudaQ:
 
         observed = circuit2(3.14)
         assert_allclose(expected, observed)
+
+    def test_jit_capture(self, mocker):
+        """Test that JAXPR capture only happens on first execution"""
+        dev1 = qml.device("softwareq.qpp", wires=2)
+        dev2 = qml.device("lightning.qubit", wires=2)
+
+        def circuit(params):
+            x, y = jax.numpy.array_split(params, 2)
+            qml.RX(x[0], wires=[0])
+            qml.RX(y[0], wires=[0])
+            return qml.expval(qml.PauliZ(0))
+
+        circuit1 = catalyst.third_party.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit2 = qjit(qml.QNode(circuit, dev2))
+        spy = mocker.spy(circuit1, "capture")
+
+        p = jnp.array([0.1, 0.2])
+        res1 = circuit1(p)
+        spy.assert_called()
+        assert_allclose(res1, circuit2(p))
+
+        p = jnp.array([0.3, 0.4])
+        spy = mocker.spy(circuit1, "capture")
+        res2 = circuit1(p)
+        spy.assert_not_called()
+        assert_allclose(res2, circuit2(p))
+
+    def test_aot_capture(self, mocker):
+        """Test that JAXPR capture can occur AOT"""
+        dev1 = qml.device("softwareq.qpp", wires=2)
+        dev2 = qml.device("lightning.qubit", wires=2)
+
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=[0])
+            qml.RX(y, wires=[0])
+            return qml.expval(qml.PauliZ(0))
+
+        circuit1 = catalyst.third_party.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit2 = qjit(qml.QNode(circuit, dev2))
+
+        x, y = 0.1, 0.2
+        spy = mocker.spy(circuit1, "capture")
+        res1 = circuit1(x, y)
+        spy.assert_not_called()
+        assert_allclose(res1, circuit2(x, y))
+
+        x, y = 0.3, 0.4
+        res2 = circuit1(x, y)
+        spy.assert_not_called()
+        assert_allclose(res2, circuit2(x, y))
+
+    def test_autograph(self):
+        """Test that autograph can be invoked"""
+        dev = qml.device("softwareq.qpp", wires=2)
+
+        @qml.qnode(dev)
+        def circuit(x: float, y: float):
+
+            for _ in range(10):
+                qml.RX(x, wires=[0])
+
+            qml.RX(y, wires=[0])
+            return qml.state()
+
+        circuit1 = catalyst.third_party.cuda.cudaqjit(circuit, autograph=True)
+        assert "for_loop" in str(circuit1.jaxpr)
+
+        circuit2 = catalyst.third_party.cuda.cudaqjit(circuit, autograph=False)
+        assert "for_loop" not in str(circuit2.jaxpr)
+
+    @pytest.mark.skip(reason="kwargs currently not supported")
+    def test_kwargs(self):
+        """Test passing kwargs to an qjit"""
+        dev1 = qml.device("softwareq.qpp", wires=2)
+        dev2 = qml.device("lightning.qubit", wires=2)
+
+        def circuit(x, y=0.2):
+            qml.RX(x, wires=[0])
+            qml.RX(y, wires=[0])
+            return qml.expval(qml.PauliZ(0))
+
+        circuit1 = catalyst.third_party.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit2 = qjit(qml.QNode(circuit, dev2))
+
+        # test using default values
+        res1 = circuit1(0.1)
+        assert_allclose(res1, circuit2(0.1))
+
+        # test passing kwargs
+        res1 = circuit1(x=0.1, y=0.3)
+        assert_allclose(res1, circuit2(x=0.1, y=0.3))
 
 
 if __name__ == "__main__":
