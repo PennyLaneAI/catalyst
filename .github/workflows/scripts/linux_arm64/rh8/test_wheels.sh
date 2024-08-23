@@ -14,13 +14,21 @@ dnf update -y
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
 if [ "$PYTHON_VERSION" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
+else
+    # Patch libpython version since we do not install python-devel for 3.10.
+    dnf groupinstall "Development Tools" -y
+    dnf install openssl-devel bzip2-devel libffi-devel -y
+    dnf install wget -y
+    cd /tmp
+    wget https://www.python.org/ftp/python/${PYTHON_VERSION}.${PYTHON_SUBVERSION}/Python-${PYTHON_VERSION}.${PYTHON_SUBVERSION}.tgz
+    tar xzf Python-${PYTHON_VERSION}.${PYTHON_SUBVERSION}.tgz
+    cd Python-${PYTHON_VERSION}.${PYTHON_SUBVERSION}
+    ./configure --enable-optimizations --enable-shared
+    make
+    make altinstall
+    cd /catalyst
 fi
 dnf clean all -y
-
-# Patch libpython version since we do not install python-devel for 3.10.
-if [ "$PYTHON_VERSION" == "3.10" ]; then
-    ln -s /usr/lib64/libpython3.11.so.1.0 /usr/lib64/libpython3.10.so
-fi
 
 # Make GCC the default compiler
 source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
