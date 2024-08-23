@@ -55,11 +55,11 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                             rewriter.setInsertionPointAfter(if_op);
                             auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
                                 if_op->getLoc(),
-                                RankedTensorType::get({}, if_op->getResult(1).getType()),
-                                if_op->getResult(1));
+                                RankedTensorType::get({}, if_op->getResult(i_result).getType()),
+                                if_op->getResult(i_result));
                             // Substitute scf.if results with from_element results
                             rewriter.replaceUsesWithIf(
-                                if_op->getResult(1), from_elem_op->getResult(0),
+                                if_op->getResult(i_result), from_elem_op->getResult(0),
                                 [&](OpOperand &operand) {
                                     return operand.getOwner() != from_elem_op;
                                 });
