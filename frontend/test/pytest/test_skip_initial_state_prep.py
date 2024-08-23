@@ -42,6 +42,27 @@ class TestExamplesFromWebsite:
         observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
+    def test_state_prep_recycled_device(self, backend):
+        """The same test as above but two qnodes using the same device"""
+        dev = qml.device(backend, wires=2)
+
+        @qml.qnode(dev)
+        def example_circuit():
+            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qml.state()
+
+        @qml.qnode(dev)
+        def example_circuit_doppelganger():
+            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qml.state()
+
+        def main():
+            return example_circuit(), example_circuit_doppelganger()
+
+        expected = jnp.array(main())
+        observed = jnp.array(qml.qjit(main)())
+        assert jnp.allclose(expected, observed)
+
     def test_basis_state(self, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
