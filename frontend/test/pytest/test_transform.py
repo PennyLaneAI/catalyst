@@ -111,9 +111,10 @@ def test_batch_params(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(keep_intermediate=True)(qnode_backend)
     expected = jax_jit(data, x, weights)
     observed = compiled(data, x, weights)
+    #breakpoint()
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -258,6 +259,8 @@ class TestBroadcastExpand:
             @qml.qnode(qml.device(device_name, wires=2), interface="jax", cache=False)
             def circuit(x, y, z, obs):
                 """Example taken from PL tests"""
+                # fails if we have stateprep. wierd
+                # but passes when we don't have stateprep...
                 qml.StatePrep(
                     np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
                     wires=[0, 1],
@@ -273,9 +276,30 @@ class TestBroadcastExpand:
 
         qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
+        qjit_circuit = qjit(keep_intermediate=True)(qnode_backend)
+        #breakpoint()
 
+        from catalyst.debug import get_compilation_stage, replace_ir
+
+        #breakpoint()
         expected = jax.jit(qnode_control)(*params, obs)
-        observed = qjit(qnode_backend)(*params, obs)
+        observed = qjit_circuit(*params, obs)
+        #old_ir = get_compilation_stage(qjit_circuit, "QuantumCompilationPass")
+        # Define the path to the file
+        file_path = 'circuit/2_QuantumCompilationPass.mlir'
+        
+        # Use the 'with' statement to open the file and ensure it gets closed properly
+        with open(file_path, 'r') as file:
+            # Read the entire file content into a string
+            file_content = file.read()
+
+        # Now file_content contains the content of the file as a string
+        print(file_content)
+
+
+        breakpoint()
+        #observed = qjit(keep_intermediate=True)(qnode_backend)(*params, obs)
+        #breakpoint()
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
