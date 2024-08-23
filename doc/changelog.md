@@ -339,6 +339,11 @@
   Array([0.99500417, 0.98006658, 0.95533649], dtype=float64)
   ```
 
+* Runtime memory usage, and compilation complexity, has been reduced by eliminating some scalar
+  tensors from the IR. This has been done by adding a `linalg-detensorize` pass at the end of the
+  HLO lowering pipeline.
+  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
+
 * Program verification is extended to confirm that the measurements included in QNodes
   are compatible with the specified device and settings.
   [(#945)](https://github.com/PennyLaneAI/catalyst/pull/945)
@@ -649,10 +654,6 @@
 
 * Catalyst's implementation of Lightning Kokkos plugin has been removed in favor of Lightning's one.
   [(#974)](https://github.com/PennyLaneAI/catalyst/pull/974)
-
-* Eliminate some scalar tensors from the IR by adding a `linalg-detensorize` pass at the end of the HLO lowering pipeline.
-  This will reduce memory usage at runtime as well reduce compilation complexity.
-  [(#1010)](https://github.com/PennyLaneAI/catalyst/pull/1010)
 
 <h3>Contributors</h3>
 
