@@ -15,8 +15,6 @@
 """
 This module contains debug functions to interact with the compiler and compiled functions.
 """
-
-import ctypes.util
 import logging
 import os
 import platform
@@ -290,12 +288,10 @@ def compile_executable(fn, *args):
             "Please ensure that python-dev or python-devel is installed and available via pip."
         )
 
-    libpython_path = ctypes.util.find_library("python3")
-    libpython_rpath = os.path.dirname(libpython_path)
-
     lib_path_flags = [
-        f"-Wl,-rpath,{libpython_rpath}",
-        libpython_path,
+        f"-Wl,-rpath,{python_lib_dir_path}",
+        f"-L{python_lib_dir_path}",
+        "-lpython" + version_str,
     ]
 
     # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
