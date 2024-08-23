@@ -266,7 +266,14 @@ def compile_executable(fn, *args):
         fn(*args)
 
     # Try default library paths in case the targeted python-dev is shipped with OS.
-    path_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
+    path_candidates = [
+        sysconfig.get_config_var("LIBDIR"),
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/lib64",
+        "/usr/local/lib",
+        "/usr/lib64",
+        "/usr/lib",
+    ]
     version_info = sys.version_info
     # Check libpython3.x.so first because libpython3.so might not link to it.
     version_candidates = [f"{version_info.major}.{version_info.minor}", f"{version_info.major}"]
