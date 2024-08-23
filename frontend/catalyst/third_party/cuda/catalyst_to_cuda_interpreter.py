@@ -847,8 +847,8 @@ class QJIT_CUDAQ(catalyst.QJIT):
 
             self.jaxpr, _, self.out_treedef, self.c_sig = self.capture(args)
 
-        # Not entirely sure how to determine if 'type promotion' is needed, or if the default
-        # type promotion value should be True or False.
+        # TODO: match the behaviour of qjit by determining the
+        # correct 'type promotion' value to return here.
         return False  # no type promotion
 
     def run(self, args, _kwargs):
