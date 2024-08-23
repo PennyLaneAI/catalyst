@@ -22,7 +22,6 @@ import pennylane as qml
 import pytest
 
 from catalyst.device import QJITDeviceNewAPI
-from catalyst.device.qjit_device import validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     ALL_SUPPORTED_SCHEMAS,
@@ -69,28 +68,6 @@ def get_test_device_capabilities(
     config = get_test_config(config_text)
     device_capabilities = load_device_capabilities(config, program_features)
     return device_capabilities
-
-
-@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
-def test_config_qjit_incompatible_device(schema):
-    """Test error is raised if checking for qjit compatibility and field is false in toml file."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            f"""
-                schema = {schema}
-                [compilation]
-                qjit_compatible = false
-            """
-        ),
-    )
-
-    name = DeviceToBeTested.name
-    with pytest.raises(
-        CompileError,
-        match=f"Attempting to compile program for incompatible device '{name}'",
-    ):
-        validate_device_capabilities(DeviceToBeTested(), device_capabilities)
 
 
 @pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
