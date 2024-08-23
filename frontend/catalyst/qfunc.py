@@ -45,7 +45,6 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
-    validate_device_capabilities,
 )
 from catalyst.jax_extras import (
     deduce_avals,
@@ -127,9 +126,6 @@ class QFunc:
         program_features = ProgramFeatures(shots_present=bool(self.device.shots))
         device_capabilities = get_device_capabilities(self.device, program_features)
         backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
-
-        # Validate decive operations against the declared capabilities
-        validate_device_capabilities(self.device, device_capabilities)
 
         if isinstance(self.device, qml.devices.Device):
             qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
