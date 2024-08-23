@@ -71,8 +71,9 @@
   can now be seeded via the new `seed` argument of the `qjit` decorator.
   [(#936)](https://github.com/PennyLaneAI/catalyst/pull/936)
 
-  The seed argument accepts an unsigned 32-bit integer.
-  Different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
+  The seed argument accepts an unsigned 32-bit integer, which is used to initialize the pseudo-random
+  state at the beginning of each execution of the compiled function.
+  Therefor, different `qjit` objects with the same seed (including repeated calls to the same `qjit`)
   will always return the same sequence of mid-circuit measurement results.
 
   ```python
