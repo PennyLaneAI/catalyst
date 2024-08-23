@@ -12,6 +12,7 @@ export PYTHON_PACKAGE=$4
 # Install system dependencies
 dnf update -y
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION}
+dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
 dnf clean all -y
 
 # Make GCC the default compiler
