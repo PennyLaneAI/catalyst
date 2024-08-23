@@ -300,17 +300,14 @@ class ExecutionContext final {
 
         auto device = std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs);
 
-        /* skip recycling
         const size_t key = device_pool.size();
         for (size_t i = 0; i < key; i++) {
             if (device_pool[i]->getDeviceStatus() == RTDeviceStatus::Inactive &&
                 *device_pool[i] == *device) {
                 device_pool[i]->setDeviceStatus(RTDeviceStatus::Active);
-                std::cout << "recycling device " << device_pool[i] << "\n";
                 return device_pool[i];
             }
         }
-        */
 
         RT_ASSERT(device->getQuantumDevicePtr());
 
@@ -323,7 +320,6 @@ class ExecutionContext final {
             device->getQuantumDevicePtr()->SetDevicePRNG(nullptr);
         }
         device_pool.push_back(device);
-        std::cout << "pushing back device " << device << "\n";
 
 #ifdef __build_with_pybind11
         if (!py_guard && device->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
@@ -331,8 +327,7 @@ class ExecutionContext final {
         }
 #endif
 
-        //return device_pool[key];
-        return device_pool.back();
+        return device_pool[key];
     }
 
     [[nodiscard]] auto getOrCreateDevice(const std::string &rtd_lib,

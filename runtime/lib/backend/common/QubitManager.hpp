@@ -141,6 +141,7 @@ class QubitManager {
     {
         // Release all qubits by clearing the map.
         this->qubits_map.clear();
+        this->next_idx = 0;
     }
 };
 } // namespace Catalyst::Runtime

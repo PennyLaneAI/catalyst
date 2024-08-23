@@ -107,11 +107,6 @@ void LightningSimulator::PrintState()
 void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data,
                                   std::vector<QubitIdType> &wires)
 {
-    // TODO: setting state on a recycled device from the device_pool
-    // (in getOrCreateDevice(...)) causes a crash.
-    // As a patch, we do not recycle devices if SetState was used
-    // More investigation into setStateVector(...) should be done
-    
     std::vector<std::complex<double>> data_vector(data.begin(), data.end());
     std::vector<std::size_t> wires_size_t(wires.begin(), wires.end());
     this->device_sv->setStateVector(data_vector, wires_size_t);
