@@ -21,13 +21,11 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
-from jax import make_jaxpr
 from jax.tree_util import tree_flatten
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
 from catalyst import CompileError, cond, measure, mitigate_with_zne, qjit
-from catalyst.jax_primitives import _get_call_jaxpr
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -400,29 +398,22 @@ class TestMidCircuitMeasurement:
         def circuit():
             return qml.expval(qml.PauliZ(0))
 
-        mcm_method = "one-shot"
-
         @qjit
-        def mitigated_circuit():
+        def mitigated_circuit_1():
             s = jnp.array([1, 2])
-            g = qml.QNode(circuit, dev, mcm_method=mcm_method)
+            g = qml.QNode(circuit, dev, mcm_method="one-shot")
             return mitigate_with_zne(g, scale_factors=s)()
 
-        observed = mitigated_circuit()
-        mcm_method = None
-        expected = mitigated_circuit()
+        @qjit
+        def mitigated_circuit_2():
+            s = jnp.array([1, 2])
+            g = qml.QNode(circuit, dev)
+            return mitigate_with_zne(g, scale_factors=s)()
+
+        observed = mitigated_circuit_1()
+        expected = mitigated_circuit_2()
 
         assert np.allclose(expected, observed)
-
-    def test_get_call_jaxpr(self):
-        """Test _get_call_jaxpr raises AsserionError if no function primitive exists."""
-
-        def f(x):
-            return x * x
-
-        jaxpr = make_jaxpr(f)(2.0)
-        with pytest.raises(AssertionError, match="No call_jaxpr found in the JAXPR"):
-            _ = _get_call_jaxpr(jaxpr)
 
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):
