@@ -240,7 +240,8 @@
   `get_compilation_stage` replaces the `print_compilation_stage` function;
   please see the Breaking Changes section for more details.
 
-* Catalyst now supports direct C executable generation with `catalyst.debug.compile_executable`.
+* Catalyst now supports generating executables from compiled functions for the native host architecture using
+  `catalyst.debug.compile_executable`.
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
   ```pycon
