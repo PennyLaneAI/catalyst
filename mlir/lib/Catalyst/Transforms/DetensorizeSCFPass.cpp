@@ -71,14 +71,26 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
             });
         });
 
+        llvm::errs() << *root << '\n';
+
         // Find scf.for
-        root->walk([&](scf::ForOp for_op) {
+        root->walk<WalkOrder::PreOrder>([&](scf::ForOp for_op) {
+            llvm::errs() << for_op << '\n';
+            bool has_for = false;
+            // for_op->walk([&](scf::ForOp op) {
+            //     has_for = true;
+            // });
+            if (!has_for) {
             // Find scf.yield
-            for_op->walk([&](scf::YieldOp yield_op) {
+            scf::YieldOp yield_op = cast<scf::YieldOp>(*for_op.getBody()->getTerminator());
+            // for_op->walk<WalkOrder::PreOrder>([&](scf::YieldOp yield_op) {
+                llvm::errs() << yield_op << '\n';
                 // Loop over results
                 std::size_t i_result = 0;
                 for (mlir::Value result : yield_op.getResults()) {
+                llvm::errs() << result << '\n';
                     if (isFromElementScalarTensor(result)) {
+                llvm::errs() << "Is a scalar tensor" << '\n';
                         // Detensorize operand and modify type
                         {
                             auto iter_arg = for_op.getOperand(3 + i_result);
@@ -134,7 +146,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                     }
                     i_result += 1;
                 }
-            });
+            // });
             // llvm::errs() << for_op << '\n';
             // for (auto args : for_op.getOperands()) {
             //     llvm::errs() << args << '\n';
@@ -145,6 +157,8 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
             // for (auto args : for_op.getResults()) {
             //     llvm::errs() << args << '\n';
             // }
+            }
+            llvm::errs() << *root << '\n';
         });
 
         // llvm::errs() << "|||||||||||||||||| Final IR ||||||||||||||||||\n";
