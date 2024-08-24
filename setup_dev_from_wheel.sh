@@ -74,7 +74,7 @@ link_repo_to_wheel(){
     export CATALYST_WHEEL=$SITEPKGS/catalyst
 
     # Create hard links to the Wheel Python sources
-    cp -lrf $CATALYST_WHEEL $CATALYST_DIR/frontend/
+    cp -lRf $CATALYST_WHEEL $CATALYST_DIR/frontend/
 }
 
 restore_catalyst_config(){
