@@ -63,7 +63,7 @@ def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_obser
 
 class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, mnemonic, traits>;
 
-def InitializeOp : Quantum_Op<"init", [NoMemoryEffect]> {
+def InitializeOp : Quantum_Op<"init"> {
     let summary = "Initialize the quantum runtime.";
 
     let assemblyFormat = [{
@@ -71,7 +71,7 @@ def InitializeOp : Quantum_Op<"init", [NoMemoryEffect]> {
     }];
 }
 
-def FinalizeOp : Quantum_Op<"finalize", [NoMemoryEffect]> {
+def FinalizeOp : Quantum_Op<"finalize"> {
     let summary = "Teardown the quantum runtime.";
 
     let assemblyFormat = [{

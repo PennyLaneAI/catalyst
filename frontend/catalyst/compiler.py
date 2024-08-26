@@ -197,9 +197,9 @@ BUFFERIZATION_PASS = (
         "one-shot-bufferize{bufferize-function-boundaries}",
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        "buffer-results-to-out-params",
-        "drop-equivalent-buffer-results",
-        "func.func(promote-buffers-to-stack)",
+        #"buffer-results-to-out-params",
+        #"drop-equivalent-buffer-results",
+        #"func.func(promote-buffers-to-stack)",
         #"buffer-deallocation-pipeline",
     ],
 )
