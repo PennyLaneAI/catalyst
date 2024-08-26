@@ -229,10 +229,13 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     // });
 
     // rewriter.setInsertionPointToEnd(&(fnFoldedOp.getRegion().back()));
-    rewriter.create<quantum::DeviceReleaseOp>(loc);
-    fnFoldedOp.walk([&](tensor::FromElementsOp fromElementsOp) {
-        rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
-    });
+    // fnFoldedOp.walk([&](tensor::FromElementsOp fromElementsOp) {
+    //     rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
+    // });
+    RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
+    Value results =
+        rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+    rewriter.create<func::ReturnOp>(loc, results);
 
     // Return the function symbol reference
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
@@ -299,33 +302,31 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
     fnFoldedOp.setPrivate();
-    Block *foldedBlock = fnFoldedOp.addEntryBlock();
-    rewriter.setInsertionPointToStart(foldedBlock);
-    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    rewriter.setInsertionPointToStart(fnFoldedOp.addEntryBlock());
     // Loop control variables
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
-    if (foldingAlgorithm != Folding(1)) {
+    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    if (foldingAlgorithm == Folding(1)) {
+        rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
+    }
+    else {
         func::FuncOp circOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         rewriter.cloneRegionBefore(circOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
         quantum::DeviceInitOp deviceInitOp = *fnFoldedOp.getOps<quantum::DeviceInitOp>().begin();
         rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
         rewriter.eraseOp(deviceInitOp);
-        // Add device
-        quantum::DeviceReleaseOp deviceReleaseOp =
-            *fnFoldedOp.getOps<quantum::DeviceReleaseOp>().begin();
-        rewriter.eraseOp(deviceReleaseOp);
         quantum::AllocOp allocOpWithMeasurements = *fnFoldedOp.getOps<quantum::AllocOp>().begin();
-        // Allocate
         Value allocQreg =
             rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
         allocOpWithMeasurements.replaceAllUsesWith(allocQreg);
         rewriter.eraseOp(allocOpWithMeasurements);
-    }
-    else {
-        rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
+        quantum::DeviceReleaseOp deviceReleaseOp =
+            *fnFoldedOp.getOps<quantum::DeviceReleaseOp>().begin();
+        rewriter.eraseOp(deviceReleaseOp);
+        rewriter.create<quantum::DeviceReleaseOp>(loc);
     }
 
     if (foldingAlgorithm == Folding(1)) {
