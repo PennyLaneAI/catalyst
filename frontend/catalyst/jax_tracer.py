@@ -146,18 +146,21 @@ def get_device_shots(dev):
     """Helper function to get device shots."""
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
+
 def get_device_total_shot_copies(dev):
     """Helper function to get device total shot copies."""
     return 1 if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.num_copies
-    
+
+
 def get_device_shot_vector(dev):
     """Helper function to get device shot vector."""
-    
+
     if isinstance(dev, qml.devices.LegacyDevice):
         return [(dev.shots, 1)]
-    
-    shot_vector = [ (shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
+
+    shot_vector = [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
     return shot_vector
+
 
 class Function:
     """An object that represents a compiled function.
@@ -870,12 +873,14 @@ def trace_quantum_measurements(
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
-        if isinstanc. e(o, MeasurementProcess):
-            
+        if isinstanc.e(o, MeasurementProcess):
+
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             num_of_total_copies = get_device_total_shot_copies(device)
-            if num_of_total_copies > 1 and o.return_type.value != "sample": # qml.sample()
-                raise NotImplementedError(f"Measurement {o.return_type.value} is not supported with the shot as shot-vector. Use qml.sample() instead.")
+            if num_of_total_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+                raise NotImplementedError(
+                    f"Measurement {o.return_type.value} is not supported with the shot as shot-vector. Use qml.sample() instead."
+                )
 
             if isinstance(device, qml.devices.LegacyDevice):
                 m_wires = o.wires if o.wires else range(device.num_wires)
@@ -887,10 +892,10 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                results = [] # list of results per copy
+                results = []  # list of results per copy
                 shot_vector = get_device_shot_vector(device)
-                for (shots, copies) in shot_vector:
-                    
+                for shots, copies in shot_vector:
+
                     if shots is None:  # needed for old device API only
                         raise ValueError(
                             "qml.sample cannot work with shots=None. "
@@ -900,18 +905,18 @@ def trace_quantum_measurements(
                         results.append(o.mv)
                     else:
                         shape = (shots, nqubits) if using_compbasis else (shots,)
-                        
+
                         for _ in range(copies):
                             result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
                             if using_compbasis:
                                 result = jnp.astype(result, jnp.int64)
                             results.append(result)
-                    
+
                 if results:
-                    if len(results) == 1: 
+                    if len(results) == 1:
                         results = results[0]
                     out_classical_tracers.append(results)
-                     
+
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
@@ -1257,7 +1262,9 @@ def trace_quantum_function(
 
                 # Check if the measurements are nested then apply the full_raise
                 def check_full_raise(arr, func):
-                    return [check_full_raise(x, func) if isinstance(x, list) else func(x) for x in arr]
+                    return [
+                        check_full_raise(x, func) if isinstance(x, list) else func(x) for x in arr
+                    ]
 
                 meas_tracers = check_full_raise(meas, trace.full_raise)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
@@ -1269,7 +1276,7 @@ def trace_quantum_function(
                     elif isinstance(meas_results, dict):
                         # Convert elements of the dictionary to tuples
                         meas_results = {k: tuple(v) for k, v in meas_results.items()}
-                                        
+
                 # TODO: Allow the user to return whatever types they specify.
                 if qnode_transformed or device_modify_measurements:
                     assert isinstance(meas_results, list)
