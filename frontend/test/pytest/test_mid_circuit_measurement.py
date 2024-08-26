@@ -25,7 +25,10 @@ from jax.tree_util import tree_flatten
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
-from catalyst import CompileError, cond, measure, mitigate_with_zne, qjit
+from catalyst import CompileError, cond, grad
+from catalyst import jvp as C_jvp
+from catalyst import measure, mitigate_with_zne, qjit, value_and_grad
+from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -782,6 +785,135 @@ class TestDynamicOneShotIntegration:
 
             r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
             assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
+
+    @pytest.mark.skip(
+        reason="grad with dynamic one-shot is not yet supported.",
+    )
+    def test_mcm_method_with_grad(self, backend):
+        """Test that the dynamic_one_shot works with grad."""
+
+        dev = qml.device(backend, wires=1, shots=5)
+
+        @qml.qnode(dev, diff_method="best", mcm_method="one-shot")
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliZ(wires=0))
+
+        @qml.qnode(dev, diff_method="best")
+        def g(x: float):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliZ(wires=0))
+
+        @qjit
+        def grad_f(x):
+            return grad(f, method="auto")(x)
+
+        @qjit
+        def grad_g(x):
+            return grad(g, method="auto")(x)
+
+        assert np.allclose(grad_f(1.0), grad_g(1.0))
+
+    @pytest.mark.xfail(
+        reason="value_and_grad with dynamic one-shot is not yet supported.",
+    )
+    def test_mcm_method_with_value_and_grad(self):
+        """Test that the dynamic_one_shot works with value_and_grad."""
+
+        @qjit
+        def workflow1(x: float):
+            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10), mcm_method="one-shot")
+            def circuit1():
+                qml.CNOT(wires=[0, 1])
+                qml.RX(0, wires=[2])
+                return qml.probs()  # This is [1, 0, 0, ...]
+
+            return x * (circuit1()[0])
+
+        @qjit
+        def workflow2(x: float):
+            @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+            def circuit2():
+                qml.CNOT(wires=[0, 1])
+                qml.RX(0, wires=[2])
+                return qml.probs()  # This is [1, 0, 0, ...]
+
+            return x * (circuit2()[0])
+
+        result1 = qjit(value_and_grad(workflow1))(3.0)
+        result2 = qjit(value_and_grad(workflow2))(3.0)
+        assert np.allclose(result1, result2)
+
+    @pytest.mark.parametrize("diff_method", ["auto", "fd"])
+    @pytest.mark.xfail(
+        reason="jvp with dynamic one-shot is not yet supported.",
+    )
+    def test_mcm_method_with_jvp(self, backend, diff_method):
+        """Test that the dynamic_one_shot works with jvp."""
+        dev = qml.device(backend, wires=1, shots=5)
+        x, t = (
+            [-0.1, 0.5],
+            [0.1, 0.33],
+        )
+
+        def circuit_rx(x1, x2):
+            """A test quantum function"""
+            qml.RX(x1, wires=0)
+            qml.RX(x2, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        @qjit
+        def C_workflow():
+            f = qml.QNode(circuit_rx, device=dev, mcm_method="one-shot")
+            return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
+
+        @qjit
+        def J_workflow():
+            f = qml.QNode(circuit_rx, device=dev)
+            return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
+
+        r1 = C_workflow()
+        r2 = J_workflow()
+        res_jax, tree_jax = tree_flatten(r1)
+        res_cat, tree_cat = tree_flatten(r2)
+        assert tree_jax == tree_cat
+        assert np.allclose(res_jax, res_cat)
+
+    @pytest.mark.parametrize("diff_method", ["auto", "fd"])
+    @pytest.mark.xfail(
+        reason="vjp with dynamic one-shot is not yet supported.",
+    )
+    def test_mcm_method_with_jvp(self, backend, diff_method):
+        """Test that the dynamic_one_shot works with vjp."""
+        dev = qml.device(backend, wires=1, shots=5)
+
+        def circuit_rx(x1, x2):
+            """A test quantum function"""
+            qml.RX(x1, wires=0)
+            qml.RX(x2, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        x, ct = (
+            [-0.1, 0.5],
+            [0.111],
+        )
+
+        @qjit
+        def C_workflow():
+            f = qml.QNode(circuit_rx, device=dev, mcm_method="one-shot")
+            return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
+
+        @qjit
+        def J_workflow():
+            f = qml.QNode(circuit_rx, device=dev)
+            return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
+
+        r1 = C_workflow()
+        r2 = J_workflow()
+        res_jax, tree_jax = tree_flatten(r1)
+        res_cat, tree_cat = tree_flatten(r2)
+        assert tree_jax == tree_cat
+        assert np.allclose(res_jax, res_cat)
 
 
 def sample_to_counts(results, meas_obj):

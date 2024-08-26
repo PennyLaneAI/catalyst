@@ -880,7 +880,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    func_call_jaxpr = _get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
