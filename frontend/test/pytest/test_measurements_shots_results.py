@@ -488,10 +488,7 @@ class TestOtherMeasurements:
         def circuit():
             return meas_fun(wires=0)
 
-        # ValueError is legacy behaviour with the old device API
-        error_type = ValueError if isinstance(dev, qml.devices.LegacyDevice) else CompileError
-
-        with pytest.raises(error_type, match="cannot work with shots=None"):
+        with pytest.raises(CompileError, match="cannot work with shots=None"):
             qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):
