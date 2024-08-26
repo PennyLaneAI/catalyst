@@ -64,6 +64,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
@@ -71,6 +72,7 @@
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
+using namespace catalyst::quantum;
 
 namespace catalyst::utils {
 
@@ -300,6 +302,9 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<quantum::QuantumDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
+
+    // Extend one-shot bufferization pass.
+    catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
 }
 } // namespace
 
