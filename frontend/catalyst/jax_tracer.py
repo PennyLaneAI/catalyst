@@ -879,7 +879,8 @@ def trace_quantum_measurements(
             num_of_total_copies = get_device_total_shot_copies(device)
             if num_of_total_copies > 1 and o.return_type.value != "sample":  # qml.sample()
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not supported with the shot as shot-vector. Use qml.sample() instead."
+                    f"Measurement {o.return_type.value} is not supported a shot-vector. "
+                    "Use qml.sample() instead."
                 )
 
             if isinstance(device, qml.devices.LegacyDevice):
@@ -1262,9 +1263,10 @@ def trace_quantum_function(
 
                 # Check if the measurements are nested then apply the full_raise
                 def check_full_raise(arr, func):
-                    return [
-                        check_full_raise(x, func) if isinstance(x, list) else func(x) for x in arr
-                    ]
+                    if isinstance(arr, list):
+                        return [check_full_raise(x, func) for x in arr]
+                    else:
+                        return func(arr)
 
                 meas_tracers = check_full_raise(meas, trace.full_raise)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
