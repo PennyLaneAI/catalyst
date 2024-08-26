@@ -80,6 +80,27 @@ class TestExamplesFromWebsite:
         observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
+    def test_basis_state_recycled_device(self, backend):
+        """The same test as above but two qnodes using the same device"""
+        dev = qml.device(backend, wires=2)
+
+        @qml.qnode(dev)
+        def example_circuit():
+            qml.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qml.state()
+
+        @qml.qnode(dev)
+        def example_circuit_doppelganger():
+            qml.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qml.state()
+
+        def main():
+            return example_circuit(), example_circuit_doppelganger()
+
+        expected = jnp.array(main())
+        observed = jnp.array(qml.qjit(main)())
+        assert jnp.allclose(expected, observed)
+
     @pytest.mark.parametrize("wires", [(0), (1), (2)])
     def test_array_less_than_size_state_prep(self, wires, backend):
         """Test what happens when the array is less than the size required.
