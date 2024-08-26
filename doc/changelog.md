@@ -1,4 +1,4 @@
-# Release 0.8.0-dev
+# Release 0.8.0
 
 <h3>New features</h3>
 
