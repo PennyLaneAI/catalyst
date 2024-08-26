@@ -194,8 +194,8 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
                                      std::string fnFoldedName, StringAttr lib, StringAttr name,
                                      StringAttr kwargs, FunctionType fnFoldedType,
                                      SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
-                                     func::FuncOp fnAllocOp, Value numberQubitsValue,
-                                     func::FuncOp fnWithMeasurementsOp, Value c0, Value c1)
+                                     func::FuncOp fnAllocOp, Value numberQubitsValue, Value c0,
+                                     Value c1)
 {
     // TODO: Implement.
 
@@ -209,74 +209,35 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                                   StringAttr lib, StringAttr name, StringAttr kwargs,
                                   FunctionType fnFoldedType, SmallVector<Type> typesFolded,
                                   func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp,
-                                  Value numberQubitsValue, func::FuncOp fnWithMeasurementsOp,
-                                  Value c0, Value c1)
+                                  Value numberQubitsValue, Value c0, Value c1)
 {
-    Type qregType = quantum::QuregType::get(rewriter.getContext());
-    // Allocate qubits
-    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
+    // Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    int64_t sizeArgs = fnFoldedOp.getArguments().size();
-    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
+    // int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    // Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
-    if (true) {
-        // Save the current insertion point
-        PatternRewriter::InsertionGuard guard(rewriter);
-
-        // Walk through the operations in fnWithMeasurementsOp
-        fnWithMeasurementsOp.walk([&](quantum::QuantumGate op) {
-            rewriter.setInsertionPoint(op);
-            auto loc = op->getLoc();
-
-            const std::vector<Value> opQubitArgs = op.getQubitOperands();
-
-            // Insert a for loop immediately before each quantum::QuantumGate
-            const auto forVal =
-                rewriter
-                    .create<scf::ForOp>(
-                        loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
-                        [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                            // Set insertion point within the loop
-                            builder.setInsertionPointToEnd(builder.getBlock());
-
-                            // Create adjoint and original operations
-                            quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
-                            origOp.setQubitOperands(iterArgs);
-                            auto origOpVal = origOp->getResults();
-
-                            #if 0
-                            auto adjointOpVal =
-                                builder.create<quantum::AdjointOp>(loc, qregType, origOpVal)
-                                    .getResults();
-                            #endif
-
-                            // Yield the qubits.
-                            builder.create<scf::YieldOp>(loc, origOpVal);
-                        })
-                    .getResults();
-
-            op.setQubitOperands(forVal);
-
-            return WalkResult::advance();
-        });
-
-        // Restore original insertion point when PatternRewriter::InsertionGuard goes out of scope
-    }
-
-    // Prepare the arguments for the final call
-    std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
-                                   fnFoldedOp.getArguments().end());
-    argsAndQreg.pop_back();
-    argsAndQreg.push_back(allocQreg);
-
-    // Insert the call to fnWithMeasurementsOp
-    Value result =
-        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndQreg).getResult(0);
+    // Walk through the operations in fnWithMeasurementsOp
+    // fnWithMeasurementsOp.walk([&](mlir::Operation *op) {
+    //     return WalkResult::advance();
+    // });
+    // Return
+    // rewriter.create<func::ReturnOp>(loc, result);
 
     // Insert the device release operation
+    // fnFoldedOp.walk([&](func::ReturnOp returnOp) {
+    //     rewriter.setInsertionPoint(returnOp);
+    // });
+
+    // rewriter.setInsertionPointToEnd(&(fnFoldedOp.getRegion().back()));
     rewriter.create<quantum::DeviceReleaseOp>(loc);
-    // Return
-    rewriter.create<func::ReturnOp>(loc, result);
+    // fnFoldedOp.walk([&](tensor::FromElementsOp fromElementsOp) {
+    //     rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
+    // });
+    RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
+    // Initialize the results as empty tensor
+    Value results =
+        rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+    rewriter.create<func::ReturnOp>(loc, results);
 
     // Return the function symbol reference
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
@@ -322,19 +283,19 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Function without measurements: Create function without measurements and with qreg as last
     // argument
     func::FuncOp fnWithoutMeasurementsOp;
+    func::FuncOp fnWithMeasurementsOp;
     if (foldingAlgorithm == Folding(1)) {
         FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
             getOrInsertFnWithoutMeasurements(loc, rewriter, op);
         fnWithoutMeasurementsOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
+        // Function with measurements: Modify the original function to take a quantum register as
+        // last arg and keep measurements
+        FlatSymbolRefAttr fnWithMeasurementsRefAttr =
+            getOrInsertFnWithMeasurements(loc, rewriter, op);
+        fnWithMeasurementsOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
     }
-
-    // Function with measurements: Modify the original function to take a quantum register as last
-    // arg and keep measurements
-    FlatSymbolRefAttr fnWithMeasurementsRefAttr = getOrInsertFnWithMeasurements(loc, rewriter, op);
-    func::FuncOp fnWithMeasurementsOp =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
-
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
@@ -343,7 +304,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
     fnFoldedOp.setPrivate();
-
     Block *foldedBlock = fnFoldedOp.addEntryBlock();
     rewriter.setInsertionPointToStart(foldedBlock);
     TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
@@ -351,6 +311,22 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Loop control variables
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+    if (foldingAlgorithm != Folding(1)) {
+        func::FuncOp circOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+        rewriter.cloneRegionBefore(circOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+        Block *fnFoldedBlock = &fnFoldedOp.front();
+        quantum::DeviceInitOp deviceInitOp = *fnFoldedOp.getOps<quantum::DeviceInitOp>().begin();
+        rewriter.eraseOp(deviceInitOp);
+        quantum::DeviceReleaseOp deviceReleaseOp =
+            *fnFoldedOp.getOps<quantum::DeviceReleaseOp>().begin();
+        rewriter.eraseOp(deviceReleaseOp);
+        quantum::AllocOp allocOpWithMeasurements = *fnFoldedOp.getOps<quantum::AllocOp>().begin();
+        auto lastArgQregIndex = fnFoldedBlock->getArguments().size();
+        allocOpWithMeasurements.replaceAllUsesWith(
+            fnFoldedBlock->getArgument(lastArgQregIndex - 1));
+        rewriter.eraseOp(allocOpWithMeasurements);
+    }
     // Add device
     rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
 
@@ -360,14 +336,12 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp, c0, c1);
     }
     if (foldingAlgorithm == Folding(2)) {
-        return randomLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs,
-                                  fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
-                                  numberQubitsValue, fnWithMeasurementsOp, c0, c1);
+        return randomLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, fnFoldedType,
+                                  typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue, c0, c1);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
     return allLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, fnFoldedType,
-                           typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue,
-                           fnWithMeasurementsOp, c0, c1);
+                           typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue, c0, c1);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
                                                        mitigation::ZneOp op)
