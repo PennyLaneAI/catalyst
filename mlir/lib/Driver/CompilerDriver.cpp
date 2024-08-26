@@ -64,7 +64,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-#include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
