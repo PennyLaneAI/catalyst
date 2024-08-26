@@ -428,7 +428,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1))
 
-        if isinstance(dev, qml.devices.Device):
+        if isinstance(dev, qml.devices.LegacyDeviceFacade):
+            with pytest.raises(
+                RuntimeError,
+                match=r"Cannot split up terms in sums for MeasurementProcess <class 'pennylane.measurements.var.VarianceMP'>",
+            ):
+                circuit(0.432, 0.123, -0.543)
+        else:
             # TODO: only raises with the new API, Kokkos should also raise an error.
             with pytest.raises(
                 TypeError,
