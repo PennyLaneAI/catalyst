@@ -228,15 +228,6 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
     //     rewriter.setInsertionPoint(returnOp);
     // });
 
-    // rewriter.setInsertionPointToEnd(&(fnFoldedOp.getRegion().back()));
-    // fnFoldedOp.walk([&](tensor::FromElementsOp fromElementsOp) {
-    //     rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
-    // });
-    RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
-    Value results =
-        rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
-    rewriter.create<func::ReturnOp>(loc, results);
-
     // Return the function symbol reference
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
@@ -302,7 +293,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
     fnFoldedOp.setPrivate();
-    rewriter.setInsertionPointToStart(fnFoldedOp.addEntryBlock());
+    auto fnFoldedOpBlock = fnFoldedOp.addEntryBlock();
+    rewriter.setInsertionPointToStart(fnFoldedOpBlock);
     // Loop control variables
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
@@ -312,21 +304,32 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
     }
     else {
-        func::FuncOp circOp =
-            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        rewriter.cloneRegionBefore(circOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+        rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+        
         quantum::DeviceInitOp deviceInitOp = *fnFoldedOp.getOps<quantum::DeviceInitOp>().begin();
         rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
         rewriter.eraseOp(deviceInitOp);
+        
         quantum::AllocOp allocOpWithMeasurements = *fnFoldedOp.getOps<quantum::AllocOp>().begin();
         Value allocQreg =
             rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
         allocOpWithMeasurements.replaceAllUsesWith(allocQreg);
         rewriter.eraseOp(allocOpWithMeasurements);
+
         quantum::DeviceReleaseOp deviceReleaseOp =
             *fnFoldedOp.getOps<quantum::DeviceReleaseOp>().begin();
+        rewriter.setInsertionPoint(deviceReleaseOp);
         rewriter.eraseOp(deviceReleaseOp);
+
+        rewriter.setInsertionPointToEnd(fnFoldedOpBlock);
         rewriter.create<quantum::DeviceReleaseOp>(loc);
+
+        // TODO: Why doesn't this next line work as ReturnOp Value?
+        // Value results = (*fnFoldedOp.getOps<tensor::FromElementsOp>().begin()).getResult();
+        RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
+        Value results =
+            rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+        rewriter.create<func::ReturnOp>(loc, results);
     }
 
     if (foldingAlgorithm == Folding(1)) {
