@@ -11,7 +11,6 @@ Module: catalyst
     :include-all-objects:
     :no-inheritance-diagram:
 
-
 Module: catalyst.debug
 ----------------------
 
@@ -20,19 +19,18 @@ Module: catalyst.debug
     :no-inheritance-diagram:
     :fullname:
 
-Module: catalyst.third_party.cuda
----------------------------------
-
-.. automodapi:: catalyst.third_party.cuda
-    :no-heading:
-    :no-inheritance-diagram:
-    :fullname:
-
-
 Module: catalyst.passes
 ---------------------------------
 
 .. automodapi:: catalyst.passes
+    :no-heading:
+    :no-inheritance-diagram:
+    :fullname:
+
+Module: catalyst.third_party.cuda
+---------------------------------
+
+.. automodapi:: catalyst.third_party.cuda
     :no-heading:
     :no-inheritance-diagram:
     :fullname:

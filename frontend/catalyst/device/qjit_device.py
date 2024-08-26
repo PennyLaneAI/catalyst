@@ -549,65 +549,6 @@ def filter_out_modifiers(operations):
     return set(filter(is_not_modifier, operations))
 
 
-@debug_logger
-def validate_device_capabilities(
-    device: qml.QubitDevice, device_capabilities: DeviceCapabilities
-) -> None:
-    """Validate configuration document against the device attributes.
-    Raise CompileError in case of mismatch:
-    * If device is not qjit-compatible.
-    * If configuration file does not exists.
-    * If decomposable, matrix, and native gates have some overlap.
-    * If decomposable, matrix, and native gates do not match gates in ``device.operations`` and
-      ``device.observables``.
-
-    Args:
-        device (qml.devices.LegacyDevice): An instance of a quantum device.
-        config (TOMLDocument): A TOML document representation.
-
-    Raises: CompileError
-    """
-
-    if not device_capabilities.qjit_compatible_flag:
-        raise CompileError(
-            f"Attempting to compile program for incompatible device '{device.name}': "
-            f"Config is not marked as qjit-compatible"
-        )
-
-    device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-
-    native = set(device_capabilities.native_ops.keys())
-    decomposable = set(device_capabilities.to_decomp_ops.keys())
-    matrix = set(device_capabilities.to_matrix_ops.keys())
-
-    overlap = (native & decomposable) | (native & matrix) | (decomposable & matrix)
-    if overlap:
-        raise CompileError(f"Device '{device_name}' has overlapping gates: {overlap}")
-
-    if hasattr(device, "operations") and hasattr(device, "observables"):
-        # For validation against PL device properties we only check base gates as Adjoint/Control
-        # declarations can be very sporadic.
-        device_gates = filter_out_modifiers(device.operations)
-        spec_gates = native | decomposable | matrix
-        if device_gates != spec_gates:
-            raise CompileError(
-                "Gates in qml.device.operations and specification file do not match for "
-                f'"{device_name}".\n'
-                f"Gates that present only in the device: {device_gates - spec_gates}\n"
-                f"Gates that present only in spec: {spec_gates - device_gates}\n"
-            )
-
-        # For observables, we do not have `non-native` section in the config, so we check that
-        # device data supercedes the specification.
-        device_observables = set(device.observables)
-        spec_observables = pennylane_operation_set(device_capabilities.native_obs)
-        if (spec_observables - device_observables) != set():
-            raise CompileError(
-                "Observables in qml.device.observables and specification file do not match.\n"
-                f"Observables that present only in spec: {spec_observables - device_observables}\n"
-            )
-
-
 def get_device_toml_config(device) -> TOMLDocument:
     """Get the contents of the device config file."""
     if hasattr(device, "config"):
