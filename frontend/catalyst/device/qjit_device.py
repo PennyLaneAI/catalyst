@@ -44,6 +44,7 @@ from catalyst.device.verification import (
     verify_operations,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
@@ -506,6 +507,8 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def _measurement_transform_program(self):
 
         measurement_program = TransformProgram()
+        if isinstance(self.original_device, SoftwareQQPP):
+            return measurement_program
 
         supports_sum_observables = any(
             obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")

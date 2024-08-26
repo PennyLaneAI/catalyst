@@ -36,6 +36,7 @@ CSWAP = { properties = [ "invertible" ] }
 [operators.observables]
 PauliX = {}
 PauliZ = {}
+Sum = {}
 
 [measurement_processes]
 
