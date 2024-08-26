@@ -873,7 +873,7 @@ def trace_quantum_measurements(
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
-        if isinstanc.e(o, MeasurementProcess):
+        if isinstance(o, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             num_of_total_copies = get_device_total_shot_copies(device)
