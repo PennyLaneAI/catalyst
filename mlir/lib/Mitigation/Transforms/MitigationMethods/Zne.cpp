@@ -230,14 +230,9 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
 
     // rewriter.setInsertionPointToEnd(&(fnFoldedOp.getRegion().back()));
     rewriter.create<quantum::DeviceReleaseOp>(loc);
-    // fnFoldedOp.walk([&](tensor::FromElementsOp fromElementsOp) {
-    //     rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
-    // });
-    RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
-    // Initialize the results as empty tensor
-    Value results =
-        rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
-    rewriter.create<func::ReturnOp>(loc, results);
+    fnFoldedOp.walk([&](tensor::FromElementsOp fromElementsOp) {
+        rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
+    });
 
     // Return the function symbol reference
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
@@ -315,20 +310,23 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         func::FuncOp circOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         rewriter.cloneRegionBefore(circOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
-        Block *fnFoldedBlock = &fnFoldedOp.front();
         quantum::DeviceInitOp deviceInitOp = *fnFoldedOp.getOps<quantum::DeviceInitOp>().begin();
+        rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
         rewriter.eraseOp(deviceInitOp);
+        // Add device
         quantum::DeviceReleaseOp deviceReleaseOp =
             *fnFoldedOp.getOps<quantum::DeviceReleaseOp>().begin();
         rewriter.eraseOp(deviceReleaseOp);
         quantum::AllocOp allocOpWithMeasurements = *fnFoldedOp.getOps<quantum::AllocOp>().begin();
-        auto lastArgQregIndex = fnFoldedBlock->getArguments().size();
-        allocOpWithMeasurements.replaceAllUsesWith(
-            fnFoldedBlock->getArgument(lastArgQregIndex - 1));
+        // Allocate
+        Value allocQreg =
+            rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
+        allocOpWithMeasurements.replaceAllUsesWith(allocQreg);
         rewriter.eraseOp(allocOpWithMeasurements);
     }
-    // Add device
-    rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
+    else {
+        rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
+    }
 
     if (foldingAlgorithm == Folding(1)) {
         return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, fnFoldedType,
