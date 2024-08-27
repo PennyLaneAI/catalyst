@@ -136,23 +136,37 @@ jobs:
         ENABLE_OPENQASM=ON \
         make runtime
 
-    - name: Install PennyLane-Lightning (latest)
-      if: ${{ inputs.lightning == 'latest' }}
-      run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
-        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
-
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
         pip install --upgrade pennylane-lightning
         pip install --upgrade pennyLane-lightning-kokkos
 
-    - name: Install PennyLane-Lightning (release-candidate)
+    - name: Download PennyLane-Lightning (latest)
+      if: ${{ inputs.lightning == 'latest' }}
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: master
+        path: lightning_build
+        fetch-depth: 0
+
+    - name: Download PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'release-candidate' }}
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: v0.38.0_rc
+        path: lightning_build
+        fetch-depth: 0
+
+    - name: Install PennyLane-Lightning (latest/release-candidate)
+      if: ${{ inputs.lightning != 'stable' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.38.0_rc
-        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.38.0_rc
+        # Lightning-Kokkos can no longer be installed with pip from git
+        pip install --upgrade lightning_build
+        PL_BACKEND=lightning_kokkos python lightning_build/scripts/configure_pyproject_toml.py
+        pip install --upgrade lightning_build
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
