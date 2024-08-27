@@ -213,20 +213,44 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
 {
     // Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    // int64_t sizeArgs = fnFoldedOp.getArguments().size();
-    // Value size = fnFoldedOp.getArgument(sizeArgs - 1);
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
     // Walk through the operations in fnWithMeasurementsOp
-    // fnWithMeasurementsOp.walk([&](mlir::Operation *op) {
-    //     return WalkResult::advance();
-    // });
-    // Return
-    // rewriter.create<func::ReturnOp>(loc, result);
+    fnFoldedOp.walk([&](quantum::QuantumGate op) {
+        rewriter.setInsertionPoint(op);
+        auto loc = op->getLoc();
+        const std::vector<Value> opQubitArgs = op.getQubitOperands();
 
-    // Insert the device release operation
-    // fnFoldedOp.walk([&](func::ReturnOp returnOp) {
-    //     rewriter.setInsertionPoint(returnOp);
-    // });
+        // Insert a for loop immediately before each quantum::QuantumGate
+        const auto forVal =
+            rewriter
+                .create<scf::ForOp>(
+                    loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                    [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                        // Set insertion point within the loop
+                        builder.setInsertionPointToEnd(builder.getBlock());
+
+                        // Create adjoint and original operations
+                        quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+                        origOp.setQubitOperands(iterArgs);
+                        auto origOpVal = origOp->getResults();
+
+                        #if 0
+                        auto adjointOpVal =
+                            builder.create<quantum::AdjointOp>(loc, qregType, origOpVal)
+                                .getResults();
+                        #endif
+
+                        // Yield the qubits.
+                        builder.create<scf::YieldOp>(loc, origOpVal);
+                    })
+                .getResults();
+
+        op.setQubitOperands(forVal);
+
+        return WalkResult::advance();
+    });
 
     // Return the function symbol reference
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
