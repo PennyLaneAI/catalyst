@@ -16,12 +16,12 @@ struct StateOpInterface
                                                     catalyst::quantum::StateOp> {
   bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
                               const mlir::bufferization::AnalysisState &state) const {
-    return false;
+    return true;
   }
 
   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
                                const mlir::bufferization::AnalysisState &state) const {
-    return false;
+    return true;
   }
 
   mlir::bufferization::AliasingValueList getAliasingValues(mlir::Operation *op,
@@ -34,17 +34,12 @@ struct StateOpInterface
                           const mlir::bufferization::BufferizationOptions &options) const {
     auto stateOp = cast<StateOp>(op);
     Location loc = op->getLoc();
-    FailureOr<Value> tensorAlloc = allocateTensorForShapedValue(
-        rewriter, loc, stateOp.getState(), options,
-        /*copy=*/false);
-    if (failed(tensorAlloc))
-      return failure();
-    llvm::outs() << "This rewrite happens!\n";
-    auto tensorType = cast<RankedTensorType>(tensorAlloc->getType());
+    auto tensorType = cast<RankedTensorType>(stateOp.getState().getType());
     MemRefType resultType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-    //rewriter.create<memref::AllocOp>(loc, resultType);
-    Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(stateOp, resultType);
-    rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(allocVal.getType()));
+
+    Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+    rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{stateOp.getObs(), allocVal});
+    mlir::bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
 
     return success();
   }
