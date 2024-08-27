@@ -232,18 +232,19 @@ FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::
                         builder.setInsertionPointToEnd(builder.getBlock());
 
                         // Create adjoint and original operations
-                        quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+                        quantum::QuantumGate origOp =
+                            dyn_cast<quantum::QuantumGate>(builder.clone(*op));
                         origOp.setQubitOperands(iterArgs);
                         auto origOpVal = origOp->getResults();
 
-                        #if 0
-                        auto adjointOpVal =
-                            builder.create<quantum::AdjointOp>(loc, qregType, origOpVal)
-                                .getResults();
-                        #endif
+                        quantum::QuantumGate adjointOp =
+                            dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
+                        adjointOp.setQubitOperands(origOpVal);
+                        adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
+                        auto adjointOpVal = adjointOp->getResults();
 
                         // Yield the qubits.
-                        builder.create<scf::YieldOp>(loc, origOpVal);
+                        builder.create<scf::YieldOp>(loc, adjointOpVal);
                     })
                 .getResults();
 
@@ -329,11 +330,11 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     }
     else {
         rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
-        
+
         quantum::DeviceInitOp deviceInitOp = *fnFoldedOp.getOps<quantum::DeviceInitOp>().begin();
         rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
         rewriter.eraseOp(deviceInitOp);
-        
+
         quantum::AllocOp allocOpWithMeasurements = *fnFoldedOp.getOps<quantum::AllocOp>().begin();
         Value allocQreg =
             rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
@@ -351,8 +352,9 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         // TODO: Why doesn't this next line work as ReturnOp Value?
         // Value results = (*fnFoldedOp.getOps<tensor::FromElementsOp>().begin()).getResult();
         RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
-        Value results =
-            rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+        Value results = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
+                                                         resultType.getElementType());
+
         rewriter.create<func::ReturnOp>(loc, results);
     }
 
