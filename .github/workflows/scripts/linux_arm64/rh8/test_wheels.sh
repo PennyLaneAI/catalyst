@@ -5,14 +5,14 @@ cd /catalyst
 
 # Process args
 export GCC_VERSION=$1
-export PYTHON_VERSION=$2
-export PYTHON_SUBVERSION=$3
+export PYTHON_MAJOR_MINOR=$2
+export PYTHON_PATCH=$3
 export PYTHON_PACKAGE=$4
 
 # Install system dependencies (gcc gives access to c99, which is needed by some tests)
 dnf update -y 
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
-if [ "$PYTHON_VERSION" != "3.10" ]; then
+if [ "$PYTHON_MAJOR_MINOR" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
 else
     # Install Python3.10 and Python3.10-devel from source because they cannot be found under this linux version.
