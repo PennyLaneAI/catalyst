@@ -68,6 +68,7 @@ class TestExamplesFromWebsite:
         Test state prep when the state array is type i32 instead of i64.
         """
         state = jnp.array([0, 1, 0, 0], dtype=jnp.int32)
+
         @qml.qnode(qml.device(backend, wires=2))
         def example_circuit():
             qml.StatePrep(state, wires=range(2))
@@ -120,6 +121,7 @@ class TestExamplesFromWebsite:
         Test basis state when the state array is type i32 instead of i64.
         """
         state = jnp.array([1, 1, 0, 0, 0, 0], dtype=jnp.int32)
+
         @qml.qnode(qml.device(backend, wires=6))
         def example_circuit():
             qml.BasisState(state, wires=range(6))
