@@ -825,9 +825,16 @@ class QJIT_CUDAQ:
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
             device_name = (
-                device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+                device.target_device.short_name
+                if isinstance(device, qml.devices.LegacyDeviceFacade)
+                else device.name
             )
-            return BackendInfo(device_name, device.name, "", {})
+            interface_name = (
+                device.target_device.name
+                if isinstance(device, qml.devices.LegacyDeviceFacade)
+                else device.name
+            )
+            return BackendInfo(device_name, interface_name, "", {})
 
         with Patcher(
             (QFunc, "extract_backend_info", cudaq_backend_info),
