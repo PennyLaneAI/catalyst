@@ -32,13 +32,13 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
-from catalyst.api_extensions import MidCircuitMeasure
 from pennylane.transforms.dynamic_one_shot import (
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
 )
 
 import catalyst
+from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import (
     BackendInfo,
     QJITDevice,
