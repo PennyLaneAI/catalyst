@@ -23,6 +23,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <iostream>
 
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
@@ -443,7 +444,16 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
     // options.
-    llvm::PassBuilder PB;
+    llvm::PassInstrumentationCallbacks PIC;
+    PIC.registerShouldRunOptionalPassCallback([](llvm::StringRef P, llvm::Any) {
+        if (P == "MemCpyOptPass") {
+            return false;
+        }
+        else {
+            return true;
+        }
+    });
+    auto PB = llvm::PassBuilder(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);
     // Register all the basic analyses with the managers.
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);
@@ -455,7 +465,6 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // This one corresponds to a typical -O2 optimization pipeline.
     llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
 
-    // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
