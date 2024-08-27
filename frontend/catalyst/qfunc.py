@@ -268,7 +268,7 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        has_mcm = any([isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations])
+        has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
         if has_mcm:
             results = parse_native_mid_circuit_measurements(
                 cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
