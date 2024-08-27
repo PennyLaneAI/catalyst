@@ -931,6 +931,7 @@ class TestDynamicOneShotIntegration:
         assert tree_jax == tree_cat
         assert np.allclose(res_jax, res_cat)
 
+
 def sample_to_counts(results, meas_obj):
     """Helper function to convert samples array to counts dictionary"""
     meas_key = "wires" if isinstance(meas_obj, list) else "op"
