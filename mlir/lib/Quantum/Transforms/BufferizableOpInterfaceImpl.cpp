@@ -1,5 +1,6 @@
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
@@ -15,7 +16,7 @@ struct StateOpInterface
                                                     catalyst::quantum::StateOp> {
   bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
                               const mlir::bufferization::AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
@@ -31,7 +32,19 @@ struct StateOpInterface
 
   LogicalResult bufferize(mlir::Operation *op, RewriterBase &rewriter,
                           const mlir::bufferization::BufferizationOptions &options) const {
-    auto StateOp = cast<catalyst::quantum::StateOp>(op);
+    auto stateOp = cast<StateOp>(op);
+    Location loc = op->getLoc();
+    FailureOr<Value> tensorAlloc = allocateTensorForShapedValue(
+        rewriter, loc, stateOp.getState(), options,
+        /*copy=*/false);
+    if (failed(tensorAlloc))
+      return failure();
+    llvm::outs() << "This rewrite happens!\n";
+    auto tensorType = cast<RankedTensorType>(tensorAlloc->getType());
+    MemRefType resultType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+    //rewriter.create<memref::AllocOp>(loc, resultType);
+    Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(stateOp, resultType);
+    rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(allocVal.getType()));
 
     return success();
   }

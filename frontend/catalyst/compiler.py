@@ -195,8 +195,8 @@ BUFFERIZATION_PASS = (
     [
         "eliminate-empty-tensors",
         "one-shot-bufferize{bufferize-function-boundaries}",
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
+        #"func.func(buffer-hoisting)",
+        #"func.func(buffer-loop-hoisting)",
         #"buffer-results-to-out-params",
         #"drop-equivalent-buffer-results",
         #"func.func(promote-buffers-to-stack)",
