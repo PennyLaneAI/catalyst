@@ -1409,7 +1409,7 @@ def test_non_parametrized_circuit(backend):
 
     def cost(x):
         @qml.qnode(dev)
-        def circuit(x):
+        def circuit(x):  # pylint: disable=unused-argument
             qml.PauliX(wires=0)
             return qml.expval(qml.PauliZ(wires=0))
 

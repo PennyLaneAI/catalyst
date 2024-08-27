@@ -23,7 +23,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <iostream>
 
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
