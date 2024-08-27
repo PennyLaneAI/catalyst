@@ -32,6 +32,7 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
+from catalyst.api_extensions import MidCircuitMeasure
 from pennylane.transforms.dynamic_one_shot import (
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
@@ -267,14 +268,15 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-
-        out = parse_native_mid_circuit_measurements(
-            cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
-        )
+        has_mcm = any([isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations])
+        if has_mcm:
+            results = parse_native_mid_circuit_measurements(
+                cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+            )
         if len(cpy_tape.measurements) == 1:
-            out = (out,)
+            results = (results,)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
-        out = tree_unflatten(out_tree_expected[0], out)
-        return out
+        results = tree_unflatten(out_tree_expected[0], results)
+        return results
 
     return one_shot_wrapper
