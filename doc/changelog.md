@@ -456,6 +456,9 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug where LegacyDevice number of shots is not correctly extracted when using the legacyDeviceFacade.
+  [(#1035)](https://github.com/PennyLaneAI/catalyst/pull/1035)
+
 * Catalyst no longer generates a `QubitUnitary` operation during decomposition if a device doesn't
   support it. Instead, the operation that would lead to a `QubitUnitary` is either decomposed or
   raises an error.
