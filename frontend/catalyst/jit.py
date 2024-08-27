@@ -26,6 +26,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from pennylane.capture.flatfn import FlatFn
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 from malt.core import config as ag_config
@@ -53,6 +54,7 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
+from catalyst.from_plxpr import from_plxpr
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -559,6 +561,22 @@ class QJIT:
 
         return processed_fn
 
+    def _experimental_capture(self, args, **kwargs):
+        verify_static_argnums(args, self.compile_options.static_argnums)
+        static_argnums = self.compile_options.static_argnums
+
+        dynamic_args = filter_static_args(args, static_argnums)
+        dynamic_sig = get_abstract_signature(dynamic_args)
+
+        flat_user_function = FlatFn(self.user_function)
+        plxpr = jax.make_jaxpr(flat_user_function)(*args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*args)
+
+        out_type = (tuple(jaxpr.out_avals + [True]), )
+
+        return jaxpr, out_type, flat_user_function.out_tree, dynamic_sig
+
+
     @instrument(size_from=0)
     @debug_logger
     def capture(self, args, **kwargs):
@@ -572,6 +590,8 @@ class QJIT:
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
+        if qml.capture.enabled():
+            return self._experimental_capture(args, **kwargs)
 
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
