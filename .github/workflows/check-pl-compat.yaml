@@ -164,10 +164,10 @@ jobs:
       if: ${{ inputs.lightning != 'stable' }}
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
+        cd lightning_build
         pip install --upgrade .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
         pip install --upgrade .
-        cd ..
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
