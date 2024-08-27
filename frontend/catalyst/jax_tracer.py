@@ -608,7 +608,9 @@ def trace_basis_state(op, qrp):
     if not jnp.can_cast(basis_state.dtype, jnp.dtype(jnp.int64)):
         raise ValueError(err_msg)
 
-    basis_state_invalid_bits = jax.lax.bitwise_and(basis_state, ~0b1)
+    neg_one = jax.lax.convert_element_type(~0b1, jnp.dtype(basis_state.dtype))
+    basis_state_invalid_bits = jax.lax.bitwise_and(basis_state, neg_one)
+
     is_basis_state_invalid = jnp.any(basis_state_invalid_bits)
     is_basis_state_valid = jnp.logical_not(is_basis_state_invalid)
     debug_assert(is_basis_state_valid, err_msg)

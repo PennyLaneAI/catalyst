@@ -63,6 +63,21 @@ class TestExamplesFromWebsite:
         observed = jnp.array(qml.qjit(main)())
         assert jnp.allclose(expected, observed)
 
+    def test_state_prep_i32_array(self, backend):
+        """
+        Test state prep when the state array is type i32 instead of i64.
+        """
+        state = jnp.array([0, 1, 0, 0], dtype=jnp.int32)
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def example_circuit():
+            qml.StatePrep(state, wires=range(2))
+            return qml.state()
+
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
+        assert jnp.allclose(expected, observed)
+
     def test_basis_state(self, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
@@ -99,6 +114,21 @@ class TestExamplesFromWebsite:
 
         expected = jnp.array(main())
         observed = jnp.array(qml.qjit(main)())
+        assert jnp.allclose(expected, observed)
+
+    def test_basis_state_i32_array(self, backend):
+        """
+        Test basis state when the state array is type i32 instead of i64.
+        """
+        state = jnp.array([1, 1, 0, 0, 0, 0], dtype=jnp.int32)
+
+        @qml.qnode(qml.device(backend, wires=6))
+        def example_circuit():
+            qml.BasisState(state, wires=range(6))
+            return qml.state()
+
+        expected = example_circuit()
+        observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("wires", [(0), (1), (2)])

@@ -370,6 +370,7 @@
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
   [(#1047)](https://github.com/PennyLaneAI/catalyst/pull/1047)
+  [(#1062)](https://github.com/PennyLaneAI/catalyst/pull/1062)
 
 * Improved type validation and error messaging has been added to both the `catalyst.jvp`
   and `catalyst.vjp` functions to ensure that the (co)tangent and parameter types are compatible.
