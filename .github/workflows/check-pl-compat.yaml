@@ -164,7 +164,7 @@ jobs:
       if: ${{ inputs.lightning != 'stable' }}
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
-        pip install --upgrade lightning_build
+        pip install --upgrade ./lightning_build
         PL_BACKEND=lightning_kokkos python lightning_build/scripts/configure_pyproject_toml.py
         pip install --upgrade lightning_build
 
