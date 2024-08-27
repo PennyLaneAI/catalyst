@@ -800,7 +800,7 @@ class TestDynamicOneShotIntegration:
             return [qml.expval(qml.Z(i)) for i in range(qubits)]
 
         result = cost()
-        assert jnp.array(result).shape == (qubits, shots)
+        assert jnp.array(result).shape == (qubits,)
 
     @pytest.mark.skip(
         reason="grad with dynamic one-shot is not yet supported.",

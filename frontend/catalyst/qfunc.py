@@ -33,6 +33,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.transforms.dynamic_one_shot import (
+    gather_non_mcm,
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
 )
@@ -269,14 +270,24 @@ def dynamic_one_shot(qnode, **kwargs):
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
         has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+        out = list(results)
         if has_mcm:
-            results = parse_native_mid_circuit_measurements(
+            out = parse_native_mid_circuit_measurements(
                 cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
             )
-        if len(cpy_tape.measurements) == 1:
-            results = (results,)
+            if len(cpy_tape.measurements) == 1:
+                out = (out,)
+        else:
+            m_count = 0
+            for m in cpy_tape.measurements:
+                is_valid = jnp.array([True] * len(out[m_count]))
+                out[m_count] = gather_non_mcm(
+                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
+                )
+                m_count += 1
+            out = tuple(out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
-        results = tree_unflatten(out_tree_expected[0], results)
-        return results
+        out = tree_unflatten(out_tree_expected[0], out)
+        return out
 
     return one_shot_wrapper
