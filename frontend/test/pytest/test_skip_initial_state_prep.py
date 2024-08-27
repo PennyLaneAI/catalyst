@@ -188,7 +188,7 @@ class TestPossibleErrors:
         in Catalyst that happen during runtime are RuntimeErrors.
         """
 
-        with pytest.raises(RuntimeError, match="must be of equal length"):
+        with pytest.raises(RuntimeError, match="State must be of length 2; got length 1"):
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -200,7 +200,7 @@ class TestPossibleErrors:
 
     def test_different_shape_state_prep(self):
         """Test that the same error is raised"""
-        with pytest.raises(ValueError, match="State vector must have shape"):
+        with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
