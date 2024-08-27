@@ -760,6 +760,7 @@ class TestDynamicOneShotIntegration:
             assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
 
     def test_dynamic_one_shot_with_no_mcm_iterable_output(self, backend):
+        """Test that `dynamic_one_shot` can work when there is no mcm and have iterable output."""
         qubits = 3
         shots = 10
         dev = qml.device(backend, wires=qubits, shots=shots)
