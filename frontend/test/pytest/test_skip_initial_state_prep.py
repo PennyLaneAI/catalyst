@@ -184,11 +184,10 @@ class TestPossibleErrors:
 
     def test_array_less_than_size_basis_state(self):
         """Test what happens when the array is less than the size required.
-        In PennyLane the error raised is a ValueError, but all errors
-        in Catalyst that happen during runtime are RuntimeErrors.
+        In PennyLane the error raised is a ValueError.
         """
 
-        with pytest.raises(RuntimeError, match="must be of equal length"):
+        with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -200,7 +199,7 @@ class TestPossibleErrors:
 
     def test_different_shape_state_prep(self):
         """Test that the same error is raised"""
-        with pytest.raises(ValueError, match="State vector must have shape"):
+        with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
