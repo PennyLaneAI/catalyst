@@ -108,17 +108,13 @@ void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data,
                                   std::vector<QubitIdType> &wires)
 {
     std::vector<std::complex<double>> data_vector(data.begin(), data.end());
-    auto &&dev_wires = getDeviceWires(wires);
-    std::vector<std::size_t> wires_size_t(dev_wires.begin(), dev_wires.end());
-    this->device_sv->setStateVector(data_vector, wires_size_t);
+    this->device_sv->setStateVector(data_vector, getDeviceWires(wires));
 }
 
 void LightningSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
 {
     std::vector<std::size_t> data_vector(data.begin(), data.end());
-    auto &&dev_wires = getDeviceWires(wires);
-    std::vector<std::size_t> wires_size_t(dev_wires.begin(), dev_wires.end());
-    this->device_sv->setBasisState(data_vector, wires_size_t);
+    this->device_sv->setBasisState(data_vector, getDeviceWires(wires));
 }
 
 auto LightningSimulator::Zero() const -> Result
