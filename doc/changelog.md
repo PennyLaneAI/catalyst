@@ -1,19 +1,3 @@
-# Release 0.9.0-dev
-
-<h3>New features</h3>
-
-<h3>Improvements</h3>
-
-<h3>Breaking changes</h3>
-
-<h3>Bug fixes</h3>
-
-<h3>Internal changes</h3>
-
-<h3>Contributors</h3>
-
-This release contains contributions from (in alphabetical order):
-
 # Release 0.8.0
 
 <h3>New features</h3>
@@ -385,6 +369,7 @@ This release contains contributions from (in alphabetical order):
 * On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
+  [(#1047)](https://github.com/PennyLaneAI/catalyst/pull/1047)
 
 * Improved type validation and error messaging has been added to both the `catalyst.jvp`
   and `catalyst.vjp` functions to ensure that the (co)tangent and parameter types are compatible.
@@ -470,6 +455,9 @@ This release contains contributions from (in alphabetical order):
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
 <h3>Bug fixes</h3>
+
+* Fix a bug where LegacyDevice number of shots is not correctly extracted when using the legacyDeviceFacade.
+  [(#1035)](https://github.com/PennyLaneAI/catalyst/pull/1035)
 
 * Catalyst no longer generates a `QubitUnitary` operation during decomposition if a device doesn't
   support it. Instead, the operation that would lead to a `QubitUnitary` is either decomposed or

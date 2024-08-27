@@ -42,6 +42,27 @@ class TestExamplesFromWebsite:
         observed = qml.qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
+    def test_state_prep_recycled_device(self, backend):
+        """The same test as above but two qnodes using the same device"""
+        dev = qml.device(backend, wires=2)
+
+        @qml.qnode(dev)
+        def example_circuit():
+            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qml.state()
+
+        @qml.qnode(dev)
+        def example_circuit_doppelganger():
+            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qml.state()
+
+        def main():
+            return example_circuit(), example_circuit_doppelganger()
+
+        expected = jnp.array(main())
+        observed = jnp.array(qml.qjit(main)())
+        assert jnp.allclose(expected, observed)
+
     def test_basis_state(self, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
@@ -57,6 +78,27 @@ class TestExamplesFromWebsite:
 
         expected = example_circuit()
         observed = qml.qjit(example_circuit)()
+        assert jnp.allclose(expected, observed)
+
+    def test_basis_state_recycled_device(self, backend):
+        """The same test as above but two qnodes using the same device"""
+        dev = qml.device(backend, wires=2)
+
+        @qml.qnode(dev)
+        def example_circuit():
+            qml.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qml.state()
+
+        @qml.qnode(dev)
+        def example_circuit_doppelganger():
+            qml.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qml.state()
+
+        def main():
+            return example_circuit(), example_circuit_doppelganger()
+
+        expected = jnp.array(main())
+        observed = jnp.array(qml.qjit(main)())
         assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("wires", [(0), (1), (2)])
@@ -142,11 +184,10 @@ class TestPossibleErrors:
 
     def test_array_less_than_size_basis_state(self):
         """Test what happens when the array is less than the size required.
-        In PennyLane the error raised is a ValueError, but all errors
-        in Catalyst that happen during runtime are RuntimeErrors.
+        In PennyLane the error raised is a ValueError.
         """
 
-        with pytest.raises(RuntimeError, match="must be of equal length"):
+        with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -158,7 +199,7 @@ class TestPossibleErrors:
 
     def test_different_shape_state_prep(self):
         """Test that the same error is raised"""
-        with pytest.raises(ValueError, match="State vector must have shape"):
+        with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
