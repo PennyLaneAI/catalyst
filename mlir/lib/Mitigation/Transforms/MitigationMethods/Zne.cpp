@@ -336,11 +336,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
         fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
-
-        tensor::FromElementsOp fromElementsOp =
-            *fnFoldedOpBlock->getOps<tensor::FromElementsOp>().begin();
-        rewriter.setInsertionPointToEnd(fnFoldedOpBlock);
-        rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
     }
 
     if (foldingAlgorithm == Folding(1)) {
