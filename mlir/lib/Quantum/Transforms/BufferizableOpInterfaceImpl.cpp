@@ -14,7 +14,7 @@ namespace {
 /// Bufferization of catalyst.quantum.unitary. Convert Matrix into memref.
 struct QubitUnitaryOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<QubitUnitaryOpInterface,
-                                                    catalyst::quantum::QubitUnitaryOp> {
+                                                    QubitUnitaryOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return true;
@@ -54,7 +54,7 @@ struct QubitUnitaryOpInterface
 /// Bufferization of catalyst.quantum.hermitian. Convert Matrix into memref.
 struct HermitianOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<HermitianOpInterface,
-                                                    catalyst::quantum::HermitianOp> {
+                                                    HermitianOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return true;
@@ -91,7 +91,7 @@ struct HermitianOpInterface
 /// Bufferization of catalyst.quantum.hamiltonian. Convert Matrix into memref.
 struct HamiltonianOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<HamiltonianOpInterface,
-                                                    catalyst::quantum::HamiltonianOp> {
+                                                    HamiltonianOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return true;
@@ -129,7 +129,7 @@ struct HamiltonianOpInterface
 /// catalyst.quantum.state that uses the memory allocated by memref.alloc.
 struct StateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<StateOpInterface,
-                                                    catalyst::quantum::StateOp> {
+                                                    StateOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return false;
@@ -165,7 +165,7 @@ struct StateOpInterface
 /// catalyst.quantum.probs that uses the memory allocated by memref.alloc.
 struct ProbsOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<ProbsOpInterface,
-                                                    catalyst::quantum::ProbsOp> {
+                                                    ProbsOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return false;
@@ -201,7 +201,7 @@ struct ProbsOpInterface
 /// catalyst.quantum.counts that uses the memory allocated by memref.allocs.
 struct CountsOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CountsOpInterface,
-                                                    catalyst::quantum::CountsOp> {
+                                                    CountsOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return false;
@@ -240,7 +240,7 @@ struct CountsOpInterface
 /// Bufferization of catalyst.quantum.set_state. Convert InState into memref.
 struct SetStateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SetStateOpInterface,
-                                                    catalyst::quantum::SetStateOp> {
+                                                    SetStateOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return false;
@@ -277,7 +277,7 @@ struct SetStateOpInterface
 /// Bufferization of catalyst.quantum.set_basic_state. Convert BasisState into memref.
 struct SetBasisStateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SetBasisStateOpInterface,
-                                                    catalyst::quantum::SetBasisStateOp> {
+                                                    SetBasisStateOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const bufferization::AnalysisState &state) const {
     return false;
@@ -315,7 +315,7 @@ struct SetBasisStateOpInterface
 
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
-  registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
+  registry.addExtension(+[](MLIRContext *ctx, QuantumDialect *dialect) {
     QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
     HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
     HamiltonianOp::attachInterface<HamiltonianOpInterface>(*ctx);
