@@ -25,11 +25,11 @@ class TestShotVector:
     """Test shot-vector"""
 
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
-    def test_return_format_and_shape(self, shots, backend):
+    def test_return_format_and_shape(self, shots):
         """Test shot-vector as parameter with single sample measurment"""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=shots))
+        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=shots))
         def circuit():
             qml.Hadamard(0)
             return qml.sample()
@@ -39,10 +39,10 @@ class TestShotVector:
         assert jnp.shape(circuit()) == (4, 3, 1)
 
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
-    def test_multiple_sample_measurement(self, shots, backend):
+    def test_multiple_sample_measurement(self, shots):
         """Test shot-vector with mulitple samples measurment"""
 
-        dev = qml.device(backend, wires=1, shots=shots)
+        dev = qml.device("lightning.qubit", wires=1, shots=shots)
 
         @qjit
         @qml.qnode(dev)
