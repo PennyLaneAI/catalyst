@@ -17,7 +17,7 @@ struct StateOpInterface
                                                     catalyst::quantum::StateOp> {
   bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
                               const mlir::bufferization::AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
@@ -53,7 +53,7 @@ struct ProbsOpInterface
                                                     catalyst::quantum::ProbsOp> {
   bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
                               const mlir::bufferization::AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
@@ -89,7 +89,7 @@ struct CountsOpInterface
                                                     catalyst::quantum::CountsOp> {
   bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
                               const mlir::bufferization::AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
