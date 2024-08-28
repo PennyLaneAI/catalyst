@@ -335,8 +335,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         // Loop control variables
         c0 = rewriter.create<index::ConstantOp>(loc, 0);
         c1 = rewriter.create<index::ConstantOp>(loc, 1);
-        TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-        numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
         fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
     }
