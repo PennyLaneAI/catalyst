@@ -161,6 +161,44 @@ struct SetStateOpInterface
   }
 };
 
+/// Bufferization of catalyst.quantum.set_basic_state. Replace with bufferization::ToMemrefOp and
+/// a new catalyst.quantum.set_basic_state that uses the memref from bufferization::ToMemrefOp.
+struct SetBasisStateOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SetBasisStateOpInterface,
+                                                    catalyst::quantum::SetBasisStateOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
+    auto setBasisStateOp = cast<SetBasisStateOp>(op);
+    Location loc = op->getLoc();
+    auto tensorType = cast<RankedTensorType>(setBasisStateOp.getBasisState().getType());
+    MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+
+    auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType,
+                                                                 setBasisStateOp.getBasisState());
+    auto memref = toMemrefOp.getResult();
+    auto newSetStateOp = rewriter.create<SetBasisStateOp>(loc, setBasisStateOp.getOutQubits().getTypes(),
+                                                     memref, setBasisStateOp.getInQubits());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
+    return success();
+  }
+};
+
 } // namespace
 
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
@@ -170,5 +208,6 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
     ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
     CountsOp::attachInterface<CountsOpInterface>(*ctx);
     SetStateOp::attachInterface<SetStateOpInterface>(*ctx);
+    SetBasisStateOp::attachInterface<SetBasisStateOpInterface>(*ctx);
   });
 }
