@@ -125,6 +125,43 @@ struct HamiltonianOpInterface
   }
 };
 
+/// Bufferization of catalyst.quantum.sample. Replace with memref.alloc and a new
+/// catalyst.quantum.sample that uses the memory allocated by memref.alloc.
+struct SampleOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SampleOpInterface,
+                                                    SampleOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
+    auto sampleOp = cast<SampleOp>(op);
+    Location loc = op->getLoc();
+    auto tensorType = cast<RankedTensorType>(sampleOp.getSamples().getType());
+    MemRefType resultType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+
+    Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+    rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{sampleOp.getObs(), allocVal},
+                              sampleOp->getAttrs());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
+
+    return success();
+  }
+};
+
 /// Bufferization of catalyst.quantum.state. Replace with memref.alloc and a new
 /// catalyst.quantum.state that uses the memory allocated by memref.alloc.
 struct StateOpInterface
@@ -319,6 +356,7 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
     QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
     HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
     HamiltonianOp::attachInterface<HamiltonianOpInterface>(*ctx);
+    SampleOp::attachInterface<SampleOpInterface>(*ctx);
     StateOp::attachInterface<StateOpInterface>(*ctx);
     ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
     CountsOp::attachInterface<CountsOpInterface>(*ctx);
