@@ -310,6 +310,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         fnWithMeasurementsOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
     }
+    else {
+    }
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
@@ -331,30 +333,14 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     else {
         rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
 
-        quantum::DeviceInitOp deviceInitOp = *fnFoldedOp.getOps<quantum::DeviceInitOp>().begin();
-        rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
-        rewriter.eraseOp(deviceInitOp);
+        // tensor::FromElementsOp fromElementsOp =
+        // *fnFoldedOp.getOps<tensor::FromElementsOp>().begin();
+        // rewriter.setInsertionPointToEnd(fnFoldedOpBlock);
+        // rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
 
-        quantum::AllocOp allocOpWithMeasurements = *fnFoldedOp.getOps<quantum::AllocOp>().begin();
-        Value allocQreg =
-            rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
-        allocOpWithMeasurements.replaceAllUsesWith(allocQreg);
-        rewriter.eraseOp(allocOpWithMeasurements);
-
-        quantum::DeviceReleaseOp deviceReleaseOp =
-            *fnFoldedOp.getOps<quantum::DeviceReleaseOp>().begin();
-        rewriter.setInsertionPoint(deviceReleaseOp);
-        rewriter.eraseOp(deviceReleaseOp);
-
-        rewriter.setInsertionPointToEnd(fnFoldedOpBlock);
-        rewriter.create<quantum::DeviceReleaseOp>(loc);
-
-        // TODO: Why doesn't this next line work as ReturnOp Value?
-        // Value results = (*fnFoldedOp.getOps<tensor::FromElementsOp>().begin()).getResult();
         RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
         Value results = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
                                                          resultType.getElementType());
-
         rewriter.create<func::ReturnOp>(loc, results);
     }
 
