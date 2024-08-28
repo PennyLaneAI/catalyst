@@ -312,27 +312,35 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                                                   /*outputs=*/fnOp.getResultTypes());
 
     func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
+    Value c0, c1, numberQubitsValue;
     fnFoldedOp.setPrivate();
-    auto fnFoldedOpBlock = fnFoldedOp.addEntryBlock();
-    rewriter.setInsertionPointToStart(fnFoldedOpBlock);
-    // Loop control variables
-    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
-    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
-    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
     if (foldingAlgorithm == Folding(1)) {
+        Block *fnFoldedOpBlock = fnFoldedOp.addEntryBlock();
+        rewriter.setInsertionPointToStart(fnFoldedOpBlock);
+        // Loop control variables
+        c0 = rewriter.create<index::ConstantOp>(loc, 0);
+        c1 = rewriter.create<index::ConstantOp>(loc, 1);
+        TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+        numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
         rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
     }
     else {
         rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
-        // tensor::FromElementsOp fromElementsOp =
-        //     *fnFoldedOp.getOps<tensor::FromElementsOp>().begin();
-        // rewriter.setInsertionPointToEnd(&fnFoldedOp.getBody().back());
-        // rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
-        RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
-        Value results = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
-                                                         resultType.getElementType());
-        rewriter.create<func::ReturnOp>(loc, results);
+
+        Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
+        rewriter.setInsertionPointToStart(fnFoldedOpBlock);
+        // Loop control variables
+        c0 = rewriter.create<index::ConstantOp>(loc, 0);
+        c1 = rewriter.create<index::ConstantOp>(loc, 1);
+        TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+        numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+
+        fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
+
+        tensor::FromElementsOp fromElementsOp =
+            *fnFoldedOpBlock->getOps<tensor::FromElementsOp>().begin();
+        rewriter.setInsertionPointToEnd(fnFoldedOpBlock);
+        rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
     }
 
     if (foldingAlgorithm == Folding(1)) {
