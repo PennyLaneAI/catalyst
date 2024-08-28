@@ -21,7 +21,7 @@ struct StateOpInterface
 
   bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
                                const mlir::bufferization::AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   mlir::bufferization::AliasingValueList getAliasingValues(mlir::Operation *op,
