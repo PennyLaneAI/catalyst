@@ -88,6 +88,43 @@ struct HermitianOpInterface
   }
 };
 
+/// Bufferization of catalyst.quantum.hamiltonian. Convert Matrix into memref.
+struct HamiltonianOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<HamiltonianOpInterface,
+                                                    catalyst::quantum::HamiltonianOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
+    auto hamiltonianOp = cast<HamiltonianOp>(op);
+    Location loc = op->getLoc();
+    auto tensorType = cast<RankedTensorType>(hamiltonianOp.getCoeffs().getType());
+    MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+    auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType,
+                                                                 hamiltonianOp.getCoeffs());
+    auto memref = toMemrefOp.getResult();
+    auto newHamiltonianOp = rewriter.create<HamiltonianOp>(loc, hamiltonianOp.getType(), memref,
+                                                       hamiltonianOp.getTerms());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, newHamiltonianOp.getObs());
+
+    return success();
+  }
+};
+
 /// Bufferization of catalyst.quantum.state. Replace with memref.alloc and a new
 /// catalyst.quantum.state that uses the memory allocated by memref.alloc.
 struct StateOpInterface
@@ -281,6 +318,7 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
   registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
     QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
     HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
+    HamiltonianOp::attachInterface<HamiltonianOpInterface>(*ctx);
     StateOp::attachInterface<StateOpInterface>(*ctx);
     ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
     CountsOp::attachInterface<CountsOpInterface>(*ctx);
