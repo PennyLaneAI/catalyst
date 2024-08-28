@@ -268,9 +268,12 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Set insertion in the module
     rewriter.setInsertionPointToStart(moduleOp.getBody());
     // Quantum Alloc function
-    FlatSymbolRefAttr quantumAllocRefAttr = getOrInsertQuantumAlloc(loc, rewriter, op);
-    func::FuncOp fnAllocOp =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
+    FlatSymbolRefAttr quantumAllocRefAttr;
+    func::FuncOp fnAllocOp;
+    if (foldingAlgorithm == Folding(1)) {
+        quantumAllocRefAttr = getOrInsertQuantumAlloc(loc, rewriter, op);
+        fnAllocOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
+    }
 
     // Get the number of qubits
     const int64_t numberQubits =
