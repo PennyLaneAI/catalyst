@@ -28,3 +28,5 @@ This page contains the release notes for Catalyst.
 .. mdinclude:: ../releases/changelog-0.1.2.md
 
 .. mdinclude:: ../releases/changelog-0.1.1.md
+
+.. mdinclude:: ../releases/changelog-0.1.0.md
