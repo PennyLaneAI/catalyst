@@ -1,4 +1,5 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -13,26 +14,26 @@ namespace {
 /// Bufferization of catalyst.quantum.state. Replace with memref.alloc and a new
 /// catalyst.quantum.state that uses the memory allocated by memref.alloc.
 struct StateOpInterface
-    : public mlir::bufferization::BufferizableOpInterface::ExternalModel<StateOpInterface,
+    : public bufferization::BufferizableOpInterface::ExternalModel<StateOpInterface,
                                                     catalyst::quantum::StateOp> {
-  bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
-                              const mlir::bufferization::AnalysisState &state) const {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
     return false;
   }
 
-  bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
-                               const mlir::bufferization::AnalysisState &state) const {
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
     return false;
   }
 
-  mlir::bufferization::AliasingValueList getAliasingValues(mlir::Operation *op,
-                                      mlir::OpOperand &opOperand,
-                                      const mlir::bufferization::AnalysisState &state) const {
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
     return {};
   }
 
-  LogicalResult bufferize(mlir::Operation *op, RewriterBase &rewriter,
-                          const mlir::bufferization::BufferizationOptions &options) const {
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
     auto stateOp = cast<StateOp>(op);
     Location loc = op->getLoc();
     auto tensorType = cast<RankedTensorType>(stateOp.getState().getType());
@@ -40,7 +41,7 @@ struct StateOpInterface
 
     Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
     rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{stateOp.getObs(), allocVal});
-    mlir::bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
 
     return success();
   }
@@ -49,26 +50,26 @@ struct StateOpInterface
 /// Bufferization of catalyst.quantum.probs. Replace with memref.alloc and a new
 /// catalyst.quantum.probs that uses the memory allocated by memref.alloc.
 struct ProbsOpInterface
-    : public mlir::bufferization::BufferizableOpInterface::ExternalModel<ProbsOpInterface,
+    : public bufferization::BufferizableOpInterface::ExternalModel<ProbsOpInterface,
                                                     catalyst::quantum::ProbsOp> {
-  bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
-                              const mlir::bufferization::AnalysisState &state) const {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
     return false;
   }
 
-  bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
-                               const mlir::bufferization::AnalysisState &state) const {
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
     return false;
   }
 
-  mlir::bufferization::AliasingValueList getAliasingValues(mlir::Operation *op,
-                                      mlir::OpOperand &opOperand,
-                                      const mlir::bufferization::AnalysisState &state) const {
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
     return {};
   }
 
-  LogicalResult bufferize(mlir::Operation *op, RewriterBase &rewriter,
-                          const mlir::bufferization::BufferizationOptions &options) const {
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
     auto probsOp = cast<ProbsOp>(op);
     Location loc = op->getLoc();
     auto tensorType = cast<RankedTensorType>(probsOp.getProbabilities().getType());
@@ -76,35 +77,35 @@ struct ProbsOpInterface
 
     Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
     rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{probsOp.getObs(), allocVal});
-    mlir::bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
 
     return success();
   }
 };
 
-/// Bufferization of catalyst.quantum.counts. Replace with memref.alloc and a new
-/// catalyst.quantum.counts that uses the memory allocated by memref.alloc.
+/// Bufferization of catalyst.quantum.counts. Replace with memref.allocs and a new
+/// catalyst.quantum.counts that uses the memory allocated by memref.allocs.
 struct CountsOpInterface
-    : public mlir::bufferization::BufferizableOpInterface::ExternalModel<CountsOpInterface,
+    : public bufferization::BufferizableOpInterface::ExternalModel<CountsOpInterface,
                                                     catalyst::quantum::CountsOp> {
-  bool bufferizesToMemoryRead(mlir::Operation *op, mlir::OpOperand &opOperand,
-                              const mlir::bufferization::AnalysisState &state) const {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
     return false;
   }
 
-  bool bufferizesToMemoryWrite(mlir::Operation *op, mlir::OpOperand &opOperand,
-                               const mlir::bufferization::AnalysisState &state) const {
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
     return false;
   }
 
-  mlir::bufferization::AliasingValueList getAliasingValues(mlir::Operation *op,
-                                      mlir::OpOperand &opOperand,
-                                      const mlir::bufferization::AnalysisState &state) const {
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
     return {};
   }
 
-  LogicalResult bufferize(mlir::Operation *op, RewriterBase &rewriter,
-                          const mlir::bufferization::BufferizationOptions &options) const {
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
     auto countsOp = cast<CountsOp>(op);
     Location loc = op->getLoc();
     auto tensorType0 = cast<RankedTensorType>(countsOp.getEigvals().getType());
@@ -116,8 +117,46 @@ struct CountsOpInterface
     Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
     rewriter.create<CountsOp>(loc, nullptr, nullptr, countsOp.getObs(), allocVal0, allocVal1,
                               countsOp.getShotsAttr());
-    mlir::bufferization::replaceOpWithBufferizedValues(rewriter, op, ValueRange{allocVal0, allocVal1});
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, ValueRange{allocVal0, allocVal1});
 
+    return success();
+  }
+};
+
+/// Bufferization of catalyst.quantum.set_state. Replace with bufferization::ToMemrefOp and
+/// a new catalyst.quantum.set_state that uses the memref from bufferization::ToMemrefOp.
+struct SetStateOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SetStateOpInterface,
+                                                    catalyst::quantum::SetStateOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
+    auto setStateOp = cast<SetStateOp>(op);
+    Location loc = op->getLoc();
+    auto tensorType = cast<RankedTensorType>(setStateOp.getInState().getType());
+    MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+
+    auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType,
+                                                                 setStateOp.getInState());
+    auto memref = toMemrefOp.getResult();
+    auto newSetStateOp = rewriter.create<SetStateOp>(loc, setStateOp.getOutQubits().getTypes(),
+                                                     memref, setStateOp.getInQubits());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
     return success();
   }
 };
@@ -130,5 +169,6 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
     StateOp::attachInterface<StateOpInterface>(*ctx);
     ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
     CountsOp::attachInterface<CountsOpInterface>(*ctx);
+    SetStateOp::attachInterface<SetStateOpInterface>(*ctx);
   });
 }
