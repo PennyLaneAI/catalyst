@@ -11,7 +11,7 @@ using namespace catalyst::quantum;
 
 namespace {
 
-/// Bufferization of catalyst.quantum.state. Convert Matrix into memref.
+/// Bufferization of catalyst.quantum.unitary. Convert Matrix into memref.
 struct QubitUnitaryOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<QubitUnitaryOpInterface,
                                                     catalyst::quantum::QubitUnitaryOp> {
@@ -46,6 +46,43 @@ struct QubitUnitaryOpInterface
             qubitUnitaryOp.getInQubits(), qubitUnitaryOp.getAdjointAttr(),
             qubitUnitaryOp.getInCtrlQubits(), qubitUnitaryOp.getInCtrlValues());
     bufferization::replaceOpWithBufferizedValues(rewriter, op, newQubitUnitaryOp.getOutQubits());
+
+    return success();
+  }
+};
+
+/// Bufferization of catalyst.quantum.hermitian. Convert Matrix into memref.
+struct HermitianOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<HermitianOpInterface,
+                                                    catalyst::quantum::HermitianOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                      OpOperand &opOperand,
+                                      const bufferization::AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options) const {
+    auto hermitianOp = cast<HermitianOp>(op);
+    Location loc = op->getLoc();
+    auto tensorType = cast<RankedTensorType>(hermitianOp.getMatrix().getType());
+    MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+    auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType,
+                                                                 hermitianOp.getMatrix());
+    auto memref = toMemrefOp.getResult();
+    auto newHermitianOp = rewriter.create<HermitianOp>(loc, hermitianOp.getType(), memref,
+                                                       hermitianOp.getQubits());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, newHermitianOp.getObs());
 
     return success();
   }
@@ -243,6 +280,7 @@ void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
     QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
+    HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
     StateOp::attachInterface<StateOpInterface>(*ctx);
     ProbsOp::attachInterface<ProbsOpInterface>(*ctx);
     CountsOp::attachInterface<CountsOpInterface>(*ctx);
