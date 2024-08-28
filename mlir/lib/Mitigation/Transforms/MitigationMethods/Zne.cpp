@@ -190,12 +190,8 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 // In *.cpp module only, to keep extraneous headers out of *.hpp
-FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
-                                     std::string fnFoldedName, StringAttr lib, StringAttr name,
-                                     StringAttr kwargs, FunctionType fnFoldedType,
-                                     SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
-                                     func::FuncOp fnAllocOp, Value numberQubitsValue, Value c0,
-                                     Value c1)
+FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
+                                     func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
     // TODO: Implement.
 
@@ -205,11 +201,8 @@ FlatSymbolRefAttr randomLocalFolding(Location loc, PatternRewriter &rewriter,
     return FlatSymbolRefAttr();
 }
 // In *.cpp module only, to keep extraneous headers out of *.hpp
-FlatSymbolRefAttr allLocalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
-                                  StringAttr lib, StringAttr name, StringAttr kwargs,
-                                  FunctionType fnFoldedType, SmallVector<Type> typesFolded,
-                                  func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp,
-                                  Value numberQubitsValue, Value c0, Value c1)
+FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
+                                  func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
     // Type qregType = quantum::QuregType::get(rewriter.getContext());
 
@@ -332,12 +325,10 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     }
     else {
         rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
-
         // tensor::FromElementsOp fromElementsOp =
-        // *fnFoldedOp.getOps<tensor::FromElementsOp>().begin();
-        // rewriter.setInsertionPointToEnd(fnFoldedOpBlock);
+        //     *fnFoldedOp.getOps<tensor::FromElementsOp>().begin();
+        // rewriter.setInsertionPointToEnd(&fnFoldedOp.getBody().back());
         // rewriter.create<func::ReturnOp>(loc, fromElementsOp.getResult());
-
         RankedTensorType resultType = cast<RankedTensorType>(fnFoldedOp.getResultTypes().front());
         Value results = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
                                                          resultType.getElementType());
@@ -350,12 +341,10 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp, c0, c1);
     }
     if (foldingAlgorithm == Folding(2)) {
-        return randomLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, fnFoldedType,
-                                  typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue, c0, c1);
+        return randomLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
-    return allLocalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, fnFoldedType,
-                           typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue, c0, c1);
+    return allLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
                                                        mitigation::ZneOp op)
