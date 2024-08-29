@@ -115,7 +115,10 @@ The essential steps are:
 
         # Install Homebrew before using it for installing other packages
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        brew install libomp
+        brew install libomp ccache
+
+        # Add ccache drop-in compiler replacements to the PATH
+        export PATH=/usr/local/opt/ccache/libexec:$PATH
 
         # Clone the Catalyst repository  
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
@@ -205,7 +208,8 @@ They can be installed via:
         xcode-select --install
         pip install cmake ninja rust
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        brew install libomp
+        brew install libomp ccache
+        export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 
 
