@@ -369,7 +369,6 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
     """
-
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 

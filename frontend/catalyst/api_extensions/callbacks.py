@@ -339,6 +339,12 @@ def accelerate_impl(users_func=None, *, dev=None):
              just called the wrapped function.
     """
 
+    if GradContext.am_inside_grad():
+        if (users_func.__module__ == "catalyst.api_extensions.callbacks") and (
+            users_func.__name__ in ("expm")
+        ):
+            users_func = users_func._fun
+
     # If this is a partial, we need to make the tracers part of the input
     is_partial = isinstance(users_func, Partial)
     context = []

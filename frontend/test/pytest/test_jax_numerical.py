@@ -34,7 +34,7 @@ class TestExpmNumerical:
             jnp.array([[1.0, -1.0j], [1.0j, -1.0]]),
             jnp.array(
                 [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]
-            ),  # this particular matrix has wrong numbers. https://github.com/PennyLaneAI/catalyst/issues/1071 # pylint: disable=line-too-long
+            ),  # this particular matrix has wrong numbers and is currently solved by patcher with callback. https://github.com/PennyLaneAI/catalyst/issues/1071 # pylint: disable=line-too-long
         ],
     )
     def test_expm_numerical(self, inp):
