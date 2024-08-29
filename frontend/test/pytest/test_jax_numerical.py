@@ -32,26 +32,17 @@ class TestExpmNumerical:
             jnp.array([[0.1, 0.2], [5.3, 1.2]]),
             jnp.array([[1, 2], [3, 4]]),
             jnp.array([[1.0, -1.0j], [1.0j, -1.0]]),
-            (jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]), "wrong numbers"),
+            jnp.array(
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]
+            ),  # this particular matrix has wrong numbers. https://github.com/PennyLaneAI/catalyst/issues/1071 # pylint: disable=line-too-long
         ],
     )
     def test_expm_numerical(self, inp):
         """Test basic numerical correctness for jax.scipy.linalg.expm for float, int, complex"""
 
-        if (type(inp) == tuple) and (inp[1] == "wrong numbers"):
-            # This particulat matrix has wrong result numbers. Use callback.
-            # https://github.com/PennyLaneAI/catalyst/issues/1071
-            @qjit
-            def f(x):
-                return accelerate(jsp.linalg.expm)(x)
-
-            inp = inp[0]
-
-        else:
-
-            @qjit
-            def f(x):
-                return jsp.linalg.expm(x)
+        @qjit
+        def f(x):
+            return jsp.linalg.expm(x)
 
         observed = f(inp)
         expected = jsp.linalg.expm(inp)

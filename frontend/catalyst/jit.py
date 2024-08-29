@@ -31,6 +31,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from malt.core import config as ag_config
 
 import catalyst
+from catalyst import accelerate
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
@@ -368,40 +369,12 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
     """
+
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
     if fn is None:
         return functools.partial(qjit, **kwargs)
-
-    # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-    # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
-    # https://github.com/PennyLaneAI/catalyst/issues/753
-    # https://github.com/PennyLaneAI/catalyst/issues/1071
-    if "jax.scipy." in inspect.getsource(fn):
-        warnings.warn(
-            """
-            catalyst.qjit occasionally gives wrong numerical results for fuunctions in jax.scipy. 
-            See https://github.com/PennyLaneAI/catalyst/issues/1071.
-            We are working on this issue.
-            In the meantime, we strongly recommend using a callback with catalyst.accelerate to the underlying jax function directly.
-            See https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html.
-            For example, instead of 
-
-            @qjit
-            def f(A):
-                B = jax.scipy.linalg.expm(A)
-                return B
-
-            , use
-
-            @qjit
-            def f(A):
-                B = catalyst.accelerate(jax.scipy.linalg.expm)(A)
-                return B
-
-            """
-        )
 
     return QJIT(fn, CompileOptions(**kwargs))
 
@@ -475,27 +448,32 @@ class QJIT:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        # Transparantly call Python function in case of nested QJIT calls.
-        if EvaluationContext.is_tracing():
-            isQNode = isinstance(self.user_function, qml.QNode)
-            if isQNode and self.compile_options.static_argnums:
-                kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
+        # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+        # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
+        # https://github.com/PennyLaneAI/catalyst/issues/753
+        # https://github.com/PennyLaneAI/catalyst/issues/1071
+        with Patcher((jax.scipy.linalg, "expm", accelerate(jax.scipy.linalg.expm))):
+            # Transparantly call Python function in case of nested QJIT calls.
+            if EvaluationContext.is_tracing():
+                isQNode = isinstance(self.user_function, qml.QNode)
+                if isQNode and self.compile_options.static_argnums:
+                    kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
 
-            return self.user_function(*args, **kwargs)
+                return self.user_function(*args, **kwargs)
 
-        requires_promotion = self.jit_compile(args, **kwargs)
+            requires_promotion = self.jit_compile(args, **kwargs)
 
-        # If we receive tracers as input, dispatch to the JAX integration.
-        if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
-            if self.jaxed_function is None:
-                self.jaxed_function = JAX_QJIT(self)  # lazy gradient compilation
-            return self.jaxed_function(*args, **kwargs)
+            # If we receive tracers as input, dispatch to the JAX integration.
+            if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
+                if self.jaxed_function is None:
+                    self.jaxed_function = JAX_QJIT(self)  # lazy gradient compilation
+                return self.jaxed_function(*args, **kwargs)
 
-        elif requires_promotion:
-            dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
-            args = promote_arguments(self.c_sig, dynamic_args)
+            elif requires_promotion:
+                dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
+                args = promote_arguments(self.c_sig, dynamic_args)
 
-        return self.run(args, kwargs)
+            return self.run(args, kwargs)
 
     @debug_logger
     def aot_compile(self):
