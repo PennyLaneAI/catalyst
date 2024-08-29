@@ -26,11 +26,11 @@ jobs:
       # Checks-out the Catalyst repository
       - uses: actions/checkout@v3
       
-      # Import Numpy because it is imported in setup.py
-      - name: Install Numpy
+      # Import Numpy/Pybind11 because it is imported in setup.py
+      - name: Install Numpy and Pybind11
         run: |
           python -m pip install --upgrade pip
-          pip install numpy
+          pip install numpy pybind11
 
       # Check for the existence of an rc branch for the current Catalyst version
       - name: Check for rc branch
