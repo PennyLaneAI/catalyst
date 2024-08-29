@@ -615,6 +615,9 @@
   function inputs.
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
 
+* Bug fixed when parameter annotations return strings.
+  [(#1078)](https://github.com/PennyLaneAI/catalyst/pull/1078)
+
 <h3>Documentation</h3>
 
 * A page has been added to the documentation, listing devices that are
