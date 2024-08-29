@@ -371,6 +371,7 @@
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
   [(#1047)](https://github.com/PennyLaneAI/catalyst/pull/1047)
   [(#1062)](https://github.com/PennyLaneAI/catalyst/pull/1062)
+  [(#1073)](https://github.com/PennyLaneAI/catalyst/pull/1073)
 
 * Improved type validation and error messaging has been added to both the `catalyst.jvp`
   and `catalyst.vjp` functions to ensure that the (co)tangent and parameter types are compatible.
@@ -557,10 +558,10 @@
   @catalyst.pure_callback
   def callback_fn(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
       return np.array([np.sin(x), np.cos(x)])
-  
+
   callback_fn.fwd(lambda x: (callback_fn(x), x))
   callback_fn.bwd(lambda x, dy: (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,))
-  
+
   @qjit
   @catalyst.grad
   def f(x):
