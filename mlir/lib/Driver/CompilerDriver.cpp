@@ -462,6 +462,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // This one corresponds to a typical -O2 optimization pipeline.
     llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
 
+    // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
