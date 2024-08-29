@@ -10,6 +10,13 @@
 
 <h3>Internal changes</h3>
 
+* Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
+  running gradient like functions.
+  
+  [(#1063)](https://github.com/PennyLaneAI/catalyst/pull/1063)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Romain Moyard
