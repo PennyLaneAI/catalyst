@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from catalyst import qjit, jacobian
+from catalyst.utils.exceptions import CompileError
 
 matrix_inputs = [
     jnp.array([[0.1, 0.2], [5.3, 1.2]]),
@@ -86,6 +87,41 @@ class TestIntegrate:
         assert np.allclose(observed, expected)
 
 
+class TestInterpolate:
+    """Tests for jax.scipy.interpolate"""
+
+    def test_regular_grid_interpolate(self):
+        """test RegularGrid interpolation"""
+
+        def f(points, values, query_points):
+            g = jsp.interpolate.RegularGridInterpolator(points, values, method="linear")
+            return g(query_points)
+
+        points = (jnp.array([1, 2, 3]), jnp.array([4, 5, 6]))
+        values = jnp.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]])
+        query_points = jnp.array([[1.5, 4.5], [2.2, 5.8]])
+
+        observed = qjit(f)(points, values, query_points)
+        expected = f(points, values, query_points)
+        assert np.allclose(observed, expected)
+
+    @pytest.mark.xfail(raises=AttributeError, strict=True)
+    def test_regular_grid_interpolate_grad(self):
+        """test RegularGrid interpolation gradients"""
+
+        def f(points, values, query_points):
+            g = jsp.interpolate.RegularGridInterpolator(points, values, method="linear")
+            return jacobian(g)(query_points)
+
+        points = (jnp.array([1, 2, 3]), jnp.array([4, 5, 6]))
+        values = jnp.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]])
+        query_points = jnp.array([[1.5, 4.5], [2.2, 5.8]])
+
+        observed = qjit(f)(points, values, query_points)
+        expected = f(points, values, query_points)
+        assert np.allclose(observed, expected)
+
+
 class TestLinalg:
     """Tests for the jax.scipy.linalg module"""
 
@@ -97,6 +133,19 @@ class TestLinalg:
         def f(x):
             return jsp.linalg.expm(x)
 
+        observed = qjit(f)(x)
+        expected = f(x)
+        assert np.allclose(observed, expected)
+
+    @pytest.mark.xfail(raises=CompileError, strict=True)
+    def test_expm_numerical_gradients(self):
+        """Test basic numerical correctness for jax.scipy.linalg.expm
+        for float gradients"""
+
+        def f(x):
+            return jacobian(jsp.linalg.expm)(x)
+
+        x = jnp.array([[0.1, 0.2], [5.3, 1.2]])
         observed = qjit(f)(x)
         expected = f(x)
         assert np.allclose(observed, expected)
