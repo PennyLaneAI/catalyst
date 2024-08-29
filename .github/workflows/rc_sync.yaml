@@ -24,7 +24,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out the Catalyst repository
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       # Import Numpy/Pybind11 because it is imported in setup.py
       - name: Install Numpy and Pybind11
