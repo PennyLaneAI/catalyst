@@ -448,6 +448,7 @@ class QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+        # As a temporary solution, QJIT patches jax.scipy.func with accelerate(jax.scipy.func) as a callback
         # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
         # https://github.com/PennyLaneAI/catalyst/issues/753
         # https://github.com/PennyLaneAI/catalyst/issues/1071
