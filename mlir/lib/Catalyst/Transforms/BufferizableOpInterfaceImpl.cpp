@@ -195,8 +195,8 @@ struct CallbackCallOpInterface
                 return failure();
             newInputs.push_back(*opBuffer);
         }
-        auto results = callOp.getResults();
 
+        auto results = callOp.getResults();
         auto loc = callOp->getLoc();
         SmallVector<Value> outmemrefs;
         for (auto result : results) {
@@ -217,8 +217,8 @@ struct CallbackCallOpInterface
         }
 
         SmallVector<Type> emptyRets;
-        bufferization::replaceOpWithNewBufferizedOp<CallbackCallOp>(rewriter, op, emptyRets,
-                                                                        callOp.getCallee(), newInputs);
+        rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, outmemrefs);
         return success();
     }
 };
