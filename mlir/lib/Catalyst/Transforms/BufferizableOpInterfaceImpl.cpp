@@ -1,5 +1,6 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -177,7 +178,13 @@ struct CallbackCallOpInterface
                             const bufferization::BufferizationOptions &options) const {
         auto callOp = cast<CallbackCallOp>(op);
 
-        if(callOp->getNumResults() != callOp.getResultTypes().size())
+        bufferization::BufferizeTypeConverter typeConverter;
+
+        SmallVector<Type> convertedResults;
+        if (failed(typeConverter.convertTypes(callOp.getResultTypes(), convertedResults)))
+            return failure();
+
+        if(callOp->getNumResults() != convertedResults.size())
             return failure();
 
         SmallVector<Value> newInputs;
@@ -210,9 +217,8 @@ struct CallbackCallOpInterface
         }
 
         SmallVector<Type> emptyRets;
-        //rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
-        bufferization::replaceOpWithNewBufferizedOp<CallbackCallOp>(rewriter, op, emptyRets, callOp.getCallee(), newInputs);
-        /*bufferization::replaceOpWithBufferizedValues(rewriter, callOp, outmemrefs);*/
+        bufferization::replaceOpWithNewBufferizedOp<CallbackCallOp>(rewriter, op, emptyRets,
+                                                                        callOp.getCallee(), newInputs);
         return success();
     }
 };
@@ -224,7 +230,7 @@ void catalyst::registerBufferizableOpInterfaceExternalModels(
     registry.addExtension(+[](MLIRContext *ctx, CatalystDialect *dialect) {
         CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
         PrintOp::attachInterface<PrintOpInterface>(*ctx);
-        //CallbackOp::attachInterface<CallbackOpInterface>(*ctx);
+        CallbackOp::attachInterface<CallbackOpInterface>(*ctx);
         CallbackCallOp::attachInterface<CallbackCallOpInterface>(*ctx);
     });
 }
