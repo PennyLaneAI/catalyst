@@ -239,6 +239,7 @@ class TestPossibleErrors:
 
             example_circuit()
 
+    @pytest.mark.skip(reason="error check removed in hotfix #1073")
     def test_domain_invalid_basis_state(self):
         """Test what happens when BasisState operand is not between {0, 1}.
         This is the same error message, but different error class.
