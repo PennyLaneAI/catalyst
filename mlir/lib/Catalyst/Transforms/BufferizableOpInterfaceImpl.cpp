@@ -45,6 +45,7 @@ struct PrintOpInterface
     }
 };
 
+/// Bufferization of catalyst.print. Mainly get buffers for arguments.
 struct CustomCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CustomCallOpInterface,
                                                     CustomCallOp> {
@@ -111,6 +112,111 @@ struct CustomCallOpInterface
     }
 };
 
+struct CallbackOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<CallbackOpInterface,
+                                                    CallbackOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const {
+        return false;
+    }
+
+    bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                        OpOperand &opOperand,
+                                        const bufferization::AnalysisState &state) const {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const {
+        auto callbackOp = cast<CallbackOp>(op);
+
+        // Only match here if we have all memref arguments and return values.
+        // Only match if we have result types.
+        if (!llvm::any_of(callbackOp.getArgumentTypes(), [](Type argType) { return !isa<MemRefType>(argType); }) &&
+            !llvm::any_of(callbackOp.getResultTypes(),[](Type argType) { return !isa<MemRefType>(argType); }) &&
+            !callbackOp.getResultTypes().empty()) {
+
+            auto argTys = callbackOp.getArgumentTypes();
+            auto retTys = callbackOp.getResultTypes();
+            SmallVector<Type> emptyRets;
+            SmallVector<Type> args(argTys.begin(), argTys.end());
+            args.insert(args.end(), retTys.begin(), retTys.end());
+            auto callbackTy = rewriter.getFunctionType(args, emptyRets);
+            rewriter.modifyOpInPlace(op, [&] { callbackOp.setFunctionType(callbackTy); });
+        }
+
+        return success();
+    }
+};
+
+struct CallbackCallOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<CallbackCallOpInterface,
+                                                    CallbackCallOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const {
+        return false;
+    }
+
+    bufferization::AliasingValueList getAliasingValues(Operation *op,
+                                        OpOperand &opOperand,
+                                        const bufferization::AnalysisState &state) const {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const {
+        auto callOp = cast<CallbackCallOp>(op);
+
+        if(callOp->getNumResults() != callOp.getResultTypes().size())
+            return failure();
+
+        SmallVector<Value> newInputs;
+        auto operands = callOp.getOperands();
+        for (Value operand : operands) {
+            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+            if (failed(opBuffer))
+                return failure();
+            newInputs.push_back(*opBuffer);
+        }
+        auto results = callOp.getResults();
+
+        auto loc = callOp->getLoc();
+        SmallVector<Value> outmemrefs;
+        for (auto result : results) {
+            FailureOr<Value> tensorAlloc =
+                bufferization::allocateTensorForShapedValue(rewriter, loc, result, options, false);
+            if (failed(tensorAlloc))
+                return failure();
+
+            auto tensor = *tensorAlloc;
+            RankedTensorType tensorTy = cast<RankedTensorType>(tensor.getType());
+            auto shape = tensorTy.getShape();
+            auto elementTy = tensorTy.getElementType();
+            auto memrefType = MemRefType::get(shape, elementTy);
+            auto toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, tensor);
+            auto memref = toMemrefOp.getResult();
+            outmemrefs.push_back(memref);
+            newInputs.push_back(memref);
+        }
+
+        SmallVector<Type> emptyRets;
+        //rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs);
+        bufferization::replaceOpWithNewBufferizedOp<CallbackCallOp>(rewriter, op, emptyRets, callOp.getCallee(), newInputs);
+        /*bufferization::replaceOpWithBufferizedValues(rewriter, callOp, outmemrefs);*/
+        return success();
+    }
+};
+
 } // namespace
 
 void catalyst::registerBufferizableOpInterfaceExternalModels(
@@ -118,5 +224,7 @@ void catalyst::registerBufferizableOpInterfaceExternalModels(
     registry.addExtension(+[](MLIRContext *ctx, CatalystDialect *dialect) {
         CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
         PrintOp::attachInterface<PrintOpInterface>(*ctx);
+        //CallbackOp::attachInterface<CallbackOpInterface>(*ctx);
+        CallbackCallOp::attachInterface<CallbackCallOpInterface>(*ctx);
     });
 }
