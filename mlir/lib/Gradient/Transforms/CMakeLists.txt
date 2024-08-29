@@ -2,6 +2,7 @@ set(LIBRARY_NAME gradient-transforms)
 
 file(GLOB SRC
     GradMethods/*.cpp
+    BufferizableOpInterfaceImpl.cpp
     BufferizationPatterns.cpp
     gradient_bufferize.cpp
     LoweringPatterns.cpp

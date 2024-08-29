@@ -7,6 +7,7 @@ file(GLOB SRC
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
     RegisterAllPasses.cpp
+    BufferizableOpInterfaceImpl.cpp
     BufferizationPatterns.cpp
     catalyst_bufferize.cpp
     catalyst_to_llvm.cpp
