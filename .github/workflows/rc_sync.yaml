@@ -37,7 +37,7 @@ jobs:
         run: |
           VERSION=$(python setup.py --version)
           IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]*}"
-          RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
+          RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc"
           if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
             echo "branch_exists=true" >> $GITHUB_ENV
             echo "rc_branch=$RC_BRANCH" >> $GITHUB_ENV
