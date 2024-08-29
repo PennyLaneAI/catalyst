@@ -458,6 +458,10 @@
 
 <h3>Bug fixes</h3>
 
+* Catalyst no longer silently converts complex parameters to floats where floats are expected,
+  instead an error is raised.
+  [(#1008)](https://github.com/PennyLaneAI/catalyst/pull/1008)
+
 * Fixes a bug where dynamic one-shot did not work when no mid-circuit measurements are present
   and when the return type is an iterable.
   [(#1060)](https://github.com/PennyLaneAI/catalyst/pull/1060)
