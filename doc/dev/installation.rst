@@ -111,10 +111,9 @@ The essential steps are:
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake ninja rust
+        pip install cmake ninja
 
-        # Install Homebrew before using it for installing other packages
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # If not present yet, install Homebrew (https://brew.sh/)
         brew install libomp ccache
 
         # Add ccache drop-in compiler replacements to the PATH
@@ -201,13 +200,14 @@ They can be installed via:
 
    .. group-tab:: macOS
 
-      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and ``brew``:
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``).
+      The remaining packages can then be installed via ``pip`` and ``brew``.
+      If ``brew`` is not present yet, install it from https://brew.sh/:
 
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake ninja rust
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        pip install cmake ninja
         brew install libomp ccache
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
