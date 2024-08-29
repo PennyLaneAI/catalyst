@@ -457,6 +457,13 @@
 
 <h3>Bug fixes</h3>
 
+* Fixes a bug where dynamic one-shot did not work when no mid-circuit measurements are present
+  and when the return type is an iterable.
+  [(#1060)](https://github.com/PennyLaneAI/catalyst/pull/1060)
+
+* Fixes a bug finding the quantum function jaxpr when using quantum primitives with dynamic one-shot
+  [(#1041)](https://github.com/PennyLaneAI/catalyst/pull/1041)
+
 * Fix a bug where LegacyDevice number of shots is not correctly extracted when using the legacyDeviceFacade.
   [(#1035)](https://github.com/PennyLaneAI/catalyst/pull/1035)
 
