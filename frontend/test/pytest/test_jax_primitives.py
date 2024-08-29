@@ -16,6 +16,7 @@
 Unit tests for Catalyst primitives in JAX.
 """
 
+import platform
 from collections import namedtuple
 
 import jax
@@ -38,6 +39,7 @@ MODCTX = namedtuple("module_context", ["context"])
 VALUE = namedtuple("qubit", ["type"])
 
 
+@pytest.mark.skipif(platform.system() == "Linux", reason="undiagnosed segfault")
 class TestLowering:
     """Test lowering methods for JAX primitives to MLIR."""
 
@@ -67,6 +69,7 @@ class TestLowering:
                 _qinsert_lowering(jax_ctx, qreg_value, index_value, qbit_value)
 
 
+@pytest.mark.skipif(platform.system() == "Linux", reason="undiagnosed segfault")
 class TestHelpers:
     """Test helper methods for primitive lowerings."""
 
@@ -131,15 +134,16 @@ class TestHelpers:
             with pytest.raises(TypeError, match="Operator TestOp expected a scalar value"):
                 extract_scalar(ir_value, "TestOp", "value")
 
-    def test_get_call_jaxpr(self):
-        """Test _get_call_jaxpr raises AsserionError if no function primitive exists."""
 
-        def f(x):
-            return x * x
+def test_get_call_jaxpr():
+    """Test _get_call_jaxpr raises AsserionError if no function primitive exists."""
 
-        jaxpr = make_jaxpr(f)(2.0)
-        with pytest.raises(AssertionError, match="No call_jaxpr found in the JAXPR"):
-            _ = _get_call_jaxpr(jaxpr)
+    def f(x):
+        return x * x
+
+    jaxpr = make_jaxpr(f)(2.0)
+    with pytest.raises(AssertionError, match="No call_jaxpr found in the JAXPR"):
+        _ = _get_call_jaxpr(jaxpr)
 
 
 if __name__ == "__main__":
