@@ -374,6 +374,35 @@ def qjit(
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
+    # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+    # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
+    # https://github.com/PennyLaneAI/catalyst/issues/753
+    # https://github.com/PennyLaneAI/catalyst/issues/1071
+    if "jax.scipy." in inspect.getsource(fn):
+        warnings.warn(
+            """
+            catalyst.qjit occasionally gives wrong numerical results for fuunctions in jax.scipy. 
+            See https://github.com/PennyLaneAI/catalyst/issues/1071.
+            We are working on this issue.
+            In the meantime, we strongly recommend using a callback with catalyst.accelerate to the underlying jax function directly.
+            See https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html.
+            For example, instead of 
+
+            @qjit
+            def f(A):
+                B = jax.scipy.linalg.expm(A)
+                return B
+
+            , use
+
+            @qjit
+            def f(A):
+                B = catalyst.accelerate(jax.scipy.linalg.expm)(A)
+                return B
+
+            """
+        )
+
     return QJIT(fn, CompileOptions(**kwargs))
 
 
