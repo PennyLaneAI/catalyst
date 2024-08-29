@@ -56,13 +56,13 @@ jobs:
           echo "tmp_branch=$BRANCH" >> $GITHUB_ENV
           git checkout -b "$BRANCH"
           # Exclude some files known to be divergent during the release process from the PR
-          git checkout main -- catalyst/frontend/_version.py
-          git checkout main -- doc/dev/release_notes.rst
+          git checkout "main" -- catalyst/frontend/_version.py
+          git checkout "main" -- doc/dev/release_notes.rst
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git commit -m "exclude files from pr"
           # check for new changes on the rc branch only, based on the diff between main and rc
-          if ! git diff main HEAD --quiet -- $(git diff --name-only main...HEAD); then
+          if ! git diff "main" HEAD --quiet -- $(git diff --name-only "main"...HEAD); then
             echo "new_changes=true" >> $GITHUB_ENV
             git push --set-upstream origin "$BRANCH"
           fi
