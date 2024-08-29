@@ -279,6 +279,7 @@ def dynamic_one_shot(qnode, **kwargs):
                 out = (out,)
         else:
             for m_count, m in enumerate(cpy_tape.measurements):
+                # Without MCMs and postselection, all samples are valid for use in MP computation.
                 is_valid = jnp.array([True] * len(out[m_count]))
                 out[m_count] = gather_non_mcm(
                     m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
