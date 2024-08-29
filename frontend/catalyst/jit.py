@@ -129,12 +129,13 @@ def qjit(
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
         seed (Optional[Int]):
-            The seed for random operations in a qjit call, such as circuit measurement results.
+            The seed for mid-circuit measurement results when the qjit-compiled function is executed
+            on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
-            Note that `lightning.qubit` and `lightning.kokkos` currently only support seeding
-            measurements, and do not yet support seeding samples. As such, these devices with
-            shots will still return random results.
+            Note that seeding samples on simulator devices is not yet supported. As such,
+            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
+            ``expval`` will remain.
 
     Returns:
         QJIT object.
@@ -771,7 +772,7 @@ class JAX_QJIT:
             updated_params.append(param.replace(annotation=annotations[arg_name]))
 
         def deriv_wrapper(*args, **kwargs):
-            return catalyst.jacobian(self.qjit_function, argnum=argnums)(*args, **kwargs)
+            return catalyst.jacobian(self.qjit_function, argnums=argnums)(*args, **kwargs)
 
         deriv_wrapper.__name__ = "deriv_" + self.qjit_function.__name__
         deriv_wrapper.__annotations__ = annotations

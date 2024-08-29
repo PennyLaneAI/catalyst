@@ -39,7 +39,7 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        git checkout v0.7.0-rc
+        git checkout v0.8.0-rc
 
     - name: Install deps
       run: |
@@ -132,7 +132,7 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=v0.37.0_rc \
+        LIGHTNING_GIT_TAG_VALUE=v0.38.0_rc \
         ENABLE_OPENQASM=ON \
         make runtime
 
@@ -151,8 +151,8 @@ jobs:
     - name: Install PennyLane-Lightning (release-candidate)
       if: ${{ inputs.lightning == 'release-candidate' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.37.0_rc
-        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.37.0_rc
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.38.0_rc
+        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.38.0_rc
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -171,8 +171,8 @@ jobs:
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
 
     - name: Add Frontend Dependencies to PATH
       run: |

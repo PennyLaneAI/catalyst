@@ -20,10 +20,12 @@ from collections import namedtuple
 
 import jax
 import pytest
+from jax import make_jaxpr
 from jax._src.lib.mlir import ir
 from jax.interpreters.mlir import ir_constant, make_ir_context
 
 from catalyst.jax_primitives import (
+    _get_call_jaxpr,
     _qextract_lowering,
     _qinsert_lowering,
     extract_scalar,
@@ -128,6 +130,16 @@ class TestHelpers:
             ir_value = ir_constant(test_input)
             with pytest.raises(TypeError, match="Operator TestOp expected a scalar value"):
                 extract_scalar(ir_value, "TestOp", "value")
+
+    def test_get_call_jaxpr(self):
+        """Test _get_call_jaxpr raises AsserionError if no function primitive exists."""
+
+        def f(x):
+            return x * x
+
+        jaxpr = make_jaxpr(f)(2.0)
+        with pytest.raises(AssertionError, match="No call_jaxpr found in the JAXPR"):
+            _ = _get_call_jaxpr(jaxpr)
 
 
 if __name__ == "__main__":
