@@ -111,7 +111,10 @@ The essential steps are:
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake ninja
+        pip install cmake ninja rust
+
+        # Install Homebrew before using it for installing other packages
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         brew install libomp
 
         # Clone the Catalyst repository  
@@ -200,7 +203,8 @@ They can be installed via:
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake ninja
+        pip install cmake ninja rust
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         brew install libomp
 
 
