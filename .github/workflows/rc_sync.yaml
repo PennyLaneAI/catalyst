@@ -51,7 +51,7 @@ jobs:
           git checkout -b "$BRANCH"
           # Exclude some files known to be divergent during the release process from the PR
           git checkout main -- catalyst/frontend/_version.py
-          git checkout master -- doc/dev/release_notes.rst
+          git checkout main -- doc/dev/release_notes.rst
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git commit -m "exclude files from pr"
