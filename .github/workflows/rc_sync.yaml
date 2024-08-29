@@ -23,15 +23,24 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+
       # Checks-out the Catalyst repository
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Import Numpy/Pybind11 because it is imported in setup.py
+      - name: Install Numpy and Pybind11
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pybind11
 
       # Check for the existence of an rc branch for the current Catalyst version
       - name: Check for rc branch
         run: |
           VERSION=$(python setup.py --version)
-          IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]}"
-          RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
+          IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]*}"
+          RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc"
           if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
             echo "branch_exists=true" >> $GITHUB_ENV
             echo "rc_branch=$RC_BRANCH" >> $GITHUB_ENV
@@ -50,13 +59,13 @@ jobs:
           echo "tmp_branch=$BRANCH" >> $GITHUB_ENV
           git checkout -b "$BRANCH"
           # Exclude some files known to be divergent during the release process from the PR
-          git checkout main -- catalyst/frontend/_version.py
-          git checkout main -- doc/dev/release_notes.rst
+          git checkout origin/main -- frontend/catalyst/_version.py
+          git checkout origin/main -- doc/dev/release_notes.rst
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git commit -m "exclude files from pr"
           # check for new changes on the rc branch only, based on the diff between main and rc
-          if ! git diff main HEAD --quiet -- $(git diff --name-only main...HEAD); then
+          if ! git diff origin/main HEAD --quiet -- $(git diff --name-only origin/main...HEAD); then
             echo "new_changes=true" >> $GITHUB_ENV
             git push --set-upstream origin "$BRANCH"
           fi
