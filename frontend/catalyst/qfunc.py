@@ -278,13 +278,11 @@ def dynamic_one_shot(qnode, **kwargs):
             if len(cpy_tape.measurements) == 1:
                 out = (out,)
         else:
-            m_count = 0
-            for m in cpy_tape.measurements:
+            for m_count, m in enumerate(cpy_tape.measurements):
                 is_valid = jnp.array([True] * len(out[m_count]))
                 out[m_count] = gather_non_mcm(
                     m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
                 )
-                m_count += 1
             out = tuple(out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
