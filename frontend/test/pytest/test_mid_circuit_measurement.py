@@ -786,6 +786,22 @@ class TestDynamicOneShotIntegration:
             r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
             assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
 
+    def test_dynamic_one_shot_with_no_mcm_iterable_output(self, backend):
+        """Test that `dynamic_one_shot` can work when there is no mcm and have iterable output."""
+        qubits = 3
+        shots = 10
+        dev = qml.device(backend, wires=qubits, shots=shots)
+
+        @qml.qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def cost():
+            qml.Hadamard(0)
+            qml.CNOT([0, 1])
+            return [qml.expval(qml.Z(i)) for i in range(qubits)]
+
+        result = cost()
+        assert jnp.array(result).shape == (qubits,)
+
     @pytest.mark.skip(
         reason="grad with dynamic one-shot is not yet supported.",
     )
