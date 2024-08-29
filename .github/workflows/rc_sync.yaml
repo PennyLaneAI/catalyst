@@ -23,6 +23,10 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+
+      - name: Set default branch to main
+        run: git config --global init.defaultBranch main
+
       # Checks-out the Catalyst repository
       - uses: actions/checkout@v4
         with:
