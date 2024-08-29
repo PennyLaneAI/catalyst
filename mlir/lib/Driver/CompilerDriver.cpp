@@ -450,7 +450,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
         }
         return true;
     });
-    auto PB = llvm::PassBuilder(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);
+    llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);
     // Register all the basic analyses with the managers.
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);
