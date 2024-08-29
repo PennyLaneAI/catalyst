@@ -448,9 +448,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
         if (P == "MemCpyOptPass") {
             return false;
         }
-        else {
-            return true;
-        }
+        return true;
     });
     auto PB = llvm::PassBuilder(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);
     // Register all the basic analyses with the managers.
