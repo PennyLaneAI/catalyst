@@ -98,8 +98,7 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
 
                 SmallVector<Value> operands;
                 SmallVector<Value> outputs;
-                auto wrapMemref = [&](Value memref, bool result) {
-                    auto memrefType = dyn_cast<mlir::MemRefType>(memref.getType());
+                auto wrapMemref = [&](Value memref) {
                     Type convertedType = typeConverter->convertType(memref.getType());
                     Value space =
                         rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
@@ -107,39 +106,12 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                     Value convertedValue =
                         rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memref)
                             .getResult(0);
-
-                    auto defOp = memref.getDefiningOp();
-                    if (!result) {
-                        if (auto structType = dyn_cast<LLVM::LLVMStructType>(convertedType)) {
-                            auto structSize = structType.getBody().size();
-                            for (size_t i = 0; i < structSize; i++) {
-                                auto baseType = structType.getBody()[i];
-                                auto convertedValueSingle =
-                                    rewriter.create<LLVM::ExtractValueOp>(loc, convertedValue, i);
-                                auto emptyValueSingle = rewriter.create<LLVM::GEPOp>(
-                                    loc, ptrType, structType, space,
-                                    llvm::ArrayRef<LLVM::GEPArg>{0, i}, true);
-                                if (ptrType == baseType && !defOp) {
-                                    auto loadedValueSingle = rewriter.create<LLVM::LoadOp>(
-                                        loc, memrefType.getElementType(), convertedValueSingle);
-                                    rewriter.create<LLVM::StoreOp>(loc, loadedValueSingle,
-                                                                   emptyValueSingle);
-                                }
-                                else {
-                                    rewriter.create<LLVM::StoreOp>(loc, convertedValueSingle,
-                                                                   emptyValueSingle);
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        rewriter.create<LLVM::StoreOp>(loc, convertedValue, space);
-                    }
+                    rewriter.create<LLVM::StoreOp>(loc, convertedValue, space);
                     return space;
                 };
                 for (Value oldOperand : callOp.getOperands()) {
                     if (isa<MemRefType>(oldOperand.getType())) {
-                        operands.push_back(wrapMemref(oldOperand, false));
+                        operands.push_back(wrapMemref(oldOperand));
                     }
                 }
                 for (Type resultType : callOp.getResultTypes()) {
@@ -148,7 +120,7 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                         Value memref = rewriter.create<memref::AllocOp>(loc, memrefType);
                         outputs.push_back(memref);
 
-                        memref = wrapMemref(memref, true);
+                        memref = wrapMemref(memref);
                         operands.push_back(memref);
                     }
                 }
