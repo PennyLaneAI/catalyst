@@ -13,7 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "jaxlib/cpu/lapack_kernels.h"
+/*
+ * This file is a modified version of
+ *
+ *   https://github.com/google/jax/blob/jaxlib-v0.4.28/jaxlib/cpu/lapack_kernels_using_lapack.cc
+ *
+ * from jaxlib-v0.4.28.
+ *
+ * See note in lapack_kernels.h for explanation of modifications.
+ */
+
+#include "lapack_kernels.h"
 
 // From a Python binary, JAX obtains its LAPACK/BLAS kernels from Scipy, but
 // a C++ user should link against LAPACK directly. This is needed when using
@@ -21,110 +31,120 @@ limitations under the License.
 
 extern "C" {
 
-jax::Trsm<float>::FnType strsm_;
-jax::Trsm<double>::FnType dtrsm_;
-jax::Trsm<std::complex<float>>::FnType ctrsm_;
-jax::Trsm<std::complex<double>>::FnType ztrsm_;
+jax::RealTrsm<float>::FnType cblas_strsm;
+jax::RealTrsm<double>::FnType cblas_dtrsm;
+jax::ComplexTrsm<std::complex<float>>::FnType cblas_ctrsm;
+jax::ComplexTrsm<std::complex<double>>::FnType cblas_ztrsm;
 
-jax::Getrf<float>::FnType sgetrf_;
-jax::Getrf<double>::FnType dgetrf_;
-jax::Getrf<std::complex<float>>::FnType cgetrf_;
-jax::Getrf<std::complex<double>>::FnType zgetrf_;
+jax::Getrf<float>::FnType LAPACKE_sgetrf;
+jax::Getrf<double>::FnType LAPACKE_dgetrf;
+jax::Getrf<std::complex<float>>::FnType LAPACKE_cgetrf;
+jax::Getrf<std::complex<double>>::FnType LAPACKE_zgetrf;
 
-jax::Geqrf<float>::FnType sgeqrf_;
-jax::Geqrf<double>::FnType dgeqrf_;
-jax::Geqrf<std::complex<float>>::FnType cgeqrf_;
-jax::Geqrf<std::complex<double>>::FnType zgeqrf_;
+jax::Geqrf<float>::FnType LAPACKE_sgeqrf;
+jax::Geqrf<double>::FnType LAPACKE_dgeqrf;
+jax::Geqrf<std::complex<float>>::FnType LAPACKE_cgeqrf;
+jax::Geqrf<std::complex<double>>::FnType LAPACKE_zgeqrf;
 
-jax::Orgqr<float>::FnType sorgqr_;
-jax::Orgqr<double>::FnType dorgqr_;
-jax::Orgqr<std::complex<float>>::FnType cungqr_;
-jax::Orgqr<std::complex<double>>::FnType zungqr_;
+jax::Orgqr<float>::FnType LAPACKE_sorgqr;
+jax::Orgqr<double>::FnType LAPACKE_dorgqr;
+jax::Orgqr<std::complex<float>>::FnType LAPACKE_cungqr;
+jax::Orgqr<std::complex<double>>::FnType LAPACKE_zungqr;
 
-jax::Potrf<float>::FnType spotrf_;
-jax::Potrf<double>::FnType dpotrf_;
-jax::Potrf<std::complex<float>>::FnType cpotrf_;
-jax::Potrf<std::complex<double>>::FnType zpotrf_;
+jax::Potrf<float>::FnType LAPACKE_spotrf;
+jax::Potrf<double>::FnType LAPACKE_dpotrf;
+jax::Potrf<std::complex<float>>::FnType LAPACKE_cpotrf;
+jax::Potrf<std::complex<double>>::FnType LAPACKE_zpotrf;
 
-jax::RealGesdd<float>::FnType sgesdd_;
-jax::RealGesdd<double>::FnType dgesdd_;
-jax::ComplexGesdd<std::complex<float>>::FnType cgesdd_;
-jax::ComplexGesdd<std::complex<double>>::FnType zgesdd_;
+jax::RealGesdd<float>::FnType LAPACKE_sgesdd;
+jax::RealGesdd<double>::FnType LAPACKE_dgesdd;
+jax::ComplexGesdd<std::complex<float>>::FnType LAPACKE_cgesdd;
+jax::ComplexGesdd<std::complex<double>>::FnType LAPACKE_zgesdd;
 
-jax::RealSyevd<float>::FnType ssyevd_;
-jax::RealSyevd<double>::FnType dsyevd_;
-jax::ComplexHeevd<std::complex<float>>::FnType cheevd_;
-jax::ComplexHeevd<std::complex<double>>::FnType zheevd_;
+jax::RealSyevd<float>::FnType LAPACKE_ssyevd;
+jax::RealSyevd<double>::FnType LAPACKE_dsyevd;
+jax::ComplexHeevd<std::complex<float>>::FnType LAPACKE_cheevd;
+jax::ComplexHeevd<std::complex<double>>::FnType LAPACKE_zheevd;
 
-jax::RealGeev<float>::FnType sgeev_;
-jax::RealGeev<double>::FnType dgeev_;
-jax::ComplexGeev<std::complex<float>>::FnType cgeev_;
-jax::ComplexGeev<std::complex<double>>::FnType zgeev_;
+jax::RealGeev<float>::FnType LAPACKE_sgeev;
+jax::RealGeev<double>::FnType LAPACKE_dgeev;
+jax::ComplexGeev<std::complex<float>>::FnType LAPACKE_cgeev;
+jax::ComplexGeev<std::complex<double>>::FnType LAPACKE_zgeev;
 
-jax::RealGees<float>::FnType sgees_;
-jax::RealGees<double>::FnType dgees_;
-jax::ComplexGees<std::complex<float>>::FnType cgees_;
-jax::ComplexGees<std::complex<double>>::FnType zgees_;
+jax::RealGees<float>::FnType LAPACKE_sgees;
+jax::RealGees<double>::FnType LAPACKE_dgees;
+jax::ComplexGees<std::complex<float>>::FnType LAPACKE_cgees;
+jax::ComplexGees<std::complex<double>>::FnType LAPACKE_zgees;
 
-jax::Gehrd<float>::FnType sgehrd_;
-jax::Gehrd<double>::FnType dgehrd_;
-jax::Gehrd<std::complex<float>>::FnType cgehrd_;
-jax::Gehrd<std::complex<double>>::FnType zgehrd_;
+jax::Gehrd<float>::FnType LAPACKE_sgehrd;
+jax::Gehrd<double>::FnType LAPACKE_dgehrd;
+jax::Gehrd<std::complex<float>>::FnType LAPACKE_cgehrd;
+jax::Gehrd<std::complex<double>>::FnType LAPACKE_zgehrd;
 
-jax::Sytrd<float>::FnType ssytrd_;
-jax::Sytrd<double>::FnType dsytrd_;
-jax::Sytrd<std::complex<float>>::FnType chetrd_;
-jax::Sytrd<std::complex<double>>::FnType zhetrd_;
+jax::Sytrd<float>::FnType LAPACKE_ssytrd;
+jax::Sytrd<double>::FnType LAPACKE_dsytrd;
+jax::Sytrd<std::complex<float>>::FnType LAPACKE_chetrd;
+jax::Sytrd<std::complex<double>>::FnType LAPACKE_zhetrd;
 
 }  // extern "C"
 
 namespace jax {
 
 static auto init = []() -> int {
-  Trsm<float>::fn = strsm_;
-  Trsm<double>::fn = dtrsm_;
-  Trsm<std::complex<float>>::fn = ctrsm_;
-  Trsm<std::complex<double>>::fn = ztrsm_;
-  Getrf<float>::fn = sgetrf_;
-  Getrf<double>::fn = dgetrf_;
-  Getrf<std::complex<float>>::fn = cgetrf_;
-  Getrf<std::complex<double>>::fn = zgetrf_;
-  Geqrf<float>::fn = sgeqrf_;
-  Geqrf<double>::fn = dgeqrf_;
-  Geqrf<std::complex<float>>::fn = cgeqrf_;
-  Geqrf<std::complex<double>>::fn = zgeqrf_;
-  Orgqr<float>::fn = sorgqr_;
-  Orgqr<double>::fn = dorgqr_;
-  Orgqr<std::complex<float>>::fn = cungqr_;
-  Orgqr<std::complex<double>>::fn = zungqr_;
-  Potrf<float>::fn = spotrf_;
-  Potrf<double>::fn = dpotrf_;
-  Potrf<std::complex<float>>::fn = cpotrf_;
-  Potrf<std::complex<double>>::fn = zpotrf_;
-  RealGesdd<float>::fn = sgesdd_;
-  RealGesdd<double>::fn = dgesdd_;
-  ComplexGesdd<std::complex<float>>::fn = cgesdd_;
-  ComplexGesdd<std::complex<double>>::fn = zgesdd_;
-  RealSyevd<float>::fn = ssyevd_;
-  RealSyevd<double>::fn = dsyevd_;
-  ComplexHeevd<std::complex<float>>::fn = cheevd_;
-  ComplexHeevd<std::complex<double>>::fn = zheevd_;
-  RealGeev<float>::fn = sgeev_;
-  RealGeev<double>::fn = dgeev_;
-  ComplexGeev<std::complex<float>>::fn = cgeev_;
-  ComplexGeev<std::complex<double>>::fn = zgeev_;
-  RealGees<float>::fn = sgees_;
-  RealGees<double>::fn = dgees_;
-  ComplexGees<std::complex<float>>::fn = cgees_;
-  ComplexGees<std::complex<double>>::fn = zgees_;
-  Gehrd<float>::fn = sgehrd_;
-  Gehrd<double>::fn = dgehrd_;
-  Gehrd<std::complex<float>>::fn = cgehrd_;
-  Gehrd<std::complex<double>>::fn = zgehrd_;
-  Sytrd<float>::fn = ssytrd_;
-  Sytrd<double>::fn = dsytrd_;
-  Sytrd<std::complex<float>>::fn = chetrd_;
-  Sytrd<std::complex<double>>::fn = zhetrd_;
+  RealTrsm<float>::fn = cblas_strsm;
+  RealTrsm<double>::fn = cblas_dtrsm;
+  ComplexTrsm<std::complex<float>>::fn = cblas_ctrsm;
+  ComplexTrsm<std::complex<double>>::fn = cblas_ztrsm;
+
+  Getrf<float>::fn = LAPACKE_sgetrf;
+  Getrf<double>::fn = LAPACKE_dgetrf;
+  Getrf<std::complex<float>>::fn = LAPACKE_cgetrf;
+  Getrf<std::complex<double>>::fn = LAPACKE_zgetrf;
+
+  Geqrf<float>::fn = LAPACKE_sgeqrf;
+  Geqrf<double>::fn = LAPACKE_dgeqrf;
+  Geqrf<std::complex<float>>::fn = LAPACKE_cgeqrf;
+  Geqrf<std::complex<double>>::fn = LAPACKE_zgeqrf;
+
+  Orgqr<float>::fn = LAPACKE_sorgqr;
+  Orgqr<double>::fn = LAPACKE_dorgqr;
+  Orgqr<std::complex<float>>::fn = LAPACKE_cungqr;
+  Orgqr<std::complex<double>>::fn = LAPACKE_zungqr;
+
+  Potrf<float>::fn = LAPACKE_spotrf;
+  Potrf<double>::fn = LAPACKE_dpotrf;
+  Potrf<std::complex<float>>::fn = LAPACKE_cpotrf;
+  Potrf<std::complex<double>>::fn = LAPACKE_zpotrf;
+
+  RealGesdd<float>::fn = LAPACKE_sgesdd;
+  RealGesdd<double>::fn = LAPACKE_dgesdd;
+  ComplexGesdd<std::complex<float>>::fn = LAPACKE_cgesdd;
+  ComplexGesdd<std::complex<double>>::fn = LAPACKE_zgesdd;
+
+  RealSyevd<float>::fn = LAPACKE_ssyevd;
+  RealSyevd<double>::fn = LAPACKE_dsyevd;
+  ComplexHeevd<std::complex<float>>::fn = LAPACKE_cheevd;
+  ComplexHeevd<std::complex<double>>::fn = LAPACKE_zheevd;
+
+  RealGeev<float>::fn = LAPACKE_sgeev;
+  RealGeev<double>::fn = LAPACKE_dgeev;
+  ComplexGeev<std::complex<float>>::fn = LAPACKE_cgeev;
+  ComplexGeev<std::complex<double>>::fn = LAPACKE_zgeev;
+
+  RealGees<float>::fn = LAPACKE_sgees;
+  RealGees<double>::fn = LAPACKE_dgees;
+  ComplexGees<std::complex<float>>::fn = LAPACKE_cgees;
+  ComplexGees<std::complex<double>>::fn = LAPACKE_zgees;
+
+  Gehrd<float>::fn = LAPACKE_sgehrd;
+  Gehrd<double>::fn = LAPACKE_dgehrd;
+  Gehrd<std::complex<float>>::fn = LAPACKE_cgehrd;
+  Gehrd<std::complex<double>>::fn = LAPACKE_zgehrd;
+
+  Sytrd<float>::fn = LAPACKE_ssytrd;
+  Sytrd<double>::fn = LAPACKE_dsytrd;
+  Sytrd<std::complex<float>>::fn = LAPACKE_chetrd;
+  Sytrd<std::complex<double>>::fn = LAPACKE_zhetrd;
 
   return 0;
 }();

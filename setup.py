@@ -177,7 +177,9 @@ class CustomBuildExtMacos(build_ext):
 if system_platform == "Linux":
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
-        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
+        sources=["frontend/catalyst/utils/libcustom_calls.cpp",
+                 "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cc",
+                 "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cc"],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
