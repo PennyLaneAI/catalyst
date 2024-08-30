@@ -347,7 +347,7 @@ def accelerate_impl(users_func=None, *, dev=None):
 
     @functools.wraps(users_func, assigned=WRAPPER_ASSIGNMENTS)
     def total(context, *args, **kwargs):
-        with AccelerateContext() as ac:
+        with AccelerateContext():
             nonlocal users_func
             if is_partial:
                 _, shape = tree_flatten(users_func)

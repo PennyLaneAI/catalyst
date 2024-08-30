@@ -16,7 +16,7 @@
 This module contains warnings for using jax.scipy.linalg functions inside qjit.
 Due to improperly linked lapack symbols, occasionally these functions give wrong
 numerical results when used in a qjit context. 
-As for now, we patch all of these with a callback. 
+As for now, we warn users to wrap all of these with a catalyst.accelerate() callback. 
 This patch should be removed when we have proper linkage to lapack.
 See:
     https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
