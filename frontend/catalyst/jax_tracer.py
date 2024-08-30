@@ -34,7 +34,6 @@ from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
-from catalyst.debug.assertion import debug_assert
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -603,19 +602,7 @@ def trace_basis_state(op, qrp):
     assert isinstance(op, qml.BasisState), "qml.BasisState expected"
 
     qubits = qrp.extract(op.wires)
-    basis_state = op.parameters[0]
-    err_msg = "BasisState parameter must consist of 0 or 1 integers."
-    if not jnp.can_cast(basis_state.dtype, jnp.dtype(jnp.int64)):
-        raise ValueError(err_msg)
-
-    neg_one = jax.lax.convert_element_type(~0b1, jnp.dtype(basis_state.dtype))
-    basis_state_invalid_bits = jax.lax.bitwise_and(basis_state, neg_one)
-
-    is_basis_state_invalid = jnp.any(basis_state_invalid_bits)
-    is_basis_state_valid = jnp.logical_not(is_basis_state_invalid)
-    debug_assert(is_basis_state_valid, err_msg)
-
-    basis_state = jax.lax.convert_element_type(basis_state, jnp.dtype(jnp.bool))
+    basis_state = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.bool))
     qubits2 = set_basis_state_p.bind(*qubits, basis_state)
     qrp.insert(op.wires, qubits2)
 

@@ -111,7 +111,7 @@ func.func @controlled1(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
     // expected-error@+1 {{number of controlling qubits in input (1) and output (0) must be the same}}
-    %out_qubits  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit
+    %out_qubits:2  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit, !quantum.bit
     return
 }
 
@@ -123,7 +123,7 @@ func.func @controlled2(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
     // expected-error@+1 {{number of controlling qubits in input (2) and controlling values (1) must be the same}}
-    %out_qubits  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3, %3) ctrlvals (%true) : !quantum.bit
+    %out_qubits:3  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3, %3) ctrlvals (%true) : !quantum.bit, !quantum.bit, !quantum.bit
     return
 }
 
