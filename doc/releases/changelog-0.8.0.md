@@ -686,6 +686,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Alessandro Cosentino,
 Lillian M. A. Frederiksen,
+David Ittah,
 Josh Izaac,
 Christina Lee,
 Kunwar Maheep Singh,
