@@ -305,8 +305,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         fnWithMeasurementsOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
     }
-    else {
-    }
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
