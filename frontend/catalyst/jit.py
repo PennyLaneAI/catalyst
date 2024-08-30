@@ -480,15 +480,6 @@ class QJIT:
             # Capture with the patched conversion rules
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-                # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-                # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
-                # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
-                # https://github.com/PennyLaneAI/catalyst/issues/753
-                # https://github.com/PennyLaneAI/catalyst/issues/1071
-                (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
-                (jax.scipy.linalg, "lu", JaxLinalgWarner(jax.scipy.linalg.lu)),
-                (jax.scipy.linalg, "lu_factor", JaxLinalgWarner(jax.scipy.linalg.lu_factor)),
-                (jax.scipy.linalg, "lu_solve", JaxLinalgWarner(jax.scipy.linalg.lu_solve)),
             ):
                 self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                     self.user_sig or ()
@@ -534,15 +525,6 @@ class QJIT:
             # Capture with the patched conversion rules
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-                # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-                # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
-                # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
-                # https://github.com/PennyLaneAI/catalyst/issues/753
-                # https://github.com/PennyLaneAI/catalyst/issues/1071
-                (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
-                (jax.scipy.linalg, "lu", JaxLinalgWarner(jax.scipy.linalg.lu)),
-                (jax.scipy.linalg, "lu_factor", JaxLinalgWarner(jax.scipy.linalg.lu_factor)),
-                (jax.scipy.linalg, "lu_solve", JaxLinalgWarner(jax.scipy.linalg.lu_solve)),
             ):
                 self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                     args, **kwargs
@@ -608,6 +590,15 @@ class QJIT:
 
         with Patcher(
             (qml.QNode, "__call__", closure),
+            # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+            # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
+            # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
+            # https://github.com/PennyLaneAI/catalyst/issues/753
+            # https://github.com/PennyLaneAI/catalyst/issues/1071
+            (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
+            (jax.scipy.linalg, "lu", JaxLinalgWarner(jax.scipy.linalg.lu)),
+            (jax.scipy.linalg, "lu_factor", JaxLinalgWarner(jax.scipy.linalg.lu_factor)),
+            (jax.scipy.linalg, "lu_solve", JaxLinalgWarner(jax.scipy.linalg.lu_solve)),
         ):
             # TODO: improve PyTree handling
 
