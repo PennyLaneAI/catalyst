@@ -220,9 +220,6 @@ FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFolde
                 .create<scf::ForOp>(
                     loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
                     [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                        // Set insertion point within the loop
-                        builder.setInsertionPointToEnd(builder.getBlock());
-
                         // Create adjoint and original operations
                         quantum::QuantumGate origOp =
                             dyn_cast<quantum::QuantumGate>(builder.clone(*op));
