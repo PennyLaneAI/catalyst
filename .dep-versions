@@ -15,4 +15,4 @@ pennylane=0.38.0.dev24
 # 'runtime/Makefile' and at all GitHub workflows, using the exact
 # commit hash corresponding to the merged PR that implements the
 # desired feature.
-lightning=0.38.0-dev50
+lightning=0.38.0rc4
