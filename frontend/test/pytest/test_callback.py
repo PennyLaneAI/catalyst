@@ -1387,7 +1387,9 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
 
 @pytest.mark.skip(
     reason="""Patcher for jax.linalg.scipy functions expect accelerate to immediately wrap around jax.linalg.scipy functions, 
-    but this test wraps an extra lambda in between."""
+    but this test wraps an extra lambda in between.
+    The patcher will be removed after we properly call lapack.
+    Unskip this test then."""
 )
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 @pytest.mark.parametrize("order", ["good", "bad"])
