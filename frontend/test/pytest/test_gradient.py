@@ -1503,6 +1503,7 @@ def test_gradient_slice(backend):
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
 
+
 def test_ellipsis_differentiation(backend):
     """Test circuit diff with ellipsis in the preprocessing."""
     dev = qml.device(backend, wires=3)
@@ -1518,6 +1519,7 @@ def test_ellipsis_differentiation(backend):
     cat_res = qjit(grad(circuit, argnums=0))(weights)
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
+
 
 @pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
@@ -1564,15 +1566,74 @@ def test_vmap_worflow_derivation(backend):
     bias = jnp.array(0.0, dtype=jax.numpy.float64)
     params = {"weights": weights, "bias": bias}
 
-    results_enzyme = qjit(grad(loss_fn))(params, data, targets)
+    results_cat = qjit(grad(loss_fn))(params, data, targets)
     results_jax = jax.grad(loss_fn)(params, data, targets)
 
-    data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
+    data_cat, pytree_enzyme = tree_flatten(results_cat)
     data_jax, pytree_fd = tree_flatten(results_jax)
 
     assert pytree_enzyme == pytree_fd
-    assert jnp.allclose(data_enzyme[0], data_jax[0])
-    assert jnp.allclose(data_enzyme[1], data_jax[1])
+    assert jnp.allclose(data_cat[0], data_jax[0])
+    assert jnp.allclose(data_cat[1], data_jax[1])
+
+
+@pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
+def test_forloop_vmap_worflow_derivation(backend):
+    """Test a forloop vmap."""
+    n_wires = 5
+    data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
+    weights = jnp.ones([n_wires, 3])
+
+    bias = jnp.array(0.0)
+    params = {"weights": weights, "bias": bias}
+
+    dev = qml.device(backend, wires=n_wires)
+
+    @qml.qnode(dev)
+    def circuit(data, weights):
+        """Quantum circuit ansatz"""
+
+        for i in range(n_wires):
+            qml.RY(data[i], wires=i)
+
+        for i in range(n_wires):
+            qml.RX(weights[i, 0], wires=i)
+            qml.RY(weights[i, 1], wires=i)
+            qml.RX(weights[i, 2], wires=i)
+            qml.CNOT(wires=[i, (i + 1) % n_wires])
+
+        return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
+
+    def my_model(data, weights):
+        transposed_data = jnp.transpose(data, [1, 0])
+        result_0 = circuit(transposed_data[0], weights)
+
+        transposed_result = jnp.empty((data.shape[1], *result_0.shape), result_0.dtype)
+        transposed_result = transposed_result.at[0].set(result_0)
+
+        @for_loop(1, data.shape[1], 1)
+        def body(i, result_array):
+            result_i = circuit(transposed_data[i], weights)
+            return result_array.at[i].set(result_i)
+
+        return body(transposed_result)
+
+    cat_res = qjit(
+        jacobian(
+            my_model,
+            argnums=1,
+        ),
+        keep_intermediate=True,
+    )(data, params["weights"])
+    jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
+
+    data_cat, pytree_enzyme = tree_flatten(jax_res)
+    data_jax, pytree_fd = tree_flatten(cat_res)
+
+    assert pytree_enzyme == pytree_fd
+
+    assert jnp.allclose(data_cat[0], data_jax[0])
+    assert jnp.allclose(data_cat[1], data_jax[1])
 
 
 class TestGradientErrors:
