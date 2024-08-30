@@ -114,6 +114,20 @@ class GradContext:
         return GradContext._grad_stack
 
 
+class AccelerateContext:
+    _am_inside_accelerate: bool = False
+
+    def __enter__(self):
+        AccelerateContext._am_inside_accelerate = True
+
+    def __exit__(self, _exc_type, _exc, _exc_tb):
+        AccelerateContext._am_inside_accelerate = False
+
+    @staticmethod
+    def am_inside_accelerate():
+        return AccelerateContext._am_inside_accelerate
+
+
 class EvaluationMode(Enum):
     """Enumerate the evaluation modes supported by Catalyst:
     INTERPRETATION - native Python execution of a Catalyst program

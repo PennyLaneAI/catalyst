@@ -31,11 +31,11 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from malt.core import config as ag_config
 
 import catalyst
-from catalyst import accelerate
 from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
+from catalyst.jax_extras.jax_scipy_linalg_warnings import JaxLinalgWarner
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.passes import _inject_transform_named_sequence
@@ -448,11 +448,11 @@ class QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-        # As a temporary solution, QJIT patches jax.scipy.func with accelerate(jax.scipy.func) as a callback
+        # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
         # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
         # https://github.com/PennyLaneAI/catalyst/issues/753
         # https://github.com/PennyLaneAI/catalyst/issues/1071
-        with Patcher((jax.scipy.linalg, "expm", accelerate(jax.scipy.linalg.expm))):
+        with Patcher((jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm))):
             # Transparantly call Python function in case of nested QJIT calls.
             if EvaluationContext.is_tracing():
                 isQNode = isinstance(self.user_function, qml.QNode)

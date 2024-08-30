@@ -14,6 +14,8 @@
 
 """Test that numerical jax functions produce correct results when compiled with qml.qjit"""
 
+import warnings
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -32,13 +34,15 @@ class TestExpmNumerical:
             jnp.array([[0.1, 0.2], [5.3, 1.2]]),
             jnp.array([[1, 2], [3, 4]]),
             jnp.array([[1.0, -1.0j], [1.0j, -1.0]]),
-            jnp.array(
-                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]
-            ),  # this particular matrix has wrong numbers and is currently solved by patcher with callback. https://github.com/PennyLaneAI/catalyst/issues/1071 # pylint: disable=line-too-long
+            jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]),
         ],
     )
     def test_expm_numerical(self, inp):
         """Test basic numerical correctness for jax.scipy.linalg.expm for float, int, complex"""
+        if np.array_equiv(inp, jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]])):
+            # this particular matrix has wrong answer numbers and need to be solved by proper lapack calls.
+            # https://github.com/PennyLaneAI/catalyst/issues/1071
+            pytest.xfail("Waiting for proper lapack calls")
 
         @qjit
         def f(x):
@@ -72,6 +76,35 @@ class TestExpmInCircuit:
         res = circuit_expm()
         expected = circuit_rot()  # expected = [0,1]
         assert np.allclose(res, expected)
+
+
+class TestExpmWarnings:
+    """Test jax.scipy.linalg.expm raises a warning when not used in accelerate callback"""
+
+    """Remove the warnings module and this test when we have proper lapack calls"""
+
+    def test_expm_warnings(self):
+        @qjit
+        def f(x):
+            expm = jsp.linalg.expm
+            return expm(x)
+
+        with pytest.warns(
+            UserWarning,
+            match="catalyst.qjit occasionally gives wrong numerical results for functions in jax.scipy.linalg.",
+        ):
+            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+
+    def test_accelerated_expm_no_warnings(self, recwarn):
+        @qjit
+        def f(x):
+            expm = accelerate(jsp.linalg.expm)
+            return expm(x)
+
+        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        expected = jsp.linalg.expm(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        assert len(recwarn) == 0
+        assert np.allclose(observed, expected)
 
 
 class TestArgsortNumerical:

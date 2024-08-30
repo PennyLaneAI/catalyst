@@ -38,7 +38,7 @@ from jax._src.tree_util import (
 
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
-from catalyst.tracing.contexts import EvaluationContext, GradContext
+from catalyst.tracing.contexts import AccelerateContext, EvaluationContext, GradContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
@@ -339,18 +339,6 @@ def accelerate_impl(users_func=None, *, dev=None):
              just called the wrapped function.
     """
 
-    # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-    # As a temporary solution, QJIT patches jax.scipy.func with accelerate(jax.scipy.func) as a callback
-    # So here in the callback itself we need to extract the jax.scipy.func when there's gradients
-    # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
-    # https://github.com/PennyLaneAI/catalyst/issues/753
-    # https://github.com/PennyLaneAI/catalyst/issues/1071
-    if GradContext.am_inside_grad():
-        if (users_func.__module__ == "catalyst.api_extensions.callbacks") and (
-            users_func.__name__ in ("expm")
-        ):
-            users_func = users_func._fun
-
     # If this is a partial, we need to make the tracers part of the input
     is_partial = isinstance(users_func, Partial)
     context = []
@@ -359,13 +347,14 @@ def accelerate_impl(users_func=None, *, dev=None):
 
     @functools.wraps(users_func, assigned=WRAPPER_ASSIGNMENTS)
     def total(context, *args, **kwargs):
-        nonlocal users_func
-        if is_partial:
-            _, shape = tree_flatten(users_func)
-            users_func = tree_unflatten(shape, context)
-            return users_func(*args, **kwargs)
-        else:
-            return users_func(*args, **kwargs)
+        with AccelerateContext() as ac:
+            nonlocal users_func
+            if is_partial:
+                _, shape = tree_flatten(users_func)
+                users_func = tree_unflatten(shape, context)
+                return users_func(*args, **kwargs)
+            else:
+                return users_func(*args, **kwargs)
 
     with transient_jax_config({"jax_dynamic_shapes": False}):
         # jax.jit will wrap total and total wraps the user_function
