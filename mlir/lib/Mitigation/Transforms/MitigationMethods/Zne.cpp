@@ -208,7 +208,7 @@ FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFolde
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
-    // Walk through the operations in fnWithMeasurementsOp
+    // Walk through the operations in fnFoldedOp
     fnFoldedOp.walk([&](quantum::QuantumGate op) {
         rewriter.setInsertionPoint(op);
         auto loc = op->getLoc();
