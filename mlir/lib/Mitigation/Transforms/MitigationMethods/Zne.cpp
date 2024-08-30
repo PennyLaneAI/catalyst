@@ -204,7 +204,6 @@ FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFo
 FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
                                   func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
-    // Type qregType = quantum::QuregType::get(rewriter.getContext());
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
