@@ -4,6 +4,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -64,7 +65,7 @@ struct AdjointOpInterface
         auto adjointOp = cast<AdjointOp>(op);
         MLIRContext *ctx = rewriter.getContext();
         Location loc = op->getLoc();
-        LLVMTypeConverter typeConverter(ctx);
+        bufferization::BufferizeTypeConverter typeConverter;
         Type vectorType = typeConverter.convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
         for (Type type : adjointOp.getResultTypes()) {
