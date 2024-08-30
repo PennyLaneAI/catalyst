@@ -1515,7 +1515,7 @@ def test_ellipsis_differentiation(backend):
 
     weights = jnp.ones([5, 3, 3])
 
-    cat_res = qjit(grad(circuit, argnum=0))(weights)
+    cat_res = qjit(grad(circuit, argnums=0))(weights)
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
 
