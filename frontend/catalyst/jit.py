@@ -447,33 +447,27 @@ class QJIT:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-        # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
-        # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
-        # https://github.com/PennyLaneAI/catalyst/issues/753
-        # https://github.com/PennyLaneAI/catalyst/issues/1071
-        with Patcher((jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm))):
-            # Transparantly call Python function in case of nested QJIT calls.
-            if EvaluationContext.is_tracing():
-                isQNode = isinstance(self.user_function, qml.QNode)
-                if isQNode and self.compile_options.static_argnums:
-                    kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
+        # Transparantly call Python function in case of nested QJIT calls.
+        if EvaluationContext.is_tracing():
+            isQNode = isinstance(self.user_function, qml.QNode)
+            if isQNode and self.compile_options.static_argnums:
+                kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
 
-                return self.user_function(*args, **kwargs)
+            return self.user_function(*args, **kwargs)
 
-            requires_promotion = self.jit_compile(args, **kwargs)
+        requires_promotion = self.jit_compile(args, **kwargs)
 
-            # If we receive tracers as input, dispatch to the JAX integration.
-            if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
-                if self.jaxed_function is None:
-                    self.jaxed_function = JAX_QJIT(self)  # lazy gradient compilation
-                return self.jaxed_function(*args, **kwargs)
+        # If we receive tracers as input, dispatch to the JAX integration.
+        if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
+            if self.jaxed_function is None:
+                self.jaxed_function = JAX_QJIT(self)  # lazy gradient compilation
+            return self.jaxed_function(*args, **kwargs)
 
-            elif requires_promotion:
-                dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
-                args = promote_arguments(self.c_sig, dynamic_args)
+        elif requires_promotion:
+            dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
+            args = promote_arguments(self.c_sig, dynamic_args)
 
-            return self.run(args, kwargs)
+        return self.run(args, kwargs)
 
     @debug_logger
     def aot_compile(self):
@@ -486,6 +480,12 @@ class QJIT:
             # Capture with the patched conversion rules
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
+                # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+                # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
+                # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
+                # https://github.com/PennyLaneAI/catalyst/issues/753
+                # https://github.com/PennyLaneAI/catalyst/issues/1071
+                (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
             ):
                 self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                     self.user_sig or ()
@@ -531,6 +531,12 @@ class QJIT:
             # Capture with the patched conversion rules
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
+                # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+                # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
+                # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
+                # https://github.com/PennyLaneAI/catalyst/issues/753
+                # https://github.com/PennyLaneAI/catalyst/issues/1071
+                (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
             ):
                 self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                     args, **kwargs
