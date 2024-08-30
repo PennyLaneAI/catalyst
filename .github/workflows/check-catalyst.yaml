@@ -421,6 +421,9 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
+        # TODO: remove workaround before merging to main
+        pip install pennylane-lightning==0.38
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
         make frontend
 
     - name: Get Cached LLVM Build
@@ -493,6 +496,9 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        # TODO: remove workaround before merging to main
+        pip install pennylane-lightning==0.38
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
         make frontend
 
     - name: Get Cached LLVM Build
@@ -548,6 +554,9 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        # TODO: remove workaround before merging to main
+        pip install pennylane-lightning==0.38
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
         make frontend
 
     - name: Get Cached LLVM Build

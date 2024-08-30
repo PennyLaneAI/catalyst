@@ -292,7 +292,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=1536d88 \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_LAPACK=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
@@ -397,6 +397,11 @@ jobs:
     - name: Install OQC client
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+
+    # TODO: remove workaround before merging to main
+    - name: Install PennyLane RC
+      run: |
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
 
     - name: Install Catalyst
       run: |
