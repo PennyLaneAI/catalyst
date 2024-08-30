@@ -29,7 +29,6 @@ limitations under the License.
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <iostream>
 
 #ifdef USE_ABSEIL_LIB
 #include "absl/base/dynamic_annotations.h"
