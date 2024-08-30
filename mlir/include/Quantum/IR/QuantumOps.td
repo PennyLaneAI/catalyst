@@ -194,15 +194,39 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
+        Quantum_Op<mnemonic, traits # [QuantumOperation]> {
 
     code extraBaseClassDeclaration = [{
         std::vector<mlir::Value> getQubitOperands() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getInQubits().begin(),
-                          getInQubits().end());
-            values.insert(values.end(), getInCtrlQubits().begin(),
-                          getInCtrlQubits().end());
+            values.insert(values.end(), getInQubits().begin(), getInQubits().end());
+            return values;
+        }
+
+        void setQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getInQubitsMutable();
+            assert(qubits.size() == replacements.size() && "must provide values for all qubits");
+            qubits.assign(replacements);
+        }
+
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
+            return values;
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
+        Gate_Op<mnemonic, traits # [QuantumGate, Unitary]> {
+
+    code extraBaseClassDeclaration = [{
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInQubits().begin(), getInQubits().end());
+            values.insert(values.end(), getInCtrlQubits().begin(), getInCtrlQubits().end());
             return values;
         }
 
@@ -218,10 +242,8 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
 
         std::vector<mlir::Value> getQubitResults() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getOutQubits().begin(),
-                          getOutQubits().end());
-            values.insert(values.end(), getOutCtrlQubits().begin(),
-                          getOutCtrlQubits().end());
+            values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
+            values.insert(values.end(), getOutCtrlQubits().begin(), getOutCtrlQubits().end());
             return values;
         }
 
@@ -270,7 +292,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Quantum_Op<"set_state", []> {
+def SetStateOp : Gate_Op<"set_state", []> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -293,7 +315,7 @@ def SetStateOp : Quantum_Op<"set_state", []> {
         `(` $in_state `)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
-    let extraClassDeclaration = [{
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
         bool isBufferized() {
             return mlir::isa<mlir::MemRefType>(getInState().getType());
         }
@@ -301,7 +323,7 @@ def SetStateOp : Quantum_Op<"set_state", []> {
 
 }
 
-def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
+def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -326,15 +348,15 @@ def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
         `(` $basis_state`)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
-    let extraClassDeclaration = [{
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
         bool isBufferized() {
             return mlir::isa<mlir::MemRefType>(getBasisState().getType());
         }
     }];
 }
 
-def CustomOp : Gate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
-                                  AttrSizedOperandSegments, AttrSizedResultSegments]> {
+def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -364,7 +386,7 @@ def CustomOp : Gate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     }];
 }
 
-def GlobalPhaseOp : Gate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
     let description = [{
     }];
@@ -402,8 +424,8 @@ def GlobalPhaseOp : Gate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegme
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
-                                    AttrSizedOperandSegments, AttrSizedResultSegments]> {
+def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -434,8 +456,8 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
+                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the

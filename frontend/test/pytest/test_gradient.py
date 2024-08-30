@@ -1485,6 +1485,27 @@ def test_gradient_slice(backend):
     assert np.allclose(cat_res, jax_res)
 
 
+@pytest.mark.parametrize(
+    "gate,state", ((qml.BasisState, np.array([1])), (qml.StatePrep, np.array([0, 1])))
+)
+def test_paramshift_with_gates(gate, state):
+    """Test parameter shift works with a variety of gates present in the circuit."""
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @grad
+    @qml.qnode(dev, diff_method="parameter-shift")
+    def cost(x):
+        gate(state, wires=0)
+        qml.RY(x, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    param = 0.1
+    expected = cost(param)
+    observed = qjit(cost)(param)
+    assert np.allclose(expected, observed)
+
+
 class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""

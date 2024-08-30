@@ -369,6 +369,9 @@
 * On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
+  [(#1047)](https://github.com/PennyLaneAI/catalyst/pull/1047)
+  [(#1062)](https://github.com/PennyLaneAI/catalyst/pull/1062)
+  [(#1073)](https://github.com/PennyLaneAI/catalyst/pull/1073)
 
 * Improved type validation and error messaging has been added to both the `catalyst.jvp`
   and `catalyst.vjp` functions to ensure that the (co)tangent and parameter types are compatible.
@@ -454,6 +457,20 @@
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
 
 <h3>Bug fixes</h3>
+
+* Catalyst no longer silently converts complex parameters to floats where floats are expected,
+  instead an error is raised.
+  [(#1008)](https://github.com/PennyLaneAI/catalyst/pull/1008)
+
+* Fixes a bug where dynamic one-shot did not work when no mid-circuit measurements are present
+  and when the return type is an iterable.
+  [(#1060)](https://github.com/PennyLaneAI/catalyst/pull/1060)
+
+* Fixes a bug finding the quantum function jaxpr when using quantum primitives with dynamic one-shot
+  [(#1041)](https://github.com/PennyLaneAI/catalyst/pull/1041)
+
+* Fix a bug where LegacyDevice number of shots is not correctly extracted when using the legacyDeviceFacade.
+  [(#1035)](https://github.com/PennyLaneAI/catalyst/pull/1035)
 
 * Catalyst no longer generates a `QubitUnitary` operation during decomposition if a device doesn't
   support it. Instead, the operation that would lead to a `QubitUnitary` is either decomposed or
@@ -545,10 +562,10 @@
   @catalyst.pure_callback
   def callback_fn(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
       return np.array([np.sin(x), np.cos(x)])
-  
+
   callback_fn.fwd(lambda x: (callback_fn(x), x))
   callback_fn.bwd(lambda x, dy: (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,))
-  
+
   @qjit
   @catalyst.grad
   def f(x):
@@ -602,6 +619,9 @@
 * A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
   function inputs.
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+
+* Bug fixed when parameter annotations return strings.
+  [(#1078)](https://github.com/PennyLaneAI/catalyst/pull/1078)
 
 <h3>Documentation</h3>
 
