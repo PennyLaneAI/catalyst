@@ -1403,6 +1403,21 @@ def test_pytrees_args_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
+def test_non_parametrized_circuit(backend):
+    """Test that the derivate of non parametrized circuit is null."""
+    dev = qml.device(backend, wires=1)
+
+    def cost(x):
+        @qml.qnode(dev)
+        def circuit(x):  # pylint: disable=unused-argument
+            qml.PauliX(wires=0)
+            return qml.expval(qml.PauliZ(wires=0))
+
+        return circuit(x)
+
+    assert np.allclose(qjit(grad(cost))(1.1), 0.0)
+
+
 @pytest.mark.xfail(reason="The verifier currently doesn't distinguish between active/inactive ops")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
