@@ -324,42 +324,27 @@ runtime libraries. The generated shared object is stored by the caching mechanis
 for future calls.
 
 Recompiling a Function
-=================
+======================
+
 Catalyst offers a way to extract IRs from pipeline stages and feed modified IRs back for recompilation.
 To enable this feature, ``qjit`` decorated function must be compiled with the option ``keep_intermediate=True``.
 
 The following example creates a square function decorated with ``@qjit(keep_intermediate=True)``.
 The function must be compiled first so that the IR from each pipeline stage can be accessed.
 
-.. code-block:: python
+>>> @qjit(keep_intermediate=True)
+... def f(x):
+...     return x**2
+>>> f(2.0)
+4.0
 
-    @qjit(keep_intermediate=True)
-    def f(x):
-        return x**2
-    f(2.0)
-    >> 4.0
+After compilation, we can use :func:`~.debug.get_compilation_stage`  in the ``debug`` module to get the IR
+from the given compiler stage. In this example, we request for the IR after ``HLOLoweringPass``:
 
-After compilation, we can use :func:`~.debug.get_compilation_stage`  in the ``debug`` module to get the IR from the given compiler stage.
-:func:`~.debug.get_compilation_stage` accepts a ``qjit`` decorated function and a stage name in string. It return the IR after the
-given stage.
+>>> from catalyst.debug import get_compilation_stage
+>>> old_ir = get_compilation_stage(f, "HLOLoweringPass")
 
-The available options are:
-
-* MLIR stages: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass`` and ``MLIRToLLVMDialect``.
-* LLVM stages: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
-
-Note that compiled functions might not always have ``CoroOpt``, ``O2Opt``, and ``Enzyme`` stages.
-The option ``last`` will provide the IR right before generating its object file.
-
-In this example, we request for the IR after ``HLOLoweringPass``.
-
-.. code-block:: python
-
-    from catalyst.debug import get_compilation_stage
-
-    old_ir = get_compilation_stage(f, "HLOLoweringPass")
-
-The output IR is
+The output IR is:
 
 .. code-block:: mlir
 
@@ -385,22 +370,44 @@ The output IR is
 
 Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one.
 
-.. code-block:: python
-
-    new_ir = old_ir.replace(
-        "%2 = arith.mulf %in, %in_0 : f64\n",
-        "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
-        )
+>>> new_ir = old_ir.replace(
+...     "%2 = arith.mulf %in, %in_0 : f64\n",
+...     "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
+... )
 
 After that, we can use :func:`~.debug.replace_ir` to make the compiler use the modified
 IR for recompilation.
-:func:`~.debug.replace_ir` accepts a `qjit` decorated function, a checkpoint stage name in string, and a IR in string.
-The recompilation starts after the given checkpoint stage.
+The recompilation starts after the given checkpoint stage:
+
+>>> from catalyst.debug import replace_ir
+>>> replace_ir(f, "HLOLoweringPass", new_ir)
+>>> f(2.0)
+8.0
+
+C Executable Generation
+=======================
+
+Catalyst provides :func:`~.debug.compile_executable` to generate a C executable with a given function and the
+corresponding arguments.
 
 .. code-block:: python
 
-    from catalyst.debug import replace_ir
+    import subprocess
+    from catalyst import qjit
+    from catalyst.debug import compile_executable, print_memref
 
-    replace_ir(f, "HLOLoweringPass", new_ir)
-    f(2.0)
-    >> 8.0
+    @qjit
+    def f(x):
+        y = x * x
+        print_memref(y)
+        return y
+
+>>> binary = compile_executable(f, 5)
+>>> print(binary)
+/path/to/executable
+
+.. code-block:: shell
+
+    $ /path/to/executable
+    MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+    25

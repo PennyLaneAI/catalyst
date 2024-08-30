@@ -13,6 +13,7 @@ import os
 import platform
 import re
 import shutil
+import subprocess
 
 import jax.numpy as jnp
 import numpy as np
@@ -23,6 +24,7 @@ from jax.tree_util import register_pytree_node_class
 from catalyst import debug, for_loop, qjit, value_and_grad
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import (
+    compile_executable,
     compile_from_mlir,
     get_cmain,
     get_compilation_stage,
@@ -543,6 +545,58 @@ class TestCProgramGeneration:
             "but no file was found.\nAre you sure the file exists?",
         ):
             get_compilation_stage(f, "mlir")
+
+    @pytest.mark.parametrize(
+        "arg",
+        [
+            5,
+            np.ones(5, dtype=int),
+            np.ones((5, 2), dtype=int),
+        ],
+    )
+    def test_executable_generation(self, arg):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """Square function with debugging print."""
+            y = x * x
+            debug.print_memref(y)
+            return y
+
+        ans = str(f(arg).tolist()).replace(" ", "")
+
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        # Clean up generated files.
+        directory_path = os.path.dirname(binary)
+        os.remove(binary)
+        os.remove(directory_path + "/" + f.__name__ + ".so")
+        os.remove(directory_path + "/main.c")
+
+        assert ans in result.stdout.replace(" ", "").replace("\n", "")
+
+    def test_executable_generation_without_precompiled_function(self):
+        """Test if generated C Program produces correct results."""
+
+        @qjit
+        def f(x):
+            """identity function with debugging print."""
+            debug.print_memref(x)
+            return x
+
+        arg = 5
+        binary = compile_executable(f, arg)
+        result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        # Clean up generated files.
+        directory_path = os.path.dirname(binary)
+        os.remove(binary)
+        os.remove(directory_path + "/" + f.__name__ + ".so")
+        os.remove(directory_path + "/main.c")
+
+        assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
 
 
 if __name__ == "__main__":

@@ -213,7 +213,7 @@ def test_multi_arg_multi_result(backend, diff_method):
 
     @qjit
     def jac_postprocess(x, y):
-        return jacobian(postprocess, argnum=[0, 1], method="auto")(x, y)
+        return jacobian(postprocess, argnums=[0, 1], method="auto")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
     jax_jacobian = jax.jacobian(postprocess, argnums=[0, 1])(*args)

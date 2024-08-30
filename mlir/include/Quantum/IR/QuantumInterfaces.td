@@ -64,16 +64,24 @@ def QuantumGate : OpInterface<"QuantumGate"> {
 
     let methods = [
         InterfaceMethod<
-            "Return all operands which are considered input qubit values.",
+            "Return all operands which are considered input qubit values (including controls).",
             "std::vector<mlir::Value>", "getQubitOperands"
         >,
         InterfaceMethod<
-            "Return all results which are considered output qubit values.",
+            "Set all operands which are considered input qubit values (including controls).",
+            "void", "setQubitOperands", (ins "mlir::ValueRange":$replacements)
+        >,
+        InterfaceMethod<
+            "Return all results which are considered output qubit values (including controls).",
             "std::vector<mlir::Value>", "getQubitResults"
         >,
         InterfaceMethod<
             "Return operands which are considered non-controlled input qubit values.",
             "mlir::ValueRange", "getNonCtrlQubitOperands"
+        >,
+        InterfaceMethod<
+            "Set all operands which are considered non-controlled input qubit values.",
+            "void", "setNonCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
             "Return results which are considered non-controlled output qubit values.",
@@ -84,8 +92,16 @@ def QuantumGate : OpInterface<"QuantumGate"> {
             "mlir::ValueRange", "getCtrlQubitOperands"
         >,
         InterfaceMethod<
+            "Set all operands which are considered controlling input qubit values.",
+            "void", "setCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
+        >,
+        InterfaceMethod<
             "Return all operands which are considered controlling input boolean values.",
             "mlir::ValueRange", "getCtrlValueOperands"
+        >,
+        InterfaceMethod<
+            "Set all operands which are considered controlling input boolean values.",
+            "void", "setCtrlValueOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
             "Return all operands which are considered controlling output qubit values.",

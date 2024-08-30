@@ -17,15 +17,23 @@ This module contains debug functions to interact with the compiler and compiled 
 """
 import logging
 import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import sysconfig
+from itertools import product
 
 from jax.interpreters import mlir
 
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler
+from catalyst.compiler import Compiler, LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 
 logger = logging.getLogger(__name__)
@@ -34,22 +42,27 @@ logger.addHandler(logging.NullHandler())
 
 @debug_logger
 def get_compilation_stage(fn, stage):
-    """Print one of the recorded compilation stages for a JIT-compiled function.
+    """Returns the intermediate representation of one of the recorded compilation
+    stages for a JIT-compiled function.
 
     The stages are indexed by their Catalyst compilation pipeline name, which are either provided
     by the user as a compilation option, or predefined in ``catalyst.compiler``.
 
     All the available stages are:
 
-    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``,
+      and ``MLIRToLLVMDialect``.
 
-    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
-    differentiation) passes do not always happen. `last` denotes the stage right before object file
-    generation.
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+    (automatic differentiation) passes do not always happen. ``last`` denotes the stage
+    right before object file generation.
 
-    Requires ``keep_intermediate=True``.
+    .. note::
+
+        In order to use this function, ``keep_intermediate=True`` must be
+        set in the :func:`~.qjit` decorator of the input function.
 
     Args:
         fn (QJIT): a qjit-decorated function
@@ -58,7 +71,7 @@ def get_compilation_stage(fn, stage):
     Returns:
         str: output ir from the target compiler stage
 
-    .. seealso:: :doc:`/dev/debugging`
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`, :func:`~.compile_from_mlir`.
 
     **Example**
 
@@ -122,7 +135,7 @@ def get_cmain(fn, *args):
 # pylint: disable=line-too-long
 @debug_logger
 def compile_from_mlir(ir, compiler=None, compile_options=None):
-    """Compile a Catalyst function to binary code from the provided MLIR.
+    r"""Compile a Catalyst function to binary code from the provided MLIR.
 
     Args:
         ir (str): the MLIR to compile in string form
@@ -130,6 +143,8 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
     Returns:
         CompiledFunction: A callable that manages the compiled shared library and its invocation.
+
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.replace_ir`.
 
     **Example**
 
@@ -179,26 +194,218 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 @debug_logger
 def replace_ir(fn, stage, new_ir):
-    """Replace the IR at any compilation stage that will be used the next time the function runs.
+    r"""Replace the IR at any compilation stage that will be used the next time the function runs.
 
-    It is important that the function signature (inputs & outputs) for the next execution matches
+    It is important that the function signature (inputs and outputs) for the next execution matches
     that of the provided IR, or else the behaviour is undefined.
 
-    All the available stages are:
+    Available stages include:
 
-    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect.
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``,
+      and ``MLIRToLLVMDialect``.
 
-    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
-    differentiation) passes do not always happen. `last` denotes the stage right before object file
-    generation.
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+    (automatic differentiation) passes do not always happen. ``last`` denotes the stage
+    right before object file generation.
 
     Args:
         fn (QJIT): a qjit-decorated function
         stage (str): Recompilation picks up after this stage.
         new_ir (str): The replacement IR to use for recompilation.
+
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.compile_from_mlir`.
+
+    **Example**
+
+    >>> from catalyst.debug import get_compilation_stage, replace_ir
+    >>> @qjit(keep_intermediate=True)
+    >>> def f(x):
+    ...     return x**2
+    >>> f(2.0)  # just-in-time compile the function
+    4.0
+
+    Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one:
+
+    >>> old_ir = get_compilation_stage(f, "HLOLoweringPass")
+    >>> new_ir = old_ir.replace(
+    ...   "%2 = arith.mulf %in, %in_0 : f64\n",
+    ...   "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
+    ... )
+
+    The recompilation starts after the given checkpoint stage:
+
+    >>> replace_ir(f, "HLOLoweringPass", new_ir)
+    >>> f(2.0)
+    8.0
     """
     fn.overwrite_ir = new_ir
     fn.compiler.options.checkpoint_stage = stage
     fn.fn_cache.clear()
+
+
+@debug_logger
+def compile_executable(fn, *args):
+    """Generate an executable binary for the native host architecture from a
+    :func:`~.qjit` decorated function with provided arguments.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        *args: argument values to use in the C program when invoking ``fn``
+
+    Returns:
+        str: the path of output binary
+
+    **Example**
+
+    For example, considering the following function where we are
+    using :func:`~.print_memref` to print (at runtime) information about
+    variable ``y``:
+
+    .. code-block:: python
+
+        @qjit
+        def f(x):
+            y = x * x
+            debug.print_memref(y)
+            return y
+
+    >>> f(5)
+    MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+    25
+    Array(25, dtype=int64)
+
+    We can now use ``compile_executable`` to compile this function to a binary.
+
+    The executable will be saved in the directory for intermediate results if
+    ``keep_intermediate=True``. Otherwise, the executable will appear in the Catalyst project
+    root.
+
+    >>> from catalyst.debug import compile_executable
+    >>> binary = compile_executable(f, 5)
+    >>> print(binary)
+    /path/to/executable
+
+    Executing this function from a shell environment:
+
+    .. code-block:: shell
+
+        $ /path/to/executable
+        MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
+        25
+
+    """
+
+    # if fn is not compiled, compile it first.
+    if not fn.compiled_function:
+        fn(*args)
+
+    # Try default library paths in case the targeted python-dev is shipped with OS.
+    path_candidates = [
+        sysconfig.get_config_var("LIBDIR"),
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/lib64",
+        "/usr/local/lib",
+        "/usr/lib64",
+        "/usr/lib",
+    ]
+    version_info = sys.version_info
+    # Check libpython3.x.so first because libpython3.so might not link to it.
+    version_candidates = [f"{version_info.major}.{version_info.minor}", f"{version_info.major}"]
+
+    file_extension = ".so" if platform.system() == "Linux" else ".dylib"
+    python_lib_dir_path = ""
+    version_str = ""
+
+    for candidate in list(product(path_candidates, version_candidates)):
+        path_candidate, version_candidate = candidate
+        if os.path.isfile(path_candidate + f"/libpython{version_candidate}{file_extension}"):
+            version_str = version_candidate
+            python_lib_dir_path = path_candidate
+            break
+
+    if not python_lib_dir_path or not version_str:  # pragma: nocover
+        raise CompileError(
+            f'Unable to find Python library {version_candidates} at "{path_candidates}". '
+            "Please ensure that python-dev or python-devel is installed and available via pip."
+        )
+
+    lib_path_flags = [
+        f"-Wl,-rpath,{python_lib_dir_path}",
+        f"-L{python_lib_dir_path}",
+        "-lpython" + version_str,
+    ]
+
+    # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
+    if platform.system() == "Darwin":  # pragma: nocover
+        python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
+        lib_path_flags.insert(1, f"-Wl,-rpath,{python_lib_dir_rpath}")
+
+    f_name = str(fn.__name__)
+    workspace = str(fn.workspace) if fn.compile_options.keep_intermediate else os.getcwd()
+    main_c_file = workspace + "/main.c"
+    output_file = workspace + "/" + f_name + ".out"
+    shared_object_file = workspace + "/" + f_name + ".so"
+
+    # copy shared object to current directory
+    original_shared_object_file = str(fn.workspace) + "/" + f_name + ".so"
+    if not fn.compile_options.keep_intermediate:
+        shutil.copy(original_shared_object_file, shared_object_file)
+
+    options = fn.compiler.options
+    with open(main_c_file, "w", encoding="utf-8") as file:
+        file.write(get_cmain(fn, *args))
+
+    # Set search path mainly for gfortran and quadmath, which are located in the same
+    # directory as openblas from scipy.
+    if platform.system() == "Linux":
+        object_directory = "$ORIGIN"
+    else:  # pragma: nocover
+        object_directory = "@loader_path"
+
+    # configure flags
+    link_so_flags = [
+        "-Wl,-rpath," + workspace,
+        shared_object_file,
+        f"-Wl,-rpath,{object_directory}",
+    ] + lib_path_flags
+    LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
+
+    # Patch DLC prefix related to openblas
+    if platform.system() == "Darwin":  # pragma: nocover
+        otool_path = shutil.which("otool")
+        install_name_tool_path = shutil.which("install_name_tool")
+        otool_result = subprocess.run(
+            [otool_path, "-l", shared_object_file], capture_output=True, text=True, check=True
+        )
+
+        dlc_pattern = r"/DLC[^)]+\.dylib"
+        dlc_matches = re.findall(dlc_pattern, otool_result.stdout)
+        for entry in dlc_matches:
+            dylib_pattern = r"/([^/]+\.dylib)$"
+            dylib_file_name = re.findall(dylib_pattern, entry)[-1]
+            new_entry = f"@rpath/{dylib_file_name}"
+            subprocess.run(
+                [install_name_tool_path, "-change", entry, new_entry, shared_object_file],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+        # Update the path of shared library if copy happens.
+        if not fn.compile_options.keep_intermediate:
+            subprocess.run(
+                [
+                    install_name_tool_path,
+                    "-change",
+                    original_shared_object_file,
+                    shared_object_file,
+                    output_file,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+    return output_file
