@@ -43,11 +43,11 @@ class JaxLinalgWarner:
     when used within a qjit-compiled function.
     See https://github.com/PennyLaneAI/catalyst/issues/1071.
     In the meantime, we recommend catalyst.accelerate to call
-    the underlying expm function directly:
+    the underlying {self.fn.__name__} function directly:
 
     @qjit
     def f(A):
-        return catalyst.accelerate(jax.scipy.linalg.expm)(A)
+        return catalyst.accelerate(jax.scipy.linalg.{self.fn.__name__})(A)
 
     See https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html
     """

@@ -107,6 +107,94 @@ class TestExpmWarnings:
         assert np.allclose(observed, expected)
 
 
+class TestLUWarnings:
+    """Test jax.scipy.linalg.lu raises a warning when not used in accelerate callback"""
+
+    """Remove the warnings module and this test when we have proper lapack calls"""
+
+    def test_lu_warnings(self):
+        @qjit
+        def f(x):
+            lu = jsp.linalg.lu
+            return lu(x)
+
+        with pytest.warns(
+            UserWarning,
+            match="jax.scipy.linalg.lu occasionally gives wrong numerical results",
+        ):
+            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+
+    def test_accelerated_lu_no_warnings(self, recwarn):
+        @qjit
+        def f(x):
+            lu = accelerate(jsp.linalg.lu)
+            return lu(x)
+
+        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        expected = jsp.linalg.lu(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        assert len(recwarn) == 0
+        assert np.allclose(observed, expected)
+
+    def test_lu_factor_warnings(self):
+        @qjit
+        def f(x):
+            luf = jsp.linalg.lu_factor
+            return luf(x)
+
+        with pytest.warns(
+            UserWarning,
+            match="jax.scipy.linalg.lu_factor occasionally gives wrong numerical results",
+        ):
+            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+
+    def test_accelerated_lu_factor_no_warnings(self, recwarn):
+        @qjit
+        def f(x):
+            luf = accelerate(jsp.linalg.lu_factor)
+            return luf(x)
+
+        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        expected = jsp.linalg.lu_factor(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        assert len(recwarn) == 0
+        assert np.allclose(observed[0], expected[0])
+        assert np.allclose(observed[1], expected[1])
+
+    def test_lu_solve_warnings(self):
+        @qjit
+        def f(x):
+            lus = jsp.linalg.lu_solve
+            b = jnp.array([3.0, 4.0])
+            B = accelerate(jsp.linalg.lu_factor)(
+                x
+            )  # since this is a lu_solve unit test, use accelerate for lu_factor
+            return lus(B, b)
+
+        with pytest.warns(
+            UserWarning,
+            match="jax.scipy.linalg.lu_solve occasionally gives wrong numerical results",
+        ):
+            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+
+    def test_accelerated_lu_solve_no_warnings(self, recwarn):
+        @qjit
+        def f(x):
+            lus = accelerate(jsp.linalg.lu_solve)
+            b = jnp.array([3.0, 4.0])
+            B = accelerate(jsp.linalg.lu_factor)(x)
+            return lus(B, b)
+
+        def truth(x):
+            lus = jsp.linalg.lu_solve
+            b = jnp.array([3.0, 4.0])
+            B = jsp.linalg.lu_factor(x)
+            return lus(B, b)
+
+        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        expected = truth(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
+        assert len(recwarn) == 0
+        assert np.allclose(observed, expected)
+
+
 class TestArgsortNumerical:
     """Test jax.numpy.argsort sort arrays correctly when being qjit compiled"""
 

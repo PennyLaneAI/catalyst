@@ -486,6 +486,9 @@ class QJIT:
                 # https://github.com/PennyLaneAI/catalyst/issues/753
                 # https://github.com/PennyLaneAI/catalyst/issues/1071
                 (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
+                (jax.scipy.linalg, "lu", JaxLinalgWarner(jax.scipy.linalg.lu)),
+                (jax.scipy.linalg, "lu_factor", JaxLinalgWarner(jax.scipy.linalg.lu_factor)),
+                (jax.scipy.linalg, "lu_solve", JaxLinalgWarner(jax.scipy.linalg.lu_solve)),
             ):
                 self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                     self.user_sig or ()
@@ -537,6 +540,9 @@ class QJIT:
                 # https://github.com/PennyLaneAI/catalyst/issues/753
                 # https://github.com/PennyLaneAI/catalyst/issues/1071
                 (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
+                (jax.scipy.linalg, "lu", JaxLinalgWarner(jax.scipy.linalg.lu)),
+                (jax.scipy.linalg, "lu_factor", JaxLinalgWarner(jax.scipy.linalg.lu_factor)),
+                (jax.scipy.linalg, "lu_solve", JaxLinalgWarner(jax.scipy.linalg.lu_solve)),
             ):
                 self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                     args, **kwargs
