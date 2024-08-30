@@ -129,14 +129,23 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                 StringAttr lib, StringAttr name, StringAttr kwargs,
-                                FunctionType fnFoldedType, SmallVector<Type> typesFolded,
-                                func::FuncOp fnFoldedOp, func::FuncOp fnAllocOp,
-                                Value numberQubitsValue, func::FuncOp fnWithoutMeasurementsOp,
-                                func::FuncOp fnWithMeasurementsOp, Value c0, Value c1)
+                                int64_t numberQubits, FunctionType fnFoldedType,
+                                SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
+                                func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
+                                func::FuncOp fnWithMeasurementsOp)
 {
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
     Type qregType = quantum::QuregType::get(rewriter.getContext());
+
+    rewriter.setInsertionPointToStart(fnFoldedOp.addEntryBlock());
+    // Loop control variables
+    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
+    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
+
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
@@ -263,13 +272,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     // Set insertion in the module
     rewriter.setInsertionPointToStart(moduleOp.getBody());
-    // Quantum Alloc function
-    FlatSymbolRefAttr quantumAllocRefAttr;
-    func::FuncOp fnAllocOp;
-    if (foldingAlgorithm == Folding(1)) {
-        quantumAllocRefAttr = getOrInsertQuantumAlloc(loc, rewriter, op);
-        fnAllocOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
-    }
 
     // Get the number of qubits
     const int64_t numberQubits =
@@ -286,22 +288,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     Type indexType = rewriter.getIndexType();
     typesFolded.push_back(indexType);
 
-    // Function without measurements: Create function without measurements and with qreg as last
-    // argument
-    func::FuncOp fnWithoutMeasurementsOp;
-    func::FuncOp fnWithMeasurementsOp;
-    if (foldingAlgorithm == Folding(1)) {
-        FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
-            getOrInsertFnWithoutMeasurements(loc, rewriter, op);
-        fnWithoutMeasurementsOp =
-            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
-        // Function with measurements: Modify the original function to take a quantum register as
-        // last arg and keep measurements
-        FlatSymbolRefAttr fnWithMeasurementsRefAttr =
-            getOrInsertFnWithMeasurements(loc, rewriter, op);
-        fnWithMeasurementsOp =
-            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
-    }
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
@@ -309,35 +295,42 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                                                   /*outputs=*/fnOp.getResultTypes());
 
     func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
-    Value c0, c1, numberQubitsValue;
     fnFoldedOp.setPrivate();
     if (foldingAlgorithm == Folding(1)) {
-        Block *fnFoldedOpBlock = fnFoldedOp.addEntryBlock();
-        rewriter.setInsertionPointToStart(fnFoldedOpBlock);
-        // Loop control variables
-        c0 = rewriter.create<index::ConstantOp>(loc, 0);
-        c1 = rewriter.create<index::ConstantOp>(loc, 1);
-        TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-        numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
-        rewriter.create<quantum::DeviceInitOp>(loc, lib, name, kwargs);
-    }
-    else {
-        rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+        // Quantum Alloc function
+        FlatSymbolRefAttr quantumAllocRefAttr = getOrInsertQuantumAlloc(loc, rewriter, op);
+        func::FuncOp fnAllocOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
-        Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
-        rewriter.setInsertionPointToStart(fnFoldedOpBlock);
-        // Loop control variables
-        c0 = rewriter.create<index::ConstantOp>(loc, 0);
-        c1 = rewriter.create<index::ConstantOp>(loc, 1);
+        // Function without measurements: Create function without measurements and with qreg as last
+        // argument
+        FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
+            getOrInsertFnWithoutMeasurements(loc, rewriter, op);
+        func::FuncOp fnWithoutMeasurementsOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
 
-        fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
+        // Function with measurements: Modify the original function to take a quantum register as
+        // last arg and keep measurements
+        FlatSymbolRefAttr fnWithMeasurementsRefAttr =
+            getOrInsertFnWithMeasurements(loc, rewriter, op);
+        func::FuncOp fnWithMeasurementsOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
+
+        return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, numberQubits,
+                             fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
+                             fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
 
-    if (foldingAlgorithm == Folding(1)) {
-        return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, fnFoldedType,
-                             typesFolded, fnFoldedOp, fnAllocOp, numberQubitsValue,
-                             fnWithoutMeasurementsOp, fnWithMeasurementsOp, c0, c1);
-    }
+    rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+
+    Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
+    rewriter.setInsertionPointToStart(fnFoldedOpBlock);
+    // Loop control variables
+    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
+    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+
+    fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
+
     if (foldingAlgorithm == Folding(2)) {
         return randomLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
     }
