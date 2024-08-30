@@ -38,22 +38,18 @@ class JaxLinalgWarner:
     def __call__(self, *args, **kwargs):
         if not AccelerateContext.am_inside_accelerate():
             warnings.warn(
-                """
-    catalyst.qjit occasionally gives wrong numerical results for functions in jax.scipy.linalg. 
+                f"""
+    jax.scipy.linalg.{self.fn.__name__} occasionally gives wrong numerical results
+    when used within a qjit-compiled function.
     See https://github.com/PennyLaneAI/catalyst/issues/1071.
-    We are working on this issue.
-    In the meantime, we strongly recommend using a callback with catalyst.accelerate to the underlying jax function directly.
-    See https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html.
-    For example, instead of 
+    In the meantime, we recommend catalyst.accelerate to call
+    the underlying expm function directly:
+
     @qjit
     def f(A):
-        B = jax.scipy.linalg.expm(A)
-        return B
-    , use
-    @qjit
-    def f(A):
-        B = catalyst.accelerate(jax.scipy.linalg.expm)(A)
-        return B
+        return catalyst.accelerate(jax.scipy.linalg.expm)(A)
+
+    See https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html
     """
             )
         return (self.fn)(*args, **kwargs)

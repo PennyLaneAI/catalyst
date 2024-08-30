@@ -91,7 +91,7 @@ class TestExpmWarnings:
 
         with pytest.warns(
             UserWarning,
-            match="catalyst.qjit occasionally gives wrong numerical results for functions in jax.scipy.linalg.",
+            match="jax.scipy.linalg.expm occasionally gives wrong numerical results",
         ):
             f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
 
