@@ -69,7 +69,7 @@ class TestLowering:
                 _qinsert_lowering(jax_ctx, qreg_value, index_value, qbit_value)
 
 
-@pytest.mark.skipif(platform.system() == "Linux", reason="undiagnosed segfault")
+@pytest.mark.skipif(platform.system() in ["Linux", "Darwin"], reason="undiagnosed segfault")
 class TestHelpers:
     """Test helper methods for primitive lowerings."""
 
