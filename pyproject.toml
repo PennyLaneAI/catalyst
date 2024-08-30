@@ -14,7 +14,12 @@ extend-exclude = '''
 [tool.isort]
 py_version=311
 profile = "black"
-skip = ["frontend/test/conftest.py", "frontend/catalyst/test/test_oqc/conftest.py"]
+skip = [
+  "catalyst/mlir/llvm-project",
+  "frontend/catalyst/test/test_oqc/conftest.py",
+  "frontend/catalyst/third_party",
+  "frontend/test/conftest.py",
+]
 extend_skip_glob = [
   "mlir/llvm-project/*",
   "mlir/mlir-hlo/*",
@@ -27,7 +32,7 @@ extend_skip_glob = [
   "_deps/*",
 ]
 known_first_party = ["catalyst"]
-known_third_party = ["diastatic-malt", "jax", "jaxlib", "pennylane"]
+known_third_party = ["diastatic-malt", "jax", "jaxlib", "numpy", "pennylane"]
 
 [tool.bandit]
 skips = ["B607"]

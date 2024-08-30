@@ -60,7 +60,7 @@ pl_min_release = 0.37
 lq_min_release = pl_min_release
 
 if pl_version is not None:
-    pennylane_dep = f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}"
+    pennylane_dep = f"pennylane=={pl_version}"  # use TestPyPI wheels, git is not allowed on PyPI
 else:
     pennylane_dep = f"pennylane>={pl_min_release}"
 if lq_version is not None:
@@ -185,6 +185,8 @@ elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
     # Here we need to switch the deault to MacOs dynamic lib
     variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
+    if sysconfig.get_config_var("LDCXXSHARED"):
+        variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],

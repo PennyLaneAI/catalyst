@@ -85,6 +85,8 @@ void LightningSimulator::SetDeviceShots(size_t shots) { this->device_shots = sho
 
 auto LightningSimulator::GetDeviceShots() const -> size_t { return this->device_shots; }
 
+void LightningSimulator::SetDevicePRNG(std::mt19937 *gen) { this->gen = gen; }
+
 void LightningSimulator::PrintState()
 {
     using std::cout;
@@ -100,6 +102,21 @@ void LightningSimulator::PrintState()
         cout << state[idx] << ", ";
     }
     cout << state[idx] << "]" << endl;
+}
+
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data,
+                                  std::vector<QubitIdType> &wires)
+{
+    std::vector<std::complex<double>> data_vector(data.begin(), data.end());
+    std::vector<std::size_t> wires_size_t(wires.begin(), wires.end());
+    this->device_sv->setStateVector(data_vector, wires_size_t);
+}
+
+void LightningSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
+{
+    std::vector<std::size_t> data_vector(data.begin(), data.end());
+    std::vector<std::size_t> wires_size_t(wires.begin(), wires.end());
+    this->device_sv->setBasisState(data_vector, wires_size_t);
 }
 
 auto LightningSimulator::Zero() const -> Result
@@ -433,7 +450,7 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
     SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
-    bool mres = Lightning::simulateDraw(probs, postselect);
+    bool mres = Lightning::simulateDraw(probs, postselect, this->gen);
     auto dev_wires = getDeviceWires(wires);
     this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
     return mres ? this->One() : this->Zero();

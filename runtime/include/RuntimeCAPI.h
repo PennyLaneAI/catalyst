@@ -24,7 +24,7 @@ extern "C" {
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
-void __catalyst__rt__initialize();
+void __catalyst__rt__initialize(uint32_t *seed);
 void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *);
 void __catalyst__rt__device_release();
 void __catalyst__rt__finalize();
@@ -48,6 +48,8 @@ RESULT *__catalyst__rt__result_get_one();
 RESULT *__catalyst__rt__result_get_zero();
 
 // Quantum Gate Set Instructions
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *, uint64_t, ...);
+void __catalyst__qis__SetBasisState(MemRefT_int8_1d *, uint64_t, ...);
 void __catalyst__qis__Identity(QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliX(QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliY(QUBIT *, const Modifiers *);

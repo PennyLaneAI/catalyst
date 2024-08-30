@@ -72,13 +72,15 @@ PYBIND11_MODULE(compiler_driver, m)
         .def("get_function_attributes",
              [](const CompilerOutput &co) -> FunctionAttributes { return co.inferredAttributes; })
         .def("get_diagnostic_messages",
-             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; });
+             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; })
+        .def("get_is_checkpoint_found",
+             [](const CompilerOutput &co) -> bool { return co.isCheckpointFound; });
 
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool verbose, py::list pipelines,
-           bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
+           bool asyncQnodes, bool verbose, py::list pipelines, bool lower_to_llvm,
+           const char *checkpointStage) -> std::unique_ptr<CompilerOutput> {
             // Install signal handler to catch user interrupts (e.g. CTRL-C).
             signal(SIGINT,
                    [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
@@ -93,9 +95,11 @@ PYBIND11_MODULE(compiler_driver, m)
                                     .moduleName = moduleName,
                                     .diagnosticStream = errStream,
                                     .keepIntermediate = keepIntermediate,
+                                    .asyncQnodes = asyncQnodes,
                                     .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .lowerToLLVM = lower_to_llvm};
+                                    .lowerToLLVM = lower_to_llvm,
+                                    .checkpointStage = checkpointStage};
 
             errStream.flush();
 
@@ -105,6 +109,7 @@ PYBIND11_MODULE(compiler_driver, m)
             return output;
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
-        py::arg("keep_intermediate") = false, py::arg("verbose") = false,
-        py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true);
+        py::arg("keep_intermediate") = false, py::arg("async_qnodes") = false,
+        py::arg("verbose") = false, py::arg("pipelines") = py::list(),
+        py::arg("lower_to_llvm") = true, py::arg("checkpoint_stage") = "");
 }

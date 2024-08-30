@@ -115,6 +115,34 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
                         "allocation is not supported by OpenQasmDevice"));
 }
 
+TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
+
+    constexpr size_t n = 2;
+    device->AllocateQubits(n);
+
+    std::vector<int8_t> state{1};
+    DataView<int8_t, 1> view(state);
+    std::vector<QubitIdType> wires{0};
+    REQUIRE_THROWS_WITH(device->SetBasisState(view, wires),
+                        Catch::Contains("Unsupported functionality"));
+}
+
+TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
+
+    constexpr size_t n = 2;
+    device->AllocateQubits(n);
+
+    std::vector<std::complex<double>> state{{1.0, 0.0}};
+    DataView<std::complex<double>, 1> view(state);
+    std::vector<QubitIdType> wires{0};
+    REQUIRE_THROWS_WITH(device->SetState(view, wires),
+                        Catch::Contains("Unsupported functionality"));
+}
+
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 {
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
@@ -532,7 +560,7 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
 
 TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     char device_aws[30] = "braket.aws.qubit";
 
@@ -545,7 +573,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[
 
     __catalyst__rt__finalize();
 
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     char device_local[30] = "braket.local.qubit";
 

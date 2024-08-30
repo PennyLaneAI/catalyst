@@ -301,7 +301,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     auto unrecoverableError = AsyncUtils::lookupOrCreateUnrecoverableError(moduleOp);
 
     auto callee = maybeCallee.value();
-    rewriter.updateRootInPlace(callee, [&] { callee.setLinkage(LLVM::Linkage::Internal); });
+    rewriter.modifyOpInPlace(callee, [&] { callee.setLinkage(LLVM::Linkage::Internal); });
 
     // llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
     // %results = call @async_execute_fn()
@@ -733,7 +733,6 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         auto terminator = abort->getTerminator();
         rewriter.setInsertionPoint(terminator);
-        assert(isa<LLVM::UnreachableOp>(terminator));
         auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
         // Make sure we clean it up later.
         AsyncUtils::annotateBrToUnreachable(brOp, rewriter);
@@ -767,7 +766,7 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
 void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
                              PatternRewriter &rewriter)
 {
-    rewriter.updateRootInPlace(callerOp, [&] {
+    rewriter.modifyOpInPlace(callerOp, [&] {
         auto personalityAttr = FlatSymbolRefAttr::get(personality.getSymNameAttr());
         callerOp.setPersonalityAttr(personalityAttr);
     });
@@ -887,7 +886,12 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns1(context);
         patterns1.add<DetectCallsInAsyncRegionsTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1)))) {
+
+        GreedyRewriteConfig config;
+        config.strictMode = GreedyRewriteStrictness::ExistingOps;
+        config.enableRegionSimplification = false;
+
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1), config))) {
             signalPassFailure();
         }
 
@@ -897,7 +901,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns2(context);
         patterns2.add<AddExceptionHandlingTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2), config))) {
             signalPassFailure();
         }
 
@@ -907,7 +911,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns3(context);
         patterns3.add<RemoveAbortInsertCallTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3), config))) {
             signalPassFailure();
         }
 
@@ -917,7 +921,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns4(context);
         patterns4.add<LivenessAnalysisDropRef>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4), config))) {
             signalPassFailure();
         }
 
@@ -927,7 +931,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
 
         RewritePatternSet patterns5(context);
         patterns5.add<CleanUpSourceTransform, BranchToUnreachableTransform>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5), config))) {
             signalPassFailure();
         }
     }

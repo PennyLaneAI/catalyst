@@ -45,7 +45,6 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
-    validate_device_capabilities,
 )
 from catalyst.jax_extras import (
     deduce_avals,
@@ -124,12 +123,9 @@ class QFunc:
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
-        program_features = ProgramFeatures(self.device.shots is not None)
+        program_features = ProgramFeatures(shots_present=bool(self.device.shots))
         device_capabilities = get_device_capabilities(self.device, program_features)
         backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
-
-        # Validate decive operations against the declared capabilities
-        validate_device_capabilities(self.device, device_capabilities)
 
         if isinstance(self.device, qml.devices.Device):
             qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
@@ -137,23 +133,31 @@ class QFunc:
             qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
         static_argnums = kwargs.pop("static_argnums", ())
+        out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
-        def _eval_quantum(*args):
-            closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, qjit_device, args, kwargs, self, static_argnums
+        def _eval_quantum(*args, **kwargs):
+            closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
+                self.func,
+                qjit_device,
+                args,
+                kwargs,
+                self,
+                static_argnums,
             )
+
+            out_tree_expected.append(out_tree_exp)
             dynamic_args = filter_static_args(args, static_argnums)
-            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args)
+            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args, **kwargs)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 
         flattened_fun, _, _, out_tree_promise = deduce_avals(
-            _eval_quantum, args, {}, static_argnums
+            _eval_quantum, args, kwargs, static_argnums
         )
         dynamic_args = filter_static_args(args, static_argnums)
-        args_flat = tree_flatten(dynamic_args)[0]
+        args_flat = tree_flatten((dynamic_args, kwargs))[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
@@ -263,6 +267,14 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results, interface="jax")
+
+        out = parse_native_mid_circuit_measurements(
+            cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+        )
+        if len(cpy_tape.measurements) == 1:
+            out = (out,)
+        out_tree_expected = kwargs.pop("_out_tree_expected", [])
+        out = tree_unflatten(out_tree_expected[0], out)
+        return out
 
     return one_shot_wrapper

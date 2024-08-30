@@ -11,11 +11,18 @@ Module: catalyst
     :include-all-objects:
     :no-inheritance-diagram:
 
-
 Module: catalyst.debug
 ----------------------
 
 .. automodapi:: catalyst.debug
+    :no-heading:
+    :no-inheritance-diagram:
+    :fullname:
+
+Module: catalyst.passes
+---------------------------------
+
+.. automodapi:: catalyst.passes
     :no-heading:
     :no-inheritance-diagram:
     :fullname:

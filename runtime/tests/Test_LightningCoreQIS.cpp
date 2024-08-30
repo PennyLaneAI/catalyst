@@ -174,7 +174,7 @@ TEST_CASE("Test device release after driver release", "[CoreQIS]")
     auto devices = getDevices();
     auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
 
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                 (int8_t *)rtd_kwargs.c_str());
     QUBIT *q = __catalyst__rt__qubit_allocate();
@@ -199,7 +199,7 @@ TEST_CASE("Test device init before device release", "[CoreQIS]")
 
 TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -227,7 +227,7 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 
 TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -252,7 +252,7 @@ TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
 
 TEST_CASE("Test __catalyst__rt__print_state", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -277,7 +277,7 @@ TEST_CASE("Test __catalyst__rt__print_state", "[CoreQIS]")
 
 TEST_CASE("Test __catalyst__qis__State with wires", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -303,7 +303,7 @@ TEST_CASE("Test __catalyst__qis__State with wires", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__Identity", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -333,7 +333,7 @@ TEST_CASE("Test __catalyst__qis__Identity", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__PauliX", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -363,7 +363,7 @@ TEST_CASE("Test __catalyst__qis__PauliX", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__ PauliY and Rot", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -456,7 +456,7 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
 
 TEST_CASE("Test memref alloc", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
     CHECK(a != NULL);
     *a = 1;
@@ -465,7 +465,7 @@ TEST_CASE("Test memref alloc", "[CoreQIS]")
 
 TEST_CASE("Test memref aligned alloc", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
 
     // macOS requires the alignment of 'aligned_alloc' is at least 8-byte
     int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(8, 2 * sizeof(int));
@@ -476,7 +476,7 @@ TEST_CASE("Test memref aligned alloc", "[CoreQIS]")
 
 TEST_CASE("Test memref free", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
     CHECK(a != NULL);
     *a = 1;
@@ -486,7 +486,7 @@ TEST_CASE("Test memref free", "[CoreQIS]")
 
 TEST_CASE("Test memory transfer in rt", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
     bool is_in_rt = _mlir_memory_transfer(a);
     CHECK(is_in_rt);
@@ -496,7 +496,7 @@ TEST_CASE("Test memory transfer in rt", "[CoreQIS]")
 
 TEST_CASE("Test memory transfer not in rt", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     int *a = (int *)malloc(sizeof(int));
     bool is_in_rt = _mlir_memory_transfer(a);
     CHECK(!is_in_rt);
@@ -507,7 +507,7 @@ TEST_CASE("Test memory transfer not in rt", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__Measure", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -532,7 +532,7 @@ TEST_CASE("Test __catalyst__qis__Measure", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -569,7 +569,7 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
 
 TEST_CASE("Test __catalyst__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -610,7 +610,7 @@ TEST_CASE("Test __catalyst__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__ GlobalPhase", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -635,7 +635,7 @@ TEST_CASE("Test __catalyst__qis__ GlobalPhase", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -681,7 +681,7 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "
 TEST_CASE("Test __catalyst__qis__ PhaseShift", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -720,7 +720,7 @@ TEST_CASE("Test __catalyst__qis__ PhaseShift", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__HermitianObs with an uninitialized matrix", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -738,7 +738,7 @@ TEST_CASE("Test __catalyst__qis__HermitianObs with an uninitialized matrix", "[C
 TEST_CASE("Test __catalyst__qis__HermitianObs with invalid Hermitian matrix", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -755,7 +755,7 @@ TEST_CASE("Test __catalyst__qis__HermitianObs with invalid Hermitian matrix", "[
 TEST_CASE("Test __catalyst__qis__HermitianObs with invalid number of wires", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -781,7 +781,7 @@ TEST_CASE("Test __catalyst__qis__HermitianObs with invalid number of wires", "[C
 TEST_CASE("Test __catalyst__qis__HermitianObs and Expval", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -843,7 +843,7 @@ TEST_CASE("Test __catalyst__qis__HermitianObs and Expval", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__TensorObs with invalid number of observables", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -860,7 +860,7 @@ TEST_CASE("Test __catalyst__qis__TensorObs with invalid number of observables", 
 TEST_CASE("Test __catalyst__qis__TensorProdObs and Expval", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -911,7 +911,7 @@ TEST_CASE("Test __catalyst__qis__TensorProdObs and Expval", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__HamiltonianObs with invalid coefficients", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -932,7 +932,7 @@ TEST_CASE(
     "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -954,7 +954,7 @@ TEST_CASE(
 TEST_CASE("Test __catalyst__qis__HamiltonianObs(h, x) and Expval", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1015,7 +1015,7 @@ TEST_CASE("Test __catalyst__qis__HamiltonianObs(h, x) and Expval", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1077,7 +1077,7 @@ TEST_CASE("Test __catalyst__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__HamiltonianObs(h, Ham(x)) and Expval", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1147,7 +1147,7 @@ TEST_CASE("Test __catalyst__qis__HamiltonianObs(h, Ham(x)) and Expval", "[CoreQI
 TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1194,7 +1194,7 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, 
           "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1240,7 +1240,7 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, 
 TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1277,7 +1277,7 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[
 TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Probs", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1314,7 +1314,7 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pr
 TEST_CASE("Test __catalyst__qis__State on the heap using malloc", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1358,7 +1358,7 @@ TEST_CASE("Test __catalyst__qis__State on the heap using malloc", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__Measure with false", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1381,7 +1381,7 @@ TEST_CASE("Test __catalyst__qis__Measure with false", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__Measure with true", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1404,7 +1404,7 @@ TEST_CASE("Test __catalyst__qis__Measure with true", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__MultiRZ", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1437,7 +1437,7 @@ TEST_CASE("Test __catalyst__qis__MultiRZ", "[CoreQIS]")
 TEST_CASE("Test __catalyst__qis__CSWAP ", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1471,7 +1471,7 @@ TEST_CASE("Test __catalyst__qis__Counts with num_qubits=2 calling Hadamard, Cont
           "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1518,7 +1518,7 @@ TEST_CASE("Test __catalyst__qis__Counts with num_qubits=2 PartialCounts calling 
           "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1558,7 +1558,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 calling Hadamard, Cont
           "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1625,7 +1625,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
           "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1678,7 +1678,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
 TEST_CASE("Test __catalyst__qis__QubitUnitary with an uninitialized matrix", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1699,7 +1699,7 @@ TEST_CASE("Test __catalyst__qis__QubitUnitary with an uninitialized matrix", "[C
 TEST_CASE("Test __catalyst__qis__QubitUnitary with invalid number of wires", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1721,7 +1721,7 @@ TEST_CASE("Test __catalyst__qis__QubitUnitary with invalid number of wires", "[C
 TEST_CASE("Test __catalyst__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1747,7 +1747,7 @@ TEST_CASE("Test __catalyst__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
 
 TEST_CASE("Test __catalyst__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -1801,7 +1801,7 @@ TEST_CASE("Test __catalyst__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
 TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1912,7 +1912,7 @@ TEST_CASE("Test that an exception is raised unconditionally", "[CoreQIS]")
     auto devices = getDevices();
     auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
 
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                 (int8_t *)rtd_kwargs.c_str());
 
@@ -1928,7 +1928,7 @@ TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[
     auto devices = getDevices();
     auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
 
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                 (int8_t *)rtd_kwargs.c_str());
 
@@ -1947,7 +1947,7 @@ TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[
 TEST_CASE("Test __catalyst__qis__ Hadamard, IsingZZ", "[CoreQIS]")
 {
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __catalyst__rt__initialize();
+        __catalyst__rt__initialize(nullptr);
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -1975,6 +1975,81 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, IsingZZ", "[CoreQIS]")
         CHECK(state[2].imag == Approx(0.1913417162).margin(1e-5));
         CHECK(state[3].real == Approx(0.4619397663).margin(1e-5));
         CHECK(state[3].imag == Approx(-0.1913417162).margin(1e-5));
+
+        freeState(result);
+        __catalyst__rt__qubit_release_array(qs);
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+}
+
+TEST_CASE("Test __catalyst__qis__SetState", "[CoreQIS]")
+{
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__initialize(nullptr);
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+        QUBIT **wire0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+
+        MemRefT_CplxT_double_1d state = getState(2);
+        state.data_aligned[0] = {0.5, 0.5};
+        state.data_aligned[1] = {0.0, 0.0};
+
+        __catalyst__qis__SetState(&state, 1, *wire0);
+
+        MemRefT_CplxT_double_1d result = getState(2);
+
+        __catalyst__qis__State(&result, 0);
+        CplxT_double *buffer = result.data_allocated;
+
+        CHECK(buffer[0].real == Approx(0.5).margin(1e-5));
+        CHECK(buffer[0].imag == Approx(0.5).margin(1e-5));
+        CHECK(buffer[1].real == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].imag == Approx(0.0).margin(1e-5));
+
+        freeState(state);
+        freeState(result);
+        __catalyst__rt__qubit_release_array(qs);
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+}
+
+TEST_CASE("Test __catalyst__qis__SetBasisState", "[CoreQIS]")
+{
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__initialize(nullptr);
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+        QUBIT **wire0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+
+        std::array<int8_t, 1> buffer_i1 = {0};
+        MemRefT_int8_1d buff{buffer_i1.data(), buffer_i1.data(), 0, {1}, {1}};
+        __catalyst__qis__SetBasisState(&buff, 1, *wire0);
+        MemRefT_CplxT_double_1d result = getState(2);
+
+        __catalyst__qis__State(&result, 0);
+        CplxT_double *buffer = result.data_allocated;
+
+        CHECK(buffer[0].real == Approx(1.0).margin(1e-5));
+        CHECK(buffer[0].imag == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].real == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].imag == Approx(0.0).margin(1e-5));
+
+        buffer_i1 = {1};
+        buff = {buffer_i1.data(), buffer_i1.data(), 0, {1}, {1}};
+        __catalyst__qis__SetBasisState(&buff, 1, *wire0);
+
+        __catalyst__qis__State(&result, 0);
+
+        CHECK(buffer[0].real == Approx(0.0).margin(1e-5));
+        CHECK(buffer[0].imag == Approx(0.0).margin(1e-5));
+        CHECK(buffer[1].real == Approx(1.0).margin(1e-5));
+        CHECK(buffer[1].imag == Approx(0.0).margin(1e-5));
 
         freeState(result);
         __catalyst__rt__qubit_release_array(qs);

@@ -170,7 +170,7 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and
 
 TEST_CASE("Test __catalyst__qis__ circuit with observables", "[CacheManager]")
 {
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
@@ -221,7 +221,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables using deactiveCacheMa
           "[CacheManager]")
 {
 
-    __catalyst__rt__initialize();
+    __catalyst__rt__initialize(nullptr);
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());

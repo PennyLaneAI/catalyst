@@ -17,11 +17,20 @@ This module contains the functions to verify quantum tapes are fully compatible
 with the compiler and device.
 """
 
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, Union
 
 from pennylane import transform
-from pennylane.measurements import MutualInfoMP, StateMP, VarianceMP, VnEntropyMP
-from pennylane.operation import Operation, Tensor
+from pennylane.measurements import (
+    ExpectationMP,
+    MutualInfoMP,
+    SampleMeasurement,
+    StateMeasurement,
+    StateMP,
+    VarianceMP,
+    VnEntropyMP,
+)
+from pennylane.measurements.shots import Shots
+from pennylane.operation import Operation, StatePrepBase, Tensor
 from pennylane.ops import (
     Adjoint,
     CompositeOp,
@@ -200,7 +209,13 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # is handled in _inv_op_checker and _ctrl_op_checker.
         # Specialed control op classes (e.g. CRZ) should be checked directly though, which is why we
         # can't use isinstance(op, Controlled).
-        if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
+        if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
+            pass
+        # Don't check StatePrep since StatePrep is not in the list of device capabilities.
+        # It is only valid when the TOML file has the initial_state_prep_flag.
+        elif (
+            isinstance(op, StatePrepBase) and qjit_device.qjit_capabilities.initial_state_prep_flag
+        ):
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
             raise CompileError(
@@ -271,8 +286,8 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 
 @transform
-def validate_observables(
-    tape: QuantumTape, qjit_capabilities: dict, name: str
+def validate_measurements(
+    tape: QuantumTape, qjit_capabilities: dict, name: str, shots: Union[int, Shots]
 ) -> (Sequence[QuantumTape], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
     from the TOML file.
@@ -280,14 +295,15 @@ def validate_observables(
     Args:
         tape (QuantumTape or QNode or Callable): a quantum circuit.
         qjit_capabilities (dict): specifies the capabilities of the qjitted device
-        name (str): the name of the device to use in error messages.
+        name: the name of the device to use in error messages
+        shots: the shots on the device to use in error messages
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[.QuantumTape], function]:
         The unaltered input circuit.
 
     Raises:
-        CompileError: if an observable is not supported by the device with Catalyst
+        CompileError: if a measurement is not supported by the given device with Catalyst
 
     """
 
@@ -298,7 +314,29 @@ def validate_observables(
             )
 
     for m in tape.measurements:
+        # verify observable is supported
         if m.obs:
+            if not isinstance(m, (ExpectationMP, VarianceMP)):
+                raise CompileError(
+                    "Only expectation value and variance measurements can "
+                    "accept observables with Catalyst"
+                )
             _verify_observable(m.obs, _obs_checker)
+        # verify measurement process type is supported
+        if shots and not isinstance(m, SampleMeasurement):
+            raise CompileError(
+                f"State-based measurements like {m} cannot work with finite shots. "
+                "Please specify shots=None."
+            )
+        if not shots and not isinstance(m, StateMeasurement):
+            raise CompileError(
+                f"Sample-based measurements like {m} cannot work with shots=None. "
+                "Please specify a finite number of shots."
+            )
+        mp_name = m.return_type.value if m.return_type else type(m).__name__
+        if not mp_name.title() in qjit_capabilities.measurement_processes:
+            raise CompileError(
+                f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"
+            )
 
     return (tape,), lambda x: x[0]

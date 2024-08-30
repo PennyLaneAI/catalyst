@@ -28,7 +28,8 @@ sphinxext-opengraph==0.9.0
 matplotlib==3.8.0
 lxml_html_clean
 
-# Pre-install development lightning wheels
+# Pre-install PL development wheels
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.37.0
-pennylane-lightning==0.37.0
+pennylane-lightning-kokkos==0.38.0-dev34
+pennylane-lightning==0.38.0-dev34
+pennylane==0.38.0.dev11

@@ -69,7 +69,7 @@ def GradOp : Gradient_Op<"grad", [
 }
 
 def ValueAndGradOp : Gradient_Op<"value_and_grad", [
-        SameVariadicResultSize,
+        AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
         GradientOpInterface

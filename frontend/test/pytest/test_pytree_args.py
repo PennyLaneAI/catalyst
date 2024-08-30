@@ -122,7 +122,6 @@ class TestPyTreesReturnValues:
             qml.RX(params[1], wires=1)
             return (
                 qml.counts(),
-                qml.state(),
                 qml.expval(qml.PauliZ(0)),
             )
 
@@ -133,8 +132,25 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
-        assert len(result[1]) == 4
-        assert jnp.allclose(result[2], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
+        assert jnp.allclose(result[1], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
+
+        @qml.qnode(qml.device(backend, wires=2, shots=None))
+        def circuit4(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return (
+                qml.state(),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit4)
+        result = jitted_fn(params)
+        assert isinstance(result, tuple)
+        assert len(result[0]) == 4
+        assert jnp.allclose(result[1], expected_expval)
 
         @qjit
         def workflow(x):
@@ -244,7 +260,6 @@ class TestPyTreesReturnValues:
             qml.RX(params[1], wires=1)
             return {
                 "counts": qml.counts(),
-                "state": qml.state(),
                 "expval": {
                     "z0": qml.expval(qml.PauliZ(0)),
                 },
@@ -257,10 +272,29 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
-        assert len(result["state"]) == 4
         assert jnp.allclose(
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
+
+        @qml.qnode(qml.device(backend, wires=2, shots=None))
+        def circuit3(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return {
+                "state": qml.state(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit3)
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert len(result["state"]) == 4
+        assert jnp.allclose(result["expval"]["z0"], expected_expval)
 
         @qjit
         def workflow1(param):
