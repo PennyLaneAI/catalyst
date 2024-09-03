@@ -591,7 +591,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", closure),
             # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
-            # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
+            # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()  # pylint: disable=line-too-long
             # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax  # pylint: disable=line-too-long
             # https://github.com/PennyLaneAI/catalyst/issues/753
             # https://github.com/PennyLaneAI/catalyst/issues/1071
