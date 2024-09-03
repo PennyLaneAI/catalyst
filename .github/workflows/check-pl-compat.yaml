@@ -103,6 +103,7 @@ jobs:
         make dialects
         # TODO: remove workaround before merging to main
         pip install pennylane-lightning==0.38
+        pip install pennylane-lightning-kokkos==0.38
         pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
         make frontend
 
