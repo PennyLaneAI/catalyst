@@ -1160,6 +1160,8 @@ def trace_quantum_function(
             for i, tape in enumerate(tapes):
                 # Set up quantum register for the current tape.
                 # We just need to ensure there is a tape cut in between each.
+                # Each tape will be outlined into its own function with mlir pass
+                # -split-multiple-tapes
                 qdevice_p.bind(
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
