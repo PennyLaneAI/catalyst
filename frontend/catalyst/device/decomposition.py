@@ -229,14 +229,16 @@ def measurements_from_counts(tape):
     for i, m in enumerate(diagonal_measurements):
         if m.obs is not None:
             diagonalizing_gates.extend(m.obs.diagonalizing_gates())
-            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=m.wires)
+            wires = m.wires if m.wires else tape.wires
+            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=wires)
     # Add diagonalizing gates
     news_operations = tape.operations
     news_operations.extend(diagonalizing_gates)
     # Transform tape
     measured_wires = set()
     for m in diagonal_measurements:
-        measured_wires.update(m.wires.tolist())
+        wires = m.wires if m.wires else tape.wires
+        measured_wires.update(wires.tolist())
 
     new_measurements = [qml.counts(wires=list(measured_wires))]
     new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
@@ -263,6 +265,8 @@ def measurements_from_counts(tape):
                 results_processed.append(
                     tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
                 )
+            else:
+                raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
         else:
@@ -271,11 +275,10 @@ def measurements_from_counts(tape):
 
     return [new_tape], postprocessing_counts
 
-
 @transform
 @debug_logger
 def measurements_from_samples(tape):
-    r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
+    r"""Replace all measurements from a tape with sample measurements, and adds postprocessing
     functions for each original measurement.
 
     Args:
@@ -285,9 +288,6 @@ def measurements_from_samples(tape):
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
         transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
 
-    .. note::
-
-        Samples are not supported.
     """
     if tape.samples_computational_basis and len(tape.measurements) > 1:
         _validate_computational_basis_sampling(tape)
@@ -333,6 +333,8 @@ def measurements_from_samples(tape):
                 results_processed.append(
                     tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
                 )
+            else:
+                raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
         else:
