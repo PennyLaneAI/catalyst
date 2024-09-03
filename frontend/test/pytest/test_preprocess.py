@@ -58,6 +58,7 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     decompose_ops_to_unitary,
     measurements_from_counts,
+    measurements_from_samples,
 )
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
@@ -125,12 +126,15 @@ class DummyDevice(Device):
         return transform_program, execution_config
 
 
-class DummyDeviceCounts(Device):
+class DummyDeviceLimitedMPs(Device):
     """A dummy device from the device API without wires."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
-    def __init__(self, wires, shots=1024):
+    def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
+        self.allow_samples = allow_samples
+        self.allow_counts=allow_counts
+        
         super().__init__(wires=wires, shots=shots)
 
     @staticmethod
@@ -160,7 +164,9 @@ class DummyDeviceCounts(Device):
                 continue
             if "Probs" in line:
                 continue
-            if "Sample" in line:
+            if "Sample" in line and not self.allow_samples:
+                continue
+            if "Counts" in line and not self.allow_counts:
                 continue
 
             updated_toml_contents.append(line)
@@ -276,33 +282,97 @@ class TestPreprocess:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qml.qjit(f, target="jaxpr")
 
-    def test_measurement_from_counts_integration_multiple_measurements(self):
-        """Test the measurment from counts transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4, shots=1000)
+    @pytest.mark.parametrize(
+        "measurement_transform, target_measurement", [(measurements_from_counts, "counts")]
+    )
+    def test_measurement_from_readout_measurements_integration_multiple_measurements(
+        self, measurement_transform, target_measurement
+    ):
+        """Test the transforms for measurement from device readout (counts or sample) to other measurement types
+        as part of the Catalyst pipeline."""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+
+        def _operations(theta):
+            qml.RY(theta, 0)
+            qml.RY(theta / 2, 1)
+            qml.RY(2 * theta, 2)
+            qml.RY(theta, 3)
 
         @qml.qjit
-        @measurements_from_counts
+        @measurement_transform
         @qml.qnode(dev)
         def circuit(theta: float):
-            qml.X(0)
-            qml.X(1)
-            qml.X(2)
-            qml.X(3)
+            _operations(theta)
             return (
                 qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                qml.var(qml.PauliX(wires=2)),
                 qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                qml.probs(wires=[3]),
             )
+
+        @qml.qnode(dev)
+        def counts_circuit(theta: float):
+            _operations(theta)
+            return qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2))
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "var" not in mlir
-        assert "counts" in mlir
+        assert target_measurement in mlir
 
-    def test_measurement_from_counts_integration_multiple_measurements_device(self):
-        """Test the measurment from counts transform as part of the Catalyst pipeline."""
-        with DummyDeviceCounts(wires=4, shots=1000) as dev:
+        theta = 1.9
 
+        expval_res, var_res, counts_res, probs_res = circuit(theta)
+
+        expval_expected = np.sin(theta) * np.sin(theta / 2)
+        var_expected = 1 - np.sin(2 * theta) ** 2
+        counts_expected = counts_circuit(theta)
+        probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
+
+        assert np.isclose(expval_res, expval_expected, atol=0.03)
+        assert np.isclose(var_res, var_expected, atol=0.03)
+        assert np.allclose(probs_res, probs_expected, atol=0.03)
+
+        # counts comparison by converting catalyst format to PL style eigvals dict
+        basis_states, counts = counts_res
+        num_excitations_per_state = [
+            sum(int(i) for i in format(int(state), "01b")) for state in basis_states
+        ]
+        eigvals = [(-1) ** i for i in num_excitations_per_state]
+        eigval_counts_res = {
+            -1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == -1]),
+            1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == 1]),
+        }
+
+        # +/- 100 shots is pretty reasonable with 3000 shots total
+        assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=100)
+        assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=100)
+
+    @pytest.mark.parametrize(
+        "device_measurements, measurement_transform, target_measurement",
+        [(["counts"], measurements_from_counts, "counts"),]
+    )
+    def test_measurement_from_counts_integration_multiple_measurements_device(
+        self, device_measurements, measurement_transform, target_measurement
+    ):
+        """Test the measurment from counts transform is applied as part of the Catalyst pipeline if the device only supports counts."""
+        allow_sample="sample" in device_measurements
+        allow_counts="counts" in device_measurements
+
+        with DummyDeviceLimitedMPs(wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample) as dev:
+
+            # transform is added to transform program
+            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
+            backend_info = extract_backend_info(dev, dev_capabilities)
+            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+                transform_program, _ = qjit_dev.preprocess(ctx)
+
+            assert measurement_transform in transform_program
+
+            # MLIR only contains target measurement
             @qml.qjit
             @qml.qnode(dev)
             def circuit(theta: float):
@@ -310,32 +380,47 @@ class TestPreprocess:
                 qml.X(1)
                 qml.X(2)
                 qml.X(3)
-                return qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1))
+                return (
+                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                    qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                    qml.probs(wires=[3, 4]),
+                )
 
             mlir = qml.qjit(circuit, target="mlir").mlir
 
             assert "expval" not in mlir
             assert "var" not in mlir
-            assert "counts" in mlir
+            assert target_measurement in mlir
 
-    def test_measurement_from_counts_integration_single_measurement(self):
+    @pytest.mark.parametrize(
+        "measurement_transform, target_measurement", [(measurements_from_counts, "counts")]
+    )
+    def test_measurement_from_counts_integration_single_measurement(
+        self, measurement_transform, target_measurement
+    ):
         """Test the measurment from counts transform with a single measurements as part of
         the Catalyst pipeline."""
-        dev = DummyDevice(wires=4, shots=1000)
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
 
         @qml.qjit
-        @measurements_from_counts
+        @measurement_transform
         @qml.qnode(dev)
         def circuit(theta: float):
-            qml.X(0)
-            qml.X(1)
-            qml.X(2)
-            qml.X(3)
-            return qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1))
+            qml.RX(theta, 0)
+            qml.RX(theta, 1)
+            return qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1))
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
-        assert "counts" in mlir
+        assert target_measurement in mlir
+
+        theta = 2.5
+        expected_res = np.sin(theta) ** 2
+        res = circuit(theta)
+
+        assert np.allclose(res, expected_res, atol=0.05)
 
     def test_measurements_are_split(self, mocker):
         """Test that the split_to_single_terms or split_non_commuting transform
@@ -879,7 +964,7 @@ class TestPreprocessHybridOp:
 
 
 class TestTransform:
-    """Test the transforms implemented in Catalyst."""
+    """Test the measurement transforms implemented in Catalyst."""
 
     def test_measurements_from_counts(self):
         """Test the transfom measurements_from_counts."""
