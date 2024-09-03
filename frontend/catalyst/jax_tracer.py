@@ -1157,7 +1157,7 @@ def trace_quantum_function(
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             qnode_transformed = len(qnode_program) > 0
-            for i, tape in enumerate(tapes):
+            for tape in tapes:
                 # Set up quantum register for the current tape.
                 # We just need to ensure there is a tape cut in between each.
                 # Each tape will be outlined into its own function with mlir pass

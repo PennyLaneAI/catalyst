@@ -98,7 +98,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     }
 
     void CreateTapeFunction(SmallVector<Operation *> *TapeOps,
-                            SmallVector<Value> &NecessaryValuesForPostProcessing,
+                            SmallVector<Value> &NecessaryValuesFromEarlierTapes,
                             IRRewriter &builder, Operation *module, unsigned int tape_number,
                             StringRef OriginalMultitapeFuncName)
     {
@@ -108,7 +108,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         SmallVector<Value> RetValues;
         SmallVector<mlir::Type> RetTypes;
 
-        for (Value v : NecessaryValuesForPostProcessing) {
+        for (Value v : NecessaryValuesFromEarlierTapes) {
             Operation *VDefOp = v.getDefiningOp();
             if (std::find(TapeOps->begin(), TapeOps->end(), VDefOp) != TapeOps->end()) {
                 // This Value needed for PP is in this tape!
@@ -131,7 +131,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                     // A tape operand not produced in this tape itself,
                     // must be from the tapes/preprocessing!
                     // Need to be replaced by the previous tape functions' return values
-                    NecessaryValuesForPostProcessing.push_back(operand);
+                    NecessaryValuesFromEarlierTapes.push_back(operand);
                 }
             }
         }
@@ -211,8 +211,9 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         //}
 
         // 3. Get the SSA values needed by the post processing (PP)
-        // These need to be returned by the tapes
-        SmallVector<Value> NecessaryValuesForPostProcessing;
+        // These need to be returned by the tapes.
+        // Note that later tapes can also need values from earilier tapes.
+        SmallVector<Value> NecessaryValuesFromEarlierTapes;
 
         // Go through all the operands of all the PP ops
         // Find the ones that are not produced in PP itself
@@ -224,7 +225,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 if (std::find(PPOps.begin(), PPOps.end(), OperandSource) == PPOps.end()) {
                     // A PP operand not produced in PP itself, must be from the tapes/preprocessing!
                     // Need to be replaced by the tape functions' return values
-                    NecessaryValuesForPostProcessing.push_back(operand);
+                    NecessaryValuesFromEarlierTapes.push_back(operand);
                 }
             }
         }
@@ -234,7 +235,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         for (unsigned int i = 0; i < NumTapes; i++) {
 
             CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                               NecessaryValuesForPostProcessing, builder, module,
+                               NecessaryValuesFromEarlierTapes, builder, module,
                                OpsEachTape.size() - 3 - i, func.getSymName());
         }
 
