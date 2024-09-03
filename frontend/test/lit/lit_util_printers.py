@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Lit test utilities for printing out qjit jaxpr and mlir.
+"""
+
 
 def print_attr(f, attr, *args, aot: bool = False, **kwargs):
     """Print function attribute"""

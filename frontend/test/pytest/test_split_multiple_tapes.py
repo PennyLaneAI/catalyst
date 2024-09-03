@@ -13,8 +13,8 @@
 # limitations under the License.
 
 """
-This file performs the frontend pytest checking that multi-tape transforms retain correct funcitonality
-after splitting each tape into a separate function in mlir.
+This file performs the frontend pytest checking that multi-tape transforms retain 
+correct funcitonality after splitting each tape into a separate function in mlir.
 """
 
 from typing import Callable, Sequence
@@ -23,11 +23,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-import catalyst
 from catalyst import qjit
 
 
 def test_split_multiple_tapes():
+    """
+    Test that multi-tape qnodes have the same functionality as core PL.
+    """
     dev = qml.device("lightning.qubit", wires=2)
 
     def my_quantum_transform(
