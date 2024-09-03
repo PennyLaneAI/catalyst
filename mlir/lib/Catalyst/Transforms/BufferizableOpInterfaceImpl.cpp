@@ -1,5 +1,6 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/IR/UnstructuredControlFlow.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -114,8 +115,24 @@ struct CustomCallOpInterface
 };
 
 struct CallbackOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<CallbackOpInterface,
-                                                    CallbackOp> {
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+                                                            CallbackOpInterface, CallbackOp> {
+
+    static bool supportsUnstructuredControlFlow() { return true; }
+
+    bool hasTensorSemantics(Operation *op) const {
+        auto isaTensor = llvm::IsaPred<TensorType>;
+
+        // A function has tensor semantics if it has tensor arguments/results.
+        auto callbackOp = cast<CallbackOp>(op);
+        bool hasTensorArg = any_of(callbackOp.getArgumentTypes(), isaTensor);
+        bool hasTensorResult = any_of(callbackOp.getResultTypes(), isaTensor);
+        if (hasTensorArg || hasTensorResult)
+            return true;
+
+        return false;
+    }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const {
         return true;
@@ -136,20 +153,21 @@ struct CallbackOpInterface
                             const bufferization::BufferizationOptions &options) const {
         auto callbackOp = cast<CallbackOp>(op);
 
-        // Only match here if we have all memref arguments and return values.
-        // Only match if we have result types.
-        if (!llvm::any_of(callbackOp.getArgumentTypes(), [](Type argType) { return !isa<MemRefType>(argType); }) &&
-            !llvm::any_of(callbackOp.getResultTypes(),[](Type argType) { return !isa<MemRefType>(argType); }) &&
-            !callbackOp.getResultTypes().empty()) {
-
-            auto argTys = callbackOp.getArgumentTypes();
-            auto retTys = callbackOp.getResultTypes();
-            SmallVector<Type> emptyRets;
-            SmallVector<Type> args(argTys.begin(), argTys.end());
-            args.insert(args.end(), retTys.begin(), retTys.end());
-            auto callbackTy = rewriter.getFunctionType(args, emptyRets);
-            rewriter.modifyOpInPlace(op, [&] { callbackOp.setFunctionType(callbackTy); });
-        }
+         auto argTys = callbackOp.getArgumentTypes();
+         auto retTys = callbackOp.getResultTypes();
+         SmallVector<Type> emptyRets;
+         SmallVector<Type> args(argTys.begin(), argTys.end());
+         args.insert(args.end(), retTys.begin(), retTys.end());
+         SmallVector<Type> bufferArgs;
+         for (Type ty : args) {
+             auto tensorType = dyn_cast<RankedTensorType>(ty);
+             if (!tensorType)
+                 bufferArgs.push_back(ty);
+             else
+                 bufferArgs.push_back(MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
+         }
+         auto callbackTy = rewriter.getFunctionType(bufferArgs, emptyRets);
+         rewriter.modifyOpInPlace(op, [&] { callbackOp.setFunctionType(callbackTy); });
 
         return success();
     }

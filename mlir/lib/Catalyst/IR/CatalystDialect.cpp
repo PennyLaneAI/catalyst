@@ -14,6 +14,7 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
@@ -40,6 +41,8 @@ void CatalystDialect::initialize()
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, CustomCallOp,
+                         PrintOp, CallbackCallOp, CallbackOp>();
 }
 
 //===----------------------------------------------------------------------===//
