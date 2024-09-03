@@ -217,7 +217,6 @@ class TestCatalystCompareJaxpr:
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
         call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
-        # breakpoint()
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_globalphase(self):
