@@ -351,7 +351,9 @@ class TestPreprocess:
 
     @pytest.mark.parametrize(
         "device_measurements, measurement_transform, target_measurement",
-        [(["counts"], measurements_from_counts, "counts"),]
+        [(["counts"], measurements_from_counts, "counts"),
+        (["sample"], measurements_from_samples, "sample"),
+        (["counts", "sample"], measurements_from_samples, "sample")],
     )
     def test_measurement_from_counts_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement

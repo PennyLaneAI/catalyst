@@ -35,6 +35,7 @@ from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
     measurements_from_counts,
+    measurements_from_samples,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -519,6 +520,8 @@ class QJITDeviceNewAPI(qml.devices.Device):
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
+        if self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}]:
+            measurement_program.add_transform(measurements_from_samples)
         if self.measurement_processes == {"Counts"}:
             measurement_program.add_transform(measurements_from_counts)
 
