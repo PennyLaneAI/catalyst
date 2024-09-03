@@ -296,7 +296,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
-            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 // We are undoing the def-use chains of this gate's return values
                 // so that we can safely delete it (all quantum ops must be eliminated).
                 rewriter.replaceOp(gate, gate.getQubitOperands());

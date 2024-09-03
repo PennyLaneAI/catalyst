@@ -1403,6 +1403,21 @@ def test_pytrees_args_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
+def test_non_parametrized_circuit(backend):
+    """Test that the derivate of non parametrized circuit is null."""
+    dev = qml.device(backend, wires=1)
+
+    def cost(x):
+        @qml.qnode(dev)
+        def circuit(x):  # pylint: disable=unused-argument
+            qml.PauliX(wires=0)
+            return qml.expval(qml.PauliZ(wires=0))
+
+        return circuit(x)
+
+    assert np.allclose(qjit(grad(cost))(1.1), 0.0)
+
+
 @pytest.mark.xfail(reason="The verifier currently doesn't distinguish between active/inactive ops")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
@@ -1468,6 +1483,27 @@ def test_gradient_slice(backend):
     )(data, params["weights"], params["bias"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
+
+
+@pytest.mark.parametrize(
+    "gate,state", ((qml.BasisState, np.array([1])), (qml.StatePrep, np.array([0, 1])))
+)
+def test_paramshift_with_gates(gate, state):
+    """Test parameter shift works with a variety of gates present in the circuit."""
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @grad
+    @qml.qnode(dev, diff_method="parameter-shift")
+    def cost(x):
+        gate(state, wires=0)
+        qml.RY(x, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    param = 0.1
+    expected = cost(param)
+    observed = qjit(cost)(param)
+    assert np.allclose(expected, observed)
 
 
 class TestGradientErrors:
