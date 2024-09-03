@@ -15,23 +15,22 @@
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL:   func.func private @circuit.folded(%arg0: index) -> tensor<f64> {
-    // CHECK:   [[nQubits:%.+]] = arith.constant 2
     // CHECK:   [[c0:%.+]] = index.constant 0
     // CHECK:   [[c1:%.+]] = index.constant 1
     // CHECK:   quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
-    // CHECK:   [[qReg:%.+]] = call @circuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
+    // CHECK:   [[qReg:%.+]] = quantum.alloc( 2) : !quantum.reg
     // CHECK:   [[q0:%.+]] = quantum.extract [[qReg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK:   [[q0_out:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
-    // CHECK:   [[q0_out_1:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] -> (!quantum.bit) {
+    // CHECK:   [[q0_out:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] iter_args([[q0_in:%.+]] = [[q0]]) -> (!quantum.bit) {
+    // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_in]] : !quantum.bit
     // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_out]] {adjoint} : !quantum.bit
-    // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_out]] : !quantum.bit
     // CHECK:     scf.yield [[q0_out]]: !quantum.bit
+    // CHECK:   [[q0_out1:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
     // CHECK:   [[q1:%.+]] = quantum.extract [[qReg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK:   [[q01_out:%.+]] = quantum.custom "CNOT"() [[q0_out_1]],[[q1]] : !quantum.bit, !quantum.bit
-    // CHECK:   [[q01_out2:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] -> (!quantum.bit, !quantum.bit) {
-    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 {adjoint} : !quantum.bit, !quantum.bit
+    // CHECK:   [[q01_out:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] iter_args([[q01_in:%.+]] = [[q1]]) -> (!quantum.bit, !quantum.bit) {
     // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 : !quantum.bit, !quantum.bit
+    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 {adjoint} : !quantum.bit, !quantum.bit
     // CHECK:     scf.yield [[q01_out]] : (!quantum.bit, !quantum.bit)
+    // CHECK:   [[q01_out2:%.+]] = quantum.custom "CNOT"() [[q0_out1]],[[q1]] : !quantum.bit, !quantum.bit
     // CHECK:   [[q2:%.+]] = quantum.namedobs [[q01_out2]]#0[ PauliY] : !quantum.obs
     // CHECK:   [[results:%.+]] = quantum.expval [[q1]] : f64
     // CHECK:   [[tensorRes:%.+]] = tensor.from_elements [[result]] : tensor<f64>
@@ -41,11 +40,7 @@
     // CHECK:   quantum.device_release
     // CHECK:   return [[tensorRes]]
 
-// CHECK-LABEL:    func.func private @circuit.quantumAlloc(%arg0: i64) -> !quantum.reg {
-    // CHECK:    [[allocQreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
-    // CHECK:    return [[allocQreg]] : !quantum.reg
-
-//CHECK-LABEL: func.func @circuit -> tensor<f64> attributes {qnode} {
+//CHECK-LABEL: func.func @circuit() -> tensor<f64> attributes {qnode} {
 func.func @circuit() -> tensor<f64> attributes {qnode} {
     quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %0 = quantum.alloc( 2) : !quantum.reg
