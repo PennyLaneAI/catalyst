@@ -91,9 +91,6 @@ def mitigate_with_zne(
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
     """
 
-    if folding.upper() == "RANDOM":
-        raise NotImplementedError("Random global folding not yet implemented!")
-
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
@@ -152,7 +149,7 @@ class ZNE:
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
         # TODO: remove the following check once #755 is completed
-        if folding != Folding.GLOBAL:
+        if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
         results = zne_p.bind(
