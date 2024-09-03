@@ -27,7 +27,7 @@
     // CHECK:   [[q0_out1:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
     // CHECK:   [[q1:%.+]] = quantum.extract [[qReg]][ 1] : !quantum.reg -> !quantum.bit
     // CHECK:   [[q01_out:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] iter_args([[q01_in:%.+]] = [[q1]]) -> (!quantum.bit, !quantum.bit) {
-    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 : !quantum.bit, !quantum.bit
+    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_in]]#0, [[q01_in]]#1 : !quantum.bit, !quantum.bit
     // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 {adjoint} : !quantum.bit, !quantum.bit
     // CHECK:     scf.yield [[q01_out]] : (!quantum.bit, !quantum.bit)
     // CHECK:   [[q01_out2:%.+]] = quantum.custom "CNOT"() [[q0_out1]],[[q1]] : !quantum.bit, !quantum.bit
