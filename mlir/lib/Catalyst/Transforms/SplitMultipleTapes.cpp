@@ -235,8 +235,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         for (unsigned int i = 0; i < NumTapes; i++) {
 
             CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                               NecessaryValuesForPostProcessing,
-                               builder, module, OpsEachTape.size() - 3 - i, func.getSymName());
+                               NecessaryValuesForPostProcessing, builder, module,
+                               OpsEachTape.size() - 3 - i, func.getSymName());
         }
 
         // TODO: use smart ptrs instead of manually
