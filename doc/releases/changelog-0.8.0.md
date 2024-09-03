@@ -623,6 +623,25 @@
 * Bug fixed when parameter annotations return strings.
   [(#1078)](https://github.com/PennyLaneAI/catalyst/pull/1078)
 
+* In certain cases, `jax.scipy.linalg.expm`
+  [may return incorrect numerical results](https://github.com/PennyLaneAI/catalyst/issues/1071)
+  when used within a qjit-compiled function. A warning will now be raised
+  when `jax.scipy.linalg.expm` is used to inform of this issue.
+
+  In the meantime, we strongly recommend the
+  [catalyst.accelerate](https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html) function
+  within qjit-compiled function to call `jax.scipy.linalg.expm` directly.
+
+  ```python
+  @qjit
+  def f(A):
+      B = catalyst.accelerate(jax.scipy.linalg.expm)(A)
+      return B
+  ```
+
+  Note that this PR doesn't actually fix the aforementioned numerical errors, and just raises a warning.
+  [(#1082)](https://github.com/PennyLaneAI/catalyst/pull/1082)
+
 <h3>Documentation</h3>
 
 * A page has been added to the documentation, listing devices that are
