@@ -32,6 +32,7 @@ import pennylane as qml
 import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+from pennylane.measurements import SampleMP
 from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
@@ -133,8 +134,8 @@ class DummyDeviceLimitedMPs(Device):
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
-        self.allow_counts=allow_counts
-        
+        self.allow_counts = allow_counts
+
         super().__init__(wires=wires, shots=shots)
 
     @staticmethod
@@ -217,7 +218,7 @@ class OtherRX(qml.RX):
         return [qml.RX(*self.parameters, self.wires)]
 
 
-class TestPreprocess:
+class TestDecomposition:
     """Test the preprocessing transforms implemented in Catalyst."""
 
     def test_decompose_integration(self):
@@ -282,8 +283,12 @@ class TestPreprocess:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qml.qjit(f, target="jaxpr")
 
+
+class TestMeasurementTransforms:
+
     @pytest.mark.parametrize(
-        "measurement_transform, target_measurement", [(measurements_from_counts, "counts")]
+        "measurement_transform, target_measurement",
+        [(measurements_from_counts, "counts"), (measurements_from_samples, "sample")],
     )
     def test_measurement_from_readout_measurements_integration_multiple_measurements(
         self, measurement_transform, target_measurement
@@ -351,18 +356,25 @@ class TestPreprocess:
 
     @pytest.mark.parametrize(
         "device_measurements, measurement_transform, target_measurement",
-        [(["counts"], measurements_from_counts, "counts"),
-        (["sample"], measurements_from_samples, "sample"),
-        (["counts", "sample"], measurements_from_samples, "sample")],
+        [
+            (["counts"], measurements_from_counts, "counts"),
+            (["sample"], measurements_from_samples, "sample"),
+            (["counts", "sample"], measurements_from_samples, "sample"),
+        ],
     )
-    def test_measurement_from_counts_integration_multiple_measurements_device(
+    def test_measurement_from_readout_measurements_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
-        """Test the measurment from counts transform is applied as part of the Catalyst pipeline if the device only supports counts."""
-        allow_sample="sample" in device_measurements
-        allow_counts="counts" in device_measurements
+        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline if the
+        device only supports sample, and measurement_from_counts transform is applied  if the device only
+        supports counts. If both are supported, sample takes precedence."""
 
-        with DummyDeviceLimitedMPs(wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample) as dev:
+        allow_sample = "sample" in device_measurements
+        allow_counts = "counts" in device_measurements
+
+        with DummyDeviceLimitedMPs(
+            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
+        ) as dev:
 
             # transform is added to transform program
             dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
@@ -396,13 +408,37 @@ class TestPreprocess:
             assert target_measurement in mlir
 
     @pytest.mark.parametrize(
-        "measurement_transform, target_measurement", [(measurements_from_counts, "counts")]
+        "input_measurement, expected_res",
+        [
+            (lambda: qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1)), lambda theta: np.sin(theta) * np.sin(theta/2)),
+            (lambda: qml.counts(), None), # ToDo: add a check
+            (lambda: qml.counts(wires=[2]), None), # ToDo: add a check
+            (lambda: qml.var(qml.Y(wires=1)), lambda theta: 1-np.sin(theta/2)**2),
+            (lambda: qml.probs(), None),  # ToDo: add a check
+            (lambda: qml.probs(wires=[1]), lambda theta: [np.cos(theta/4)**2, np.sin(theta/4)**2]),
+            (lambda: qml.sample(), None), # ToDo: add a check
+            (lambda: qml.sample(wires=[2]), None), # ToDo: add a check
+        ],
     )
-    def test_measurement_from_counts_integration_single_measurement(
-        self, measurement_transform, target_measurement
+    @pytest.mark.parametrize(
+        "measurement_transform, target_measurement",
+        [
+            (measurements_from_counts, "counts"), 
+            (measurements_from_samples, "sample")
+        ],
+    )
+    def test_measurement_from_readout_measurements_integration_single_measurement(
+        self,
+        input_measurement,
+        expected_res,
+        measurement_transform,
+        target_measurement,
     ):
         """Test the measurment from counts transform with a single measurements as part of
         the Catalyst pipeline."""
+
+        if measurement_transform is measurements_from_counts and isinstance(input_measurement(), SampleMP):
+            pytest.skip("The measurement_from_counts transform does not support qml.sample")
 
         dev = qml.device("lightning.qubit", wires=4, shots=3000)
 
@@ -411,18 +447,29 @@ class TestPreprocess:
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
-            qml.RX(theta, 1)
-            return qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1))
+            qml.RX(theta/2, 1)
+            return input_measurement()
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert target_measurement in mlir
 
-        theta = 2.5
-        expected_res = np.sin(theta) ** 2
-        res = circuit(theta)
+        if expected_res:
+            theta = 2.5
+            assert np.allclose(circuit(theta), expected_res(theta), atol=0.05)
 
-        assert np.allclose(res, expected_res, atol=0.05)
+    def test_measurement_from_counts_raises_not_implemented(self):
+        """Test that an measurement not supported by the measurements_from_counts or
+        measurements_from_samples transform raises a NotImplementedError"""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        @qml.qjit
+        @measurements_from_counts
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            return qml.counts()
 
     def test_measurements_are_split(self, mocker):
         """Test that the split_to_single_terms or split_non_commuting transform
