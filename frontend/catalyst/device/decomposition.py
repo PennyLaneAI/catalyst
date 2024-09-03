@@ -29,6 +29,7 @@ from pennylane.measurements import (
     ExpectationMP,
     MidMeasureMP,
     ProbabilityMP,
+    SampleMP,
     VarianceMP,
 )
 from pennylane.tape.tape import (
@@ -295,14 +296,16 @@ def measurements_from_samples(tape):
     for i, m in enumerate(diagonal_measurements):
         if m.obs is not None:
             diagonalizing_gates.extend(m.obs.diagonalizing_gates())
-            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=m.wires)
+            wires = m.wires if m.wires else tape.wires
+            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=wires)
     # Add diagonalizing gates
     news_operations = tape.operations
     news_operations.extend(diagonalizing_gates)
     # Transform tape
     measured_wires = set()
     for m in diagonal_measurements:
-        measured_wires.update(m.wires.tolist())
+        wires = m.wires if m.wires else tape.wires
+        measured_wires.update(wires.tolist())
 
     new_measurements = [qml.sample(wires=list(measured_wires))]
     new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
@@ -333,6 +336,9 @@ def measurements_from_samples(tape):
                 results_processed.append(
                     tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
                 )
+            elif isinstance(m, SampleMP):
+                raise NotImplementedError
+                results_processed.append(tuple(results))
             else:
                 raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
         if len(tape.measurements) == 1:
