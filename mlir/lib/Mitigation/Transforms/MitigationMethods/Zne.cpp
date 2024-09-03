@@ -332,10 +332,10 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
 
     if (foldingAlgorithm == Folding(2)) {
-        return randomLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
+        return allLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
     }
     // Else, if (foldingAlgorithm == Folding(3)):
-    return allLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
+    return randomLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
                                                        mitigation::ZneOp op)
