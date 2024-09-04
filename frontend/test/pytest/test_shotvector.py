@@ -136,6 +136,22 @@ class TestShotVector:
 
             circuit()
 
+    def test_shot_vector_with_complex_container_sample(self):
+        """Test shot-vector with complex container sample"""
+        
+        dev = qml.device("lightning.qubit", wires=1, shots=((3, 4),))
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            return {"first": qml.sample(), "second": [100, qml.sample()], "third": (qml.sample(), qml.sample())}
+
+        assert list(circuit().keys()) == ["first", "second", "third"]
+        assert jnp.shape(circuit()["first"]) == (4, 3, 1)
+        assert circuit()["second"][0] == 100
+        assert jnp.shape(circuit()["second"][1]) == (4, 3, 1)
+        assert jnp.shape(circuit()["third"]) == (2, 4, 3, 1)
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
