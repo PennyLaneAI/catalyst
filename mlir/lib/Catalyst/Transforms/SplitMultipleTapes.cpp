@@ -26,6 +26,8 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 
+#include <memory>
+
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
@@ -49,8 +51,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         return count;
     }
 
-    void CollectOperationsForEachTape(func::FuncOp func,
-                                      SmallVector<SmallVector<Operation *> *> &OpsEachTape)
+    void CollectOperationsForEachTape(
+        func::FuncOp func, SmallVector<std::shared_ptr<SmallVector<Operation *>>> &OpsEachTape)
     {
         // During tracing, each tape starts with a qdevice_p primitive
         // This means each tape starts with a quantum.device
@@ -74,8 +76,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // OpsEachTape = [[preprocessing ops], [tape1 ops], [tape2 ops], ..., [postprocessing ops]]
 
         for (size_t i = 0; i < OpsEachTape.size(); i++) {
-            OpsEachTape[i] =
-                new SmallVector<Operation *>; // todo: use smart ptrs instead of manually
+            OpsEachTape[i] = std::make_shared<SmallVector<Operation *>>();
         }
 
         // special: [0] for pre and [-1] for post processing
@@ -97,7 +98,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         });
     }
 
-    LogicalResult CreateTapeFunction(SmallVector<Operation *> *TapeOps,
+    LogicalResult CreateTapeFunction(std::shared_ptr<SmallVector<Operation *>> TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
                                      IRRewriter &builder, unsigned int tape_number,
                                      func::FuncOp OriginalMultitapeFunc,
@@ -214,7 +215,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // for (auto func : MultitapePrograms){
         func::FuncOp func =
             MultitapePrograms[0]; // temporary! TODO: process all multitape functions
-        SmallVector<SmallVector<Operation *> *> OpsEachTape(countTapes(func) + 2, nullptr);
+        SmallVector<std::shared_ptr<SmallVector<Operation *>>> OpsEachTape(countTapes(func) + 2,
+                                                                           nullptr);
 
         CollectOperationsForEachTape(func, OpsEachTape);
         //}
@@ -265,11 +267,6 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
             func::FuncOp outlinedfunc = *outlined;
             outlinedfunc->moveAfter(func);
             outlinedfunc->setAttrs(OutlinedFuncAttrs);
-        }
-
-        // TODO: use smart ptrs instead of manually
-        for (auto _ : OpsEachTape) {
-            delete _;
         }
     }
 };
