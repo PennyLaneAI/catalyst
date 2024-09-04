@@ -20,11 +20,14 @@ from __future__ import annotations
 import jax
 from jax._src.lax.lax import _nary_lower_hlo
 from jax._src.lax.slicing import (
+    _argnum_weak_type,
+    _gather_dtype_rule,
     _gather_shape_computation,
     _is_sorted,
     _no_duplicate_dims,
     _rank,
     _sorted_dims_in_range,
+    standard_primitive,
 )
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue, Tracer, concrete_aval
@@ -35,6 +38,7 @@ __all__ = (
     "_gather_shape_rule_dynamic",
     "_sin_lowering2",
     "_cos_lowering2",
+    "gather2_p",
 )
 
 
@@ -184,6 +188,16 @@ def _gather_shape_rule_dynamic(
             )
 
     return _gather_shape_computation(indices, dimension_numbers, slice_sizes)
+
+
+# TODO: See the `_gather_shape_rule_dynamic` comment. Remove once the upstream change is
+# applied.
+gather2_p = standard_primitive(
+    _gather_shape_rule_dynamic,
+    _gather_dtype_rule,
+    "gather",
+    weak_type_rule=_argnum_weak_type(0),
+)
 
 
 def _sin_lowering2(ctx, x):
