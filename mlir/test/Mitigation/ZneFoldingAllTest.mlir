@@ -36,7 +36,7 @@
     // CHECK:   [[tensorRes:%.+]] = tensor.from_elements [[result]] : tensor<f64>
     // CHECK:   [[q2:%.+]] = quantum.insert %0[ 0], [[q01_out2]]#0 : !quantum.reg, !quantum.bit
     // CHECK:   [[q3:%.+]] = quantum.insert %7[ 1], [[q01_out2]]#1 : !quantum.reg, !quantum.bit
-    // CHECK:   quantum.dealloc [[q2]] : !quantum.reg
+    // CHECK:   quantum.dealloc [[q3]] : !quantum.reg
     // CHECK:   quantum.device_release
     // CHECK:   return [[tensorRes]]
 
@@ -62,6 +62,7 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
     //CHECK:    [[c0:%.+]] = index.constant 0
     //CHECK:    [[c1:%.+]] = index.constant 1
     //CHECK:    [[c3:%.+]] = index.constant 3
+    //CHECK:    [[t:%.+]] = tensor.empty() : tensor<3xf64> 
     //CHECK:    [[dense3:%.+]] = arith.constant dense<[1, 2, 3]>
     //CHECK:    [[emptyRes:%.+]] = tensor.empty() : tensor<3xf64>
     //CHECK:    [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c3]] step [[c1]] iter_args(%arg1 = [[emptyRes]]) -> (tensor<3xf64>) {
