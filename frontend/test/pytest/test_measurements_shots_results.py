@@ -428,7 +428,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1))
 
-        if isinstance(dev, qml.devices.Device):
+        if isinstance(dev, qml.devices.LegacyDeviceFacade):
+            with pytest.raises(
+                RuntimeError,
+                match=r"Cannot split up terms in sums for MeasurementProcess <class 'pennylane.measurements.var.VarianceMP'>",
+            ):
+                circuit(0.432, 0.123, -0.543)
+        else:
             # TODO: only raises with the new API, Kokkos should also raise an error.
             with pytest.raises(
                 TypeError,
@@ -488,10 +494,7 @@ class TestOtherMeasurements:
         def circuit():
             return meas_fun(wires=0)
 
-        # ValueError is legacy behaviour with the old device API
-        error_type = ValueError if isinstance(dev, qml.devices.LegacyDevice) else CompileError
-
-        with pytest.raises(error_type, match="cannot work with shots=None"):
+        with pytest.raises(CompileError, match="cannot work with shots=None"):
             qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):

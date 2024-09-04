@@ -44,6 +44,7 @@ from catalyst.device.verification import (
     verify_operations,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
@@ -133,7 +134,7 @@ SUPPORTED_RT_DEVICES = {
 
 def get_device_shots(dev):
     """Helper function to get device shots."""
-    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+    return dev.shots.total_shots if isinstance(dev, qml.devices.Device) else dev.shots
 
 
 @dataclass
@@ -153,8 +154,8 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
     to a valid TOML config file."""
 
     dname = device.name
-    if isinstance(device, qml.devices.LegacyDevice):
-        dname = device.short_name
+    if isinstance(device, qml.devices.LegacyDeviceFacade):
+        dname = device.target_device.short_name
 
     device_name = ""
     device_lpath = ""
@@ -189,18 +190,18 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         device_kwargs["device_type"] = dname
         device_kwargs["backend"] = (
             # pylint: disable=protected-access
-            device._device._delegate.DEVICE_ID
+            device.target_device._device._delegate.DEVICE_ID
         )
     elif dname == "braket.aws.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
-        if device._s3_folder:  # pylint: disable=protected-access
+        if device.target_device._s3_folder:  # pylint: disable=protected-access
             device_kwargs["s3_destination_folder"] = str(
-                device._s3_folder  # pylint: disable=protected-access
+                device.target_device._s3_folder  # pylint: disable=protected-access
             )
 
     for k, v in capabilities.options.items():
-        if hasattr(device, v):
+        if hasattr(device, v) and not k in device_kwargs:
             device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
@@ -506,6 +507,8 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def _measurement_transform_program(self):
 
         measurement_program = TransformProgram()
+        if isinstance(self.original_device, SoftwareQQPP):
+            return measurement_program
 
         supports_sum_observables = any(
             obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
@@ -547,65 +550,6 @@ def filter_out_modifiers(operations):
         return not re.match(pattern, op)
 
     return set(filter(is_not_modifier, operations))
-
-
-@debug_logger
-def validate_device_capabilities(
-    device: qml.QubitDevice, device_capabilities: DeviceCapabilities
-) -> None:
-    """Validate configuration document against the device attributes.
-    Raise CompileError in case of mismatch:
-    * If device is not qjit-compatible.
-    * If configuration file does not exists.
-    * If decomposable, matrix, and native gates have some overlap.
-    * If decomposable, matrix, and native gates do not match gates in ``device.operations`` and
-      ``device.observables``.
-
-    Args:
-        device (qml.devices.LegacyDevice): An instance of a quantum device.
-        config (TOMLDocument): A TOML document representation.
-
-    Raises: CompileError
-    """
-
-    if not device_capabilities.qjit_compatible_flag:
-        raise CompileError(
-            f"Attempting to compile program for incompatible device '{device.name}': "
-            f"Config is not marked as qjit-compatible"
-        )
-
-    device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-
-    native = set(device_capabilities.native_ops.keys())
-    decomposable = set(device_capabilities.to_decomp_ops.keys())
-    matrix = set(device_capabilities.to_matrix_ops.keys())
-
-    overlap = (native & decomposable) | (native & matrix) | (decomposable & matrix)
-    if overlap:
-        raise CompileError(f"Device '{device_name}' has overlapping gates: {overlap}")
-
-    if hasattr(device, "operations") and hasattr(device, "observables"):
-        # For validation against PL device properties we only check base gates as Adjoint/Control
-        # declarations can be very sporadic.
-        device_gates = filter_out_modifiers(device.operations)
-        spec_gates = native | decomposable | matrix
-        if device_gates != spec_gates:
-            raise CompileError(
-                "Gates in qml.device.operations and specification file do not match for "
-                f'"{device_name}".\n'
-                f"Gates that present only in the device: {device_gates - spec_gates}\n"
-                f"Gates that present only in spec: {spec_gates - device_gates}\n"
-            )
-
-        # For observables, we do not have `non-native` section in the config, so we check that
-        # device data supercedes the specification.
-        device_observables = set(device.observables)
-        spec_observables = pennylane_operation_set(device_capabilities.native_obs)
-        if (spec_observables - device_observables) != set():
-            raise CompileError(
-                "Observables in qml.device.observables and specification file do not match.\n"
-                f"Observables that present only in spec: {spec_observables - device_observables}\n"
-            )
 
 
 def get_device_toml_config(device) -> TOMLDocument:

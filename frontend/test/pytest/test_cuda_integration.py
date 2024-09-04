@@ -68,7 +68,7 @@ class TestCudaQ:
         from catalyst.third_party.cuda import cudaqjit as cjit
 
         @cjit
-        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=None))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
             measure(0)

@@ -35,6 +35,7 @@ from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
+from catalyst.jax_extras.jax_scipy_linalg_warnings import JaxLinalgWarner
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.passes import _inject_transform_named_sequence
@@ -129,12 +130,13 @@ def qjit(
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
         seed (Optional[Int]):
-            The seed for random operations in a qjit call, such as circuit measurement results.
+            The seed for mid-circuit measurement results when the qjit-compiled function is executed
+            on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
-            Note that `lightning.qubit` and `lightning.kokkos` currently only support seeding
-            measurements, and do not yet support seeding samples. As such, these devices with
-            shots will still return random results.
+            Note that seeding samples on simulator devices is not yet supported. As such,
+            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
+            ``expval`` will remain.
 
     Returns:
         QJIT object.
@@ -588,6 +590,15 @@ class QJIT:
 
         with Patcher(
             (qml.QNode, "__call__", closure),
+            # !!! TODO: fix jax.scipy numerical failures with properly fetched lapack calls
+            # As of now, we raise a warning prompting the user to use a callback with catalyst.accelerate()
+            # https://app.shortcut.com/xanaduai/story/70899/find-a-system-to-automatically-create-a-custom-call-library-from-the-one-in-jax
+            # https://github.com/PennyLaneAI/catalyst/issues/753
+            # https://github.com/PennyLaneAI/catalyst/issues/1071
+            (jax.scipy.linalg, "expm", JaxLinalgWarner(jax.scipy.linalg.expm)),
+            (jax.scipy.linalg, "lu", JaxLinalgWarner(jax.scipy.linalg.lu)),
+            (jax.scipy.linalg, "lu_factor", JaxLinalgWarner(jax.scipy.linalg.lu_factor)),
+            (jax.scipy.linalg, "lu_solve", JaxLinalgWarner(jax.scipy.linalg.lu_solve)),
         ):
             # TODO: improve PyTree handling
 

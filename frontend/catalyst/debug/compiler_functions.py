@@ -42,22 +42,27 @@ logger.addHandler(logging.NullHandler())
 
 @debug_logger
 def get_compilation_stage(fn, stage):
-    """Print one of the recorded compilation stages for a JIT-compiled function.
+    """Returns the intermediate representation of one of the recorded compilation
+    stages for a JIT-compiled function.
 
     The stages are indexed by their Catalyst compilation pipeline name, which are either provided
     by the user as a compilation option, or predefined in ``catalyst.compiler``.
 
     All the available stages are:
 
-    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``,
+      and ``MLIRToLLVMDialect``.
 
-    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
-    differentiation) passes do not always happen. `last` denotes the stage right before object file
-    generation.
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+    (automatic differentiation) passes do not always happen. ``last`` denotes the stage
+    right before object file generation.
 
-    Requires ``keep_intermediate=True``.
+    .. note::
+
+        In order to use this function, ``keep_intermediate=True`` must be
+        set in the :func:`~.qjit` decorator of the input function.
 
     Args:
         fn (QJIT): a qjit-decorated function
@@ -66,7 +71,7 @@ def get_compilation_stage(fn, stage):
     Returns:
         str: output ir from the target compiler stage
 
-    .. seealso:: :doc:`/dev/debugging`
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`, :func:`~.compile_from_mlir`.
 
     **Example**
 
@@ -130,7 +135,7 @@ def get_cmain(fn, *args):
 # pylint: disable=line-too-long
 @debug_logger
 def compile_from_mlir(ir, compiler=None, compile_options=None):
-    """Compile a Catalyst function to binary code from the provided MLIR.
+    r"""Compile a Catalyst function to binary code from the provided MLIR.
 
     Args:
         ir (str): the MLIR to compile in string form
@@ -138,6 +143,8 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
     Returns:
         CompiledFunction: A callable that manages the compiled shared library and its invocation.
+
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.replace_ir`.
 
     **Example**
 
@@ -187,25 +194,51 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
 @debug_logger
 def replace_ir(fn, stage, new_ir):
-    """Replace the IR at any compilation stage that will be used the next time the function runs.
+    r"""Replace the IR at any compilation stage that will be used the next time the function runs.
 
-    It is important that the function signature (inputs & outputs) for the next execution matches
+    It is important that the function signature (inputs and outputs) for the next execution matches
     that of the provided IR, or else the behaviour is undefined.
 
-    All the available stages are:
+    Available stages include:
 
-    - MILR: mlir, HLOLoweringPass, QuantumCompilationPass, BufferizationPass, and MLIRToLLVMDialect.
+    - MILR: ``mlir``, ``HLOLoweringPass``, ``QuantumCompilationPass``, ``BufferizationPass``,
+      and ``MLIRToLLVMDialect``.
 
-    - LLVM: llvm_ir, CoroOpt, O2Opt, Enzyme, and last.
+    - LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
-    Note that `CoroOpt` (Coroutine lowering), `O2Opt` (O2 optimization), and `Enzyme` (Automatic
-    differentiation) passes do not always happen. `last` denotes the stage right before object file
-    generation.
+    Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+    (automatic differentiation) passes do not always happen. ``last`` denotes the stage
+    right before object file generation.
 
     Args:
         fn (QJIT): a qjit-decorated function
         stage (str): Recompilation picks up after this stage.
         new_ir (str): The replacement IR to use for recompilation.
+
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.compile_from_mlir`.
+
+    **Example**
+
+    >>> from catalyst.debug import get_compilation_stage, replace_ir
+    >>> @qjit(keep_intermediate=True)
+    >>> def f(x):
+    ...     return x**2
+    >>> f(2.0)  # just-in-time compile the function
+    4.0
+
+    Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one:
+
+    >>> old_ir = get_compilation_stage(f, "HLOLoweringPass")
+    >>> new_ir = old_ir.replace(
+    ...   "%2 = arith.mulf %in, %in_0 : f64\n",
+    ...   "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
+    ... )
+
+    The recompilation starts after the given checkpoint stage:
+
+    >>> replace_ir(f, "HLOLoweringPass", new_ir)
+    >>> f(2.0)
+    8.0
     """
     fn.overwrite_ir = new_ir
     fn.compiler.options.checkpoint_stage = stage
@@ -214,44 +247,47 @@ def replace_ir(fn, stage, new_ir):
 
 @debug_logger
 def compile_executable(fn, *args):
-    """Generate and compile a C program that calls a jitted function with the provided arguments.
-
+    """Generate an executable binary for the native host architecture from a
+    :func:`~.qjit` decorated function with provided arguments.
 
     Args:
         fn (QJIT): a qjit-decorated function
         *args: argument values to use in the C program when invoking ``fn``
 
     Returns:
-        (str): the paths that should be included in LD_LIBRARY_PATH.
-        (str): the path of output binary.
+        str: the path of output binary
 
     **Example**
 
-    The following example is a square function.
-    Here we are using ``debug.print_memref`` to print the information of the result from ``y``.
+    For example, considering the following function where we are
+    using :func:`~.print_memref` to print (at runtime) information about
+    variable ``y``:
 
     .. code-block:: python
 
         @qjit
         def f(x):
-            y = x*x
+            y = x * x
             debug.print_memref(y)
             return y
 
     >>> f(5)
     MemRef: base@ = 0x64fc9dd5ffc0 rank = 0 offset = 0 sizes = [] strides = [] data =
     25
+    Array(25, dtype=int64)
 
-    The executable will be saved in the directory for intermediate results if ``keep_intermediate=True``.
-    Otherwise, the executable will appear in the Catalyst project root.
+    We can now use ``compile_executable`` to compile this function to a binary.
 
-    .. code-block:: python
+    The executable will be saved in the directory for intermediate results if
+    ``keep_intermediate=True``. Otherwise, the executable will appear in the Catalyst project
+    root.
 
-        from catalyst.debug import compile_executable
-        binary = compile_executable(f, 1)
-
+    >>> from catalyst.debug import compile_executable
+    >>> binary = compile_executable(f, 5)
     >>> print(binary)
     /path/to/executable
+
+    Executing this function from a shell environment:
 
     .. code-block:: shell
 
@@ -266,7 +302,14 @@ def compile_executable(fn, *args):
         fn(*args)
 
     # Try default library paths in case the targeted python-dev is shipped with OS.
-    path_candidates = [sysconfig.get_config_var("LIBDIR"), "/usr/lib64", "/usr/lib"]
+    path_candidates = [
+        sysconfig.get_config_var("LIBDIR"),
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/lib64",
+        "/usr/local/lib",
+        "/usr/lib64",
+        "/usr/lib",
+    ]
     version_info = sys.version_info
     # Check libpython3.x.so first because libpython3.so might not link to it.
     version_candidates = [f"{version_info.major}.{version_info.minor}", f"{version_info.major}"]
