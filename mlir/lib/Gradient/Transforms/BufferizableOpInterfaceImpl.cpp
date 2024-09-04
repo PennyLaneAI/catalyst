@@ -19,27 +19,6 @@ using namespace catalyst::gradient;
 
 namespace {
 
-constexpr int64_t UNKNOWN = ShapedType::kDynamic;
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(RewriterBase &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        RewriterBase::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
-
 struct AdjointOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<AdjointOpInterface, AdjointOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -65,12 +44,17 @@ struct AdjointOpInterface
                             const bufferization::BufferizationOptions &options) const
     {
         llvm::outs() << "Happens?\n";
+
+        auto adjointOp = cast<AdjointOp>(op);
+
+        bufferization::BufferizeTypeConverter typeConverter;
+
         SmallVector<Type> resTypes;
-        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
+        if (failed(typeConverter.convertTypes(adjointOp.getResultTypes(), resTypes)))
             return failure();
 
-        Location loc = op.getLoc();
-        Value gradSize = op.getGradSize();
+        Location loc = adjointOp.getLoc();
+        Value gradSize = adjointOp.getGradSize();
         SmallVector<Value> memrefValues;
         for (Type resType : resTypes) {
             MemRefType memrefType = cast<MemRefType>(resType);
@@ -78,8 +62,18 @@ struct AdjointOpInterface
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
-                                   adaptor.getArgs(), memrefValues);
+        SmallVector<Value> bufferArgs;
+        ValueRange operands = adjointOp.getArgs();
+        for (Value operand : operands) {
+            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+            if (failed(opBuffer))
+                return failure();
+            bufferArgs.push_back(*opBuffer);
+        }
+
+
+        rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(), adjointOp.getGradSize(),
+                                   bufferArgs, memrefValues);
        bufferization::replaceOpWithBufferizedValues(rewriter, op, memrefValues);
         return success();
     }
