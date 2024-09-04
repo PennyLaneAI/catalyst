@@ -23,4 +23,5 @@
 
 This release contains contributions from (in alphabetical order):
 
-Romain Moyard
+Romain Moyard,
+Paul Haochen Wang,
