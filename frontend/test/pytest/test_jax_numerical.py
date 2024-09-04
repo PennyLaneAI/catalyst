@@ -53,6 +53,28 @@ class TestExpmNumerical:
 
         assert np.allclose(observed, expected)
 
+    def test_expm_and_solve(self):
+        """
+        Test against the "gather rule not implemented" bug for
+        using expm and solve together.
+        https://github.com/PennyLaneAI/catalyst/issues/1094
+        """
+
+        A = jnp.array([[1.0, 0.0], [0.0, 1.0]])
+        b = jnp.array([[0.1], [0.2]])
+
+        def f(A, b):
+            return jsp.linalg.solve(A, b)
+
+        def g(A):
+            return jsp.linalg.expm(A)
+
+        expected = [g(A), f(A, b)]  # [e, 0; 0, e], [0.1; 0.2]
+        observed = [qjit(g)(A), qjit(f)(A, b)]
+
+        assert np.allclose(expected[0], observed[0])
+        assert np.allclose(expected[1], observed[1])
+
 
 class TestExpmInCircuit:
     """Test entire quantum workflows with jax.scipy.linag.expm"""
