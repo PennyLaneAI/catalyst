@@ -97,10 +97,12 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         });
     }
 
-    void CreateTapeFunction(SmallVector<Operation *> *TapeOps,
-                            SmallVector<Value> &NecessaryValuesFromEarlierTapes,
-                            IRRewriter &builder, Operation *module, unsigned int tape_number,
-                            StringRef OriginalMultitapeFuncName)
+    LogicalResult CreateTapeFunction(SmallVector<Operation *> *TapeOps,
+                                     SmallVector<Value> &NecessaryValuesFromEarlierTapes,
+                                     IRRewriter &builder, Operation *module,
+                                     unsigned int tape_number, StringRef OriginalMultitapeFuncName,
+                                     func::FuncOp OriginalMultitapeFunc,
+                                     SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
     {
         assert(TapeOps); // nullptr protection
 
@@ -175,6 +177,12 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         FailureOr<func::FuncOp> outlined = outlineSingleBlockRegion(
             builder, module->getLoc(), executeRegionOp.getRegion(),
             OriginalMultitapeFuncName.str() + "_tape_" + std::to_string(tape_number), &call);
+        OutlinedFuncs.push_back(outlined);
+
+        if (failed(outlined)) {
+            return failure();
+        }
+        return success();
     }
 
     void runOnOperation() override
@@ -232,11 +240,22 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
         // 4. Generate the functions for each tape
         unsigned int NumTapes = countTapes(func);
+        SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
         for (unsigned int i = 0; i < NumTapes; i++) {
 
-            CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                               NecessaryValuesFromEarlierTapes, builder, module,
-                               OpsEachTape.size() - 3 - i, func.getSymName());
+            if (failed(CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
+                                          NecessaryValuesFromEarlierTapes, builder, module,
+                                          OpsEachTape.size() - 3 - i, func.getSymName(), func,
+                                          OutlinedFuncs))) {
+                return signalPassFailure();
+            };
+        }
+
+        // OutlinedFuncs contains the tapes in reverse order (tape_2, tape_1, tape_0)
+        // Move them into the correct order
+        for (auto outlined : OutlinedFuncs) {
+            func::FuncOp outlinedfunc = *outlined;
+            outlinedfunc->moveAfter(func);
         }
 
         // TODO: use smart ptrs instead of manually

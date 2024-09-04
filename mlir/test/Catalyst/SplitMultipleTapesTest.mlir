@@ -14,63 +14,51 @@
 
 // RUN: quantum-opt %s --split-multiple-tapes --split-input-file --verify-diagnostics | FileCheck %s
 
+// Test that --split-multiple-tapes pass correctly outlines each tape into its own function and calls the outlined functions.
+// A tape is the operations between a "quantum.device" and a "quantum.device_release", inclusive.
+
+
+// Basic test with a two-tape function
+// Each tape take in different number elements in different order
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<4xcomplex<f64>>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %3:2 = quantum.set_state(%arg0) %1, %2 : (tensor<4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-    %extracted = tensor.extract %arg1[] : tensor<f64>
-    %out_qubits = quantum.custom "RY"(%extracted) %3#0 {adjoint} : !quantum.bit
-    %4 = quantum.namedobs %out_qubits[ PauliX] : !quantum.obs
-    %5 = quantum.expval %4 : f64
-    %from_elements = tensor.from_elements %5 : tensor<f64>
-    %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-    %7 = stablehlo.add %arg2, %cst_0 : tensor<f64>
-    %extracted_1 = tensor.extract %7[] : tensor<f64>
-    %out_qubits_2 = quantum.custom "RX"(%extracted_1) %3#1 : !quantum.bit
-    %8 = quantum.insert %6[ 1], %out_qubits_2 : !quantum.reg, !quantum.bit
-    quantum.dealloc %8 : !quantum.reg
+    %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-    %9 = quantum.alloc( 2) : !quantum.reg
-    %10 = quantum.extract %9[ 0] : !quantum.reg -> !quantum.bit
-    %11 = stablehlo.add %arg1, %cst : tensor<f64>
-    %extracted_3 = tensor.extract %11[] : tensor<f64>
-    %out_qubits_4 = quantum.custom "RY"(%extracted_3) %10 : !quantum.bit
-    %12 = quantum.namedobs %out_qubits_4[ PauliX] : !quantum.obs
-    %13 = quantum.expval %12 : f64
-    %from_elements_5 = tensor.from_elements %13 : tensor<f64>
-    %14 = quantum.insert %9[ 0], %out_qubits_4 : !quantum.reg, !quantum.bit
-    quantum.dealloc %14 : !quantum.reg
+    %extracted = tensor.extract %arg1[] : tensor<f64>
+    %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
     quantum.device_release
-    %15 = stablehlo.add %from_elements, %from_elements_5 : tensor<f64>
-    return %15 : tensor<f64>
+    %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    return %result : tensor<f64>
   }
 }
 
-// CHECK-LABEL: circuit_twotapes_tape_1
+// CHECK: module @circuit_twotapes_module {
+// CHECK: func.func private @circuit_twotapes
+// CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
+// CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
+// CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
+
+// CHECK: func.func @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>)
 // CHECK: quantum.device
-// CHECK: quantum.dealloc {{%.+}} : !quantum.reg
+// CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK: quantum.device_release
-// CHECK: return %from_elements : tensor<f64>
+// CHECK: return {{%.+}} : tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK-LABEL: circuit_twotapes_tape_0
+// CHECK: func.func @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>)
 // CHECK: quantum.device
-// CHECK: quantum.dealloc {{%.+}} : !quantum.reg
+// CHECK: tensor.extract %arg0[]
+// CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
 // CHECK: quantum.device_release
-// CHECK: return %from_elements : tensor<f64>
+// CHECK: return {{%.+}} : tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK-LABEL: circuit_twotapes
-// CHECK: func.call @circuit_twotapes_tape_0
-// CHECK: func.call @circuit_twotapes_tape_1
-// CHECK: {{%.+}} = stablehlo.add {{%.+}}, {{%.+}} : tensor<f64>
+// CHECK: }
 
 
 // -----
@@ -81,7 +69,21 @@ module @empty_workflow {
 
 }
 
+module @classical_workflow {
+  func.func private @func() -> tensor<f64> {
+    %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
+    return %cst : tensor<f64>
+  }
+}
+
 // CHECK: module @empty_workflow {
+// CHECK-NEXT: }
+
+// CHECK-NEXT: module @classical_workflow {
+// CHCEK-NEXT: func.func private @func() -> tensor<f64> {
+// CHECK: %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
+// CHECK-NEXT: return %cst : tensor<f64>
+// CHECK-NEXT: }
 // CHECK-NEXT: }
 
 
