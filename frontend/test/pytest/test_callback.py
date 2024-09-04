@@ -1386,13 +1386,9 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
 
 
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
-@pytest.mark.parametrize("order", ["good", "bad"])
+@pytest.mark.parametrize("order", ["truth_hypo", "hypo_truth"])
 def test_vjp_as_residual(arg, order):
     """See https://github.com/PennyLaneAI/catalyst/issues/852"""
-
-    if order == "bad":
-        # See https://github.com/PennyLaneAI/catalyst/issues/894
-        pytest.skip("Bug")
 
     def jax_callback(fn, result_type):
 
@@ -1421,7 +1417,7 @@ def test_vjp_as_residual(arg, order):
     def ground_truth(x):
         return jax.scipy.linalg.expm(x)
 
-    if order == "bad":
+    if order == "hypo_truth":
         obs = hypothesis(arg)
         exp = ground_truth(arg)
     else:
@@ -1431,13 +1427,9 @@ def test_vjp_as_residual(arg, order):
 
 
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
-@pytest.mark.parametrize("order", ["good", "bad"])
+@pytest.mark.parametrize("order", ["truth_hypo", "hypo_truth"])
 def test_vjp_as_residual_automatic(arg, order):
     """Test automatic differentiation of accelerated function"""
-
-    if order == "bad":
-        # See https://github.com/PennyLaneAI/catalyst/issues/894
-        pytest.skip("Bug")
 
     @qml.qjit
     @jacobian
@@ -1448,7 +1440,7 @@ def test_vjp_as_residual_automatic(arg, order):
     def ground_truth(x):
         return jax.scipy.linalg.expm(x)
 
-    if order == "bad":
+    if order == "hypo_truth":
         obs = hypothesis(arg)
         exp = ground_truth(arg)
     else:
