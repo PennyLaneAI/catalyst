@@ -1,6 +1,7 @@
 # Release 0.9.0-dev
 
 <h3>New features</h3>
+
 * Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`. Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be structured using Python containers. For example, a program can return a dictionary like `return {"first": qml.sample(), "second": qml.sample()}`.[(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
   For example,
