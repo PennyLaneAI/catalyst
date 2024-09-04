@@ -224,25 +224,14 @@ def measurements_from_counts(tape):
 
         Samples are not supported.
     """
-    if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape)
-    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for i, m in enumerate(diagonal_measurements):
-        if m.obs is not None:
-            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
-            wires = m.wires if m.wires else tape.wires
-            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=wires)
-    # Add diagonalizing gates
-    news_operations = tape.operations
-    news_operations.extend(diagonalizing_gates)
-    # Transform tape
-    measured_wires = set()
-    for m in diagonal_measurements:
-        wires = m.wires if m.wires else tape.wires
-        measured_wires.update(wires.tolist())
+
+    diagonalizing_gates, measured_wires = _diagonalize_measurements(tape)
+
+    new_operations = tape.operations
+    new_operations.extend(diagonalizing_gates)
 
     new_measurements = [qml.counts(wires=list(measured_wires))]
-    new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+    new_tape = type(tape)(new_operations, new_measurements, shots=tape.shots)
 
     def postprocessing_counts(results):
         """A processing function to get expecation values from counts."""
@@ -290,25 +279,15 @@ def measurements_from_samples(tape):
         transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
 
     """
-    if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape)
-    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for i, m in enumerate(diagonal_measurements):
-        if m.obs is not None:
-            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
-            wires = m.wires if m.wires else tape.wires
-            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=wires)
-    # Add diagonalizing gates
-    news_operations = tape.operations
-    news_operations.extend(diagonalizing_gates)
-    # Transform tape
-    measured_wires = set()
-    for m in diagonal_measurements:
-        wires = m.wires if m.wires else tape.wires
-        measured_wires.update(wires.tolist())
+
+    diagonalizing_gates, measured_wires = _diagonalize_measurements(tape)
+
+    new_operations = tape.operations
+    new_operations.extend(diagonalizing_gates)
 
     new_measurements = [qml.sample(wires=list(measured_wires))]
-    new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+
+    new_tape = type(tape)(new_operations, new_measurements, shots=tape.shots)
 
     def postprocessing_samples(results):
         """A processing function to get expecation values from counts."""
@@ -349,6 +328,23 @@ def measurements_from_samples(tape):
 
     return [new_tape], postprocessing_samples
 
+def _diagonalize_measurements(tape):
+    """Get diagonalizing gates and measured wires for the tape"""
+
+    if tape.samples_computational_basis and len(tape.measurements) > 1:
+        _validate_computational_basis_sampling(tape)
+
+    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
+    for i, m in enumerate(diagonal_measurements):
+        if m.obs is not None:
+            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
+
+    measured_wires = set()
+    for m in diagonal_measurements:
+        wires = m.wires if m.wires else tape.wires
+        measured_wires.update(wires.tolist())
+
+    return diagonalizing_gates, measured_wires
 
 def _probs_from_counts(counts_outcome):
     """From the counts outcome, calculate the probability vector."""
