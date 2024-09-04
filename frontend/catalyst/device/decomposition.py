@@ -225,13 +225,9 @@ def measurements_from_counts(tape):
         Samples are not supported.
     """
 
-    diagonalizing_gates, measured_wires = _diagonalize_measurements(tape)
+    new_operations, measured_wires = _diagonalize_measurements(tape)
 
-    new_operations = tape.operations
-    new_operations.extend(diagonalizing_gates)
-
-    new_measurements = [qml.counts(wires=list(measured_wires))]
-    new_tape = type(tape)(new_operations, new_measurements, shots=tape.shots)
+    new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_counts(results):
         """A processing function to get expecation values from counts."""
@@ -280,44 +276,20 @@ def measurements_from_samples(tape):
 
     """
 
-    diagonalizing_gates, measured_wires = _diagonalize_measurements(tape)
+    new_operations, measured_wires = _diagonalize_measurements(tape)
 
-    new_operations = tape.operations
-    new_operations.extend(diagonalizing_gates)
-
-    new_measurements = [qml.sample(wires=list(measured_wires))]
-
-    new_tape = type(tape)(new_operations, new_measurements, shots=tape.shots)
+    new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_samples(results):
         """A processing function to get expecation values from counts."""
-        states = results[0][0]
-        counts_outcomes = results[0][1]
+        samples = results[0]
         results_processed = []
         for m in tape.measurements:
-            mapped_counts_outcome = _map_counts(
-                counts_outcomes, m.wires, qml.wires.Wires(list(measured_wires))
-            )
-            if isinstance(m, ExpectationMP):
-                raise NotImplementedError
-                probs = _probs_from_counts(mapped_counts_outcome)
-                results_processed.append(_expval_from_probs(eigvals=m.eigvals(), prob_vector=probs))
-            elif isinstance(m, VarianceMP):
-                raise NotImplementedError
-                probs = _probs_from_counts(mapped_counts_outcome)
-                results_processed.append(_var_from_probs(eigvals=m.eigvals(), prob_vector=probs))
-            elif isinstance(m, ProbabilityMP):
-                raise NotImplementedError
-                probs = _probs_from_counts(mapped_counts_outcome)
-                results_processed.append(probs)
+            if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
+                results_processed.append(m.process_samples(samples, measured_wires, shot_range=tape.shots))
             elif isinstance(m, CountsMP):
-                raise NotImplementedError
-                results_processed.append(
-                    tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
-                )
-            elif isinstance(m, SampleMP):
-                raise NotImplementedError
-                results_processed.append(tuple(results))
+                counts_results = _counts_from_samples(samples)
+                results_processed.append(counts_results)
             else:
                 raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
         if len(tape.measurements) == 1:
@@ -329,7 +301,17 @@ def measurements_from_samples(tape):
     return [new_tape], postprocessing_samples
 
 def _diagonalize_measurements(tape):
-    """Get diagonalizing gates and measured wires for the tape"""
+    """Convert the measurements and operations on the tape to those relevant 
+    for measuring in the readout basis.
+
+    Args:
+        tape (QuantumTape): A quantum circuit.
+
+    Returns:
+        new_operations (list): The original operations, plus the diagonalizing gates for the circuit
+        measured_wires (list): A list of all wires that are measured on the tape
+    
+    """
 
     if tape.samples_computational_basis and len(tape.measurements) > 1:
         _validate_computational_basis_sampling(tape)
@@ -344,7 +326,13 @@ def _diagonalize_measurements(tape):
         wires = m.wires if m.wires else tape.wires
         measured_wires.update(wires.tolist())
 
-    return diagonalizing_gates, measured_wires
+    new_operations = tape.operations
+    new_operations.extend(diagonalizing_gates)
+
+    return new_operations, list(measured_wires)
+
+def _counts_from_samples(samples_outcome):
+    raise NotImplementedError()
 
 def _probs_from_counts(counts_outcome):
     """From the counts outcome, calculate the probability vector."""
