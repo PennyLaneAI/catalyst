@@ -1,5 +1,5 @@
 diff --git a/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp b/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
-index 0a4072605c26..2983af0fcbf3 100644
+index 0a4072605c26..5231fe860553 100644
 --- a/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
 +++ b/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
 @@ -75,7 +75,7 @@ using namespace mlir::bufferization;
@@ -135,7 +135,7 @@ index 0a4072605c26..2983af0fcbf3 100644
    }
  
    return success();
-@@ -430,20 +449,20 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
+@@ -430,7 +449,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
    IRRewriter rewriter(moduleOp.getContext());
  
    // A list of functions in the order in which they are analyzed + bufferized.
@@ -144,17 +144,15 @@ index 0a4072605c26..2983af0fcbf3 100644
  
    // A mapping of FuncOps to their callers.
    FuncCallerMap callerMap;
- 
-   if (failed(getFuncOpsOrderedByCalls(moduleOp, orderedFuncOps, callerMap)))
+@@ -439,11 +458,11 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
      return failure();
-+  SmallVector<FunctionOpInterface> ops;
  
    // Bufferize functions.
 -  for (func::FuncOp funcOp : orderedFuncOps) {
 +  for (FunctionOpInterface funcOp : orderedFuncOps) {
      // Note: It would be good to apply cleanups here but we cannot as aliasInfo
      // would be invalidated.
--
+ 
 -    if (llvm::is_contained(options.noAnalysisFuncFilter, funcOp.getSymName())) {
 +    if (llvm::is_contained(options.noAnalysisFuncFilter, funcOp.getName())) {
        // This function was not analyzed and RaW conflicts were not resolved.
