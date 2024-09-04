@@ -25,16 +25,16 @@
 #include "mhlo/IR/hlo_ops.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Gradient/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Quantum/Transforms/Passes.h"
 
 int main(int argc, char **argv)
 {

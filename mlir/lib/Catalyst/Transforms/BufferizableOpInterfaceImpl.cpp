@@ -15,33 +15,36 @@ namespace {
 
 /// Bufferization of catalyst.print. Get memref of printOp.val.
 struct PrintOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<PrintOpInterface,
-                                                    PrintOp> {
+    : public bufferization::BufferizableOpInterface::ExternalModel<PrintOpInterface, PrintOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const {
+                                const bufferization::AnalysisState &state) const
+    {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const {
+                                 const bufferization::AnalysisState &state) const
+    {
         return false;
     }
 
-    bufferization::AliasingValueList getAliasingValues(Operation *op,
-                                        OpOperand &opOperand,
-                                        const bufferization::AnalysisState &state) const {
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const {
+                            const bufferization::BufferizationOptions &options) const
+    {
         auto printOp = cast<PrintOp>(op);
         if (printOp.getVal()) {
             FailureOr<Value> source = getBuffer(rewriter, printOp.getVal(), options);
             if (failed(source))
                 return failure();
-            bufferization::replaceOpWithNewBufferizedOp<PrintOp>(rewriter, op, *source,
-                            printOp.getConstValAttr(), printOp.getPrintDescriptorAttr());
+            bufferization::replaceOpWithNewBufferizedOp<PrintOp>(
+                rewriter, op, *source, printOp.getConstValAttr(), printOp.getPrintDescriptorAttr());
         }
         return success();
     }
@@ -50,25 +53,29 @@ struct PrintOpInterface
 /// Bufferization of catalyst.print. Mainly get buffers for arguments.
 struct CustomCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CustomCallOpInterface,
-                                                    CustomCallOp> {
+                                                                   CustomCallOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const {
+                                const bufferization::AnalysisState &state) const
+    {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const {
+                                 const bufferization::AnalysisState &state) const
+    {
         return false;
     }
 
-    bufferization::AliasingValueList getAliasingValues(Operation *op,
-                                        OpOperand &opOperand,
-                                        const bufferization::AnalysisState &state) const {
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const {
+                            const bufferization::BufferizationOptions &options) const
+    {
         auto customCallOp = cast<CustomCallOp>(op);
 
         // Add bufferized arguments
@@ -99,7 +106,7 @@ struct CustomCallOpInterface
             bufferArgs.push_back(newBuffer);
         }
 
-         // Add the initial number of arguments
+        // Add the initial number of arguments
         int32_t numArguments = static_cast<int32_t>(customCallOp.getNumOperands());
         DenseI32ArrayAttr numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
 
@@ -116,11 +123,12 @@ struct CustomCallOpInterface
 
 struct CallbackOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
-                                                            CallbackOpInterface, CallbackOp> {
+          CallbackOpInterface, CallbackOp> {
 
     static bool supportsUnstructuredControlFlow() { return true; }
 
-    bool hasTensorSemantics(Operation *op) const {
+    bool hasTensorSemantics(Operation *op) const
+    {
         auto isaTensor = llvm::IsaPred<TensorType>;
 
         // A function has tensor semantics if it has tensor arguments/results.
@@ -134,40 +142,45 @@ struct CallbackOpInterface
     }
 
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const {
+                                const bufferization::AnalysisState &state) const
+    {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const {
+                                 const bufferization::AnalysisState &state) const
+    {
         return false;
     }
 
-    bufferization::AliasingValueList getAliasingValues(Operation *op,
-                                        OpOperand &opOperand,
-                                        const bufferization::AnalysisState &state) const {
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const {
+                            const bufferization::BufferizationOptions &options) const
+    {
         auto callbackOp = cast<CallbackOp>(op);
 
-         auto argTys = callbackOp.getArgumentTypes();
-         auto retTys = callbackOp.getResultTypes();
-         SmallVector<Type> emptyRets;
-         SmallVector<Type> args(argTys.begin(), argTys.end());
-         args.insert(args.end(), retTys.begin(), retTys.end());
-         SmallVector<Type> bufferArgs;
-         for (Type ty : args) {
-             auto tensorType = dyn_cast<RankedTensorType>(ty);
-             if (!tensorType)
-                 bufferArgs.push_back(ty);
-             else
-                 bufferArgs.push_back(MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
-         }
-         auto callbackTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-         rewriter.modifyOpInPlace(op, [&] { callbackOp.setFunctionType(callbackTy); });
+        auto argTys = callbackOp.getArgumentTypes();
+        auto retTys = callbackOp.getResultTypes();
+        SmallVector<Type> emptyRets;
+        SmallVector<Type> args(argTys.begin(), argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end());
+        SmallVector<Type> bufferArgs;
+        for (Type ty : args) {
+            auto tensorType = dyn_cast<RankedTensorType>(ty);
+            if (!tensorType)
+                bufferArgs.push_back(ty);
+            else
+                bufferArgs.push_back(
+                    MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
+        }
+        auto callbackTy = rewriter.getFunctionType(bufferArgs, emptyRets);
+        rewriter.modifyOpInPlace(op, [&] { callbackOp.setFunctionType(callbackTy); });
 
         return success();
     }
@@ -175,25 +188,29 @@ struct CallbackOpInterface
 
 struct CallbackCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CallbackCallOpInterface,
-                                                    CallbackCallOp> {
+                                                                   CallbackCallOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const {
+                                const bufferization::AnalysisState &state) const
+    {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const {
+                                 const bufferization::AnalysisState &state) const
+    {
         return false;
     }
 
-    bufferization::AliasingValueList getAliasingValues(Operation *op,
-                                        OpOperand &opOperand,
-                                        const bufferization::AnalysisState &state) const {
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                            const bufferization::BufferizationOptions &options) const {
+                            const bufferization::BufferizationOptions &options) const
+    {
         auto callOp = cast<CallbackCallOp>(op);
 
         bufferization::BufferizeTypeConverter typeConverter;
@@ -202,7 +219,7 @@ struct CallbackCallOpInterface
         if (failed(typeConverter.convertTypes(callOp.getResultTypes(), convertedResults)))
             return failure();
 
-        if(callOp->getNumResults() != convertedResults.size())
+        if (callOp->getNumResults() != convertedResults.size())
             return failure();
 
         SmallVector<Value> newInputs;
@@ -243,8 +260,8 @@ struct CallbackCallOpInterface
 
 } // namespace
 
-void catalyst::registerBufferizableOpInterfaceExternalModels(
-    DialectRegistry &registry) {
+void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
+{
     registry.addExtension(+[](MLIRContext *ctx, CatalystDialect *dialect) {
         CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
         PrintOp::attachInterface<PrintOpInterface>(*ctx);

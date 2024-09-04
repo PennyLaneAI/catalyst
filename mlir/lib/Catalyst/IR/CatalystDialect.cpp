@@ -41,8 +41,8 @@ void CatalystDialect::initialize()
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
-    declarePromisedInterfaces<bufferization::BufferizableOpInterface, CustomCallOp,
-                         PrintOp, CallbackCallOp, CallbackOp>();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, CustomCallOp, PrintOp,
+                              CallbackCallOp, CallbackOp>();
 }
 
 //===----------------------------------------------------------------------===//
