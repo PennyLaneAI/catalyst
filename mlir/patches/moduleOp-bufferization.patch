@@ -1,5 +1,5 @@
 diff --git a/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp b/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
-index 0a4072605c26..5b1536a59e11 100644
+index 0a4072605c26..2983af0fcbf3 100644
 --- a/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
 +++ b/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
 @@ -75,7 +75,7 @@ using namespace mlir::bufferization;
@@ -27,7 +27,7 @@ index 0a4072605c26..5b1536a59e11 100644
  /// Gather equivalence info of CallOps.
  /// Note: This only adds new equivalence info if the called function was already
  /// analyzed.
-@@ -277,11 +286,15 @@ static void equivalenceAnalysis(func::FuncOp funcOp,
+@@ -277,10 +286,10 @@ static void equivalenceAnalysis(func::FuncOp funcOp,
  }
  
  /// Return "true" if the given function signature has tensor semantics.
@@ -39,14 +39,9 @@ index 0a4072605c26..5b1536a59e11 100644
 -         llvm::any_of(funcOp.getFunctionType().getResults(),
 +         llvm::any_of(funcOp.getResultTypes(),
                        llvm::IsaPred<TensorType>);
-+  /*return llvm::any_of(funcOp.getFunctionType().getInputs(),
-+                      llvm::IsaPred<TensorType>) ||
-+         llvm::any_of(funcOp.getFunctionType().getResults(),
-+                      llvm::IsaPred<TensorType>);*/
  }
  
- /// Store all functions of the `moduleOp` in `orderedFuncOps`, sorted by
-@@ -291,14 +304,16 @@ static bool hasTensorSignature(func::FuncOp funcOp) {
+@@ -291,26 +300,30 @@ static bool hasTensorSignature(func::FuncOp funcOp) {
  /// retrieve the called FuncOp from any func::CallOp.
  static LogicalResult
  getFuncOpsOrderedByCalls(ModuleOp moduleOp,
@@ -60,41 +55,36 @@ index 0a4072605c26..5b1536a59e11 100644
    // For each FuncOp, the number of func::CallOp it contains.
 -  DenseMap<func::FuncOp, unsigned> numberCallOpsContainedInFuncOp;
 -  WalkResult res = moduleOp.walk([&](func::FuncOp funcOp) -> WalkResult {
+-    if (!funcOp.getBody().empty()) {
+-      func::ReturnOp returnOp = getAssumedUniqueReturnOp(funcOp);
+-      if (!returnOp)
+-        return funcOp->emitError()
+-               << "cannot bufferize a FuncOp with tensors and "
+-                  "without a unique ReturnOp";
 +  DenseMap<FunctionOpInterface, unsigned> numberCallOpsContainedInFuncOp;
-+  WalkResult res = moduleOp.walk([&](FunctionOpInterface funcOpIn) -> WalkResult {
-+    if(isa<FuncOp>(funcOpIn)) {
-+    func::FuncOp funcOp = cast<FuncOp>(funcOpIn);
-     if (!funcOp.getBody().empty()) {
-       func::ReturnOp returnOp = getAssumedUniqueReturnOp(funcOp);
-       if (!returnOp)
-@@ -306,11 +321,12 @@ getFuncOpsOrderedByCalls(ModuleOp moduleOp,
-                << "cannot bufferize a FuncOp with tensors and "
-                   "without a unique ReturnOp";
++  WalkResult res = moduleOp.walk([&](FunctionOpInterface funcOp) -> WalkResult {
++    // Only handle ReturnOp if funcOp is exactly the FuncOp type.
++    if(isa<FuncOp>(funcOp)) {
++      FuncOp funcOpCasted = cast<FuncOp>(funcOp);
++      if (!funcOpCasted.getBody().empty()) {
++        func::ReturnOp returnOp = getAssumedUniqueReturnOp(funcOpCasted);
++        if (!returnOp)
++          return funcOp->emitError()
++                 << "cannot bufferize a FuncOp with tensors and "
++                    "without a unique ReturnOp";
++      }
      }
-+    }
  
      // Collect function calls and populate the caller map.
--    numberCallOpsContainedInFuncOp[funcOp] = 0;
+     numberCallOpsContainedInFuncOp[funcOp] = 0;
 -    return funcOp.walk([&](func::CallOp callOp) -> WalkResult {
 -      func::FuncOp calledFunction = getCalledFunction(callOp);
-+    numberCallOpsContainedInFuncOp[funcOpIn] = 0;
-+    return funcOpIn.walk([&](CallOpInterface callOp) -> WalkResult {
++    return funcOp.walk([&](CallOpInterface callOp) -> WalkResult {
 +      FunctionOpInterface calledFunction = getCalledFunction(callOp);
        assert(calledFunction && "could not retrieved called func::FuncOp");
        // If the called function does not have any tensors in its signature, then
        // it is not necessary to bufferize the callee before the caller.
-@@ -318,8 +334,8 @@ getFuncOpsOrderedByCalls(ModuleOp moduleOp,
-         return WalkResult::skip();
- 
-       callerMap[calledFunction].insert(callOp);
--      if (calledBy[calledFunction].insert(funcOp).second) {
--        numberCallOpsContainedInFuncOp[funcOp]++;
-+      if (calledBy[calledFunction].insert(funcOpIn).second) {
-+        numberCallOpsContainedInFuncOp[funcOpIn]++;
-       }
-       return WalkResult::advance();
-     });
-@@ -379,7 +395,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
+@@ -379,7 +392,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
    FuncAnalysisState &funcState = getOrCreateFuncAnalysisState(state);
  
    // A list of functions in the order in which they are analyzed + bufferized.
@@ -103,18 +93,48 @@ index 0a4072605c26..5b1536a59e11 100644
  
    // A mapping of FuncOps to their callers.
    FuncCallerMap callerMap;
-@@ -388,7 +404,10 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
+@@ -388,27 +401,33 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
      return failure();
  
    // Analyze ops.
 -  for (func::FuncOp funcOp : orderedFuncOps) {
-+   for (FunctionOpInterface funcOpIn : orderedFuncOps) {
-+    if(!isa<func::FuncOp>(funcOpIn))
+-    if (!state.getOptions().isOpAllowed(funcOp))
++  for (FunctionOpInterface funcOp : orderedFuncOps) {
++
++    // The following analysis is specific to the FuncOp type.
++    if(!isa<FuncOp>(funcOp))
 +        continue;
-+    func::FuncOp funcOp = cast<func::FuncOp>(funcOpIn);
-     if (!state.getOptions().isOpAllowed(funcOp))
++    FuncOp funcOpCasted = cast<func::FuncOp>(funcOp);
++
++    if (!state.getOptions().isOpAllowed(funcOpCasted))
        continue;
  
+     // Now analyzing function.
+-    funcState.startFunctionAnalysis(funcOp);
++    funcState.startFunctionAnalysis(funcOpCasted);
+ 
+     // Gather equivalence info for CallOps.
+-    equivalenceAnalysis(funcOp, state, funcState);
++    equivalenceAnalysis(funcOpCasted, state, funcState);
+ 
+     // Analyze funcOp.
+-    if (failed(analyzeOp(funcOp, state, statistics)))
++    if (failed(analyzeOp(funcOpCasted, state, statistics)))
+       return failure();
+ 
+     // Run some extra function analyses.
+-    if (failed(aliasingFuncOpBBArgsAnalysis(funcOp, state, funcState)) ||
+-        failed(funcOpBbArgReadWriteAnalysis(funcOp, state, funcState)))
++    if (failed(aliasingFuncOpBBArgsAnalysis(funcOpCasted, state, funcState)) ||
++        failed(funcOpBbArgReadWriteAnalysis(funcOpCasted, state, funcState)))
+       return failure();
+ 
+     // Mark op as fully analyzed.
+-    funcState.analyzedFuncOps[funcOp] = FuncOpAnalysisState::Analyzed;
++    funcState.analyzedFuncOps[funcOpCasted] = FuncOpAnalysisState::Analyzed;
+   }
+ 
+   return success();
 @@ -430,20 +449,20 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
    IRRewriter rewriter(moduleOp.getContext());
  
