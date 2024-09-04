@@ -253,9 +253,19 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
         // OutlinedFuncs contains the tapes in reverse order (tape_2, tape_1, tape_0)
         // Move them into the correct order
+        // Also, make the outlined functions keep the original's attributes
+        SmallVector<NamedAttribute> OutlinedFuncAttrs;
+        ArrayRef<NamedAttribute> FullOriginalFuncAttrs = func->getAttrs();
+        for (auto attr : FullOriginalFuncAttrs) {
+            StringRef attrname = attr.getName();
+            if ((attrname != "sym_name") && (attrname != "function_type")) {
+                OutlinedFuncAttrs.push_back(attr);
+            }
+        }
         for (auto outlined : OutlinedFuncs) {
             func::FuncOp outlinedfunc = *outlined;
             outlinedfunc->moveAfter(func);
+            outlinedfunc->setAttrs(OutlinedFuncAttrs);
         }
 
         // TODO: use smart ptrs instead of manually
