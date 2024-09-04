@@ -60,8 +60,8 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                                 if_op->getLoc(), RankedTensorType::get({}, if_result.getType()),
                                 if_result);
                             rewriter.replaceUsesWithIf(
-                                if_result, from_elem_op->getResult(0), [&](OpOperand &operand) {
-                                    return !isa<tensor::FromElementsOp>(operand.getOwner());
+                                if_result, from_elem_op->getResult(0), [&](OpOperand &op) {
+                                    return !isa<tensor::FromElementsOp>(op.getOwner());
                                 });
                         }
                     }
@@ -100,9 +100,11 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                             RankedTensorType::get({},
                                                   for_op.getRegionIterArg(i_argument).getType()),
                             for_op.getRegionIterArg(i_argument));
-                        rewriter.replaceUsesWithIf(
-                            for_op.getRegionIterArg(i_argument), from_elem_op->getResult(0),
-                            [&](OpOperand &op) { return op.getOwner() != from_elem_op; });
+                        rewriter.replaceUsesWithIf(for_op.getRegionIterArg(i_argument),
+                                                   from_elem_op->getResult(0), [&](OpOperand &op) {
+                                                       return !isa<tensor::FromElementsOp>(
+                                                           op.getOwner());
+                                                   });
                     }
                 }
                 i_operand += 1;
@@ -112,6 +114,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
             std::size_t i_result = 0;
             for (mlir::Value result : yield_op.getOperands()) {
                 if (isScalarTensor(result)) {
+                    auto for_result = for_op->getResult(i_result);
                     // Detensorize result: extract tensor element before yielding
                     {
                         rewriter.setInsertionPoint(yield_op);
@@ -119,25 +122,25 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                             yield_op->getLoc(), result, ValueRange{});
                         rewriter.replaceUsesWithIf(
                             result, extract_op->getResult(0),
-                            [&](OpOperand &op) { return op.getOwner() != extract_op; });
+                            [&](OpOperand &op) { return op.getOwner() == yield_op; });
                         rewriter.modifyOpInPlace(yield_op, [&]() {
                             yield_op->getOperand(i_result).setType(
                                 extract_op->getResult(0).getType());
                         });
                         rewriter.modifyOpInPlace(for_op, [&]() {
-                            for_op.getResult(i_result).setType(extract_op->getResult(0).getType());
+                            for_result.setType(extract_op->getResult(0).getType());
                         });
                     }
                     // Retensorize result: reconstruct tensor after the for body
                     {
                         rewriter.setInsertionPointAfter(for_op);
                         auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
-                            for_op->getLoc(),
-                            RankedTensorType::get({}, for_op->getResult(i_result).getType()),
-                            for_op->getResult(i_result));
+                            for_op->getLoc(), RankedTensorType::get({}, for_result.getType()),
+                            for_result);
                         rewriter.replaceUsesWithIf(
-                            for_op->getResult(i_result), from_elem_op->getResult(0),
-                            [&](OpOperand &operand) { return operand.getOwner() != from_elem_op; });
+                            for_result, from_elem_op->getResult(0), [&](OpOperand &op) {
+                                return !isa<tensor::FromElementsOp>(op.getOwner());
+                            });
                     }
                 }
                 i_result += 1;
