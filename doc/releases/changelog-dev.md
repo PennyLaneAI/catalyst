@@ -60,6 +60,8 @@
   * [`jax.scipy.linalg.sqrtm`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.sqrtm.html)
   * [`jax.scipy.linalg.svd`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.svd.html)
 
+  [(#1097)](https://github.com/PennyLaneAI/catalyst/pull/1097)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
