@@ -166,8 +166,12 @@ void Getrf<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
                 static_cast<int64_t>(b) * static_cast<int64_t>(m) *
                     static_cast<int64_t>(n) * sizeof(T));
   }
+
+  constexpr int corder = LAPACK_ROW_MAJOR;
+  const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
+
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, m, n, a_out, m, ipiv);
+    *info = fn(corder, m, n, a_out, lda, ipiv);
     a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
     ipiv += std::min(m, n);
     ++info;
@@ -205,8 +209,11 @@ void Geqrf<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
                     static_cast<int64_t>(n) * sizeof(T));
   }
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
+  const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
+
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, m, n, a_out, m, tau);
+    *info = fn(LAPACK_ROW_MAJOR, m, n, a_out, lda, tau);
     a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
     tau += std::min(m, n);
     ++info;
@@ -245,8 +252,11 @@ void Orgqr<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
                     static_cast<int64_t>(n) * sizeof(T));
   }
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
+  const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
+
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, m, n, k, a_out, m, tau);
+    *info = fn(LAPACK_ROW_MAJOR, m, n, k, a_out, lda, tau);
     a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
     tau += k;
     ++info;
@@ -281,8 +291,10 @@ void Potrf<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
                     static_cast<int64_t>(n) * sizeof(T));
   }
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
+
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, uplo, n, a_out, n);
+    *info = fn(corder, uplo, n, a_out, n);
     a_out += static_cast<int64_t>(n) * static_cast<int64_t>(n);
     ++info;
   }
@@ -302,6 +314,38 @@ static char GesddJobz(bool job_opt_compute_uv, bool job_opt_full_matrices) {
     return 'S';
   }
   return 'A';
+}
+
+static int Gesdd_ldu(const int order, const char jobz, const int m, const int n) {
+  int ldu = 0;
+  if (jobz == 'N') {
+    ldu = 1;
+  } else if (jobz == 'A') {
+    ldu = m;
+  } else if (jobz == 'S') {
+    if (m >= n) {
+      ldu = (order == LAPACK_ROW_MAJOR) ? n : m;
+    } else {
+      ldu = m;
+    }
+  }
+  return ldu;
+}
+
+static int Gesdd_ldvt(const int order, const char jobz, const int m, const int n) {
+  int ldu = 0;
+  if (jobz == 'N') {
+    ldu = 1;
+  } else if (jobz == 'A') {
+    ldu = n;
+  } else if (jobz == 'S') {
+    if (m >= n) {
+      ldu = n;
+    } else {
+      ldu = (order == LAPACK_ROW_MAJOR) ? n : m;
+    }
+  }
+  return ldu;
 }
 
 template <typename T>
@@ -334,13 +378,14 @@ void RealGesdd<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
 
   const char jobz = GesddJobz(job_opt_compute_uv, job_opt_full_matrices);
 
-  const int lda = m;
-  const int ldu = m;
-  const int tdu = job_opt_full_matrices ? m : std::min(m, n);
-  const int ldvt = job_opt_full_matrices ? n : std::min(m, n);
+  constexpr int corder = LAPACK_ROW_MAJOR;
+  const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
+  const int ldu = Gesdd_ldu(corder, jobz, m, n);
+  const int tdu = ldu;
+  const int ldvt = Gesdd_ldvt(corder, jobz, m, n);
 
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, jobz, m, n, a_out, lda, s, u, ldu, vt, ldvt);
+    *info = fn(corder, jobz, m, n, a_out, lda, s, u, ldu, vt, ldvt);
     a_out += static_cast<int64_t>(m) * n;
     s += std::min(m, n);
     u += static_cast<int64_t>(m) * tdu;
@@ -382,10 +427,11 @@ void ComplexGesdd<T>::Kernel(void* out_tuple, void** data,
 
   const char jobz = GesddJobz(job_opt_compute_uv, job_opt_full_matrices);
 
-  const int lda = m;
-  const int ldu = m;
-  const int tdu = job_opt_full_matrices ? m : std::min(m, n);
-  const int ldvt = job_opt_full_matrices ? n : std::min(m, n);
+  constexpr int corder = LAPACK_ROW_MAJOR;
+  const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
+  const int ldu = Gesdd_ldu(corder, jobz, m, n);
+  const int tdu = ldu;
+  const int ldvt = Gesdd_ldvt(corder, jobz, m, n);
 
   for (int i = 0; i < b; ++i) {
     *info = fn(LAPACK_ROW_MAJOR, jobz, m, n, a_out, lda, s, u, ldu, vt, ldvt);
@@ -427,11 +473,12 @@ void RealSyevd<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
                     static_cast<int64_t>(n) * sizeof(T));
   }
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
   const char jobz = 'V';
   const char uplo = lower ? 'L' : 'U';
 
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, jobz, uplo, n, a_out, n, w_out);
+    *info = fn(corder, jobz, uplo, n, a_out, n, w_out);
     a_out += static_cast<int64_t>(n) * n;
     w_out += n;
     ++info;
@@ -462,11 +509,12 @@ void ComplexHeevd<T>::Kernel(void* out_tuple, void** data,
                     static_cast<int64_t>(n) * sizeof(T));
   }
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
   const char jobz = 'V';
   const char uplo = lower ? 'L' : 'U';
 
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, jobz, uplo, n, a_out, n, w_out);
+    *info = fn(corder, jobz, uplo, n, a_out, n, w_out);
     a_out += static_cast<int64_t>(n) * n;
     w_out += n;
     ++info;
@@ -532,8 +580,10 @@ void RealGeev<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
   std::complex<T>* vr_out = reinterpret_cast<std::complex<T>*>(out[6]);
   int* info = reinterpret_cast<int*>(out[7]);
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
+
   // TODO(phawkins): preallocate workspace using XLA.
-  *info = fn(LAPACK_ROW_MAJOR, jobvl, jobvr, n_int, a_work, n_int, wr_out, wi_out,
+  *info = fn(corder, jobvl, jobvr, n_int, a_work, n_int, wr_out, wi_out,
              vl_work, n_int, vr_work, n_int);
 
   auto is_finite = [](T* a_work, int64_t n) {
@@ -550,7 +600,7 @@ void RealGeev<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
     size_t a_size = n * n * sizeof(T);
     std::memcpy(a_work, a_in, a_size);
     if (is_finite(a_work, n)) {
-      *info = fn(LAPACK_ROW_MAJOR, jobvl, jobvr, n_int, a_work, n_int, wr_out, wi_out,
+      *info = fn(corder, jobvl, jobvr, n_int, a_work, n_int, wr_out, wi_out,
                  vl_work, n_int, vr_work, n_int);
 #ifdef USE_ABSEIL_LIB
       ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(a_work, a_size);
@@ -600,8 +650,10 @@ void ComplexGeev<T>::Kernel(void* out_tuple, void** data,
   T* vr_out = reinterpret_cast<T*>(out[4]);
   int* info = reinterpret_cast<int*>(out[5]);
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
+
   // TODO(phawkins): preallocate workspace using XLA.
-  *info = fn(LAPACK_ROW_MAJOR, jobvl, jobvr, n_int, a_work, n_int, w_out, vl_out,
+  *info = fn(corder, jobvl, jobvr, n_int, a_work, n_int, w_out, vl_out,
              n_int, vr_out, n_int);
 
   auto is_finite = [](T* a_work, int64_t n) {
@@ -620,7 +672,7 @@ void ComplexGeev<T>::Kernel(void* out_tuple, void** data,
     size_t a_size = n * n * sizeof(T);
     std::memcpy(a_work, a_in, a_size);
     if (is_finite(a_work, n)) {
-      *info = fn(LAPACK_ROW_MAJOR, jobvl, jobvr, n_int, a_work, n_int, w_out, vl_out, n_int, vr_out, n_int);
+      *info = fn(corder, jobvl, jobvr, n_int, a_work, n_int, w_out, vl_out, n_int, vr_out, n_int);
 #ifdef USE_ABSEIL_LIB
       ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(a_work, a_size);
       ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(w_out, sizeof(T) * n);
@@ -672,7 +724,9 @@ void RealGees<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
   int* sdim_out = reinterpret_cast<int*>(out[4]);
   int* info = reinterpret_cast<int*>(out[5]);
 
-  *info = fn(LAPACK_ROW_MAJOR, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
+  constexpr int corder = LAPACK_ROW_MAJOR;
+
+  *info = fn(corder, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
              wr_out, wi_out, vs_out, n_int);
 
   size_t a_size = static_cast<int64_t>(n) * static_cast<int64_t>(n) * sizeof(T);
@@ -681,7 +735,7 @@ void RealGees<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
   }
 
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
+    *info = fn(corder, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
                wr_out, wi_out, vs_out, n_int);
 #ifdef USE_ABSEIL_LIB
     ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(a_out, a_size);
@@ -728,7 +782,9 @@ void ComplexGees<T>::Kernel(void* out_tuple, void** data,
   int* sdim_out = reinterpret_cast<int*>(out[4]);
   int* info = reinterpret_cast<int*>(out[5]);
 
-  *info = fn(LAPACK_ROW_MAJOR, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
+  constexpr int corder = LAPACK_ROW_MAJOR;
+
+  *info = fn(corder, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
              w_out, vs_out, n_int);
 
   if (a_out != a_in) {
@@ -738,7 +794,7 @@ void ComplexGees<T>::Kernel(void* out_tuple, void** data,
   }
 
   for (int i = 0; i < b; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
+    *info = fn(corder, jobvs, sort, select, n_int, a_out, n_int, sdim_out,
                w_out, vs_out, n_int);
 #ifdef USE_ABSEIL_LIB
     ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(w_out, sizeof(T) * n);
@@ -790,8 +846,10 @@ void Gehrd<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
 
   const int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(n);
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
+
   for (int i = 0; i < batch; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, n, ilo, ihi, a_out, lda, tau);
+    *info = fn(corder, n, ilo, ihi, a_out, lda, tau);
     a_out += a_plus;
     tau += n - 1;
     ++info;
@@ -833,12 +891,13 @@ void Sytrd<T>::Kernel(void* out_tuple, void** data, XlaCustomCallStatus*) {
                     static_cast<int64_t>(n) * sizeof(T));
   }
 
+  constexpr int corder = LAPACK_ROW_MAJOR;
   const char cuplo = lower ? 'L' : 'U';
 
   const int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(n);
 
   for (int i = 0; i < batch; ++i) {
-    *info = fn(LAPACK_ROW_MAJOR, cuplo, n, a_out, lda, d, e, tau);
+    *info = fn(corder, cuplo, n, a_out, lda, d, e, tau);
     a_out += a_plus;
     d += n;
     e += n - 1;
