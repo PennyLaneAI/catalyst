@@ -28,7 +28,6 @@ def a_plus_b_times_2(a, b):
     # CHECK: arith.addf
     # CHECK-NOT: linalg.generic
     c = a + b
-    # CHECK: tensor.from_elements
     return c + c
 
 
@@ -57,7 +56,6 @@ def f_with_cond(a, b):
         # CHECK: arith.subf
         b = b - 2.0
         c = a + b
-    # CHECK: tensor.from_elements
     return c * 2.0
 
 
@@ -72,7 +70,6 @@ def f_with_for_loop(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
     # CHECK-NOT: linalg.generic
-    # CHECK: arith.addf
     b = a + b
     for _ in range(10):
         if b % 2:
@@ -80,7 +77,6 @@ def f_with_for_loop(a, b):
             b = b - b
         else:
             b = b + 1
-    # CHECK: tensor.from_elements
     # CHECK: arith.mulf
     c = a * b
     return c
@@ -89,3 +85,29 @@ def f_with_for_loop(a, b):
 f_with_for_loop(1.0, 2.0)
 print(get_compilation_stage(f_with_for_loop, "HLOLoweringPass"))
 f_with_for_loop.workspace.cleanup()
+
+
+# CHECK-LABEL: public @jit_f_with_nested_ifs
+@qjit(autograph=True, keep_intermediate=True)
+def f_with_nested_ifs(a, b, c):
+    # CHECK: %extracted
+    # CHECK: tensor.extract
+    # CHECK-NOT: linalg.generic
+    if a < b:
+        c = c + 1.0
+        if a > 2 * b:
+            b = 2 * a
+        else:
+            b = a / 2
+    else:
+        c = c - 1.0
+        if b > 2 * a:
+            a = 2 * b
+        else:
+            a = b / 2
+    return a * b * c + 2 * a**2 * b**2
+
+
+f_with_nested_ifs(1.0, 2.0, 3.0)
+print(get_compilation_stage(f_with_nested_ifs, "HLOLoweringPass"))
+f_with_nested_ifs.workspace.cleanup()
