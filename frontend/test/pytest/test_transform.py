@@ -41,7 +41,7 @@ try:
 except:  # pylint: disable=bare-except
     from pennylane.transforms import qcut
 
-from pennylane.transforms import hamiltonian_expand, merge_rotations, sum_expand
+from pennylane.transforms import merge_rotations, sum_expand
 
 from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
@@ -343,7 +343,7 @@ class TestHamiltonianExpand:
         def qnode_builder(device_name):
             """Builder"""
 
-            @hamiltonian_expand
+            @qml.transforms.split_non_commuting
             @qml.qnode(qml.device(device_name, wires=3))
             def qfunc():
                 """Example taken from PL tests."""
@@ -500,7 +500,7 @@ class TestTransformValidity:
         with pytest.raises(CompileError, match=msg):
 
             @qjit
-            @hamiltonian_expand
+            @qml.transforms.split_non_commuting
             @qml.qnode(qml.device(backend, wires=3))
             def qfunc():
                 """Example taken from PL tests."""
