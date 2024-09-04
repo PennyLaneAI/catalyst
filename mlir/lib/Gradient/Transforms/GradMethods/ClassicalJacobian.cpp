@@ -84,14 +84,14 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
                     rewriter.create<memref::StoreOp>(loc, newCount, paramCountBuffer);
                 }
 
-                rewriter.replaceOp(gate, cast<quantum::QuantumGate>(op).getQubitOperands());
+                rewriter.replaceOp(gate, gate.getQubitOperands());
             }
             // Any other gates or quantum instructions can also be stripped.
             // Measurements are handled separately.
             else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
-            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
             else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
@@ -179,7 +179,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
             else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
-            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
             else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
@@ -273,7 +273,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
             else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
-            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
             else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
