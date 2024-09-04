@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include <complex>
 
 #include "jax_cpu_lapack_kernels/lapack_kernels.h"
 
 #ifdef DEBUG
-    #include <iostream>
-    #define DEBUG_MSG(str) std::cout << "DEBUG: " << str << std::endl;
+#include <iostream>
+#define DEBUG_MSG(str) std::cout << "DEBUG: " << str << std::endl;
 #else
-    #define DEBUG_MSG(str) // No operation
+#define DEBUG_MSG(str) // No operation
 #endif
-
 
 // MemRef type
 struct EncodedMemref {
@@ -32,31 +30,31 @@ struct EncodedMemref {
     int8_t dtype;
 };
 
-
-#define DEFINE_LAPACK_FUNC(FUNC_NAME, DATA_SIZE, OUT_SIZE, KERNEL)                     \
-extern "C" {                                                                           \
-void FUNC_NAME(void **dataEncoded, void **resultsEncoded)                              \
-{                                                                                      \
-    DEBUG_MSG(#FUNC_NAME);                                                             \
-    void* data[DATA_SIZE];                                                             \
-    for (size_t i = 0; i < DATA_SIZE; ++i) {                                           \
-        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));     \
-        data[i] = encodedMemref.data_aligned;                                          \
-    }                                                                                  \
-                                                                                       \
-    if (OUT_SIZE > 1) {                                                                \
-        void* out[OUT_SIZE];                                                           \
-        for (size_t i = 0; i < OUT_SIZE; ++i) {                                        \
-            auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i])); \
-            out[i] = encodedMemref.data_aligned;                                       \
-        }                                                                              \
-        KERNEL::Kernel(out, data, nullptr);                                            \
-    } else {                                                                           \
-        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[0]));  \
-        KERNEL::Kernel(encodedMemref.data_aligned, data, nullptr);                     \
-    }                                                                                  \
-}                                                                                      \
-}
+#define DEFINE_LAPACK_FUNC(FUNC_NAME, DATA_SIZE, OUT_SIZE, KERNEL)                                 \
+    extern "C" {                                                                                   \
+    void FUNC_NAME(void **dataEncoded, void **resultsEncoded)                                      \
+    {                                                                                              \
+        DEBUG_MSG(#FUNC_NAME);                                                                     \
+        void *data[DATA_SIZE];                                                                     \
+        for (size_t i = 0; i < DATA_SIZE; ++i) {                                                   \
+            auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));             \
+            data[i] = encodedMemref.data_aligned;                                                  \
+        }                                                                                          \
+                                                                                                   \
+        if (OUT_SIZE > 1) {                                                                        \
+            void *out[OUT_SIZE];                                                                   \
+            for (size_t i = 0; i < OUT_SIZE; ++i) {                                                \
+                auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));      \
+                out[i] = encodedMemref.data_aligned;                                               \
+            }                                                                                      \
+            KERNEL::Kernel(out, data, nullptr);                                                    \
+        }                                                                                          \
+        else {                                                                                     \
+            auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[0]));          \
+            KERNEL::Kernel(encodedMemref.data_aligned, data, nullptr);                             \
+        }                                                                                          \
+    }                                                                                              \
+    }
 
 DEFINE_LAPACK_FUNC(blas_strsm, 10, 1, jax::RealTrsm<float>)
 DEFINE_LAPACK_FUNC(blas_dtrsm, 10, 1, jax::RealTrsm<double>)

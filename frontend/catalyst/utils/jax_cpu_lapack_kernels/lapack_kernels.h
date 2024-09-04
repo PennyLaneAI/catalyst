@@ -40,7 +40,6 @@ limitations under the License.
 typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
 #endif
 
-
 // Underlying function pointers (e.g., Trsm<double>::Fn) are initialized either
 // by the pybind wrapper that links them to an existing SciPy lapack instance,
 // or using the lapack_kernels_strong.cc static initialization to link them
@@ -49,18 +48,23 @@ typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
 namespace jax {
 
 // Copied from cblas.h
-typedef enum CBLAS_ORDER     {CblasRowMajor=101, CblasColMajor=102} CBLAS_ORDER;
-typedef enum CBLAS_TRANSPOSE {CblasNoTrans=111, CblasTrans=112, CblasConjTrans=113, CblasConjNoTrans=114} CBLAS_TRANSPOSE;
-typedef enum CBLAS_UPLO      {CblasUpper=121, CblasLower=122} CBLAS_UPLO;
-typedef enum CBLAS_DIAG      {CblasNonUnit=131, CblasUnit=132} CBLAS_DIAG;
-typedef enum CBLAS_SIDE      {CblasLeft=141, CblasRight=142} CBLAS_SIDE;
+typedef enum CBLAS_ORDER { CblasRowMajor = 101, CblasColMajor = 102 } CBLAS_ORDER;
+typedef enum CBLAS_TRANSPOSE {
+    CblasNoTrans = 111,
+    CblasTrans = 112,
+    CblasConjTrans = 113,
+    CblasConjNoTrans = 114
+} CBLAS_TRANSPOSE;
+typedef enum CBLAS_UPLO { CblasUpper = 121, CblasLower = 122 } CBLAS_UPLO;
+typedef enum CBLAS_DIAG { CblasNonUnit = 131, CblasUnit = 132 } CBLAS_DIAG;
+typedef enum CBLAS_SIDE { CblasLeft = 141, CblasRight = 142 } CBLAS_SIDE;
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 
 typedef int lapack_int;
 
 // Copied from lapacke.h
-#define LAPACK_ROW_MAJOR  101
-#define LAPACK_COL_MAJOR  102
+#define LAPACK_ROW_MAJOR 101
+#define LAPACK_COL_MAJOR 102
 
 // #ifndef lapack_logical
 // #define lapack_logical lapack_int
@@ -69,170 +73,143 @@ typedef int lapack_int;
 // typedef lapack_logical (*LAPACK_S_SELECT2) ( const float*, const float* );
 
 // trsm: Solves a triangular matrix equation.
-template <typename T>
-struct RealTrsm {
-  using FnType = void(const CBLAS_LAYOUT layout, const CBLAS_SIDE Side,
-                      const CBLAS_UPLO Uplo, const CBLAS_TRANSPOSE TransA,
-                      const CBLAS_DIAG Diag, const int M, const int N,
-                      const T alpha, const T *A, const int lda,
-                      T *B, const int ldb);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct RealTrsm {
+    using FnType = void(const CBLAS_LAYOUT layout, const CBLAS_SIDE Side, const CBLAS_UPLO Uplo,
+                        const CBLAS_TRANSPOSE TransA, const CBLAS_DIAG Diag, const int M,
+                        const int N, const T alpha, const T *A, const int lda, T *B, const int ldb);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
-template <typename T>
-struct ComplexTrsm {
-  using FnType = void(const CBLAS_LAYOUT layout, const CBLAS_SIDE Side,
-                      const CBLAS_UPLO Uplo, const CBLAS_TRANSPOSE TransA,
-                      const CBLAS_DIAG Diag, const int M, const int N,
-                      const void *alpha, const void *A, const int lda,
-                      void *B, const int ldb);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct ComplexTrsm {
+    using FnType = void(const CBLAS_LAYOUT layout, const CBLAS_SIDE Side, const CBLAS_UPLO Uplo,
+                        const CBLAS_TRANSPOSE TransA, const CBLAS_DIAG Diag, const int M,
+                        const int N, const void *alpha, const void *A, const int lda, void *B,
+                        const int ldb);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // getrf: Computes the LU factorization of a general m-by-n matrix
-template <typename T>
-struct Getrf {
-  using FnType = lapack_int(int matrix_layout, lapack_int m, lapack_int n, T* a,
-                            lapack_int lda, lapack_int* ipiv);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct Getrf {
+    using FnType = lapack_int(int matrix_layout, lapack_int m, lapack_int n, T *a, lapack_int lda,
+                              lapack_int *ipiv);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // geqrf: Computes the QR factorization of a general m-by-n matrix.
-template <typename T>
-struct Geqrf {
-  using FnType = lapack_int(int matrix_layout, lapack_int m, lapack_int n,
-                            T* a, lapack_int lda, T* tau);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct Geqrf {
+    using FnType = lapack_int(int matrix_layout, lapack_int m, lapack_int n, T *a, lapack_int lda,
+                              T *tau);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // orgqr: Generates the real orthogonal matrix Q of the QR factorization formed by geqrf
-template <typename T>
-struct Orgqr {
-  using FnType = lapack_int(int matrix_layout, lapack_int m, lapack_int n,
-                            lapack_int k, T* a, lapack_int lda, const T* tau);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct Orgqr {
+    using FnType = lapack_int(int matrix_layout, lapack_int m, lapack_int n, lapack_int k, T *a,
+                              lapack_int lda, const T *tau);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // potrf: Computes the Cholesky factorization of a symmetric (Hermitian) positive-definite matrix
-template <typename T>
-struct Potrf {
-  using FnType = lapack_int(int matrix_layout, char uplo, lapack_int n, T* a,
-                            lapack_int lda);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct Potrf {
+    using FnType = lapack_int(int matrix_layout, char uplo, lapack_int n, T *a, lapack_int lda);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // gesdd: computes the singular value decomposition (SVD) of an m-by-n matrix
-template <typename T>
-struct RealGesdd {
-  using FnType = lapack_int(int matrix_layout, char jobz, lapack_int m,
-                            lapack_int n, T* a, lapack_int lda, T* s,
-                            T* u, lapack_int ldu, T* vt, lapack_int ldvt);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct RealGesdd {
+    using FnType = lapack_int(int matrix_layout, char jobz, lapack_int m, lapack_int n, T *a,
+                              lapack_int lda, T *s, T *u, lapack_int ldu, T *vt, lapack_int ldvt);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
-template <typename T>
-struct ComplexGesdd {
-  using FnType = lapack_int(int matrix_layout, char jobz, lapack_int m, lapack_int n,
-                            T* a, lapack_int lda, typename T::value_type* s,
-                            T* u, lapack_int ldu, T* vt, lapack_int ldvt);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct ComplexGesdd {
+    using FnType = lapack_int(int matrix_layout, char jobz, lapack_int m, lapack_int n, T *a,
+                              lapack_int lda, typename T::value_type *s, T *u, lapack_int ldu,
+                              T *vt, lapack_int ldvt);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // syevd: Computes all eigenvalues and, optionally, all eigenvectors of a real symmetric matrix
-template <typename T>
-struct RealSyevd {
-  using FnType = lapack_int(int matrix_layout, char jobz, char uplo, lapack_int n,
-                            T* a, lapack_int lda, T* w);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct RealSyevd {
+    using FnType = lapack_int(int matrix_layout, char jobz, char uplo, lapack_int n, T *a,
+                              lapack_int lda, T *w);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // heevd: Computes all eigenvalues and, optionally, all eigenvectors of a complex Hermitian matrix
-template <typename T>
-struct ComplexHeevd {
-  using FnType = lapack_int(int matrix_layout, char jobz, char uplo, lapack_int n,
-                            T* a, lapack_int lda, typename T::value_type* w);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct ComplexHeevd {
+    using FnType = lapack_int(int matrix_layout, char jobz, char uplo, lapack_int n, T *a,
+                              lapack_int lda, typename T::value_type *w);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // geev: Computes the eigenvalues and left and right eigenvectors of a general matrix
-template <typename T>
-struct RealGeev {
-  using FnType = lapack_int(int matrix_layout, char jobvl, char jobvr,
-                            lapack_int n, T* a, lapack_int lda, T* wr,
-                            T* wi, T* vl, lapack_int ldvl, T* vr,
-                            lapack_int ldvr);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct RealGeev {
+    using FnType = lapack_int(int matrix_layout, char jobvl, char jobvr, lapack_int n, T *a,
+                              lapack_int lda, T *wr, T *wi, T *vl, lapack_int ldvl, T *vr,
+                              lapack_int ldvr);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
-template <typename T>
-struct ComplexGeev {
-  using FnType = lapack_int(int matrix_layout, char jobvl, char jobvr,
-                            lapack_int n, T* a, lapack_int lda, T* w, T* vl,
-                            lapack_int ldvl, T* vr, lapack_int ldvr);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct ComplexGeev {
+    using FnType = lapack_int(int matrix_layout, char jobvl, char jobvr, lapack_int n, T *a,
+                              lapack_int lda, T *w, T *vl, lapack_int ldvl, T *vr, lapack_int ldvr);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // gees: Computes the eigenvalues and Schur factorization of a general matrix
-template <typename T>
-struct RealGees {
-  using FnType = lapack_int(int matrix_layout, char jobvs, char sort,
-                            bool (*select)(T, T), lapack_int n, T* a,
-                            lapack_int lda, lapack_int* sdim, T* wr, T* wi,
-                            T* vs, lapack_int ldvs);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct RealGees {
+    using FnType = lapack_int(int matrix_layout, char jobvs, char sort, bool (*select)(T, T),
+                              lapack_int n, T *a, lapack_int lda, lapack_int *sdim, T *wr, T *wi,
+                              T *vs, lapack_int ldvs);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
-template <typename T>
-struct ComplexGees {
-  using FnType = lapack_int(int matrix_layout, char jobvs, char sort,
-                            bool (*select)(T), lapack_int n, T* a,
-                            lapack_int lda, lapack_int* sdim, T* w, T* vs,
-                            lapack_int ldvs);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct ComplexGees {
+    using FnType = lapack_int(int matrix_layout, char jobvs, char sort, bool (*select)(T),
+                              lapack_int n, T *a, lapack_int lda, lapack_int *sdim, T *w, T *vs,
+                              lapack_int ldvs);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
 // Gehrd: Reduces a non-symmetric square matrix to upper Hessenberg form
-template <typename T>
-struct Gehrd {
-  using FnType = lapack_int(int matrix_layout, lapack_int n, lapack_int ilo,
-                            lapack_int ihi, T* a, lapack_int lda, T* tau);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct Gehrd {
+    using FnType = lapack_int(int matrix_layout, lapack_int n, lapack_int ilo, lapack_int ihi, T *a,
+                              lapack_int lda, T *tau);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
-template <typename T>
-struct real_type {
-  typedef T type;
+template <typename T> struct real_type {
+    typedef T type;
 };
-template <typename T>
-struct real_type<std::complex<T>> {
-  typedef T type;
+template <typename T> struct real_type<std::complex<T>> {
+    typedef T type;
 };
 
 // Sytrd/Hetrd: Reduces a symmetric (Hermitian) square matrix to tridiagonal form
-template <typename T>
-struct Sytrd {
-  using FnType = lapack_int(int matrix_layout, char uplo, lapack_int n, T* a,
-                            lapack_int lda, typename real_type<T>::type* d,
-                            typename real_type<T>::type* e, T* tau);
-  static FnType* fn;
-  static void Kernel(void* out, void** data, XlaCustomCallStatus*);
+template <typename T> struct Sytrd {
+    using FnType = lapack_int(int matrix_layout, char uplo, lapack_int n, T *a, lapack_int lda,
+                              typename real_type<T>::type *d, typename real_type<T>::type *e,
+                              T *tau);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
 };
 
-}  // namespace jax
+} // namespace jax
 
-#endif  // JAXLIB_CPU_LAPACK_KERNELS_H_
+#endif // JAXLIB_CPU_LAPACK_KERNELS_H_

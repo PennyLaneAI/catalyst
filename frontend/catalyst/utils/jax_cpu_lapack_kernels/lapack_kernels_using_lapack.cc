@@ -86,67 +86,67 @@ jax::Sytrd<double>::FnType LAPACKE_dsytrd;
 jax::Sytrd<std::complex<float>>::FnType LAPACKE_chetrd;
 jax::Sytrd<std::complex<double>>::FnType LAPACKE_zhetrd;
 
-}  // extern "C"
+} // extern "C"
 
 namespace jax {
 
 static auto init = []() -> int {
-  RealTrsm<float>::fn = cblas_strsm;
-  RealTrsm<double>::fn = cblas_dtrsm;
-  ComplexTrsm<std::complex<float>>::fn = cblas_ctrsm;
-  ComplexTrsm<std::complex<double>>::fn = cblas_ztrsm;
+    RealTrsm<float>::fn = cblas_strsm;
+    RealTrsm<double>::fn = cblas_dtrsm;
+    ComplexTrsm<std::complex<float>>::fn = cblas_ctrsm;
+    ComplexTrsm<std::complex<double>>::fn = cblas_ztrsm;
 
-  Getrf<float>::fn = LAPACKE_sgetrf;
-  Getrf<double>::fn = LAPACKE_dgetrf;
-  Getrf<std::complex<float>>::fn = LAPACKE_cgetrf;
-  Getrf<std::complex<double>>::fn = LAPACKE_zgetrf;
+    Getrf<float>::fn = LAPACKE_sgetrf;
+    Getrf<double>::fn = LAPACKE_dgetrf;
+    Getrf<std::complex<float>>::fn = LAPACKE_cgetrf;
+    Getrf<std::complex<double>>::fn = LAPACKE_zgetrf;
 
-  Geqrf<float>::fn = LAPACKE_sgeqrf;
-  Geqrf<double>::fn = LAPACKE_dgeqrf;
-  Geqrf<std::complex<float>>::fn = LAPACKE_cgeqrf;
-  Geqrf<std::complex<double>>::fn = LAPACKE_zgeqrf;
+    Geqrf<float>::fn = LAPACKE_sgeqrf;
+    Geqrf<double>::fn = LAPACKE_dgeqrf;
+    Geqrf<std::complex<float>>::fn = LAPACKE_cgeqrf;
+    Geqrf<std::complex<double>>::fn = LAPACKE_zgeqrf;
 
-  Orgqr<float>::fn = LAPACKE_sorgqr;
-  Orgqr<double>::fn = LAPACKE_dorgqr;
-  Orgqr<std::complex<float>>::fn = LAPACKE_cungqr;
-  Orgqr<std::complex<double>>::fn = LAPACKE_zungqr;
+    Orgqr<float>::fn = LAPACKE_sorgqr;
+    Orgqr<double>::fn = LAPACKE_dorgqr;
+    Orgqr<std::complex<float>>::fn = LAPACKE_cungqr;
+    Orgqr<std::complex<double>>::fn = LAPACKE_zungqr;
 
-  Potrf<float>::fn = LAPACKE_spotrf;
-  Potrf<double>::fn = LAPACKE_dpotrf;
-  Potrf<std::complex<float>>::fn = LAPACKE_cpotrf;
-  Potrf<std::complex<double>>::fn = LAPACKE_zpotrf;
+    Potrf<float>::fn = LAPACKE_spotrf;
+    Potrf<double>::fn = LAPACKE_dpotrf;
+    Potrf<std::complex<float>>::fn = LAPACKE_cpotrf;
+    Potrf<std::complex<double>>::fn = LAPACKE_zpotrf;
 
-  RealGesdd<float>::fn = LAPACKE_sgesdd;
-  RealGesdd<double>::fn = LAPACKE_dgesdd;
-  ComplexGesdd<std::complex<float>>::fn = LAPACKE_cgesdd;
-  ComplexGesdd<std::complex<double>>::fn = LAPACKE_zgesdd;
+    RealGesdd<float>::fn = LAPACKE_sgesdd;
+    RealGesdd<double>::fn = LAPACKE_dgesdd;
+    ComplexGesdd<std::complex<float>>::fn = LAPACKE_cgesdd;
+    ComplexGesdd<std::complex<double>>::fn = LAPACKE_zgesdd;
 
-  RealSyevd<float>::fn = LAPACKE_ssyevd;
-  RealSyevd<double>::fn = LAPACKE_dsyevd;
-  ComplexHeevd<std::complex<float>>::fn = LAPACKE_cheevd;
-  ComplexHeevd<std::complex<double>>::fn = LAPACKE_zheevd;
+    RealSyevd<float>::fn = LAPACKE_ssyevd;
+    RealSyevd<double>::fn = LAPACKE_dsyevd;
+    ComplexHeevd<std::complex<float>>::fn = LAPACKE_cheevd;
+    ComplexHeevd<std::complex<double>>::fn = LAPACKE_zheevd;
 
-  RealGeev<float>::fn = LAPACKE_sgeev;
-  RealGeev<double>::fn = LAPACKE_dgeev;
-  ComplexGeev<std::complex<float>>::fn = LAPACKE_cgeev;
-  ComplexGeev<std::complex<double>>::fn = LAPACKE_zgeev;
+    RealGeev<float>::fn = LAPACKE_sgeev;
+    RealGeev<double>::fn = LAPACKE_dgeev;
+    ComplexGeev<std::complex<float>>::fn = LAPACKE_cgeev;
+    ComplexGeev<std::complex<double>>::fn = LAPACKE_zgeev;
 
-  RealGees<float>::fn = LAPACKE_sgees;
-  RealGees<double>::fn = LAPACKE_dgees;
-  ComplexGees<std::complex<float>>::fn = LAPACKE_cgees;
-  ComplexGees<std::complex<double>>::fn = LAPACKE_zgees;
+    RealGees<float>::fn = LAPACKE_sgees;
+    RealGees<double>::fn = LAPACKE_dgees;
+    ComplexGees<std::complex<float>>::fn = LAPACKE_cgees;
+    ComplexGees<std::complex<double>>::fn = LAPACKE_zgees;
 
-  Gehrd<float>::fn = LAPACKE_sgehrd;
-  Gehrd<double>::fn = LAPACKE_dgehrd;
-  Gehrd<std::complex<float>>::fn = LAPACKE_cgehrd;
-  Gehrd<std::complex<double>>::fn = LAPACKE_zgehrd;
+    Gehrd<float>::fn = LAPACKE_sgehrd;
+    Gehrd<double>::fn = LAPACKE_dgehrd;
+    Gehrd<std::complex<float>>::fn = LAPACKE_cgehrd;
+    Gehrd<std::complex<double>>::fn = LAPACKE_zgehrd;
 
-  Sytrd<float>::fn = LAPACKE_ssytrd;
-  Sytrd<double>::fn = LAPACKE_dsytrd;
-  Sytrd<std::complex<float>>::fn = LAPACKE_chetrd;
-  Sytrd<std::complex<double>>::fn = LAPACKE_zhetrd;
+    Sytrd<float>::fn = LAPACKE_ssytrd;
+    Sytrd<double>::fn = LAPACKE_dsytrd;
+    Sytrd<std::complex<float>>::fn = LAPACKE_chetrd;
+    Sytrd<std::complex<double>>::fn = LAPACKE_zhetrd;
 
-  return 0;
+    return 0;
 }();
 
-}  // namespace jax
+} // namespace jax
