@@ -671,9 +671,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
-            llvmModule =
-                timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
-                             /* add_endl */ false, *op, llvmContext, "LLVMDialectModule");
+            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
+                                      /* add_endl */ false, *op, llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();

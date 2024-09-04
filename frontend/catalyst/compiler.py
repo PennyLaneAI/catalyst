@@ -195,12 +195,12 @@ BUFFERIZATION_PASS = (
     [
         "eliminate-empty-tensors",
         "one-shot-bufferize{bufferize-function-boundaries}",
-        #"func.func(buffer-hoisting)",
-        #"func.func(buffer-loop-hoisting)",
-        #"buffer-results-to-out-params",
-        #"drop-equivalent-buffer-results",
-        #"func.func(promote-buffers-to-stack)",
-        #"buffer-deallocation-pipeline",
+        # "func.func(buffer-hoisting)",
+        # "func.func(buffer-loop-hoisting)",
+        # "buffer-results-to-out-params",
+        # "drop-equivalent-buffer-results",
+        # "func.func(promote-buffers-to-stack)",
+        # "buffer-deallocation-pipeline",
     ],
 )
 
@@ -256,8 +256,8 @@ DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
-    #BUFFERIZATION_PASS2,
-    #BUFFERIZATION_PASS3,
+    # BUFFERIZATION_PASS2,
+    # BUFFERIZATION_PASS3,
     MLIR_TO_LLVM_PASS,
 ]
 
@@ -273,8 +273,8 @@ DEFAULT_ASYNC_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
-    #BUFFERIZATION_PASS2,
-    #BUFFERIZATION_PASS3,
+    # BUFFERIZATION_PASS2,
+    # BUFFERIZATION_PASS3,
     MLIR_TO_LLVM_ASYNC_PASS,
 ]
 
