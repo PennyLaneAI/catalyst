@@ -8,6 +8,10 @@
 
 <h3>Bug fixes</h3>
 
+* Those functions calling the `gather_p` primitive (like `jax.scipy.linalg.expm`)
+  can now be used in multiple qjits in a single program.
+  [(#1096)](https://github.com/PennyLaneAI/catalyst/pull/1096)
+
 <h3>Internal changes</h3>
 
 * Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
