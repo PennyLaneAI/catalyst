@@ -14,6 +14,8 @@
 
 """Integration tests for the runtime assertion feature."""
 
+import re
+
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -63,6 +65,76 @@ class TestShotVector:
         assert list(circuit_dict().keys()) == ["first", "second"]
         assert jnp.shape(circuit_dict()["first"]) == (4, 3, 1)
         assert jnp.shape(circuit_dict()["second"]) == (4, 3, 1)
+
+    def test_shot_vector_with_mixes_shots_and_without_copies(self):
+        """Test shot-vector with mixes shots and without copies"""
+
+        dev = qml.device("lightning.qubit", wires=1, shots=((20, 5), 100, (101, 2)))
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            return qml.sample()
+
+        assert type(circuit()) == tuple
+        assert len(circuit()) == 8
+
+        for i in range(5):
+            assert jnp.shape(circuit()[i]) == (20, 1)
+        assert jnp.shape(circuit()[5]) == (100, 1)
+        assert jnp.shape(circuit()[6]) == (101, 1)
+        assert jnp.shape(circuit()[7]) == (101, 1)
+
+    def test_shot_vector_with_different_measurement(self):
+        """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
+
+        dev = qml.device("lightning.qubit", wires=1, shots=((3, 4)))
+
+        with pytest.raises(
+            NotImplementedError,
+            match=re.escape(
+                "Measurement expval is not supported a shot-vector. Use qml.sample() instead."
+            ),
+        ):
+
+            @qjit
+            @qml.qnode(dev)
+            def circuit():
+                qml.Hadamard(0)
+                return qml.expval(qml.Z(0))
+
+            circuit()
+
+        with pytest.raises(
+            NotImplementedError,
+            match=re.escape(
+                "Measurement var is not supported a shot-vector. Use qml.sample() instead."
+            ),
+        ):
+
+            @qjit
+            @qml.qnode(dev)
+            def circuit():
+                qml.Hadamard(0)
+                return qml.var(qml.Z(0))
+
+            circuit()
+
+        with pytest.raises(
+            NotImplementedError,
+            match=re.escape(
+                "Measurement probs is not supported a shot-vector. Use qml.sample() instead."
+            ),
+        ):
+
+            @qjit
+            @qml.qnode(dev)
+            def circuit():
+                qml.Hadamard(0)
+                return qml.probs(wires=[0])
+
+            circuit()
 
 
 if __name__ == "__main__":

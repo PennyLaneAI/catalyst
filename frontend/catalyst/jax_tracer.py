@@ -154,12 +154,7 @@ def get_device_total_shot_copies(dev):
 
 def get_device_shot_vector(dev):
     """Helper function to get device shot vector."""
-
-    if isinstance(dev, qml.devices.LegacyDevice):
-        return [(dev.shots, 1)]
-
-    shot_vector = [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
-    return shot_vector
+    return [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
 
 
 class Function:
@@ -894,29 +889,33 @@ def trace_quantum_measurements(
 
             if o.return_type.value == "sample":
                 results = []  # list of results per copy
-                shot_vector = get_device_shot_vector(device)
-                for shots, copies in shot_vector:
 
-                    if shots is None:  # needed for old device API only
-                        raise ValueError(
-                            "qml.sample cannot work with shots=None. "
-                            "Please specify a finite number of shots."
-                        )
-                    if o.mv is not None:  # qml.sample(m)
-                        results.append(o.mv)
-                    else:
-                        shape = (shots, nqubits) if using_compbasis else (shots,)
+                if shots is None:  # needed for old device API only
+                    raise ValueError(
+                        "qml.sample cannot work with shots=None. "
+                        "Please specify a finite number of shots."
+                    )
+                if o.mv is not None:  # qml.sample(m)
+                    out_classical_tracers.append(o.mv)
+                else:
+                    shape = (shots, nqubits) if using_compbasis else (shots,)
+                    result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                    if using_compbasis:
+                        result = jnp.astype(result, jnp.int64)
 
+                    reshaped_result = ()
+                    shot_vector = get_device_shot_vector(device)
+                    start_idx = 0  # Start index for slicing
+                    for shot, copies in shot_vector:
                         for _ in range(copies):
-                            result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
-                            if using_compbasis:
-                                result = jnp.astype(result, jnp.int64)
-                            results.append(result)
+                            sliced_result = result[start_idx : start_idx + shot]
+                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                            start_idx += shot
 
-                if results:
-                    if len(results) == 1:
-                        results = results[0]
-                    out_classical_tracers.append(results)
+                    if len(reshaped_result) == 1:
+                        reshaped_result = reshaped_result[0]
+
+                    out_classical_tracers.append(reshaped_result)
 
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
@@ -1263,21 +1262,13 @@ def trace_quantum_function(
 
                 # Check if the measurements are nested then apply the full_raise
                 def check_full_raise(arr, func):
-                    if isinstance(arr, list):
-                        return [check_full_raise(x, func) for x in arr]
+                    if isinstance(arr, (list, tuple)):
+                        return type(arr)(check_full_raise(x, func) for x in arr)
                     else:
                         return func(arr)
 
                 meas_tracers = check_full_raise(meas, trace.full_raise)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
-
-                # Always return a tuple of results with shot-vectors where num_of_total_copies > 1
-                if get_device_total_shot_copies(device) > 1:
-                    if isinstance(meas_results, list):
-                        meas_results = tuple(meas_results)
-                    elif isinstance(meas_results, dict):
-                        # Convert elements of the dictionary to tuples
-                        meas_results = {k: tuple(v) for k, v in meas_results.items()}
 
                 # TODO: Allow the user to return whatever types they specify.
                 if qnode_transformed or device_modify_measurements:
