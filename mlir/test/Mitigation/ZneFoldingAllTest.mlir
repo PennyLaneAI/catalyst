@@ -21,16 +21,16 @@
     // CHECK:   [[qReg:%.+]] = quantum.alloc( 2) : !quantum.reg
     // CHECK:   [[q0:%.+]] = quantum.extract [[qReg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK:   [[q0_out:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] iter_args([[q0_in:%.+]] = [[q0]]) -> (!quantum.bit) {
-    // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_in]] : !quantum.bit
-    // CHECK:     [[q0_out]] = quantum.custom "Hadamard"() [[q0_out]] {adjoint} : !quantum.bit
-    // CHECK:     scf.yield [[q0_out]]: !quantum.bit
-    // CHECK:   [[q0_out1:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
+    // CHECK:     [[q0_loop:%.+]] = quantum.custom "Hadamard"() [[q0_in]] : !quantum.bit
+    // CHECK:     [[q0_loop2:%.+]] = quantum.custom "Hadamard"() [[q0_loop]] {adjoint} : !quantum.bit
+    // CHECK:     scf.yield [[q0_loop2]] : !quantum.bit
+    // CHECK:   [[q0_out2:%.+]] = quantum.custom "Hadamard"() [[q0_out]] : !quantum.bit
     // CHECK:   [[q1:%.+]] = quantum.extract [[qReg]][ 1] : !quantum.reg -> !quantum.bit
     // CHECK:   [[q01_out:%.+]] = scf.for %arg1 = [[c0]] to %arg0 step [[c1]] iter_args([[q01_in:%.+]] = [[q1]]) -> (!quantum.bit, !quantum.bit) {
-    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_in]]#0, [[q01_in]]#1 : !quantum.bit, !quantum.bit
-    // CHECK:     [[q01_out]]:2 = quantum.custom "CNOT"() [[q01_out]]#0, [[q01_out]]#1 {adjoint} : !quantum.bit, !quantum.bit
-    // CHECK:     scf.yield [[q01_out]] : (!quantum.bit, !quantum.bit)
-    // CHECK:   [[q01_out2:%.+]] = quantum.custom "CNOT"() [[q0_out1]],[[q1]] : !quantum.bit, !quantum.bit
+    // CHECK:     [[q01_loop:%.+]]:2 = quantum.custom "CNOT"() [[q01_in]]#0, [[q01_in]]#1 : !quantum.bit, !quantum.bit
+    // CHECK:     [[q01_loop2:%.+]]:2 = quantum.custom "CNOT"() [[q01_loop]]#0, [[q01_out]]#1 {adjoint} : !quantum.bit, !quantum.bit
+    // CHECK:     scf.yield [[q01_loop2]] : (!quantum.bit, !quantum.bit)
+    // CHECK:   [[q01_out2:%.+]] = quantum.custom "CNOT"() [[q0_out]]#0, [[q0_out]]#1 : !quantum.bit, !quantum.bit
     // CHECK:   [[q2:%.+]] = quantum.namedobs [[q01_out2]]#0[ PauliY] : !quantum.obs
     // CHECK:   [[results:%.+]] = quantum.expval [[q1]] : f64
     // CHECK:   [[tensorRes:%.+]] = tensor.from_elements [[result]] : tensor<f64>
