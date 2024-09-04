@@ -16,6 +16,8 @@ message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
 
+option(CATALYST_MLIR_WARNINGS_AS_ERRORS "Enable warnings as errors in the MLIR directory build" OFF)
+
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
@@ -25,6 +27,11 @@ if(LLVM_USE_SANITIZER)
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
   endif()
+endif()
+
+if(CATALYST_MLIR_WARNINGS_AS_ERRORS)
+    message(STATUS "CATALYST_MLIR_WARNINGS_AS_ERRORS is ON.")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>)
 endif()
 
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.

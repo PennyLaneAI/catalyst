@@ -74,7 +74,7 @@ endfunction()
 
 if(RUNTIME_ENABLE_WARNINGS)
     message(STATUS "Building with compiler warnings as errors enabled.")
-    add_compile_options(-Werror -Wall)
+    add_compile_options(-Werror -Wall -Wextra)
 endif()
 
 message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
