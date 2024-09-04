@@ -569,6 +569,12 @@ class TestCProgramGeneration:
         binary = compile_executable(f, arg)
         result = subprocess.run(binary, capture_output=True, text=True, check=True)
 
+        # Clean up generated files.
+        directory_path = os.path.dirname(binary)
+        os.remove(binary)
+        os.remove(directory_path + "/" + f.__name__ + ".so")
+        os.remove(directory_path + "/main.c")
+
         assert ans in result.stdout.replace(" ", "").replace("\n", "")
 
     def test_executable_generation_without_precompiled_function(self):
@@ -583,6 +589,12 @@ class TestCProgramGeneration:
         arg = 5
         binary = compile_executable(f, arg)
         result = subprocess.run(binary, capture_output=True, text=True, check=True)
+
+        # Clean up generated files.
+        directory_path = os.path.dirname(binary)
+        os.remove(binary)
+        os.remove(directory_path + "/" + f.__name__ + ".so")
+        os.remove(directory_path + "/main.c")
 
         assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
 

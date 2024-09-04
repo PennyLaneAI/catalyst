@@ -38,7 +38,7 @@ from jax._src.tree_util import (
 
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
-from catalyst.tracing.contexts import EvaluationContext, GradContext
+from catalyst.tracing.contexts import AccelerateContext, EvaluationContext, GradContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
@@ -347,13 +347,14 @@ def accelerate_impl(users_func=None, *, dev=None):
 
     @functools.wraps(users_func, assigned=WRAPPER_ASSIGNMENTS)
     def total(context, *args, **kwargs):
-        nonlocal users_func
-        if is_partial:
-            _, shape = tree_flatten(users_func)
-            users_func = tree_unflatten(shape, context)
-            return users_func(*args, **kwargs)
-        else:
-            return users_func(*args, **kwargs)
+        with AccelerateContext():
+            nonlocal users_func
+            if is_partial:
+                _, shape = tree_flatten(users_func)
+                users_func = tree_unflatten(shape, context)
+                return users_func(*args, **kwargs)
+            else:
+                return users_func(*args, **kwargs)
 
     with transient_jax_config({"jax_dynamic_shapes": False}):
         # jax.jit will wrap total and total wraps the user_function
