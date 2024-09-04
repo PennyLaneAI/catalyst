@@ -410,11 +410,6 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
-    # TODO: remove workaround before merging to main
-    - name: Install PennyLane RC
-      run: |
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
-
     - name: Install Catalyst
       run: |
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple

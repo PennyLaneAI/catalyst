@@ -51,9 +51,6 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_MAJOR_MINOR
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja pytest pytest-xdist pytest-mock autoray PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1'
 /usr/bin/python3 -m pip install oqc-qcaas-client
 
-# TODO: remove workaround before merging to main
-pip install git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
-
 # Install Catalyst wheel
 /usr/bin/python3 -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple
 
