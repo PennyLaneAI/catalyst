@@ -99,8 +99,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     LogicalResult CreateTapeFunction(SmallVector<Operation *> *TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
-                                     IRRewriter &builder, Operation *module,
-                                     unsigned int tape_number, StringRef OriginalMultitapeFuncName,
+                                     IRRewriter &builder, unsigned int tape_number,
                                      func::FuncOp OriginalMultitapeFunc,
                                      SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
     {
@@ -141,8 +140,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 2. Create a scf.execute_region and wrap it around the tape ops
         // The scf.execute_region needs to yield (aka return) the values identified
         builder.setInsertionPoint(TapeOps->front());
-        scf::ExecuteRegionOp executeRegionOp =
-            builder.create<scf::ExecuteRegionOp>(module->getLoc(), ArrayRef(RetTypes));
+        scf::ExecuteRegionOp executeRegionOp = builder.create<scf::ExecuteRegionOp>(
+            OriginalMultitapeFunc->getLoc(), ArrayRef(RetTypes));
 
         builder.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
         mlir::Block::iterator it = executeRegionOp.getRegion().front().end();
@@ -151,7 +150,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
-        Operation *y = builder.create<scf::YieldOp>(module->getLoc(), ArrayRef(RetValues));
+        Operation *y =
+            builder.create<scf::YieldOp>(OriginalMultitapeFunc->getLoc(), ArrayRef(RetValues));
 
         // 3. The scf outliner automatically captures values not defined in the
         // to-be-outlined function body and transforms them to the outlined function's
@@ -175,8 +175,9 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 4. Outline the region
         func::CallOp call;
         FailureOr<func::FuncOp> outlined = outlineSingleBlockRegion(
-            builder, module->getLoc(), executeRegionOp.getRegion(),
-            OriginalMultitapeFuncName.str() + "_tape_" + std::to_string(tape_number), &call);
+            builder, OriginalMultitapeFunc->getLoc(), executeRegionOp.getRegion(),
+            OriginalMultitapeFunc.getSymName().str() + "_tape_" + std::to_string(tape_number),
+            &call);
         OutlinedFuncs.push_back(outlined);
 
         if (failed(outlined)) {
@@ -242,11 +243,9 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         unsigned int NumTapes = countTapes(func);
         SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
         for (unsigned int i = 0; i < NumTapes; i++) {
-
             if (failed(CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                                          NecessaryValuesFromEarlierTapes, builder, module,
-                                          OpsEachTape.size() - 3 - i, func.getSymName(), func,
-                                          OutlinedFuncs))) {
+                                          NecessaryValuesFromEarlierTapes, builder,
+                                          OpsEachTape.size() - 3 - i, func, OutlinedFuncs))) {
                 return signalPassFailure();
             };
         }
