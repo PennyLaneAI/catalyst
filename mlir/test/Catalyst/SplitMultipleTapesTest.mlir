@@ -160,7 +160,13 @@ module @circuit_twotapes_module {
       %result_in_scf = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
       scf.yield %result_in_scf : tensor<f64>
     }
-    return %result : tensor<f64>
+    %result_1 = func.call @adder(%result, %cst) : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    return %result_1 : tensor<f64>
+  }
+
+  func.func @adder(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
+    %out = stablehlo.add %arg0, %arg1 : tensor<f64>
+    return %out : tensor<f64>
   }
 }
 
@@ -171,6 +177,7 @@ module @circuit_twotapes_module {
 // CHECK: {{%.+}} = scf.execute_region
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 // CHECK: scf.yield
+// CHECK: {{%.+}} = call @adder({{%.+}}, {{%.+}})
 
 // CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
 // CHECK: quantum.device
