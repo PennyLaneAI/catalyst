@@ -175,7 +175,7 @@ def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
 
     @jax.jit
     def J_workflow():
-        f = qml.QNode(circuit_rx, device=qml.device("default.qubit.jax", wires=1), interface="jax")
+        f = qml.QNode(circuit_rx, device=qml.device("default.qubit", wires=1), interface="jax")
         return J_jvp(f, x, t)
 
     r1 = C_workflow()
@@ -423,7 +423,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
 
     @jax.jit
     def J_workflow():
-        f = qml.QNode(circuit_rx, device=qml.device("default.qubit.jax", wires=1), interface="jax")
+        f = qml.QNode(circuit_rx, device=qml.device("default.qubit", wires=1), interface="jax")
         y, ft = J_vjp(f, *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
         return (y, ft(ct2))
