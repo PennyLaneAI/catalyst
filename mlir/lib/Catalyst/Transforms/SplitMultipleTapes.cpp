@@ -119,7 +119,6 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 }
             });
         }
-
     } // collectNecessaryValuesFromEarlierTapes()
 
     void getNecessaryTapeReturns(SmallVector<Value> &RetValues,
