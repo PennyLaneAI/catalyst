@@ -133,7 +133,11 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                     // A tape operand not produced in this tape itself,
                     // must be from the tapes/preprocessing!
                     // Need to be replaced by the previous tape functions' return values
-                    NecessaryValuesFromEarlierTapes.push_back(operand);
+                    if (std::find(NecessaryValuesFromEarlierTapes.begin(),
+                                  NecessaryValuesFromEarlierTapes.end(),
+                                  operand) == NecessaryValuesFromEarlierTapes.end()) {
+                        NecessaryValuesFromEarlierTapes.push_back(operand);
+                    }
                 }
             }
         }

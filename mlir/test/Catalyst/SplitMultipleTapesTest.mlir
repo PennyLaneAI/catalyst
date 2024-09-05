@@ -200,6 +200,102 @@ module @circuit_twotapes_module {
 // -----
 
 
+// Test when a later tapes uses values from an eariler tape
+
+module @circuit_twotapes_module {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
+    %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
+    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    quantum.device_release
+    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %extracted = tensor.extract %arg1[] : tensor<f64>
+    %2 = stablehlo.multiply %arg0, %cst : tensor<f64>
+    %tape1_out = stablehlo.multiply %2, %tape0_out : tensor<f64>
+    quantum.device_release
+    %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    return %result : tensor<f64>
+  }
+}
+
+// CHECK: module @circuit_twotapes_module {
+// CHECK: func.func private @circuit_twotapes
+// CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
+// CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst, {{%.+}})
+// CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
+
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: quantum.device
+// CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
+// CHECK: quantum.device_release
+// CHECK: return {{%.+}} : tensor<f64>
+// CHECK-NEXT: }
+
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: quantum.device
+// CHECK: tensor.extract %arg0[]
+// CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
+// CHECK: {{%.+}} = stablehlo.multiply {{%.+}}, %arg3 : tensor<f64>
+// CHECK: quantum.device_release
+// CHECK: return {{%.+}} : tensor<f64>
+// CHECK-NEXT: }
+
+// CHECK: }
+
+
+// -----
+
+
+// Test when there's operations between the two tapes
+
+// Note that frontend tracing should never produce this case, but even if it does happen it should not matter as physical positions of operations do not interfere with underlying dataflow.
+// Technically, an "in-between" operation will be distributed to the tape immediately above it during parsing in SplitMultipleTapes.cpp/CollectOperationsForEachTape().
+
+module @circuit_twotapes_module {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %cst = stablehlo.constant dense<8.000000e-01> : tensor<f64>
+    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %tape0_out = stablehlo.add %arg1, %cst : tensor<f64>
+    quantum.device_release
+    %cst_0 = stablehlo.constant dense<4.000000e-01> : tensor<f64>
+    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %extracted = tensor.extract %arg1[] : tensor<f64>
+    %tape1_out = stablehlo.multiply %arg0, %cst_0 : tensor<f64>
+    quantum.device_release
+    %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    return %result : tensor<f64>
+  }
+}
+
+// CHECK: module @circuit_twotapes_module {
+// CHECK: func.func private @circuit_twotapes
+// CHECK: {{%.+}}:2 = func.call @circuit_twotapes_tape_0(%arg1, %cst)
+// CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, {{%.+}}#1)
+// CHECK: {{%.+}} = stablehlo.subtract {{%.+}}#0, {{%.+}} : tensor<f64>
+
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> (tensor<f64>, tensor<f64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: quantum.device
+// CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
+// CHECK: quantum.device_release
+// CHECK: {{%.+}} = stablehlo.constant dense<4.000000e-01> : tensor<f64>
+// CHECK: return {{%.+}}, {{%.+}} : tensor<f64>, tensor<f64>
+// CHECK-NEXT: }
+
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: quantum.device
+// CHECK: tensor.extract %arg0[]
+// CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
+// CHECK: quantum.device_release
+// CHECK: return {{%.+}} : tensor<f64>
+// CHECK-NEXT: }
+
+// CHECK: }
+
+
+// -----
+
+
 // Should do nothing when there's no tapes
 module @empty_workflow {
 
