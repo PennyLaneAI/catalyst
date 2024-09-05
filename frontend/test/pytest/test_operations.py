@@ -233,7 +233,7 @@ def test_multicontrolledx_via_paulix():
         qml.Hadamard(0)
         qml.Hadamard(1)
         qml.Hadamard(2)
-        qml.MultiControlledX(control_wires=[0, 1, 2], wires=[3], control_values=[True, False, True])
+        qml.MultiControlledX(wires=[0, 1, 2, 3], control_values=[True, False, True])
         return qml.state()
 
     assert "QubitUnitary" not in str(circuit.jaxpr)
