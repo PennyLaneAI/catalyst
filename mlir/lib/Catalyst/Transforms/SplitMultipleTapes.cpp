@@ -39,7 +39,7 @@ namespace catalyst {
 struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass> {
     using impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass>::SplitMultipleTapesPassBase;
 
-    unsigned int countTapes(func::FuncOp func)
+    unsigned int countTapes(const func::FuncOp &func)
     {
         // Count the number of quantum.device operations in a function
         unsigned int count = 0;
@@ -52,7 +52,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // countTapes()
 
     void collectOperationsForEachTape(
-        func::FuncOp func, SmallVector<std::shared_ptr<SmallVector<Operation *>>> &OpsEachTape)
+        const func::FuncOp &func,
+        SmallVector<std::shared_ptr<SmallVector<Operation *>>> &OpsEachTape)
     {
         // During tracing, each tape starts with a qdevice_p primitive
         // This means each tape starts with a quantum.device
@@ -163,10 +164,10 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         return std::make_pair(executeRegionOp, y);
     } // wrapTapeOpsInSCFRegion()
 
-    void propagateSCFRetValsDownstream(scf::ExecuteRegionOp executeRegionOp,
-                                       scf::YieldOp SCFRegionYieldOp,
+    void propagateSCFRetValsDownstream(const scf::ExecuteRegionOp &executeRegionOp,
+                                       const scf::YieldOp &SCFRegionYieldOp,
                                        std::shared_ptr<SmallVector<Operation *>> TapeOps,
-                                       SmallVector<Value> RetValues)
+                                       SmallVector<Value> &RetValues)
     {
         SmallPtrSet<Operation *, 16> exceptions;
         exceptions.insert(SCFRegionYieldOp);
@@ -181,8 +182,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     LogicalResult createTapeFunction(std::shared_ptr<SmallVector<Operation *>> TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
-                                     IRRewriter &builder, unsigned int tape_number,
-                                     func::FuncOp OriginalMultitapeFunc,
+                                     IRRewriter &builder, const unsigned int &tape_number,
+                                     func::FuncOp &OriginalMultitapeFunc,
                                      SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
     {
         assert(TapeOps); // nullptr protection
