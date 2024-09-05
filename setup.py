@@ -179,8 +179,8 @@ if system_platform == "Linux":
         "catalyst.utils.libcustom_calls",
         sources=[
             "frontend/catalyst/utils/libcustom_calls.cpp",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cc",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cc",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
@@ -195,8 +195,8 @@ elif system_platform == "Darwin":
         "catalyst.utils.libcustom_calls",
         sources=[
             "frontend/catalyst/utils/libcustom_calls.cpp",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cc",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cc",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
