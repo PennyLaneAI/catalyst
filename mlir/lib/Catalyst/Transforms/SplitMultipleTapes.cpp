@@ -51,7 +51,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         return count;
     }
 
-    void CollectOperationsForEachTape(
+    void collectOperationsForEachTape(
         func::FuncOp func, SmallVector<std::shared_ptr<SmallVector<Operation *>>> &OpsEachTape)
     {
         // During tracing, each tape starts with a qdevice_p primitive
@@ -96,26 +96,17 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 cur_tape++;
             }
         });
-    } // CollectOperationsForEachTape()
+    } // collectOperationsForEachTape()
 
-    LogicalResult CreateTapeFunction(std::shared_ptr<SmallVector<Operation *>> TapeOps,
-                                     SmallVector<Value> &NecessaryValuesFromEarlierTapes,
-                                     IRRewriter &builder, unsigned int tape_number,
-                                     func::FuncOp OriginalMultitapeFunc,
-                                     SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
+    void getNecessaryTapeReturns(SmallVector<Value> &RetValues,
+                                 std::shared_ptr<SmallVector<Operation *>> TapeOps,
+                                 SmallVector<Value> &NecessaryValuesFromEarlierTapes)
     {
-        assert(TapeOps); // nullptr protection
-
-        // 1. Identify the necessary return values
-        SmallVector<Value> RetValues;
-        SmallVector<mlir::Type> RetTypes;
-
         for (Value v : NecessaryValuesFromEarlierTapes) {
             Operation *VDefOp = v.getDefiningOp();
             if (std::find(TapeOps->begin(), TapeOps->end(), VDefOp) != TapeOps->end()) {
                 // This Value needed for PP is in this tape!
                 RetValues.push_back(v);
-                RetTypes.push_back(v.getType());
             }
         }
 
@@ -141,12 +132,15 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 }
             }
         }
+    } // getNecessaryTapeReturns()
 
-        // 2. Create a scf.execute_region and wrap it around the tape ops
-        // The scf.execute_region needs to yield (aka return) the values identified
+    std::pair<scf::ExecuteRegionOp, scf::YieldOp> WrapTapeOpsInSCFRegion(
+        std::shared_ptr<SmallVector<Operation *>> TapeOps, const SmallVector<Value> &RetValues,
+        const SmallVector<mlir::Type> &RetTypes, IRRewriter &builder, Location loc)
+    {
         builder.setInsertionPoint(TapeOps->front());
-        scf::ExecuteRegionOp executeRegionOp = builder.create<scf::ExecuteRegionOp>(
-            OriginalMultitapeFunc->getLoc(), ArrayRef(RetTypes));
+        scf::ExecuteRegionOp executeRegionOp =
+            builder.create<scf::ExecuteRegionOp>(loc, ArrayRef(RetTypes));
 
         builder.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
         mlir::Block::iterator it = executeRegionOp.getRegion().front().end();
@@ -155,8 +149,50 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
-        Operation *y =
-            builder.create<scf::YieldOp>(OriginalMultitapeFunc->getLoc(), ArrayRef(RetValues));
+        scf::YieldOp y = builder.create<scf::YieldOp>(loc, ArrayRef(RetValues));
+
+        return std::make_pair(executeRegionOp, y);
+    } // WrapTapeOpsInSCFRegion()
+
+    void PropagateSCFRetValsDownstream(scf::ExecuteRegionOp executeRegionOp,
+                                       scf::YieldOp SCFRegionYieldOp,
+                                       std::shared_ptr<SmallVector<Operation *>> TapeOps,
+                                       SmallVector<Value> RetValues)
+    {
+        SmallPtrSet<Operation *, 16> exceptions;
+        exceptions.insert(SCFRegionYieldOp);
+        for (auto op : *TapeOps) {
+            exceptions.insert(op);
+        }
+
+        for (size_t i = 0; i < RetValues.size(); i++) {
+            RetValues[i].replaceAllUsesExcept(executeRegionOp->getResults()[i], exceptions);
+        }
+    } // PropagateSCFRetValsDownstream()
+
+    LogicalResult CreateTapeFunction(std::shared_ptr<SmallVector<Operation *>> TapeOps,
+                                     SmallVector<Value> &NecessaryValuesFromEarlierTapes,
+                                     IRRewriter &builder, unsigned int tape_number,
+                                     func::FuncOp OriginalMultitapeFunc,
+                                     SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
+    {
+        assert(TapeOps); // nullptr protection
+
+        // 1. Identify the necessary return values
+        SmallVector<Value> RetValues;
+        SmallVector<mlir::Type> RetTypes;
+        getNecessaryTapeReturns(RetValues, TapeOps, NecessaryValuesFromEarlierTapes);
+        for (Value v : RetValues) {
+            RetTypes.push_back(v.getType());
+        }
+
+        // 2. Create a scf.execute_region and wrap it around the tape ops
+        // The scf.execute_region needs to yield (aka return) the values identified
+        std::pair<scf::ExecuteRegionOp, scf::YieldOp> WrappingRegionAndYield =
+            WrapTapeOpsInSCFRegion(TapeOps, RetValues, RetTypes, builder,
+                                   OriginalMultitapeFunc->getLoc());
+        scf::ExecuteRegionOp executeRegionOp = WrappingRegionAndYield.first;
+        scf::YieldOp SCFRegionYieldOp = WrappingRegionAndYield.second;
 
         // 3. The scf outliner automatically captures values not defined in the
         // to-be-outlined function body and transforms them to the outlined function's
@@ -166,16 +202,18 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // At this stage, the scf.yield values ARE the ones to be replaced by
         // the scf region's result values, since we never replaced anything yet
         // Of course, don't replace the use in the region itself!
+        PropagateSCFRetValsDownstream(executeRegionOp, SCFRegionYieldOp, TapeOps, RetValues);
+        /*
+                SmallPtrSet<Operation *, 16> exceptions;
+                exceptions.insert(SCFRegionYieldOp);
+                for (auto op : *TapeOps) {
+                    exceptions.insert(op);
+                }
 
-        SmallPtrSet<Operation *, 16> exceptions;
-        exceptions.insert(y);
-        for (auto op : *TapeOps) {
-            exceptions.insert(op);
-        }
-
-        for (size_t i = 0; i < RetValues.size(); i++) {
-            RetValues[i].replaceAllUsesExcept(executeRegionOp->getResults()[i], exceptions);
-        }
+                for (size_t i = 0; i < RetValues.size(); i++) {
+                    RetValues[i].replaceAllUsesExcept(executeRegionOp->getResults()[i], exceptions);
+                }
+        */
 
         // 4. Outline the region
         func::CallOp call;
@@ -219,7 +257,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
             SmallVector<std::shared_ptr<SmallVector<Operation *>>> OpsEachTape(countTapes(func) + 2,
                                                                                nullptr);
 
-            CollectOperationsForEachTape(func, OpsEachTape);
+            collectOperationsForEachTape(func, OpsEachTape);
 
             // 3. Get the SSA values needed by the post processing (PP)
             // These need to be returned by the tapes.

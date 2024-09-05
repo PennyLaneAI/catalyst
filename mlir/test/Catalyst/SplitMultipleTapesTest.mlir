@@ -250,7 +250,7 @@ module @circuit_twotapes_module {
 // Test when there's operations between the two tapes
 
 // Note that frontend tracing should never produce this case, but even if it does happen it should not matter as physical positions of operations do not interfere with underlying dataflow.
-// Technically, an "in-between" operation will be distributed to the tape immediately above it during parsing in SplitMultipleTapes.cpp/CollectOperationsForEachTape().
+// Technically, an "in-between" operation will be distributed to the tape immediately above it during parsing in SplitMultipleTapes.cpp/collectOperationsForEachTape().
 
 module @circuit_twotapes_module {
   func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
