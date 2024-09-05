@@ -78,6 +78,54 @@ endif()
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
+
+# Handle unittests when building out-of-tree against an installed version of
+# LLVM/MLIR (not a build tree). Adapted from `llvm/flang/CMakeLists.txt`.
+set(CATALYST_GTEST_AVAILABLE 0)
+if (TARGET llvm_gtest)
+  # Installed gtest, via LLVM_INSTALL_GTEST.  Preferred.
+  message(STATUS "LLVM GTest found, enabling unittests")
+  set(CATALYST_GTEST_AVAILABLE 1)
+else()
+    find_package(Threads REQUIRED)
+    set(LLVM_THIRD_PARTY_DIR llvm-project/third-party)
+    set(UNITTEST_DIR ${LLVM_THIRD_PARTY_DIR}/unittest)
+    if (NOT EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
+      set(UNITTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llvm/third-party/unittest)
+    endif()
+    if (EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
+      add_llvm_library(llvm_gtest
+        ${UNITTEST_DIR}/googletest/src/gtest-all.cc
+        ${UNITTEST_DIR}/googlemock/src/gmock-all.cc
+        LINK_COMPONENTS Support # llvm::raw_ostream
+        BUILDTREE_ONLY
+      )
+      target_include_directories(llvm_gtest
+        PUBLIC
+        "${UNITTEST_DIR}/googletest/include"
+        "${UNITTEST_DIR}/googlemock/include"
+        PRIVATE
+        "${UNITTEST_DIR}/googletest"
+        "${UNITTEST_DIR}/googlemock"
+      )
+      target_link_libraries(llvm_gtest PUBLIC Threads::Threads)
+      add_llvm_library(llvm_gtest_main
+        ${UNITTEST_DIR}/UnitTestMain/TestMain.cpp
+        LINK_LIBS llvm_gtest
+        LINK_COMPONENTS Support # llvm::cl
+        BUILDTREE_ONLY
+      )
+      set(CATALYST_GTEST_AVAILABLE 1)
+    else()
+      message(WARNING "Skipping unittests since LLVM install does not include \
+        gtest headers and libraries")
+      set(CATALYST_GTEST_AVAILABLE 0)
+    endif()
+endif()
+if (CATALYST_GTEST_AVAILABLE)
+  add_subdirectory(unittests)
+endif()
+
 add_subdirectory(test)
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
