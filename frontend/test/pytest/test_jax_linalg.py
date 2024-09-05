@@ -414,6 +414,8 @@ class TestExpm:
             jnp.array(MatrixGenerator.random_complex_matrix(3, 3, seed=31)),
             jnp.array(np.triu(MatrixGenerator.random_complex_matrix(3, 3, seed=32))),
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=33))),
+            # Special case from https://github.com/PennyLaneAI/catalyst/issues/1071
+            jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]),
         ],
     )
     def test_expm_numerical(self, A):

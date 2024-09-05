@@ -14,8 +14,6 @@
 
 """Test that numerical jax functions produce correct results when compiled with qml.qjit"""
 
-import warnings
-
 import numpy as np
 import pennylane as qml
 import pytest
@@ -25,33 +23,12 @@ from jax import scipy as jsp
 from catalyst import qjit
 
 
-class TestExpmNumerical:
-    """Test jax.scipy.linalg.expm is numerically correct when being qjit compiled"""
+class TestExpmAndSolve:
+    """Test that `jax.scipy.linalg.expm` and `jax.scipy.linalg.solve` can run together
+    in the same function scope but from different qjit blocks.
 
-    @pytest.mark.parametrize(
-        "inp",
-        [
-            jnp.array([[0.1, 0.2], [5.3, 1.2]]),
-            jnp.array([[1, 2], [3, 4]]),
-            jnp.array([[1.0, -1.0j], [1.0j, -1.0]]),
-            jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]),
-        ],
-    )
-    def test_expm_numerical(self, inp):
-        """Test basic numerical correctness for jax.scipy.linalg.expm for float, int, complex"""
-        if np.array_equiv(inp, jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]])):
-            # this particular matrix has wrong answer numbers and need to be solved by proper lapack calls.
-            # https://github.com/PennyLaneAI/catalyst/issues/1071
-            pytest.xfail("Waiting for proper lapack calls")
-
-        @qjit
-        def f(x):
-            return jsp.linalg.expm(x)
-
-        observed = f(inp)
-        expected = jsp.linalg.expm(inp)
-
-        assert np.allclose(observed, expected)
+    Also test that their results are numerically correct when qjit compiled.
+    """
 
     def test_expm_and_solve(self):
         """
