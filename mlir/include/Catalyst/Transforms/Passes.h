@@ -33,6 +33,7 @@ std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
 std::unique_ptr<mlir::Pass> createMemrefToLLVMWithTBAAPass();
 std::unique_ptr<mlir::Pass> createMemrefCopyToLinalgCopyPass();
 std::unique_ptr<mlir::Pass> createApplyTransformSequencePass();
+std::unique_ptr<mlir::Pass> createInlineNestedModulePass();
 
 void registerAllCatalystPasses();
 

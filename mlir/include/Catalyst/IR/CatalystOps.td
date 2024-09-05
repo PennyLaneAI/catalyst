@@ -181,4 +181,30 @@ def CallbackCallOp : Catalyst_Op<"callback_call",
 
 }
 
+def CallNestedModuleOp : Catalyst_Op<"call_function_in_module",
+    [DeclareOpInterfaceMethods<CallOpInterface>,
+     DeclareOpInterfaceMethods<SymbolUserOpInterface>
+    ]> {
+
+  let arguments = (ins
+        SymbolRefAttr:$callee,
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs
+  );
+
+  let results = (outs Variadic<AnyType>);
+
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let extraClassDeclaration = [{
+    /// The name of the kernel's containing module.
+    mlir::StringAttr getCalleeModuleName();
+
+    /// The name of the kernel.
+    mlir::StringAttr getCalleeName();
+  }];
+
+}
+
 #endif // GRADIENT_OPS

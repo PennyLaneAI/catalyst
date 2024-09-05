@@ -175,4 +175,27 @@ def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
+def InlineNestedModulePass : Pass<"inline-nested-module"> {
+    let summary = "Inline nested modules with qnode attribute.";
+
+    let dependentDialects = [
+        "mlir::func::FuncDialect"
+    ];
+
+    let constructor = "catalyst::createInlineNestedModulePass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"stopAfterStep",
+            /*CLI arg name=*/"stop-after-step",
+            /*type=*/"int",
+            /*default=*/"0",
+            /*description=*/
+            "Useful for tests. This will stop the execution of the transformation after a "
+            "N step has been executed. Defaults to 0 which is equivalent to running "
+            "all steps to completion."
+        >
+    ];
+}
+
 #endif // CATALYST_PASSES

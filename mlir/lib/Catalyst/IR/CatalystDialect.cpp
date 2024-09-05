@@ -83,6 +83,28 @@ Operation::operand_range CallbackCallOp::getArgOperands() { return getInputs(); 
 MutableOperandRange CallbackCallOp::getArgOperandsMutable() { return getInputsMutable(); }
 
 //===----------------------------------------------------------------------===//
+// CallNestedModuleOp
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable CallNestedModuleOp::getCallableForCallee()
+{
+    return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+void CallNestedModuleOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+}
+
+Operation::operand_range CallNestedModuleOp::getArgOperands() { return getInputs(); }
+
+MutableOperandRange CallNestedModuleOp::getArgOperandsMutable() { return getInputsMutable(); }
+
+StringAttr CallNestedModuleOp::getCalleeModuleName() { return getCallee().getRootReference(); }
+
+StringAttr CallNestedModuleOp::getCalleeName() { return getCallee().getLeafReference(); }
+
+//===----------------------------------------------------------------------===//
 // Catalyst type definitions.
 //===----------------------------------------------------------------------===//
 
