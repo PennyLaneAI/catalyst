@@ -215,7 +215,7 @@ def measurements_from_counts(tape, device_wires):
 
     Args:
         tape (QNode or QuantumTape or Callable): A quantum circuit.
-        device_wires (Wires): the wires from the device, for assessing what wires to use 
+        device_wires (Wires): the wires from the device, for assessing what wires to use
             when a measurement applies to all wires.
 
     Returns:
@@ -255,7 +255,9 @@ def measurements_from_counts(tape, device_wires):
                     tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
                 )
             else:
-                raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_counts")
+                raise NotImplementedError(
+                    f"Measurement type {type(m)} is not implemented with measurements_from_counts"
+                )
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
         else:
@@ -263,6 +265,7 @@ def measurements_from_counts(tape, device_wires):
         return results_processed
 
     return [new_tape], postprocessing_counts
+
 
 @transform
 @debug_logger
@@ -294,7 +297,9 @@ def measurements_from_samples(tape, device_wires):
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
                 results_processed.append(m.process_samples(samples, measured_wires))
             else:
-                raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
+                raise NotImplementedError(
+                    f"Measurement type {type(m)} is not implemented with measurements_from_samples"
+                )
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
         else:
@@ -303,8 +308,9 @@ def measurements_from_samples(tape, device_wires):
 
     return [new_tape], postprocessing_samples
 
+
 def _diagonalize_measurements(tape, device_wires):
-    """Convert the measurements and operations on the tape to those relevant 
+    """Convert the measurements and operations on the tape to those relevant
     for measuring in the readout basis.
 
     Args:
@@ -313,7 +319,7 @@ def _diagonalize_measurements(tape, device_wires):
     Returns:
         new_operations (list): The original operations, plus the diagonalizing gates for the circuit
         measured_wires (list): A list of all wires that are measured on the tape
-    
+
     """
     if tape.samples_computational_basis and len(tape.measurements) > 1:
         _validate_computational_basis_sampling(tape)
@@ -332,6 +338,7 @@ def _diagonalize_measurements(tape, device_wires):
     new_operations.extend(diagonalizing_gates)
 
     return new_operations, list(measured_wires)
+
 
 def _probs_from_counts(counts_outcome):
     """From the counts outcome, calculate the probability vector."""

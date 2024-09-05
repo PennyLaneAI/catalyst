@@ -308,7 +308,7 @@ class TestMeasurementTransforms:
             )
 
         transformed_circuit = measurements_from_counts(basic_circuit, dev.wires)
-        
+
         mlir = qml.qjit(transformed_circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
@@ -438,12 +438,15 @@ class TestMeasurementTransforms:
             assert "probs" not in mlir
             assert target_measurement in mlir
 
-    @pytest.mark.parametrize("measurement", [
-        lambda: qml.counts(), 
-        lambda: qml.counts(wires=[2]), 
-        lambda: qml.counts(wires=[2, 3]), 
-        lambda: qml.counts(qml.Y(1))
-        ])
+    @pytest.mark.parametrize(
+        "measurement",
+        [
+            lambda: qml.counts(),
+            lambda: qml.counts(wires=[2]),
+            lambda: qml.counts(wires=[2, 3]),
+            lambda: qml.counts(qml.Y(1)),
+        ],
+    )
     def test_measurement_from_counts_with_counts_measurement(self, measurement):
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
@@ -454,7 +457,7 @@ class TestMeasurementTransforms:
         def circuit(theta: float):
             qml.RX(theta, 0)
             qml.RX(theta / 2, 1)
-            qml.RX(theta/3, 2)
+            qml.RX(theta / 3, 2)
             return measurement()
 
         theta = 2.5
@@ -488,12 +491,15 @@ class TestMeasurementTransforms:
                 assert res[0] == expected_res[0]
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
-    @pytest.mark.parametrize("measurement", [
-        lambda: qml.sample(), 
-        lambda: qml.sample(wires=[0]), 
-        lambda: qml.sample(wires=[1, 2]), 
-        lambda: qml.sample(qml.Y(1)@qml.Y(0))
-        ])
+    @pytest.mark.parametrize(
+        "measurement",
+        [
+            lambda: qml.sample(),
+            lambda: qml.sample(wires=[0]),
+            lambda: qml.sample(wires=[1, 2]),
+            lambda: qml.sample(qml.Y(1) @ qml.Y(0)),
+        ],
+    )
     def test_measurement_from_samples_with_sample_measurement(self, measurement):
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
@@ -517,7 +523,7 @@ class TestMeasurementTransforms:
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
-    #ToDo: add a parameterization with a shot vector to this test after #1051 is merged, and update test accordingly
+    # ToDo: add a parameterization with a shot vector to this test after #1051 is merged, and update test accordingly
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -556,7 +562,8 @@ class TestMeasurementTransforms:
         shots,
     ):
         """Test the measurment_from_counts/measurement_from_samples transform with a single measurements as part of
-        the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result."""
+        the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result.
+        """
 
         dev = qml.device("lightning.qubit", wires=4, shots=shots)
 
@@ -576,7 +583,7 @@ class TestMeasurementTransforms:
         res = circuit(theta)
 
         # if len(dev.shots.shot_vector) != 1:
-            # assert len(res) == len(dev.shots.shot_vector)
+        # assert len(res) == len(dev.shots.shot_vector)
 
         assert not np.allclose(res, 0)
         assert np.allclose(res, expected_res(theta), atol=0.05)
@@ -593,7 +600,9 @@ class TestMeasurementTransforms:
             qml.RX(theta, 0)
             return qml.sample()
 
-        with pytest.raises(NotImplementedError, match="not implemented with measurements_from_counts"):
+        with pytest.raises(
+            NotImplementedError, match="not implemented with measurements_from_counts"
+        ):
             qml.qjit(circuit)
 
     def test_measurement_from_samples_raises_not_implemented(self):
@@ -608,7 +617,9 @@ class TestMeasurementTransforms:
             qml.RX(theta, 0)
             return qml.counts()
 
-        with pytest.raises(NotImplementedError, match="not implemented with measurements_from_samples"):
+        with pytest.raises(
+            NotImplementedError, match="not implemented with measurements_from_samples"
+        ):
             qml.qjit(circuit)
 
     def test_measurements_are_split(self, mocker):
@@ -1192,39 +1203,6 @@ class TestTransform:
         assert len(counts) == 2
         assert counts[0].shape == (8,)
         assert counts[1].shape == (8,)
-
-
-
-
-    def test_stuff(self):
-        """Test the measurment_from_counts/measurement_from_samples transform with a single measurements as part of
-        the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result."""
-
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
-
-        @qml.qjit
-        @partial(measurements_from_counts, device_wires=dev.wires)
-        @qml.qnode(dev)
-        def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RX(theta / 2, 1)
-            return qml.probs()
-
-        theta = 2.5
-
-        expected_res = np.outer(
-            np.outer(
-                [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2],
-                [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2]),
-            [1, 0, 0, 0],
-            ).flatten(),
-
-        res = circuit(theta)
-
-        print(res)
-
-        assert np.allclose(res, expected_res, atol=0.05)
-
 
 
 if __name__ == "__main__":
