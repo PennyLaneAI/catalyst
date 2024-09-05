@@ -20,7 +20,12 @@ limitations under the License.
  *
  * from jaxlib-v0.4.28.
  *
- * See note in lapack_kernels.h for explanation of modifications.
+ * See note in lapack_kernels.h for a high-level explanation of the
+ * modifications and the motivation for them. Specifically, the names of the
+ * BLAS and LAPACK routine symbols have been changed from the FORTRAN interfaces
+ * to the equivalent C interfaces. For example, the `dtrsm` BLAS routine has
+ * been changed from `dtrsm_` to `cblas_dtrsm`, and the `dgetrf` LAPACK routine
+ * has been changed from `dgetrf_` to `LAPACKE_dgetrf`.
  */
 
 #include "lapack_kernels.h"

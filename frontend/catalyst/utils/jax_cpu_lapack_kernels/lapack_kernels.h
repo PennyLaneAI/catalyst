@@ -26,6 +26,15 @@ limitations under the License.
  * with Catalyst. Recall that the FORTRAN interfaces require arrays and matrices
  * in column-major order, while the C interfaces allow row-major order, which is
  * required for Catalyst.
+ *
+ * In addition, the following modifications have been made:
+ *
+ *   1. Guarded the #include of the XLA `custom_call_status.h` header by the
+ *      `USE_XLA_LIB` macro; simply declared the `XlaCustomCallStatus` type
+ *      instead, since it is not explicitly used.
+ *   2. Copied the BLAS and LAPACK enums and option codes (e.g. `CBLAS_ORDER`
+ *      and `LAPACK_ROW_MAJOR`) needed for the C interfaces.
+ *   3. Applied Catalyst C++ code formatting.
  */
 
 #ifndef JAXLIB_CPU_LAPACK_KERNELS_H_
@@ -65,12 +74,6 @@ typedef int lapack_int;
 // Copied from lapacke.h
 #define LAPACK_ROW_MAJOR 101
 #define LAPACK_COL_MAJOR 102
-
-// #ifndef lapack_logical
-// #define lapack_logical lapack_int
-// #endif
-
-// typedef lapack_logical (*LAPACK_S_SELECT2) ( const float*, const float* );
 
 // trsm: Solves a triangular matrix equation.
 template <typename T> struct RealTrsm {

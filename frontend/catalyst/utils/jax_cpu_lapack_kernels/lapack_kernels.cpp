@@ -20,7 +20,29 @@ limitations under the License.
  *
  * from jaxlib-v0.4.28.
  *
- * See note in lapack_kernels.h for explanation of modifications.
+ * See note in lapack_kernels.h for a high-level explanation of the
+ * modifications and the motivation for them. Specifically, the modifications
+ * made in this file include:
+ *
+ *  1. Used the C interfaces to the BLAS and LAPACK routines instead of the
+ *     FORTRAN interfaces, and always use row-major matrix layout. This
+ *     modification generally involves the following:
+ *       - Adding the matrix layout parameter as the first argument to the BLAS/
+ *         LAPACK call, either `CblasRowMajor` for BLAS or `LAPACK_ROW_MAJOR`
+ *         for LAPACK.
+ *       - Specifying the array leading dimensions (e.g. `lda`) such that they
+ *         are dependent upon the matrix layout, rather than hard-coding them.
+ *         Note that these should always evaluate to the value required for
+ *         row-major matrix layout (typically the number of rows n of the
+ *         matrix).
+ *       - Remove parameters used by the FORTRAN interfaces but not by the C
+ *         interfaces, e.g. the workspace array parameters `lwork`, `rwork`,
+ *         `iwork`, etc.
+ *  2. Guarded the #include of the ABSEIL `dynamic_annotations.h header by the
+ *     `USE_ABSEIL_LIB` macro and the uses of `ABSL_ANNOTATE_MEMORY_IS_INITIALIZED`,
+ *     since they are not needed for Catalyst.
+ *  3. Opportunistically improved const-correctness.
+ *  4. Applied Catalyst C++ code formatting.
  */
 
 #include "lapack_kernels.h"
