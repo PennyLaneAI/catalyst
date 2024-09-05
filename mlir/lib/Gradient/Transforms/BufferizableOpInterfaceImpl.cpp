@@ -104,7 +104,7 @@ struct AdjointOpInterface
 
         rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(), adjointOp.getGradSize(),
                                    bufferArgs, memrefValues);
-       bufferization::replaceOpWithBufferizedValues(rewriter, op, memrefValues);
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, memrefValues);
         return success();
     }
 };
@@ -144,8 +144,24 @@ struct BackpropOpInterface
         // scalarIndices = {1, 3, 4}.
         SmallVector<unsigned> scalarIndices;
         SmallVector<Type> scalarReturnTypes;
+
+        SmallVector<Value> bufferArgs;
+        ValueRange operands = backpropOp.getArgs();
+        for (Value operand : operands) {
+            if(isa<TensorType>(operand.getType())) {
+                FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+                if (failed(opBuffer))
+                    return failure();
+                bufferArgs.push_back(*opBuffer);
+            } else {
+                bufferArgs.push_back(operand);
+            }
+
+        }
+
         std::vector<Value> diffArgs =
-            computeDiffArgs(backpropOp.getArgs(), backpropOp.getDiffArgIndicesAttr());
+            computeDiffArgs(bufferArgs, backpropOp.getDiffArgIndicesAttr());
+
         for (const auto &[idx, diffArg] : llvm::enumerate(diffArgs)) {
             // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers
             // to these as shadow arguments. There is one result for each differentiable MemRef
@@ -169,21 +185,33 @@ struct BackpropOpInterface
         // computation.
         SmallVector<Value> calleeResults, resShadows;
         ValueRange cotangents = backpropOp.getCotangents();
-        generateAllocations(rewriter, loc, calleeResults, cotangents);
+        SmallVector<Value> bufferCotangentsList;
+        for (Value operand : cotangents) {
+            FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
+            if (failed(opBuffer))
+                return failure();
+            bufferCotangentsList.push_back(*opBuffer);
+        }
+        mlir::ValueRange bufferCotangents(bufferCotangentsList);
+
+        generateAllocations(rewriter, loc, calleeResults, bufferCotangents);
         // Enzyme mutates the result shadows but the cotangent tensors must be immutable, so we
         // create copies to pass into Enzyme. Concretely, this issue pops up with multiple
         // BackpropOps that have the same cotangent tensor due to a CSE effect from one-shot
         // bufferization.
-        generateAllocations(rewriter, loc, resShadows, cotangents);
-        for (const auto &[cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
+        generateAllocations(rewriter, loc, resShadows, bufferCotangents);
+        for (const auto &[cotangent, resShadow] : llvm::zip(bufferCotangents, resShadows)) {
             rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
         }
 
+
+        llvm::outs() << "======================\n";
+        llvm::outs() << scalarReturnTypes;
+        llvm::outs() << "======================\n";
         DenseIntElementsAttr diffArgIndicesAttr = backpropOp.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
-            loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), backpropOp.getArgs(), argShadows,
+            loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
             calleeResults, resShadows, diffArgIndicesAttr, backpropOp.getKeepValueResultsAttr());
-
         // Fill in the null placeholders.
         for (const auto &[idx, scalarResult] :
              llvm::enumerate(bufferizedBackpropOp.getGradients())) {
@@ -202,7 +230,7 @@ struct BackpropOpInterface
             results.insert(results.end(), gradients.begin(), gradients.end());
         }
 
-        rewriter.replaceOp(op, results);
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, results);
         return success();
     }
 };
