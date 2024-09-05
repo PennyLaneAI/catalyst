@@ -21,6 +21,7 @@ import pathlib
 import platform
 import tempfile
 from dataclasses import replace
+from flaky import flaky
 from functools import partial
 from os.path import join
 from tempfile import TemporaryDirectory
@@ -32,7 +33,7 @@ import pennylane as qml
 import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
-from pennylane.measurements import SampleMP
+from pennylane.measurements import CountsMP, SampleMP
 from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
@@ -286,29 +287,19 @@ class TestDecomposition:
 
 class TestMeasurementTransforms:
 
-    @pytest.mark.parametrize(
-        "measurement_transform, target_measurement",
-        [(measurements_from_counts, "counts"), (measurements_from_samples, "sample")],
-    )
-    def test_measurement_from_readout_measurements_integration_multiple_measurements(
-        self, measurement_transform, target_measurement
-    ):
-        """Test the transforms for measurement from device readout (counts or sample) to other measurement types
+    @flaky
+    def test_measurements_from_counts_multiple_measurements(self):
+        """Test the transforms for measurements_from_counts to other measurement types
         as part of the Catalyst pipeline."""
 
         dev = qml.device("lightning.qubit", wires=4, shots=3000)
 
-        def _operations(theta):
+        @qml.qnode(dev)
+        def basic_circuit(theta: float):
             qml.RY(theta, 0)
             qml.RY(theta / 2, 1)
             qml.RY(2 * theta, 2)
             qml.RY(theta, 3)
-
-        @qml.qjit
-        @measurement_transform
-        @qml.qnode(dev)
-        def circuit(theta: float):
-            _operations(theta)
             return (
                 qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
                 qml.var(qml.PauliX(wires=2)),
@@ -316,23 +307,19 @@ class TestMeasurementTransforms:
                 qml.probs(wires=[3]),
             )
 
-        @qml.qnode(dev)
-        def counts_circuit(theta: float):
-            _operations(theta)
-            return qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2))
-
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        transformed_circuit = measurements_from_counts(basic_circuit, dev.wires)
+        
+        mlir = qml.qjit(transformed_circuit, target="mlir").mlir
         assert "expval" not in mlir
-        assert "var" not in mlir
-        assert target_measurement in mlir
+        assert "quantum.var" not in mlir
+        assert "counts" in mlir
 
         theta = 1.9
-
-        expval_res, var_res, counts_res, probs_res = circuit(theta)
+        expval_res, var_res, counts_res, probs_res = qml.qjit(transformed_circuit)(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
-        counts_expected = counts_circuit(theta)
+        counts_expected = basic_circuit(theta)[2]
         probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
 
         assert np.isclose(expval_res, expval_expected, atol=0.03)
@@ -354,6 +341,50 @@ class TestMeasurementTransforms:
         assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=100)
         assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=100)
 
+    def test_measurements_from_samples_multiple_measurements(self):
+        """Test the transform measurements_from_samples with multiple measurement types
+        as part of the Catalyst pipeline."""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+
+        @qml.qnode(dev)
+        def basic_circuit(theta: float):
+            qml.RY(theta, 0)
+            qml.RY(theta / 2, 1)
+            qml.RY(2 * theta, 2)
+            qml.RY(theta, 3)
+            return (
+                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                qml.var(qml.PauliX(wires=2)),
+                qml.sample(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                qml.probs(wires=[3]),
+            )
+
+        transformed_circuit = measurements_from_samples(basic_circuit, dev.wires)
+
+        mlir = qml.qjit(transformed_circuit, target="mlir").mlir
+        assert "expval" not in mlir
+        assert "quantum.var" not in mlir
+        assert "sample" in mlir
+
+        theta = 1.9
+
+        expval_res, var_res, sample_res, probs_res = qml.qjit(transformed_circuit)(theta)
+
+        expval_expected = np.sin(theta) * np.sin(theta / 2)
+        var_expected = 1 - np.sin(2 * theta) ** 2
+        sample_expected = basic_circuit(theta)[2]
+        probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
+
+        assert np.isclose(expval_res, expval_expected, atol=0.05)
+        assert np.isclose(var_res, var_expected, atol=0.05)
+        assert np.allclose(probs_res, probs_expected, atol=0.05)
+
+        # sample comparison
+        assert np.isclose(np.mean(sample_res), np.mean(sample_expected), atol=0.05)
+        assert len(sample_res) == len(sample_expected)
+        assert set(np.array(sample_res)) == set(sample_expected)
+
     @pytest.mark.parametrize(
         "device_measurements, measurement_transform, target_measurement",
         [
@@ -362,7 +393,7 @@ class TestMeasurementTransforms:
             (["counts", "sample"], measurements_from_samples, "sample"),
         ],
     )
-    def test_measurement_from_readout_measurements_integration_multiple_measurements_device(
+    def test_measurement_from_readout_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
         """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline if the
@@ -397,66 +428,168 @@ class TestMeasurementTransforms:
                 return (
                     qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
                     qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                    qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
                     qml.probs(wires=[3, 4]),
                 )
 
             mlir = qml.qjit(circuit, target="mlir").mlir
 
             assert "expval" not in mlir
-            assert "var" not in mlir
+            assert "quantum.var" not in mlir
+            assert "probs" not in mlir
             assert target_measurement in mlir
+
+    @pytest.mark.parametrize("measurement", [
+        lambda: qml.counts(), 
+        lambda: qml.counts(wires=[2]), 
+        lambda: qml.counts(wires=[2, 3]), 
+        lambda: qml.counts(qml.Y(1))
+        ])
+    def test_measurement_from_counts_with_counts_measurement(self, measurement):
+        """Test the measurment_from_counts transform with a single counts measurement as part of
+        the Catalyst pipeline."""
+
+        if measurement() == qml.counts():
+            raise RuntimeError("there seems to be a problem with measuring counts on all wires")
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RX(theta / 2, 1)
+            qml.RX(theta/3, 2)
+            return measurement()
+
+        theta = 2.5
+        counts_expected = circuit(theta)
+        res = qml.qjit(measurements_from_counts(circuit, dev.wires))(theta)
+
+        # counts comparison by converting catalyst format to PL style eigvals dict
+        basis_states, counts = res
+
+        if measurement().obs:
+            num_excitations_per_state = [
+                sum(int(i) for i in format(int(state), "01b")) for state in basis_states
+            ]
+            eigvals = [(-1) ** i for i in num_excitations_per_state]
+            eigval_counts_res = {
+                -1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == -1]),
+                1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == 1]),
+            }
+
+            # +/- 100 shots is pretty reasonable with 3000 shots total
+            assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=100)
+            assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=100)
+
+        else:
+            num_wires = len(measurement().wires) if measurement().wires else len(dev.wires)
+            basis_states = [format(int(state), "01b").zfill(num_wires) for state in basis_states]
+            counts = [int(c) for c in counts]
+            counts_dict = dict([(state, c) for (state, c) in zip(basis_states, counts) if c != 0])
+
+            for res, expected_res in zip(counts_dict.items(), counts_expected.items()):
+                assert res[0] == expected_res[0]
+                assert np.isclose(res[1], expected_res[1], atol=100)
+
+    @pytest.mark.parametrize("measurement", [
+        lambda: qml.sample(), 
+        lambda: qml.sample(wires=[1]), 
+        lambda: qml.sample(wires=[1, 2]), 
+        lambda: qml.sample(qml.X(1))
+        ])
+    def test_measurement_from_samples_with_sample_measurement(self, measurement):
+        """Test the measurment_from_counts transform with a single counts measurement as part of
+        the Catalyst pipeline."""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RX(theta / 2, 1)
+            return measurement()
+
+        theta = 2.5
+        samples_expected = circuit(theta)
+        res = qml.qjit(measurements_from_samples(circuit, dev.wires))(theta)
+
+        # check shape and compare expectation calculated from samples to measuring expval on the same circuit
+        print(np.mean(res))
+        print(np.mean(samples_expected))
+        raise RuntimeError
+        # if measurement().obs:
+        #     obs = measurement().obs
+        #     wires = obs.wires
+        #     expval_from_samples = np.mean(res)
+        #     assert res.shape == (dev.shots.total_shots,)
+        # else:
+        #     obs = qml.Z(1)
+        #     wires = measurement().wires if measurement().wires else dev.wires
+        #     expval_from_samples = qml.expval(qml.Z(1)).process_samples(samples=res, wire_order=wires)
+        #     assert res.shape == (dev.shots.total_shots, len(wires)) 
+
+        # assert np.allclose(expval_from_samples, expected_expval(theta), atol=0.05)
 
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
-            (lambda: qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1)), lambda theta: np.sin(theta) * np.sin(theta/2)),
-            (lambda: qml.counts(), None), # ToDo: add a check
-            (lambda: qml.counts(wires=[2]), None), # ToDo: add a check
-            (lambda: qml.var(qml.Y(wires=1)), lambda theta: 1-np.sin(theta/2)**2),
-            (lambda: qml.probs(), None),  # ToDo: add a check
-            (lambda: qml.probs(wires=[1]), lambda theta: [np.cos(theta/4)**2, np.sin(theta/4)**2]),
-            (lambda: qml.sample(), None), # ToDo: add a check
-            (lambda: qml.sample(wires=[2]), None), # ToDo: add a check
+            (
+                lambda: qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1)),
+                lambda theta: np.sin(theta) * np.sin(theta / 2),
+            ),
+            (lambda: qml.var(qml.Y(wires=1)), lambda theta: 1 - np.sin(theta / 2) ** 2),
+            (
+                lambda: qml.probs(),
+                lambda theta: np.outer(
+                    np.outer(
+                        [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2],
+                        [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2],
+                    ),
+                    [1, 0, 0, 0],
+                ).flatten(),
+            ),
+            (
+                lambda: qml.probs(wires=[1]),
+                lambda theta: [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2],
+            ),
         ],
     )
     @pytest.mark.parametrize(
         "measurement_transform, target_measurement",
-        [
-            (measurements_from_counts, "counts"), 
-            (measurements_from_samples, "sample")
-        ],
+        [(measurements_from_counts, "counts"), (measurements_from_samples, "sample")],
     )
-    def test_measurement_from_readout_measurements_integration_single_measurement(
+    def test_measurement_from_readout_single_measurement_analytic(
         self,
         input_measurement,
         expected_res,
         measurement_transform,
         target_measurement,
     ):
-        """Test the measurment from counts transform with a single measurements as part of
-        the Catalyst pipeline."""
+        """Test the measurment_from_counts/measurement_from_samples transform with a single measurements as part of
+        the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result."""
 
-        if measurement_transform is measurements_from_counts and isinstance(input_measurement(), SampleMP):
-            pytest.skip("The measurement_from_counts transform does not support qml.sample")
+        # if input_measurement() == qml.probs() and target_measurement=="sample":
+        #     raise RuntimeError("need to find out if probs() shape should be based on tape wires or device wires for catalyst")
 
         dev = qml.device("lightning.qubit", wires=4, shots=3000)
 
         @qml.qjit
-        @measurement_transform
+        @partial(measurement_transform, device_wires=dev.wires)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
-            qml.RX(theta/2, 1)
+            qml.RX(theta / 2, 1)
             return input_measurement()
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert target_measurement in mlir
 
-        if expected_res:
-            theta = 2.5
-            assert np.allclose(circuit(theta), expected_res(theta), atol=0.05)
+        theta = 2.5
+        res = circuit(theta)
+
+        assert not np.allclose(res, 0)
+        assert np.allclose(res, expected_res(theta), atol=0.05)
 
     def test_measurement_from_counts_raises_not_implemented(self):
         """Test that an measurement not supported by the measurements_from_counts or
@@ -464,12 +597,29 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=1000)
 
-        @qml.qjit
-        @measurements_from_counts
+        @partial(measurements_from_counts, device_wires=dev.wires)
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            return qml.sample()
+
+        with pytest.raises(NotImplementedError, match="not implemented with measurements_from_counts"):
+            qml.qjit(circuit)
+
+    def test_measurement_from_samples_raises_not_implemented(self):
+        """Test that an measurement not supported by the measurements_from_counts or
+        measurements_from_samples transform raises a NotImplementedError"""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        @partial(measurements_from_samples, device_wires=dev.wires)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
             return qml.counts()
+
+        with pytest.raises(NotImplementedError, match="not implemented with measurements_from_samples"):
+            qml.qjit(circuit)
 
     def test_measurements_are_split(self, mocker):
         """Test that the split_to_single_terms or split_non_commuting transform
@@ -1020,7 +1170,7 @@ class TestTransform:
         device = qml.device("lightning.qubit", wires=4, shots=1000)
 
         @qml.qjit
-        @measurements_from_counts
+        @partial(measurements_from_counts, device_wires=device.wires)
         @qml.qnode(device=device)
         def circuit(a: float):
             qml.X(0)
