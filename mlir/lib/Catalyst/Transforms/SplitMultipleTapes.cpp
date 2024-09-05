@@ -96,7 +96,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 cur_tape++;
             }
         });
-    }
+    } // CollectOperationsForEachTape()
 
     LogicalResult CreateTapeFunction(std::shared_ptr<SmallVector<Operation *>> TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
@@ -185,7 +185,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
             return failure();
         }
         return success();
-    }
+    } // CreateTapeFunction()
 
     void runOnOperation() override
     {
@@ -211,64 +211,62 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 2. Parse the function into tapes
         // total number of operation lists is number of tapes +2
         // for classical pre and post processing
+        for (func::FuncOp func : MultitapePrograms) {
+            SmallVector<std::shared_ptr<SmallVector<Operation *>>> OpsEachTape(countTapes(func) + 2,
+                                                                               nullptr);
 
-        // for (auto func : MultitapePrograms){
-        func::FuncOp func =
-            MultitapePrograms[0]; // temporary! TODO: process all multitape functions
-        SmallVector<std::shared_ptr<SmallVector<Operation *>>> OpsEachTape(countTapes(func) + 2,
-                                                                           nullptr);
+            CollectOperationsForEachTape(func, OpsEachTape);
 
-        CollectOperationsForEachTape(func, OpsEachTape);
-        //}
+            // 3. Get the SSA values needed by the post processing (PP)
+            // These need to be returned by the tapes.
+            // Note that later tapes can also need values from earilier tapes.
+            SmallVector<Value> NecessaryValuesFromEarlierTapes;
 
-        // 3. Get the SSA values needed by the post processing (PP)
-        // These need to be returned by the tapes.
-        // Note that later tapes can also need values from earilier tapes.
-        SmallVector<Value> NecessaryValuesFromEarlierTapes;
+            // Go through all the operands of all the PP ops
+            // Find the ones that are not produced in PP itself
+            SmallVector<Operation *> PPOps = *(OpsEachTape.back());
 
-        // Go through all the operands of all the PP ops
-        // Find the ones that are not produced in PP itself
-        SmallVector<Operation *> PPOps = *(OpsEachTape.back());
-
-        for (Operation *op : PPOps) {
-            for (auto operand : op->getOperands()) {
-                Operation *OperandSource = operand.getDefiningOp();
-                if (std::find(PPOps.begin(), PPOps.end(), OperandSource) == PPOps.end()) {
-                    // A PP operand not produced in PP itself, must be from the tapes/preprocessing!
-                    // Need to be replaced by the tape functions' return values
-                    NecessaryValuesFromEarlierTapes.push_back(operand);
+            for (Operation *op : PPOps) {
+                for (auto operand : op->getOperands()) {
+                    Operation *OperandSource = operand.getDefiningOp();
+                    if (std::find(PPOps.begin(), PPOps.end(), OperandSource) == PPOps.end()) {
+                        // A PP operand not produced in PP itself, must be from the
+                        // tapes/preprocessing! Need to be replaced by the tape functions' return
+                        // values
+                        NecessaryValuesFromEarlierTapes.push_back(operand);
+                    }
                 }
             }
-        }
 
-        // 4. Generate the functions for each tape
-        unsigned int NumTapes = countTapes(func);
-        SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
-        for (unsigned int i = 0; i < NumTapes; i++) {
-            if (failed(CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                                          NecessaryValuesFromEarlierTapes, builder,
-                                          OpsEachTape.size() - 3 - i, func, OutlinedFuncs))) {
-                return signalPassFailure();
-            };
-        }
+            // 4. Generate the functions for each tape
+            unsigned int NumTapes = countTapes(func);
+            SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
+            for (unsigned int i = 0; i < NumTapes; i++) {
+                if (failed(CreateTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
+                                              NecessaryValuesFromEarlierTapes, builder,
+                                              OpsEachTape.size() - 3 - i, func, OutlinedFuncs))) {
+                    return signalPassFailure();
+                };
+            }
 
-        // OutlinedFuncs contains the tapes in reverse order (tape_2, tape_1, tape_0)
-        // Move them into the correct order
-        // Also, make the outlined functions keep the original's attributes
-        SmallVector<NamedAttribute> OutlinedFuncAttrs;
-        ArrayRef<NamedAttribute> FullOriginalFuncAttrs = func->getAttrs();
-        for (auto attr : FullOriginalFuncAttrs) {
-            StringRef attrname = attr.getName();
-            if ((attrname != "sym_name") && (attrname != "function_type")) {
-                OutlinedFuncAttrs.push_back(attr);
+            // OutlinedFuncs contains the tapes in reverse order (tape_2, tape_1, tape_0)
+            // Move them into the correct order
+            // Also, make the outlined functions keep the original's attributes
+            SmallVector<NamedAttribute> OutlinedFuncAttrs;
+            ArrayRef<NamedAttribute> FullOriginalFuncAttrs = func->getAttrs();
+            for (auto attr : FullOriginalFuncAttrs) {
+                StringRef attrname = attr.getName();
+                if ((attrname != "sym_name") && (attrname != "function_type")) {
+                    OutlinedFuncAttrs.push_back(attr);
+                }
+            }
+            for (auto outlined : OutlinedFuncs) {
+                func::FuncOp outlinedfunc = *outlined;
+                outlinedfunc->moveAfter(func);
+                outlinedfunc->setAttrs(OutlinedFuncAttrs);
             }
         }
-        for (auto outlined : OutlinedFuncs) {
-            func::FuncOp outlinedfunc = *outlined;
-            outlinedfunc->moveAfter(func);
-            outlinedfunc->setAttrs(OutlinedFuncAttrs);
-        }
-    }
+    } // runOnOperation()
 };
 
 std::unique_ptr<Pass> createSplitMultipleTapesPass()
