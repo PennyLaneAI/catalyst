@@ -146,11 +146,6 @@ def get_device_shots(dev):
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
 
-def get_device_total_shot_copies(dev):
-    """Helper function to get device total shot copies."""
-    return 1 if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.num_copies
-
-
 def get_device_shot_vector(dev):
     """Helper function to get device shot vector."""
     return [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
@@ -860,8 +855,7 @@ def trace_quantum_measurements(
         if isinstance(o, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            num_of_total_copies = get_device_total_shot_copies(device)
-            if num_of_total_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+            if device.shots.num_copies > 1 and o.return_type.value != "sample":  # qml.sample()
                 raise NotImplementedError(
                     f"Measurement {o.return_type.value} is not supported a shot-vector. "
                     "Use qml.sample() instead."
