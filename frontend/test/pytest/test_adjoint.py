@@ -682,20 +682,22 @@ class TestInheritanceMixins:
             num_params = 0
 
         base = CustomObs(wires=0)
-        ob = adjoint(base)
+        ob0 = adjoint(base)
 
-        assert isinstance(ob, Adjoint)
-        assert isinstance(ob, qml.operation.Operator)
-        assert not isinstance(ob, qml.operation.Operation)
-        assert isinstance(ob, qml.operation.Observable)
-        assert not isinstance(ob, AdjointOperation)
+        ob1 = adjoint(CustomObs(wires=1))
+
+        assert isinstance(ob0, Adjoint)
+        assert isinstance(ob0, qml.operation.Operator)
+        assert not isinstance(ob0, qml.operation.Operation)
+        assert isinstance(ob0, qml.operation.Observable)
+        assert not isinstance(ob0, AdjointOperation)
 
         # Check some basic observable functionality
-        assert ob.compare(ob)
-        assert isinstance(1.0 * ob @ ob, qml.Hamiltonian)
+        assert ob0.compare(ob0)
+        assert isinstance(1.0 * ob0 @ ob1, qml.Hamiltonian)
 
         # check the dir
-        assert "grad_recipe" not in dir(ob)
+        assert "grad_recipe" not in dir(ob0)
 
 
 class TestInitialization:
@@ -757,7 +759,7 @@ class TestInitialization:
     @pytest.mark.usefixtures("use_legacy_opmath")
     def test_hamiltonian_base(self):
         """Test adjoint initialization for a hamiltonian."""
-        base = 2.0 * qml.PauliX(0) @ qml.PauliY(0) + qml.PauliZ("b")
+        base = 2.0 * qml.PauliX(0) @ qml.PauliY(1) + qml.PauliZ("b")
 
         op = adjoint(base)
 
@@ -769,7 +771,7 @@ class TestInitialization:
         assert qml.math.allclose(op.parameters, [2.0, 1.0])
         assert qml.math.allclose(op.data, [2.0, 1.0])
 
-        assert op.wires == qml.wires.Wires([0, "b"])
+        assert op.wires == qml.wires.Wires([0, 1, "b"])
 
 
 class TestProperties:
