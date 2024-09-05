@@ -50,14 +50,15 @@ def mitigate_with_zne(
         scale_factors (array[int]): the range of noise scale factors used.
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
-            By default, perfect polynomial fitting will be used.
+            By default, perfect polynomial fitting :func:`~.polynomial_extrapolate` will be used,
+            the :func:`~.exponential_extrapolate` function from PennyLane may also be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
 
     Returns:
-        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
+        Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
         for the given arguments.
 
     **Example:**
@@ -89,6 +90,32 @@ def mitigate_with_zne(
         def mitigated_circuit(args, n):
             s = jax.numpy.array([1, 2, 3])
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+
+    Exponential extrapolation can also be performed via the
+    :func:`~.exponential_extrapolate` function from PennyLane:
+
+    .. code-block:: python
+
+        from pennylane.transforms import exponential_extrapolate
+
+        dev = qml.device("lightning.qubit", wires=2, shots=100000)
+
+        @qml.qnode(dev)
+        def circuit(weights):
+            qml.StronglyEntanglingLayers(weights, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+        @qjit
+        def workflow(weights, s):
+            zne_circuit = mitigate_with_zne(
+                circuit, scale_factors=s, extrapolate=exponential_extrapolate
+            )
+            return zne_circuit(weights)
+
+    >>> weights = jnp.ones([3, 2, 3])
+    >>> scale_factors = jnp.array([1, 2, 3])
+    >>> workflow(weights, scale_factors)
+    Array(-0.19946598, dtype=float64)
     """
 
     kwargs = copy.copy(locals())

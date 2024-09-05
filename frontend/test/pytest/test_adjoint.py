@@ -25,7 +25,7 @@ import pytest
 from numpy.testing import assert_allclose
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
-from catalyst import adjoint, cond, debug, for_loop, qjit, while_loop
+from catalyst import adjoint, cond, debug, for_loop, measure, qjit, while_loop
 
 # pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
@@ -1011,7 +1011,7 @@ class TestMiscMethods:
 
         base = qml.S(0) + qml.T(0)
         op = adjoint(base)
-        assert op.label() == "(S+T)†"
+        assert op.label() == "𝓗†"
 
     def test_adjoint_of_adjoint(self):
         """Test that the adjoint of an adjoint is the original operation."""
@@ -1683,6 +1683,30 @@ class TestAdjointConstructorIntegration:
         expected_grad = jnp.cos(x)
         assert qml.math.allclose(circ(x), expected_res)
         assert qml.math.allclose(jax.grad(circ)(x), expected_grad)
+
+
+class TestMidCircuitMeasurementAfterAdjoint:
+
+    def test_issue_1055(self, backend):
+        """See https://github.com/PennyLaneAI/catalyst/issues/1055"""
+
+        def subroutine():
+            qml.Hadamard(wires=1)
+
+        @qml.qjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            # Comment/uncomment to toggle bug
+            adjoint(subroutine)()
+
+            res = measure(0)
+
+            # This call is just to show that it works after the measurement
+            adjoint(subroutine)()
+
+            return res
+
+        assert not circuit()
 
 
 if __name__ == "__main__":

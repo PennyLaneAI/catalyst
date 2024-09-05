@@ -29,6 +29,7 @@ from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     get_abstract_signature,
+    params_are_annotated,
     typecheck_signatures,
 )
 
@@ -977,6 +978,15 @@ class TestGradPartial:
         expected = jax.grad(partial_fn)(0.3)
 
         assert np.allclose(grad_partial_fn(0.3), expected)
+
+
+class TestParamsAnnotations:
+    """Test param annotations"""
+
+    def test_params_invalid_annotation(self):
+        def foo(hello: "BAD ANNOTATION"): ...
+
+        assert not params_are_annotated(foo)
 
 
 if __name__ == "__main__":
