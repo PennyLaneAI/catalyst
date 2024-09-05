@@ -237,8 +237,9 @@ def measurements_from_counts(tape, device_wires):
         counts_outcomes = results[0][1]
         results_processed = []
         for m in tape.measurements:
+            wires = m.wires if m.wires else device_wires
             mapped_counts_outcome = _map_counts(
-                counts_outcomes, m.wires, qml.wires.Wires(list(measured_wires))
+                counts_outcomes, wires, qml.wires.Wires(list(measured_wires))
             )
             if isinstance(m, ExpectationMP):
                 probs = _probs_from_counts(mapped_counts_outcome)
@@ -291,7 +292,7 @@ def measurements_from_samples(tape, device_wires):
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
-                results_processed.append(m.process_samples(samples, measured_wires, shot_range=tape.shots))
+                results_processed.append(m.process_samples(samples, measured_wires))
             else:
                 raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
         if len(tape.measurements) == 1:
