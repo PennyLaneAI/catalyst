@@ -182,6 +182,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
+        extra_compile_args=["-std=c++17"],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -198,6 +199,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
+        extra_compile_args=["-std=c++17"],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
