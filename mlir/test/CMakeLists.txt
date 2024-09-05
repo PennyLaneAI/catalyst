@@ -54,7 +54,7 @@ add_custom_target(check-all
 
 add_lit_testsuite(check-unit-tests "Just run unit tests"
     ${CMAKE_CURRENT_BINARY_DIR}/Unit
-    DEPENDS ${DIALECT_TEST_DEPENDS}
+    DEPENDS ${DIALECT_TEST_DEPENDS} check-dialects
 )
 
 set_target_properties(check-unit-tests PROPERTIES FOLDER "Unit Tests")
