@@ -547,11 +547,7 @@ class TestObservableValidation:
             ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
-            (
-                [qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))],
-                None,
-            ),  # legacy hamiltonian
-            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
+            ([qml.expval(qml.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
             # sample with observable is currently unsupported
@@ -768,7 +764,6 @@ class TestAdjointMethodVerification:
             qml.operation.Tensor(qml.X(0), qml.Z(1)),  # tensor
             qml.PauliX(0) + qml.PauliY(1),  # sum
             qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # hamiltonian
-            qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]),  # legacy hamiltonian
             2 * qml.PauliX(0),  # sprod
             (2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1),  # nested prod+sprod
         ],
