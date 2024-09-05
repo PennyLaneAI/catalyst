@@ -448,9 +448,6 @@ class TestMeasurementTransforms:
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
-        if measurement() == qml.counts():
-            raise RuntimeError("there seems to be a problem with measuring counts on all wires")
-
         dev = qml.device("lightning.qubit", wires=4, shots=3000)
 
         @qml.qnode(dev)
@@ -493,9 +490,9 @@ class TestMeasurementTransforms:
 
     @pytest.mark.parametrize("measurement", [
         lambda: qml.sample(), 
-        lambda: qml.sample(wires=[1]), 
+        lambda: qml.sample(wires=[0]), 
         lambda: qml.sample(wires=[1, 2]), 
-        lambda: qml.sample(qml.X(1))
+        lambda: qml.sample(qml.Y(1)@qml.Y(0))
         ])
     def test_measurement_from_samples_with_sample_measurement(self, measurement):
         """Test the measurment_from_counts transform with a single counts measurement as part of
@@ -510,26 +507,17 @@ class TestMeasurementTransforms:
             return measurement()
 
         theta = 2.5
-        samples_expected = circuit(theta)
         res = qml.qjit(measurements_from_samples(circuit, dev.wires))(theta)
 
-        # check shape and compare expectation calculated from samples to measuring expval on the same circuit
-        print(np.mean(res))
-        print(np.mean(samples_expected))
-        raise RuntimeError
-        # if measurement().obs:
-        #     obs = measurement().obs
-        #     wires = obs.wires
-        #     expval_from_samples = np.mean(res)
-        #     assert res.shape == (dev.shots.total_shots,)
-        # else:
-        #     obs = qml.Z(1)
-        #     wires = measurement().wires if measurement().wires else dev.wires
-        #     expval_from_samples = qml.expval(qml.Z(1)).process_samples(samples=res, wire_order=wires)
-        #     assert res.shape == (dev.shots.total_shots, len(wires)) 
+        if len(measurement().wires) == 1:
+            samples_expected = qml.qjit(circuit)(theta)
+        else:
+            samples_expected = circuit(theta)
 
-        # assert np.allclose(expval_from_samples, expected_expval(theta), atol=0.05)
+        assert res.shape == samples_expected.shape
+        assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
+    #ToDo: add a parameterization with a shot vector to this test after #1051 is merged, and update test accordingly
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -558,20 +546,19 @@ class TestMeasurementTransforms:
         "measurement_transform, target_measurement",
         [(measurements_from_counts, "counts"), (measurements_from_samples, "sample")],
     )
+    @pytest.mark.parametrize("shots", [3000])
     def test_measurement_from_readout_single_measurement_analytic(
         self,
         input_measurement,
         expected_res,
         measurement_transform,
         target_measurement,
+        shots,
     ):
         """Test the measurment_from_counts/measurement_from_samples transform with a single measurements as part of
         the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result."""
 
-        # if input_measurement() == qml.probs() and target_measurement=="sample":
-        #     raise RuntimeError("need to find out if probs() shape should be based on tape wires or device wires for catalyst")
-
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4, shots=shots)
 
         @qml.qjit
         @partial(measurement_transform, device_wires=dev.wires)
@@ -587,6 +574,9 @@ class TestMeasurementTransforms:
 
         theta = 2.5
         res = circuit(theta)
+
+        # if len(dev.shots.shot_vector) != 1:
+            # assert len(res) == len(dev.shots.shot_vector)
 
         assert not np.allclose(res, 0)
         assert np.allclose(res, expected_res(theta), atol=0.05)
@@ -1202,6 +1192,39 @@ class TestTransform:
         assert len(counts) == 2
         assert counts[0].shape == (8,)
         assert counts[1].shape == (8,)
+
+
+
+
+    def test_stuff(self):
+        """Test the measurment_from_counts/measurement_from_samples transform with a single measurements as part of
+        the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result."""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+
+        @qml.qjit
+        @partial(measurements_from_counts, device_wires=dev.wires)
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RX(theta / 2, 1)
+            return qml.probs()
+
+        theta = 2.5
+
+        expected_res = np.outer(
+            np.outer(
+                [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2],
+                [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2]),
+            [1, 0, 0, 0],
+            ).flatten(),
+
+        res = circuit(theta)
+
+        print(res)
+
+        assert np.allclose(res, expected_res, atol=0.05)
+
 
 
 if __name__ == "__main__":
