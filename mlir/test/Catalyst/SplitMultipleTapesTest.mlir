@@ -143,6 +143,56 @@ module @circuit_twotapes_module {
 // -----
 
 
+// Test when a post processing op is nested and the necessary values are not exposed at the upmost layer
+
+module @circuit_twotapes_module {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
+    %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
+    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    quantum.device_release
+    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %extracted = tensor.extract %arg1[] : tensor<f64>
+    %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
+    quantum.device_release
+    %result = scf.execute_region -> (tensor<f64>) {
+      %result_in_scf = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+      scf.yield %result_in_scf : tensor<f64>
+    }
+    return %result : tensor<f64>
+  }
+}
+
+// CHECK: module @circuit_twotapes_module {
+// CHECK: func.func private @circuit_twotapes
+// CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
+// CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
+// CHECK: {{%.+}} = scf.execute_region
+// CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
+// CHECK: scf.yield
+
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: quantum.device
+// CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
+// CHECK: quantum.device_release
+// CHECK: return {{%.+}} : tensor<f64>
+// CHECK-NEXT: }
+
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: quantum.device
+// CHECK: tensor.extract %arg0[]
+// CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
+// CHECK: quantum.device_release
+// CHECK: return {{%.+}} : tensor<f64>
+// CHECK-NEXT: }
+
+// CHECK: }
+
+
+// -----
+
+
 // Should do nothing when there's no tapes
 module @empty_workflow {
 

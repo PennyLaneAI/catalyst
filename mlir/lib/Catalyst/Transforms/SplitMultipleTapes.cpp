@@ -226,16 +226,22 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
             // Find the ones that are not produced in PP itself
             SmallVector<Operation *> PPOps = *(OpsEachTape.back());
 
-            for (Operation *op : PPOps) {
-                for (auto operand : op->getOperands()) {
-                    Operation *OperandSource = operand.getDefiningOp();
-                    if (std::find(PPOps.begin(), PPOps.end(), OperandSource) == PPOps.end()) {
-                        // A PP operand not produced in PP itself, must be from the
-                        // tapes/preprocessing! Need to be replaced by the tape functions' return
-                        // values
-                        NecessaryValuesFromEarlierTapes.push_back(operand);
+            for (Operation *PPOp : PPOps) {
+                PPOp->walk([&](Operation *op) {
+                    for (auto operand : op->getOperands()) {
+                        Operation *OperandSource = operand.getDefiningOp();
+                        if (std::find(PPOps.begin(), PPOps.end(), OperandSource) == PPOps.end()) {
+                            // A PP operand not produced in PP itself, must be from the
+                            // tapes/preprocessing! Need to be replaced by the tape functions'
+                            // return values
+                            if (std::find(NecessaryValuesFromEarlierTapes.begin(),
+                                          NecessaryValuesFromEarlierTapes.end(),
+                                          operand) == NecessaryValuesFromEarlierTapes.end()) {
+                                NecessaryValuesFromEarlierTapes.push_back(operand);
+                            }
+                        }
                     }
-                }
+                });
             }
 
             // 4. Generate the functions for each tape
