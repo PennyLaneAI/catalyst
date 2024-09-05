@@ -21,6 +21,8 @@ from jax import scipy as jsp
 
 from catalyst import qjit
 
+# pylint: disable=too-many-lines
+
 
 class MatrixGenerator:
     """
