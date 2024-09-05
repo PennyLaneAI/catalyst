@@ -521,9 +521,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
             measurement_program.add_transform(split_to_single_terms)
 
         if self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}]:
-            measurement_program.add_transform(measurements_from_samples)
+            measurement_program.add_transform(measurements_from_samples, self.wires)
         if self.measurement_processes == {"Counts"}:
-            measurement_program.add_transform(measurements_from_counts)
+            measurement_program.add_transform(measurements_from_counts, self.wires)
 
         return measurement_program
 

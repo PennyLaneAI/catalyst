@@ -209,12 +209,14 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
 
 @transform
 @debug_logger
-def measurements_from_counts(tape):
+def measurements_from_counts(tape, device_wires):
     r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
     functions for each original measurement.
 
     Args:
         tape (QNode or QuantumTape or Callable): A quantum circuit.
+        device_wires (Wires): the wires from the device, for assessing what wires to use 
+            when a measurement applies to all wires.
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
@@ -225,7 +227,7 @@ def measurements_from_counts(tape):
         Samples are not supported.
     """
 
-    new_operations, measured_wires = _diagonalize_measurements(tape)
+    new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
     new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
 
@@ -252,7 +254,7 @@ def measurements_from_counts(tape):
                     tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
                 )
             else:
-                raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
+                raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_counts")
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
         else:
@@ -263,7 +265,7 @@ def measurements_from_counts(tape):
 
 @transform
 @debug_logger
-def measurements_from_samples(tape):
+def measurements_from_samples(tape, device_wires):
     r"""Replace all measurements from a tape with sample measurements, and adds postprocessing
     functions for each original measurement.
 
@@ -274,9 +276,12 @@ def measurements_from_samples(tape):
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
         transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
 
+    .. note::
+
+        Counts are not supported.
     """
 
-    new_operations, measured_wires = _diagonalize_measurements(tape)
+    new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
     new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
 
@@ -287,9 +292,6 @@ def measurements_from_samples(tape):
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
                 results_processed.append(m.process_samples(samples, measured_wires, shot_range=tape.shots))
-            elif isinstance(m, CountsMP):
-                counts_results = _counts_from_samples(samples)
-                results_processed.append(counts_results)
             else:
                 raise NotImplementedError(f"Measurement type {type(m)} is not implemented with measurements_from_samples")
         if len(tape.measurements) == 1:
@@ -300,7 +302,7 @@ def measurements_from_samples(tape):
 
     return [new_tape], postprocessing_samples
 
-def _diagonalize_measurements(tape):
+def _diagonalize_measurements(tape, device_wires):
     """Convert the measurements and operations on the tape to those relevant 
     for measuring in the readout basis.
 
@@ -312,7 +314,6 @@ def _diagonalize_measurements(tape):
         measured_wires (list): A list of all wires that are measured on the tape
     
     """
-
     if tape.samples_computational_basis and len(tape.measurements) > 1:
         _validate_computational_basis_sampling(tape)
 
@@ -323,16 +324,13 @@ def _diagonalize_measurements(tape):
 
     measured_wires = set()
     for m in diagonal_measurements:
-        wires = m.wires if m.wires else tape.wires
+        wires = m.wires if m.wires else device_wires
         measured_wires.update(wires.tolist())
 
     new_operations = tape.operations
     new_operations.extend(diagonalizing_gates)
 
     return new_operations, list(measured_wires)
-
-def _counts_from_samples(samples_outcome):
-    raise NotImplementedError()
 
 def _probs_from_counts(counts_outcome):
     """From the counts outcome, calculate the probability vector."""
