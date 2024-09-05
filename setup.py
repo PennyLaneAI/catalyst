@@ -193,7 +193,11 @@ elif system_platform == "Darwin":
         variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
-        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
+        sources=[
+            "frontend/catalyst/utils/libcustom_calls.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cc",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cc",
+        ],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
