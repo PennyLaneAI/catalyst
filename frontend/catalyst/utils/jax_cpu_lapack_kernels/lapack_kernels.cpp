@@ -33,7 +33,7 @@ limitations under the License.
  *       - Specifying the array leading dimensions (e.g. `lda`) such that they
  *         are dependent upon the matrix layout, rather than hard-coding them.
  *         Note that these should always evaluate to the value required for
- *         row-major matrix layout (typically the number of rows n of the
+ *         row-major matrix layout (typically the number of columns n of the
  *         matrix).
  *       - Remove parameters used by the FORTRAN interfaces but not by the C
  *         interfaces, e.g. the workspace array parameters `lwork`, `rwork`,
