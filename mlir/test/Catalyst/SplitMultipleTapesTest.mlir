@@ -200,7 +200,7 @@ module @circuit_twotapes_module {
 // -----
 
 
-// Test when a later tapes uses values from an eariler tape
+// Test when a later tape uses values from an earlier tape
 
 module @circuit_twotapes_module {
   func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
