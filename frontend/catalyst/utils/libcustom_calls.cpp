@@ -14,7 +14,7 @@
 
 #include <complex>
 
-#include "jax_cpu_lapack_kernels/lapack_kernels.h"
+#include "jax_cpu_lapack_kernels/lapack_kernels.hpp"
 
 #ifdef DEBUG
 #include <iostream>

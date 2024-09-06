@@ -33,7 +33,7 @@
  * has been changed from `dgetrf_` to `LAPACKE_dgetrf`.
  */
 
-#include "lapack_kernels.h"
+#include "lapack_kernels.hpp"
 
 // From a Python binary, JAX obtains its LAPACK/BLAS kernels from Scipy, but
 // a C++ user should link against LAPACK directly. This is needed when using

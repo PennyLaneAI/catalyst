@@ -50,7 +50,7 @@
  *  4. Applied Catalyst C++ code formatting.
  */
 
-#include "lapack_kernels.h"
+#include "lapack_kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
