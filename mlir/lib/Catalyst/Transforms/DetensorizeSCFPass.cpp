@@ -17,115 +17,86 @@ namespace catalyst {
 #define GEN_PASS_DEF_DETENSORIZESCFPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-// struct DetensorizeIfOp : public OpRewritePattern<IfOp> {
-//   using OpRewritePattern<IfOp>::OpRewritePattern;
-
-//   LogicalResult matchAndRewrite(IfOp op,
-//                                 PatternRewriter &rewriter) const override {
-//     auto isScalarTensor = [](Value v) {
-//         if (!::llvm::isa<TensorType>(v.getType())) {
-//             return false;
-//         }
-//         return dyn_cast<TensorType>(v.getType()).getRank() == 0;
-//     };
-//     bool has_scalar_tensor = false;
-//     for (mlir::Value operand : op.getThenRegion().getTerminator().getOperands()) {
-//         if (isScalarTensor(operand)) {
-//             has_scalar_tensor = true;
-//             break;
-//         }
-//     }
-//     if (!has_scalar_tensor)
-//       return failure();
-
-//     if (condition.getValue())
-//       replaceOpWithRegion(rewriter, op, op.getThenRegion());
-//     else if (!op.getElseRegion().empty())
-//       replaceOpWithRegion(rewriter, op, op.getElseRegion());
-//     else
-//       rewriter.eraseOp(op);
-
-//     return success();
-//   }
-// };
-
 struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPass> {
     using impl::DetensorizeSCFPassBase<DetensorizeSCFPass>::DetensorizeSCFPassBase;
 
-    void detensorizeForOp(scf::ForOp for_op, IRRewriter &rewriter)
+    void detensorizeForOp(scf::ForOp forOp, IRRewriter &rewriter)
     {
+
         auto isScalarTensor = [](Value v) {
             if (!::llvm::isa<TensorType>(v.getType())) {
                 return false;
             }
             return dyn_cast<TensorType>(v.getType()).getRank() == 0;
         };
-        // Loop over operands
-        std::size_t i_operand = 0;
-        for (mlir::Value operand : for_op.getOperands()) {
-            if (isScalarTensor(operand)) {
-                const std::size_t i_argument = i_operand - 3;
-                // Detensorize operand: extract tensor element before for operation and replace
-                // operand
-                {
-                    rewriter.setInsertionPoint(for_op);
-                    mlir::Operation *extract_op =
-                        rewriter.create<tensor::ExtractOp>(for_op->getLoc(), operand, ValueRange{});
-                    rewriter.replaceUsesWithIf(
-                        operand, extract_op->getResult(0),
-                        [&](OpOperand &op) { return op.getOwner() == for_op; });
-                    rewriter.modifyOpInPlace(for_op, [&]() {
-                        for_op.getRegionIterArg(i_argument)
-                            .setType(extract_op->getResult(0).getType());
-                    });
-                }
-                // Retensorize argument: reconstruct tensor at the beginning of the for body
-                {
-                    rewriter.setInsertionPointToStart(for_op.getBody());
-                    auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
-                        for_op->getLoc(),
-                        RankedTensorType::get({}, for_op.getRegionIterArg(i_argument).getType()),
-                        for_op.getRegionIterArg(i_argument));
-                    rewriter.replaceUsesWithIf(
-                        for_op.getRegionIterArg(i_argument), from_elem_op->getResult(0),
-                        [&](OpOperand &op) { return !isa<tensor::FromElementsOp>(op.getOwner()); });
-                }
+
+        // 1. Find scalar tensors and extract element
+        SmallVector<std::size_t> indices;
+        SmallVector<Value> newIterOperands;
+        std::size_t index = 0;
+        for (OpOperand &opOperand : forOp.getInitArgsMutable()) {
+            if (isScalarTensor(opOperand.get())) {
+                rewriter.setInsertionPoint(forOp);
+                mlir::Operation *extract_op = rewriter.create<tensor::ExtractOp>(
+                    forOp->getLoc(), opOperand.get(), ValueRange{});
+                newIterOperands.push_back(extract_op->getResult(0));
+                indices.push_back(index);
+                index += 1;
+                continue;
             }
-            i_operand += 1;
+            newIterOperands.push_back(opOperand.get());
+            index += 1;
         }
-        scf::YieldOp yield_op = cast<scf::YieldOp>(*for_op.getBody()->getTerminator());
-        // Loop over results
-        std::size_t i_result = 0;
-        for (mlir::Value result : yield_op.getOperands()) {
-            if (isScalarTensor(result)) {
-                auto for_result = for_op->getResult(i_result);
-                // Detensorize result: extract tensor element before yielding
-                {
-                    rewriter.setInsertionPoint(yield_op);
-                    mlir::Operation *extract_op = rewriter.create<tensor::ExtractOp>(
-                        yield_op->getLoc(), result, ValueRange{});
-                    rewriter.replaceUsesWithIf(
-                        result, extract_op->getResult(0),
-                        [&](OpOperand &op) { return op.getOwner() == yield_op; });
-                    rewriter.modifyOpInPlace(yield_op, [&]() {
-                        yield_op->getOperand(i_result).setType(extract_op->getResult(0).getType());
-                    });
-                    rewriter.modifyOpInPlace(
-                        for_op, [&]() { for_result.setType(extract_op->getResult(0).getType()); });
-                }
-                // Retensorize result: reconstruct tensor after the for body
-                {
-                    rewriter.setInsertionPointAfter(for_op);
-                    auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
-                        for_op->getLoc(), RankedTensorType::get({}, for_result.getType()),
-                        for_result);
-                    rewriter.replaceUsesWithIf(
-                        for_result, from_elem_op->getResult(0),
-                        [&](OpOperand &op) { return !isa<tensor::FromElementsOp>(op.getOwner()); });
-                }
-            }
-            i_result += 1;
+
+        // 2. Create the new ForOp shell.
+        scf::ForOp newForOp =
+            rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.getLowerBound(),
+                                        forOp.getUpperBound(), forOp.getStep(), newIterOperands);
+        newForOp->setAttrs(forOp->getAttrs());
+        Block &newBlock = newForOp.getRegion().front();
+        SmallVector<Value> newBlockTransferArgs(newBlock.getArguments().begin(),
+                                                newBlock.getArguments().end());
+
+        // 3. Copy body
+        Block &oldBlock = forOp.getRegion().front();
+        rewriter.mergeBlocks(&oldBlock, &newBlock, newBlockTransferArgs);
+
+        // 4. Retensorize arguments at the beginning of the body
+        rewriter.setInsertionPoint(&newBlock, newBlock.begin());
+        for (std::size_t index : indices) {
+            auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
+                newForOp->getLoc(),
+                RankedTensorType::get({}, newForOp.getRegionIterArg(index).getType()),
+                newForOp.getRegionIterArg(index));
+            rewriter.replaceUsesWithIf(
+                newForOp.getRegionIterArg(index), from_elem_op->getResult(0),
+                [&](OpOperand &op) { return !isa<tensor::FromElementsOp>(op.getOwner()); });
         }
+
+        // 5. Extract scalar tensor elements and detensorize terminator
+        auto clonedYieldOp = cast<scf::YieldOp>(newBlock.getTerminator());
+        SmallVector<Value> newYieldOperands = clonedYieldOp.getOperands();
+        rewriter.setInsertionPoint(clonedYieldOp);
+        for (std::size_t index : indices) {
+            mlir::Operation *extract_op = rewriter.create<tensor::ExtractOp>(
+                clonedYieldOp->getLoc(), clonedYieldOp->getOperand(index), ValueRange{});
+            newYieldOperands[index] = extract_op->getResult(0);
+        }
+        rewriter.create<scf::YieldOp>(newForOp.getLoc(), newYieldOperands);
+        rewriter.eraseOp(clonedYieldOp);
+
+        // 6. Retensorize results after for loop
+        rewriter.setInsertionPointAfter(forOp);
+        for (std::size_t index : indices) {
+            mlir::Value for_result = newForOp->getResult(index);
+            auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
+                newForOp->getLoc(), RankedTensorType::get({}, for_result.getType()), for_result);
+            rewriter.replaceUsesWithIf(
+                forOp->getResult(index), from_elem_op->getResult(0),
+                [&](OpOperand &op) { return !isa<tensor::FromElementsOp>(op.getOwner()); });
+        }
+
+        rewriter.replaceOp(forOp, newForOp);
     }
 
     void detensorizeIfOp(scf::IfOp if_op, IRRewriter &rewriter)
@@ -178,10 +149,14 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
     void runOnOperation() override
     {
         mlir::Operation *root = getOperation();
-        llvm::errs() << *root << '\n';
         IRRewriter rewriter(root->getContext());
 
+        // llvm::errs() << *root << '\n';
+
         root->walk([&](scf::ForOp for_op) { detensorizeForOp(for_op, rewriter); });
+
+        // llvm::errs() << *root << '\n';
+
         root->walk([&](scf::IfOp if_op) { detensorizeIfOp(if_op, rewriter); });
     }
 };

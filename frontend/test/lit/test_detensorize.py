@@ -87,6 +87,52 @@ print(get_compilation_stage(f_with_for_loop, "HLOLoweringPass"))
 f_with_for_loop.workspace.cleanup()
 
 
+# CHECK-LABEL: public @jit_f_with_loop_over_list
+@qjit(autograph=True, keep_intermediate=True)
+def f_with_loop_over_list(a, b):
+    # CHECK: %extracted
+    # CHECK: tensor.extract
+    # CHECK-NOT: linalg.generic
+    b = a + b
+    for i in list(range(10)):
+        if i < 5:
+            # CHECK: arith.addf
+            a = a + i
+        else:
+            b = b + i
+    # CHECK: arith.mulf
+    c = a * b
+    return c
+
+
+f_with_loop_over_list(1.0, 2.0)
+print(get_compilation_stage(f_with_loop_over_list, "HLOLoweringPass"))
+f_with_loop_over_list.workspace.cleanup()
+
+
+# CHECK-LABEL: public @jit_f_with_enumerate
+@qjit(autograph=True, keep_intermediate=True)
+def f_with_enumerate(a, b):
+    # CHECK: %extracted
+    # CHECK: tensor.extract
+    # CHECK-NOT: linalg.generic
+    b = a + b
+    for i, j in enumerate([5, 4, 3, 2, 1]):
+        if i < 2:
+            # CHECK: arith.addf
+            a = a + j
+        else:
+            b = b + j
+    # CHECK: arith.mulf
+    c = a * b
+    return c
+
+
+f_with_enumerate(1.0, 2.0)
+print(get_compilation_stage(f_with_enumerate, "HLOLoweringPass"))
+f_with_enumerate.workspace.cleanup()
+
+
 # CHECK-LABEL: public @jit_f_with_nested_ifs
 @qjit(autograph=True, keep_intermediate=True)
 def f_with_nested_ifs(a, b, c):
