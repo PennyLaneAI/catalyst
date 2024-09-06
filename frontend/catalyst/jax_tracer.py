@@ -545,7 +545,9 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, pl_capture, args, kwar
             jaxpr = catalyst.from_plxpr(plxpr)(*args, **kwargs)
         else:
             with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-                jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+                jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(
+                    *args, **kwargs
+                )
 
     return jaxpr, out_type, out_treedef
 

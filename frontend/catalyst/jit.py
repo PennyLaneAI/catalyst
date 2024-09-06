@@ -585,6 +585,7 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
         if pl_capture:
+
             def fn_with_transform_named_sequence(*args, **kwargs):
                 """
                 This function behaves exactly like the user function being jitted,
@@ -601,10 +602,16 @@ class QJIT:
                 return self.user_function(*args, **kwargs)
 
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, pl_capture, full_sig, kwargs
+                fn_with_transform_named_sequence,
+                static_argnums,
+                abstracted_axes,
+                pl_capture,
+                full_sig,
+                kwargs,
             )
 
             return jaxpr, out_type, treedef, dynamic_sig
+
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
@@ -641,7 +648,12 @@ class QJIT:
                 return self.user_function(*args, **kwargs)
 
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, pl_capture, full_sig, kwargs
+                fn_with_transform_named_sequence,
+                static_argnums,
+                abstracted_axes,
+                pl_capture,
+                full_sig,
+                kwargs,
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
