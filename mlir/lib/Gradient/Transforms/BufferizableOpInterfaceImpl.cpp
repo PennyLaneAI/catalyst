@@ -425,5 +425,7 @@ void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRe
     registry.addExtension(+[](MLIRContext *ctx, GradientDialect *dialect) {
         AdjointOp::attachInterface<AdjointOpInterface>(*ctx);
         BackpropOp::attachInterface<BackpropOpInterface>(*ctx);
+        ForwardOp::attachInterface<ForwardOpInterface>(*ctx);
+        ReverseOp::attachInterface<ReverseOpInterface>(*ctx);
     });
 }
