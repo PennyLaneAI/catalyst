@@ -231,6 +231,128 @@ struct BackpropOpInterface
     }
 };
 
+struct ForwardOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<ForwardOpInterface, ForwardOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        auto forwardOp = cast<ForwardOp>(op);
+
+        auto argc = forwardOp.getArgc();
+        auto resc = forwardOp.getResc();
+        SmallVector<Value> inputs;
+        SmallVector<Value> differentials;
+        SmallVector<Value> outputs;
+        SmallVector<Value> cotangents;
+
+        Block *block;
+        rewriter.modifyOpInPlace(op, [&] { block = forwardOp.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto params = forwardOp.getArguments();
+
+        for (size_t i = 0; i < argc * 2; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? differentials.push_back(val) : inputs.push_back(val);
+        }
+
+        auto upperLimit = (argc * 2) + (resc * 2);
+        for (size_t i = argc * 2; i < upperLimit; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        }
+
+        auto implAttr = forwardOp.getImplementationAttr();
+        auto impl = forwardOp.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = forwardOp.getLoc();
+
+        SmallVector<Value> tensorInputs;
+        for (auto input : inputs) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, input);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
+        SmallVector<Value> tensorOutputs(callOp.getResults());
+
+        for (auto [memrefOutput, tensorOutput] : llvm::zip(outputs, tensorOutputs)) {
+            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, memrefOutput.getType(),
+                                                                       tensorOutput);
+            rewriter.create<memref::CopyOp>(loc, castVal, memrefOutput);
+        }
+
+        auto tapeCount = forwardOp.getTape();
+        SmallVector<Value> tapeOutputs;
+        tapeOutputs.insert(tapeOutputs.begin(), tensorOutputs.end() - tapeCount,
+                           tensorOutputs.end());
+
+        SmallVector<Value> tapeMemrefOutputs;
+        for (auto [tapeTensorOutput, memrefTapeOutput] :
+             llvm::zip(tapeOutputs, forwardOp.getResultTypes())) {
+            Value castVal =
+                rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput, tapeTensorOutput);
+            tapeMemrefOutputs.push_back(castVal);
+        }
+
+        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
+        bufferization::replaceOpWithNewBufferizedOp<catalyst::gradient::ReturnOp>(rewriter, op, tapeMemrefOutputs, F);
+
+        return success();
+    }
+};
+
+struct ReverseOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<ReverseOpInterface, ReverseOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options) const
+    {
+        return success();
+    }
+};
+
 } // namespace
 
 void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
