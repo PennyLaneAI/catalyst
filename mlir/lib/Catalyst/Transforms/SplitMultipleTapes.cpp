@@ -259,7 +259,6 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
         // Go through all the operands of all the PP ops
         // Find the ones that are not produced in PP itself
-        // SmallVector<Operation *> PPOps = *(OpsEachTape.back());
         SmallVector<Operation *> PPOps = OpsEachTape.back();
         collectNecessaryValuesFromEarlierTapes(PPOps, NecessaryValuesFromEarlierTapes);
 
