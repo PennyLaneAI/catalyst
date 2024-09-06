@@ -226,6 +226,12 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     void runOnOperation() override
     {
         func::FuncOp func = cast<func::FuncOp>(getOperation());
+
+        // Exit if function is not a qnode: they won't have tapes.
+        if (!func->hasAttrOfType<UnitAttr>("qnode")) {
+            return;
+        }
+
         mlir::IRRewriter builder(func->getContext());
 
         // 1. Identify the functions with multiple tapes
