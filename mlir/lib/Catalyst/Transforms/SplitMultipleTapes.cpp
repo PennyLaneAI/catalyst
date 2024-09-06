@@ -140,6 +140,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         const SmallVector<Operation *> &TapeOps, const SmallVector<Value> &RetValues,
         const SmallVector<mlir::Type> &RetTypes, IRRewriter &builder, Location loc)
     {
+        OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPoint(TapeOps.front());
         scf::ExecuteRegionOp executeRegionOp =
             builder.create<scf::ExecuteRegionOp>(loc, ArrayRef(RetTypes));
