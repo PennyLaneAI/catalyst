@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.9]
+        python_version: ["3.10"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-12
@@ -246,7 +246,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source

@@ -74,7 +74,7 @@ jobs:
       - name: Python versions
         id: python_versions
         run: |
-          echo 'python_versions=["3.9", "3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+          echo 'python_versions=["3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
 
       - name: Primary Python version
         id: primary_python_version
