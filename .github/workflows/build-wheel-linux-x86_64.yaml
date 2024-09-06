@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.9]
+        python_version: ["3.10"]
         container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -296,7 +296,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -342,7 +342,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=1536d88 \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \

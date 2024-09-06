@@ -56,7 +56,7 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = 0.37
+pl_min_release = 0.38
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -107,7 +107,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -216,7 +215,7 @@ setup(
     name="PennyLane-Catalyst",
     provides=["catalyst"],
     version=version,
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
