@@ -51,7 +51,7 @@
       circuit,
       scale_factors=s,
       extrapolate=exponential_extrapolate,
-      folding="all" #"all" for local or "global" for the original method, default is "global
+      folding="all" #"all" for local or "global" for the original method, default is "global"
     )()
 
 print(circuit())
