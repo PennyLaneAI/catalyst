@@ -22,7 +22,6 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
 
     void detensorizeForOp(scf::ForOp forOp, IRRewriter &rewriter)
     {
-
         auto isScalarTensor = [](Value v) {
             if (!::llvm::isa<TensorType>(v.getType())) {
                 return false;
@@ -108,7 +107,6 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
             return dyn_cast<TensorType>(v.getType()).getRank() == 0;
         };
 
-        bool first_yield = false;
         if_op->walk([&](scf::YieldOp yield_op) {
             // Loop over results
             std::size_t i_result = 0;
@@ -129,7 +127,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                         rewriter.modifyOpInPlace(if_op, [&]() { if_result.setType(type); });
                     }
                     // Retensorize operand: reconstruct tensor after the for body
-                    if (first_yield) {
+                    {
                         rewriter.setInsertionPointAfter(if_op);
                         auto from_elem_op = rewriter.create<tensor::FromElementsOp>(
                             if_op->getLoc(), RankedTensorType::get({}, if_result.getType()),
@@ -142,7 +140,6 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
                 }
                 i_result += 1;
             }
-            first_yield = true;
         });
     }
 
