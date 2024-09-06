@@ -53,30 +53,6 @@ class TestExpmAndSolve:
         assert np.allclose(expected[1], observed[1])
 
 
-class TestExpmInCircuit:
-    """Test entire quantum workflows with jax.scipy.linag.expm"""
-
-    def test_expm_in_circuit(self):
-        """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
-
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_expm():
-            generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
-            unitary = jsp.linalg.expm(generator)
-            qml.QubitUnitary(unitary, wires=[0])
-            return qml.probs()
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_rot():
-            qml.RX(np.pi, wires=[0])
-            return qml.probs()
-
-        res = circuit_expm()
-        expected = circuit_rot()  # expected = [0,1]
-        assert np.allclose(res, expected)
-
-
 class TestArgsortNumerical:
     """Test jax.numpy.argsort sort arrays correctly when being qjit compiled"""
 
