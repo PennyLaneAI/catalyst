@@ -83,20 +83,20 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         // special: [0] for pre and [-1] for post processing
-        unsigned int cur_tape = 0;
+        unsigned int curTape = 0;
 
         func->walk([&](Operation *op) {
             if (op == func) {
                 return; // don't visit the funcop itself
             }
             if (op->getName().getStringRef() == "quantum.device") {
-                cur_tape++;
+                curTape++;
             }
-            OpsEachTape[cur_tape]->push_back(op);
+            OpsEachTape[curTape]->push_back(op);
             if ((op->getName().getStringRef() == "quantum.device_release") &&
-                cur_tape == OpsEachTape.size() - 2) {
+                curTape == OpsEachTape.size() - 2) {
                 // reached post processing
-                cur_tape++;
+                curTape++;
             }
         });
     } // collectOperationsForEachTape()
@@ -184,7 +184,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     LogicalResult createTapeFunction(std::shared_ptr<SmallVector<Operation *>> TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
-                                     IRRewriter &builder, const unsigned int &tape_number,
+                                     IRRewriter &builder, const unsigned int &tapeNumber,
                                      func::FuncOp &OriginalMultitapeFunc,
                                      SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
     {
@@ -220,7 +220,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         func::CallOp call;
         FailureOr<func::FuncOp> outlined = outlineSingleBlockRegion(
             builder, OriginalMultitapeFunc->getLoc(), executeRegionOp.getRegion(),
-            OriginalMultitapeFunc.getSymName().str() + "_tape_" + std::to_string(tape_number),
+            OriginalMultitapeFunc.getSymName().str() + "_tape_" + std::to_string(tapeNumber),
             &call);
         OutlinedFuncs.push_back(outlined);
 
