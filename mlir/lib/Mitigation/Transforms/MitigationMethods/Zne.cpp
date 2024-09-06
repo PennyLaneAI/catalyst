@@ -329,7 +329,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
 
-    fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().front(), loc);
+    fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
 
     if (foldingAlgorithm == Folding(2)) {
         return allLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
