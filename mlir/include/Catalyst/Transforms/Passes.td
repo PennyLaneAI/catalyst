@@ -166,7 +166,7 @@ def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
 }
 
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
-    let summary = "Split each tape into its own function.";
+    let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
