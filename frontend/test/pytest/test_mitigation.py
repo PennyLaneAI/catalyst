@@ -53,7 +53,10 @@ def test_single_measurement(params, extrapolation, folding):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation, folding=folding
+            circuit,
+            scale_factors=jax.numpy.array([1, 2, 3]),
+            extrapolate=extrapolation,
+            folding=folding,
         )(args)
 
     assert np.allclose(mitigated_qnode(params), circuit(params))
@@ -80,7 +83,10 @@ def test_multiple_measurements(params, extrapolation, folding):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation, folding=folding
+            circuit,
+            scale_factors=jax.numpy.array([1, 2, 3]),
+            extrapolate=extrapolation,
+            folding=folding,
         )(args)
 
     assert np.allclose(mitigated_qnode(params), circuit(params))
@@ -116,9 +122,9 @@ def test_single_measurement_control_flow(params, folding):
 
     @catalyst.qjit
     def mitigated_qnode(args, n):
-        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]), folding=folding)(
-            args, n
-        )
+        return catalyst.mitigate_with_zne(
+            circuit, scale_factors=jax.numpy.array([1, 2, 3]), folding=folding
+        )(args, n)
 
     assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
 
