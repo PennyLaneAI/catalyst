@@ -27,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -43,10 +44,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     {
         // Count the number of quantum.device operations in a function
         unsigned int count = 0;
-        func->walk([&](Operation *op) {
-            if (op->getName().getStringRef() == "quantum.device") {
-                count++;
-            }
+        func->walk([&](catalyst::quantum::DeviceInitOp op) {
+            count++;
         });
         return count;
     } // countTapes()
@@ -82,12 +81,12 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
             if (op == func) {
                 return; // don't visit the funcop itself
             }
-            if (op->getName().getStringRef() == "quantum.device") {
+            if (isa<catalyst::quantum::DeviceInitOp>(op)){
                 curTape++;
             }
             OpsEachTape[curTape].push_back(op);
-            if ((op->getName().getStringRef() == "quantum.device_release") &&
-                curTape == OpsEachTape.size() - 2) {
+            if ((isa<catalyst::quantum::DeviceReleaseOp>(op)) &&
+                (curTape == OpsEachTape.size() - 2)) {
                 // reached post processing
                 curTape++;
             }
