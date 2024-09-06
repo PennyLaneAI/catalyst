@@ -1279,22 +1279,14 @@ class TestEigvals:
             adjoint(base).eigvals()
 
 
-class TestDecompositionExpand:
-    """Test the decomposition and expand methods for the Adjoint class."""
+class TestDecomposition:
+    """Test the decomposition methods for the Adjoint class."""
 
     def test_decomp_custom_adjoint_defined(self):
         """Test decomposition method when a custom adjoint is defined."""
         decomp = adjoint(qml.Hadamard(0)).decomposition()
         assert len(decomp) == 1
         assert isinstance(decomp[0], qml.Hadamard)
-
-    def test_expand_custom_adjoint_defined(self):
-        """Test expansion method when a custom adjoint is defined."""
-        base = qml.Hadamard(0)
-        tape = adjoint(base).expand()
-
-        assert len(tape) == 1
-        assert isinstance(tape[0], qml.Hadamard)
 
     def test_decomp(self):
         """Test decomposition when base has decomposition but no custom adjoint."""
@@ -1305,18 +1297,6 @@ class TestDecompositionExpand:
         for adj_op, base_op in zip(decomp, reversed(base_decomp)):
             assert isinstance(adj_op, Adjoint)
             assert adj_op.base.__class__ == base_op.__class__
-            assert qml.math.allclose(adj_op.data, base_op.data)
-
-    def test_expand(self):
-        """Test expansion when base has decomposition but no custom adjoint."""
-
-        base = qml.SX(0)
-        base_tape = base.expand()
-        tape = adjoint(base).expand()
-
-        for base_op, adj_op in zip(reversed(base_tape), tape):
-            assert isinstance(adj_op, Adjoint)
-            assert base_op.__class__ == adj_op.base.__class__
             assert qml.math.allclose(adj_op.data, base_op.data)
 
     def test_no_base_gate_decomposition(self):
@@ -1331,17 +1311,13 @@ class TestDecompositionExpand:
             adjoint(base).decomposition()
 
     def test_adjoint_of_adjoint(self):
-        """Test that the adjoint an adjoint returns the base operator through both decomposition
-        and expand."""
+        """Test that the adjoint an adjoint returns the base operator through both decomposition."""
 
         base = qml.PauliX(0)
         adj1 = adjoint(base)
         adj2 = adjoint(adj1)
 
         assert adj2.decomposition()[0] is base
-
-        tape = adj2.expand()
-        assert tape.circuit[0] is base
 
 
 class TestIntegration:
