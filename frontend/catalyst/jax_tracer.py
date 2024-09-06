@@ -144,6 +144,11 @@ def get_device_shots(dev):
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
 
+def get_device_shot_vector(dev):
+    """Helper function to get device shot vector."""
+    return [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
+
+
 class Function:
     """An object that represents a compiled function.
 
@@ -846,6 +851,14 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
+
+            # Check if the measurement is supported shot-vector where num_of_total_copies > 1
+            if device.shots.num_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+                raise NotImplementedError(
+                    f"Measurement {o.return_type.value} is not supported a shot-vector. "
+                    "Use qml.sample() instead."
+                )
+
             if isinstance(device, qml.devices.LegacyDevice):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
@@ -856,6 +869,8 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
+                results = []  # list of results per copy
+
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -868,7 +883,21 @@ def trace_quantum_measurements(
                     result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
-                    out_classical_tracers.append(result)
+
+                    reshaped_result = ()
+                    shot_vector = get_device_shot_vector(device)
+                    start_idx = 0  # Start index for slicing
+                    for shot, copies in shot_vector:
+                        for _ in range(copies):
+                            sliced_result = result[start_idx : start_idx + shot]
+                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                            start_idx += shot
+
+                    if len(reshaped_result) == 1:
+                        reshaped_result = reshaped_result[0]
+
+                    out_classical_tracers.append(reshaped_result)
+
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
@@ -1183,7 +1212,14 @@ def trace_quantum_function(
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
-                meas_tracers = [trace.full_raise(m) for m in meas]
+                # Check if the measurements are nested then apply the full_raise
+                def check_full_raise(arr, func):
+                    if isinstance(arr, (list, tuple)):
+                        return type(arr)(check_full_raise(x, func) for x in arr)
+                    else:
+                        return func(arr)
+
+                meas_tracers = check_full_raise(meas, trace.full_raise)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
