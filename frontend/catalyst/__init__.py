@@ -94,6 +94,7 @@ from catalyst.utils.exceptions import (
     CompileError,
     DifferentiableCompileError,
 )
+from catalyst.from_plxpr import from_plxpr
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising

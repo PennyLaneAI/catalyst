@@ -74,6 +74,7 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
+        pl_capture (bool): If set to ``True``, the frontend uses the PL program capture.
     """
 
     verbose: Optional[bool] = False
@@ -90,6 +91,7 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
+    pl_capture: Optional[bool] = False
 
     def __post_init__(self):
         # Check that async runs must not be seeded

@@ -187,6 +187,7 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
             # transformations
             outvals = func_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
         else:
+            print(eqn, invals, eqn.params, "\n")
             outvals = eqn.primitive.bind(*invals, **eqn.params)
         # Primitives may return multiple outputs or not
         if not eqn.primitive.multiple_results:

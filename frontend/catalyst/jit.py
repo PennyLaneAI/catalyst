@@ -84,6 +84,7 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
+    pl_capture=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -137,6 +138,7 @@ def qjit(
             Note that seeding samples on simulator devices is not yet supported. As such,
             shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
             ``expval`` will remain.
+        pl_capture (bool): If set to ``True``, the frontend uses the PL program capture.
 
     Returns:
         QJIT object.
@@ -577,11 +579,32 @@ class QJIT:
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
+        pl_capture = self.compile_options.pl_capture
 
         dynamic_args = filter_static_args(args, static_argnums)
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
+        if pl_capture:
+            def fn_with_transform_named_sequence(*args, **kwargs):
+                """
+                This function behaves exactly like the user function being jitted,
+                taking in the same arguments and producing the same results, except
+                it injects a transform_named_sequence jax primitive at the beginning
+                of the jaxpr when being traced.
 
+                Note that we do not overwrite self.original_function and self.user_function;
+                this fn_with_transform_named_sequence is ONLY used here to produce tracing
+                results with a transform_named_sequence primitive at the beginning of the
+                jaxpr. It is never executed or used anywhere, except being traced here.
+                """
+                _inject_transform_named_sequence()
+                return self.user_function(*args, **kwargs)
+
+            jaxpr, out_type, treedef = trace_to_jaxpr(
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, pl_capture, full_sig, kwargs
+            )
+
+            return jaxpr, out_type, treedef, dynamic_sig
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
@@ -618,7 +641,7 @@ class QJIT:
                 return self.user_function(*args, **kwargs)
 
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, pl_capture, full_sig, kwargs
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
