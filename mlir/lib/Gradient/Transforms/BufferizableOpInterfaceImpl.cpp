@@ -204,10 +204,6 @@ struct BackpropOpInterface
             rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
         }
 
-
-        llvm::outs() << "======================\n";
-        llvm::outs() << scalarReturnTypes;
-        llvm::outs() << "======================\n";
         DenseIntElementsAttr diffArgIndicesAttr = backpropOp.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
             loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
