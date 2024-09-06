@@ -295,7 +295,11 @@ def measurements_from_samples(tape, device_wires):
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
-                results_processed.append(m.process_samples(samples, measured_wires))
+                if len(tape.shots.shot_vector) > 1:
+                    res = tuple([m.process_samples(s, measured_wires) for s in samples])
+                else:
+                    res = m.process_samples(samples, measured_wires)
+                results_processed.append(res)
             else:
                 raise NotImplementedError(
                     f"Measurement type {type(m)} is not implemented with measurements_from_samples"

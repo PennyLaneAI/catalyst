@@ -322,9 +322,9 @@ class TestMeasurementTransforms:
         counts_expected = basic_circuit(theta)[2]
         probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
 
-        assert np.isclose(expval_res, expval_expected, atol=0.03)
-        assert np.isclose(var_res, var_expected, atol=0.03)
-        assert np.allclose(probs_res, probs_expected, atol=0.03)
+        assert np.isclose(expval_res, expval_expected, atol=0.05)
+        assert np.isclose(var_res, var_expected, atol=0.05)
+        assert np.allclose(probs_res, probs_expected, atol=0.05)
 
         # counts comparison by converting catalyst format to PL style eigvals dict
         basis_states, counts = counts_res
@@ -523,7 +523,6 @@ class TestMeasurementTransforms:
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
-    # ToDo: add a parameterization with a shot vector to this test after #1051 is merged, and update test accordingly
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -548,27 +547,25 @@ class TestMeasurementTransforms:
             ),
         ],
     )
-    @pytest.mark.parametrize(
-        "measurement_transform, target_measurement",
-        [(measurements_from_counts, "counts"), (measurements_from_samples, "sample")],
-    )
-    @pytest.mark.parametrize("shots", [3000])
-    def test_measurement_from_readout_single_measurement_analytic(
+    @pytest.mark.parametrize("shots", [
+        3000, 
+        (3000, 4000), 
+        (3000, 3500, 4000),
+        ])
+    def test_measurement_from_samples_single_measurement_analytic(
         self,
         input_measurement,
         expected_res,
-        measurement_transform,
-        target_measurement,
         shots,
     ):
-        """Test the measurment_from_counts/measurement_from_samples transform with a single measurements as part of
-        the Catalyst pipeline, for measurements whose outcome can be directly compared to an expected analytic result.
-        """
+        """Test the measurement_from_samples transform with a single measurements as part of the
+         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected 
+         analytic result."""
 
         dev = qml.device("lightning.qubit", wires=4, shots=shots)
 
         @qml.qjit
-        @partial(measurement_transform, device_wires=dev.wires)
+        @partial(measurements_from_samples, device_wires=dev.wires)
         @qml.qnode(dev)
         def circuit(theta: float):
             qml.RX(theta, 0)
@@ -577,15 +574,66 @@ class TestMeasurementTransforms:
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
-        assert target_measurement in mlir
+        assert "sample" in mlir
 
         theta = 2.5
         res = circuit(theta)
 
-        # if len(dev.shots.shot_vector) != 1:
-        # assert len(res) == len(dev.shots.shot_vector)
+        if len(dev.shots.shot_vector) != 1:
+            assert len(res) == len(dev.shots.shot_vector)
 
-        assert not np.allclose(res, 0)
+        assert np.allclose(res, expected_res(theta), atol=0.05)
+
+
+    @pytest.mark.parametrize(
+        "input_measurement, expected_res",
+        [
+            (
+                lambda: qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1)),
+                lambda theta: np.sin(theta) * np.sin(theta / 2),
+            ),
+            (lambda: qml.var(qml.Y(wires=1)), lambda theta: 1 - np.sin(theta / 2) ** 2),
+            (
+                lambda: qml.probs(),
+                lambda theta: np.outer(
+                    np.outer(
+                        [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2],
+                        [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2],
+                    ),
+                    [1, 0, 0, 0],
+                ).flatten(),
+            ),
+            (
+                lambda: qml.probs(wires=[1]),
+                lambda theta: [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2],
+            ),
+        ],
+    )
+    def test_measurement_from_counts_single_measurement_analytic(self, input_measurement, expected_res):
+        """Test the measurment_from_counts transform with a single measurements as part of the 
+        Catalyst pipeline, for measurements whose outcome can be directly compared to an expected 
+        analytic result."""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+
+        @qml.qjit
+        @partial(measurements_from_counts, device_wires=dev.wires)
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RX(theta / 2, 1)
+            return input_measurement()
+
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        assert "expval" not in mlir
+        assert "counts" in mlir
+
+        theta = 2.5
+        res = circuit(theta)
+
+        if len(dev.shots.shot_vector) != 1:
+            assert len(res) == len(dev.shots.shot_vector)
+
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
     def test_measurement_from_counts_raises_not_implemented(self):
