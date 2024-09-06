@@ -336,7 +336,7 @@ struct ReverseOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return false;
+        return true;
     }
 
     bufferization::AliasingValueList
@@ -349,6 +349,71 @@ struct ReverseOpInterface
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
+        auto reverseOp = cast<ReverseOp>(op);
+
+        auto argc = reverseOp.getArgc();
+        auto resc = reverseOp.getResc();
+        SmallVector<Value> inputs;
+        SmallVector<Value> differentials;
+        SmallVector<Value> outputs;
+        SmallVector<Value> cotangents;
+        SmallVector<Value> tapeElements;
+
+        Block *block;
+        rewriter.modifyOpInPlace(op, [&] { block = reverseOp.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto params = reverseOp.getArguments();
+
+        for (size_t i = 0; i < argc * 2; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? differentials.push_back(val) : inputs.push_back(val);
+        }
+
+        auto upperLimit = (argc * 2) + (resc * 2);
+        for (size_t i = argc * 2; i < upperLimit; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        }
+
+        auto tapeCount = reverseOp.getTape();
+        auto uppestLimit = upperLimit + tapeCount;
+        for (size_t i = upperLimit; i < uppestLimit; i++) {
+            tapeElements.push_back(params[i]);
+        }
+
+        auto implAttr = reverseOp.getImplementationAttr();
+        auto impl = reverseOp.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(reverseOp, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = reverseOp.getLoc();
+
+        SmallVector<Value> tensorInputs;
+        for (auto tapeElement : tapeElements) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        for (auto cotangent : cotangents) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
+        SmallVector<Value> tensorOutputs(callOp.getResults());
+
+        for (auto [differential, tensorOutput] : llvm::zip(differentials, tensorOutputs)) {
+            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, differential.getType(),
+                                                                       tensorOutput);
+            rewriter.create<memref::CopyOp>(loc, castVal, differential);
+        }
+
+        auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{}, T);
+
         return success();
     }
 };
