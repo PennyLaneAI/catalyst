@@ -21,7 +21,6 @@ import pathlib
 import platform
 import tempfile
 from dataclasses import replace
-from flaky import flaky
 from functools import partial
 from os.path import join
 from tempfile import TemporaryDirectory
@@ -31,6 +30,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
+from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.measurements import CountsMP, SampleMP
@@ -547,11 +547,7 @@ class TestMeasurementTransforms:
             ),
         ],
     )
-    @pytest.mark.parametrize("shots", [
-        3000, 
-        (3000, 4000), 
-        (3000, 3500, 4000),
-        ])
+    @pytest.mark.parametrize("shots", [3000, (3000, 4000), (3000, 3500, 4000)])
     def test_measurement_from_samples_single_measurement_analytic(
         self,
         input_measurement,
@@ -559,8 +555,8 @@ class TestMeasurementTransforms:
         shots,
     ):
         """Test the measurement_from_samples transform with a single measurements as part of the
-         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected 
-         analytic result."""
+        Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
+        analytic result."""
 
         dev = qml.device("lightning.qubit", wires=4, shots=shots)
 
@@ -583,7 +579,6 @@ class TestMeasurementTransforms:
             assert len(res) == len(dev.shots.shot_vector)
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
-
 
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
@@ -609,9 +604,11 @@ class TestMeasurementTransforms:
             ),
         ],
     )
-    def test_measurement_from_counts_single_measurement_analytic(self, input_measurement, expected_res):
-        """Test the measurment_from_counts transform with a single measurements as part of the 
-        Catalyst pipeline, for measurements whose outcome can be directly compared to an expected 
+    def test_measurement_from_counts_single_measurement_analytic(
+        self, input_measurement, expected_res
+    ):
+        """Test the measurment_from_counts transform with a single measurements as part of the
+        Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
         analytic result."""
 
         dev = qml.device("lightning.qubit", wires=4, shots=3000)
