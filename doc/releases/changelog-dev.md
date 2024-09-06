@@ -26,7 +26,7 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
-* ZNE local folding: Introduces the option to fold gates "locally" as well as the existing method of "globally." Global folding (as in previous versions) applies the scale factor by forming the inverse of the entire quantum circuit (without measurements) and repeating the circuit with its inverse; local folding inserts per-gate folding sequences directly in place of each gate in the original circuit instead of applying the scale factor to the entire circuit at once. [(#1006)](https://github.com/PennyLaneAI/catalyst/pull/1006)
+* ZNE local folding: Introduces the option to fold gates locally as well as the existing method of globally. Global folding (as in previous versions) applies the scale factor by forming the inverse of the entire quantum circuit (without measurements) and repeating the circuit with its inverse; local folding inserts per-gate folding sequences directly in place of each gate in the original circuit instead of applying the scale factor to the entire circuit at once. [(#1006)](https://github.com/PennyLaneAI/catalyst/pull/1006)
 
   For example,
 
