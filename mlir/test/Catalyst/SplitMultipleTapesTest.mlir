@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --split-multiple-tapes --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(split-multiple-tapes))" --split-input-file --verify-diagnostics | FileCheck %s
 
 // Test that --split-multiple-tapes pass correctly outlines each tape into its own function and calls the outlined functions.
 // A tape is the operations between a "quantum.device" and a "quantum.device_release", inclusive.

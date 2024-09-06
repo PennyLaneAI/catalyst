@@ -44,9 +44,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     {
         // Count the number of quantum.device operations in a function
         unsigned int count = 0;
-        func->walk([&](catalyst::quantum::DeviceInitOp op) {
-            count++;
-        });
+        func->walk([&](catalyst::quantum::DeviceInitOp op) { count++; });
         return count;
     } // countTapes()
 
@@ -81,7 +79,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
             if (op == func) {
                 return; // don't visit the funcop itself
             }
-            if (isa<catalyst::quantum::DeviceInitOp>(op)){
+            if (isa<catalyst::quantum::DeviceInitOp>(op)) {
                 curTape++;
             }
             OpsEachTape[curTape].push_back(op);
@@ -220,74 +218,71 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         return success();
     } // createTapeFunction()
 
+    bool canScheduleOn(RegisteredOperationName opInfo) const override
+    {
+        return opInfo.hasInterface<FunctionOpInterface>();
+    }
+
     void runOnOperation() override
     {
-        Operation *module = getOperation();
-        mlir::IRRewriter builder(module->getContext());
+        func::FuncOp func = cast<func::FuncOp>(getOperation());
+        mlir::IRRewriter builder(func->getContext());
 
         // 1. Identify the functions with multiple tapes
         // Walk through each function and count the number of devices.
         // In frontend when tracing (jax_tracers.py/trace_quantum_function),
         // each tape has its own quantum.device operation attached to it
-        SmallVector<func::FuncOp> MultitapePrograms;
-        module->walk([&](func::FuncOp func) {
-            if (countTapes(func) >= 2) {
-                MultitapePrograms.push_back(func);
-            }
-        });
 
         // Do nothing and exit for classical and single-tape programs
-        if (MultitapePrograms.empty()) {
+        if (countTapes(func) < 2) {
             return;
         }
 
         // 2. Parse the function into tapes
         // total number of operation lists is number of tapes +2
         // for classical pre and post processing
-        for (func::FuncOp func : MultitapePrograms) {
-            SmallVector<SmallVector<Operation *>> OpsEachTape(countTapes(func) + 2,
-                                                              SmallVector<Operation *>());
+        SmallVector<SmallVector<Operation *>> OpsEachTape(countTapes(func) + 2,
+                                                          SmallVector<Operation *>());
 
-            collectOperationsForEachTape(func, OpsEachTape);
+        collectOperationsForEachTape(func, OpsEachTape);
 
-            // 3. Get the SSA values needed by the post processing (PP)
-            // These need to be returned by the tapes.
-            // Note that later tapes can also need values from earilier tapes.
-            SmallVector<Value> NecessaryValuesFromEarlierTapes;
+        // 3. Get the SSA values needed by the post processing (PP)
+        // These need to be returned by the tapes.
+        // Note that later tapes can also need values from earilier tapes.
+        SmallVector<Value> NecessaryValuesFromEarlierTapes;
 
-            // Go through all the operands of all the PP ops
-            // Find the ones that are not produced in PP itself
-            // SmallVector<Operation *> PPOps = *(OpsEachTape.back());
-            SmallVector<Operation *> PPOps = OpsEachTape.back();
-            collectNecessaryValuesFromEarlierTapes(PPOps, NecessaryValuesFromEarlierTapes);
+        // Go through all the operands of all the PP ops
+        // Find the ones that are not produced in PP itself
+        // SmallVector<Operation *> PPOps = *(OpsEachTape.back());
+        SmallVector<Operation *> PPOps = OpsEachTape.back();
+        collectNecessaryValuesFromEarlierTapes(PPOps, NecessaryValuesFromEarlierTapes);
 
-            // 4. Generate the functions for each tape
-            unsigned int NumTapes = countTapes(func);
-            SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
-            for (unsigned int i = 0; i < NumTapes; i++) {
-                if (failed(createTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
-                                              NecessaryValuesFromEarlierTapes, builder,
-                                              OpsEachTape.size() - 3 - i, func, OutlinedFuncs))) {
-                    return signalPassFailure();
-                };
+        // 4. Generate the functions for each tape
+        unsigned int NumTapes = countTapes(func);
+        SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
+        for (unsigned int i = 0; i < NumTapes; i++) {
+            if (failed(createTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
+                                          NecessaryValuesFromEarlierTapes, builder,
+                                          OpsEachTape.size() - 3 - i, func, OutlinedFuncs))) {
+                return signalPassFailure();
+            };
+        }
+
+        // OutlinedFuncs contains the tapes in reverse order (tape_2, tape_1, tape_0)
+        // Move them into the correct order
+        // Also, make the outlined functions keep the original's attributes
+        SmallVector<NamedAttribute> OutlinedFuncAttrs;
+        ArrayRef<NamedAttribute> FullOriginalFuncAttrs = func->getAttrs();
+        for (auto attr : FullOriginalFuncAttrs) {
+            StringRef attrname = attr.getName();
+            if ((attrname != "sym_name") && (attrname != "function_type")) {
+                OutlinedFuncAttrs.push_back(attr);
             }
-
-            // OutlinedFuncs contains the tapes in reverse order (tape_2, tape_1, tape_0)
-            // Move them into the correct order
-            // Also, make the outlined functions keep the original's attributes
-            SmallVector<NamedAttribute> OutlinedFuncAttrs;
-            ArrayRef<NamedAttribute> FullOriginalFuncAttrs = func->getAttrs();
-            for (auto attr : FullOriginalFuncAttrs) {
-                StringRef attrname = attr.getName();
-                if ((attrname != "sym_name") && (attrname != "function_type")) {
-                    OutlinedFuncAttrs.push_back(attr);
-                }
-            }
-            for (auto outlined : OutlinedFuncs) {
-                func::FuncOp outlinedfunc = *outlined;
-                outlinedfunc->moveAfter(func);
-                outlinedfunc->setAttrs(OutlinedFuncAttrs);
-            }
+        }
+        for (auto outlined : OutlinedFuncs) {
+            func::FuncOp outlinedfunc = *outlined;
+            outlinedfunc->moveAfter(func);
+            outlinedfunc->setAttrs(OutlinedFuncAttrs);
         }
     } // runOnOperation()
 };
