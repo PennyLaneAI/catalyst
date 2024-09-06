@@ -44,7 +44,7 @@ def print_mlir(f, *args, **kwargs):
     """Print mlir code of a function"""
     return print_attr(f, "mlir", *args, **kwargs)
 
-    
+
 # CHECK-LABEL: test_qjit_dynamic_argument
 @qjit(abstracted_axes={0: "n"})
 def test_qjit_dynamic_argument(a):
