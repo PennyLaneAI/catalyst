@@ -365,7 +365,6 @@ class QFuncPlxprInterpreter:
             self.env[constvar] = const
 
         for eqn in jaxpr.eqns:
-            print(eqn, eqn.outvars)
             if isinstance(eqn.outvars[0].aval, AbstractOperator):
                 self.interpret_operator_eqn(eqn)
             elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
