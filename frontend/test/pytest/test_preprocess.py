@@ -396,8 +396,8 @@ class TestMeasurementTransforms:
     def test_measurement_from_readout_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
-        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline 
-        if the device only supports sample, and measurement_from_counts transform is applied if 
+        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
+        if the device only supports sample, and measurement_from_counts transform is applied if
         the device only supports counts. If both are supported, sample takes precedence."""
 
         allow_sample = "sample" in device_measurements
