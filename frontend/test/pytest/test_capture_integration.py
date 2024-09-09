@@ -13,10 +13,11 @@
 # limitations under the License.
 """Integration tests for the the PL capture in Catalyst.
 """
-import pennylane as qml
-import catalyst
 import jax.numpy as jnp
+import pennylane as qml
 import pytest
+
+import catalyst
 
 
 class TestCapture:
