@@ -290,7 +290,7 @@ def measurements_from_samples(tape, device_wires):
     new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_samples(results):
-        """A processing function to get expecation values from counts."""
+        """A processing function to get expecation values from samples."""
         samples = results[0]
         results_processed = []
         for m in tape.measurements:
@@ -314,8 +314,8 @@ def measurements_from_samples(tape, device_wires):
 
 
 def _diagonalize_measurements(tape, device_wires):
-    """Convert the measurements and operations on the tape to those relevant
-    for measuring in the readout basis.
+    """Takes a tape and returns the information needed to create a new tape based on 
+    diagonalization and readout in the measurement basis.
 
     Args:
         tape (QuantumTape): A quantum circuit.
