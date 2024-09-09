@@ -123,8 +123,32 @@ class TestCapture:
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
 
-    # def test_forloop(self, backend):
+    @pytest.mark.xfail(reason="For not supported.")
+    @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
+    def test_forloop(self, backend, theta):
+        """Test the integration for a circuit with a for loop."""
 
-    # def test_whileloop(self, backend):
+        @qml.qjit(experimental_capture=True)
+        @qml.qnode(qml.device(backend, wires=4))
+        def catalyst_circuit(x):
 
-    # def test_nested_operations(self, backend):
+            @qml.for_loop(1, 1, 3)
+            def loop(i):
+                qml.CNOT(wires=[0, i])
+                qml.RX(x, wires=i)
+
+            return loop()
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def pl_circuit(x):
+
+            @qml.for_loop(1, 1, 3)
+            def loop(i):
+                qml.CNOT(wires=[0, i])
+                qml.RX(x, wires=i)
+
+            return loop()
+
+        actual = catalyst_circuit(theta)
+        desired = pl_circuit(theta)
+        assert jnp.allclose(actual, desired)
