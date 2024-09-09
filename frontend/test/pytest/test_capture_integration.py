@@ -142,7 +142,7 @@ class TestCapture:
             return qml.expval(qml.Z(2))
 
         @qml.qnode(qml.device(backend, wires=4))
-        def catalyst_circuit(x):
+        def pl_circuit(x):
 
             for i in range(1, 4):
                 qml.CNOT(wires=[0, i])
@@ -151,5 +151,5 @@ class TestCapture:
             return qml.expval(qml.Z(2))
 
         actual = catalyst_capture_circuit(theta)
-        desired = catalyst_circuit(theta)
+        desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
