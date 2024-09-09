@@ -31,6 +31,11 @@
 
 <h3>Breaking changes</h3>
 
+* Remove `static_size` field from `AbstractQreg` class.
+  [(#1113)](https://github.com/PennyLaneAI/catalyst/pull/1113)
+
+  This reverts a previous breaking change.
+
 <h3>Bug fixes</h3>
 
 * Those functions calling the `gather_p` primitive (like `jax.scipy.linalg.expm`)
@@ -52,5 +57,6 @@
 This release contains contributions from (in alphabetical order):
 
 Romain Moyard,
+Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
