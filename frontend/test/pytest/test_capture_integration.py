@@ -130,25 +130,26 @@ class TestCapture:
 
         @qml.qjit(experimental_capture=True)
         @qml.qnode(qml.device(backend, wires=4))
+        def catalyst_capture_circuit(x):
+
+            @qml.for_loop(1, 1, 4)
+            def loop(i):
+                qml.CNOT(wires=[0, i])
+                qml.RX(x, wires=i)
+
+            loop()
+
+            return qml.expval(qml.Z(2))
+
+        @qml.qnode(qml.device(backend, wires=4))
         def catalyst_circuit(x):
 
-            @qml.for_loop(1, 1, 3)
-            def loop(i):
+            for i in range(1, 4):
                 qml.CNOT(wires=[0, i])
                 qml.RX(x, wires=i)
 
-            return loop()
+            return qml.expval(qml.Z(2))
 
-        @qml.qnode(qml.device(backend, wires=1))
-        def pl_circuit(x):
-
-            @qml.for_loop(1, 1, 3)
-            def loop(i):
-                qml.CNOT(wires=[0, i])
-                qml.RX(x, wires=i)
-
-            return loop()
-
-        actual = catalyst_circuit(theta)
-        desired = pl_circuit(theta)
+        actual = catalyst_capture_circuit(theta)
+        desired = catalyst_circuit(theta)
         assert jnp.allclose(actual, desired)
