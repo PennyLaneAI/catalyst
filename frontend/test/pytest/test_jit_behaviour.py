@@ -88,7 +88,6 @@ class TestDifferentPrecisions:
         assert jnp.allclose(res_float32, res_float64)
 
 
-@pytest.mark.filterwarnings("ignore:Casting complex")
 class TestJittedWithOneTypeRunWithAnother:
     @pytest.mark.parametrize(
         "from_type,to_type",
@@ -245,7 +244,6 @@ class TestJittedWithOneTypeRunWithAnother:
         assert jnp.allclose(res_from, res_to)
 
 
-@pytest.mark.filterwarnings("ignore:Casting complex")
 class TestTypePromotion:
     @pytest.mark.parametrize(
         "promote_from,val",
