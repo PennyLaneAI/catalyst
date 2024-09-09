@@ -145,9 +145,6 @@ class AbstractQreg(AbstractValue):
 
     hash_value = hash("AbstractQreg")
 
-    def __init__(self, length):
-        self.length = length
-
     def __eq__(self, other):
         return isinstance(other, AbstractQreg)
 
@@ -987,17 +984,17 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
 # qalloc
 #
 @qalloc_p.def_impl
-def _qalloc_def_impl(ctx, size_value, static_size=None):  # pragma: no cover
+def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qalloc_p.def_abstract_eval
-def _qalloc_abstract_eval(size, static_size=None):
+def _qalloc_abstract_eval(size):
     """This function is called with abstract arguments for tracing."""
-    return AbstractQreg(static_size)
+    return AbstractQreg()
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value, static_size=None):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1083,7 +1080,7 @@ def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
     assert isinstance(qubit, AbstractQbit)
-    return AbstractQreg(qreg_old.length)
+    return AbstractQreg()
 
 
 def _qinsert_lowering(
