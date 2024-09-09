@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "splitmultipletapes"
 
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Debug.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -36,6 +37,9 @@ using namespace catalyst;
 
 namespace catalyst {
 #define GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
+#ifdef GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
+#define SmallSetSize 8
+#endif
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass> {
@@ -93,21 +97,27 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // collectOperationsForEachTape()
 
     void collectNecessaryValuesFromEarlierTapes(const SmallVector<Operation *> &TapeOps,
-                                                SmallVector<Value> &NecessaryValuesFromEarlierTapes)
+                                                //SmallVector<Value> &NecessaryValuesFromEarlierTapes)
+                                                SmallSet<Value*, SmallSetSize> &NecessaryValuesFromEarlierTapes)
     {
         // Go through a list of operations and collect all the necessary operand values
         // not defined in this list itself, and add them to NecessaryValuesFromEarlierTapes
         for (Operation *PPOp : TapeOps) {
             PPOp->walk([&](Operation *op) {
-                for (auto operand : op->getOperands()) {
+                //for (auto operand : op->getOperands()) {
+                for (size_t i=0; i<op->getNumOperands(); i++){
+                    Value operand = op->getOperand(i);
                     Operation *OperandSource = operand.getDefiningOp();
                     if (std::find(TapeOps.begin(), TapeOps.end(), OperandSource) == TapeOps.end()) {
                         // A list operand not produced in list itself, must be from earlier
                         // tapes/preprocessing!
-                        if (std::find(NecessaryValuesFromEarlierTapes.begin(),
-                                      NecessaryValuesFromEarlierTapes.end(),
-                                      operand) == NecessaryValuesFromEarlierTapes.end()) {
-                            NecessaryValuesFromEarlierTapes.push_back(operand);
+                        //if (std::find(NecessaryValuesFromEarlierTapes.begin(),
+                        //              NecessaryValuesFromEarlierTapes.end(),
+                        //              &operand) == NecessaryValuesFromEarlierTapes.end()) {
+                        llvm::errs() << "operand: " << operand << &operand << *(&operand) << "\n";
+                        if (!NecessaryValuesFromEarlierTapes.contains(&operand)){
+                            //NecessaryValuesFromEarlierTapes.push_back(operand);
+                            NecessaryValuesFromEarlierTapes.insert(&operand);
                         }
                     }
                 }
@@ -115,17 +125,20 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
     } // collectNecessaryValuesFromEarlierTapes()
 
-    void getNecessaryTapeReturns(SmallVector<Value> &RetValues,
+    void getNecessaryTapeReturns(SmallVector<Value *> &RetValues,
                                  const SmallVector<Operation *> &TapeOps,
-                                 SmallVector<Value> &NecessaryValuesFromEarlierTapes)
+                                 //SmallVector<Value> &NecessaryValuesFromEarlierTapes)
+                                 SmallSet<Value *, SmallSetSize> &NecessaryValuesFromEarlierTapes)
     {
-        for (Value v : NecessaryValuesFromEarlierTapes) {
-            Operation *VDefOp = v.getDefiningOp();
+        for (Value *v : NecessaryValuesFromEarlierTapes) {
+            Operation *VDefOp = v->getDefiningOp();
+            llvm::errs() << *v << "has defining op " << *VDefOp << "\n";
             if (std::find(TapeOps.begin(), TapeOps.end(), VDefOp) != TapeOps.end()) {
                 // This Value needed for PP is in this tape!
                 RetValues.push_back(v);
             }
         }
+        llvm::errs() << "retval size: " << RetValues.size() << "\n";
 
         // We process the tapes in reverse order
         // Hence from the viewpoint of the earlier tapes,
@@ -138,7 +151,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // getNecessaryTapeReturns()
 
     std::pair<scf::ExecuteRegionOp, scf::YieldOp> wrapTapeOpsInSCFRegion(
-        const SmallVector<Operation *> &TapeOps, const SmallVector<Value> &RetValues,
+        const SmallVector<Operation *> &TapeOps, const SmallVector<Value *> &RetValues,
         const SmallVector<mlir::Type> &RetTypes, IRRewriter &builder, Location loc)
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
@@ -153,7 +166,12 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
-        scf::YieldOp y = builder.create<scf::YieldOp>(loc, ArrayRef(RetValues));
+
+        SmallVector<Value> RetValuesDereferenced;
+        for (Value *v : RetValues){
+            RetValuesDereferenced.push_back(*v);
+        }
+        scf::YieldOp y = builder.create<scf::YieldOp>(loc, ArrayRef(RetValuesDereferenced));
 
         return std::make_pair(executeRegionOp, y);
     } // wrapTapeOpsInSCFRegion()
@@ -161,7 +179,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     void propagateSCFRetValsDownstream(const scf::ExecuteRegionOp &executeRegionOp,
                                        const scf::YieldOp &SCFRegionYieldOp,
                                        const SmallVector<Operation *> &TapeOps,
-                                       SmallVector<Value> &RetValues)
+                                       SmallVector<Value *> &RetValues)
     {
         SmallPtrSet<Operation *, 16> exceptions;
         exceptions.insert(SCFRegionYieldOp);
@@ -170,7 +188,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         for (size_t i = 0; i < RetValues.size(); i++) {
-            RetValues[i].replaceAllUsesExcept(executeRegionOp->getResults()[i], exceptions);
+            RetValues[i]->replaceAllUsesExcept(executeRegionOp->getResults()[i], exceptions);
         }
     } // propagateSCFRetValsDownstream()
 
@@ -182,17 +200,18 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // renameToUnique()
 
     LogicalResult createTapeFunction(const SmallVector<Operation *> &TapeOps,
-                                     SmallVector<Value> &NecessaryValuesFromEarlierTapes,
+                                     //SmallVector<Value> &NecessaryValuesFromEarlierTapes,
+                                     SmallSet<Value *, SmallSetSize> &NecessaryValuesFromEarlierTapes,
                                      IRRewriter &builder, const unsigned int &tapeNumber,
                                      func::FuncOp &OriginalMultitapeFunc,
                                      SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
     {
         // 1. Identify the necessary return values
-        SmallVector<Value> RetValues;
+        SmallVector<Value *> RetValues;
         SmallVector<mlir::Type> RetTypes;
         getNecessaryTapeReturns(RetValues, TapeOps, NecessaryValuesFromEarlierTapes);
-        for (Value v : RetValues) {
-            RetTypes.push_back(v.getType());
+        for (Value *v : RetValues) {
+            RetTypes.push_back(v->getType());
         }
 
         // 2. Create a scf.execute_region and wrap it around the tape ops
@@ -230,6 +249,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         OutlinedFuncs.push_back(outlined);
+        llvm::errs() << OriginalMultitapeFunc << "\n";
         return success();
     } // createTapeFunction()
 
@@ -270,7 +290,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 3. Get the SSA values needed by the post processing (PP)
         // These need to be returned by the tapes.
         // Note that later tapes can also need values from earilier tapes.
-        SmallVector<Value> NecessaryValuesFromEarlierTapes;
+        //SmallVector<Value> NecessaryValuesFromEarlierTapes;
+        SmallSet<Value *, SmallSetSize> NecessaryValuesFromEarlierTapes;
 
         // Go through all the operands of all the PP ops
         // Find the ones that are not produced in PP itself
