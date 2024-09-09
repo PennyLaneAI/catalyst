@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
-from pennylane.transforms import split_non_commuting, split_to_single_terms
+from pennylane.transforms import diagonalize_measurements, split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -522,8 +522,20 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         if self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}]:
             measurement_program.add_transform(measurements_from_samples, self.wires)
-        if self.measurement_processes == {"Counts"}:
+        elif self.measurement_processes == {"Counts"}:
             measurement_program.add_transform(measurements_from_counts, self.wires)
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
+            _obs_dict = {
+                "PauliX": qml.X, 
+                "PauliY": qml.Y, 
+                "PauliZ": qml.Z, 
+                "Hadamard": qml.Hadamard
+            }
+            supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(self.observables)
+            supported_observables = [_obs_dict[obs] for obs in supported_observables]
+
+            measurement_program.add_transform(diagonalize_measurements, supported_base_obs=supported_observables)
+            raise RuntimeError
 
         return measurement_program
 
