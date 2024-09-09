@@ -249,7 +249,7 @@ def _apply_result_type_conversion(
         OutputSignature: new output signature of the function
     """
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
-    args = [AbstractQreg(target_types[-1].length)] if with_qreg else []
+    args = [AbstractQreg()] if with_qreg else []
 
     def _fun(*in_tracers):
         out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
@@ -289,12 +289,9 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
     if all_ends_with_qreg:  # [1]
-        length = types[-1][-1].length
         types = [t[:-1] for t in types]
-    else:
-        length = None
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg(length)] if all_ends_with_qreg else [])
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
 
 
 @debug_logger
@@ -1232,7 +1229,7 @@ def trace_quantum_function(
                 rtd_name=device.backend_name,
                 rtd_kwargs=str(device.backend_kwargs),
             )
-            qreg_in = qalloc_p.bind(len(device.wires), static_size=len(device.wires))
+            qreg_in = qalloc_p.bind(len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
