@@ -296,7 +296,7 @@ def measurements_from_samples(tape, device_wires):
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
                 if len(tape.shots.shot_vector) > 1:
-                    res = tuple([m.process_samples(s, measured_wires) for s in samples])
+                    res = tuple(m.process_samples(s, measured_wires) for s in samples)
                 else:
                     res = m.process_samples(samples, measured_wires)
                 results_processed.append(res)
@@ -329,7 +329,7 @@ def _diagonalize_measurements(tape, device_wires):
         _validate_computational_basis_sampling(tape)
 
     diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for i, m in enumerate(diagonal_measurements):
+    for m in diagonal_measurements:
         if m.obs is not None:
             diagonalizing_gates.extend(m.obs.diagonalizing_gates())
 
