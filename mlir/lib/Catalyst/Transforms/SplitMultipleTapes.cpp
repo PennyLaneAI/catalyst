@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "splitmultipletapes"
 
+#include <vector>
+
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 
@@ -50,7 +52,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // countTapes()
 
     void collectOperationsForEachTape(const func::FuncOp &func,
-                                      SmallVector<SmallVector<Operation *>> &OpsEachTape)
+                                      SmallVector<std::vector<Operation *>> &OpsEachTape)
     {
         // During tracing, each tape starts with a qdevice_p primitive
         // This means each tape starts with a quantum.device
@@ -92,7 +94,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         });
     } // collectOperationsForEachTape()
 
-    void collectNecessaryValuesFromEarlierTapes(const SmallVector<Operation *> &TapeOps,
+    void collectNecessaryValuesFromEarlierTapes(const std::vector<Operation *> &TapeOps,
                                                 SmallVector<Value> &NecessaryValuesFromEarlierTapes)
     {
         // Go through a list of operations and collect all the necessary operand values
@@ -116,7 +118,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // collectNecessaryValuesFromEarlierTapes()
 
     void getNecessaryTapeReturns(SmallVector<Value> &RetValues,
-                                 const SmallVector<Operation *> &TapeOps,
+                                 const std::vector<Operation *> &TapeOps,
                                  SmallVector<Value> &NecessaryValuesFromEarlierTapes)
     {
         for (Value v : NecessaryValuesFromEarlierTapes) {
@@ -138,7 +140,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // getNecessaryTapeReturns()
 
     std::pair<scf::ExecuteRegionOp, scf::YieldOp> wrapTapeOpsInSCFRegion(
-        const SmallVector<Operation *> &TapeOps, const SmallVector<Value> &RetValues,
+        const std::vector<Operation *> &TapeOps, const SmallVector<Value> &RetValues,
         const SmallVector<mlir::Type> &RetTypes, IRRewriter &builder, Location loc)
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
@@ -160,7 +162,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     void propagateSCFRetValsDownstream(const scf::ExecuteRegionOp &executeRegionOp,
                                        const scf::YieldOp &SCFRegionYieldOp,
-                                       const SmallVector<Operation *> &TapeOps,
+                                       const std::vector<Operation *> &TapeOps,
                                        SmallVector<Value> &RetValues)
     {
         SmallPtrSet<Operation *, 16> exceptions;
@@ -181,7 +183,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
     } // renameToUnique()
 
-    LogicalResult createTapeFunction(const SmallVector<Operation *> &TapeOps,
+    LogicalResult createTapeFunction(const std::vector<Operation *> &TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
                                      IRRewriter &builder, const unsigned int &tapeNumber,
                                      func::FuncOp &OriginalMultitapeFunc,
@@ -262,8 +264,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 2. Parse the function into tapes
         // total number of operation lists is number of tapes +2
         // for classical pre and post processing
-        SmallVector<SmallVector<Operation *>> OpsEachTape(countTapes(func) + 2,
-                                                          SmallVector<Operation *>());
+        SmallVector<std::vector<Operation *>> OpsEachTape(countTapes(func) + 2,
+                                                          std::vector<Operation *>());
 
         collectOperationsForEachTape(func, OpsEachTape);
 
@@ -274,7 +276,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
         // Go through all the operands of all the PP ops
         // Find the ones that are not produced in PP itself
-        SmallVector<Operation *> PPOps = OpsEachTape.back();
+        std::vector<Operation *> PPOps = OpsEachTape.back();
         collectNecessaryValuesFromEarlierTapes(PPOps, NecessaryValuesFromEarlierTapes);
 
         // 4. Generate the functions for each tape
