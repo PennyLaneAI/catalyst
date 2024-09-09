@@ -60,8 +60,10 @@ class DummyDevice(Device):
         """Execution."""
         return circuits, execution_config
 
-    def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+    def preprocess(self, execution_config=None):
         """Preprocessing."""
+        if execution_config is None:
+            execution_config = ExecutionConfig()
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
@@ -105,7 +107,8 @@ def test_qjit_device():
 
     # Check the preprocess of the new device
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-        transform_program, _ = device_qjit.preprocess(ctx)
+        execution_config = ExecutionConfig()
+        transform_program, _ = device_qjit.preprocess(ctx, execution_config)
     assert transform_program
     assert len(transform_program) == 3
     assert transform_program[-2]._transform.__name__ == "verify_operations"
