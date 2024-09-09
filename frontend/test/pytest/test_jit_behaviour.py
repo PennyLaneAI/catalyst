@@ -113,6 +113,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if (x.dtype == jnp.dtype(jnp.complex64)):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -168,6 +170,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
+            if (x.dtype == jnp.dtype(jnp.complex64)):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -196,6 +200,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if (x.dtype == jnp.dtype(jnp.complex128)):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -290,6 +296,8 @@ class TestTypePromotion:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if (x.dtype == jnp.dtype(jnp.complex128)):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
