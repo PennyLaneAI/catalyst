@@ -195,6 +195,7 @@ BUFFERIZATION_PASS = (
     [
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
+        "scf-loop-bufferization-preprocessing",
         "one-shot-bufferize{bufferize-function-boundaries}",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
