@@ -12,8 +12,9 @@ ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
-LLVM_TARGET_FILE=$(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
-LLVM_PATCH_FILE=$(MK_DIR)/patches/moduleOp-bufferization.patch
+LLVM_ROOT=$(MK_DIR)/llvm-project
+LLVM_MODULE_PATCH_FILE=$(MK_DIR)/patches/moduleOp-bufferization.patch
+LLVM_SCF_PATCH_FILE=$(MK_DIR)/patches/scf-for-preprocessing.patch
 TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 
@@ -56,8 +57,11 @@ all: llvm mhlo enzyme dialects
 .PHONY: llvm
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
-	@if patch --dry-run -p1 -N $(LLVM_TARGET_FILE) $(LLVM_PATCH_FILE) > /dev/null 2>&1; then \
-        patch -p1 $(LLVM_TARGET_FILE) $(LLVM_PATCH_FILE); \
+	@if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE) > /dev/null 2>&1; then \
+        patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE); \
+	fi
+	@if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_SCF_PATCH_FILE) > /dev/null 2>&1; then \
+        patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_SCF_PATCH_FILE); \
 	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
