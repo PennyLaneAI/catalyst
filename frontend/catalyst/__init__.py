@@ -88,13 +88,13 @@ from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
+from catalyst.from_plxpr import from_plxpr
 from catalyst.jit import QJIT, qjit
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
 )
-from catalyst.from_plxpr import from_plxpr
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising

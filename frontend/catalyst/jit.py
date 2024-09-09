@@ -84,7 +84,7 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
-    pl_capture=False,
+    experimental_capture=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -138,7 +138,7 @@ def qjit(
             Note that seeding samples on simulator devices is not yet supported. As such,
             shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
             ``expval`` will remain.
-        pl_capture (bool): If set to ``True``, the frontend uses the PL program capture.
+        experimental_capture (bool): If set to ``True``, the frontend uses the PL program capture.
 
     Returns:
         QJIT object.
@@ -579,12 +579,12 @@ class QJIT:
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
-        pl_capture = self.compile_options.pl_capture
+        experimental_capture = self.compile_options.experimental_capture
 
         dynamic_args = filter_static_args(args, static_argnums)
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
-        if pl_capture:
+        if experimental_capture:
 
             def fn_with_transform_named_sequence(*args, **kwargs):
                 """
@@ -605,7 +605,7 @@ class QJIT:
                 fn_with_transform_named_sequence,
                 static_argnums,
                 abstracted_axes,
-                pl_capture,
+                experimental_capture,
                 full_sig,
                 kwargs,
             )
@@ -651,7 +651,7 @@ class QJIT:
                 fn_with_transform_named_sequence,
                 static_argnums,
                 abstracted_axes,
-                pl_capture,
+                experimental_capture,
                 full_sig,
                 kwargs,
             )
