@@ -314,7 +314,7 @@ def measurements_from_samples(tape, device_wires):
 
 
 def _diagonalize_measurements(tape, device_wires):
-    """Takes a tape and returns the information needed to create a new tape based on 
+    """Takes a tape and returns the information needed to create a new tape based on
     diagonalization and readout in the measurement basis.
 
     Args:
