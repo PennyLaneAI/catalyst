@@ -23,6 +23,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Pass/Pass.h"
 
@@ -173,6 +174,13 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
     } // propagateSCFRetValsDownstream()
 
+    void renameToUnique(std::string &name, const SymbolTable &table)
+    {
+        while (table.lookup(name)) {
+            name += "_0";
+        }
+    } // renameToUnique()
+
     LogicalResult createTapeFunction(const SmallVector<Operation *> &TapeOps,
                                      SmallVector<Value> &NecessaryValuesFromEarlierTapes,
                                      IRRewriter &builder, const unsigned int &tapeNumber,
@@ -206,16 +214,22 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         propagateSCFRetValsDownstream(executeRegionOp, SCFRegionYieldOp, TapeOps, RetValues);
 
         // 4. Outline the region
-        func::CallOp call;
-        FailureOr<func::FuncOp> outlined = outlineSingleBlockRegion(
-            builder, OriginalMultitapeFunc->getLoc(), executeRegionOp.getRegion(),
-            OriginalMultitapeFunc.getSymName().str() + "_tape_" + std::to_string(tapeNumber),
-            &call);
-        OutlinedFuncs.push_back(outlined);
+        // First check if the outlined name is already used by the module symboltable
+        // If yes, then need to rename
+        std::string outlinedName =
+            OriginalMultitapeFunc.getSymName().str() + "_tape_" + std::to_string(tapeNumber);
+        SymbolTable modSymTable(OriginalMultitapeFunc->getParentOfType<ModuleOp>());
+        renameToUnique(outlinedName, modSymTable);
 
+        func::CallOp call;
+        FailureOr<func::FuncOp> outlined =
+            outlineSingleBlockRegion(builder, OriginalMultitapeFunc->getLoc(),
+                                     executeRegionOp.getRegion(), StringRef(outlinedName), &call);
         if (failed(outlined)) {
             return failure();
         }
+
+        OutlinedFuncs.push_back(outlined);
         return success();
     } // createTapeFunction()
 
