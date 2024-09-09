@@ -218,7 +218,6 @@ class TestDecomposition:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qml.qjit(f, target="jaxpr")
 
-
 # tapes and regions for generating HybridOps
 tape1 = QuantumScript([qml.X(0), qml.Hadamard(1)])
 tape2 = QuantumScript([qml.RY(1.23, 1), qml.Y(0), qml.Hadamard(2)])
