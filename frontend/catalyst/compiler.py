@@ -195,7 +195,7 @@ BUFFERIZATION_PASS = (
     [
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
-        "one-shot-bufferize{bufferize-function-boundaries function-boundary-type-conversion=identity-layout-map}",
+        "one-shot-bufferize{bufferize-function-boundaries}",
         # "func.func(buffer-hoisting)",
         # "func.func(buffer-loop-hoisting)",
         # "buffer-results-to-out-params",

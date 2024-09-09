@@ -23,7 +23,9 @@ namespace {
 
 Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 {
-    auto memrefType = cast<MemRefType>(reference.getType());
+    auto origMemrefType = cast<MemRefType>(reference.getType());
+    // Rebuild MemRefType without memory layout.
+    auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
     // Get dynamic dimension sizes from the provided reference value if necessary.
     SmallVector<Value> dynamicDims;
     if (!memrefType.hasStaticShape()) {
