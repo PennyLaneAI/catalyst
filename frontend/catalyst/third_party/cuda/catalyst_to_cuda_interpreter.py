@@ -846,7 +846,7 @@ class QJIT_CUDAQ:
             # We could also pass abstract arguments here in *args
             # the same way we do so in Catalyst.
             # But I think that is redundant now given make_jaxpr2
-            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, False, args, {})
 
         # TODO(@erick-xanadu):
         # What about static_args?
