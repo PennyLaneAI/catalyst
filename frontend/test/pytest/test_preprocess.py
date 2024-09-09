@@ -345,7 +345,7 @@ class TestMeasurementTransforms:
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4, shots=5000)
 
         @qml.qnode(dev)
         def basic_circuit(theta: float):
@@ -438,6 +438,7 @@ class TestMeasurementTransforms:
             assert "probs" not in mlir
             assert target_measurement in mlir
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -485,12 +486,13 @@ class TestMeasurementTransforms:
             num_wires = len(measurement().wires) if measurement().wires else len(dev.wires)
             basis_states = [format(int(state), "01b").zfill(num_wires) for state in basis_states]
             counts = [int(c) for c in counts]
-            counts_dict = dict([(state, c) for (state, c) in zip(basis_states, counts) if c != 0])
+            counts_dict = dict((state, c) for (state, c) in zip(basis_states, counts) if c != 0)
 
             for res, expected_res in zip(counts_dict.items(), counts_expected.items()):
                 assert res[0] == expected_res[0]
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
         [
