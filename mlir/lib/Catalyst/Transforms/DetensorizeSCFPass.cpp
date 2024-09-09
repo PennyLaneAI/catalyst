@@ -249,37 +249,60 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         rewriter.replaceOp(forOp, newForOp);
     }
 
-    void detensorizeIfOp(scf::IfOp if_op, IRRewriter &rewriter)
+    void detensorizeIfOp(scf::IfOp ifOp, IRRewriter &rewriter)
     {
-        if_op->walk([&](scf::YieldOp yield_op) {
-            // Loop over results
+        // Collect the types for the new IfOp
+        SmallVector<Type> newResultTypes;
+        for (auto result : ifOp->getResults()) {
+            if (isScalarTensor(result)) {
+                newResultTypes.push_back(cast<TensorType>(result.getType()).getElementType());
+            }
+            else {
+                newResultTypes.push_back(result.getType());
+            }
+        }
+        // Extract tensor elements before yield op
+        ifOp->walk([&](scf::YieldOp yield_op) {
+            // Loop over yield operands
             std::size_t i_result = 0;
             for (Value operand : yield_op.getOperands()) {
+                // Detensorize operand: extract tensor element before yielding
                 if (isScalarTensor(operand)) {
-                    auto if_result = if_op->getResult(i_result);
-                    // Detensorize operand: extract tensor element before yielding
-                    {
-                        rewriter.setInsertionPoint(yield_op);
-                        Value value = rewriter.create<tensor::ExtractOp>(yield_op->getLoc(),
-                                                                         operand, ValueRange{});
-                        yield_op.setOperand(i_result, value);
-                        rewriter.modifyOpInPlace(if_op,
-                                                 [&]() { if_result.setType(value.getType()); });
-                    }
-                    // Retensorize operand: reconstruct tensor after the for body
-                    {
-                        rewriter.setInsertionPointAfter(if_op);
-                        Value value = rewriter.create<tensor::FromElementsOp>(
-                            if_op->getLoc(), RankedTensorType::get({}, if_result.getType()),
-                            if_result);
-                        rewriter.replaceUsesWithIf(if_result, value, [&](OpOperand &op) {
-                            return !isa<tensor::FromElementsOp>(op.getOwner());
-                        });
-                    }
+                    PatternRewriter::InsertionGuard insertGuard(rewriter);
+                    rewriter.setInsertionPoint(yield_op);
+                    Value value = rewriter.create<tensor::ExtractOp>(yield_op->getLoc(), operand,
+                                                                     ValueRange{});
+                    yield_op.setOperand(i_result, value);
                 }
                 i_result += 1;
             }
         });
+
+        // 2. Create the new IfOp
+        PatternRewriter::InsertionGuard ifOpInsertGuard(rewriter);
+        rewriter.setInsertionPoint(ifOp);
+        auto newIfOp =
+            rewriter.create<scf::IfOp>(ifOp.getLoc(), newResultTypes, ifOp.getCondition());
+        rewriter.cloneRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
+                                   newIfOp.getThenRegion().end());
+        rewriter.cloneRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
+                                   newIfOp.getElseRegion().end());
+
+        // 3. Retensorize results after if op
+        {
+            PatternRewriter::InsertionGuard insertGuard(rewriter);
+            rewriter.setInsertionPointAfter(ifOp);
+            for (auto results : llvm::zip(ifOp->getResults(), newIfOp->getResults())) {
+                auto oldResult = std::get<0>(results);
+                auto newResult = std::get<1>(results);
+                Value value = rewriter.create<tensor::FromElementsOp>(
+                    ifOp->getLoc(), RankedTensorType::get({}, newResult.getType()), newResult);
+                rewriter.replaceAllUsesWith(oldResult, value);
+            }
+        }
+
+        // 4. Replace if op with new if op
+        rewriter.replaceOp(ifOp, newIfOp);
     }
 
     void runOnOperation() override
@@ -306,6 +329,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         // patterns.add<DetensorizeForOp>(typeConverter, patterns.getContext());
         // if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
         //     signalPassFailure();
+
         // llvm::errs() << *root << '\n';
 
         root->walk([&](scf::ForOp for_op) { detensorizeForOp(for_op, rewriter); });
@@ -313,6 +337,8 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         // llvm::errs() << *root << '\n';
 
         root->walk([&](scf::IfOp if_op) { detensorizeIfOp(if_op, rewriter); });
+
+        // llvm::errs() << *root << '\n';
     }
 };
 
