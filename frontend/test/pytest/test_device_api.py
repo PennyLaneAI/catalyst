@@ -19,7 +19,7 @@ import platform
 import pennylane as qml
 import pytest
 from pennylane.devices import Device
-from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
