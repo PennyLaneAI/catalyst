@@ -106,6 +106,11 @@
   The reset routine that makes a maeasurement between tapes and inserts a X gate if measured one is no longer used.
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
 
+<h3>Documentation</h3>
+
+* The "Known Issues" section has been added to the installation guide
+  [(#1122)](https://github.com/PennyLaneAI/catalyst/pull/1122)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -115,4 +120,5 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
-Daniel Strano
+Daniel Strano,
+Raul Torres.
