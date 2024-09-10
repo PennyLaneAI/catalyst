@@ -27,8 +27,8 @@ def Folding : I32EnumAttr<"Folding",
     "Folding types",
     [
         I32EnumAttrCase<"global", 1>,
-        I32EnumAttrCase<"random", 2>,
-        I32EnumAttrCase<"all",    3>,
+        I32EnumAttrCase<"all",    2>,
+        I32EnumAttrCase<"random", 3>,
     ]> {
     let cppNamespace = "catalyst::mitigation";
     let genSpecializedAttr = 0;

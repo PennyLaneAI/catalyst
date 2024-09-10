@@ -26,6 +26,40 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
+* Zero-Noise Extrapolation (ZNE) local folding: Introduces the option to fold gates locally as well as the existing method of globally. Global folding (as in previous versions) applies the scale factor by forming the inverse of the entire quantum circuit (without measurements) and repeating the circuit with its inverse; local folding inserts per-gate folding sequences directly in place of each gate in the original circuit instead of applying the scale factor to the entire circuit at once. [(#1006)](https://github.com/PennyLaneAI/catalyst/pull/1006)
+
+  For example,
+
+  ```python
+  import jax
+  import pennylane as qml
+  from catalyst import qjit, mitigate_with_zne
+  from pennylane.transforms import exponential_extrapolate
+
+  dev = qml.device("lightning.qubit", wires=4, shots=5)
+
+  @qml.qnode(dev)
+  def circuit():
+    qml.Hadamard(wires=0)
+    qml.CNOT(wires=[0, 1])
+    return qml.expval(qml.PauliY(wires=0))
+
+  @qjit(keep_intermediate=True)
+  def mitigated_circuit():
+    s = jax.numpy.array([1, 2, 3])
+    return mitigate_with_zne(
+      circuit,
+      scale_factors=s,
+      extrapolate=exponential_extrapolate,
+      folding="all" # "all" for local or "global" for the original method (default being "global")
+    )()
+  ```
+
+  ```pycon
+  >>> circuit()
+  >>> mitigated_circuit()
+  ```
+
 <h3>Improvements</h3>
 
 * Fixes an issue where certain JAX linear algebra functions from `jax.scipy.linalg` gave incorrect
@@ -77,3 +111,4 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
+Daniel Strano
