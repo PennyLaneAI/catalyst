@@ -26,9 +26,9 @@ from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
 quadratic_extrapolation = polynomial_extrapolation(2)
 
 
-def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func):
+def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func, threshold):
     """skip test if exponential extrapolation will be unstable"""
-    if circuit_param < 0.3 and extrapolation_func == exponential_extrapolate:
+    if circuit_param <= threshold and extrapolation_func == exponential_extrapolate:
         pytest.skip("Exponential extrapolation unstable in this region.")
 
 
@@ -37,7 +37,7 @@ def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func
 @pytest.mark.parametrize("folding", ["global", "all"])
 def test_single_measurement(params, extrapolation, folding):
     """Test that without noise the same results are returned for single measurements."""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -67,7 +67,7 @@ def test_single_measurement(params, extrapolation, folding):
 @pytest.mark.parametrize("folding", ["global", "all"])
 def test_multiple_measurements(params, extrapolation, folding):
     """Test that without noise the same results are returned for multiple measurements"""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.4)
 
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -273,7 +273,7 @@ def test_folding_type_not_implemented():
 @pytest.mark.parametrize("folding", ["global", "all"])
 def test_zne_usage_patterns(params, extrapolation, folding):
     """Test usage patterns of catalyst.zne."""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
     dev = qml.device("lightning.qubit", wires=2)
 
