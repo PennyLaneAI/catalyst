@@ -521,21 +521,37 @@ class QJITDeviceNewAPI(qml.devices.Device):
             measurement_program.add_transform(split_to_single_terms)
 
         if self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}]:
+            if not split_non_commuting in measurement_program:
+                # this should be redundant, a TOML that only supports samples/counts should
+                # have a False non_commuting_observables flag
+                # not sure if we want the redundancy, or maybe we want some
+                # verification on TOML file import to make sure there is consistency
+                # for related information? Seems like between verification and redundancy 
+                # we should have at least one.
+                measurement_program.add_transform(split_non_commuting)
             measurement_program.add_transform(measurements_from_samples, self.wires)
         elif self.measurement_processes == {"Counts"}:
+            if not split_non_commuting in measurement_program:
+                # as above
+                measurement_program.add_transform(split_non_commuting)
             measurement_program.add_transform(measurements_from_counts, self.wires)
         elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
+            if not split_non_commuting in measurement_program:
+                # technically the device might support non commuting measurements 
+                # but not Hadamard, so here it makes sense.
+                measurement_program.add_transform(split_non_commuting)
             _obs_dict = {
                 "PauliX": qml.X, 
                 "PauliY": qml.Y, 
                 "PauliZ": qml.Z, 
                 "Hadamard": qml.Hadamard
             }
+            # these are not *all* supported observables, but the supported base observables
+            # the transform deals with Sum, Prod, etc - it just needs to know which components to diagonalize
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(self.observables)
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
             measurement_program.add_transform(diagonalize_measurements, supported_base_obs=supported_observables)
-            raise RuntimeError
 
         return measurement_program
 
