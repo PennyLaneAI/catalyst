@@ -184,6 +184,8 @@ class ZNE:
             *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
         )
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
+        print("X axis", float_scale_factors)
+        print("Data axis", results[0])
         results = self.extrapolate(float_scale_factors, results[0])
         # Single measurement
         if results.shape == ():
