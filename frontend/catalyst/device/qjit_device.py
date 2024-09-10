@@ -526,11 +526,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         if not self.observables:
             if not split_non_commuting in measurement_program:
-                # this *should* be redundant, a TOML that doesn't have observables should
-                # have a False non_commuting_observables flag, but since we aren't
-                # enforcing that, let's keep it for now
+                # this *should* be redundant, a TOML that doesn't have observables should have
+                # a False non_commuting_observables flag, but we aren't enforcing that
                 measurement_program.add_transform(split_non_commuting)
-
             if "Sample" in self.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
             elif "Counts" in self.measurement_processes:
@@ -548,8 +546,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
                 "PauliZ": qml.Z,
                 "Hadamard": qml.Hadamard,
             }
-            # these are not *all* supported observables, but the supported base observables
-            # the transform deals with Sum, Prod, etc - it just needs to know which components to diagonalize
+            # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
                 self.observables
             )
