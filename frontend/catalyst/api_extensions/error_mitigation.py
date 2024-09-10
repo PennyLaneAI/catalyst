@@ -130,7 +130,8 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    return ZNE(fn, scale_factors, extrapolate, folding)
+    num_folds = scale_factors
+    return ZNE(fn, num_folds, extrapolate, folding)
 
 
 ## IMPL ##
@@ -149,7 +150,7 @@ class ZNE:
     def __init__(
         self,
         fn: Callable,
-        scale_factors: jnp.ndarray,
+        num_folds: jnp.ndarray,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
@@ -157,7 +158,7 @@ class ZNE:
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
-        self.scale_factors = scale_factors
+        self.num_folds = num_folds
         self.extrapolate = extrapolate
         self.folding = folding
 
@@ -181,10 +182,10 @@ class ZNE:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
         results = zne_p.bind(
-            *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
+            *args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=self.fn
         )
-        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = self.extrapolate(float_scale_factors, results[0])
+        float_num_folds = jnp.array(self.num_folds, dtype=float)
+        results = self.extrapolate(float_num_folds, results[0])
         # Single measurement
         if results.shape == ():
             return results
