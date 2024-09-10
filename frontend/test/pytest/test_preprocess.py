@@ -33,7 +33,6 @@ import pytest
 from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
-from pennylane.measurements import CountsMP, SampleMP
 from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
@@ -286,6 +285,7 @@ class TestDecomposition:
 
 
 class TestMeasurementTransforms:
+    """Tests for transforms modifying measurements"""
 
     @flaky
     def test_measurements_from_counts_multiple_measurements(self):
@@ -333,8 +333,8 @@ class TestMeasurementTransforms:
         ]
         eigvals = [(-1) ** i for i in num_excitations_per_state]
         eigval_counts_res = {
-            -1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == -1]),
-            1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == 1]),
+            -1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == -1),
+            1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == 1),
         }
 
         # +/- 100 shots is pretty reasonable with 3000 shots total
@@ -345,7 +345,7 @@ class TestMeasurementTransforms:
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4, shots=5000)
 
         @qml.qnode(dev)
         def basic_circuit(theta: float):
@@ -385,6 +385,7 @@ class TestMeasurementTransforms:
         assert len(sample_res) == len(sample_expected)
         assert set(np.array(sample_res)) == set(sample_expected)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -420,8 +421,8 @@ class TestMeasurementTransforms:
             ]
             eigvals = [(-1) ** i for i in num_excitations_per_state]
             eigval_counts_res = {
-                -1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == -1]),
-                1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == 1]),
+                -1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == -1),
+                1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == 1),
             }
 
             # +/- 100 shots is pretty reasonable with 3000 shots total
@@ -432,12 +433,13 @@ class TestMeasurementTransforms:
             num_wires = len(measurement().wires) if measurement().wires else len(dev.wires)
             basis_states = [format(int(state), "01b").zfill(num_wires) for state in basis_states]
             counts = [int(c) for c in counts]
-            counts_dict = dict([(state, c) for (state, c) in zip(basis_states, counts) if c != 0])
+            counts_dict = dict((state, c) for (state, c) in zip(basis_states, counts) if c != 0)
 
             for res, expected_res in zip(counts_dict.items(), counts_expected.items()):
                 assert res[0] == expected_res[0]
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -470,6 +472,7 @@ class TestMeasurementTransforms:
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -527,6 +530,7 @@ class TestMeasurementTransforms:
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [

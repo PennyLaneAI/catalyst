@@ -17,11 +17,41 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, grad, jacobian, measure, qjit, while_loop
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode, GradContext
+from catalyst import accelerate, cond, grad, jacobian, measure, qjit, while_loop
+from catalyst.tracing.contexts import (
+    AccelerateContext,
+    EvaluationContext,
+    EvaluationMode,
+    GradContext,
+)
 
 
 # pylint: disable=protected-access
+class TestAccelerateContext:
+    """Unit tests for accelerate context"""
+
+    def test_in_accelerate_context(self):
+        """Test that AccelerateContext returns True when in an accelerate context."""
+
+        @qjit
+        @accelerate
+        def identity(x: float):
+            assert AccelerateContext.am_inside_accelerate()
+            return x
+
+        identity(1.0)
+
+    def test_not_in_accelerate_context(self):
+        """Test that AccelerateContext returns False when not in an accelerate context."""
+
+        @qjit
+        def identity(x: float):
+            assert not AccelerateContext.am_inside_accelerate()
+            return x
+
+        identity(1.0)
+
+
 class TestGradContextUnitTests:
     """Unit tests for grad context"""
 
