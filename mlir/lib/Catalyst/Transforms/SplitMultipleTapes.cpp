@@ -80,20 +80,22 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // special: [0] for pre and [-1] for post processing
         unsigned int curTape = 0;
 
-        func->walk([&](Operation *op) {
-            if (op == func) {
-                return; // don't visit the funcop itself
+        // The device and device_release are always top-level operations in the funcop's (only)
+        // region
+        Region &region = func->getRegion(0);
+        for (Block &block : region.getBlocks()) {
+            for (Operation &op : block.getOperations()) {
+                if (isa<catalyst::quantum::DeviceInitOp>(op)) {
+                    curTape++;
+                }
+                OpsEachTape[curTape].push_back(&op);
+                if ((isa<catalyst::quantum::DeviceReleaseOp>(op)) &&
+                    (curTape == OpsEachTape.size() - 2)) {
+                    // reached post processing
+                    curTape++;
+                }
             }
-            if (isa<catalyst::quantum::DeviceInitOp>(op)) {
-                curTape++;
-            }
-            OpsEachTape[curTape].push_back(op);
-            if ((isa<catalyst::quantum::DeviceReleaseOp>(op)) &&
-                (curTape == OpsEachTape.size() - 2)) {
-                // reached post processing
-                curTape++;
-            }
-        });
+        }
     } // collectOperationsForEachTape()
 
     void collectNecessaryValuesFromEarlierTapes(
