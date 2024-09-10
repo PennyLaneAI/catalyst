@@ -26,7 +26,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
+from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -765,7 +765,7 @@ def trace_observables(
         obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
-            f"Observable {obs} (of type {type(obs)}) is not impemented"
+            f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
     return obs_tracers, (len(qubits) if qubits else 0)
 
@@ -925,13 +925,13 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif o.return_type.value == "state":
+            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not impemented"
+                    f"Measurement {type(o)} is not implemented"
                 )  # pragma: no cover
         elif isinstance(o, DynamicJaxprTracer):
             out_classical_tracers.append(o)
