@@ -87,7 +87,10 @@ llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
  */
 Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
 {
-    auto memrefType = cast<MemRefType>(memref.getType());
+    auto origMemrefType = cast<MemRefType>(memref.getType());
+    // Rebuild MemRefType without memory layout.
+    auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
+
     llvm::SmallVector<Value> dynDims;
     {
         llvm::SmallVector<int64_t> dynIndices;
@@ -102,8 +105,10 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
     }
 
     Value newMemRef = rewriter.create<memref::AllocOp>(loc, memrefType, dynDims);
+    // Cast memrefType back to maintain memory layout.
+    Value castMemRef = rewriter.create<memref::CastOp>(loc, origMemrefType, newMemRef);
     rewriter.create<memref::CopyOp>(loc, memref, newMemRef);
-    return newMemRef;
+    return castMemRef;
 }
 
 /**
