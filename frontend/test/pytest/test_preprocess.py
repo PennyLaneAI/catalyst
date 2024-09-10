@@ -386,59 +386,6 @@ class TestMeasurementTransforms:
         assert set(np.array(sample_res)) == set(sample_expected)
 
     @pytest.mark.parametrize(
-        "device_measurements, measurement_transform, target_measurement",
-        [
-            (["counts"], measurements_from_counts, "counts"),
-            (["sample"], measurements_from_samples, "sample"),
-            (["counts", "sample"], measurements_from_samples, "sample"),
-        ],
-    )
-    def test_measurement_from_readout_integration_multiple_measurements_device(
-        self, device_measurements, measurement_transform, target_measurement
-    ):
-        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline if the
-        device only supports sample, and measurement_from_counts transform is applied  if the device only
-        supports counts. If both are supported, sample takes precedence."""
-
-        allow_sample = "sample" in device_measurements
-        allow_counts = "counts" in device_measurements
-
-        with DummyDeviceLimitedMPs(
-            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
-        ) as dev:
-
-            # transform is added to transform program
-            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
-            backend_info = extract_backend_info(dev, dev_capabilities)
-            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
-
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx)
-
-            assert measurement_transform in transform_program
-
-            # MLIR only contains target measurement
-            @qml.qjit
-            @qml.qnode(dev)
-            def circuit(theta: float):
-                qml.X(0)
-                qml.X(1)
-                qml.X(2)
-                qml.X(3)
-                return (
-                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                    qml.probs(wires=[3, 4]),
-                )
-
-            mlir = qml.qjit(circuit, target="mlir").mlir
-
-            assert "expval" not in mlir
-            assert "quantum.var" not in mlir
-            assert "probs" not in mlir
-            assert target_measurement in mlir
-
-    @pytest.mark.parametrize(
         "measurement",
         [
             lambda: qml.counts(),
@@ -1206,6 +1153,95 @@ class TestPreprocessHybridOp:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+
+class TestDiagonalizationTransforms():
+    """Test that the diagonalization transforms are included as expected in the QJIT device 
+    TransformProgram based on device capabilities"""
+
+    @pytest.mark.parametrize(
+        "device_measurements, measurement_transform, target_measurement",
+        [
+            (["counts"], measurements_from_counts, "counts"),
+            (["sample"], measurements_from_samples, "sample"),
+            (["counts", "sample"], measurements_from_samples, "sample"),
+        ],
+    )
+    def test_measurement_from_readout_integration_multiple_measurements_device(
+        self, device_measurements, measurement_transform, target_measurement
+    ):
+        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline if the
+        device only supports sample, and measurement_from_counts transform is applied  if the device only
+        supports counts. If both are supported, sample takes precedence."""
+
+        allow_sample = "sample" in device_measurements
+        allow_counts = "counts" in device_measurements
+
+        with DummyDeviceLimitedMPs(
+            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
+        ) as dev:
+
+            # transform is added to transform program
+            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
+            backend_info = extract_backend_info(dev, dev_capabilities)
+            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+                transform_program, _ = qjit_dev.preprocess(ctx)
+
+            assert measurement_transform in transform_program
+
+            # MLIR only contains target measurement
+            @qml.qjit
+            @qml.qnode(dev)
+            def circuit(theta: float):
+                qml.X(0)
+                qml.X(1)
+                qml.X(2)
+                qml.X(3)
+                return (
+                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                    qml.probs(wires=[3, 4]),
+                )
+
+            mlir = qml.qjit(circuit, target="mlir").mlir
+
+            assert "expval" not in mlir
+            assert "quantum.var" not in mlir
+            assert "probs" not in mlir
+            assert target_measurement in mlir
+
+    @pytest.mark.parametrize("unsupported_obs", [("PauliX",), ("PauliY",), ("Hadamard",), ("PauliX", "PauliY"), ("PauliX", "Hadamard"), ("PauliY", "Hadamard"), ("PauliX", "PauliY", "Hadamard")])
+    def test_diagonalize_measurements_integration(self, unsupported_obs, mocker):
+        """Test that the diagonalize_measurements transform is applied or not as when 
+        we are not diagonalizing everything to counts or samples, but not all of 
+        {X, Y, Z, H} are supported."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def unjitted_circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RY(0.89, 1)
+            return qml.expval(qml.X(0)), qml.var(qml.Y(1))
+
+        expected_result = unjitted_circuit(1.2)
+
+        config = get_device_toml_config(dev)
+        for obs in unsupported_obs:
+            del config["operators"]["observables"][obs]
+        
+        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+
+        # mock TOML file output to indicate some observables are not supported
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            jitted_circuit = qml.qjit(unjitted_circuit)
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 2
+            assert np.allclose(jitted_circuit(1.2), expected_result)
+
+        transform_program, _ = spy.spy_return
+        assert split_non_commuting in transform_program
+        assert qml.transforms.diagonalize_measurements in transform_program
 
 
 class TestTransform:
