@@ -47,7 +47,7 @@ index 053ea7935260..fed1c49d22be 100644
    auto createdEquiv = equivalentFuncArgs.try_emplace(funcOp, IndexMapping());
    auto createdAliasingResults =
 diff --git a/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp b/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
-index 0a4072605c26..bd054ac4e7b8 100644
+index 0a4072605c26..ce90d907b4ca 100644
 --- a/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
 +++ b/mlir/lib/Dialect/Bufferization/Transforms/OneShotModuleBufferize.cpp
 @@ -75,7 +75,7 @@ using namespace mlir::bufferization;
@@ -59,7 +59,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
  
  /// Get or create FuncAnalysisState.
  static FuncAnalysisState &
-@@ -88,15 +88,19 @@ getOrCreateFuncAnalysisState(OneShotAnalysisState &state) {
+@@ -88,10 +88,11 @@ getOrCreateFuncAnalysisState(OneShotAnalysisState &state) {
  
  /// Return the unique ReturnOp that terminates `funcOp`.
  /// Return nullptr if there is no such unique ReturnOp.
@@ -67,7 +67,6 @@ index 0a4072605c26..bd054ac4e7b8 100644
 -  func::ReturnOp returnOp;
 -  for (Block &b : funcOp.getBody()) {
 -    if (auto candidateOp = dyn_cast<func::ReturnOp>(b.getTerminator())) {
-+/// Return `funcOp` it self if there is no ReturnOp.
 +static Operation* getAssumedUniqueReturnOp(FunctionOpInterface funcOp) {
 +  Operation *returnOp = nullptr;
 +  for (Block &b : funcOp.getFunctionBody()) {
@@ -76,14 +75,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        if (returnOp)
          return nullptr;
        returnOp = candidateOp;
-     }
-   }
-+  if (!returnOp)
-+    return funcOp;
-   return returnOp;
- }
- 
-@@ -126,16 +130,15 @@ static void annotateEquivalentReturnBbArg(OpOperand &returnVal,
+@@ -126,16 +127,15 @@ static void annotateEquivalentReturnBbArg(OpOperand &returnVal,
  /// Store function BlockArguments that are equivalent to/aliasing a returned
  /// value in FuncAnalysisState.
  static LogicalResult
@@ -104,19 +96,16 @@ index 0a4072605c26..bd054ac4e7b8 100644
          if (!isa<TensorType>(resultIt.value()))
            continue;
          int64_t returnIdx = resultIt.index();
-@@ -147,7 +150,10 @@ aliasingFuncOpBBArgsAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
+@@ -147,7 +147,7 @@ aliasingFuncOpBBArgsAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
    }
  
    // Support only single return-terminated block in the function.
 -  func::ReturnOp returnOp = getAssumedUniqueReturnOp(funcOp);
-+  // If funcOp has no returnOp, skip the following analysis.
 +  Operation *returnOp = getAssumedUniqueReturnOp(funcOp);
-+  if (returnOp == funcOp)
-+    return success();
    assert(returnOp && "expected func with single return op");
  
    for (OpOperand &returnVal : returnOp->getOpOperands())
-@@ -168,7 +174,7 @@ aliasingFuncOpBBArgsAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
+@@ -168,7 +168,7 @@ aliasingFuncOpBBArgsAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
    return success();
  }
  
@@ -125,7 +114,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
                                    bool isWritten) {
    OpBuilder b(funcOp.getContext());
    Attribute accessType;
-@@ -189,12 +195,12 @@ static void annotateFuncArgAccess(func::FuncOp funcOp, int64_t idx, bool isRead,
+@@ -189,12 +189,12 @@ static void annotateFuncArgAccess(func::FuncOp funcOp, int64_t idx, bool isRead,
  /// function with unknown ops, we conservatively assume that such ops bufferize
  /// to a read + write.
  static LogicalResult
@@ -141,7 +130,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        continue;
      bool isRead;
      bool isWritten;
-@@ -204,7 +210,7 @@ funcOpBbArgReadWriteAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
+@@ -204,7 +204,7 @@ funcOpBbArgReadWriteAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
        StringRef str = accessAttr.getValue();
        isRead = str == "read" || str == "read-write";
        isWritten = str == "write" || str == "read-write";
@@ -150,7 +139,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        // If the function has no body, conservatively assume that all args are
        // read + written.
        isRead = true;
-@@ -230,20 +236,19 @@ funcOpBbArgReadWriteAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
+@@ -230,20 +230,19 @@ funcOpBbArgReadWriteAnalysis(FuncOp funcOp, OneShotAnalysisState &state,
  
  /// Remove bufferization attributes on FuncOp arguments.
  static void removeBufferizationAttributes(BlockArgument bbArg) {
@@ -174,7 +163,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        SymbolTable::lookupNearestSymbolFrom(callOp, sym));
  }
  
-@@ -251,12 +256,12 @@ static func::FuncOp getCalledFunction(func::CallOp callOp) {
+@@ -251,12 +250,12 @@ static func::FuncOp getCalledFunction(func::CallOp callOp) {
  /// Note: This only adds new equivalence info if the called function was already
  /// analyzed.
  // TODO: This does not handle cyclic function call graphs etc.
@@ -191,7 +180,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
  
      // No equivalence info available for the called function.
      if (!funcState.equivalentFuncArgs.count(calledFunction))
-@@ -267,7 +272,7 @@ static void equivalenceAnalysis(func::FuncOp funcOp,
+@@ -267,7 +266,7 @@ static void equivalenceAnalysis(func::FuncOp funcOp,
        int64_t bbargIdx = it.second;
        if (!state.isInPlace(callOp->getOpOperand(bbargIdx)))
          continue;
@@ -200,7 +189,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        Value argVal = callOp->getOperand(bbargIdx);
        state.unionEquivalenceClasses(returnVal, argVal);
      }
-@@ -277,10 +282,10 @@ static void equivalenceAnalysis(func::FuncOp funcOp,
+@@ -277,10 +276,10 @@ static void equivalenceAnalysis(func::FuncOp funcOp,
  }
  
  /// Return "true" if the given function signature has tensor semantics.
@@ -214,7 +203,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
                        llvm::IsaPred<TensorType>);
  }
  
-@@ -291,17 +296,17 @@ static bool hasTensorSignature(func::FuncOp funcOp) {
+@@ -291,16 +290,16 @@ static bool hasTensorSignature(func::FuncOp funcOp) {
  /// retrieve the called FuncOp from any func::CallOp.
  static LogicalResult
  getFuncOpsOrderedByCalls(ModuleOp moduleOp,
@@ -230,16 +219,14 @@ index 0a4072605c26..bd054ac4e7b8 100644
 -  WalkResult res = moduleOp.walk([&](func::FuncOp funcOp) -> WalkResult {
 -    if (!funcOp.getBody().empty()) {
 -      func::ReturnOp returnOp = getAssumedUniqueReturnOp(funcOp);
--      if (!returnOp)
 +  DenseMap<FunctionOpInterface, unsigned> numberCallOpsContainedInFuncOp;
 +  WalkResult res = moduleOp.walk([&](FunctionOpInterface funcOp) -> WalkResult {
 +    if (!funcOp.getFunctionBody().empty()) {
 +      Operation *returnOp = getAssumedUniqueReturnOp(funcOp);
-+      if (!returnOp && returnOp != funcOp)
+       if (!returnOp)
          return funcOp->emitError()
                 << "cannot bufferize a FuncOp with tensors and "
-                   "without a unique ReturnOp";
-@@ -309,9 +314,9 @@ getFuncOpsOrderedByCalls(ModuleOp moduleOp,
+@@ -309,9 +308,9 @@ getFuncOpsOrderedByCalls(ModuleOp moduleOp,
  
      // Collect function calls and populate the caller map.
      numberCallOpsContainedInFuncOp[funcOp] = 0;
@@ -252,7 +239,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        // If the called function does not have any tensors in its signature, then
        // it is not necessary to bufferize the callee before the caller.
        if (!hasTensorSignature(calledFunction))
-@@ -349,11 +354,15 @@ getFuncOpsOrderedByCalls(ModuleOp moduleOp,
+@@ -349,11 +348,11 @@ getFuncOpsOrderedByCalls(ModuleOp moduleOp,
  /// most generic layout map as function return types. After bufferizing the
  /// entire function body, a more concise memref type can potentially be used for
  /// the return type of the function.
@@ -260,18 +247,14 @@ index 0a4072605c26..bd054ac4e7b8 100644
 -  if (funcOp.getBody().empty())
 +static void foldMemRefCasts(FunctionOpInterface funcOp) {
 +  if (funcOp.getFunctionBody().empty())
-+    return;
-+
-+  Operation *returnOp = getAssumedUniqueReturnOp(funcOp);
-+
-+  if (!returnOp || returnOp == funcOp)
      return;
  
 -  func::ReturnOp returnOp = getAssumedUniqueReturnOp(funcOp);
++  Operation *returnOp = getAssumedUniqueReturnOp(funcOp);
    SmallVector<Type> resultTypes;
  
    for (OpOperand &operand : returnOp->getOpOperands()) {
-@@ -366,7 +375,7 @@ static void foldMemRefCasts(func::FuncOp funcOp) {
+@@ -366,7 +365,7 @@ static void foldMemRefCasts(func::FuncOp funcOp) {
    }
  
    auto newFuncType = FunctionType::get(
@@ -280,7 +263,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
    funcOp.setType(newFuncType);
  }
  
-@@ -379,7 +388,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
+@@ -379,7 +378,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
    FuncAnalysisState &funcState = getOrCreateFuncAnalysisState(state);
  
    // A list of functions in the order in which they are analyzed + bufferized.
@@ -289,17 +272,16 @@ index 0a4072605c26..bd054ac4e7b8 100644
  
    // A mapping of FuncOps to their callers.
    FuncCallerMap callerMap;
-@@ -388,7 +397,8 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
+@@ -388,7 +387,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
      return failure();
  
    // Analyze ops.
 -  for (func::FuncOp funcOp : orderedFuncOps) {
 +  for (FunctionOpInterface funcOp : orderedFuncOps) {
-+
      if (!state.getOptions().isOpAllowed(funcOp))
        continue;
  
-@@ -416,7 +426,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
+@@ -416,7 +415,7 @@ mlir::bufferization::analyzeModuleOp(ModuleOp moduleOp,
  
  void mlir::bufferization::removeBufferizationAttributesInModule(
      ModuleOp moduleOp) {
@@ -308,7 +290,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
      for (BlockArgument bbArg : op.getArguments())
        removeBufferizationAttributes(bbArg);
    });
-@@ -430,7 +440,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
+@@ -430,7 +429,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
    IRRewriter rewriter(moduleOp.getContext());
  
    // A list of functions in the order in which they are analyzed + bufferized.
@@ -317,7 +299,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
  
    // A mapping of FuncOps to their callers.
    FuncCallerMap callerMap;
-@@ -439,11 +449,11 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
+@@ -439,11 +438,11 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
      return failure();
  
    // Bufferize functions.
@@ -331,7 +313,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        // This function was not analyzed and RaW conflicts were not resolved.
        // Buffer copies must be inserted before every write.
        OneShotBufferizationOptions updatedOptions = options;
-@@ -463,7 +473,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
+@@ -463,7 +462,7 @@ LogicalResult mlir::bufferization::bufferizeModuleOp(
    // Bufferize all other ops.
    for (Operation &op : llvm::make_early_inc_range(moduleOp.getOps())) {
      // Functions were already bufferized.
@@ -340,7 +322,7 @@ index 0a4072605c26..bd054ac4e7b8 100644
        continue;
      if (failed(bufferizeOp(&op, options, statistics)))
        return failure();
-@@ -490,12 +500,12 @@ LogicalResult mlir::bufferization::runOneShotModuleBufferize(
+@@ -490,12 +489,12 @@ LogicalResult mlir::bufferization::runOneShotModuleBufferize(
        // FuncOps whose names are specified in options.noAnalysisFuncFilter will
        // not be analyzed. Ops in these FuncOps will not be analyzed as well.
        OpFilter::Entry::FilterFn analysisFilterFn = [=](Operation *op) {
@@ -356,3 +338,559 @@ index 0a4072605c26..bd054ac4e7b8 100644
          return false;
        };
        OneShotBufferizationOptions updatedOptions(options);
+diff --git a/mlir/test/Dialect/Bufferization/Transforms/transform-ops.mlir b/mlir/test/Dialect/Bufferization/Transforms/transform-ops.mlir
+index 3c50a9e72d9d..588aa8a85a84 100644
+--- a/mlir/test/Dialect/Bufferization/Transforms/transform-ops.mlir
++++ b/mlir/test/Dialect/Bufferization/Transforms/transform-ops.mlir
+@@ -1,4 +1,4 @@
+-// RUN: mlir-opt --transform-interpreter %s -split-input-file -verify-diagnostics | FileCheck %s
++// RUN: mlir-opt --transform-interpreter="debug-payload-root-tag=payload" %s -split-input-file -verify-diagnostics | FileCheck %s
+ 
+ // Test One-Shot Bufferize.
+ 
+@@ -12,19 +12,21 @@ module attributes {transform.with_named_sequence} {
+ 
+ // CHECK-LABEL: func @test_function(
+ //  CHECK-SAME:     %[[A:.*]]: tensor<?xf32>
+-func.func @test_function(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
+-  %c0 = arith.constant 0 : index
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @test_function(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
++    %c0 = arith.constant 0 : index
+ 
+-  // CHECK: %[[A_memref:.*]] = bufferization.to_memref %[[A]]
+-  // CHECK: %[[dim:.*]] = memref.dim %[[A_memref]]
+-  // CHECK: %[[alloc:.*]] = memref.alloc(%[[dim]])
+-  // CHECK: memref.copy %[[A_memref]], %[[alloc]]
+-  // CHECK: vector.transfer_write %{{.*}}, %[[alloc]]
+-  // CHECK: %[[res_tensor:.*]] = bufferization.to_tensor %[[alloc]]
+-  %0 = vector.transfer_write %v, %A[%c0] : vector<4xf32>, tensor<?xf32>
++    // CHECK: %[[A_memref:.*]] = bufferization.to_memref %[[A]]
++    // CHECK: %[[dim:.*]] = memref.dim %[[A_memref]]
++    // CHECK: %[[alloc:.*]] = memref.alloc(%[[dim]])
++    // CHECK: memref.copy %[[A_memref]], %[[alloc]]
++    // CHECK: vector.transfer_write %{{.*}}, %[[alloc]]
++    // CHECK: %[[res_tensor:.*]] = bufferization.to_tensor %[[alloc]]
++    %0 = vector.transfer_write %v, %A[%c0] : vector<4xf32>, tensor<?xf32>
+ 
+-  // CHECK: return %[[res_tensor]]
+-  return %0 : tensor<?xf32>
++    // CHECK: return %[[res_tensor]]
++    return %0 : tensor<?xf32>
++  }
+ }
+ 
+ // -----
+@@ -42,19 +44,21 @@ module attributes {transform.with_named_sequence} {
+ // CHECK-LABEL: func @test_function(
+ //  CHECK-SAME:     %[[A:.*]]: tensor<?xf32>
+ //   CHECK-NOT:   memref.copy
+-func.func @test_function(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
+-  %c0 = arith.constant 0 : index
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @test_function(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
++    %c0 = arith.constant 0 : index
+ 
+-  // CHECK: %[[A_memref:.*]] = bufferization.to_memref %[[A]]
+-  // CHECK: %[[dim:.*]] = memref.dim %[[A_memref]]
+-  // CHECK: %[[alloc:.*]] = memref.alloc(%[[dim]])
+-  // CHECK: linalg.copy ins(%[[A_memref]] : memref<{{.*}}>) outs(%[[alloc]]
+-  // CHECK: vector.transfer_write %{{.*}}, %[[alloc]]
+-  // CHECK: %[[res_tensor:.*]] = bufferization.to_tensor %[[alloc]]
+-  %0 = vector.transfer_write %v, %A[%c0] : vector<4xf32>, tensor<?xf32>
++    // CHECK: %[[A_memref:.*]] = bufferization.to_memref %[[A]]
++    // CHECK: %[[dim:.*]] = memref.dim %[[A_memref]]
++    // CHECK: %[[alloc:.*]] = memref.alloc(%[[dim]])
++    // CHECK: linalg.copy ins(%[[A_memref]] : memref<{{.*}}>) outs(%[[alloc]]
++    // CHECK: vector.transfer_write %{{.*}}, %[[alloc]]
++    // CHECK: %[[res_tensor:.*]] = bufferization.to_tensor %[[alloc]]
++    %0 = vector.transfer_write %v, %A[%c0] : vector<4xf32>, tensor<?xf32>
+ 
+-  // CHECK: return %[[res_tensor]]
+-  return %0 : tensor<?xf32>
++    // CHECK: return %[[res_tensor]]
++    return %0 : tensor<?xf32>
++  }
+ }
+ 
+ // -----
+@@ -72,13 +76,15 @@ module attributes {transform.with_named_sequence} {
+ 
+ // CHECK-LABEL: func @test_function_analysis(
+ //  CHECK-SAME:     %[[A:.*]]: tensor<?xf32>
+-func.func @test_function_analysis(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
+-  %c0 = arith.constant 0 : index
+-  // CHECK: vector.transfer_write
+-  // CHECK-SAME: {__inplace_operands_attr__ = ["none", "false", "none"]}
+-  // CHECK-SAME: tensor<?xf32>
+-  %0 = vector.transfer_write %v, %A[%c0] : vector<4xf32>, tensor<?xf32>
+-  return %0 : tensor<?xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @test_function_analysis(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
++    %c0 = arith.constant 0 : index
++    // CHECK: vector.transfer_write
++    // CHECK-SAME: {__inplace_operands_attr__ = ["none", "false", "none"]}
++    // CHECK-SAME: tensor<?xf32>
++    %0 = vector.transfer_write %v, %A[%c0] : vector<4xf32>, tensor<?xf32>
++    return %0 : tensor<?xf32>
++  }
+ }
+ 
+ // -----
+@@ -95,10 +101,12 @@ module attributes {transform.with_named_sequence} {
+   }
+ }
+ 
+-func.func @test_unknown_op_failure() -> (tensor<?xf32>) {
+-  // expected-error @+1 {{op was not bufferized}}
+-  %0 = "test.dummy_op"() : () -> (tensor<?xf32>)
+-  return %0 : tensor<?xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @test_unknown_op_failure() -> (tensor<?xf32>) {
++    // expected-error @+1 {{op was not bufferized}}
++    %0 = "test.dummy_op"() : () -> (tensor<?xf32>)
++    return %0 : tensor<?xf32>
++  }
+ }
+ 
+ // -----
+@@ -111,7 +119,7 @@ module attributes {transform.with_named_sequence} {
+   }
+ }
+ 
+-module {
++module @payload attributes { transform.target_tag = "payload" } {
+   // CHECK-LABEL: func @test_function(
+   //  CHECK-SAME:     %[[A:.*]]: tensor<?xf32>
+   func.func @test_function(%A : tensor<?xf32>, %v : vector<4xf32>) -> (tensor<?xf32>) {
+@@ -146,11 +154,13 @@ module attributes {transform.with_named_sequence} {
+ // CHECK-SAME:  %[[A:.*]]: memref<12x9xf32>,
+ // CHECK-SAME:  %[[B:.*]]: memref<9x6xf32>,
+ // CHECK-SAME:  %[[C:.*]]: memref<12x6xf32>) -> memref<12x6xf32> {
+-func.func @matmul(%A: tensor<12x9xf32>, %B: tensor<9x6xf32>, %C: tensor<12x6xf32>) -> tensor<12x6xf32> {
+-  // CHECK: linalg.matmul ins(%[[A]], %[[B]] : memref<12x9xf32>, memref<9x6xf32>) outs(%[[C]] : memref<12x6xf32>)
+-  %D = linalg.matmul ins(%A, %B: tensor<12x9xf32>, tensor<9x6xf32>) outs(%C: tensor<12x6xf32>) -> tensor<12x6xf32>
+-  // CHECK: return %[[C]] : memref<12x6xf32>
+-  return %D : tensor<12x6xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @matmul(%A: tensor<12x9xf32>, %B: tensor<9x6xf32>, %C: tensor<12x6xf32>) -> tensor<12x6xf32> {
++    // CHECK: linalg.matmul ins(%[[A]], %[[B]] : memref<12x9xf32>, memref<9x6xf32>) outs(%[[C]] : memref<12x6xf32>)
++    %D = linalg.matmul ins(%A, %B: tensor<12x9xf32>, tensor<9x6xf32>) outs(%C: tensor<12x6xf32>) -> tensor<12x6xf32>
++    // CHECK: return %[[C]] : memref<12x6xf32>
++    return %D : tensor<12x6xf32>
++  }
+ }
+ 
+ // -----
+@@ -165,10 +175,12 @@ module attributes {transform.with_named_sequence} {
+ }
+ 
+ // Expect `bufferization.empty_tensor_to_alloc_tensor` to replace the tensor.empty.
+-func.func @empty_to_tensor_alloc() -> tensor<2x2xf32> {
+-  // CHECK: bufferization.alloc_tensor
+-  %0 = tensor.empty() : tensor<2x2xf32>
+-  return %0 : tensor<2x2xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @empty_to_tensor_alloc() -> tensor<2x2xf32> {
++    // CHECK: bufferization.alloc_tensor
++    %0 = tensor.empty() : tensor<2x2xf32>
++    return %0 : tensor<2x2xf32>
++  }
+ }
+ 
+ // -----
+@@ -185,13 +197,15 @@ module attributes {transform.with_named_sequence} {
+ //       CHECK:   tensor.extract_slice
+ //       CHECK:   linalg.fill
+ //       CHECK:   tensor.insert_slice
+-func.func @empty_tensor_elimination(
+-    %t: tensor<10xf32>, %f: f32) -> tensor<10xf32> {
+-  %0 = tensor.empty() : tensor<5xf32>
+-  %1 = linalg.fill ins(%f : f32) outs(%0 : tensor<5xf32>) -> tensor<5xf32>
+-  %2 = tensor.insert_slice %1 into %t [1][5][1]
+-      : tensor<5xf32> into tensor<10xf32>
+-  return %2 : tensor<10xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @empty_tensor_elimination(
++      %t: tensor<10xf32>, %f: f32) -> tensor<10xf32> {
++    %0 = tensor.empty() : tensor<5xf32>
++    %1 = linalg.fill ins(%f : f32) outs(%0 : tensor<5xf32>) -> tensor<5xf32>
++    %2 = tensor.insert_slice %1 into %t [1][5][1]
++        : tensor<5xf32> into tensor<10xf32>
++    return %2 : tensor<10xf32>
++  }
+ }
+ 
+ // -----
+@@ -208,12 +222,14 @@ module attributes {transform.with_named_sequence} {
+ //       CHECK:   memref.alloca
+ //       CHECK:   scf.for
+ //       CHECK:     memref.store
+-func.func @buffer_loop_hoisting(%lb: index, %ub: index, %step: index, %f: f32, %pos: index) {
+-  scf.for %iv = %lb to %ub step %step {
+-    %0 = memref.alloca() : memref<5xf32>
+-    memref.store %f, %0[%pos] : memref<5xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @buffer_loop_hoisting(%lb: index, %ub: index, %step: index, %f: f32, %pos: index) {
++    scf.for %iv = %lb to %ub step %step {
++      %0 = memref.alloca() : memref<5xf32>
++      memref.store %f, %0[%pos] : memref<5xf32>
++    }
++    return
+   }
+-  return
+ }
+ 
+ // -----
+@@ -231,10 +247,12 @@ module attributes {transform.with_named_sequence} {
+ 
+ // Expect `bufferization.bufferize_to_allocation` to create an alloc.
+ //  CHECK-LABEL: func.func @empty_to_tensor_alloc()
+-func.func @empty_to_tensor_alloc() -> tensor<2x2xf32> {
+-  // CHECK-NEXT: %[[alloca:.*]] = memref.alloca() : memref<2x2xf32>
+-  // CHECK-NEXT: %[[tensor:.*]] = bufferization.to_tensor %[[alloca]] restrict writable : memref<2x2xf32>
+-  // CHECK-NEXT: return %[[tensor]] : tensor<2x2xf32>
+-  %0 = bufferization.alloc_tensor() : tensor<2x2xf32>
+-  return %0 : tensor<2x2xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @empty_to_tensor_alloc() -> tensor<2x2xf32> {
++    // CHECK-NEXT: %[[alloca:.*]] = memref.alloca() : memref<2x2xf32>
++    // CHECK-NEXT: %[[tensor:.*]] = bufferization.to_tensor %[[alloca]] restrict writable : memref<2x2xf32>
++    // CHECK-NEXT: return %[[tensor]] : tensor<2x2xf32>
++    %0 = bufferization.alloc_tensor() : tensor<2x2xf32>
++    return %0 : tensor<2x2xf32>
++  }
+ }
+diff --git a/mlir/test/Dialect/LLVM/transform-e2e.mlir b/mlir/test/Dialect/LLVM/transform-e2e.mlir
+index c00b47fb936e..3e637a3ec49a 100644
+--- a/mlir/test/Dialect/LLVM/transform-e2e.mlir
++++ b/mlir/test/Dialect/LLVM/transform-e2e.mlir
+@@ -1,15 +1,17 @@
+-// RUN: mlir-opt %s --transform-interpreter -test-transform-dialect-erase-schedule --test-lower-to-llvm --split-input-file | FileCheck %s
++// RUN: mlir-opt %s --transform-interpreter="debug-payload-root-tag=payload" -test-transform-dialect-erase-schedule --test-lower-to-llvm --split-input-file | FileCheck %s
+ 
+ // CHECK-LABEL: llvm.func @matmul_tensors
+-func.func @matmul_tensors(
+-  %arg0: tensor<2x4xf32>, %arg1: tensor<4x6xf32>, %arg2: tensor<2x6xf32>)
+-    -> tensor<2x6xf32> {
+-// CHECK-NOT: linalg
+-// CHECK: llvm.intr.fmuladd{{.*}}
+-  %0 = linalg.matmul  ins(%arg0, %arg1: tensor<2x4xf32>, tensor<4x6xf32>)
+-                     outs(%arg2: tensor<2x6xf32>)
+-    -> tensor<2x6xf32>
+-  return %0 : tensor<2x6xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @matmul_tensors(
++    %arg0: tensor<2x4xf32>, %arg1: tensor<4x6xf32>, %arg2: tensor<2x6xf32>)
++      -> tensor<2x6xf32> {
++  // CHECK-NOT: linalg
++  // CHECK: llvm.intr.fmuladd{{.*}}
++    %0 = linalg.matmul  ins(%arg0, %arg1: tensor<2x4xf32>, tensor<4x6xf32>)
++                       outs(%arg2: tensor<2x6xf32>)
++      -> tensor<2x6xf32>
++    return %0 : tensor<2x6xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
+diff --git a/mlir/test/Dialect/Linalg/matmul-shared-memory-padding.mlir b/mlir/test/Dialect/Linalg/matmul-shared-memory-padding.mlir
+index 3f8d2ea06641..9c223737750a 100644
+--- a/mlir/test/Dialect/Linalg/matmul-shared-memory-padding.mlir
++++ b/mlir/test/Dialect/Linalg/matmul-shared-memory-padding.mlir
+@@ -1,4 +1,4 @@
+-// RUN: mlir-opt --split-input-file --transform-interpreter %s | FileCheck %s
++// RUN: mlir-opt --split-input-file --transform-interpreter="debug-payload-root-tag=payload" %s | FileCheck %s
+ 
+ // CHECK-LABEL: func @matmul_divisible
+ //       CHECK:   scf.forall
+@@ -24,19 +24,21 @@
+ //       CHECK:       scf.forall
+ //       CHECK:         vector.transfer_read
+ //       CHECK:         vector.transfer_write
+-func.func @matmul_divisible(%A: tensor<1024x1024xf32>,
+-                            %B: tensor<1024x1024xf32>,
+-                            %C: tensor<1024x1024xf32>)
+-    -> tensor<1024x1024xf32>
+-{
+-  %cst = arith.constant 0.000000e+00 : f32
+-  %0 = linalg.fill ins(%cst : f32)
+-                   outs(%C : tensor<1024x1024xf32>)
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @matmul_divisible(%A: tensor<1024x1024xf32>,
++                              %B: tensor<1024x1024xf32>,
++                              %C: tensor<1024x1024xf32>)
+       -> tensor<1024x1024xf32>
+-  %1 = linalg.matmul ins(%A, %B : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
+-                     outs(%0 : tensor<1024x1024xf32>)
+-      -> tensor<1024x1024xf32>
+-  return %1 : tensor<1024x1024xf32>
++  {
++    %cst = arith.constant 0.000000e+00 : f32
++    %0 = linalg.fill ins(%cst : f32)
++                     outs(%C : tensor<1024x1024xf32>)
++        -> tensor<1024x1024xf32>
++    %1 = linalg.matmul ins(%A, %B : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
++                       outs(%0 : tensor<1024x1024xf32>)
++        -> tensor<1024x1024xf32>
++    return %1 : tensor<1024x1024xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
+@@ -143,19 +145,21 @@ module attributes {transform.with_named_sequence} {
+ //       CHECK:       linalg.matmul
+ //       CHECK:       vector.transfer_read
+ //       CHECK:       vector.transfer_write
++module @payload attributes { transform.target_tag = "payload" } {
+ func.func @matmul_not_divisible(%A: tensor<1023x1023xf32>,
+-                                %B: tensor<1023x1023xf32>,
+-                                %C: tensor<1023x1023xf32>)
+-    -> tensor<1023x1023xf32>
+-{
+-  %cst = arith.constant 0.000000e+00 : f32
+-  %0 = linalg.fill ins(%cst : f32)
+-                   outs(%C : tensor<1023x1023xf32>)
++                                  %B: tensor<1023x1023xf32>,
++                                  %C: tensor<1023x1023xf32>)
+       -> tensor<1023x1023xf32>
+-  %1 = linalg.matmul ins(%A, %B : tensor<1023x1023xf32>, tensor<1023x1023xf32>)
+-                     outs(%0 : tensor<1023x1023xf32>)
+-      -> tensor<1023x1023xf32>
+-  return %1 : tensor<1023x1023xf32>
++  {
++    %cst = arith.constant 0.000000e+00 : f32
++    %0 = linalg.fill ins(%cst : f32)
++                     outs(%C : tensor<1023x1023xf32>)
++        -> tensor<1023x1023xf32>
++    %1 = linalg.matmul ins(%A, %B : tensor<1023x1023xf32>, tensor<1023x1023xf32>)
++                       outs(%0 : tensor<1023x1023xf32>)
++        -> tensor<1023x1023xf32>
++    return %1 : tensor<1023x1023xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
+diff --git a/mlir/test/Dialect/Linalg/pad-to-specific-memory-space.mlir b/mlir/test/Dialect/Linalg/pad-to-specific-memory-space.mlir
+index f2e9e839b7c4..5e5657980ba1 100644
+--- a/mlir/test/Dialect/Linalg/pad-to-specific-memory-space.mlir
++++ b/mlir/test/Dialect/Linalg/pad-to-specific-memory-space.mlir
+@@ -1,5 +1,5 @@
+ 
+-// RUN: mlir-opt --transform-interpreter -cse -canonicalize -split-input-file -verify-diagnostics %s | FileCheck %s
++// RUN: mlir-opt --transform-interpreter="debug-payload-root-tag=payload" -cse -canonicalize -split-input-file -verify-diagnostics %s | FileCheck %s
+ 
+ #map = affine_map<()[s0] -> (-s0 + 12, 7)>
+ 
+@@ -7,43 +7,45 @@
+ //  CHECK-SAME:     %[[arg0:.*]]: memref<24x12xf32, strided<[?, ?], offset: ?>>,
+ //  CHECK-SAME:     %[[arg1:.*]]: memref<12x25xf32, strided<[?, ?], offset: ?>>,
+ //  CHECK-SAME:     %[[arg2:.*]]: memref<24x25xf32, strided<[?, ?], offset: ?>>,
+-func.func @pad_to_memory_space(%arg0: tensor<24x12xf32>,
+-                               %arg1: tensor<12x25xf32>,
+-                               %arg2: tensor<24x25xf32>,
+-                               %iv0 : index, %iv1 : index,
+-                               %iv2 : index) -> tensor<24x25xf32> {
+-  %0 = affine.min #map()[%iv2]
+-
+-  // CHECK: %[[s0:.*]] = memref.subview %[[arg0]]
+-  %1 = tensor.extract_slice %arg0[%iv0, %iv2] [4, %0] [1, 1] : tensor<24x12xf32> to tensor<4x?xf32>
+-  // CHECK: %[[s1:.*]] = memref.subview %[[arg1]]
+-  %2 = tensor.extract_slice %arg1[%iv2, %iv1] [%0, 5] [1, 1] : tensor<12x25xf32> to tensor<?x5xf32>
+-  // CHECK: %[[s2:.*]] = memref.subview %[[arg2]]
+-  %3 = tensor.extract_slice %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<24x25xf32> to tensor<4x5xf32>
+-
+-  // CHECK: %[[alloc0:.*]] = memref.alloc() : memref<4x7xf32, 3>
+-  // CHECK: linalg.fill {{.*}} outs(%[[alloc0]]
+-  // CHECK: %[[alloc0_view:.*]] = memref.subview %[[alloc0]][0, 0] [4, %{{.*}}] [1, 1]
+-  // CHECK: memref.copy %[[s0]], %[[alloc0_view]]
+-
+-  // CHECK: %[[alloc1:.*]] = memref.alloc() : memref<7x5xf32, 3>
+-  // CHECK: linalg.fill {{.*}} outs(%[[alloc1]]
+-  // CHECK: %[[alloc1_view:.*]] = memref.subview %[[alloc1]][0, 0] [%{{.*}}, 5] [1, 1]
+-  // CHECK: memref.copy %[[s1]], %[[alloc1_view]]
+-
+-  // CHECK: %[[alloc2:.*]] = memref.alloc() : memref<4x5xf32, 3>
+-  // CHECK-NOT: linalg.fill {{.*}} outs(%[[alloc2]]
+-  // No subview because there is 0 padding
+-  // CHECK: memref.copy %[[s2]], %[[alloc2]]
+-
+-  // CHECK: linalg.matmul ins(%[[alloc0]], %[[alloc1]] : {{.*}}) outs(%[[alloc2]] : {{.*}})
+-  // Copy back result.
+-  // CHECK: memref.copy %[[alloc2]], %[[s2]]
+-  %4 = linalg.matmul ins(%1, %2 : tensor<4x?xf32>, tensor<?x5xf32>) outs(%3 : tensor<4x5xf32>) -> tensor<4x5xf32>
+-
+-  // insert_slice bufferizes to a no-op.
+-  %5 = tensor.insert_slice %4 into %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<4x5xf32> into tensor<24x25xf32>
+-  func.return %5 : tensor<24x25xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @pad_to_memory_space(%arg0: tensor<24x12xf32>,
++                                 %arg1: tensor<12x25xf32>,
++                                 %arg2: tensor<24x25xf32>,
++                                 %iv0 : index, %iv1 : index,
++                                 %iv2 : index) -> tensor<24x25xf32> {
++    %0 = affine.min #map()[%iv2]
++
++    // CHECK: %[[s0:.*]] = memref.subview %[[arg0]]
++    %1 = tensor.extract_slice %arg0[%iv0, %iv2] [4, %0] [1, 1] : tensor<24x12xf32> to tensor<4x?xf32>
++    // CHECK: %[[s1:.*]] = memref.subview %[[arg1]]
++    %2 = tensor.extract_slice %arg1[%iv2, %iv1] [%0, 5] [1, 1] : tensor<12x25xf32> to tensor<?x5xf32>
++    // CHECK: %[[s2:.*]] = memref.subview %[[arg2]]
++    %3 = tensor.extract_slice %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<24x25xf32> to tensor<4x5xf32>
++
++    // CHECK: %[[alloc0:.*]] = memref.alloc() : memref<4x7xf32, 3>
++    // CHECK: linalg.fill {{.*}} outs(%[[alloc0]]
++    // CHECK: %[[alloc0_view:.*]] = memref.subview %[[alloc0]][0, 0] [4, %{{.*}}] [1, 1]
++    // CHECK: memref.copy %[[s0]], %[[alloc0_view]]
++
++    // CHECK: %[[alloc1:.*]] = memref.alloc() : memref<7x5xf32, 3>
++    // CHECK: linalg.fill {{.*}} outs(%[[alloc1]]
++    // CHECK: %[[alloc1_view:.*]] = memref.subview %[[alloc1]][0, 0] [%{{.*}}, 5] [1, 1]
++    // CHECK: memref.copy %[[s1]], %[[alloc1_view]]
++
++    // CHECK: %[[alloc2:.*]] = memref.alloc() : memref<4x5xf32, 3>
++    // CHECK-NOT: linalg.fill {{.*}} outs(%[[alloc2]]
++    // No subview because there is 0 padding
++    // CHECK: memref.copy %[[s2]], %[[alloc2]]
++
++    // CHECK: linalg.matmul ins(%[[alloc0]], %[[alloc1]] : {{.*}}) outs(%[[alloc2]] : {{.*}})
++    // Copy back result.
++    // CHECK: memref.copy %[[alloc2]], %[[s2]]
++    %4 = linalg.matmul ins(%1, %2 : tensor<4x?xf32>, tensor<?x5xf32>) outs(%3 : tensor<4x5xf32>) -> tensor<4x5xf32>
++
++    // insert_slice bufferizes to a no-op.
++    %5 = tensor.insert_slice %4 into %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<4x5xf32> into tensor<24x25xf32>
++    func.return %5 : tensor<24x25xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
+@@ -69,40 +71,42 @@ module attributes {transform.with_named_sequence} {
+ //  CHECK-SAME:     %[[arg0:.*]]: memref<24x12xf32, strided<[?, ?], offset: ?>>,
+ //  CHECK-SAME:     %[[arg1:.*]]: memref<12x25xf32, strided<[?, ?], offset: ?>>,
+ //  CHECK-SAME:     %[[arg2:.*]]: memref<24x25xf32, strided<[?, ?], offset: ?>>,
+-func.func @vectorize_and_bufferize_pad(%arg0: tensor<24x12xf32>,
+-                                       %arg1: tensor<12x25xf32>,
+-                                       %arg2: tensor<24x25xf32>,
+-                                       %iv0 : index, %iv1 : index,
+-                                       %iv2 : index) -> tensor<24x25xf32> {
+-  %0 = affine.min #map()[%iv2]
+-
+-  // CHECK: %[[s0:.*]] = memref.subview %[[arg0]]
+-  %1 = tensor.extract_slice %arg0[%iv0, %iv2] [4, %0] [1, 1] : tensor<24x12xf32> to tensor<4x?xf32>
+-  // CHECK: %[[s1:.*]] = memref.subview %[[arg1]]
+-  %2 = tensor.extract_slice %arg1[%iv2, %iv1] [%0, 5] [1, 1] : tensor<12x25xf32> to tensor<?x5xf32>
+-  // CHECK: %[[s2:.*]] = memref.subview %[[arg2]]
+-  %3 = tensor.extract_slice %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<24x25xf32> to tensor<4x5xf32>
+-
+-  // CHECK: %[[v0:.*]] = vector.mask {{.*}} { vector.transfer_read %[[s0]]
+-  // CHECK: %[[alloc0:.*]] = memref.alloc() : memref<4x7xf32, 3>
+-  // CHECK: vector.mask {{.*}} { vector.transfer_write %[[v0]], %[[alloc0]]
+-
+-  // CHECK: %[[v1:.*]] = vector.mask {{.*}} { vector.transfer_read %[[s1]]
+-  // CHECK: %[[alloc1:.*]] = memref.alloc() : memref<7x5xf32, 3>
+-  // CHECK: vector.mask {{.*}} { vector.transfer_write %[[v1]], %[[alloc1]]
+-
+-  // CHECK: %[[v2:.*]] = vector.mask {{.*}} { vector.transfer_read %[[s2]]
+-  // CHECK: %[[alloc2:.*]] = memref.alloc() : memref<4x5xf32, 3>
+-  // CHECK: vector.mask {{.*}} { vector.transfer_write %[[v2]], %[[alloc0]]
+-
+-  // CHECK: linalg.matmul ins(%[[alloc0]], %[[alloc1]] : {{.*}}) outs(%[[alloc2]] : {{.*}})
+-  // Copy back result.
+-  // CHECK: memref.copy %[[alloc2]], %[[s2]]
+-  %4 = linalg.matmul ins(%1, %2 : tensor<4x?xf32>, tensor<?x5xf32>) outs(%3 : tensor<4x5xf32>) -> tensor<4x5xf32>
+-
+-  // insert_slice bufferizes to a no-op.
+-  %5 = tensor.insert_slice %4 into %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<4x5xf32> into tensor<24x25xf32>
+-  func.return %5 : tensor<24x25xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @vectorize_and_bufferize_pad(%arg0: tensor<24x12xf32>,
++                                         %arg1: tensor<12x25xf32>,
++                                         %arg2: tensor<24x25xf32>,
++                                         %iv0 : index, %iv1 : index,
++                                         %iv2 : index) -> tensor<24x25xf32> {
++    %0 = affine.min #map()[%iv2]
++
++    // CHECK: %[[s0:.*]] = memref.subview %[[arg0]]
++    %1 = tensor.extract_slice %arg0[%iv0, %iv2] [4, %0] [1, 1] : tensor<24x12xf32> to tensor<4x?xf32>
++    // CHECK: %[[s1:.*]] = memref.subview %[[arg1]]
++    %2 = tensor.extract_slice %arg1[%iv2, %iv1] [%0, 5] [1, 1] : tensor<12x25xf32> to tensor<?x5xf32>
++    // CHECK: %[[s2:.*]] = memref.subview %[[arg2]]
++    %3 = tensor.extract_slice %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<24x25xf32> to tensor<4x5xf32>
++
++    // CHECK: %[[v0:.*]] = vector.mask {{.*}} { vector.transfer_read %[[s0]]
++    // CHECK: %[[alloc0:.*]] = memref.alloc() : memref<4x7xf32, 3>
++    // CHECK: vector.mask {{.*}} { vector.transfer_write %[[v0]], %[[alloc0]]
++
++    // CHECK: %[[v1:.*]] = vector.mask {{.*}} { vector.transfer_read %[[s1]]
++    // CHECK: %[[alloc1:.*]] = memref.alloc() : memref<7x5xf32, 3>
++    // CHECK: vector.mask {{.*}} { vector.transfer_write %[[v1]], %[[alloc1]]
++
++    // CHECK: %[[v2:.*]] = vector.mask {{.*}} { vector.transfer_read %[[s2]]
++    // CHECK: %[[alloc2:.*]] = memref.alloc() : memref<4x5xf32, 3>
++    // CHECK: vector.mask {{.*}} { vector.transfer_write %[[v2]], %[[alloc0]]
++
++    // CHECK: linalg.matmul ins(%[[alloc0]], %[[alloc1]] : {{.*}}) outs(%[[alloc2]] : {{.*}})
++    // Copy back result.
++    // CHECK: memref.copy %[[alloc2]], %[[s2]]
++    %4 = linalg.matmul ins(%1, %2 : tensor<4x?xf32>, tensor<?x5xf32>) outs(%3 : tensor<4x5xf32>) -> tensor<4x5xf32>
++
++    // insert_slice bufferizes to a no-op.
++    %5 = tensor.insert_slice %4 into %arg2[%iv0, %iv1] [4, 5] [1, 1] : tensor<4x5xf32> into tensor<24x25xf32>
++    func.return %5 : tensor<24x25xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
+diff --git a/mlir/test/Dialect/Vector/transform-vector.mlir b/mlir/test/Dialect/Vector/transform-vector.mlir
+index 75b29e22b4d2..21e615e60438 100644
+--- a/mlir/test/Dialect/Vector/transform-vector.mlir
++++ b/mlir/test/Dialect/Vector/transform-vector.mlir
+@@ -1,16 +1,18 @@
+-// RUN: mlir-opt %s --transform-interpreter --split-input-file | FileCheck %s
++// RUN: mlir-opt --transform-interpreter="debug-payload-root-tag=payload" %s --split-input-file | FileCheck %s
+ 
+ // CHECK-LABEL: func @matmul_tensors
+-func.func @matmul_tensors(
+-  %arg0: tensor<8x16xf32>, %arg1: tensor<16x32xf32>, %arg2: tensor<8x32xf32>)
+-    -> tensor<8x32xf32> {
+-// CHECK-NOT: linalg
+-// CHECK: vector.extract {{.*}} : vector<4xf32> from vector<8x4xf32>
+-// CHECK: vector.store {{.*}} : memref<8x32xf32>, vector<4xf32>
+-  %0 = linalg.matmul  ins(%arg0, %arg1: tensor<8x16xf32>, tensor<16x32xf32>)
+-                     outs(%arg2: tensor<8x32xf32>)
+-    -> tensor<8x32xf32>
+-  return %0 : tensor<8x32xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @matmul_tensors(
++    %arg0: tensor<8x16xf32>, %arg1: tensor<16x32xf32>, %arg2: tensor<8x32xf32>)
++      -> tensor<8x32xf32> {
++  // CHECK-NOT: linalg
++  // CHECK: vector.extract {{.*}} : vector<4xf32> from vector<8x4xf32>
++  // CHECK: vector.store {{.*}} : memref<8x32xf32>, vector<4xf32>
++    %0 = linalg.matmul  ins(%arg0, %arg1: tensor<8x16xf32>, tensor<16x32xf32>)
++                       outs(%arg2: tensor<8x32xf32>)
++      -> tensor<8x32xf32>
++    return %0 : tensor<8x32xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
+@@ -76,11 +78,13 @@ module attributes {transform.with_named_sequence} {
+ //  CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
+ //  CHECK-SAME:   %[[ARG0]], %[[ARG1]], %[[ARG2]] : vector<64x64xf16>, vector<64x64xf16> into vector<64x64xf32>
+ //  CHECK-NEXT:   return %[[R]] : vector<64x64xf32>
+-func.func @fold_arith_extf_into_contract(%arg0: vector<64x64xf16>, %arg1: vector<64x64xf16>, %arg2: vector<64x64xf32>) -> vector<64x64xf32> {
+-    %lhs_f32 = arith.extf %arg0 : vector<64x64xf16> to vector<64x64xf32>
+-    %rhs_f32 = arith.extf %arg1 : vector<64x64xf16> to vector<64x64xf32>
+-    %result = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %lhs_f32, %rhs_f32, %arg2 : vector<64x64xf32>, vector<64x64xf32> into vector<64x64xf32>
+-    return %result : vector<64x64xf32>
++module @payload attributes { transform.target_tag = "payload" } {
++  func.func @fold_arith_extf_into_contract(%arg0: vector<64x64xf16>, %arg1: vector<64x64xf16>, %arg2: vector<64x64xf32>) -> vector<64x64xf32> {
++      %lhs_f32 = arith.extf %arg0 : vector<64x64xf16> to vector<64x64xf32>
++      %rhs_f32 = arith.extf %arg1 : vector<64x64xf16> to vector<64x64xf32>
++      %result = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %lhs_f32, %rhs_f32, %arg2 : vector<64x64xf32>, vector<64x64xf32> into vector<64x64xf32>
++      return %result : vector<64x64xf32>
++  }
+ }
+ 
+ module attributes {transform.with_named_sequence} {
