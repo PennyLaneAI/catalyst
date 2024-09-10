@@ -159,6 +159,19 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
+TAPE_SPLITTING_PASS = (
+    # We clump multiple tapes into a single function and split them
+    # in mlir with a pass (frontend/jax_tracer.py).
+    # Therefore before the splitting the quantum mlir is "illegal",
+    # as each function will have multiple devices.
+    # Thus, the split must be the very first pass before anything else
+    # happens.
+    "QuantumTapeSplittingPass",
+    [
+        "func.func(split-multiple-tapes)",
+    ],
+)
+
 HLO_LOWERING_PASS = (
     "HLOLoweringPass",
     [
@@ -272,6 +285,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
+    TAPE_SPLITTING_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -287,6 +301,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
+    TAPE_SPLITTING_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
