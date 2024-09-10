@@ -530,7 +530,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
                 # have a False non_commuting_observables flag, but since we aren't
                 # enforcing that, let's keep it for now
                 measurement_program.add_transform(split_non_commuting)
-            
+
             if "Sample" in self.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
             elif "Counts" in self.measurement_processes:
@@ -539,7 +539,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
                 raise RuntimeError("The device does not support observables or sample/counts")
         elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
             if not split_non_commuting in measurement_program:
-                # the device might support non commuting measurements but not all the 
+                # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
                 measurement_program.add_transform(split_non_commuting)
             _obs_dict = {

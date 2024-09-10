@@ -1184,7 +1184,9 @@ class TestDiagonalizationTransforms:
             config = get_device_toml_config(dev)
             config["operators"]["observables"] = {}
 
-            with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            with patch(
+                "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
+            ):
                 # transform is added to transform program
                 dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
                 backend_info = extract_backend_info(dev, dev_capabilities)
@@ -1207,8 +1209,11 @@ class TestDiagonalizationTransforms:
                         qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
                         qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
                         qml.probs(wires=[3, 4]),
-                )
-            with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+                    )
+
+            with patch(
+                "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
+            ):
                 mlir = qml.qjit(circuit, target="mlir").mlir
 
             assert "expval" not in mlir
