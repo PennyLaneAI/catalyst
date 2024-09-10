@@ -979,5 +979,20 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
 
+class TestDensityMatrixMP:
+    """Tests for density_matrix"""
+
+    def test_error(self, backend):
+        """Test that tracing density matrix produces an error"""
+
+        err_msg = "Measurement .* is not implemented"
+        with pytest.raises(NotImplementedError, match=err_msg):
+
+            @qml.qjit
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit():
+                return qml.density_matrix([0])
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
