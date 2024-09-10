@@ -274,14 +274,15 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // each tape has its own quantum.device operation attached to it
 
         // Do nothing and exit for classical and single-tape programs
-        if (countTapes(func) < 2) {
+        auto howManyTapes = countTapes(func);
+        if (howManyTapes < 2) {
             return;
         }
 
         // 2. Parse the function into tapes
         // total number of operation lists is number of tapes +2
         // for classical pre and post processing
-        SmallVector<std::vector<Operation *>> OpsEachTape(countTapes(func) + 2,
+        SmallVector<std::vector<Operation *>> OpsEachTape(howManyTapes + 2,
                                                           std::vector<Operation *>());
 
         collectOperationsForEachTape(func, OpsEachTape);
@@ -297,9 +298,8 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         collectNecessaryValuesFromEarlierTapes(PPOps, NecessaryValuesFromEarlierTapes);
 
         // 4. Generate the functions for each tape
-        unsigned int NumTapes = countTapes(func);
         SmallVector<FailureOr<func::FuncOp>> OutlinedFuncs;
-        for (unsigned int i = 0; i < NumTapes; i++) {
+        for (unsigned int i = 0; i < howManyTapes; i++) {
             if (failed(createTapeFunction(OpsEachTape[OpsEachTape.size() - 2 - i],
                                           NecessaryValuesFromEarlierTapes, builder,
                                           OpsEachTape.size() - 3 - i, func, OutlinedFuncs))) {
