@@ -477,6 +477,9 @@
   raises an error.
   [(#1002)](https://github.com/PennyLaneAI/catalyst/pull/1002)
 
+* Correctly errors out when user uses `qml.density_matrix`
+  [(#1118)](https://github.com/PennyLaneAI/catalyst/pull/1118)
+
 * Catalyst now preserves output PyTrees in QNodes executed with `mcm_method="one-shot"`.
   [(#957)](https://github.com/PennyLaneAI/catalyst/pull/957)
 

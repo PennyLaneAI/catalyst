@@ -32,10 +32,6 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
-from pennylane.tape.tape import (
-    _validate_computational_basis_sampling,
-    rotations_and_diagonal_measurements,
-)
 
 from catalyst.api_extensions import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
@@ -290,13 +286,13 @@ def measurements_from_samples(tape, device_wires):
     new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_samples(results):
-        """A processing function to get expecation values from counts."""
+        """A processing function to get expecation values from samples."""
         samples = results[0]
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
                 if len(tape.shots.shot_vector) > 1:
-                    res = tuple([m.process_samples(s, measured_wires) for s in samples])
+                    res = tuple(m.process_samples(s, measured_wires) for s in samples)
                 else:
                     res = m.process_samples(samples, measured_wires)
                 results_processed.append(res)
@@ -314,8 +310,8 @@ def measurements_from_samples(tape, device_wires):
 
 
 def _diagonalize_measurements(tape, device_wires):
-    """Convert the measurements and operations on the tape to those relevant
-    for measuring in the readout basis.
+    """Takes a tape and returns the information needed to create a new tape based on
+    diagonalization and readout in the measurement basis.
 
     Args:
         tape (QuantumTape): A quantum circuit.
@@ -325,23 +321,15 @@ def _diagonalize_measurements(tape, device_wires):
         measured_wires (list): A list of all wires that are measured on the tape
 
     """
-    if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape)
 
-    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for i, m in enumerate(diagonal_measurements):
-        if m.obs is not None:
-            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
+    (diagonalized_tape,) , _ = qml.transforms.diagonalize_measurements(tape)
 
     measured_wires = set()
-    for m in diagonal_measurements:
+    for m in diagonalized_tape.measurements:
         wires = m.wires if m.wires else device_wires
         measured_wires.update(wires.tolist())
 
-    new_operations = tape.operations
-    new_operations.extend(diagonalizing_gates)
-
-    return new_operations, list(measured_wires)
+    return diagonalized_tape.operations, list(measured_wires)
 
 
 def _probs_from_counts(counts_outcome):

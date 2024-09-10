@@ -26,7 +26,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
+from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -249,7 +249,7 @@ def _apply_result_type_conversion(
         OutputSignature: new output signature of the function
     """
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
-    args = [AbstractQreg(target_types[-1].length)] if with_qreg else []
+    args = [AbstractQreg()] if with_qreg else []
 
     def _fun(*in_tracers):
         out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
@@ -289,12 +289,9 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
     if all_ends_with_qreg:  # [1]
-        length = types[-1][-1].length
         types = [t[:-1] for t in types]
-    else:
-        length = None
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg(length)] if all_ends_with_qreg else [])
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
 
 
 @debug_logger
@@ -770,7 +767,7 @@ def trace_observables(
         obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
-            f"Observable {obs} (of type {type(obs)}) is not impemented"
+            f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
     return obs_tracers, (len(qubits) if qubits else 0)
 
@@ -930,13 +927,13 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif o.return_type.value == "state":
+            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not impemented"
+                    f"Measurement {type(o)} is not implemented"
                 )  # pragma: no cover
         elif isinstance(o, DynamicJaxprTracer):
             out_classical_tracers.append(o)
@@ -1223,7 +1220,7 @@ def trace_quantum_function(
                 rtd_name=device.backend_name,
                 rtd_kwargs=str(device.backend_kwargs),
             )
-            qreg_in = qalloc_p.bind(len(device.wires), static_size=len(device.wires))
+            qreg_in = qalloc_p.bind(len(device.wires))
 
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
