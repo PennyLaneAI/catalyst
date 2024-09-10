@@ -990,7 +990,7 @@ class TestDensityMatrixMP:
 
             @qml.qjit
             @qml.qnode(qml.device(backend, wires=1))
-            def foo():
+            def circuit():
                 return qml.density_matrix([0])
 
 
