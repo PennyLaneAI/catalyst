@@ -423,6 +423,27 @@ To generate html files for the documentation for Catalyst:
 
 The generated files are located in ``doc/_build/html``
 
+Known Issues
+------------
+
+.. tabs::
+
+   .. group-tab:: Linux Debian/Ubuntu
+
+      .. warning::
+        | If you get this error: 
+        | ``cannot find -lstdc++: No such file or directory``
+        | you might need to install a recent version of ``libstdc``. E.g.: 
+        | ``sudo apt install libstdc++-12-dev``.
+
+   .. group-tab:: macOS
+
+      .. warning::
+        | If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
+        | with the path to the Conda Python binary. E.g.:
+        | ``export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python``
+        | If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
+
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
 
