@@ -280,7 +280,8 @@ class TestBroadcastExpand:
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
-        # TODO: expected is tuple, observed is list
+        # TODO: See https://github.com/PennyLaneAI/catalyst/issues/1099
+        # assert expected_shape == observed_shape
         assert expected_shape.num_leaves == observed_shape.num_leaves
 
 
