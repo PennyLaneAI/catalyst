@@ -51,16 +51,23 @@
       circuit,
       scale_factors=s,
       extrapolate=exponential_extrapolate,
-      folding="all" #"all" for local or "global" for the original method, default is "global"
+      folding="all" # "all" for local or "global" for the original method (default being "global")
     )()
+  ```
 
-print(circuit())
-print(mitigated_circuit())
+  ```pycon
+  >>> circuit()
+  >>> mitigated_circuit()
   ```
 
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
+
+* Remove `static_size` field from `AbstractQreg` class.
+  [(#1113)](https://github.com/PennyLaneAI/catalyst/pull/1113)
+
+  This reverts a previous breaking change.
 
 <h3>Bug fixes</h3>
 
@@ -80,6 +87,7 @@ print(mitigated_circuit())
 This release contains contributions from (in alphabetical order):
 
 Romain Moyard,
+Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
 Daniel Strano

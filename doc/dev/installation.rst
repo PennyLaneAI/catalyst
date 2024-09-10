@@ -4,7 +4,7 @@ Installation
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) 
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
-Python versions 3.9 and higher. To install it, simply run the following ``pip`` command:
+Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -161,7 +161,7 @@ installed and available on the path (depending on the platform):
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
   `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
 
-- `Python <https://www.python.org/>`_ 3.9 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.10 or higher for the Python frontend.
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
