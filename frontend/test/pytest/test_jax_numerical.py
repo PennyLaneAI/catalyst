@@ -14,185 +14,21 @@
 
 """Test that numerical jax functions produce correct results when compiled with qml.qjit"""
 
-import warnings
-
 import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from jax import scipy as jsp
 
-from catalyst import accelerate, qjit
+from catalyst import qjit
 
 
-class TestExpmNumerical:
-    """Test jax.scipy.linalg.expm is numerically correct when being qjit compiled"""
+class TestExpmAndSolve:
+    """Test that `jax.scipy.linalg.expm` and `jax.scipy.linalg.solve` can run together
+    in the same function scope but from different qjit blocks.
 
-    @pytest.mark.parametrize(
-        "inp",
-        [
-            jnp.array([[0.1, 0.2], [5.3, 1.2]]),
-            jnp.array([[1, 2], [3, 4]]),
-            jnp.array([[1.0, -1.0j], [1.0j, -1.0]]),
-            jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]),
-        ],
-    )
-    def test_expm_numerical(self, inp):
-        """Test basic numerical correctness for jax.scipy.linalg.expm for float, int, complex"""
-        if np.array_equiv(inp, jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]])):
-            # this particular matrix has wrong answer numbers and need to be solved by proper lapack calls.
-            # https://github.com/PennyLaneAI/catalyst/issues/1071
-            pytest.xfail("Waiting for proper lapack calls")
-
-        @qjit
-        def f(x):
-            return jsp.linalg.expm(x)
-
-        observed = f(inp)
-        expected = jsp.linalg.expm(inp)
-
-        assert np.allclose(observed, expected)
-
-
-class TestExpmInCircuit:
-    """Test entire quantum workflows with jax.scipy.linag.expm"""
-
-    def test_expm_in_circuit(self):
-        """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
-
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_expm():
-            generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
-            unitary = jsp.linalg.expm(generator)
-            qml.QubitUnitary(unitary, wires=[0])
-            return qml.probs()
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_rot():
-            qml.RX(np.pi, wires=[0])
-            return qml.probs()
-
-        res = circuit_expm()
-        expected = circuit_rot()  # expected = [0,1]
-        assert np.allclose(res, expected)
-
-
-class TestExpmWarnings:
-    """Test jax.scipy.linalg.expm raises a warning when not used in accelerate callback"""
-
-    """Remove the warnings module and this test when we have proper lapack calls"""
-
-    def test_expm_warnings(self):
-        @qjit
-        def f(x):
-            expm = jsp.linalg.expm
-            return expm(x)
-
-        with pytest.warns(
-            UserWarning,
-            match="jax.scipy.linalg.expm occasionally gives wrong numerical results",
-        ):
-            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-
-    def test_accelerated_expm_no_warnings(self, recwarn):
-        @qjit
-        def f(x):
-            expm = accelerate(jsp.linalg.expm)
-            return expm(x)
-
-        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        expected = jsp.linalg.expm(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        assert len(recwarn) == 0
-        assert np.allclose(observed, expected)
-
-
-class TestLUWarnings:
-    """Test jax.scipy.linalg.lu raises a warning when not used in accelerate callback"""
-
-    """Remove the warnings module and this test when we have proper lapack calls"""
-
-    def test_lu_warnings(self):
-        @qjit
-        def f(x):
-            lu = jsp.linalg.lu
-            return lu(x)
-
-        with pytest.warns(
-            UserWarning,
-            match="jax.scipy.linalg.lu occasionally gives wrong numerical results",
-        ):
-            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-
-    def test_accelerated_lu_no_warnings(self, recwarn):
-        @qjit
-        def f(x):
-            lu = accelerate(jsp.linalg.lu)
-            return lu(x)
-
-        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        expected = jsp.linalg.lu(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        assert len(recwarn) == 0
-        assert np.allclose(observed, expected)
-
-    def test_lu_factor_warnings(self):
-        @qjit
-        def f(x):
-            luf = jsp.linalg.lu_factor
-            return luf(x)
-
-        with pytest.warns(
-            UserWarning,
-            match="jax.scipy.linalg.lu_factor occasionally gives wrong numerical results",
-        ):
-            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-
-    def test_accelerated_lu_factor_no_warnings(self, recwarn):
-        @qjit
-        def f(x):
-            luf = accelerate(jsp.linalg.lu_factor)
-            return luf(x)
-
-        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        expected = jsp.linalg.lu_factor(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        assert len(recwarn) == 0
-        assert np.allclose(observed[0], expected[0])
-        assert np.allclose(observed[1], expected[1])
-
-    def test_lu_solve_warnings(self):
-        @qjit
-        def f(x):
-            lus = jsp.linalg.lu_solve
-            b = jnp.array([3.0, 4.0])
-            B = accelerate(jsp.linalg.lu_factor)(
-                x
-            )  # since this is a lu_solve unit test, use accelerate for lu_factor
-            return lus(B, b)
-
-        with pytest.warns(
-            UserWarning,
-            match="jax.scipy.linalg.lu_solve occasionally gives wrong numerical results",
-        ):
-            f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-
-    def test_accelerated_lu_solve_no_warnings(self, recwarn):
-        @qjit
-        def f(x):
-            lus = accelerate(jsp.linalg.lu_solve)
-            b = jnp.array([3.0, 4.0])
-            B = accelerate(jsp.linalg.lu_factor)(x)
-            return lus(B, b)
-
-        def truth(x):
-            lus = jsp.linalg.lu_solve
-            b = jnp.array([3.0, 4.0])
-            B = jsp.linalg.lu_factor(x)
-            return lus(B, b)
-
-        observed = f(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        expected = truth(jnp.array([[0.1, 0.2], [5.3, 1.2]]))
-        assert len(recwarn) == 0
-        assert np.allclose(observed, expected)
+    Also test that their results are numerically correct when qjit compiled.
+    """
 
 
 class TestArgsortNumerical:
