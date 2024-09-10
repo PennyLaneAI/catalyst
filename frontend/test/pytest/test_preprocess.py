@@ -286,6 +286,7 @@ class TestDecomposition:
 
 
 class TestMeasurementTransforms:
+    """Tests for transforms modifying measurements"""
 
     @flaky
     def test_measurements_from_counts_multiple_measurements(self):
@@ -333,8 +334,8 @@ class TestMeasurementTransforms:
         ]
         eigvals = [(-1) ** i for i in num_excitations_per_state]
         eigval_counts_res = {
-            -1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == -1]),
-            1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == 1]),
+            -1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == -1),
+            1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == 1),
         }
 
         # +/- 100 shots is pretty reasonable with 3000 shots total
@@ -345,7 +346,7 @@ class TestMeasurementTransforms:
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4, shots=3000)
+        dev = qml.device("lightning.qubit", wires=4, shots=5000)
 
         @qml.qnode(dev)
         def basic_circuit(theta: float):
@@ -410,9 +411,7 @@ class TestMeasurementTransforms:
             config = get_device_toml_config(dev)
             config["operators"]["observables"] = {}
 
-            with patch(
-                "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
-            ):
+            with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
                 # transform is added to transform program
                 dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
                 backend_info = extract_backend_info(dev, dev_capabilities)
@@ -435,7 +434,7 @@ class TestMeasurementTransforms:
                         qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
                         qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
                         qml.probs(wires=[3, 4]),
-                    )
+                )
 
                 mlir = qml.qjit(circuit, target="mlir").mlir
 
@@ -444,6 +443,7 @@ class TestMeasurementTransforms:
             assert "probs" not in mlir
             assert target_measurement in mlir
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -479,8 +479,8 @@ class TestMeasurementTransforms:
             ]
             eigvals = [(-1) ** i for i in num_excitations_per_state]
             eigval_counts_res = {
-                -1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == -1]),
-                1.0: sum([count for count, eigval in zip(counts, eigvals) if eigval == 1]),
+                -1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == -1),
+                1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == 1),
             }
 
             # +/- 100 shots is pretty reasonable with 3000 shots total
@@ -491,12 +491,13 @@ class TestMeasurementTransforms:
             num_wires = len(measurement().wires) if measurement().wires else len(dev.wires)
             basis_states = [format(int(state), "01b").zfill(num_wires) for state in basis_states]
             counts = [int(c) for c in counts]
-            counts_dict = dict([(state, c) for (state, c) in zip(basis_states, counts) if c != 0])
+            counts_dict = dict((state, c) for (state, c) in zip(basis_states, counts) if c != 0)
 
             for res, expected_res in zip(counts_dict.items(), counts_expected.items()):
                 assert res[0] == expected_res[0]
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -586,6 +587,7 @@ class TestMeasurementTransforms:
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -1294,6 +1296,8 @@ class TestPreprocessHybridOp:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+
+
 
 
 class TestTransform:
