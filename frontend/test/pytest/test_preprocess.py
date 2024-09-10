@@ -410,7 +410,9 @@ class TestMeasurementTransforms:
             config = get_device_toml_config(dev)
             config["operators"]["observables"] = {}
 
-            with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            with patch(
+                "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
+            ):
                 # transform is added to transform program
                 dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
                 backend_info = extract_backend_info(dev, dev_capabilities)
@@ -433,7 +435,7 @@ class TestMeasurementTransforms:
                         qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
                         qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
                         qml.probs(wires=[3, 4]),
-                )
+                    )
 
                 mlir = qml.qjit(circuit, target="mlir").mlir
 
@@ -1292,8 +1294,6 @@ class TestPreprocessHybridOp:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
-
-
 
 
 class TestTransform:

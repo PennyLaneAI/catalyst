@@ -322,7 +322,7 @@ def _diagonalize_measurements(tape, device_wires):
 
     """
 
-    (diagonalized_tape,) , _ = qml.transforms.diagonalize_measurements(tape)
+    (diagonalized_tape,), _ = qml.transforms.diagonalize_measurements(tape)
 
     measured_wires = set()
     for m in diagonalized_tape.measurements:
