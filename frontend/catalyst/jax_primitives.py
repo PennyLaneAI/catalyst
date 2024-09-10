@@ -947,13 +947,13 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    scale_factors = args[-1]
+    num_folds = args[-1]
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args[0:-1]),
         _folding_attribute(ctx, folding),
-        scale_factors,
+        num_folds,
     ).results
 
 
