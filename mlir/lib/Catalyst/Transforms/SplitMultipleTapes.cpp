@@ -39,13 +39,11 @@ using namespace catalyst;
 
 namespace catalyst {
 #define GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
-#ifdef GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
-#define SmallSetSize 8
-#endif
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass> {
     using impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass>::SplitMultipleTapesPassBase;
+    template <typename T> using SmallSet = llvm::SmallSet<T, 8>;
 
     unsigned int countTapes(const func::FuncOp &func)
     {
@@ -100,8 +98,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     void collectNecessaryValuesFromEarlierTapes(
         const std::vector<Operation *> &TapeOps,
-        SmallSet<std::pair<Operation *, unsigned int>, SmallSetSize>
-            &NecessaryValuesFromEarlierTapes)
+        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes)
     {
         // Go through a list of operations and collect all the necessary operand values
         // not defined in this list itself, and add them to NecessaryValuesFromEarlierTapes
@@ -136,10 +133,9 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
     } // collectNecessaryValuesFromEarlierTapes()
 
-    void getNecessaryTapeReturns(SmallVector<Value> &RetValues,
-                                 const std::vector<Operation *> &TapeOps,
-                                 SmallSet<std::pair<Operation *, unsigned int>, SmallSetSize>
-                                     &NecessaryValuesFromEarlierTapes)
+    void getNecessaryTapeReturns(
+        SmallVector<Value> &RetValues, const std::vector<Operation *> &TapeOps,
+        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes)
     {
         for (auto pair : NecessaryValuesFromEarlierTapes) {
             if (std::find(TapeOps.begin(), TapeOps.end(), pair.first) != TapeOps.end()) {
@@ -184,7 +180,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                                        const std::vector<Operation *> &TapeOps,
                                        SmallVector<Value> &RetValues)
     {
-        SmallPtrSet<Operation *, SmallSetSize> exceptions;
+        SmallPtrSet<Operation *, 8> exceptions;
         exceptions.insert(SCFRegionYieldOp);
         for (auto op : TapeOps) {
             exceptions.insert(op);
@@ -202,12 +198,11 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
     } // renameToUnique()
 
-    LogicalResult createTapeFunction(const std::vector<Operation *> &TapeOps,
-                                     SmallSet<std::pair<Operation *, unsigned int>, SmallSetSize>
-                                         &NecessaryValuesFromEarlierTapes,
-                                     IRRewriter &builder, const unsigned int &tapeNumber,
-                                     func::FuncOp &OriginalMultitapeFunc,
-                                     SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
+    LogicalResult createTapeFunction(
+        const std::vector<Operation *> &TapeOps,
+        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes,
+        IRRewriter &builder, const unsigned int &tapeNumber, func::FuncOp &OriginalMultitapeFunc,
+        SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
     {
         // 1. Identify the necessary return values
         SmallVector<Value> RetValues;
@@ -292,8 +287,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         // 3. Get the SSA values needed by the post processing (PP)
         // These need to be returned by the tapes.
         // Note that later tapes can also need values from earilier tapes.
-        SmallSet<std::pair<Operation *, unsigned int>, SmallSetSize>
-            NecessaryValuesFromEarlierTapes;
+        SmallSet<std::pair<Operation *, unsigned int>> NecessaryValuesFromEarlierTapes;
 
         // Go through all the operands of all the PP ops
         // Find the ones that are not produced in PP itself
