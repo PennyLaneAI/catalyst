@@ -1154,8 +1154,9 @@ class TestPreprocessHybridOp:
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
-class TestDiagonalizationTransforms():
-    """Test that the diagonalization transforms are included as expected in the QJIT device 
+
+class TestDiagonalizationTransforms:
+    """Test that the diagonalization transforms are included as expected in the QJIT device
     TransformProgram based on device capabilities"""
 
     @pytest.mark.parametrize(
@@ -1211,10 +1212,21 @@ class TestDiagonalizationTransforms():
             assert "probs" not in mlir
             assert target_measurement in mlir
 
-    @pytest.mark.parametrize("unsupported_obs", [("PauliX",), ("PauliY",), ("Hadamard",), ("PauliX", "PauliY"), ("PauliX", "Hadamard"), ("PauliY", "Hadamard"), ("PauliX", "PauliY", "Hadamard")])
+    @pytest.mark.parametrize(
+        "unsupported_obs",
+        [
+            ("PauliX",),
+            ("PauliY",),
+            ("Hadamard",),
+            ("PauliX", "PauliY"),
+            ("PauliX", "Hadamard"),
+            ("PauliY", "Hadamard"),
+            ("PauliX", "PauliY", "Hadamard"),
+        ],
+    )
     def test_diagonalize_measurements_integration(self, unsupported_obs, mocker):
-        """Test that the diagonalize_measurements transform is applied or not as when 
-        we are not diagonalizing everything to counts or samples, but not all of 
+        """Test that the diagonalize_measurements transform is applied or not as when
+        we are not diagonalizing everything to counts or samples, but not all of
         {X, Y, Z, H} are supported."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -1230,7 +1242,7 @@ class TestDiagonalizationTransforms():
         config = get_device_toml_config(dev)
         for obs in unsupported_obs:
             del config["operators"]["observables"][obs]
-        
+
         spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
 
         # mock TOML file output to indicate some observables are not supported
