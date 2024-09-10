@@ -99,17 +99,6 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         });
     } // collectOperationsForEachTape()
 
-    unsigned int getResultNumber(Operation *op, Value v)
-    {
-        // Get the result index i such that v = op->getResult(i)
-        for (unsigned int i = 0; i < op->getNumResults(); i++) {
-            if (op->getResult(i) == v) {
-                return i;
-            }
-        }
-        assert(false && "Value is not a result of the operation!");
-    } // getResultNumber()
-
     void collectNecessaryValuesFromEarlierTapes(
         const std::vector<Operation *> &TapeOps,
         SmallSet<std::pair<Operation *, unsigned int>, SmallSetSize>
@@ -117,30 +106,34 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     {
         // Go through a list of operations and collect all the necessary operand values
         // not defined in this list itself, and add them to NecessaryValuesFromEarlierTapes
-        for (Operation *PPOp : TapeOps) {
-            PPOp->walk([&](Operation *op) {
-                for (auto operand : op->getOperands()) {
-                    if (isa<BlockArgument>(operand)) {
-                        // Arguments to the original multitape function are always available
-                        // and do not have defining ops, so don't process them
-                        continue;
-                    }
-                    Operation *OperandSource = operand.getDefiningOp();
-                    unsigned int whichResult = getResultNumber(OperandSource, operand);
-                    if (std::find(TapeOps.begin(), TapeOps.end(), OperandSource) == TapeOps.end()) {
-                        // A list operand not produced in list itself, must be from earlier
-                        // tapes/preprocessing!
-                        // Note that we should not record the same value twice in the set
-
-                        // Enforce the pair as rvalue for `contains`
-                        auto &&pair = std::make_pair(OperandSource, whichResult);
-                        if (!NecessaryValuesFromEarlierTapes.contains(pair)) {
-                            NecessaryValuesFromEarlierTapes.insert(
-                                std::make_pair(OperandSource, whichResult));
-                        }
-                    }
+        // Record the Value as pair<defining op, result index number>
+        auto findNecessaryValues = [&](Operation *op) {
+            for (auto operand : op->getOperands()) {
+                if (isa<BlockArgument>(operand)) {
+                    // Arguments to the original multitape function are always available
+                    // and do not have defining ops, so don't process them
+                    continue;
                 }
-            });
+                Operation *OperandSource = operand.getDefiningOp();
+                if (std::find(TapeOps.begin(), TapeOps.end(), OperandSource) != TapeOps.end()) {
+                    continue;
+                }
+
+                // A list operand not defined in list itself, must be from earlier
+                // tapes/preprocessing!
+                unsigned whichResult = cast<mlir::OpResult>(operand).getResultNumber();
+
+                // Note that we should not record the same value twice in the set
+                // Enforce the pair as rvalue for `contains`
+                auto &&pair = std::make_pair(OperandSource, whichResult);
+                if (!NecessaryValuesFromEarlierTapes.contains(pair)) {
+                    NecessaryValuesFromEarlierTapes.insert(
+                        std::make_pair(OperandSource, whichResult));
+                }
+            }
+        };
+        for (Operation *PPOp : TapeOps) {
+            PPOp->walk(findNecessaryValues);
         }
     } // collectNecessaryValuesFromEarlierTapes()
 
