@@ -330,6 +330,128 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         rewriter.replaceOp(ifOp, newIfOp);
     }
 
+    void detensorizeWhileOp(Operation *root, scf::WhileOp whileOp, IRRewriter &rewriter)
+    {
+        SmallVector<Type> newResultTypes;
+        for (auto result : whileOp->getResults()) {
+            if (isScalarTensor(result)) {
+                newResultTypes.push_back(cast<TensorType>(result.getType()).getElementType());
+            }
+            else {
+                newResultTypes.push_back(result.getType());
+            }
+        }
+
+        // 1. Find scalar tensors and extract element
+        SmallVector<std::size_t> indices;
+        SmallVector<Value> newIterOperands;
+        std::size_t index = 0;
+        for (Value opOperand : whileOp.getOperands()) {
+            if (isScalarTensor(opOperand)) {
+                rewriter.setInsertionPoint(whileOp);
+                Value value =
+                    rewriter.create<tensor::ExtractOp>(whileOp->getLoc(), opOperand, ValueRange{});
+                newIterOperands.push_back(value);
+                indices.push_back(index);
+                index += 1;
+                continue;
+            }
+            newIterOperands.push_back(opOperand);
+            index += 1;
+        }
+
+        // 2. Create the new WhileOp shell.
+        scf::WhileOp newWhileOp =
+            rewriter.create<scf::WhileOp>(whileOp.getLoc(), newResultTypes, newIterOperands,
+                                          /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
+
+        // 3. Copy body
+        Block &beforeBlock = *whileOp.getBeforeBody();
+        Block &afterBlock = *whileOp.getAfterBody();
+        Block &newBeforeBlock = *newWhileOp.getBeforeBody();
+        Block &newAfterBlock = *newWhileOp.getAfterBody();
+        rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock, newBeforeBlock.getArguments());
+        rewriter.mergeBlocks(&afterBlock, &newAfterBlock, newAfterBlock.getArguments());
+
+        // 4. Retensorize arguments at the beginning of the body
+        rewriter.setInsertionPoint(&newBeforeBlock, newBeforeBlock.begin());
+        for (std::size_t index : indices) {
+
+            Value value = rewriter.create<tensor::FromElementsOp>(
+                newWhileOp->getLoc(),
+                RankedTensorType::get({}, newBeforeBlock.getArgument(index).getType()),
+                newBeforeBlock.getArgument(index));
+            rewriter.replaceUsesWithIf(newBeforeBlock.getArgument(index), value,
+                                       [&](OpOperand &op) {
+                                           return !isa<tensor::FromElementsOp>(op.getOwner()) &&
+                                                  !isa<scf::WhileOp>(op.getOwner());
+                                       });
+        }
+
+        scf::ConditionOp condOp = newWhileOp.getConditionOp();
+        SmallVector<Value> newCondOpArgs;
+        OperandRange condOpArgs = condOp.getArgs();
+        for (const auto &it : llvm::enumerate(condOpArgs)) {
+            Value condOpArg = it.value();
+            if (isScalarTensor(condOpArg)) {
+                OpBuilder::InsertionGuard g(rewriter);
+                rewriter.setInsertionPoint(condOp);
+                Value value =
+                    rewriter.create<tensor::ExtractOp>(condOp->getLoc(), condOpArg, ValueRange{});
+                newCondOpArgs.push_back(value);
+            }
+            else {
+                newCondOpArgs.emplace_back(condOpArg);
+            }
+        }
+
+        {
+            OpBuilder::InsertionGuard g(rewriter);
+            rewriter.setInsertionPoint(condOp);
+            rewriter.replaceOpWithNewOp<scf::ConditionOp>(condOp, condOp.getCondition(),
+                                                          newCondOpArgs);
+        }
+
+        rewriter.setInsertionPoint(&newAfterBlock, newAfterBlock.begin());
+        for (std::size_t index : indices) {
+            Value value = rewriter.create<tensor::FromElementsOp>(
+                newWhileOp->getLoc(),
+                RankedTensorType::get({}, newAfterBlock.getArgument(index).getType()),
+                newAfterBlock.getArgument(index));
+            rewriter.replaceUsesWithIf(newAfterBlock.getArgument(index), value, [&](OpOperand &op) {
+                return !isa<tensor::FromElementsOp>(op.getOwner());
+            });
+        }
+
+        // 5. Extract scalar tensor elements and detensorize terminator
+        scf::YieldOp clonedYieldOp = cast<scf::YieldOp>(newAfterBlock.getTerminator());
+        SmallVector<Value> newYieldOperands = clonedYieldOp.getOperands();
+        rewriter.setInsertionPoint(clonedYieldOp);
+        for (std::size_t index : indices) {
+            newYieldOperands[index] = rewriter.create<tensor::ExtractOp>(
+                clonedYieldOp->getLoc(), clonedYieldOp->getOperand(index), ValueRange{});
+        }
+        rewriter.create<scf::YieldOp>(newWhileOp.getLoc(), newYieldOperands);
+        rewriter.eraseOp(clonedYieldOp);
+
+        // llvm::errs() << "========================================" << '\n';
+        // llvm::errs() << *root << '\n';
+        // llvm::errs() << "========================================" << '\n';
+
+        // 6. Retensorize results after for loop
+        rewriter.setInsertionPointAfter(whileOp);
+        for (std::size_t index : indices) {
+            Value for_result = newWhileOp->getResult(index);
+            Value value = rewriter.create<tensor::FromElementsOp>(
+                newWhileOp->getLoc(), RankedTensorType::get({}, for_result.getType()), for_result);
+            rewriter.replaceUsesWithIf(whileOp->getResult(index), value, [&](OpOperand &op) {
+                return !isa<tensor::FromElementsOp>(op.getOwner());
+            });
+        }
+
+        rewriter.replaceOp(whileOp, newWhileOp);
+    }
+
     void runOnOperation() override
     {
         Operation *root = getOperation();
@@ -337,6 +459,7 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
         IRRewriter rewriter(root->getContext());
         root->walk([&](scf::ForOp for_op) { detensorizeForOp(for_op, rewriter); });
         root->walk([&](scf::IfOp if_op) { detensorizeIfOp(if_op, rewriter); });
+        root->walk([&](scf::WhileOp while_op) { detensorizeWhileOp(root, while_op, rewriter); });
 
         // MLIRContext *context = &getContext();
         // ConversionTarget target(*context);
