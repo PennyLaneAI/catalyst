@@ -30,6 +30,10 @@ from jax._src.tree_util import tree_flatten
 from catalyst.jax_primitives import Folding, zne_p
 
 
+def _is_odd_positive(list):
+    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in list)
+
+
 ## API ##
 def mitigate_with_zne(
     fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="global"
@@ -114,7 +118,7 @@ def mitigate_with_zne(
             return zne_circuit(weights)
 
     >>> weights = jnp.ones([3, 2, 3])
-    >>> scale_factors = jnp.array([1, 3, 5 , 7])
+    >>> scale_factors = [1, 3, 5]
     >>> workflow(weights, scale_factors)
     Array(-0.19946598, dtype=float64)
     """
@@ -130,10 +134,7 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    def is_odd_positive(scale_list):
-        return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in scale_list)
-
-    if not is_odd_positive(scale_list=scale_factors):
+    if not _is_odd_positive(scale_factors):
         raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
 
     num_folds = jnp.array([jax.numpy.floor((s - 1) / 2) for s in scale_factors], dtype=int)
