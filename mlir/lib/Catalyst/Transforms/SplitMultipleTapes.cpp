@@ -14,7 +14,6 @@
 
 #define DEBUG_TYPE "splitmultipletapes"
 
-#include <cassert>
 #include <vector>
 
 #include "llvm/ADT/SmallPtrSet.h"
