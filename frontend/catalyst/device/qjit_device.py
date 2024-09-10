@@ -524,25 +524,23 @@ class QJITDeviceNewAPI(qml.devices.Device):
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
-        if self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}]:
+        if not self.observables:
             if not split_non_commuting in measurement_program:
-                # this should be redundant, a TOML that only supports samples/counts should
-                # have a False non_commuting_observables flag
-                # not sure if we want the redundancy, or maybe we want some
-                # verification on TOML file import to make sure there is consistency
-                # for related information? Seems like between verification and redundancy
-                # we should have at least one.
+                # this *should* be redundant, a TOML that doesn't have observables should
+                # have a False non_commuting_observables flag, but since we aren't
+                # enforcing that, let's keep it for now
                 measurement_program.add_transform(split_non_commuting)
-            measurement_program.add_transform(measurements_from_samples, self.wires)
-        elif self.measurement_processes == {"Counts"}:
-            if not split_non_commuting in measurement_program:
-                # as above
-                measurement_program.add_transform(split_non_commuting)
-            measurement_program.add_transform(measurements_from_counts, self.wires)
+            
+            if "Sample" in self.measurement_processes:
+                measurement_program.add_transform(measurements_from_samples, self.wires)
+            elif "Counts" in self.measurement_processes:
+                measurement_program.add_transform(measurements_from_counts, self.wires)
+            else:
+                raise RuntimeError("The device does not support observables or sample/counts")
         elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
             if not split_non_commuting in measurement_program:
-                # technically the device might support non commuting measurements
-                # but not Hadamard, so here it makes sense.
+                # the device might support non commuting measurements but not all the 
+                # Pauli + Hadamard observables, so here it is needed
                 measurement_program.add_transform(split_non_commuting)
             _obs_dict = {
                 "PauliX": qml.X,

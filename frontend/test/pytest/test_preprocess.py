@@ -1181,31 +1181,35 @@ class TestDiagonalizationTransforms:
             wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
-            # transform is added to transform program
-            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
-            backend_info = extract_backend_info(dev, dev_capabilities)
-            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+            config = get_device_toml_config(dev)
+            config["operators"]["observables"] = {}
 
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx)
+            with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+                # transform is added to transform program
+                dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
+                backend_info = extract_backend_info(dev, dev_capabilities)
+                qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
-            assert measurement_transform in transform_program
+                with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+                    transform_program, _ = qjit_dev.preprocess(ctx)
 
-            # MLIR only contains target measurement
-            @qml.qjit
-            @qml.qnode(dev)
-            def circuit(theta: float):
-                qml.X(0)
-                qml.X(1)
-                qml.X(2)
-                qml.X(3)
-                return (
-                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                    qml.probs(wires=[3, 4]),
+                assert measurement_transform in transform_program
+
+                # MLIR only contains target measurement
+                @qml.qjit
+                @qml.qnode(dev)
+                def circuit(theta: float):
+                    qml.X(0)
+                    qml.X(1)
+                    qml.X(2)
+                    qml.X(3)
+                    return (
+                        qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                        qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                        qml.probs(wires=[3, 4]),
                 )
-
-            mlir = qml.qjit(circuit, target="mlir").mlir
+            with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+                mlir = qml.qjit(circuit, target="mlir").mlir
 
             assert "expval" not in mlir
             assert "quantum.var" not in mlir
