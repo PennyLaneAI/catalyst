@@ -173,8 +173,6 @@ class ZNE:
             raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
         try:
-            if self.folding == "local-all":
-                self.folding = "all"
             folding = Folding(self.folding)
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e

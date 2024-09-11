@@ -247,7 +247,7 @@ def test_folding_type_not_implemented():
         return 0.0
 
     def mitigated_qnode():
-        return catalyst.mitigate_with_zne(circuit, scale_factors=[], folding="random")()
+        return catalyst.mitigate_with_zne(circuit, scale_factors=[], folding="local-random")()
 
     with pytest.raises(NotImplementedError):
         catalyst.qjit(mitigated_qnode)

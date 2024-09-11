@@ -224,8 +224,8 @@ class Folding(Enum):
     """
 
     GLOBAL = "global"
-    RANDOM = "random"
-    ALL = "all"
+    RANDOM = "local-random"
+    ALL = "local-all"
 
 
 ##############
@@ -927,7 +927,7 @@ def _folding_attribute(ctx, folding):
     ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
         "mitigation",
-        ("folding " + Folding(folding).value).encode("utf-8"),
+        ("folding " + Folding(folding).name).encode("utf-8"),
         ir.NoneType.get(ctx),
         ctx,
     )
