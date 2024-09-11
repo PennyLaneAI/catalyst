@@ -105,6 +105,7 @@
 * Functions with multiple tapes are now split with a new mlir pass `--split-multiple-tapes`, with one tape per function. 
   The reset routine that makes a maeasurement between tapes and inserts a X gate if measured one is no longer used.
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
+  [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
 <h3>Contributors</h3>
 
