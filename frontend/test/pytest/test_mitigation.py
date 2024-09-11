@@ -66,7 +66,7 @@ def test_single_measurement(params, extrapolation, folding, scale_factors):
     def mitigated_qnode_passes(args):
         return catalyst.passes.mitigate_with_zne(
             circuit,
-            scale_factors=jax.numpy.array([1, 2, 3]),
+            scale_factors=scale_factors,
             extrapolate=extrapolation,
             folding=folding,
         )(args)
