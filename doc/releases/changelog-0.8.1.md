@@ -54,6 +54,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 David Ittah,
 Romain Moyard,
 Daniel Strano,
