@@ -430,46 +430,47 @@ Known Issues
 
    .. group-tab:: Linux Debian/Ubuntu
 
-      .. warning::
+      If you get this error: 
 
-        If you get this error: 
-
-        .. code-block:: console
-          
-          cannot find -lstdc++: No such file or directory
-
-        you might need to install a recent version of ``libstdc``. E.g.: 
-
-        .. code-block:: console
-          
-          sudo apt install libstdc++-12-dev
-
-      .. warning::
-
-        Under Ubuntu 24.04, if you get this error:
-
-        .. code-block:: console
+      .. code-block:: console
         
-          fatal error: 'Python.h' file not found
-        
-        you might need to install the Python Dev package:
+        cannot find -lstdc++: No such file or directory
 
-        .. code-block:: console
-          
-          sudo apt install python-dev-is-python3
+      you might need to install a recent version of ``libstdc``. E.g.: 
+
+      .. code-block:: console
+        
+        sudo apt install libstdc++-12-dev
+
+      .. raw:: html
+
+        <hr>
+
+      Under Ubuntu 24.04, if you get this error:
+
+      .. code-block:: console
+      
+        fatal error: 'Python.h' file not found
+      
+      you might need to install the Python Dev package:
+
+      .. code-block:: console
+        
+        sudo apt install python3-dev
+
+      (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/1084>`_)
 
    .. group-tab:: macOS
 
-      .. warning::
+      If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
+      with the path to the Conda Python binary. E.g.:
 
-        If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
-        with the path to the Conda Python binary. E.g.:
+      .. code-block:: console
 
-        .. code-block:: console
+        export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python
 
-          export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python
-
-        If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
+      If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
+      (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/377>`_)
 
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
