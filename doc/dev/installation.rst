@@ -431,24 +431,45 @@ Known Issues
    .. group-tab:: Linux Debian/Ubuntu
 
       .. warning::
-        | If you get this error: 
-        | ``cannot find -lstdc++: No such file or directory``
-        | you might need to install a recent version of ``libstdc``. E.g.: 
-        | ``sudo apt install libstdc++-12-dev``.
+
+        If you get this error: 
+
+        .. code-block:: console
+          
+          cannot find -lstdc++: No such file or directory
+
+        you might need to install a recent version of ``libstdc``. E.g.: 
+
+        .. code-block:: console
+          
+          sudo apt install libstdc++-12-dev
 
       .. warning::
-        | Under Ubuntu 24.04, if you get this error:
-        | ``fatal error: 'Python.h' file not found``
-        | you might need to install the Python Dev package:
-        | ``sudo apt install python-dev-is-python3``.
+
+        Under Ubuntu 24.04, if you get this error:
+
+        .. code-block:: console
+        
+          fatal error: 'Python.h' file not found
+        
+        you might need to install the Python Dev package:
+
+        .. code-block:: console
+          
+          sudo apt install python-dev-is-python3
 
    .. group-tab:: macOS
 
       .. warning::
-        | If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
-        | with the path to the Conda Python binary. E.g.:
-        | ``export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python``
-        | If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
+
+        If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
+        with the path to the Conda Python binary. E.g.:
+
+        .. code-block:: console
+
+          export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python
+
+        If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
 
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
