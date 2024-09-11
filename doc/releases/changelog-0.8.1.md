@@ -73,12 +73,19 @@
   part.
   [(#1120)](https://github.com/PennyLaneAI/catalyst/pull/1120)
 
+<h3>Bug fixes</h3>
+
+* Those functions calling the `gather_p` primitive (like `jax.scipy.linalg.expm`)
+  can now be used in multiple qjits in a single program.
+  [(#1096)](https://github.com/PennyLaneAI/catalyst/pull/1096)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Alessandro Cosentino,
+Paul Haochen Wang,
 David Ittah,
 Romain Moyard,
 Daniel Strano,
