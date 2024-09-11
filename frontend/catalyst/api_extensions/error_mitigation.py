@@ -137,7 +137,7 @@ def mitigate_with_zne(
     if not _is_odd_positive(scale_factors):
         raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
 
-    num_folds = jnp.array([jax.numpy.floor((s - 1) / 2) for s in scale_factors], dtype=int)
+    num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
 
     return ZNE(fn, num_folds, extrapolate, folding)
 
