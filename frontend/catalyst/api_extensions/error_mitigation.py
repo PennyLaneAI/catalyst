@@ -56,7 +56,7 @@ def mitigate_with_zne(
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
-            - all: per-gate folding sequences replace original gates in-place in the circuit
+            - local-all: per-gate folding sequences replace original gates in-place in the circuit
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
@@ -173,6 +173,8 @@ class ZNE:
             raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
         try:
+            if self.folding == "local-all":
+                self.folding = "all"
             folding = Folding(self.folding)
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e

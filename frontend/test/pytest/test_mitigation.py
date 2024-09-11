@@ -34,7 +34,7 @@ def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-@pytest.mark.parametrize("folding", ["global", "all"])
+@pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_single_measurement(params, extrapolation, folding):
     """Test that without noise the same results are returned for single measurements."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
@@ -64,7 +64,7 @@ def test_single_measurement(params, extrapolation, folding):
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-@pytest.mark.parametrize("folding", ["global", "all"])
+@pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_multiple_measurements(params, extrapolation, folding):
     """Test that without noise the same results are returned for multiple measurements"""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.4)
@@ -93,7 +93,7 @@ def test_multiple_measurements(params, extrapolation, folding):
 
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
-@pytest.mark.parametrize("folding", ["global", "all"])
+@pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_single_measurement_control_flow(params, folding):
     """Test that without noise the same results are returned for single measurement and with
     control flow."""
@@ -255,7 +255,7 @@ def test_folding_type_not_implemented():
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-@pytest.mark.parametrize("folding", ["global", "all"])
+@pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_zne_usage_patterns(params, extrapolation, folding):
     """Test usage patterns of catalyst.zne."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
