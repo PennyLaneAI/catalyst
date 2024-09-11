@@ -436,6 +436,12 @@ Known Issues
         | you might need to install a recent version of ``libstdc``. E.g.: 
         | ``sudo apt install libstdc++-12-dev``.
 
+      .. warning::
+        | Under Ubuntu 24.04, if you get this error:
+        | ``fatal error: 'Python.h' file not found``
+        | you might need to install the Python Dev package:
+        | ``sudo apt install python-dev-is-python3``.
+
    .. group-tab:: macOS
 
       .. warning::
