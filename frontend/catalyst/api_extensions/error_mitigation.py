@@ -27,8 +27,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, zne_p
-
+from catalyst.jax_primitives import Folding, apply_registered_pass_p, zne_p
 
 ## API ##
 def mitigate_with_zne(
@@ -130,7 +129,24 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    return ZNE(fn, scale_factors, extrapolate, folding)
+    # wrapper for transform_named_sequence
+    if not isinstance(fn, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+
+    wrapped_qnode_function = fn.func
+    funcname = fn.__name__
+
+    def wrapper(*args, **kwrags):
+        apply_registered_pass_p.bind(
+            pass_name="lower-mitigation",
+        )
+        return wrapped_qnode_function(*args, **kwrags)
+
+    fn_clone = copy.copy(fn)
+    fn_clone.func = wrapper
+    fn_clone.__name__ = funcname + "_mitigate_with_zne"
+
+    return ZNE(fn_clone, scale_factors, extrapolate, folding)
 
 
 ## IMPL ##
@@ -153,8 +169,6 @@ class ZNE:
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
-        if not isinstance(fn, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.scale_factors = scale_factors

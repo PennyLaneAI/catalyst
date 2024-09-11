@@ -61,6 +61,17 @@ def test_single_measurement(params, extrapolation, folding):
 
     assert np.allclose(mitigated_qnode(params), circuit(params))
 
+    @catalyst.qjit
+    def mitigated_qnode_passes(args):
+        return catalyst.passes.mitigate_with_zne(
+            circuit,
+            scale_factors=jax.numpy.array([1, 2, 3]),
+            extrapolate=extrapolation,
+            folding=folding,
+        )(args)
+
+    assert np.allclose(mitigated_qnode_passes(params), circuit(params))
+
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])

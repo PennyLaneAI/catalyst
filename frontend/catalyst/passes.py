@@ -36,6 +36,7 @@ import copy
 
 import pennylane as qml
 
+from catalyst.api_extensions import mitigate_with_zne as _mitigate_with_zne_api_extensions
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
 
 
@@ -161,6 +162,13 @@ def cancel_inverses(fn=None):
     fn_clone.__name__ = funcname + "_cancel_inverses"
 
     return fn_clone
+
+
+def mitigate_with_zne(*args, **kwrags):
+    """
+    See https://docs.pennylane.ai/projects/catalyst/en/stable/code/api/catalyst.mitigate_with_zne.html
+    """
+    return _mitigate_with_zne_api_extensions(*args, **kwrags)
 
 
 ## IMPL and helpers ##

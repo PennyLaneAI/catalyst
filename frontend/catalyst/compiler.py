@@ -196,7 +196,6 @@ QUANTUM_COMPILATION_PASS = (
     [
         "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
-        "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
         "disable-assertion",
