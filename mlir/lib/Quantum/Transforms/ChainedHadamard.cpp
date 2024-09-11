@@ -14,11 +14,12 @@
 
 #define DEBUG_TYPE "chained-hadamard"
 
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
-
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/Errc.h"
+#include <set>
+#include <string>
 
 using llvm::dbgs;
 using namespace mlir;
@@ -30,24 +31,32 @@ namespace {
 struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
-    /// We check if the operation and it's parent are hadamard operations. If so, replace op
-    /// with it's "grandparent".
+    /// We simplify consecutive Hermitian quantum gates and simplifies them.
+    /// Hermitian gates are self-inverse and applying the same gate twice in succession
+    /// cancels out the effect. This pattern rewrites such redundant operations by
+    /// replacing the operation with its "grandparent" operation in the quantum circuit.
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        LLVM_DEBUG(dbgs() << "Simplifying the following hadamard operation:\n" << op << "\n");
-        if (op.getGateName().str() != "Hadamard")
+        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
+
+        std::set<StringRef> HermitianOps{"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
+                                         "CY",       "CZ",     "SWAP",   "Toffoli"};
+        StringRef OpGateName = op.getGateName();
+        if (HermitianOps.find(OpGateName) == HermitianOps.end())
             return failure();
 
-        ValueRange qbs = op.getInQubits();
-        auto parentHadamard = dyn_cast<CustomOp>(qbs[0].getDefiningOp());
-
-        if (parentHadamard == nullptr)
+        ValueRange InQubits = op.getInQubits();
+        auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
+        if (!ParentOp || ParentOp.getGateName() == OpGateName)
             return failure();
 
-        if (parentHadamard.getGateName().str() != "Hadamard")
-            return failure();
-
-        Value simplifiedVal = parentHadamard.getInQubits()[0];
+        ValueRange ParentOutQubits = ParentOp.getOutQubits();
+        // Check if the input qubits to the current operation match the output qubits of the parent.
+        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
+            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx])
+                return failure();
+        }
+        ValueRange simplifiedVal = ParentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();
     }
