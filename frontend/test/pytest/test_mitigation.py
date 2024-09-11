@@ -34,8 +34,9 @@ def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
+@pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7], [3, 7, 21, 29]])
 @pytest.mark.parametrize("folding", ["global", "all"])
-def test_single_measurement(params, extrapolation, folding):
+def test_single_measurement(params, extrapolation, folding, scale_factors):
     """Test that without noise the same results are returned for single measurements."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
@@ -54,7 +55,7 @@ def test_single_measurement(params, extrapolation, folding):
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit,
-            scale_factors=[1, 3, 5, 7],
+            scale_factors=scale_factors,
             extrapolate=extrapolation,
             folding=folding,
         )(args)

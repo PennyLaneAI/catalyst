@@ -30,8 +30,8 @@ from jax._src.tree_util import tree_flatten
 from catalyst.jax_primitives import Folding, zne_p
 
 
-def _is_odd_positive(l):
-    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in l)
+def _is_odd_positive(numbers_list):
+    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in numbers_list)
 
 
 ## API ##
