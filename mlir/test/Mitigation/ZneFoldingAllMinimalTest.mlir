@@ -77,6 +77,6 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
     // CHECK:    return [[results]]
 func.func @mitigated_circuit() -> tensor<3xf64> {
     %scaleFactors = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
-    %0 = mitigation.zne @circuit() folding (ALL) scaleFactors (%scaleFactors : tensor<3xindex>) : () -> tensor<3xf64>
+    %0 = mitigation.zne @circuit() folding (all) scaleFactors (%scaleFactors : tensor<3xindex>) : () -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }

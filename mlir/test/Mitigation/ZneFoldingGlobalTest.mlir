@@ -98,6 +98,6 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     // CHECK:    return [[results]]
 func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
     %scaleFactors = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    %0 = mitigation.zne @simpleCircuit(%arg0) folding (GLOBAL) scaleFactors (%scaleFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
+    %0 = mitigation.zne @simpleCircuit(%arg0) folding (global) scaleFactors (%scaleFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
     func.return %0 : tensor<5xf64>
 }
