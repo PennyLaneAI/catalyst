@@ -442,6 +442,8 @@ Known Issues
         
         sudo apt install libstdc++-12-dev
 
+      (See user's report `here <https://discourse.llvm.org/t/usr-bin-clang-is-not-able-to-compile-a-simple-test-program/72889/3>`_)
+
       .. raw:: html
 
         <hr>
