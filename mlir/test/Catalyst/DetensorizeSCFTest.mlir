@@ -17,22 +17,22 @@
 // CHECK-LABEL: @test0
 module @test0 {
   // CHECK-LABEL: @test_while_loop
-  // CHECK:       scf.while {{.*}} (f64, i64) -> (f64, i64)
-  // CHECK:       scf.condition{{.*}} : f64, i64
+  // CHECK:       [[WHILE_RESULTS:.+]]:2 = scf.while {{.*}} (f64, i64) -> (f64, i64)
+  // CHECK:         scf.condition{{.*}} : f64, i64
   // CHECK:       do
-  // CHECK-NOT:   tensor<
-  // CHECK:       tensor.from_elements
-  // CHECK:       scf.if
-  // CHECK-NOT:   tensor<
-  // CHECK:       scf.yield {{.*}} : f64
-  // CHECK-NOT:   tensor<
-  // CHECK:       else
-  // CHECK-NOT:   tensor<
-  // CHECK:       scf.yield {{.*}} : f64
-  // CHECK-NOT:   tensor<
-  // CHECK:       scf.yield  {{.*}} : f64, i64
-  // CHECK-NOT:   tensor<
-  // CHECK:       from_elements
+  // CHECK-NOT:     tensor<
+  // CHECK:         tensor.from_elements
+  // CHECK:         scf.if {{.*}} -> (f64)
+  // CHECK-NOT:       tensor<
+  // CHECK:           scf.yield {{.*}} : f64
+  // CHECK-NOT:       tensor<
+  // CHECK:         else
+  // CHECK-NOT:       tensor<
+  // CHECK:           scf.yield {{.*}} : f64
+  // CHECK-NOT:       tensor<
+  // CHECK:         scf.yield  {{.*}} : f64, i64
+  // CHECK-NOT:     tensor<
+  // CHECK:       tensor.from_elements [[WHILE_RESULTS:.+]]#0 : tensor<f64>
   func.func public @test_while_loop(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
     %c10_i64 = arith.constant 10 : i64
     %cst = arith.constant 0.000000e+00 : f64
@@ -69,8 +69,7 @@ module @test0 {
       scf.yield %5, %from_elements_9 : tensor<f64>, tensor<i64>
     }
     %extracted_4 = tensor.extract %1#0[] : tensor<f64>
-    %2 = arith.mulf %extracted, %extracted_4 : f64
-    %from_elements_5 = tensor.from_elements %2 : tensor<f64>
+    %from_elements_5 = tensor.from_elements %extracted_4 : tensor<f64>
     return %from_elements_5 : tensor<f64>
   }
   module attributes {llvm.linkage = #llvm.linkage<internal>, transform.with_named_sequence} {
