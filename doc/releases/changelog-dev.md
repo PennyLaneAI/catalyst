@@ -115,4 +115,4 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
-Daniel Strano
+Daniel Strano.
