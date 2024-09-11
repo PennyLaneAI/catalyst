@@ -34,8 +34,9 @@ def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
+@pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7], [3, 7, 21, 29]])
 @pytest.mark.parametrize("folding", ["global", "local-all"])
-def test_single_measurement(params, extrapolation, folding):
+def test_single_measurement(params, extrapolation, folding, scale_factors):
     """Test that without noise the same results are returned for single measurements."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
@@ -54,7 +55,7 @@ def test_single_measurement(params, extrapolation, folding):
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit,
-            scale_factors=jax.numpy.array([1, 2, 3]),
+            scale_factors=scale_factors,
             extrapolate=extrapolation,
             folding=folding,
         )(args)
@@ -84,7 +85,7 @@ def test_multiple_measurements(params, extrapolation, folding):
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit,
-            scale_factors=jax.numpy.array([1, 2, 3]),
+            scale_factors=[1, 3, 5, 7],
             extrapolate=extrapolation,
             folding=folding,
         )(args)
@@ -122,11 +123,26 @@ def test_single_measurement_control_flow(params, folding):
 
     @catalyst.qjit
     def mitigated_qnode(args, n):
-        return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), folding=folding
-        )(args, n)
+        return catalyst.mitigate_with_zne(circuit, scale_factors=[1, 3, 5, 7], folding=folding)(
+            args, n
+        )
 
     assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
+
+
+@pytest.mark.parametrize("scale_factors", [[1.0, 3, 5, 7], [-1, 3, 5, 7], [1, 2, 5, 7]])
+def test_scale_factors_error(scale_factors):
+    """Test that when scale factors are not positive odd integer, it raises an error."""
+
+    def circuit(x):
+        return jax.numpy.sin(x)
+
+    @catalyst.qjit
+    def mitigated_function(args):
+        return catalyst.mitigate_with_zne(circuit, scale_factors=scale_factors)(args)
+
+    with pytest.raises(ValueError, match="The scale factors must be positive odd integers:"):
+        mitigated_function(0.1)
 
 
 def test_not_qnode_error():
@@ -137,7 +153,7 @@ def test_not_qnode_error():
 
     @catalyst.qjit
     def mitigated_function(args):
-        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(args)
+        return catalyst.mitigate_with_zne(circuit, scale_factors=[1, 3, 5, 7])(args)
 
     with pytest.raises(TypeError, match="A QNode is expected, got the classical function"):
         mitigated_function(0.1)
@@ -160,7 +176,7 @@ def test_dtype_error(extrapolation):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            circuit, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation
         )(args)
 
     with pytest.raises(
@@ -186,7 +202,7 @@ def test_dtype_not_float_error(extrapolation):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            circuit, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation
         )(args)
 
     with pytest.raises(
@@ -212,7 +228,7 @@ def test_shape_error(extrapolation):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            circuit, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation
         )(args)
 
     with pytest.raises(
@@ -274,13 +290,13 @@ def test_zne_usage_patterns(params, extrapolation, folding):
     @catalyst.qjit
     def mitigated_qnode_fn_as_argument(args):
         return catalyst.mitigate_with_zne(
-            fn, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation, folding=folding
+            fn, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation, folding=folding
         )(args)
 
     @catalyst.qjit
     def mitigated_qnode_partial(args):
         return catalyst.mitigate_with_zne(
-            scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation, folding=folding
+            scale_factors=[1, 3, 5, 7], extrapolate=extrapolation, folding=folding
         )(fn)(args)
 
     assert np.allclose(mitigated_qnode_fn_as_argument(params), fn(params))
@@ -306,7 +322,7 @@ def test_zne_with_jax_polyfit():
     @catalyst.qjit
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=jax_extrapolation
+            circuit, scale_factors=[1, 3, 5, 7], extrapolate=jax_extrapolation
         )()
 
     assert np.allclose(mitigated_qnode(), circuit())
@@ -329,7 +345,7 @@ def test_zne_with_extrap_kwargs():
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit,
-            scale_factors=jax.numpy.array([1, 2, 3]),
+            scale_factors=[1, 3, 5, 7],
             extrapolate=qml.transforms.poly_extrapolate,
             extrapolate_kwargs={"order": 2},
         )()
@@ -354,7 +370,7 @@ def test_exponential_extrapolation_with_kwargs():
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit,
-            scale_factors=jax.numpy.array([1, 2, 3]),
+            scale_factors=[1, 3, 5, 7],
             extrapolate=qml.transforms.exponential_extrapolate,
             extrapolate_kwargs={"asymptote": 3},
         )()

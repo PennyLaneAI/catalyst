@@ -86,6 +86,10 @@
 
 <h3>Breaking changes</h3>
 
+* The argument `scale_factors` of `mitigate_with_zne` function now follows the proper literature definition. 
+  It now needs to be a list of positive odd integers, as we don't support the fractional part.
+  [(#1120)](https://github.com/PennyLaneAI/catalyst/pull/1120)
+
 * Remove `static_size` field from `AbstractQreg` class.
   [(#1113)](https://github.com/PennyLaneAI/catalyst/pull/1113)
 

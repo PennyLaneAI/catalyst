@@ -403,13 +403,13 @@ class TestMidCircuitMeasurement:
 
         @qjit
         def mitigated_circuit_1():
-            s = jnp.array([1, 2])
+            s = [1, 3]
             g = qml.QNode(circuit, dev, mcm_method="one-shot")
             return mitigate_with_zne(g, scale_factors=s)()
 
         @qjit
         def mitigated_circuit_2():
-            s = jnp.array([1, 2])
+            s = [1, 3]
             g = qml.QNode(circuit, dev)
             return mitigate_with_zne(g, scale_factors=s)()
 
