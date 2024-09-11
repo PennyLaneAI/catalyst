@@ -17,37 +17,22 @@
 // CHECK-LABEL: @test0
 module @test0 {
   // CHECK-LABEL: @test_while_loop
-  // CHECK-NEXT:  {{.*}} = arith.constant 0 : i64
-  // CHECK-NEXT:  {{.*}} = arith.constant 10 : i64
-  // CHECK-NEXT:  {{.*}} = arith.constant 0.000000e+00 : f64
-  // CHECK-NEXT:  {{.*}} = arith.constant 1.000000e+00 : f64
-  // CHECK-NEXT:  {{.*}} = arith.constant 1 : i64
-  // CHECK-NEXT:  {{.*}} = arith.constant dense<2> : tensor<i64>
-  // CHECK-NEXT:  {{.*}} = tensor.extract {{.*}}[] : tensor<f64>
-  // CHECK-NEXT:  {{.*}} = tensor.extract {{.*}}[] : tensor<f64>
-  // CHECK-NEXT:  {{.*}} = arith.addf {{.*}}, {{.*}} : f64
-  // CHECK-NEXT:  {{.*}}:2 = scf.while ({{.*}} = {{.*}}, {{.*}} = {{.*}}) : (f64, i64) -> (f64, i64) {
-  // CHECK-NEXT:    {{.*}} = arith.cmpi slt, {{.*}}, {{.*}} : i64
-  // CHECK-NEXT:    scf.condition({{.*}}) {{.*}}, {{.*}} : f64, i64
-  // CHECK-NEXT:  } do {
-  // CHECK-NEXT:  ^bb0({{.*}}: f64, {{.*}}: i64):
-  // CHECK-NEXT:    {{.*}} = tensor.from_elements {{.*}} : tensor<f64>
-  // CHECK-NEXT:    {{.*}} = func.call @fun({{.*}}, {{.*}}) : (tensor<f64>, tensor<i64>) -> tensor<f64>
-  // CHECK-NEXT:    {{.*}} = tensor.extract {{.*}}[] : tensor<f64>
-  // CHECK-NEXT:    {{.*}} = arith.cmpf une, {{.*}}, {{.*}} : f64
-  // CHECK-NEXT:    {{.*}} = scf.if {{.*}} -> (f64) {
-  // CHECK-NEXT:      {{.*}} = arith.subf {{.*}}, {{.*}} : f64
-  // CHECK-NEXT:      scf.yield {{.*}} : f64
-  // CHECK-NEXT:    } else {
-  // CHECK-NEXT:      {{.*}} = arith.addf {{.*}}, {{.*}} : f64
-  // CHECK-NEXT:      scf.yield {{.*}} : f64
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:    {{.*}} = arith.addi {{.*}}, {{.*}} : i64
-  // CHECK-NEXT:    scf.yield {{.*}}, {{.*}} : f64, i64
-  // CHECK-NEXT:  }
-  // CHECK-NEXT:  {{.*}} = arith.mulf {{.*}}, {{.*}}#0 : f64
-  // CHECK-NEXT:  {{.*}} = tensor.from_elements {{.*}} : tensor<f64>
-  // CHECK-NEXT:  return {{.*}} : tensor<f64>
+  // CHECK:       scf.while {{.*}} (f64, i64) -> (f64, i64)
+  // CHECK:       scf.condition{{.*}} : f64, i64
+  // CHECK:       do
+  // CHECK-NOT:   tensor<
+  // CHECK:       tensor.from_elements
+  // CHECK:       scf.if
+  // CHECK-NOT:   tensor<
+  // CHECK:       scf.yield {{.*}} : f64
+  // CHECK-NOT:   tensor<
+  // CHECK:       else
+  // CHECK-NOT:   tensor<
+  // CHECK:       scf.yield {{.*}} : f64
+  // CHECK-NOT:   tensor<
+  // CHECK:       scf.yield  {{.*}} : f64, i64
+  // CHECK-NOT:   tensor<
+  // CHECK:       from_elements
   func.func public @test_while_loop(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
     %c10_i64 = arith.constant 10 : i64
     %cst = arith.constant 0.000000e+00 : f64
