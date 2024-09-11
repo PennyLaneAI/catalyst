@@ -423,6 +423,57 @@ To generate html files for the documentation for Catalyst:
 
 The generated files are located in ``doc/_build/html``
 
+Known Issues
+------------
+
+.. tabs::
+
+   .. group-tab:: Linux Debian/Ubuntu
+
+      If you get this error: 
+
+      .. code-block:: console
+        
+        cannot find -lstdc++: No such file or directory
+
+      you might need to install a recent version of ``libstdc``. E.g.: 
+
+      .. code-block:: console
+        
+        sudo apt install libstdc++-12-dev
+
+      (See user's report `here <https://discourse.llvm.org/t/usr-bin-clang-is-not-able-to-compile-a-simple-test-program/72889/3>`_)
+
+      .. raw:: html
+
+        <hr>
+
+      Under Ubuntu 24.04, if you get this error:
+
+      .. code-block:: console
+      
+        fatal error: 'Python.h' file not found
+      
+      you might need to install the Python Dev package:
+
+      .. code-block:: console
+        
+        sudo apt install python3-dev
+
+      (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/1084>`_)
+
+   .. group-tab:: macOS
+
+      If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
+      with the path to the Conda Python binary. E.g.:
+
+      .. code-block:: console
+
+        export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python
+
+      If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
+      (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/377>`_)
+
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
 

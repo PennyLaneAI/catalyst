@@ -28,6 +28,7 @@
   ```
 
 * Zero-Noise Extrapolation (ZNE) local folding: Introduces the option to fold gates locally as well as the existing method of globally. Global folding (as in previous versions) applies the scale factor by forming the inverse of the entire quantum circuit (without measurements) and repeating the circuit with its inverse; local folding inserts per-gate folding sequences directly in place of each gate in the original circuit instead of applying the scale factor to the entire circuit at once. [(#1006)](https://github.com/PennyLaneAI/catalyst/pull/1006)
+[(#1129)](https://github.com/PennyLaneAI/catalyst/pull/1129)
 
   For example,
 
@@ -52,7 +53,7 @@
       circuit,
       scale_factors=s,
       extrapolate=exponential_extrapolate,
-      folding="all" # "all" for local or "global" for the original method (default being "global")
+      folding="local-all" # "local-all" for local on all gates or "global" for the original method (default being "global")
     )()
   ```
 
@@ -85,6 +86,10 @@
 
 <h3>Breaking changes</h3>
 
+* The argument `scale_factors` of `mitigate_with_zne` function now follows the proper literature definition. 
+  It now needs to be a list of positive odd integers, as we don't support the fractional part.
+  [(#1120)](https://github.com/PennyLaneAI/catalyst/pull/1120)
+
 * Remove `static_size` field from `AbstractQreg` class.
   [(#1113)](https://github.com/PennyLaneAI/catalyst/pull/1113)
 
@@ -115,4 +120,4 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
-Daniel Strano
+Daniel Strano.
