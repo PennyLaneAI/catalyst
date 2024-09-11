@@ -32,10 +32,6 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
-from pennylane.tape.tape import (
-    _validate_computational_basis_sampling,
-    rotations_and_diagonal_measurements,
-)
 
 from catalyst.api_extensions import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
@@ -325,23 +321,15 @@ def _diagonalize_measurements(tape, device_wires):
         measured_wires (list): A list of all wires that are measured on the tape
 
     """
-    if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape)
 
-    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for m in diagonal_measurements:
-        if m.obs is not None:
-            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
+    (diagonalized_tape,) , _ = qml.transforms.diagonalize_measurements(tape)
 
     measured_wires = set()
-    for m in diagonal_measurements:
+    for m in diagonalized_tape.measurements:
         wires = m.wires if m.wires else device_wires
         measured_wires.update(wires.tolist())
 
-    new_operations = tape.operations
-    new_operations.extend(diagonalizing_gates)
-
-    return new_operations, list(measured_wires)
+    return diagonalized_tape.operations, list(measured_wires)
 
 
 def _probs_from_counts(counts_outcome):
