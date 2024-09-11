@@ -26,17 +26,18 @@ from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
 quadratic_extrapolation = polynomial_extrapolation(2)
 
 
-def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func):
+def skip_if_exponential_extrapolation_unstable(circuit_param, extrapolation_func, threshold):
     """skip test if exponential extrapolation will be unstable"""
-    if circuit_param < 0.3 and extrapolation_func == exponential_extrapolate:
+    if circuit_param <= threshold and extrapolation_func == exponential_extrapolate:
         pytest.skip("Exponential extrapolation unstable in this region.")
 
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-def test_single_measurement(params, extrapolation):
+@pytest.mark.parametrize("folding", ["global", "all"])
+def test_single_measurement(params, extrapolation, folding):
     """Test that without noise the same results are returned for single measurements."""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -52,7 +53,10 @@ def test_single_measurement(params, extrapolation):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            circuit,
+            scale_factors=jax.numpy.array([1, 2, 3]),
+            extrapolate=extrapolation,
+            folding=folding,
         )(args)
 
     assert np.allclose(mitigated_qnode(params), circuit(params))
@@ -60,9 +64,10 @@ def test_single_measurement(params, extrapolation):
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-def test_multiple_measurements(params, extrapolation):
+@pytest.mark.parametrize("folding", ["global", "all"])
+def test_multiple_measurements(params, extrapolation, folding):
     """Test that without noise the same results are returned for multiple measurements"""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.4)
 
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -78,14 +83,18 @@ def test_multiple_measurements(params, extrapolation):
     @catalyst.qjit
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            circuit,
+            scale_factors=jax.numpy.array([1, 2, 3]),
+            extrapolate=extrapolation,
+            folding=folding,
         )(args)
 
     assert np.allclose(mitigated_qnode(params), circuit(params))
 
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
-def test_single_measurement_control_flow(params):
+@pytest.mark.parametrize("folding", ["global", "all"])
+def test_single_measurement_control_flow(params, folding):
     """Test that without noise the same results are returned for single measurement and with
     control flow."""
     dev = qml.device("lightning.qubit", wires=2)
@@ -113,9 +122,9 @@ def test_single_measurement_control_flow(params):
 
     @catalyst.qjit
     def mitigated_qnode(args, n):
-        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
-            args, n
-        )
+        return catalyst.mitigate_with_zne(
+            circuit, scale_factors=jax.numpy.array([1, 2, 3]), folding=folding
+        )(args, n)
 
     assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
 
@@ -238,7 +247,7 @@ def test_folding_type_not_implemented():
         return 0.0
 
     def mitigated_qnode():
-        return catalyst.mitigate_with_zne(circuit, scale_factors=[], folding="all")()
+        return catalyst.mitigate_with_zne(circuit, scale_factors=[], folding="random")()
 
     with pytest.raises(NotImplementedError):
         catalyst.qjit(mitigated_qnode)
@@ -246,9 +255,10 @@ def test_folding_type_not_implemented():
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-def test_zne_usage_patterns(params, extrapolation):
+@pytest.mark.parametrize("folding", ["global", "all"])
+def test_zne_usage_patterns(params, extrapolation, folding):
     """Test usage patterns of catalyst.zne."""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -264,13 +274,13 @@ def test_zne_usage_patterns(params, extrapolation):
     @catalyst.qjit
     def mitigated_qnode_fn_as_argument(args):
         return catalyst.mitigate_with_zne(
-            fn, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            fn, scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation, folding=folding
         )(args)
 
     @catalyst.qjit
     def mitigated_qnode_partial(args):
         return catalyst.mitigate_with_zne(
-            scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation
+            scale_factors=jax.numpy.array([1, 2, 3]), extrapolate=extrapolation, folding=folding
         )(fn)(args)
 
     assert np.allclose(mitigated_qnode_fn_as_argument(params), fn(params))

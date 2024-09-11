@@ -56,6 +56,7 @@ def mitigate_with_zne(
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
+            - all: per-gate folding sequences replace original gates in-place in the circuit
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
@@ -117,6 +118,7 @@ def mitigate_with_zne(
     >>> workflow(weights, scale_factors)
     Array(-0.19946598, dtype=float64)
     """
+
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
@@ -175,7 +177,7 @@ class ZNE:
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
         # TODO: remove the following check once #755 is completed
-        if folding != Folding.GLOBAL:
+        if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
         results = zne_p.bind(

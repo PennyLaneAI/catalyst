@@ -176,7 +176,12 @@ class CustomBuildExtMacos(build_ext):
 if system_platform == "Linux":
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
-        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
+        sources=[
+            "frontend/catalyst/utils/libcustom_calls.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
+        ],
+        extra_compile_args=["-std=c++17"],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -188,7 +193,12 @@ elif system_platform == "Darwin":
         variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
-        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
+        sources=[
+            "frontend/catalyst/utils/libcustom_calls.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
+        ],
+        extra_compile_args=["-std=c++17"],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
