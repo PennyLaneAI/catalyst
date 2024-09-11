@@ -22,7 +22,6 @@ file(GLOB SRC
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
     ApplyTransformSequencePass.cpp
-    SplitMultipleTapes.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

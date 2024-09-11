@@ -39,7 +39,7 @@ using namespace catalyst;
 
 namespace catalyst {
 #define GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
-#include "Catalyst/Transforms/Passes.h.inc"
+#include "Quantum/Transforms/Passes.h.inc"
 
 struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass> {
     using impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass>::SplitMultipleTapesPassBase;
