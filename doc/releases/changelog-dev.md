@@ -52,7 +52,7 @@
       circuit,
       scale_factors=s,
       extrapolate=exponential_extrapolate,
-      folding="all" # "all" for local or "global" for the original method (default being "global")
+      folding="local-all" # "local-all" for local on all gates or "global" for the original method (default being "global")
     )()
   ```
 
