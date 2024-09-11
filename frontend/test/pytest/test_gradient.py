@@ -1535,7 +1535,7 @@ class TestGradientErrors:
             return qml.expval(qml.PauliX(0))
 
         def g(x):
-            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]))(x)
+            return mitigate_with_zne(f, scale_factors=[1, 3, 5])(x)
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
