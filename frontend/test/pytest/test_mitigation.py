@@ -67,7 +67,7 @@ def test_single_measurement(params, extrapolation, folding):
 @pytest.mark.parametrize("folding", ["global", "all"])
 def test_multiple_measurements(params, extrapolation, folding):
     """Test that without noise the same results are returned for multiple measurements"""
-    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.4)
+    skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.5)
 
     dev = qml.device("lightning.qubit", wires=2)
 
