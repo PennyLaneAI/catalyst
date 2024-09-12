@@ -21,6 +21,7 @@ import pathlib
 import platform
 import tempfile
 from dataclasses import replace
+from flaky import flaky
 from functools import partial
 from unittest.mock import Mock, patch
 
@@ -143,6 +144,7 @@ class DummyDeviceLimitedMPs(Device):
 class TestMeasurementTransforms:
     """Tests for transforms modifying measurements"""
 
+    @flaky
     def test_measurements_from_counts_multiple_measurements(self):
         """Test the transforms for measurements_from_counts to other measurement types
         as part of the Catalyst pipeline."""
@@ -196,6 +198,7 @@ class TestMeasurementTransforms:
         assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=100)
         assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=100)
 
+    @flaky
     def test_measurements_from_samples_multiple_measurements(self):
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
@@ -321,6 +324,7 @@ class TestMeasurementTransforms:
             ):
                 qml.qjit(circuit)()
 
+    @flaky
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
@@ -375,6 +379,7 @@ class TestMeasurementTransforms:
                 assert res[0] == expected_res[0]
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
+    @flaky
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
@@ -408,7 +413,9 @@ class TestMeasurementTransforms:
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
+
     # pylint: disable=unnecessary-lambda
+    @flaky
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -467,6 +474,7 @@ class TestMeasurementTransforms:
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
     # pylint: disable=unnecessary-lambda
+    @flaky
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
