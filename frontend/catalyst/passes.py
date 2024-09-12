@@ -33,15 +33,65 @@ for enabling and configuring individual Catalyst MLIR compiler passes.
 """
 
 import copy
+import functools
 
 import pennylane as qml
 
-from catalyst.api_extensions import mitigate_with_zne as _mitigate_with_zne_api_extensions
+from catalyst.api_extensions import (
+    mitigate_with_zne as _mitigate_with_zne_api_extensions,
+)
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
+from catalyst.tracing.contexts import EvaluationContext
 
 
 ## API ##
 # pylint: disable=line-too-long
+def pipeline(fn=None, *, pass_pipeline=None):
+    """
+    Here are documentation words
+    """
+
+    """
+    Implementation design: it just stacks the decorators for the user automatically.
+    e.g.pass_pipeline = {
+            "mitigate_with_zne": {"scale_factors": [1, 2, 3]},
+            "cancel_inverses": {}
+        }
+    will just do 
+    fn = mitigate_with_zne(scale_factors=[1, 2, 3])(fn)
+    fn = cancel_inverses(fn)
+
+    Note that since python 3.7, dictionary order is guaranteed to be in insertion order
+    https://docs.python.org/3/library/stdtypes.html#dict.values
+    """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(pipeline, **kwargs)
+
+    if not isinstance(fn, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+
+    API_calls = API_name_to_API_calls()
+    fn_clone = "__default__init__clone__"
+    # Note: we create wrappers to inject the apply_registered_pass primitive
+    # In other words, the last API call, aka the last wrapper, will be the outermost primitive
+    # Therefore when lowering these primitives to mlir (in jax_primitives.py), lower them in reverse order!
+    for decorator, decorator_args in pass_pipeline.items():
+        print("seeing pass: ", decorator)
+        if decorator not in API_calls.keys():
+            raise RuntimeError(f"{decorator} is not a valid quantum transformation pass")
+
+        if fn_clone == "__default__init__clone__":
+            fn_clone = API_calls[decorator](fn, **decorator_args)
+        else:
+            fn_clone = API_calls[decorator](fn_clone, **decorator_args)
+
+    return fn_clone
+
+
+
 def cancel_inverses(fn=None):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
@@ -151,10 +201,11 @@ def cancel_inverses(fn=None):
         # But when we add the full peephole pipeline in the future, the attribute
         # could get properly documented.
 
-        apply_registered_pass_p.bind(
-            pass_name="remove-chained-self-inverse",
-            options=f"func-name={funcname}" + "_cancel_inverses",
-        )
+        if EvaluationContext.is_tracing():
+            apply_registered_pass_p.bind(
+                pass_name="remove-chained-self-inverse",
+                options=f"func-name={funcname}" + "_cancel_inverses",
+            )
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone = copy.copy(fn)
@@ -172,6 +223,10 @@ def mitigate_with_zne(*args, **kwrags):
 
 
 ## IMPL and helpers ##
+def API_name_to_API_calls():
+    return {"cancel_inverses":cancel_inverses, 
+            "mitigate_with_zne":mitigate_with_zne}
+
 def _inject_transform_named_sequence():
     """
     Inject a transform_named_sequence jax primitive.

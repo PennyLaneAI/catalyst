@@ -31,7 +31,8 @@ from lit_util_printers import print_jaxpr, print_mlir
 
 from catalyst import qjit
 from catalyst.debug import get_compilation_stage
-from catalyst.passes import cancel_inverses
+from catalyst.passes import cancel_inverses, pipeline
+from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
@@ -73,6 +74,49 @@ def test_transform_named_sequence_injection():
 
 
 test_transform_named_sequence_injection()
+
+
+#
+# pipeline
+#
+
+
+def test_pipeline_lowering():
+    my_pipeline = { "cancel_inverses":{},
+                    "mitigate_with_zne":{"scale_factors":[1, 3, 5, 7], 
+                                        "extrapolate": polynomial_extrapolation(2),
+                                        "folding":"global"},
+                  }
+
+    @qjit#(keep_intermediate=True)
+    @pipeline(pass_pipeline=my_pipeline)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_pipeline_lowering_workflow(x):
+        qml.RX(x, wires=[0])
+        qml.Hadamard(wires=[1])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    # CHECK: transform_named_sequence
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK:   pass_name=lower-mitigation
+    # CHECK: ]
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK:   options=func-name=test_pipeline_lowering_workflow_cancel_inverses
+    # CHECK:   pass_name=remove-chained-self-inverse
+    # CHECK: ]
+    print_jaxpr(test_pipeline_lowering_workflow, 1.2)
+
+
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_cancel_inverses"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "lower-mitigation" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print_mlir(test_pipeline_lowering_workflow, 1.2)
+
+
+test_pipeline_lowering()
+#breakpoint()
 
 
 #
@@ -132,8 +176,8 @@ def test_cancel_inverses_tracing_and_lowering():
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f_cancel_inverses"}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g_cancel_inverses"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f_cancel_inverses"}
     # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h_cancel_inverses"}
     # CHECK-NEXT: transform.yield
     print_mlir(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)

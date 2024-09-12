@@ -28,6 +28,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import Folding, apply_registered_pass_p, zne_p
+from catalyst.tracing.contexts import EvaluationContext
 
 
 def _is_odd_positive(numbers_list):
@@ -139,24 +140,7 @@ def mitigate_with_zne(
 
     num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
 
-    # wrapper for transform_named_sequence
-    if not isinstance(fn, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {fn}")
-
-    wrapped_qnode_function = fn.func
-    funcname = fn.__name__
-
-    def wrapper(*args, **kwrags):
-        apply_registered_pass_p.bind(
-            pass_name="lower-mitigation",
-        )
-        return wrapped_qnode_function(*args, **kwrags)
-
-    fn_clone = copy.copy(fn)
-    fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_mitigate_with_zne"
-
-    return ZNE(fn_clone, num_folds, extrapolate, folding)
+    return ZNE(fn, num_folds, extrapolate, folding)
 
 
 ## IMPL ##
@@ -179,6 +163,17 @@ class ZNE:
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
+        if not isinstance(fn, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        
+        wrapped_qnode_function = fn.func
+        def wrapper(*args, **kwrags):
+            if EvaluationContext.is_tracing():
+                apply_registered_pass_p.bind(
+                    pass_name="lower-mitigation"
+                )
+            return wrapped_qnode_function(*args, **kwrags)
+        fn.func = wrapper
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.num_folds = num_folds
