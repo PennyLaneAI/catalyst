@@ -47,7 +47,7 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
 
         ValueRange InQubits = op.getInQubits();
         auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (!ParentOp || ParentOp.getGateName() == OpGateName)
+        if (!ParentOp || ParentOp.getGateName() != OpGateName)
             return failure();
 
         ValueRange ParentOutQubits = ParentOp.getOutQubits();
