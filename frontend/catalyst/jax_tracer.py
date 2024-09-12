@@ -65,7 +65,6 @@ from catalyst.jax_primitives import (
     CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
-    cond_p,
     counts_p,
     expval_p,
     func_p,
@@ -81,7 +80,6 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
-    qmeasure_p,
     qunitary_p,
     sample_p,
     set_basis_state_p,
@@ -1074,37 +1072,6 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
 
 
 @debug_logger
-def reset_qubit(qreg_in, w):
-    """Perform a qubit reset on a single wire. Suitable for use during late-stage tracing,
-    as JAX primitives are used directly. These operations will not appear on tape."""
-
-    def flip(qreg):
-        """Flip a qubit."""
-        qbit = qextract_p.bind(qreg, w)
-        qbit2 = qinst_p.bind(qbit, op="PauliX", qubits_len=1)[0]
-        return qinsert_p.bind(qreg, w, qbit2)
-
-    def dont_flip(qreg):
-        """Identity function."""
-        return qreg
-
-    qbit = qextract_p.bind(qreg_in, w)
-    m, qbit2 = qmeasure_p.bind(qbit)
-    qreg_mid = qinsert_p.bind(qreg_in, w, qbit2)
-
-    jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
-    jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(
-        m,
-        qreg_mid,
-        branch_jaxprs=[jaxpr_true, jaxpr_false],
-        nimplicit_outputs=0,
-    )[0]
-
-    return qreg_out
-
-
-@debug_logger
 def trace_function(
     ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
 ) -> Tuple[List[Any], InputSignature, OutputSignature]:
@@ -1213,17 +1180,19 @@ def trace_quantum_function(
         transformed_results = []
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            # Set up same device and quantum register for all tapes in the program.
-            # We just need to ensure the qubits are reset in between each.
-            qdevice_p.bind(
-                rtd_lib=device.backend_lib,
-                rtd_name=device.backend_name,
-                rtd_kwargs=str(device.backend_kwargs),
-            )
-            qreg_in = qalloc_p.bind(len(device.wires))
-
             qnode_transformed = len(qnode_program) > 0
-            for i, tape in enumerate(tapes):
+            for tape in tapes:
+                # Set up quantum register for the current tape.
+                # We just need to ensure there is a tape cut in between each.
+                # Each tape will be outlined into its own function with mlir pass
+                # -split-multiple-tapes
+                qdevice_p.bind(
+                    rtd_lib=device.backend_lib,
+                    rtd_name=device.backend_name,
+                    rtd_kwargs=str(device.backend_kwargs),
+                )
+                qreg_in = qalloc_p.bind(len(device.wires))
+
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
@@ -1260,14 +1229,9 @@ def trace_quantum_function(
                 else:
                     transformed_results.append(meas_results)
 
-                # Reset the qubits and update the register value for the next tape.
-                if len(tapes) > 1 and i < len(tapes) - 1:
-                    for w in device.wires:
-                        qreg_out = reset_qubit(qreg_out, w)
-                    qreg_in = qreg_out
-
-            # Deallocate the register before tracing the post-processing.
-            qdealloc_p.bind(qreg_out)
+                # Deallocate the register after the current tape is finished
+                # This dealloc primitive also serves as the tape cut when splitting tapes
+                qdealloc_p.bind(qreg_out)
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
