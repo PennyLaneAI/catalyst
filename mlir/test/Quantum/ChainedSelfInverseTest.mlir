@@ -37,3 +37,119 @@ func.func @test_chained_self_inverse(%arg: !quantum.bit) -> !quantum.bit {
     %1 = quantum.custom "Hadamard"() %0 : !quantum.bit
     return %1 : !quantum.bit
 }
+
+// -----
+
+// Test for chained PauliX
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+    %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Test for chained PauliY
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %2 = quantum.custom "PauliY"() %1 : !quantum.bit
+    %3 = quantum.custom "PauliY"() %2 : !quantum.bit
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Test for chained PauliZ
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %2 = quantum.custom "PauliZ"() %1 : !quantum.bit
+    %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
+    return %3 : !quantum.bit
+}
+
+// -----
+
+// Test for chained CNOT
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+    %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
+    // CHECK: return %1, %2 : !quantum.bit, !quantum.bit
+    return %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Test for chained CY
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits:2 = quantum.custom "CY"() %1, %2 : !quantum.bit, !quantum.bit
+    %out_qubits_0:2 = quantum.custom "CY"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
+    // CHECK: return %1, %2 : !quantum.bit, !quantum.bit
+    return %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Test for chained CZ
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits:2 = quantum.custom "CZ"() %1, %2 : !quantum.bit, !quantum.bit
+    %out_qubits_0:2 = quantum.custom "CZ"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
+    // CHECK: return %1, %2 : !quantum.bit, !quantum.bit
+    return %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Test for chained SWAP
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits:2 = quantum.custom "SWAP"() %1, %2 : !quantum.bit, !quantum.bit
+    %out_qubits_0:2 = quantum.custom "SWAP"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
+    // CHECK: return %1, %2 : !quantum.bit, !quantum.bit
+    return %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Test for chained Toffoli
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    %0 = quantum.alloc(3) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[2] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits:3 = quantum.custom "Toffoli"() %1, %2, %3: !quantum.bit, !quantum.bit, !quantum.bit
+    %out_qubits_0:3 = quantum.custom "Toffoli"() %out_qubits#0, %out_qubits#1, %out_qubits#2 : !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: return %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    return %out_qubits_0#0, %out_qubits_0#1, %out_qubits_0#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
