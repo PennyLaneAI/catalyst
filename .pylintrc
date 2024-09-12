@@ -3,6 +3,7 @@
 # be loaded. Extensions are loading into the active Python interpreter and may
 # run arbitrary code
 extension-pkg-allow-list=catalyst.utils.wrapper
+ignore-patterns=.*lit.cfg.*
 
 [TYPECHECK]
 
@@ -10,7 +11,7 @@ extension-pkg-allow-list=catalyst.utils.wrapper
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis. It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=pennylane.ops,jaxlib.mlir.ir,jaxlib.xla_extension,lit.cfg
+ignored-modules=pennylane.ops,jaxlib.mlir.ir,jaxlib.xla_extension
 
 # List of classes names for which member attributes should not be checked
 # (useful for classes with attributes dynamically set). This supports can work
