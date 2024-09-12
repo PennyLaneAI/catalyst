@@ -473,6 +473,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
+        if config is qml.devices.DefaultExecutionConfig:
+            # Do not modify DefaultExecutionConfig; copy into new config and modify the copy
+            config = deepcopy(config)
         config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
         program = program + measurement_transforms
 

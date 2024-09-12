@@ -18,6 +18,7 @@ This module contains functions tracing and lowering JAX code to MLIR.
 
 import logging
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -130,12 +131,12 @@ def _make_execution_config(qnode):
     used in preprocess to determine what decomposition and validation is needed."""
 
     if qnode:
-        _gradient_method = _in_gradient_tracing(qnode)
+        # Do not modify DefaultExecutionConfig; copy into new config and modify the copy
+        execution_config = deepcopy(qml.devices.DefaultExecutionConfig)
+        execution_config.gradient_method = _in_gradient_tracing(qnode)
     else:
-        _gradient_method = None
+        execution_config = qml.devices.DefaultExecutionConfig
 
-    execution_config = qml.devices.DefaultExecutionConfig
-    execution_config.gradient_method = _gradient_method
     return execution_config
 
 
