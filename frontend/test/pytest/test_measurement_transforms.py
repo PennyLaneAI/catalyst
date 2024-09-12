@@ -251,9 +251,10 @@ class TestMeasurementTransforms:
     def test_measurement_from_readout_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
-        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
-        if the device only supports sample, and measurement_from_counts transform is applied if
-        the device only supports counts. If both are supported, sample takes precedence."""
+        """Test that for devices without observable support,  measurment_from_samples transform
+        is applied as part of the Catalyst pipeline if the device only supports sample, and
+        measurement_from_counts transform is applied if the device only supports counts. If
+        both are supported, sample takes precedence."""
 
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements
@@ -298,6 +299,27 @@ class TestMeasurementTransforms:
             assert "quantum.var" not in mlir
             assert "probs" not in mlir
             assert target_measurement in mlir
+
+    def test_error_is_raised_if_no_observables_and_no_samples_or_counts(self, mocker):
+        """Test that for a device that doesn't support observables, if counts
+        and sample are also both unsupported, an error is raised."""
+
+        # no shots - samples/counts unsupported
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @qml.qnode(dev)
+        def circuit():
+            return qml.expval(qml.X(0)), qml.var(qml.Y(1))
+
+        # modify config to indicate no observables supported
+        config = get_device_toml_config(dev)
+        config["operators"]["observables"] = {}
+
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            with pytest.raises(
+                RuntimeError, match="The device does not support observables or sample/counts"
+            ):
+                qml.qjit(circuit)()
 
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
