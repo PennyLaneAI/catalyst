@@ -29,11 +29,8 @@ from pennylane.measurements import (
     ExpectationMP,
     MidMeasureMP,
     ProbabilityMP,
+    SampleMP,
     VarianceMP,
-)
-from pennylane.tape.tape import (
-    _validate_computational_basis_sampling,
-    rotations_and_diagonal_measurements,
 )
 
 from catalyst.api_extensions import HybridCtrl
@@ -208,8 +205,68 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
 
 @transform
 @debug_logger
-def measurements_from_counts(tape):
+def measurements_from_counts(tape, device_wires):
     r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
+    functions for each original measurement.
+
+    Args:
+        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        device_wires (Wires): the wires from the device, for assessing what wires to use
+            when a measurement applies to all wires.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+
+    .. note::
+
+        Samples are not supported.
+    """
+
+    new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
+
+    new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
+
+    def postprocessing_counts(results):
+        """A processing function to get expecation values from counts."""
+        states = results[0][0]
+        counts_outcomes = results[0][1]
+        results_processed = []
+        for m in tape.measurements:
+            wires = m.wires if m.wires else device_wires
+            mapped_counts_outcome = _map_counts(
+                counts_outcomes, wires, qml.wires.Wires(list(measured_wires))
+            )
+            if isinstance(m, ExpectationMP):
+                probs = _probs_from_counts(mapped_counts_outcome)
+                results_processed.append(_expval_from_probs(eigvals=m.eigvals(), prob_vector=probs))
+            elif isinstance(m, VarianceMP):
+                probs = _probs_from_counts(mapped_counts_outcome)
+                results_processed.append(_var_from_probs(eigvals=m.eigvals(), prob_vector=probs))
+            elif isinstance(m, ProbabilityMP):
+                probs = _probs_from_counts(mapped_counts_outcome)
+                results_processed.append(probs)
+            elif isinstance(m, CountsMP):
+                results_processed.append(
+                    tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
+                )
+            else:
+                raise NotImplementedError(
+                    f"Measurement type {type(m)} is not implemented with measurements_from_counts"
+                )
+        if len(tape.measurements) == 1:
+            results_processed = results_processed[0]
+        else:
+            results_processed = tuple(results_processed)
+        return results_processed
+
+    return [new_tape], postprocessing_counts
+
+
+@transform
+@debug_logger
+def measurements_from_samples(tape, device_wires):
+    r"""Replace all measurements from a tape with sample measurements, and adds postprocessing
     functions for each original measurement.
 
     Args:
@@ -221,47 +278,27 @@ def measurements_from_counts(tape):
 
     .. note::
 
-        Samples are not supported.
+        Counts are not supported.
     """
-    if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape)
-    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for i, m in enumerate(diagonal_measurements):
-        if m.obs is not None:
-            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
-            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=m.wires)
-    # Add diagonalizing gates
-    news_operations = tape.operations
-    news_operations.extend(diagonalizing_gates)
-    # Transform tape
-    measured_wires = set()
-    for m in diagonal_measurements:
-        measured_wires.update(m.wires.tolist())
 
-    new_measurements = [qml.counts(wires=list(measured_wires))]
-    new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+    new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
-    def postprocessing_counts_to_expval(results):
-        """A processing function to get expecation values from counts."""
-        states = results[0][0]
-        counts_outcomes = results[0][1]
+    new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
+
+    def postprocessing_samples(results):
+        """A processing function to get expecation values from samples."""
+        samples = results[0]
         results_processed = []
         for m in tape.measurements:
-            mapped_counts_outcome = _map_counts(
-                counts_outcomes, m.wires, qml.wires.Wires(list(measured_wires))
-            )
-            if isinstance(m, ExpectationMP):
-                probs = _get_probs(mapped_counts_outcome)
-                results_processed.append(_get_expval(eigvals=m.eigvals(), prob_vector=probs))
-            elif isinstance(m, VarianceMP):
-                probs = _get_probs(mapped_counts_outcome)
-                results_processed.append(_get_var(eigvals=m.eigvals(), prob_vector=probs))
-            elif isinstance(m, ProbabilityMP):
-                probs = _get_probs(mapped_counts_outcome)
-                results_processed.append(probs)
-            elif isinstance(m, CountsMP):
-                results_processed.append(
-                    tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
+            if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
+                if len(tape.shots.shot_vector) > 1:
+                    res = tuple(m.process_samples(s, measured_wires) for s in samples)
+                else:
+                    res = m.process_samples(samples, measured_wires)
+                results_processed.append(res)
+            else:
+                raise NotImplementedError(
+                    f"Measurement type {type(m)} is not implemented with measurements_from_samples"
                 )
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
@@ -269,10 +306,33 @@ def measurements_from_counts(tape):
             results_processed = tuple(results_processed)
         return results_processed
 
-    return [new_tape], postprocessing_counts_to_expval
+    return [new_tape], postprocessing_samples
 
 
-def _get_probs(counts_outcome):
+def _diagonalize_measurements(tape, device_wires):
+    """Takes a tape and returns the information needed to create a new tape based on
+    diagonalization and readout in the measurement basis.
+
+    Args:
+        tape (QuantumTape): A quantum circuit.
+
+    Returns:
+        new_operations (list): The original operations, plus the diagonalizing gates for the circuit
+        measured_wires (list): A list of all wires that are measured on the tape
+
+    """
+
+    (diagonalized_tape,), _ = qml.transforms.diagonalize_measurements(tape)
+
+    measured_wires = set()
+    for m in diagonalized_tape.measurements:
+        wires = m.wires if m.wires else device_wires
+        measured_wires.update(wires.tolist())
+
+    return diagonalized_tape.operations, list(measured_wires)
+
+
+def _probs_from_counts(counts_outcome):
     """From the counts outcome, calculate the probability vector."""
     prob_vector = []
     num_shots = jax.numpy.sum(counts_outcome)
@@ -282,17 +342,17 @@ def _get_probs(counts_outcome):
     return jax.numpy.array(prob_vector)
 
 
-def _get_expval(eigvals, prob_vector):
+def _expval_from_probs(eigvals, prob_vector):
     """From the observable eigenvalues and the probability vector
     it calculates the expectation value."""
     expval = jax.numpy.dot(jax.numpy.array(eigvals), prob_vector)
     return expval
 
 
-def _get_var(eigvals, prob_vector):
+def _var_from_probs(eigvals, prob_vector):
     """From the observable eigenvalues and the probability vector
     it calculates the variance."""
-    var = jax.numpy.dot(prob_vector, (eigvals**2)) - jax.numpy.dot(prob_vector, eigvals)
+    var = jax.numpy.dot(prob_vector, (eigvals**2)) - jax.numpy.dot(prob_vector, eigvals) ** 2
     return var
 
 
