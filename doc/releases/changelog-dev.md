@@ -29,33 +29,11 @@
 
 <h3>Improvements</h3>
 
-<<<<<<< meas-from-sample
+
 * Support is expanded for backend devices that exculsively return samples in the measurement 
   basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`, 
   `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
   [(#1106)](https://github.com/PennyLaneAI/catalyst/pull/1106)
-
-* Fixes an issue where certain JAX linear algebra functions from `jax.scipy.linalg` gave incorrect
-  results when invoked from within a qjit block, and adds full support for other `jax.scipy.linalg`
-  functions.
-  [(#1097)](https://github.com/PennyLaneAI/catalyst/pull/1097)
-
-  The supported linear algebra functions include, but are not limited to:
-
-  - [`jax.scipy.linalg.cholesky`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.cholesky.html)
-  - [`jax.scipy.linalg.expm`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.expm.html)
-  - [`jax.scipy.linalg.funm`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.funm.html)
-  - [`jax.scipy.linalg.hessenberg`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.hessenberg.html)
-  - [`jax.scipy.linalg.lu`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.lu.html)
-  - [`jax.scipy.linalg.lu_solve`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.lu_solve.html)
-  - [`jax.scipy.linalg.polar`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.polar.html)
-  - [`jax.scipy.linalg.qr`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.qr.html)
-  - [`jax.scipy.linalg.schur`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.schur.html)
-  - [`jax.scipy.linalg.solve`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.solve.html)
-  - [`jax.scipy.linalg.sqrtm`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.sqrtm.html)
-  - [`jax.scipy.linalg.svd`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.linalg.svd.html)
-=======
->>>>>>> main
 
 <h3>Breaking changes</h3>
 
