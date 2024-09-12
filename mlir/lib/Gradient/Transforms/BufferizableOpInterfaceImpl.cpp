@@ -17,6 +17,7 @@
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -249,6 +250,8 @@ struct ForwardOpInterface
         auto forwardOp = cast<ForwardOp>(op);
         bool hasTensorArg = any_of(forwardOp.getArgumentTypes(), isaTensor);
         bool hasTensorResult = any_of(forwardOp.getResultTypes(), isaTensor);
+        bool hasTensorFuncInType = any_of(forwardOp.getFunctionType().getInputs(), isaTensor);
+        bool hasTensorFuncOutType = any_of(forwardOp.getFunctionType().getResults(), isaTensor);
 
         // Implementation must be bufferized.
         auto implAttr = forwardOp.getImplementationAttr();
@@ -264,7 +267,7 @@ struct ForwardOpInterface
                 return false;
         }
 
-        if (hasTensorArg || hasTensorResult)
+        if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
             return true;
 
         return false;
@@ -396,6 +399,8 @@ struct ReverseOpInterface
         auto reverseOp = cast<ReverseOp>(op);
         bool hasTensorArg = any_of(reverseOp.getArgumentTypes(), isaTensor);
         bool hasTensorResult = any_of(reverseOp.getResultTypes(), isaTensor);
+        bool hasTensorFuncInType = any_of(reverseOp.getFunctionType().getInputs(), isaTensor);
+        bool hasTensorFuncOutType = any_of(reverseOp.getFunctionType().getResults(), isaTensor);
 
         // Implementation must be bufferized.
         auto implAttr = reverseOp.getImplementationAttr();
@@ -411,7 +416,7 @@ struct ReverseOpInterface
                 return false;
         }
 
-        if (hasTensorArg || hasTensorResult)
+        if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
             return true;
 
         return false;
