@@ -79,6 +79,20 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
 
+##############################################################################
+# The following subsection of code                                           #
+# was taken from the CIRCT project: https://github.com/llvm/circt            #
+# Small alteration were made for Catalyst                                    #
+# The CIRCT project has a the following license:                             #
+#                                                                            #
+#   The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:  #
+#   As an incubator project with ambition to become part of the LLVM Project,#
+#   CIRCT is under the same license.                                         #
+#                                                                            #
+# https://github.com/llvm/circt/blob/                                        #
+#  930aabe70fe78965a153f6e936c5853e948873eb/CMakeLists.txt#L85-L126          #
+##############################################################################
+
 # Handle unittests when building out-of-tree against an installed version of
 # LLVM/MLIR (not a build tree). Adapted from `llvm/flang/CMakeLists.txt`.
 set(CATALYST_GTEST_AVAILABLE 0)
@@ -125,6 +139,10 @@ endif()
 if (CATALYST_GTEST_AVAILABLE)
   add_subdirectory(unittests)
 endif()
+
+######################
+# End of CIRCT code  #
+######################
 
 add_subdirectory(test)
 
