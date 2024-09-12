@@ -10,6 +10,7 @@
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -248,6 +249,21 @@ struct ForwardOpInterface
         auto forwardOp = cast<ForwardOp>(op);
         bool hasTensorArg = any_of(forwardOp.getArgumentTypes(), isaTensor);
         bool hasTensorResult = any_of(forwardOp.getResultTypes(), isaTensor);
+
+        // Implementation must be bufferized.
+        auto implAttr = forwardOp.getImplementationAttr();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implArgTy = implOp.getArgumentTypes();
+        auto implResTy = implOp.getResultTypes();
+        for (auto ty: implArgTy) {
+            if (!isa<MemRefType>(ty))
+                return false;
+        }
+        for (auto ty: implResTy) {
+            if (!isa<MemRefType>(ty))
+                return false;
+        }
+
         if (hasTensorArg || hasTensorResult)
             return true;
 
@@ -333,15 +349,16 @@ struct ForwardOpInterface
 
         SmallVector<Value> tensorInputs;
         for (auto input : inputs) {
-            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, input);
+            Value tensorIn = (isa<TensorType>(input.getType())) ? input :
+                rewriter.create<bufferization::ToTensorOp>(loc, input);
             tensorInputs.push_back(tensorIn);
         }
         auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
         SmallVector<Value> tensorOutputs(callOp.getResults());
 
         for (auto [memrefOutput, tensorOutput] : llvm::zip(outputs, tensorOutputs)) {
-            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, memrefOutput.getType(),
-                                                                       tensorOutput);
+            Value castVal = (isa<MemRefType>(tensorOutput.getType())) ? tensorOutput :
+                rewriter.create<bufferization::ToMemrefOp>(loc, memrefOutput.getType(), tensorOutput);
             rewriter.create<memref::CopyOp>(loc, castVal, memrefOutput);
         }
 
@@ -353,7 +370,7 @@ struct ForwardOpInterface
         SmallVector<Value> tapeMemrefOutputs;
         for (auto [tapeTensorOutput, memrefTapeOutput] :
              llvm::zip(tapeOutputs, forwardOp.getResultTypes())) {
-            Value castVal =
+            Value castVal = (isa<MemRefType>(tapeTensorOutput.getType())) ? tapeTensorOutput :
                 rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput, tapeTensorOutput);
             tapeMemrefOutputs.push_back(castVal);
         }
@@ -504,6 +521,6 @@ void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRe
         AdjointOp::attachInterface<AdjointOpInterface>(*ctx);
         BackpropOp::attachInterface<BackpropOpInterface>(*ctx);
         ForwardOp::attachInterface<ForwardOpInterface>(*ctx);
-        ReverseOp::attachInterface<ReverseOpInterface>(*ctx);
+        //ReverseOp::attachInterface<ReverseOpInterface>(*ctx);
     });
 }
