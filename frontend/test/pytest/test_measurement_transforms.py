@@ -22,19 +22,15 @@ import platform
 import tempfile
 from dataclasses import replace
 from functools import partial
-
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pennylane as qml
 import pytest
-
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
-
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
-
 
 from catalyst.compiler import get_lib_path
 from catalyst.device import (
@@ -47,12 +43,8 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
 )
-
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-)
+from catalyst.utils.toml import OperationProperties, ProgramFeatures
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -259,9 +251,9 @@ class TestMeasurementTransforms:
     def test_measurement_from_readout_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
-        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline if the
-        device only supports sample, and measurement_from_counts transform is applied  if the device only
-        supports counts. If both are supported, sample takes precedence."""
+        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
+        if the device only supports sample, and measurement_from_counts transform is applied if
+        the device only supports counts. If both are supported, sample takes precedence."""
 
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements

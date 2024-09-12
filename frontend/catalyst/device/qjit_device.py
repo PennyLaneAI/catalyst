@@ -555,7 +555,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
             measurement_program.add_transform(
                 diagonalize_measurements, supported_base_obs=supported_observables
             )
-
+            
         return measurement_program
 
     def execute(self, circuits, execution_config):
