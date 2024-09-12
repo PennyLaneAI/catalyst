@@ -219,3 +219,36 @@ module @test2 {
     return %from_elements : tensor<f64>
   }
 }
+
+// -----
+
+// CHECK-LABEL: @test3
+module @test3 {
+  // CHECK-LABEL: @test_if_mixed_return_types
+  func.func public @test_if_mixed_return_types(%arg0: f64, %arg1: f64) -> tensor<f64> attributes {llvm.emit_c_interface} {
+  // CHECK:     scf.if {{.*}} -> (f64)
+  // CHECK-NOT:   tensor<
+  // CHECK:       scf.yield {{.*}} : f64
+  // CHECK-NOT:   tensor<
+  // CHECK:     else
+  // CHECK:       scf.yield {{.*}} : f64
+  // CHECK-NOT:   tensor<
+  // CHECK:     }
+  // CHECK:     %[[ADDF_RES:.+]] = arith.addf {{.*}} : f64
+  // CHECK:     tensor.from_elements %[[ADDF_RES]] : tensor<f64>
+    %0 = arith.cmpf ogt, %arg0, %arg1 : f64
+    %1:2 = scf.if %0 -> (f64, tensor<f64>) {
+      %3 = arith.subf %arg0, %arg1 : f64
+      %from_elements_0 = tensor.from_elements %3 : tensor<f64>
+      scf.yield %arg0, %from_elements_0 : f64, tensor<f64>
+    } else {
+      %3 = arith.subf %arg1, %arg0 : f64
+      %from_elements_0 = tensor.from_elements %3 : tensor<f64>
+      scf.yield %arg0, %from_elements_0 : f64, tensor<f64>
+    }
+    %extracted = tensor.extract %1#1[] : tensor<f64>
+    %2 = arith.addf %1#0, %extracted : f64
+    %from_elements = tensor.from_elements %2 : tensor<f64>
+    return %from_elements : tensor<f64>
+  }
+}
