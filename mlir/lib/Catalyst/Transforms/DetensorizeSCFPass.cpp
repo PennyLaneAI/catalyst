@@ -145,7 +145,8 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
         }
 
         // 1. Extract tensor elements before yield op
-        ifOp->walk([&](scf::YieldOp yield_op) {
+        SmallVector<scf::YieldOp> yieldOps = {ifOp.thenYield(), ifOp.elseYield()};
+        for (scf::YieldOp yield_op : yieldOps) {
             // Loop over yield operands
             for (const auto &it : llvm::enumerate(yield_op.getOperands())) {
                 Value operand = it.value();
@@ -158,7 +159,7 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
                     yield_op.setOperand(it.index(), value);
                 }
             }
-        });
+        };
 
         // Collect the types for the new IfOp
         SmallVector<Type> newResultTypes;
