@@ -3,6 +3,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/IR/UnstructuredControlFlow.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -234,7 +235,25 @@ struct BackpropOpInterface
 };
 
 struct ForwardOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<ForwardOpInterface, ForwardOp> {
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+        ForwardOpInterface, ForwardOp> {
+
+    static bool supportsUnstructuredControlFlow() { return true; }
+
+    bool hasTensorSemantics(Operation *op) const
+    {
+        auto isaTensor = llvm::IsaPred<TensorType>;
+
+        // A function has tensor semantics if it has tensor arguments/results.
+        auto forwardOp = cast<ForwardOp>(op);
+        bool hasTensorArg = any_of(forwardOp.getArgumentTypes(), isaTensor);
+        bool hasTensorResult = any_of(forwardOp.getResultTypes(), isaTensor);
+        if (hasTensorArg || hasTensorResult)
+            return true;
+
+        return false;
+    }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -328,7 +347,25 @@ struct ForwardOpInterface
 };
 
 struct ReverseOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<ReverseOpInterface, ReverseOp> {
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+        ReverseOpInterface, ReverseOp> {
+
+    static bool supportsUnstructuredControlFlow() { return true; }
+
+    bool hasTensorSemantics(Operation *op) const
+    {
+        auto isaTensor = llvm::IsaPred<TensorType>;
+
+        // A function has tensor semantics if it has tensor arguments/results.
+        auto reverseOp = cast<ReverseOp>(op);
+        bool hasTensorArg = any_of(reverseOp.getArgumentTypes(), isaTensor);
+        bool hasTensorResult = any_of(reverseOp.getResultTypes(), isaTensor);
+        if (hasTensorArg || hasTensorResult)
+            return true;
+
+        return false;
+    }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -352,6 +389,9 @@ struct ReverseOpInterface
                             const bufferization::BufferizationOptions &options) const
     {
         auto reverseOp = cast<ReverseOp>(op);
+        llvm::outs() << "Found reverse!\n";
+        llvm::outs() << "Found reverse!\n";
+        llvm::outs() << "Found reverse!\n";
 
         auto argc = reverseOp.getArgc();
         auto resc = reverseOp.getResc();
