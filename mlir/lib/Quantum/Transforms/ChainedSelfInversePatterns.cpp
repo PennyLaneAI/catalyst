@@ -19,7 +19,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 #include <set>
-#include <string>
 
 using llvm::dbgs;
 using namespace mlir;
