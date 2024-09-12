@@ -48,12 +48,12 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
         FoldingAttr:$folding,
-        RankedTensorOf<[AnySignlessIntegerOrIndex]>:$scaleFactors
+        RankedTensorOf<[AnySignlessIntegerOrIndex]>:$numFolds
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
     let assemblyFormat = [{
-        $callee `(` $args `)` `folding` `(` $folding `)` `scaleFactors` `(` $scaleFactors `:` type($scaleFactors) `)` attr-dict `:` functional-type($args, results)
+        $callee `(` $args `)` `folding` `(` $folding `)` `numFolds` `(` $numFolds `:` type($numFolds) `)` attr-dict `:` functional-type($args, results)
     }];
 }
 
