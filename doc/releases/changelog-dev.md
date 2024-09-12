@@ -56,7 +56,9 @@
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
 * Treat `qml.devices.DefaultExecutionConfig` as if it were immutable and make copies of it when
-  modifications are required.
+  modifications are required. Doing so helps avoid unexpected bugs and test failures when the
+  `DefaultExecutionConfig` object becomes modified from its original state.
+  [(#1137)](https://github.com/PennyLaneAI/catalyst/pull/1137)
 
 <h3>Contributors</h3>
 
