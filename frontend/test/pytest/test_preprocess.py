@@ -14,12 +14,10 @@
 """Test for the device preprocessing.
 """
 # pylint: disable=unused-argument
-import os
 import pathlib
 
 # pylint: disable=unused-argument
 import platform
-import tempfile
 from functools import partial
 from os.path import join
 from tempfile import TemporaryDirectory

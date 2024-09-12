@@ -22,34 +22,20 @@ import platform
 import tempfile
 from dataclasses import replace
 from functools import partial
-from os.path import join
 
-# from tempfile import TemporaryDirectory
-# from textwrap import dedent
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pennylane as qml
 import pytest
 
-# from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 
-# from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
-# from catalyst import CompileError, ctrl
-# from catalyst.api_extensions.control_flow import (
-#     Cond,
-#     ForLoop,
-#     WhileLoop,
-#     cond,
-#     for_loop,
-#     while_loop,
-# )
-# from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
+
 from catalyst.compiler import get_lib_path
 from catalyst.device import (
     QJITDeviceNewAPI,
@@ -58,23 +44,17 @@ from catalyst.device import (
     get_device_toml_config,
 )
 from catalyst.device.decomposition import (
-    # catalyst_acceptance,
-    # catalyst_decompose,
-    # decompose_ops_to_unitary,
     measurements_from_counts,
     measurements_from_samples,
 )
 
-# from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
-    # TOMLDocument,
-    # load_device_capabilities,
-    # pennylane_operation_set,
-    # read_toml_file,
 )
+
+# pylint: disable=attribute-defined-outside-init
 
 
 class DummyDevice(Device):
