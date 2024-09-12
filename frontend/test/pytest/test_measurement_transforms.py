@@ -21,13 +21,13 @@ import pathlib
 import platform
 import tempfile
 from dataclasses import replace
-from flaky import flaky
 from functools import partial
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pennylane as qml
 import pytest
+from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.transforms import split_non_commuting, split_to_single_terms
@@ -412,6 +412,7 @@ class TestMeasurementTransforms:
 
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
+
 
     # pylint: disable=unnecessary-lambda
     @flaky
