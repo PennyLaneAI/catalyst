@@ -55,6 +55,9 @@
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
+* Treat `qml.devices.DefaultExecutionConfig` as if it were immutable and make copies of it when
+  modifications are required.
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
