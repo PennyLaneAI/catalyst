@@ -285,8 +285,28 @@ struct ForwardOpInterface
         SmallVector<Value> outputs;
         SmallVector<Value> cotangents;
 
+        // Update signature
+        auto argTys = forwardOp.getArgumentTypes();
+        auto retTys = forwardOp.getResultTypes();
+        SmallVector<Type> emptyRets;
+        SmallVector<Type> args(argTys.begin(), argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end());
+        SmallVector<Type> bufferArgs;
+        for (Type ty : args) {
+            auto tensorType = dyn_cast<RankedTensorType>(ty);
+            if (!tensorType)
+                bufferArgs.push_back(ty);
+            else
+                bufferArgs.push_back(
+                    MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
+        }
+        auto forwardTy = rewriter.getFunctionType(bufferArgs, emptyRets);
+        
         Block *block;
-        rewriter.modifyOpInPlace(op, [&] { block = forwardOp.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { 
+            forwardOp.setFunctionType(forwardTy); 
+            block = forwardOp.addEntryBlock();
+        });
 
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(block);
@@ -316,7 +336,6 @@ struct ForwardOpInterface
             Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, input);
             tensorInputs.push_back(tensorIn);
         }
-
         auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
         SmallVector<Value> tensorOutputs(callOp.getResults());
 
@@ -340,7 +359,7 @@ struct ForwardOpInterface
         }
 
         auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
-        bufferization::replaceOpWithNewBufferizedOp<catalyst::gradient::ReturnOp>(rewriter, op, tapeMemrefOutputs, F);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeMemrefOutputs, F);
 
         return success();
     }
@@ -389,9 +408,6 @@ struct ReverseOpInterface
                             const bufferization::BufferizationOptions &options) const
     {
         auto reverseOp = cast<ReverseOp>(op);
-        llvm::outs() << "Found reverse!\n";
-        llvm::outs() << "Found reverse!\n";
-        llvm::outs() << "Found reverse!\n";
 
         auto argc = reverseOp.getArgc();
         auto resc = reverseOp.getResc();
@@ -401,8 +417,28 @@ struct ReverseOpInterface
         SmallVector<Value> cotangents;
         SmallVector<Value> tapeElements;
 
+        // Update signature
+        auto argTys = reverseOp.getArgumentTypes();
+        auto retTys = reverseOp.getResultTypes();
+        SmallVector<Type> emptyRets;
+        SmallVector<Type> args(argTys.begin(), argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end());
+        SmallVector<Type> bufferArgs;
+        for (Type ty : args) {
+            auto tensorType = dyn_cast<RankedTensorType>(ty);
+            if (!tensorType)
+                bufferArgs.push_back(ty);
+            else
+                bufferArgs.push_back(
+                    MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
+        }
+        auto reverseTy = rewriter.getFunctionType(bufferArgs, emptyRets);
+        
         Block *block;
-        rewriter.modifyOpInPlace(op, [&] { block = reverseOp.addEntryBlock(); });
+        rewriter.modifyOpInPlace(op, [&] { 
+            reverseOp.setFunctionType(reverseTy); 
+            block = reverseOp.addEntryBlock();
+        });
 
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(block);
