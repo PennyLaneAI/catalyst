@@ -636,6 +636,64 @@ class TestMeasurementTransforms:
             for obs in unsupported_obs:
                 assert f"{obs}] : !quantum.obs" not in mlir
 
+    @pytest.mark.parametrize("non_commuting_flag", (True, False))
+    def test_split_non_commuting_is_added_for_partial_diagonalization(
+        self, non_commuting_flag, mocker
+    ):
+        """Test that the split_non_commuting transform is added to the transform program from
+        preprocess when diagonalizing some observables, regarless of the non_commuting_observables
+        flag"""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        config = get_device_toml_config(dev)
+
+        del config["operators"]["observables"]["Hadamard"]
+        config["compilation"]["non_commuting_observables"] = non_commuting_flag
+
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
+            backend_info = extract_backend_info(dev, dev_capabilities)
+            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+        # dev1 supports non-commuting observables and sum observables - no splitting
+        assert dev_capabilities.non_commuting_observables_flag is non_commuting_flag
+
+        # Check the preprocess
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            transform_program, _ = qjit_dev.preprocess(ctx)
+
+        assert split_non_commuting in transform_program
+
+    @pytest.mark.parametrize("non_commuting_flag", (True, False))
+    def test_split_non_commuting_is_added_for_full_diagonalization(
+        self, non_commuting_flag, mocker
+    ):
+        """Test that the split_non_commuting transform is added to the transform program from
+        preprocess when diagonalizing all observables, regarless of the non_commuting_observables
+        flag"""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        config = get_device_toml_config(dev)
+
+        config["operators"]["observables"] = {}
+        config["compilation"]["non_commuting_observables"] = non_commuting_flag
+
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
+            backend_info = extract_backend_info(dev, dev_capabilities)
+            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+
+        # dev1 supports non-commuting observables and sum observables - no splitting
+        assert dev_capabilities.non_commuting_observables_flag is non_commuting_flag
+
+        # Check the preprocess
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            transform_program, _ = qjit_dev.preprocess(ctx)
+
+        assert split_non_commuting in transform_program
+
     def test_measurements_are_split(self, mocker):
         """Test that the split_to_single_terms or split_non_commuting transform
         are added to the transform program from preprocess as expected, based on the
