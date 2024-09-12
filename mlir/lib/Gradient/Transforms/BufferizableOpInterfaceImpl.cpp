@@ -396,6 +396,21 @@ struct ReverseOpInterface
         auto reverseOp = cast<ReverseOp>(op);
         bool hasTensorArg = any_of(reverseOp.getArgumentTypes(), isaTensor);
         bool hasTensorResult = any_of(reverseOp.getResultTypes(), isaTensor);
+
+        // Implementation must be bufferized.
+        auto implAttr = reverseOp.getImplementationAttr();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implArgTy = implOp.getArgumentTypes();
+        auto implResTy = implOp.getResultTypes();
+        for (auto ty: implArgTy) {
+            if (!isa<MemRefType>(ty))
+                return false;
+        }
+        for (auto ty: implResTy) {
+            if (!isa<MemRefType>(ty))
+                return false;
+        }
+
         if (hasTensorArg || hasTensorResult)
             return true;
 
@@ -488,12 +503,14 @@ struct ReverseOpInterface
 
         SmallVector<Value> tensorInputs;
         for (auto tapeElement : tapeElements) {
-            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
+            Value tensorIn = (isa<TensorType>(tapeElement.getType())) ? tapeElement :
+                rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
             tensorInputs.push_back(tensorIn);
         }
 
         for (auto cotangent : cotangents) {
-            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
+            Value tensorIn = (isa<TensorType>(cotangent.getType())) ? cotangent :
+                rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
             tensorInputs.push_back(tensorIn);
         }
 
@@ -501,8 +518,8 @@ struct ReverseOpInterface
         SmallVector<Value> tensorOutputs(callOp.getResults());
 
         for (auto [differential, tensorOutput] : llvm::zip(differentials, tensorOutputs)) {
-            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, differential.getType(),
-                                                                       tensorOutput);
+            Value castVal = (isa<MemRefType>(tensorOutput.getType())) ? tensorOutput :
+                rewriter.create<bufferization::ToMemrefOp>(loc, differential.getType(), tensorOutput);
             rewriter.create<memref::CopyOp>(loc, castVal, differential);
         }
 
@@ -521,6 +538,6 @@ void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRe
         AdjointOp::attachInterface<AdjointOpInterface>(*ctx);
         BackpropOp::attachInterface<BackpropOpInterface>(*ctx);
         ForwardOp::attachInterface<ForwardOpInterface>(*ctx);
-        //ReverseOp::attachInterface<ReverseOpInterface>(*ctx);
+        ReverseOp::attachInterface<ReverseOpInterface>(*ctx);
     });
 }
