@@ -252,21 +252,6 @@ struct ForwardOpInterface
         bool hasTensorResult = any_of(forwardOp.getResultTypes(), isaTensor);
         bool hasTensorFuncInType = any_of(forwardOp.getFunctionType().getInputs(), isaTensor);
         bool hasTensorFuncOutType = any_of(forwardOp.getFunctionType().getResults(), isaTensor);
-
-        // Implementation must be bufferized.
-        auto implAttr = forwardOp.getImplementationAttr();
-        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
-        auto implArgTy = implOp.getArgumentTypes();
-        auto implResTy = implOp.getResultTypes();
-        for (auto ty: implArgTy) {
-            if (!isa<MemRefType>(ty))
-                return false;
-        }
-        for (auto ty: implResTy) {
-            if (!isa<MemRefType>(ty))
-                return false;
-        }
-
         if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
             return true;
 
@@ -401,21 +386,6 @@ struct ReverseOpInterface
         bool hasTensorResult = any_of(reverseOp.getResultTypes(), isaTensor);
         bool hasTensorFuncInType = any_of(reverseOp.getFunctionType().getInputs(), isaTensor);
         bool hasTensorFuncOutType = any_of(reverseOp.getFunctionType().getResults(), isaTensor);
-
-        // Implementation must be bufferized.
-        auto implAttr = reverseOp.getImplementationAttr();
-        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
-        auto implArgTy = implOp.getArgumentTypes();
-        auto implResTy = implOp.getResultTypes();
-        for (auto ty: implArgTy) {
-            if (!isa<MemRefType>(ty))
-                return false;
-        }
-        for (auto ty: implResTy) {
-            if (!isa<MemRefType>(ty))
-                return false;
-        }
-
         if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
             return true;
 
