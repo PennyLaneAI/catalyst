@@ -39,7 +39,7 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        git checkout v0.8.0-rc
+        git checkout v0.8.1-rc
 
     - name: Install deps
       run: |
