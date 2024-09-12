@@ -82,6 +82,12 @@ def AnnotateFunctionPass : Pass<"annotate-function"> {
     let constructor = "catalyst::createAnnotateFunctionPass()";
 }
 
+def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
+    let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
+
+    let constructor = "catalyst::createSplitMultipleTapesPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 

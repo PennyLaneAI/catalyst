@@ -177,7 +177,7 @@ TAPE_SPLITTING_PASS = (
     # happens.
     "QuantumTapeSplittingPass",
     [
-        "func.func(split-multiple-tapes)",
+        "split-multiple-tapes",
     ],
 )
 
