@@ -413,7 +413,6 @@ class TestMeasurementTransforms:
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
-
     # pylint: disable=unnecessary-lambda
     @flaky
     @pytest.mark.parametrize(
