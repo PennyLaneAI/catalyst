@@ -23,6 +23,7 @@ import tempfile
 from dataclasses import replace
 from functools import partial
 from os.path import join
+
 # from tempfile import TemporaryDirectory
 # from textwrap import dedent
 from unittest.mock import Mock, patch
@@ -30,9 +31,11 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
+
 # from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+
 # from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
@@ -61,6 +64,7 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
 )
+
 # from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import (
@@ -162,7 +166,6 @@ class DummyDeviceLimitedMPs(Device):
     def __exit__(self, *args, **kwargs):
         os.unlink(self.toml_file.name)
         self.config = None
-
 
 
 class TestMeasurementTransforms:
@@ -276,8 +279,8 @@ class TestMeasurementTransforms:
     def test_measurement_from_readout_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
-        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline 
-        if the device only supports sample, and measurement_from_counts transform is applied if 
+        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
+        if the device only supports sample, and measurement_from_counts transform is applied if
         the device only supports counts. If both are supported, sample takes precedence."""
 
         allow_sample = "sample" in device_measurements
@@ -690,7 +693,6 @@ class TestMeasurementTransforms:
         assert split_to_single_terms in transform_program
 
 
-
 class TestTransform:
     """Test the measurement transforms implemented in Catalyst."""
 
@@ -731,4 +733,3 @@ class TestTransform:
         assert len(counts) == 2
         assert counts[0].shape == (8,)
         assert counts[1].shape == (8,)
-
