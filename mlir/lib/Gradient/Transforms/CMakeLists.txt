@@ -5,6 +5,8 @@ file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
     BufferizationPatterns.cpp
     gradient_bufferize.cpp
+    PreprocessingPatterns.cpp
+    gradient_preprocess.cpp
     LoweringPatterns.cpp
     gradient_lowering.cpp
     ConversionPatterns.cpp

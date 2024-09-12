@@ -71,4 +71,16 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
     ];
 }
 
+def GradientPreprocessingPass : Pass<"gradient-preprocess"> {
+    let summary = "Bufferize tensors in quantum operations.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "memref::MemRefDialect",
+        "index::IndexDialect"
+    ];
+
+    let constructor = "catalyst::createGradientPreprocessingPass()";
+}
+
 #endif // GRADIENT_PASSES
