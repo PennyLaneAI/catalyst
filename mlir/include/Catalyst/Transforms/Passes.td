@@ -18,7 +18,7 @@
 include "mlir/Pass/PassBase.td"
 
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
-    let summary = "An empty pass boilerplate that prints out hello world.";
+    let summary = "Detensorize for, if, while operations from the SCF dialect.";
 
     let constructor = "catalyst::createDetensorizeSCFPass()";
 }
