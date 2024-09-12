@@ -29,7 +29,7 @@
 
 <h3>Improvements</h3>
 
-* The decorator `self_inverses` not support all Hermitian Gates.
+* The decorator `self_inverses` now supports all Hermitian Gates.
   [(#1136)](https://github.com/PennyLaneAI/catalyst/pull/1136)
 
   The full list of supported gates are as follows:
