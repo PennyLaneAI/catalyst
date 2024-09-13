@@ -37,14 +37,17 @@ def get_param_annotations(fn: Callable):
     assert isinstance(fn, Callable)
     signature = inspect.signature(fn)
     parameters = signature.parameters
-    return (p.annotation for p in parameters.values())
+    return [p.annotation for p in parameters.values()]
 
 
 def params_are_annotated(fn: Callable):
     """Return true if all parameters are typed-annotated, or no parameters are present."""
     assert isinstance(fn, Callable)
     annotations = get_param_annotations(fn)
-    return all(annotation is not inspect.Parameter.empty for annotation in annotations)
+    are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
+    if not are_annotated:
+        return False
+    return all(isinstance(annotation, (type, jax.core.ShapedArray)) for annotation in annotations)
 
 
 def get_type_annotations(fn: Callable):
