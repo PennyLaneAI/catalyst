@@ -55,6 +55,9 @@
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
+* Remove the `QJITDevice` class in favor of `QJITDeviceNewAPI`.
+  [(#1138)](https://github.com/PennyLaneAI/catalyst/pull/1138)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -65,4 +68,5 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
-Daniel Strano.
+Daniel Strano,
+Raul Torres.
