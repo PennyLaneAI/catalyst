@@ -22,7 +22,7 @@ import pathlib
 import platform
 import re
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import Any, Dict, Optional, Set
 
@@ -323,7 +323,7 @@ class QJITDevice(qml.devices.Device):
     def preprocess(
         self,
         ctx,
-        execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
+        execution_config: Optional[qml.devices.ExecutionConfig] = None,
     ):
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
@@ -346,6 +346,9 @@ class QJITDevice(qml.devices.Device):
         backend according to the backend TOML file).
         """
 
+        if execution_config is None:
+            execution_config = qml.devices.ExecutionConfig()
+
         _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
@@ -353,6 +356,7 @@ class QJITDevice(qml.devices.Device):
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
+        config = replace(config, device_options=deepcopy(config.device_options))
         config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
         program = program + measurement_transforms
 

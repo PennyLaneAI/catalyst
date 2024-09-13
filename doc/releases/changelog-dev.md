@@ -55,6 +55,11 @@
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
+* Prefer creating new `qml.devices.ExecutionConfig` objects over using the global
+  `qml.devices.DefaultExecutionConfig`. Doing so helps avoid unexpected bugs and test failures in
+  case the `DefaultExecutionConfig` object becomes modified from its original state.
+  [(#1137)](https://github.com/PennyLaneAI/catalyst/pull/1137)
+
 * Remove the old `QJITDevice` API.
   [(#1138)](https://github.com/PennyLaneAI/catalyst/pull/1138)
 
