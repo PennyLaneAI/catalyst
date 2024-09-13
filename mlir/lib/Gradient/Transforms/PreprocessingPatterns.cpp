@@ -36,8 +36,29 @@ struct PreprocessForwardOp : public OpRewritePattern<ForwardOp> {
     mlir::LogicalResult matchAndRewrite(ForwardOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        llvm::outs() << "preprocess forward\n";
-        return failure();
+        if (!op.getBody().empty())
+            return failure();
+
+        Block *block;
+        rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto inputs = op.getArguments();
+
+        auto implAttr = op.getImplementationAttr();
+        auto impl = op.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = op.getLoc();
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, inputs);
+        SmallVector<Value> outputs(callOp.getResults());
+
+        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, F);
+
+        return success();
     }
 };
 
@@ -47,8 +68,29 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
     mlir::LogicalResult matchAndRewrite(ReverseOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        llvm::outs() << "preprocess reverse\n";
-        return failure();
+        if (!op.getBody().empty())
+            return failure();
+
+        Block *block;
+        rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto inputs = op.getArguments();
+
+        auto implAttr = op.getImplementationAttr();
+        auto impl = op.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = op.getLoc();
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, inputs);
+        SmallVector<Value> outputs(callOp.getResults());
+
+        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, F);
+
+        return success();
     }
 };
 
