@@ -242,7 +242,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        python_version: ["3.10"]
         container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
@@ -257,7 +257,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12 clang-tools-extra
         # Update env vars valid for all tasks of this job
         echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
 
@@ -387,7 +387,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        python_version: ["3.10"]
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
