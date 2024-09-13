@@ -406,8 +406,8 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeReturnOp>(typeConverter, patterns.getContext());
-    //patterns.add<BufferizeForwardOp>(typeConverter, patterns.getContext());
-    //patterns.add<BufferizeReverseOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeForwardOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeReverseOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient
