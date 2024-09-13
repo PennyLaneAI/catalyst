@@ -1,0 +1,441 @@
+name: Clang-tidy C++ build
+on:
+  schedule:
+  # Monday 01:35 @ UTC-0
+  - cron: '35 1 * * 1'
+  workflow_dispatch:
+name: Build Catalyst Wheel on Linux (x86_64)
+
+concurrency:
+  group: Build Catalyst with clang-tidy & warnings as errors on Linux (x86_64)-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  determine_runner:
+    if: github.event.pull_request.draft == false
+    name: Determine runner type to use
+    uses: ./.github/workflows/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-latest
+
+  check_if_wheel_build_required:
+    if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
+  constants:
+    needs: [check_if_wheel_build_required, determine_runner]
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    with:
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
+
+  build-dependencies:
+    needs: [constants, check_if_wheel_build_required, determine_runner]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ["3.10"]
+        container_img: ["manylinux_2_28_x86_64"]
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    container: quay.io/pypa/${{ matrix.container_img }}
+
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Set Ownership in Container
+      run: |
+        # To fix the git issue with the owner of the checkout dir
+        chown -R $(id -u):$(id -g) $PWD
+
+    # Cache external project sources
+    # Note that these caches will not be the same as for our main check-catalyst action, since
+    # GH doesn't support using caches across un-/containerized actions (those with `container_img`).
+    - name: Cache LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v4
+      with:
+        path:  mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
+        enableCrossOsArchive: True
+
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/mlir-hlo
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
+        enableCrossOsArchive: True
+
+    - name: Cache Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v4
+      with:
+        path:  mlir/Enzyme
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
+        enableCrossOsArchive: True
+
+    - name: Clone LLVM Submodule
+      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ needs.constants.outputs.llvm_version }}
+        path: mlir/llvm-project
+
+    - name: Clone MHLO Submodule
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ needs.constants.outputs.mhlo_version }}
+        path: mlir/mlir-hlo
+
+    - name: Clone Enzyme Submodule
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
+    # Cache external project builds
+    - name: Restore LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path:  llvm-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+
+    - name: Restore MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache/restore@v4
+      with:
+        path:  mhlo-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        lookup-only: True
+
+    - name: Restore Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache/restore@v4
+      with:
+        path:  enzyme-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        lookup-only: True
+
+    - name: Install dependencies (AlmaLinux)
+      if: |
+        steps.cache-llvm-build.outputs.cache-hit != 'true' ||
+        steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        # Reduce wait time for repos not responding
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y libzstd-devel gcc-toolset-12 clang-tools-extra
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
+
+    # Required for MHLO and building MLIR with protected symbols.
+    # (Don't forget to add the build directory to PATH in subsequent steps, so
+    # other tools can find it, in particular collect2 invoked by gcc.)
+    - name: Build LLD
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_TARGETS_TO_BUILD="host" \
+              -DLLVM_ENABLE_PROJECTS="lld"
+
+        cmake --build llvm-build --target lld
+
+    - name: Build LLVM / MLIR
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_BUILD_EXAMPLES=OFF \
+              -DLLVM_TARGETS_TO_BUILD="host" \
+              -DLLVM_ENABLE_PROJECTS="mlir" \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DLLVM_INSTALL_UTILS=ON \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DLLVM_ENABLE_LLD=ON
+
+        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
+        # and remove filter
+        # This tests fails on CI/CD not locally.
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
+
+    - name: Save LLVM Build
+      id: save-llvm-build
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  llvm-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+
+    - name: Build MHLO Dialect
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      # building with LLD is a strong requirement for mhlo
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+
+        cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DLLVM_ENABLE_LLD=ON
+
+        LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build mhlo-build --target check-mlir-hlo
+
+    - name: Save MHLO Build
+      id: save-mhlo-build
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path:  mhlo-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+              -DENZYME_STATIC_LIB=ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
+
+        cmake --build enzyme-build --target EnzymeStatic-19
+
+    - name: Save Enzyme Build
+      id: save-enzyme-build
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: enzyme-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+
+  catalyst-linux-wheels-x86-64:
+    needs: [constants, build-dependencies, determine_runner]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+        container_img: ["manylinux_2_28_x86_64"]
+
+    name: Build Wheels (Python ${{ matrix.python_version }})
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    container: quay.io/pypa/${{ matrix.container_img }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Install dependencies (AlmaLinux)
+      run: |
+        # Reduce wait time for repos not responding
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-12
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-12/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache/restore@v4
+      with:
+        path: mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path:  llvm-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache/restore@v4
+      with:
+        path: mlir/mlir-hlo
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache/restore@v4
+      with:
+        path:  mhlo-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache/restore@v4
+      with:
+        path:  mlir/Enzyme
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache/restore@v4
+      with:
+        path:  enzyme-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        fail-on-cache-miss: True
+
+    # Build Catalyst-Runtime
+    - name: Build Catalyst-Runtime
+      run: |
+        cmake -S runtime -B runtime-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
+              -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
+              -DENABLE_LAPACK=OFF \
+              -DLIGHTNING_GIT_TAG=latest_release \
+              -DENABLE_WARNINGS=ON \
+              -DENABLE_CLANG_TIDY=ON \
+              -DCLANG_TIDY_BINARY=clang-tidy \
+              -DENABLE_OPENQASM=ON \
+              -DENABLE_OPENMP=ON \
+              -DLQ_ENABLE_KERNEL_OMP=OFF
+
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_dummy
+
+    # Build Quantum and Gradient Dialects
+    - name: Build MLIR Dialects
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S mlir -B quantum-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
+              -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
+              -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
+              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_LLD=ON
+
+        cmake --build quantum-build --target check-dialects compiler_driver
+
+    - name: Build wheel
+      run: |
+        PYTHON=python${{ matrix.python_version }} \
+        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
+        MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
+        DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
+        RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+        OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        make wheel
+
+    - name: Repair wheel using auditwheel
+      run: |
+        # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
+        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
+
+    - name: Upload Wheel Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        path: wheel/
+        retention-days: 14
+
+  test-wheels:
+    needs: [constants, catalyst-linux-wheels-x86-64, determine_runner]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+
+    # To check all wheels for supported python3 versions
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Linux x86
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Download Wheel Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        path: dist
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
+
+    - name: Install Python dependencies
+      run: |
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock 
+
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1' "boto3==1.26"
+
+    - name: Install OQC client
+      run: |
+        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+
+    - name: Install Catalyst
+      run: |
+        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
+
+    - name: Run Python Pytest Tests
+      run: |
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/async_tests
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
