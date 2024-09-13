@@ -18,11 +18,8 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from jax.tree_util import tree_flatten
 
-from catalyst import for_loop, grad, qjit, vmap
-
-# pylint: disable=too-many-public-methods
+from catalyst import qjit, vmap
 
 
 class TestVectorizeMap:

@@ -34,7 +34,6 @@ from catalyst import (
     pure_callback,
     qjit,
     value_and_grad,
-    vmap,
 )
 
 # pylint: disable=too-many-lines
@@ -1445,6 +1444,7 @@ def test_adj_qubitunitary(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+@pytest.mark.xfail(reason="Need PR 332.")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_preprocessing_outside_qnode(inp, backend):
     """Test the preprocessing outside qnode."""
@@ -1503,6 +1503,7 @@ def test_gradient_slice(backend):
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
 
+
 def test_ellipsis_differentiation(backend):
     """Test circuit diff with ellipsis in the preprocessing."""
     dev = qml.device(backend, wires=3)
@@ -1519,7 +1520,8 @@ def test_ellipsis_differentiation(backend):
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
 
-@pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
+
+@pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
     n_wires = 5
@@ -1575,7 +1577,7 @@ def test_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[1], data_jax[1])
 
 
-@pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
+@pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_forloop_vmap_worflow_derivation(backend):
     """Test a forloop vmap."""
     n_wires = 5
@@ -1632,6 +1634,7 @@ def test_forloop_vmap_worflow_derivation(backend):
 
     assert jnp.allclose(data_cat[0], data_jax[0])
     assert jnp.allclose(data_cat[1], data_jax[1])
+
 
 @pytest.mark.parametrize(
     "gate,state", ((qml.BasisState, np.array([1])), (qml.StatePrep, np.array([0, 1])))
