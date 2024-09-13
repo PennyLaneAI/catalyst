@@ -71,7 +71,7 @@ def _verify_nested(
 
 
 def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
-    """Validates whether or not an observable is accepted by QJITDevice.
+    """Validates whether or not an observable is accepted by QJITDeviceNewAPI.
 
     Args:
         obs(Operator): the observable to be validated
