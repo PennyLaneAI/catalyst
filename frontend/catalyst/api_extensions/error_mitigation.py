@@ -165,14 +165,14 @@ class ZNE:
     ):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
-        
+
         wrapped_qnode_function = fn.func
+
         def wrapper(*args, **kwrags):
             if EvaluationContext.is_tracing():
-                apply_registered_pass_p.bind(
-                    pass_name="lower-mitigation"
-                )
+                apply_registered_pass_p.bind(pass_name="lower-mitigation")
             return wrapped_qnode_function(*args, **kwrags)
+
         fn.func = wrapper
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"

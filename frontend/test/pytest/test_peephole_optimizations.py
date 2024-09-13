@@ -19,7 +19,8 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.passes import cancel_inverses
+from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
+from catalyst.passes import cancel_inverses, pipeline
 
 # pylint: disable=missing-function-docstring
 
@@ -87,6 +88,34 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
         _f = f(theta)
         _g = g(theta)
         return _f, _g
+
+    assert np.allclose(workflow()[0], workflow()[1])
+
+
+@pytest.mark.parametrize("theta", [42.42])
+def test_pipeline_functionality(theta, backend):
+    my_pipeline = {
+        "cancel_inverses": {},
+        "mitigate_with_zne": {
+            "scale_factors": [1, 3, 5, 7],
+            "extrapolate": polynomial_extrapolation(2),
+            "folding": "global",
+        },
+    }
+
+    @qjit
+    def workflow():
+        @qml.qnode(qml.device(backend, wires=2))
+        def f(x):
+            qml.RX(x, wires=[0])
+            qml.Hadamard(wires=[1])
+            qml.Hadamard(wires=[1])
+            return qml.expval(qml.PauliY(wires=0))
+
+        no_pipeline_result = f(theta)
+        pipeline_result = pipeline(pass_pipeline=my_pipeline)(f)(theta)
+
+        return no_pipeline_result, pipeline_result
 
     assert np.allclose(workflow()[0], workflow()[1])
 

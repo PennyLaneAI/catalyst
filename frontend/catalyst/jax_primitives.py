@@ -529,11 +529,11 @@ def _apply_registered_pass_lowering(
         """
 
     if first_op_in_block.name == "transform.apply_registered_pass":
+        """
         _ = len(named_sequence_op_block.operations)
         yield_op = named_sequence_op_block.operations[_ - 1].operation
-        '''
         current_last_pass = named_sequence_op_block.operations[_ - 2].operation
-        
+
         with ir.InsertionPoint(yield_op):
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
@@ -541,7 +541,7 @@ def _apply_registered_pass_lowering(
                 pass_name=pass_name,
                 options=options,
             )
-        '''
+        """
         current_first_pass = named_sequence_op_block.operations[0].operation
         with ir.InsertionPoint(first_op_in_block):
             apply_registered_pass_op = ApplyRegisteredPassOp(
@@ -550,7 +550,6 @@ def _apply_registered_pass_lowering(
                 pass_name=pass_name,
                 options=options,
             )
-            #breakpoint()
             current_first_pass.operands[0] = apply_registered_pass_op.result
 
     # otherwise it's the first pass, i.e. only a yield op is in the block

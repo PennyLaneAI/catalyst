@@ -73,8 +73,11 @@ def pipeline(fn=None, *, pass_pipeline=None):
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
+    fn_original_name = fn.__name__
+
     API_calls = API_name_to_API_calls()
-    fn_clone = "__default__init__clone__"
+    fn_clone = copy.copy(fn)
+    fn_clone.__name__ = fn_original_name + "_transformed"
     # Note: we create wrappers to inject the apply_registered_pass primitive
     # In other words, the last API call, aka the last wrapper, will be the outermost primitive
     # Therefore when lowering these primitives to mlir (in jax_primitives.py), lower them in reverse order!
@@ -83,16 +86,12 @@ def pipeline(fn=None, *, pass_pipeline=None):
         if decorator not in API_calls.keys():
             raise RuntimeError(f"{decorator} is not a valid quantum transformation pass")
 
-        if fn_clone == "__default__init__clone__":
-            fn_clone = API_calls[decorator](fn, **decorator_args)
-        else:
-            fn_clone = API_calls[decorator](fn_clone, **decorator_args)
+        fn_clone = API_calls[decorator](fn_clone, keep_original=False, **decorator_args)
 
     return fn_clone
 
 
-
-def cancel_inverses(fn=None):
+def cancel_inverses(fn=None, keep_original=True):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
@@ -188,35 +187,51 @@ def cancel_inverses(fn=None):
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    wrapped_qnode_function = fn.func
     funcname = fn.__name__
+    wrapped_qnode_function = fn.func
 
-    def wrapper(*args, **kwrags):
-        # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
-        # instead of the qnode name. That way the clone can have this attribute and
-        # the original can just not have it.
-        # We are not doing this right now and passing by name because this would
-        # be a discardable attribute (i.e. a user/developer wouldn't know that this
-        # attribute exists just by looking at qnode's documentation)
-        # But when we add the full peephole pipeline in the future, the attribute
-        # could get properly documented.
+    if keep_original:
 
-        if EvaluationContext.is_tracing():
-            apply_registered_pass_p.bind(
-                pass_name="remove-chained-self-inverse",
-                options=f"func-name={funcname}" + "_cancel_inverses",
-            )
-        return wrapped_qnode_function(*args, **kwrags)
+        def wrapper(*args, **kwrags):
+            # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
+            # instead of the qnode name. That way the clone can have this attribute and
+            # the original can just not have it.
+            # We are not doing this right now and passing by name because this would
+            # be a discardable attribute (i.e. a user/developer wouldn't know that this
+            # attribute exists just by looking at qnode's documentation)
+            # But when we add the full peephole pipeline in the future, the attribute
+            # could get properly documented.
 
-    fn_clone = copy.copy(fn)
-    fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_cancel_inverses"
+            if EvaluationContext.is_tracing():
+                apply_registered_pass_p.bind(
+                    pass_name="remove-chained-self-inverse",
+                    options=f"func-name={funcname}" + "_cancel_inverses",
+                )
+            return wrapped_qnode_function(*args, **kwrags)
 
-    return fn_clone
+        fn_clone = copy.copy(fn)
+        fn_clone.func = wrapper
+        fn_clone.__name__ = funcname + "_cancel_inverses"
+
+        return fn_clone
+
+    else:
+
+        def wrapper(*args, **kwrags):
+            if EvaluationContext.is_tracing():
+                apply_registered_pass_p.bind(
+                    pass_name="remove-chained-self-inverse",
+                    options=f"func-name={funcname}",
+                )
+            return wrapped_qnode_function(*args, **kwrags)
+
+        fn.func = wrapper
+        return fn
 
 
-def mitigate_with_zne(*args, **kwrags):
+def mitigate_with_zne(*args, keep_original=False, **kwrags):
     """
+    An alias of catalyst.mitigate_with_zne.
     See https://docs.pennylane.ai/projects/catalyst/en/stable/code/api/catalyst.mitigate_with_zne.html
     """
     return _mitigate_with_zne_api_extensions(*args, **kwrags)
@@ -224,8 +239,8 @@ def mitigate_with_zne(*args, **kwrags):
 
 ## IMPL and helpers ##
 def API_name_to_API_calls():
-    return {"cancel_inverses":cancel_inverses, 
-            "mitigate_with_zne":mitigate_with_zne}
+    return {"cancel_inverses": cancel_inverses, "mitigate_with_zne": mitigate_with_zne}
+
 
 def _inject_transform_named_sequence():
     """
