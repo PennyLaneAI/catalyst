@@ -16,10 +16,9 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
-#include <set>
-
 using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst;
@@ -38,8 +37,9 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        std::set<StringRef> HermitianOps{"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                         "CY",       "CZ",     "SWAP",   "Toffoli"};
+        mlir::StringSet<> HermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
+                                          "CY",       "CZ",     "SWAP",   "Toffoli"};
+
         StringRef OpGateName = op.getGateName();
         if (HermitianOps.find(OpGateName) == HermitianOps.end())
             return failure();
