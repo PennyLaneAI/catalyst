@@ -251,3 +251,21 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
     %5 = quantum.custom "Hadamard"() %4 : !quantum.bit
     return %5 : !quantum.bit
 }
+// -----
+
+// test non-consecutive self-inverse Gates not canceled out
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> !quantum.bit {
+    // CHECK: quantum.alloc
+    // CHECK: quantum.extract
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[VAL1:%.*]] = quantum.custom "Hadamard"() %1 : !quantum.bit
+    // CHECK: [[VAL2:%.*]] = quantum.custom "PauliX"() [[VAL1:%.*]] : !quantum.bit
+    // CHECK: quantum.custom "Hadamard"() [[VAL2:%.*]] : !quantum.bit
+    %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
+    %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+    %4 = quantum.custom "Hadamard"() %3 : !quantum.bit
+    return %4 : !quantum.bit
+}
+
