@@ -175,6 +175,7 @@ TAPE_SPLITTING_PASS = (
 HLO_LOWERING_PASS = (
     "HLOLoweringPass",
     [
+        "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
         "func.func(mhlo-legalize-control-flow)",
@@ -182,6 +183,7 @@ HLO_LOWERING_PASS = (
         "func.func(mhlo-legalize-to-std)",
         "func.func(hlo-legalize-sort)",
         "convert-to-signless",
+        "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
         "cse",

@@ -214,9 +214,8 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
         Block &beforeBlock = *whileOp.getBeforeBody();
         Block &afterBlock = *whileOp.getAfterBody();
 
-        // 1. Find scalar tensors and extract element
+        // 1. Find scalar tensors and extract elements
         SmallVector<std::size_t> newIterOperandsIndices;
-        SmallVector<Type> newResultTypes;
         SmallVector<Value> newIterOperands;
         for (const auto &it : llvm::enumerate(whileOp.getOperands())) {
             Value opOperand = it.value();
@@ -227,10 +226,20 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
                     rewriter.create<tensor::ExtractOp>(whileOp->getLoc(), opOperand, ValueRange{});
                 newIterOperands.push_back(value);
                 newIterOperandsIndices.push_back(it.index());
-                newResultTypes.push_back(value.getType());
                 continue;
             }
             newIterOperands.push_back(opOperand);
+        }
+
+        SmallVector<std::size_t> newResultIndices;
+        SmallVector<Type> newResultTypes;
+        for (const auto &it : llvm::enumerate(whileOp.getResults())) {
+            Value opOperand = it.value();
+            if (isScalarTensor(opOperand)) {
+                newResultTypes.push_back(cast<TensorType>(opOperand.getType()).getElementType());
+                newResultIndices.push_back(it.index());
+                continue;
+            }
             newResultTypes.push_back(opOperand.getType());
         }
 
@@ -244,6 +253,7 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
         // 3. Copy body
         Block &newBeforeBlock = *newWhileOp.getBeforeBody();
         rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock, newBeforeBlock.getArguments());
+
         Block &newAfterBlock = *newWhileOp.getAfterBody();
         rewriter.mergeBlocks(&afterBlock, &newAfterBlock, newAfterBlock.getArguments());
 
@@ -260,6 +270,9 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
                     newBeforeBlock.getArgument(index), value,
                     [&](OpOperand &op) { return !isa<tensor::FromElementsOp>(op.getOwner()); });
             }
+        }
+
+        for (std::size_t index : newResultIndices) {
             {
                 OpBuilder::InsertionGuard g(rewriter);
                 rewriter.setInsertionPoint(&newAfterBlock, newAfterBlock.begin());
@@ -313,7 +326,7 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
         {
             OpBuilder::InsertionGuard g(rewriter);
             rewriter.setInsertionPointAfter(whileOp);
-            for (std::size_t index : newIterOperandsIndices) {
+            for (std::size_t index : newResultIndices) {
                 Value for_result = newWhileOp->getResult(index);
                 Value value = rewriter.create<tensor::FromElementsOp>(
                     newWhileOp->getLoc(), RankedTensorType::get({}, for_result.getType()),
