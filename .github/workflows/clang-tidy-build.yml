@@ -5,7 +5,6 @@ on:
   - cron: '35 1 * * 1'
   workflow_dispatch:
   pull_request:
-name: Build Catalyst Wheel on Linux (x86_64)
 
 concurrency:
   group: Build Catalyst with clang-tidy & warnings as errors on Linux (x86_64)-${{ github.ref }}
