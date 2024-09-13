@@ -29,6 +29,7 @@ from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     get_abstract_signature,
+    params_are_annotated,
     typecheck_signatures,
 )
 
@@ -87,7 +88,6 @@ class TestDifferentPrecisions:
         assert jnp.allclose(res_float32, res_float64)
 
 
-@pytest.mark.filterwarnings("ignore:Casting complex")
 class TestJittedWithOneTypeRunWithAnother:
     @pytest.mark.parametrize(
         "from_type,to_type",
@@ -112,6 +112,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if x.dtype == jnp.dtype(jnp.complex64):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -167,6 +169,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
+            if x.dtype == jnp.dtype(jnp.complex64):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -195,6 +199,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if x.dtype == jnp.dtype(jnp.complex128):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -238,7 +244,6 @@ class TestJittedWithOneTypeRunWithAnother:
         assert jnp.allclose(res_from, res_to)
 
 
-@pytest.mark.filterwarnings("ignore:Casting complex")
 class TestTypePromotion:
     @pytest.mark.parametrize(
         "promote_from,val",
@@ -289,6 +294,8 @@ class TestTypePromotion:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if x.dtype == jnp.dtype(jnp.complex128):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -977,6 +984,15 @@ class TestGradPartial:
         expected = jax.grad(partial_fn)(0.3)
 
         assert np.allclose(grad_partial_fn(0.3), expected)
+
+
+class TestParamsAnnotations:
+    """Test param annotations"""
+
+    def test_params_invalid_annotation(self):
+        def foo(hello: "BAD ANNOTATION"): ...
+
+        assert not params_are_annotated(foo)
 
 
 if __name__ == "__main__":

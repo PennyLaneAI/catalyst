@@ -23,52 +23,34 @@ from jax import scipy as jsp
 from catalyst import qjit
 
 
-class TestExpmNumerical:
-    """Test jax.scipy.linalg.expm is numerically correct when being qjit compiled"""
+class TestExpmAndSolve:
+    """Test that `jax.scipy.linalg.expm` and `jax.scipy.linalg.solve` can run together
+    in the same function scope but from different qjit blocks.
 
-    @pytest.mark.parametrize(
-        "inp",
-        [
-            jnp.array([[0.1, 0.2], [5.3, 1.2]]),
-            jnp.array([[1, 2], [3, 4]]),
-            jnp.array([[1.0, -1.0j], [1.0j, -1.0]]),
-        ],
-    )
-    def test_expm_numerical(self, inp):
-        """Test basic numerical correctness for jax.scipy.linalg.expm for float, int, complex"""
+    Also test that their results are numerically correct when qjit compiled.
+    """
 
-        @qjit
-        def f(x):
-            return jsp.linalg.expm(x)
+    def test_expm_and_solve(self):
+        """
+        Test against the "gather rule not implemented" bug for
+        using expm and solve together.
+        https://github.com/PennyLaneAI/catalyst/issues/1094
+        """
 
-        observed = f(inp)
-        expected = jsp.linalg.expm(inp)
+        A = jnp.array([[1.0, 0.0], [0.0, 1.0]])
+        b = jnp.array([[0.1], [0.2]])
 
-        assert np.allclose(observed, expected)
+        def f(A, b):
+            return jsp.linalg.solve(A, b)
 
+        def g(A):
+            return jsp.linalg.expm(A)
 
-class TestExpmInCircuit:
-    """Test entire quantum workflows with jax.scipy.linag.expm"""
+        expected = [g(A), f(A, b)]  # [e, 0; 0, e], [0.1; 0.2]
+        observed = [qjit(g)(A), qjit(f)(A, b)]
 
-    def test_expm_in_circuit(self):
-        """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
-
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_expm():
-            generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
-            unitary = jsp.linalg.expm(generator)
-            qml.QubitUnitary(unitary, wires=[0])
-            return qml.probs()
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_rot():
-            qml.RX(np.pi, wires=[0])
-            return qml.probs()
-
-        res = circuit_expm()
-        expected = circuit_rot()  # expected = [0,1]
-        assert np.allclose(res, expected)
+        assert np.allclose(expected[0], observed[0])
+        assert np.allclose(expected[1], observed[1])
 
 
 class TestArgsortNumerical:

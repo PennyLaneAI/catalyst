@@ -1503,7 +1503,6 @@ def test_gradient_slice(backend):
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
 
-
 def test_ellipsis_differentiation(backend):
     """Test circuit diff with ellipsis in the preprocessing."""
     dev = qml.device(backend, wires=3)
@@ -1519,7 +1518,6 @@ def test_ellipsis_differentiation(backend):
     cat_res = qjit(grad(circuit, argnums=0))(weights)
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
-
 
 @pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
@@ -1635,6 +1633,26 @@ def test_forloop_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[0], data_jax[0])
     assert jnp.allclose(data_cat[1], data_jax[1])
 
+@pytest.mark.parametrize(
+    "gate,state", ((qml.BasisState, np.array([1])), (qml.StatePrep, np.array([0, 1])))
+)
+def test_paramshift_with_gates(gate, state):
+    """Test parameter shift works with a variety of gates present in the circuit."""
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @grad
+    @qml.qnode(dev, diff_method="parameter-shift")
+    def cost(x):
+        gate(state, wires=0)
+        qml.RY(x, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    param = 0.1
+    expected = cost(param)
+    observed = qjit(cost)(param)
+    assert np.allclose(expected, observed)
+
 
 class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
@@ -1680,7 +1698,7 @@ class TestGradientErrors:
             return qml.expval(qml.PauliX(0))
 
         def g(x):
-            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]))(x)
+            return mitigate_with_zne(f, scale_factors=[1, 3, 5])(x)
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 

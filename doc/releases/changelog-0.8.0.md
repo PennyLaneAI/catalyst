@@ -369,6 +369,9 @@
 * On devices that support it, initial state preparation routines `qml.StatePrep` and `qml.BasisState`
   are no longer decomposed when using Catalyst, improving compilation and runtime performance.
   [(#955)](https://github.com/PennyLaneAI/catalyst/pull/955)
+  [(#1047)](https://github.com/PennyLaneAI/catalyst/pull/1047)
+  [(#1062)](https://github.com/PennyLaneAI/catalyst/pull/1062)
+  [(#1073)](https://github.com/PennyLaneAI/catalyst/pull/1073)
 
 * Improved type validation and error messaging has been added to both the `catalyst.jvp`
   and `catalyst.vjp` functions to ensure that the (co)tangent and parameter types are compatible.
@@ -455,10 +458,27 @@
 
 <h3>Bug fixes</h3>
 
+* Catalyst no longer silently converts complex parameters to floats where floats are expected,
+  instead an error is raised.
+  [(#1008)](https://github.com/PennyLaneAI/catalyst/pull/1008)
+
+* Fixes a bug where dynamic one-shot did not work when no mid-circuit measurements are present
+  and when the return type is an iterable.
+  [(#1060)](https://github.com/PennyLaneAI/catalyst/pull/1060)
+
+* Fixes a bug finding the quantum function jaxpr when using quantum primitives with dynamic one-shot
+  [(#1041)](https://github.com/PennyLaneAI/catalyst/pull/1041)
+
+* Fix a bug where LegacyDevice number of shots is not correctly extracted when using the legacyDeviceFacade.
+  [(#1035)](https://github.com/PennyLaneAI/catalyst/pull/1035)
+
 * Catalyst no longer generates a `QubitUnitary` operation during decomposition if a device doesn't
   support it. Instead, the operation that would lead to a `QubitUnitary` is either decomposed or
   raises an error.
   [(#1002)](https://github.com/PennyLaneAI/catalyst/pull/1002)
+
+* Correctly errors out when user uses `qml.density_matrix`
+  [(#1118)](https://github.com/PennyLaneAI/catalyst/pull/1118)
 
 * Catalyst now preserves output PyTrees in QNodes executed with `mcm_method="one-shot"`.
   [(#957)](https://github.com/PennyLaneAI/catalyst/pull/957)
@@ -545,10 +565,10 @@
   @catalyst.pure_callback
   def callback_fn(x) -> jax.ShapeDtypeStruct((2,), jnp.float32):
       return np.array([np.sin(x), np.cos(x)])
-  
+
   callback_fn.fwd(lambda x: (callback_fn(x), x))
   callback_fn.bwd(lambda x, dy: (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,))
-  
+
   @qjit
   @catalyst.grad
   def f(x):
@@ -602,6 +622,28 @@
 * A bug is fixed in `catalyst.debug.get_cmain` to support multi-dimensional arrays as
   function inputs.
   [(#1003)](https://github.com/PennyLaneAI/catalyst/pull/1003)
+
+* Bug fixed when parameter annotations return strings.
+  [(#1078)](https://github.com/PennyLaneAI/catalyst/pull/1078)
+
+* In certain cases, `jax.scipy.linalg.expm`
+  [may return incorrect numerical results](https://github.com/PennyLaneAI/catalyst/issues/1071)
+  when used within a qjit-compiled function. A warning will now be raised
+  when `jax.scipy.linalg.expm` is used to inform of this issue.
+
+  In the meantime, we strongly recommend the
+  [catalyst.accelerate](https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.accelerate.html) function
+  within qjit-compiled function to call `jax.scipy.linalg.expm` directly.
+
+  ```python
+  @qjit
+  def f(A):
+      B = catalyst.accelerate(jax.scipy.linalg.expm)(A)
+      return B
+  ```
+
+  Note that this PR doesn't actually fix the aforementioned numerical errors, and just raises a warning.
+  [(#1082)](https://github.com/PennyLaneAI/catalyst/pull/1082)
 
 <h3>Documentation</h3>
 
@@ -666,6 +708,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Alessandro Cosentino,
 Lillian M. A. Frederiksen,
+David Ittah,
 Josh Izaac,
 Christina Lee,
 Kunwar Maheep Singh,

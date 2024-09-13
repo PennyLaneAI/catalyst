@@ -41,7 +41,7 @@ try:
 except:  # pylint: disable=bare-except
     from pennylane.transforms import qcut
 
-from pennylane.transforms import hamiltonian_expand, merge_rotations, sum_expand
+from pennylane.transforms import merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
@@ -280,7 +280,8 @@ class TestBroadcastExpand:
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
-        # TODO: expected is tuple, observed is list
+        # TODO: See https://github.com/PennyLaneAI/catalyst/issues/1099
+        # assert expected_shape == observed_shape
         assert expected_shape.num_leaves == observed_shape.num_leaves
 
 
@@ -325,11 +326,12 @@ class TestCutCircuitMCTransform:
         assert expected_shape == observed_shape
 
 
-class TestHamiltonianExpand:
-    """Test Hamiltonian Expand"""
+class TestSplitNonCommuting:
+    """Test split_non_commuting"""
 
-    def test_hamiltonian_expand(self, backend):
-        """Test hamiltonian expand."""
+    def test_split_non_commuting_single_observable(self, backend):
+        """Test split_non_commuting on a single, multi-term observable containing
+        non-commuting terms."""
 
         H4 = (
             qml.PauliX(0) @ qml.PauliZ(2)
@@ -343,7 +345,7 @@ class TestHamiltonianExpand:
         def qnode_builder(device_name):
             """Builder"""
 
-            @hamiltonian_expand
+            @qml.transforms.split_non_commuting
             @qml.qnode(qml.device(device_name, wires=3))
             def qfunc():
                 """Example taken from PL tests."""
@@ -365,23 +367,20 @@ class TestHamiltonianExpand:
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-
-class TestSumExpand:
-    """Test Sum Expand"""
-
-    def test_sum_expand(self, backend):
-        """Test Sum Expand"""
+    def test_split_non_commuting_mulitiple_observables(self, backend):
+        """Test split_non_commuting on two separate measurements with non-commuting
+        observables"""
 
         def qnode_builder(device_name):
             """Builder"""
 
-            @sum_expand
+            @qml.transforms.split_non_commuting
             @qml.qnode(qml.device(device_name, wires=2, shots=None))
             def qfunc():
                 """Example taken from PL tests"""
                 obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
                 obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
-                return [qml.expval(obs1), qml.expval(obs2)]
+                return qml.expval(obs1), qml.expval(obs2)
 
             return qfunc
 
@@ -392,7 +391,9 @@ class TestSumExpand:
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
-        assert expected_shape == observed_shape
+        assert expected_shape.num_leaves == observed_shape.num_leaves
+        # TODO: See https://github.com/PennyLaneAI/catalyst/issues/1099
+        # assert expected_shape == observed_shape
 
 
 class TestQFuncTransforms:
@@ -500,7 +501,7 @@ class TestTransformValidity:
         with pytest.raises(CompileError, match=msg):
 
             @qjit
-            @hamiltonian_expand
+            @qml.transforms.split_non_commuting
             @qml.qnode(qml.device(backend, wires=3))
             def qfunc():
                 """Example taken from PL tests."""

@@ -127,7 +127,10 @@ class BaseCudaInstructionSet(qml.QubitDevice):
         "SWAP",
         "CSWAP",
     ]
-    observables = []
+    observables = [
+        "PauliX",
+        "PauliZ",
+    ]
     config = Path(__file__).parent / "cuda_quantum.toml"
 
     def __init__(self, shots=None, wires=None):

@@ -56,7 +56,7 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = 0.37
+pl_min_release = 0.38
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -107,7 +107,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -177,7 +176,12 @@ class CustomBuildExtMacos(build_ext):
 if system_platform == "Linux":
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
-        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
+        sources=[
+            "frontend/catalyst/utils/libcustom_calls.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
+        ],
+        extra_compile_args=["-std=c++17"],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -189,7 +193,12 @@ elif system_platform == "Darwin":
         variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
-        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
+        sources=[
+            "frontend/catalyst/utils/libcustom_calls.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
+            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
+        ],
+        extra_compile_args=["-std=c++17"],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
@@ -216,7 +225,7 @@ setup(
     name="PennyLane-Catalyst",
     provides=["catalyst"],
     version=version,
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
