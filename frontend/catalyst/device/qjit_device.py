@@ -268,7 +268,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     return qjit_capabilities
 
 
-class QJITDeviceNewAPI(qml.devices.Device):
+class QJITDevice(qml.devices.Device):
     """QJIT device for the new device API.
     A device that interfaces the compilation pipeline of Pennylane programs.
     Args:

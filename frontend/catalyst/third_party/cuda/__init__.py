@@ -106,7 +106,7 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     # There are similar lines of code in possibly
     # all other list of operations supported by devices.
     # At the time of writing, this warning is raised
-    # due to similar lines of code in the QJITDeviceNewAPI
+    # due to similar lines of code in the QJITDevice
     # pylint: disable=duplicate-code
     operations = [
         "CNOT",
