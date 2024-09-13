@@ -48,6 +48,7 @@ mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> catalyst::TBAATree::createTag
     return map;
 }
 
-mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName) {
+mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName)
+{
     return tags.find(typeName)->getSecond();
 }
