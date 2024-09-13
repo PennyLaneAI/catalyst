@@ -144,13 +144,13 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
         // 1. Extract tensor elements before yield op
         SmallVector<scf::YieldOp> yieldOps = {ifOp.thenYield(), ifOp.elseYield()};
         for (scf::YieldOp yield_op : yieldOps) {
+            OpBuilder::InsertionGuard g(rewriter);
+            rewriter.setInsertionPoint(yield_op);
             // Loop over yield operands
             for (const auto &it : llvm::enumerate(yield_op.getOperands())) {
                 Value operand = it.value();
                 // Detensorize operand: extract tensor element before yielding
                 if (isScalarTensor(operand)) {
-                    OpBuilder::InsertionGuard g(rewriter);
-                    rewriter.setInsertionPoint(yield_op);
                     Value value = rewriter.create<tensor::ExtractOp>(yield_op->getLoc(), operand,
                                                                      ValueRange{});
                     yield_op.setOperand(it.index(), value);
