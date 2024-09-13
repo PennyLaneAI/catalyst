@@ -15,11 +15,12 @@
 """
 import pathlib
 import platform
+from typing import Optional
 
 import pennylane as qml
 import pytest
 from pennylane.devices import Device
-from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
@@ -60,8 +61,11 @@ class DummyDevice(Device):
         """Execution."""
         return circuits, execution_config
 
-    def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
         """Preprocessing."""
+        if execution_config is None:
+            execution_config = ExecutionConfig()
+
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
