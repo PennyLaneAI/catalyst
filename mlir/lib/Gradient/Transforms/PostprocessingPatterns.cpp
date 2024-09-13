@@ -18,7 +18,9 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -36,7 +38,55 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
     mlir::LogicalResult matchAndRewrite(ForwardOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        llvm::outs() << "postprocess forward\n";
+        // Check if the numbers of args and returns match Enzyme's format.
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        auto tapeCount = op.getTape();
+        
+        //if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
+        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 ||
+            op.getFunctionType().getNumResults() == tapeCount)
+            return failure();
+
+        auto argTys = op.getArgumentTypes();
+        auto retTys = op.getResultTypes();
+        SmallVector<Type> bufferArgs;
+        SmallVector<Type> bufferRets;
+
+        // Prepare for arg insertion.
+        unsigned appendingSize = argc + 2 * resc;
+        SmallVector<unsigned> argIndices(/*size=*/appendingSize,
+                                         /*values=*/op.getNumArguments());
+        SmallVector<Type> argTypes;
+        SmallVector<DictionaryAttr> argAttrs{appendingSize};
+        SmallVector<Location> argLocs{appendingSize, op.getLoc()};
+
+        for (Type ty : argTys) {
+            bufferArgs.push_back(ty);
+            bufferArgs.push_back(ty);
+
+            // create new argument to insert
+            argTypes.push_back(ty);
+        }
+
+        for (size_t i = 0; i < op.getNumResults(); i++) {
+            auto ty = retTys[i];
+            if (i < resc) {
+                bufferArgs.push_back(ty);
+                bufferArgs.push_back(ty);
+                argTypes.push_back(ty);
+                argTypes.push_back(ty);
+            } else {
+                bufferRets.push_back(ty);
+            }
+        }
+
+        auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
+        llvm::outs() << forwardTy << "postprocess forward\n";
+        rewriter.modifyOpInPlace(op, [&] { 
+            op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
+            op.setFunctionType(forwardTy); 
+        });
         return failure();
     }
 };
