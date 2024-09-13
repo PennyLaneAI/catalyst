@@ -14,10 +14,23 @@
 
 // RUN: quantum-opt --memref-to-llvm-tbaa --split-input-file %s | FileCheck %s
 
+// CHECK-NOT: = #llvm.tbaa_root
+module @my_model {
+    func.func @func_noenzyme_notbaa(%arg0: memref<i32>, %arg1: memref<4xi32>) -> (memref<i32>, memref<4xi32>) {
+        %0 = memref.load %arg0[] : memref<i32>
+        %idx0 = index.constant 0
+        memref.store %0, %arg1[%idx0] : memref<4xi32>
+        return %arg0, %arg1: memref<i32>, memref<4xi32>
+    }
+}
+
+// -----
+
 // CHECK: [[root:#.+]] = #llvm.tbaa_root<id = "Catalyst TBAA">
 // CHECK: [[typedesc:#.+]] = #llvm.tbaa_type_desc<id = "int", members = {<[[root]], 0>}>
 // CHECK: [[tag:#.+]] = #llvm.tbaa_tag<base_type = [[typedesc]], access_type = [[typedesc]], offset = 0>
 module @my_model {
+    llvm.func @__enzyme_autodiff0(...)
     func.func @func_i32(%arg0: memref<i32>, %arg1: memref<4xi32>) -> (memref<i32>, memref<4xi32>) {
         // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<i32> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xi32> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
@@ -41,6 +54,7 @@ module @my_model {
 // CHECK: [[typedesc:#.+]] = #llvm.tbaa_type_desc<id = "float", members = {<[[root]], 0>}>
 // CHECK: [[tag:#.+]] = #llvm.tbaa_tag<base_type = [[typedesc]], access_type = [[typedesc]], offset = 0>
 module @my_model {
+    llvm.func @__enzyme_autodiff1(...)
     func.func @func_f32(%arg0: memref<f32>, %arg1: memref<4xf32>) -> (memref<f32>, memref<4xf32>) {
         // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f32> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf32> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
@@ -64,6 +78,7 @@ module @my_model {
 // CHECK: [[typedesc:#.+]] = #llvm.tbaa_type_desc<id = "double", members = {<[[root]], 0>}>
 // CHECK: [[tag:#.+]] = #llvm.tbaa_tag<base_type = [[typedesc]], access_type = [[typedesc]], offset = 0>
 module @my_model {
+    llvm.func @__enzyme_autodiff1(...)
     func.func @func_f64(%arg0: memref<f64>, %arg1: memref<4xf64>) -> (memref<f64>, memref<4xf64>) {
         // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
@@ -89,6 +104,7 @@ module @my_model {
 // CHECK: [[tagdouble:#.+]] = #llvm.tbaa_tag<base_type = [[typedescdouble]], access_type = [[typedescdouble]], offset = 0>
 // CHECK: [[tagint:#.+]] = #llvm.tbaa_tag<base_type = [[typedescint]], access_type = [[typedescint]], offset = 0>
 module @my_model {
+    llvm.func @__enzyme_autodiff2(...)
     func.func @func_mix_f64_index(%arg0: memref<f64>, %arg1: memref<4xf64>, %arg2: memref<index>, %arg3: memref<3xindex>) -> (memref<4xf64>, memref<3xindex>) {
         // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>

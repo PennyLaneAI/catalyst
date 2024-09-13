@@ -26,6 +26,7 @@
 #include "Catalyst/Transforms/TBAAUtils.h"
 
 #include "Catalyst/Transforms/Patterns.h"
+#include "Gradient/IR/GradientInterfaces.h"
 
 using namespace mlir;
 
@@ -43,16 +44,25 @@ class MemrefToLLVMWithTBAAPass
     void runOnOperation() override;
 
   private:
-    void createTBAATree(ModuleOp module);
+    void lowerMemrefWithTBAA(ModuleOp module);
 };
 
 void MemrefToLLVMWithTBAAPass::runOnOperation()
 {
     ModuleOp mod = getOperation();
-    createTBAATree(mod);
+    bool containGradients = false;
+    mod.walk([&](LLVM::LLVMFuncOp op) {
+        if (op.getName().starts_with("__enzyme_autodiff")) {
+            containGradients = true;
+        }
+        return WalkResult::interrupt();
+    });
+    if (containGradients) {
+        lowerMemrefWithTBAA(mod);
+    }
 }
 
-void MemrefToLLVMWithTBAAPass::createTBAATree(ModuleOp module)
+void MemrefToLLVMWithTBAAPass::lowerMemrefWithTBAA(ModuleOp module)
 {
     mlir::MLIRContext *ctx = module.getContext();
 
