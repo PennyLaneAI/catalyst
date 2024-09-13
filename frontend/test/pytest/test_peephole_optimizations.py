@@ -94,6 +94,10 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
 
 @pytest.mark.parametrize("theta", [42.42])
 def test_pipeline_functionality(theta, backend):
+    """
+    Test that the @pipeline decorator does not change functionality
+    when all the passes in the pipeline does not change functionality.
+    """
     my_pipeline = {
         "cancel_inverses": {},
         "mitigate_with_zne": {
@@ -117,7 +121,8 @@ def test_pipeline_functionality(theta, backend):
 
         return no_pipeline_result, pipeline_result
 
-    assert np.allclose(workflow()[0], workflow()[1])
+    res = workflow()
+    assert np.allclose(res[0], res[1])
 
 
 ### Test bad usages of pass decorators ###
@@ -129,6 +134,12 @@ def test_cancel_inverses_bad_usages():
     def test_cancel_inverses_not_on_qnode():
         def classical_func():
             return 42.42
+
+        with pytest.raises(
+            TypeError,
+            match="A QNode is expected, got the classical function",
+        ):
+            pipeline(classical_func)
 
         with pytest.raises(
             TypeError,

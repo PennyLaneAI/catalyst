@@ -90,6 +90,7 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
+    circuit_transform_pipeline: Optional[dict] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded

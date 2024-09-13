@@ -56,6 +56,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
+from catalyst.passes import pipeline
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
@@ -109,8 +110,10 @@ class QFunc:
 
     # pylint: disable=no-member
     @debug_logger
-    def __call__(self, *args, **kwargs):
+    def __call__(self, pass_pipeline, *args, **kwargs):
         assert isinstance(self, qml.QNode)
+
+        self = pipeline(pass_pipeline=pass_pipeline)(self)
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)

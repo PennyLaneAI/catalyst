@@ -64,6 +64,10 @@ def test_single_measurement(params, extrapolation, folding, scale_factors):
 
     @catalyst.qjit
     def mitigated_qnode_passes(args):
+        """
+        Test that catalyst.passes.mitigate_with_zne and catalyst.mitigate_with_zne
+        have the same behavior.
+        """
         return catalyst.passes.mitigate_with_zne(
             circuit,
             scale_factors=scale_factors,

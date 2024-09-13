@@ -73,16 +73,20 @@ def pipeline(fn=None, *, pass_pipeline=None):
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    fn_original_name = fn.__name__
+    if pass_pipeline is None:
+        # TODO: design a default peephole pipeline
+        return fn
 
     API_calls = API_name_to_API_calls()
+
+    fn_original_name = fn.__name__
     fn_clone = copy.copy(fn)
     fn_clone.__name__ = fn_original_name + "_transformed"
+
     # Note: we create wrappers to inject the apply_registered_pass primitive
     # In other words, the last API call, aka the last wrapper, will be the outermost primitive
     # Therefore when lowering these primitives to mlir (in jax_primitives.py), lower them in reverse order!
     for decorator, decorator_args in pass_pipeline.items():
-        print("seeing pass: ", decorator)
         if decorator not in API_calls.keys():
             raise RuntimeError(f"{decorator} is not a valid quantum transformation pass")
 

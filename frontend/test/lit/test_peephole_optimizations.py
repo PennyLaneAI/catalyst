@@ -193,6 +193,63 @@ def test_pipeline_lowering_keep_original():
 test_pipeline_lowering_keep_original()
 
 
+def test_pipeline_lowering_global():
+    my_pipeline = {
+        "cancel_inverses": {},
+    }
+    @qjit(keep_intermediate=True, 
+          circuit_transform_pipeline=my_pipeline)
+    def global_wf():
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def g(x):
+            qml.RX(x, wires=[0])
+            qml.Hadamard(wires=[1])
+            qml.Hadamard(wires=[1])
+            return qml.expval(qml.PauliY(wires=0))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def h(x):
+            qml.RX(x, wires=[0])
+            qml.Hadamard(wires=[1])
+            qml.Hadamard(wires=[1])
+            return qml.expval(qml.PauliY(wires=0))
+        return g(1.2), h(1.2)
+
+    # CHECK: transform_named_sequence
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK:   options=func-name=g_transformed
+    # CHECK:   pass_name=remove-chained-self-inverse
+    # CHECK: ]
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK:   options=func-name=h_transformed
+    # CHECK:   pass_name=remove-chained-self-inverse
+    # CHECK: ]
+    print_jaxpr(global_wf)
+
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h_transformed"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g_transformed"}
+    # CHECK-NEXT: transform.yield
+    print_mlir(global_wf)
+
+    # CHECK: func.func public @jit_global_wf()
+    # CHECK {{%.+}} = call @g_transformed(
+    # CHECK {{%.+}} = call @h_transformed(
+    # CHECK: func.func private @g_transformed
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK: func.func private @h_transformed
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    global_wf()
+    flush_peephole_opted_mlir_to_iostream(global_wf)
+
+
+test_pipeline_lowering_global()
+
+
 #
 # cancel_inverses
 #

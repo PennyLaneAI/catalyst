@@ -38,6 +38,7 @@ from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.passes import _inject_transform_named_sequence
+from catalyst.passes import pipeline as circuit_transform_pass_pipeline
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -83,6 +84,7 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
+    circuit_transform_pipeline=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -585,7 +587,10 @@ class QJIT:
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
-            return QFunc.__call__(qnode, *args, **dict(params, **kwargs))
+            return QFunc.__call__(qnode, self.compile_options.circuit_transform_pipeline,
+                *args,
+                **dict(params, **kwargs),
+            )
 
         with Patcher(
             (qml.QNode, "__call__", closure),
