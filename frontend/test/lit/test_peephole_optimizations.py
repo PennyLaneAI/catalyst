@@ -197,8 +197,8 @@ def test_pipeline_lowering_global():
     my_pipeline = {
         "cancel_inverses": {},
     }
-    @qjit(keep_intermediate=True, 
-          circuit_transform_pipeline=my_pipeline)
+
+    @qjit(keep_intermediate=True, circuit_transform_pipeline=my_pipeline)
     def global_wf():
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def g(x):
@@ -213,6 +213,7 @@ def test_pipeline_lowering_global():
             qml.Hadamard(wires=[1])
             qml.Hadamard(wires=[1])
             return qml.expval(qml.PauliY(wires=0))
+
         return g(1.2), h(1.2)
 
     # CHECK: transform_named_sequence

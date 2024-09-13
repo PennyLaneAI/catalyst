@@ -587,7 +587,9 @@ class QJIT:
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
-            return QFunc.__call__(qnode, self.compile_options.circuit_transform_pipeline,
+            return QFunc.__call__(
+                qnode,
+                self.compile_options.circuit_transform_pipeline,
                 *args,
                 **dict(params, **kwargs),
             )
