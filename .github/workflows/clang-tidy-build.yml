@@ -4,6 +4,7 @@ on:
   # Monday 01:35 @ UTC-0
   - cron: '35 1 * * 1'
   workflow_dispatch:
+  pull_request:
 name: Build Catalyst Wheel on Linux (x86_64)
 
 concurrency:
@@ -18,20 +19,15 @@ jobs:
     with:
       default_runner: ubuntu-latest
 
-  check_if_wheel_build_required:
-    if: github.event.pull_request.draft == false
-    uses: ./.github/workflows/check-for-wheel-build.yml
-
   constants:
-    needs: [check_if_wheel_build_required, determine_runner]
-    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    needs: [determine_runner]
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
     with:
       runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
   build-dependencies:
-    needs: [constants, check_if_wheel_build_required, determine_runner]
+    needs: [constants, determine_runner]
 
     strategy:
       fail-fast: false
@@ -42,8 +38,6 @@ jobs:
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     container: quay.io/pypa/${{ matrix.container_img }}
-
-    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
     - name: Checkout Catalyst repo
