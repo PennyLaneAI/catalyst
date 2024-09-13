@@ -434,8 +434,8 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest -W error frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest -W error frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest -W error frontend/test/async_tests
+        python${{ matrix.python_version }} -m pytest -W error frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest -W error frontend/test/test_oqc/oqc -n auto
