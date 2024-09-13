@@ -130,7 +130,7 @@ class QFunc:
 
         assert isinstance(self.device, qml.devices.Device), "Unsupported device API"
         qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
-        
+
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
 
