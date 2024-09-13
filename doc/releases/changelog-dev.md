@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* Implement detensorization pass for the SCF dialect (for, if, while operations only);
+* The `linalg-detensorize` pass detensors internal control flow inside a function, but scalar tensors remain in the entry block. In particular, scalar tensors are constructed and their element are extracted around often used structured control flow operations such as for, if, and while. This PR introduces the `detensorize-scf` pass which removes scalar tensors from the SCF dialect (for, if, while operations). A follow-up `canonicalize` pass is necessary to cancel out and remove `tensor::ExtractOp` and `tensor::FromElementsOp` operations.
   [(#1075)](https://github.com/PennyLaneAI/catalyst/pull/1075)
 
 * Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`. Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be structured using Python containers. For example, a program can return a dictionary like `return {"first": qml.sample(), "second": qml.sample()}`.
@@ -68,4 +68,5 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
+Vincent Michaud-Rioux,
 Daniel Strano.
