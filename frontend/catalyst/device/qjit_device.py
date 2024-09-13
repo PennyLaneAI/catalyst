@@ -24,10 +24,9 @@ import re
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Dict, Optional, Set, Union
+from typing import Any, Dict, Optional, Set
 
 import pennylane as qml
-from pennylane.measurements import MidMeasureMP
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
@@ -47,7 +46,6 @@ from catalyst.device.verification import (
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
 from catalyst.utils.toml import (
     DeviceCapabilities,
