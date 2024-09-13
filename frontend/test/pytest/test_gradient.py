@@ -1464,6 +1464,7 @@ def test_preprocessing_outside_qnode(inp, backend):
     assert np.allclose(g(inp), h(inp))
 
 
+@pytest.mark.xfail(reason="Need PR 332.")
 def test_gradient_slice(backend):
     """Test the differentation when the qnode generates memref with non identity layout."""
     n_wires = 5
