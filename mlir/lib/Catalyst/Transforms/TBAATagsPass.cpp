@@ -37,7 +37,8 @@ namespace catalyst {
 
 } // namespace catalyst
 
-class MemrefToLLVMWithTBAAPass : public catalyst::impl::MemrefToLLVMWithTBAAPassBase<MemrefToLLVMWithTBAAPass> {
+class MemrefToLLVMWithTBAAPass
+    : public catalyst::impl::MemrefToLLVMWithTBAAPassBase<MemrefToLLVMWithTBAAPass> {
   public:
     void runOnOperation() override;
 
