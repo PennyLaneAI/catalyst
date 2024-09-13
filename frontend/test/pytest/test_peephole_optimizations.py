@@ -31,7 +31,7 @@ from catalyst.passes import cancel_inverses
 
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
-def test_cancel_inverses_functionality(self, theta, backend):
+def test_cancel_inverses_functionality(theta, backend):
 
     @qjit
     def workflow():
