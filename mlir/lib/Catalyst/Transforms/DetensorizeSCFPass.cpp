@@ -137,9 +137,6 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
     LogicalResult matchAndRewrite(scf::IfOp ifOp, PatternRewriter &rewriter) const override
     {
         // Early exit if there are no results that could be replaced.
-        if (ifOp.getNumResults() == 0) {
-            return failure();
-        }
         if (!hasScalarTensorResult(ifOp)) {
             return failure();
         }
@@ -176,15 +173,13 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
         rewriter.setInsertionPoint(ifOp);
         auto newIfOp =
             rewriter.create<scf::IfOp>(ifOp.getLoc(), newResultTypes, ifOp.getCondition());
-        rewriter.cloneRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
-                                   newIfOp.getThenRegion().end());
-        rewriter.cloneRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
-                                   newIfOp.getElseRegion().end());
+        newIfOp.getThenRegion().takeBody(ifOp.getThenRegion());
+        newIfOp.getElseRegion().takeBody(ifOp.getElseRegion());
 
         // 3. Retensorize results after if op
         {
             OpBuilder::InsertionGuard g(rewriter);
-            rewriter.setInsertionPointAfter(ifOp);
+            rewriter.setInsertionPointAfter(newIfOp);
             for (auto results : llvm::zip(ifOp->getResults(), newIfOp->getResults())) {
                 auto oldResult = std::get<0>(results);
                 auto newResult = std::get<1>(results);
@@ -354,9 +349,9 @@ struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPa
     {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
-        patterns.add<DetensorizeForOp>(patterns.getContext());
-        patterns.add<DetensorizeIfOp>(patterns.getContext());
-        patterns.add<DetensorizeWhileOp>(patterns.getContext());
+        patterns.add<DetensorizeForOp>(context);
+        patterns.add<DetensorizeIfOp>(context);
+        patterns.add<DetensorizeWhileOp>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
             signalPassFailure();
     }
