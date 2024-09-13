@@ -253,7 +253,7 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 }
 // -----
 
-// test non-consecutive self-inverse Gates not canceled out
+// test non-consecutive self-inverse Gates are not canceled out
 // CHECK-LABEL: test_chained_self_inverse
 func.func @test_chained_self_inverse() -> !quantum.bit {
     // CHECK: quantum.alloc
