@@ -214,16 +214,6 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
         Block &beforeBlock = *whileOp.getBeforeBody();
         Block &afterBlock = *whileOp.getAfterBody();
 
-        if (beforeBlock.getNumArguments() != afterBlock.getNumArguments()) {
-            return failure();
-        }
-
-        for (const auto &args : llvm::zip(beforeBlock.getArguments(), afterBlock.getArguments())) {
-            if (std::get<0>(args).getType() != std::get<1>(args).getType()) {
-                return failure();
-            }
-        }
-
         // 1. Find scalar tensors and extract element
         SmallVector<std::size_t> newIterOperandsIndices;
         SmallVector<Type> newResultTypes;
