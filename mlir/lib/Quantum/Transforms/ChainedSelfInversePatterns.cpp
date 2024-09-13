@@ -24,12 +24,15 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::quantum;
 
+static const mlir::StringSet<> HermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
+                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
+
 namespace {
 
 struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
-    /// We simplify consecutive Hermitian quantum gates and simplifies them.
+    /// We simplify consecutive Hermitian quantum gates by removing them.
     /// Hermitian gates are self-inverse and applying the same gate twice in succession
     /// cancels out the effect. This pattern rewrites such redundant operations by
     /// replacing the operation with its "grandparent" operation in the quantum circuit.
@@ -37,11 +40,8 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        mlir::StringSet<> HermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                          "CY",       "CZ",     "SWAP",   "Toffoli"};
-
         StringRef OpGateName = op.getGateName();
-        if (HermitianOps.find(OpGateName) == HermitianOps.end())
+        if (!HermitianOps.contains(OpGateName))
             return failure();
 
         ValueRange InQubits = op.getInQubits();
