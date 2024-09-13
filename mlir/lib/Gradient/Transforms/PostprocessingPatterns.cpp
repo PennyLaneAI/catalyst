@@ -87,6 +87,26 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
             op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
             op.setFunctionType(forwardTy); 
         });
+
+        op.walk([&](ReturnOp returnOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(returnOp);
+            SmallVector<Value> tapeReturns;
+            size_t idx = 0;
+            for (Value operand : returnOp.getOperands()) {
+                if (isa<MemRefType>(operand.getType())) {
+                    BlockArgument output = op.getArgument(idx + argc * 2);
+                    // We need a linalg.copy instead of a memref.copy here because it provides better
+                    // type information at the LLVM level for Enzyme.
+                    rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
+                    idx++;
+                }
+                else {
+                    tapeReturns.push_back(operand);
+                }
+            }
+            rewriter.modifyOpInPlace(returnOp, [&] {op->setOperands(tapeReturns);});
+        });
         return failure();
     }
 };
