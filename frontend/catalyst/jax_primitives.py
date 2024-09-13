@@ -145,9 +145,6 @@ class AbstractQreg(AbstractValue):
 
     hash_value = hash("AbstractQreg")
 
-    def __init__(self, length):
-        self.length = length
-
     def __eq__(self, other):
         return isinstance(other, AbstractQreg)
 
@@ -227,8 +224,8 @@ class Folding(Enum):
     """
 
     GLOBAL = "global"
-    RANDOM = "random"
-    ALL = "all"
+    RANDOM = "local-random"
+    ALL = "local-all"
 
 
 ##############
@@ -930,7 +927,7 @@ def _folding_attribute(ctx, folding):
     ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
         "mitigation",
-        ("folding " + Folding(folding).value).encode("utf-8"),
+        ("folding " + Folding(folding).name.lower()).encode("utf-8"),
         ir.NoneType.get(ctx),
         ctx,
     )
@@ -950,13 +947,13 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    scale_factors = args[-1]
+    num_folds = args[-1]
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args[0:-1]),
         _folding_attribute(ctx, folding),
-        scale_factors,
+        num_folds,
     ).results
 
 
@@ -987,17 +984,17 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
 # qalloc
 #
 @qalloc_p.def_impl
-def _qalloc_def_impl(ctx, size_value, static_size=None):  # pragma: no cover
+def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qalloc_p.def_abstract_eval
-def _qalloc_abstract_eval(size, static_size=None):
+def _qalloc_abstract_eval(size):
     """This function is called with abstract arguments for tracing."""
-    return AbstractQreg(static_size)
+    return AbstractQreg()
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value, static_size=None):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1083,7 +1080,7 @@ def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
     assert isinstance(qubit, AbstractQbit)
-    return AbstractQreg(qreg_old.length)
+    return AbstractQreg()
 
 
 def _qinsert_lowering(
