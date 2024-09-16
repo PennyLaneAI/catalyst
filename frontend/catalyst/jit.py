@@ -35,6 +35,8 @@ from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
+from catalyst.from_plxpr import from_plxpr
+from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.passes import _inject_transform_named_sequence
@@ -53,8 +55,6 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
-from catalyst.from_plxpr import from_plxpr
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
