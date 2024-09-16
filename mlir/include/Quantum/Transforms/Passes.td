@@ -105,6 +105,12 @@ def RemoveChainedSelfInversePass : QuantumCircuitTransformationPass<"remove-chai
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
 }
 
+def MergeRotationPass : QuantumCircuitTransformationPass<"merge-rotation"> {
+    let summary = "merge rotation boilerplate words";
+
+    let constructor = "catalyst::createMergeRotationPass()";
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
