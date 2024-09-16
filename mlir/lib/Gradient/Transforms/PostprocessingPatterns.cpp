@@ -82,7 +82,6 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         }
 
         auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
-        llvm::outs() << forwardTy << "postprocess forward\n";
         rewriter.modifyOpInPlace(op, [&] { 
             op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
             op.setFunctionType(forwardTy); 
@@ -94,10 +93,8 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
             SmallVector<Value> tapeReturns;
             size_t idx = 0;
             for (Value operand : returnOp.getOperands()) {
-                if (isa<MemRefType>(operand.getType())) {
+                if (isa<MemRefType>(operand.getType()) && idx < resc) {
                     BlockArgument output = op.getArgument(idx + argc * 2);
-                    // We need a linalg.copy instead of a memref.copy here because it provides better
-                    // type information at the LLVM level for Enzyme.
                     rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
                     idx++;
                 }
@@ -105,9 +102,9 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
                     tapeReturns.push_back(operand);
                 }
             }
-            rewriter.modifyOpInPlace(returnOp, [&] {op->setOperands(tapeReturns);});
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, tapeReturns, returnOp.getEmpty());
         });
-        return failure();
+        return success();
     }
 };
 
@@ -117,8 +114,74 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
     mlir::LogicalResult matchAndRewrite(ReverseOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        llvm::outs() << "postprocess reverse\n";
         return failure();
+        // Check if the numbers of args and returns match Enzyme's format.
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        auto tapeCount = op.getTape();
+        
+        //if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
+        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 ||
+            op.getFunctionType().getNumResults() == tapeCount)
+            return failure();
+
+        auto argTys = op.getArgumentTypes();
+        auto retTys = op.getResultTypes();
+        SmallVector<Type> bufferArgs;
+        SmallVector<Type> bufferRets;
+
+        // Prepare for arg insertion.
+        unsigned appendingSize = argc + 2 * resc;
+        SmallVector<unsigned> argIndices(/*size=*/appendingSize,
+                                         /*values=*/op.getNumArguments());
+        SmallVector<Type> argTypes;
+        SmallVector<DictionaryAttr> argAttrs{appendingSize};
+        SmallVector<Location> argLocs{appendingSize, op.getLoc()};
+
+        for (Type ty : argTys) {
+            bufferArgs.push_back(ty);
+            bufferArgs.push_back(ty);
+
+            // create new argument to insert
+            argTypes.push_back(ty);
+        }
+
+        for (size_t i = 0; i < op.getNumResults(); i++) {
+            auto ty = retTys[i];
+            if (i < resc) {
+                bufferArgs.push_back(ty);
+                bufferArgs.push_back(ty);
+                argTypes.push_back(ty);
+                argTypes.push_back(ty);
+            } else {
+                bufferRets.push_back(ty);
+            }
+        }
+
+        auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
+        rewriter.modifyOpInPlace(op, [&] { 
+            op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
+            op.setFunctionType(forwardTy); 
+        });
+
+        op.walk([&](ReturnOp returnOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(returnOp);
+            SmallVector<Value> tapeReturns;
+            size_t idx = 0;
+            for (Value operand : returnOp.getOperands()) {
+                if (isa<MemRefType>(operand.getType()) && idx < resc) {
+                    BlockArgument output = op.getArgument(idx + argc * 2);
+                    rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
+                    idx++;
+                }
+                else {
+                    tapeReturns.push_back(operand);
+                }
+            }
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, tapeReturns, returnOp.getEmpty());
+        });
+        return success();
     }
 };
 
