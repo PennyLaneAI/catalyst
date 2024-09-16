@@ -48,10 +48,6 @@ def cancel_inverses(fn=None):
     gates should be applied to the decorated QNode during :func:`~.qjit`
     compilation.
 
-    .. warning::
-
-        Currently, only Hadamard gates are canceled.
-
     .. note::
 
         Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
