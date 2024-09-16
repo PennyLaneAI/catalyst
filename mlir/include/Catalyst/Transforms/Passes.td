@@ -139,7 +139,7 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
 
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
-    
+
     let dependentDialects = [
         "memref::MemRefDialect",
         "linalg::LinalgDialect"
@@ -157,6 +157,16 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
     let constructor = "catalyst::createRegisterInactiveCallbackPass()";
 
+}
+
+def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
+  let summary = "Lower the memref load and store operation to LLVM and add the TBAA tags.";
+
+  let dependentDialects = [
+        "mlir::LLVM::LLVMDialect"
+  ];
+
+  let constructor = "::catalyst::createMemrefToLLVMWithTBAAPass()";
 }
 
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
