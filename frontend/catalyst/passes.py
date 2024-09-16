@@ -48,6 +48,23 @@ def cancel_inverses(fn=None):
     gates should be applied to the decorated QNode during :func:`~.qjit`
     compilation.
 
+    The full list of supported gates are as follows:
+
+    Unary Gates:
+    - :class:`qml.Hadamard <pennylane.Hadamard>`
+    - :class:`qml.PauliX <pennylane.PauliX>`
+    - :class:`qml.PauliY <pennylane.PauliY>`
+    - :class:`qml.PauliZ <pennylane.PauliZ>`
+
+    Binary Gates:
+    - :class:`qml.CNOT <pennylane.CNOT>`
+    - :class:`qml.CY <pennylane.CY>`
+    - :class:`qml.CZ <pennylane.CZ>`
+    - :class:`qml.SWAP <pennylane.SWAP>`
+
+    Trinary Gates:
+    - :class:`qml.Toffoli <pennylane.Toffoli>`
+
     .. note::
 
         Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
