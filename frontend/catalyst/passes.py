@@ -64,7 +64,8 @@ def pipeline(fn=None, *, pass_pipeline=None):
     fn_original_name = fn.__name__
     wrapped_qnode_function = fn.func
     fn_clone = copy.copy(fn)
-    fn_clone.__name__ = fn_original_name + "_transformed"
+    uniquer = str(rename_to_unique())
+    fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
 
     pass_names = API_name_to_pass_name()
 
@@ -73,16 +74,17 @@ def pipeline(fn=None, *, pass_pipeline=None):
             for API_name, pass_options in pass_pipeline.items():
                 apply_registered_pass_p.bind(
                     pass_name=pass_names[API_name],
-                    options=f"func-name={fn_original_name}" + "_transformed",
+                    options=f"func-name={fn_original_name}" + "_transformed" + uniquer,
                 )
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone.func = wrapper
+    fn_clone._peephole_transformed = True
 
     return fn_clone
 
 
-def cancel_inverses(fn=None, keep_original=True):
+def cancel_inverses(fn=None):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
@@ -180,47 +182,45 @@ def cancel_inverses(fn=None, keep_original=True):
 
     funcname = fn.__name__
     wrapped_qnode_function = fn.func
+    uniquer = str(rename_to_unique())
 
-    if keep_original:
+    def wrapper(*args, **kwrags):
+        # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
+        # instead of the qnode name. That way the clone can have this attribute and
+        # the original can just not have it.
+        # We are not doing this right now and passing by name because this would
+        # be a discardable attribute (i.e. a user/developer wouldn't know that this
+        # attribute exists just by looking at qnode's documentation)
+        # But when we add the full peephole pipeline in the future, the attribute
+        # could get properly documented.
 
-        def wrapper(*args, **kwrags):
-            # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
-            # instead of the qnode name. That way the clone can have this attribute and
-            # the original can just not have it.
-            # We are not doing this right now and passing by name because this would
-            # be a discardable attribute (i.e. a user/developer wouldn't know that this
-            # attribute exists just by looking at qnode's documentation)
-            # But when we add the full peephole pipeline in the future, the attribute
-            # could get properly documented.
+        if EvaluationContext.is_tracing():
+            apply_registered_pass_p.bind(
+                pass_name="remove-chained-self-inverse",
+                options=f"func-name={funcname}" + "_cancel_inverses" + uniquer,
+            )
+        return wrapped_qnode_function(*args, **kwrags)
 
-            if EvaluationContext.is_tracing():
-                apply_registered_pass_p.bind(
-                    pass_name="remove-chained-self-inverse",
-                    options=f"func-name={funcname}" + "_cancel_inverses",
-                )
-            return wrapped_qnode_function(*args, **kwrags)
+    fn_clone = copy.copy(fn)
+    fn_clone.func = wrapper
+    fn_clone.__name__ = funcname + "_cancel_inverses" + uniquer
 
-        fn_clone = copy.copy(fn)
-        fn_clone.func = wrapper
-        fn_clone.__name__ = funcname + "_cancel_inverses"
-
-        return fn_clone
-
-    else:
-
-        def wrapper(*args, **kwrags):
-            if EvaluationContext.is_tracing():
-                apply_registered_pass_p.bind(
-                    pass_name="remove-chained-self-inverse",
-                    options=f"func-name={funcname}",
-                )
-            return wrapped_qnode_function(*args, **kwrags)
-
-        fn.func = wrapper
-        return fn
+    return fn_clone
 
 
 ## IMPL and helpers ##
+class _PipelineNameUniquer:
+    def __init__(self, i):
+        self.i = i
+    def get(self):
+        self.i += 1
+        return self.i
+    def reset(self):
+        self.i = -1
+PipelineNameUniquer = _PipelineNameUniquer(-1)
+def rename_to_unique():
+    return PipelineNameUniquer.get()
+
 def API_name_to_pass_name():
     return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotation"}
 

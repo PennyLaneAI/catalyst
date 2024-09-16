@@ -618,6 +618,7 @@ class QJIT:
                 fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
             )
 
+        catalyst.passes.PipelineNameUniquer.reset()
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
