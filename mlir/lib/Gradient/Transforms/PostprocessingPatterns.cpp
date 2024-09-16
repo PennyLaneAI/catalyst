@@ -53,19 +53,15 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         SmallVector<Type> bufferRets;
 
         // Prepare for arg insertion.
-        unsigned appendingSize = argc + 2 * resc;
-        SmallVector<unsigned> argIndices(/*size=*/appendingSize,
-                                         /*values=*/op.getNumArguments());
-        SmallVector<Type> argTypes;
-        SmallVector<DictionaryAttr> argAttrs{appendingSize};
-        SmallVector<Location> argLocs{appendingSize, op.getLoc()};
+        SmallVector<Type> newArgInTypes;
+        SmallVector<Type> newArgResTypes;
 
         for (Type ty : argTys) {
             bufferArgs.push_back(ty);
             bufferArgs.push_back(ty);
 
             // create new argument to insert
-            argTypes.push_back(ty);
+            newArgInTypes.push_back(ty);
         }
 
         for (size_t i = 0; i < op.getNumResults(); i++) {
@@ -73,8 +69,8 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
             if (i < resc) {
                 bufferArgs.push_back(ty);
                 bufferArgs.push_back(ty);
-                argTypes.push_back(ty);
-                argTypes.push_back(ty);
+                newArgResTypes.push_back(ty);
+                newArgResTypes.push_back(ty);
             }
             else {
                 bufferRets.push_back(ty);
@@ -83,7 +79,19 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
 
         auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
         rewriter.modifyOpInPlace(op, [&] {
-            op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
+            // Insert new argIn in interleaving way.
+            size_t idx = 0;
+            for (auto ty : newArgInTypes) {
+                op.insertArgument(2 * idx + 1, ty, {}, op.getLoc());
+                idx++;
+            }
+            // Append newArgRes.
+            unsigned appendingSize = 2 * resc;
+            SmallVector<unsigned> argIndices(/*size=*/appendingSize,
+                                             /*values=*/op.getNumArguments());
+            SmallVector<DictionaryAttr> argAttrs{appendingSize};
+            SmallVector<Location> argLocs{appendingSize, op.getLoc()};
+            op.insertArguments(argIndices, newArgResTypes, argAttrs, argLocs);
             op.setFunctionType(forwardTy);
         });
 
@@ -138,7 +146,6 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         // For the function format of ReverseOP should follow that of ForwardOp,
         // so the returns go to the front.
         for (Type ty : retTys) {
-            llvm::outs() << "R\n";
             bufferArgs.push_back(ty);
             bufferArgs.push_back(ty);
 
