@@ -508,7 +508,7 @@ def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
 
 
 @debug_logger
-def trace_to_jaxpr(func, static_argnums, abstracted_axes, experimental_capture, args, kwargs):
+def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """Trace a Python function to JAXPR.
 
     Args:
@@ -516,7 +516,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, experimental_capture, 
         static_argnums: indices of static arguments.
         abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
             sizes.
-        experimental_capture: uses PennyLane to capture the JaxPr
         args: arguments to ``func``
         kwargs: keyword arguments to ``func``
 

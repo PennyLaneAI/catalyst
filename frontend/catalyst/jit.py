@@ -54,6 +54,7 @@ from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.from_plxpr import from_plxpr
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -535,9 +536,14 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    args, **kwargs
-                )
+                if self.compile_options.experimental_capture:
+                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = (
+                        self.experimental_capture(args, **kwargs)
+                    )
+                else:
+                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                        args, **kwargs
+                    )
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -586,7 +592,6 @@ class QJIT:
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
-        experimental_capture = self.compile_options.experimental_capture
 
         dynamic_args = filter_static_args(args, static_argnums)
         dynamic_sig = get_abstract_signature(dynamic_args)
@@ -606,19 +611,6 @@ class QJIT:
             """
             _inject_transform_named_sequence()
             return self.user_function(*args, **kwargs)
-
-        if experimental_capture:
-
-            jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence,
-                static_argnums,
-                abstracted_axes,
-                experimental_capture,
-                full_sig,
-                kwargs,
-            )
-
-            return jaxpr, out_type, treedef, dynamic_sig
 
         def closure(qnode, *args, **kwargs):
             params = {}
@@ -634,7 +626,6 @@ class QJIT:
                 fn_with_transform_named_sequence,
                 static_argnums,
                 abstracted_axes,
-                experimental_capture,
                 full_sig,
                 kwargs,
             )
@@ -644,7 +635,8 @@ class QJIT:
     @instrument(size_from=0)
     @debug_logger
     def experimental_capture(self, args, **kwargs):
-        """Capture the JAX program representation (JAXPR) of the wrapped function.
+        """Capture the JAX program representation (JAXPR) of the wrapped function, using
+        PL capure module.
 
         Args:
             args (Iterable): arguments to use for program capture
@@ -658,7 +650,6 @@ class QJIT:
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
-        experimental_capture = self.compile_options.experimental_capture
 
         dynamic_args = filter_static_args(args, static_argnums)
         dynamic_sig = get_abstract_signature(dynamic_args)
@@ -678,27 +669,31 @@ class QJIT:
             """
             _inject_transform_named_sequence()
             return self.user_function(*args, **kwargs)
-        
+
         with transient_jax_config({"jax_dynamic_shapes": True}):
-        
+
             make_jaxpr_kwargs = {
                 "static_argnums": static_argnums,
                 "abstracted_axes": abstracted_axes,
             }
+
             if qml.capture.enable():
                 capture_on = True
             else:
                 capture_on = False
-            
+
             if not capture_on:
                 qml.capture.enable()
 
-            plxpr, out_type, out_treedef = make_jaxpr2(fn_with_transform_named_sequence, **make_jaxpr_kwargs)(*args, **kwargs)
+            args = full_sig
+            plxpr, out_type, out_treedef = make_jaxpr2(
+                fn_with_transform_named_sequence, **make_jaxpr_kwargs
+            )(*args, **kwargs)
 
             if not capture_on:
                 qml.capture.disable()
 
-            jaxpr = catalyst.from_plxpr(plxpr)(*args, **kwargs)
+            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
 
         return jaxpr, out_type, out_treedef, dynamic_sig
 
