@@ -117,7 +117,9 @@ class QFunc:
         if "pass_pipeline" in kwargs.keys():
             pass_pipeline = kwargs["pass_pipeline"]
             if not hasattr(self, "_peephole_transformed"):
-                self = pipeline(pass_pipeline=pass_pipeline)(self)  # pylint: disable=self-cls-assignment
+                self = pipeline(pass_pipeline=pass_pipeline)(
+                    self
+                )  # pylint: disable=self-cls-assignment
             kwargs.pop("pass_pipeline")
 
         # Mid-circuit measurement configuration/execution

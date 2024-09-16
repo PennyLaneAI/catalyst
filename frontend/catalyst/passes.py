@@ -212,14 +212,21 @@ def cancel_inverses(fn=None):
 class _PipelineNameUniquer:
     def __init__(self, i):
         self.i = i
+
     def get(self):
         self.i += 1
         return self.i
+
     def reset(self):
         self.i = -1
+
+
 PipelineNameUniquer = _PipelineNameUniquer(-1)
+
+
 def rename_to_unique():
     return PipelineNameUniquer.get()
+
 
 def API_name_to_pass_name():
     return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotation"}
