@@ -589,7 +589,7 @@ class QJIT:
             params["_out_tree_expected"] = []
             return QFunc.__call__(
                 qnode,
-                self.compile_options.circuit_transform_pipeline,
+                pass_pipeline=self.compile_options.circuit_transform_pipeline,
                 *args,
                 **dict(params, **kwargs),
             )
