@@ -27,12 +27,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, apply_registered_pass_p, zne_p
-from catalyst.tracing.contexts import EvaluationContext
-
-
-def _is_odd_positive(numbers_list):
-    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in numbers_list)
+from catalyst.jax_primitives import Folding, zne_p
 
 
 ## API ##
@@ -52,7 +47,7 @@ def mitigate_with_zne(
 
     Args:
         fn (qml.QNode): the circuit to be mitigated.
-        scale_factors (list[int]): the range of noise scale factors used.
+        scale_factors (array[int]): the range of noise scale factors used.
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
             By default, perfect polynomial fitting :func:`~.polynomial_extrapolate` will be used,
@@ -61,7 +56,7 @@ def mitigate_with_zne(
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
-            - local-all: per-gate folding sequences replace original gates in-place in the circuit
+            - all: per-gate folding sequences replace original gates in-place in the circuit
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
@@ -119,7 +114,7 @@ def mitigate_with_zne(
             return zne_circuit(weights)
 
     >>> weights = jnp.ones([3, 2, 3])
-    >>> scale_factors = [1, 3, 5]
+    >>> scale_factors = jnp.array([1, 2, 3])
     >>> workflow(weights, scale_factors)
     Array(-0.19946598, dtype=float64)
     """
@@ -135,12 +130,7 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    if not _is_odd_positive(scale_factors):
-        raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
-
-    num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
-
-    return ZNE(fn, num_folds, extrapolate, folding)
+    return ZNE(fn, scale_factors, extrapolate, folding)
 
 
 ## IMPL ##
@@ -159,24 +149,15 @@ class ZNE:
     def __init__(
         self,
         fn: Callable,
-        num_folds: jnp.ndarray,
+        scale_factors: jnp.ndarray,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
-
-        wrapped_qnode_function = fn.func
-
-        def wrapper(*args, **kwrags):
-            if EvaluationContext.is_tracing():
-                apply_registered_pass_p.bind(pass_name="lower-mitigation")
-            return wrapped_qnode_function(*args, **kwrags)
-
-        fn.func = wrapper
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
-        self.num_folds = num_folds
+        self.scale_factors = scale_factors
         self.extrapolate = extrapolate
         self.folding = folding
 
@@ -199,9 +180,11 @@ class ZNE:
         if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
-        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=self.fn)
-        float_num_folds = jnp.array(self.num_folds, dtype=float)
-        results = self.extrapolate(float_num_folds, results[0])
+        results = zne_p.bind(
+            *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
+        )
+        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
+        results = self.extrapolate(float_scale_factors, results[0])
         # Single measurement
         if results.shape == ():
             return results
