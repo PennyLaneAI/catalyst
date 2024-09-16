@@ -18,9 +18,9 @@
   @qjit(experimental_capture=True)
   @qml.qnode(dev)
   def circuit():
-    qml.Hadamard(0)
-    qml.CNOT([0, 1])
-    return qml.expval(qml.Z(0))
+      qml.Hadamard(0)
+      qml.CNOT([0, 1])
+      return qml.expval(qml.Z(0))
   ```
 
 * Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently

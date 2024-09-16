@@ -74,7 +74,9 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
-        experimental_capture (bool): If set to ``True``, the frontend uses the PL program capture.
+        experimental_capture (bool): If set to ``True``,
+            use PennyLane's experimental program capture capabilities
+            to capture the function for compilation.
     """
 
     verbose: Optional[bool] = False
