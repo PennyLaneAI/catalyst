@@ -67,6 +67,7 @@ def pipeline(fn=None, *, pass_pipeline=None):
     fn_clone.__name__ = fn_original_name + "_transformed"
 
     pass_names = API_name_to_pass_name()
+
     def wrapper(*args, **kwrags):
         if EvaluationContext.is_tracing():
             for API_name, pass_options in pass_pipeline.items():
@@ -221,8 +222,7 @@ def cancel_inverses(fn=None, keep_original=True):
 
 ## IMPL and helpers ##
 def API_name_to_pass_name():
-    return {"cancel_inverses": "remove-chained-self-inverse", 
-            "merge_rotations": "merge-rotation"}
+    return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotation"}
 
 
 def _inject_transform_named_sequence():

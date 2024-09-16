@@ -19,7 +19,6 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
 from catalyst.passes import cancel_inverses, pipeline
 
 # pylint: disable=missing-function-docstring

@@ -14,13 +14,11 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
-
-#include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-
 
 using namespace llvm;
 using namespace mlir;
@@ -33,8 +31,7 @@ namespace quantum {
 #define GEN_PASS_DECL_MERGEROTATIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct MergeRotationPass
-    : impl::MergeRotationPassBase<MergeRotationPass> {
+struct MergeRotationPass : impl::MergeRotationPassBase<MergeRotationPass> {
     using MergeRotationPassBase::MergeRotationPassBase;
 
     void runOnOperation() final

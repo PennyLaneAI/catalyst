@@ -113,7 +113,8 @@ class QFunc:
     def __call__(self, pass_pipeline, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
-        self = pipeline(pass_pipeline=pass_pipeline)(self)
+        # Update the qnode with peephole pipeline
+        self = pipeline(pass_pipeline=pass_pipeline)(self)  # pylint: disable=self-cls-assignment
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
