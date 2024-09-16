@@ -30,6 +30,11 @@
 <h3>Improvements</h3>
 
 
+* Support is expanded for backend devices that exculsively return samples in the measurement 
+  basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`, 
+  `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
+  [(#1106)](https://github.com/PennyLaneAI/catalyst/pull/1106)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
@@ -50,11 +55,17 @@
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
+* Prefer creating new `qml.devices.ExecutionConfig` objects over using the global
+  `qml.devices.DefaultExecutionConfig`. Doing so helps avoid unexpected bugs and test failures in
+  case the `DefaultExecutionConfig` object becomes modified from its original state.
+  [(#1137)](https://github.com/PennyLaneAI/catalyst/pull/1137)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Lillian M.A. Frederiksen,
 Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,

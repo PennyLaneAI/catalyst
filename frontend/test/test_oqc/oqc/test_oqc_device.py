@@ -70,6 +70,16 @@ class TestOQCDevice:
         tranform_program, _ = dev.preprocess()
         assert tranform_program == qml.transforms.core.TransformProgram()
 
+    def test_preprocess_with_config(self, set_dummy_oqc_env):
+        """Test the device preprocessing by explicitly passing an execution config"""
+        from catalyst.third_party.oqc import OQCDevice
+
+        dev = OQCDevice(backend="lucy", shots=1000, wires=8)
+        execution_config = qml.devices.ExecutionConfig()
+        tranform_program, config = dev.preprocess(execution_config)
+        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert config == execution_config
+
     def test_get_c_interface(self, set_dummy_oqc_env):
         """Test the device get_c_interface method."""
         from catalyst.third_party.oqc import OQCDevice

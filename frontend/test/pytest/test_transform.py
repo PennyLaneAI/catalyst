@@ -326,11 +326,12 @@ class TestCutCircuitMCTransform:
         assert expected_shape == observed_shape
 
 
-class TestHamiltonianExpand:
-    """Test Hamiltonian Expand"""
+class TestSplitNonCommuting:
+    """Test split_non_commuting"""
 
-    def test_hamiltonian_expand(self, backend):
-        """Test hamiltonian expand."""
+    def test_split_non_commuting_single_observable(self, backend):
+        """Test split_non_commuting on a single, multi-term observable containing
+        non-commuting terms."""
 
         H4 = (
             qml.PauliX(0) @ qml.PauliZ(2)
@@ -366,12 +367,9 @@ class TestHamiltonianExpand:
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-
-class TestSumExpand:
-    """Test Sum Expand"""
-
-    def test_sum_expand(self, backend):
-        """Test Sum Expand"""
+    def test_split_non_commuting_mulitiple_observables(self, backend):
+        """Test split_non_commuting on two separate measurements with non-commuting
+        observables"""
 
         def qnode_builder(device_name):
             """Builder"""
@@ -382,7 +380,7 @@ class TestSumExpand:
                 """Example taken from PL tests"""
                 obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
                 obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
-                return [qml.expval(obs1), qml.expval(obs2)]
+                return qml.expval(obs1), qml.expval(obs2)
 
             return qfunc
 
