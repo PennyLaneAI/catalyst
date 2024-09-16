@@ -79,7 +79,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
 
         auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
         rewriter.modifyOpInPlace(op, [&] {
-            // Insert new argIn in interleaving way.
+            // Insert new argIn in an interleaving way.
             size_t idx = 0;
             for (auto ty : newArgInTypes) {
                 op.insertArgument(2 * idx + 1, ty, {}, op.getLoc());
@@ -165,7 +165,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
 
         auto reverseTy = rewriter.getFunctionType(bufferArgs, bufferRets);
         rewriter.modifyOpInPlace(op, [&] {
-            // Insert new argIn in interleaving way.
+            // Insert new argIn in an interleaving way.
             size_t idx = 0;
             for (auto ty : newArgInTypes) {
                 op.insertArgument(2 * idx, ty, {}, op.getLoc());
@@ -188,7 +188,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
             size_t idx = 0;
             for (Value operand : returnOp.getOperands()) {
                 if (isa<MemRefType>(operand.getType()) && idx < forwardArgc) {
-                    BlockArgument output = op.getArgument(2 * idx + forwardResc);
+                    BlockArgument output = op.getArgument(2 * idx + 1);
                     rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
                     idx++;
                 }
