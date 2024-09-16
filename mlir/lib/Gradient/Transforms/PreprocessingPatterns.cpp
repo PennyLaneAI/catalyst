@@ -78,13 +78,24 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
         rewriter.setInsertionPointToStart(block);
         auto inputs = op.getArguments();
 
+        SmallVector<Value> tapeInputs;
+        auto resc = op.getResc();
+        // In ReverseOp, Tape comes first when we call the backward function.
+        for (size_t i = 0; i < op.getTape(); i++) {
+            tapeInputs.push_back(inputs[resc + i]);
+        }
+
+        for (size_t i = 0; i < resc; i++) {
+            tapeInputs.push_back(inputs[i]);
+        }
+
         auto implAttr = op.getImplementationAttr();
         auto impl = op.getImplementation();
         auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
         auto implResTy = implOp.getResultTypes();
         Location loc = op.getLoc();
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, inputs);
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tapeInputs);
         SmallVector<Value> outputs(callOp.getResults());
 
         auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
