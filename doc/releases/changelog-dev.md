@@ -34,19 +34,19 @@
 
   The full list of supported gates are as follows:
 
-  Unary Gates:
+  One-bit Gates:
   - [`qml.Hadamard`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Hadamard.html)
   - [`qml.PauliX`](https://docs.pennylane.ai/en/stable/code/api/pennylane.PauliX.html)
   - [`qml.PauliY`](https://docs.pennylane.ai/en/stable/code/api/pennylane.PauliY.html)
   - [`qml.PauliZ`](https://docs.pennylane.ai/en/stable/code/api/pennylane.PauliZ.html)
 
-  Binary Gates:
+  Two-bit Gates:
   - [`qml.CNOT`](https://docs.pennylane.ai/en/stable/code/api/pennylane.CNOT.html)
   - [`qml.CY`](https://docs.pennylane.ai/en/stable/code/api/pennylane.CY.html)
   - [`qml.CZ`](https://docs.pennylane.ai/en/stable/code/api/pennylane.CZ.html)
   - [`qml.SWAP`](https://docs.pennylane.ai/en/stable/code/api/pennylane.SWAP.html)
 
-  Trinary Gates: Toffoli
+  Three-bit Gates: Toffoli
   - [`qml.Toffoli`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Toffoli.html)
   
   
