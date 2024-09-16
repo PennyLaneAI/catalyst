@@ -34,6 +34,7 @@ from catalyst import (
     pure_callback,
     qjit,
     value_and_grad,
+    vmap,
 )
 
 # pylint: disable=too-many-lines
