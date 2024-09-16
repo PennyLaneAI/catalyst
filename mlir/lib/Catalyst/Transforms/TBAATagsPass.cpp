@@ -56,7 +56,7 @@ void MemrefToLLVMWithTBAAPass::runOnOperation()
             containGradients = true;
             return WalkResult::interrupt();
         }
-        return WalkResult::advance();
+        return WalkResult::skip();
     });
     if (containGradients) {
         lowerMemrefWithTBAA(mod);
