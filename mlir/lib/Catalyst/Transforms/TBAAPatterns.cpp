@@ -102,7 +102,12 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
                                                              0, false, storeOp.getNontemporal());
 
-        setTag(baseType, tree, storeOp.getContext(), op);
+        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+            setTag(baseType, tree, storeOp.getContext(), op);
+        }
+        else {
+            return failure();
+        }
         return success();
     }
 
