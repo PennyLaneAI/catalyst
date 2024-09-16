@@ -100,11 +100,7 @@ def test_pipeline_functionality(theta, backend):
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "mitigate_with_zne": {
-            "scale_factors": [1, 3, 5, 7],
-            "extrapolate": polynomial_extrapolation(2),
-            "folding": "global",
-        },
+        "merge_rotations": {},
     }
 
     @qjit

@@ -514,8 +514,7 @@ def _apply_registered_pass_lowering(
             """
 
     # If there already is a apply_registered_pass,
-    # insert before the first pass in the existing pass sequence.
-    # See comment in frontend/catalyst/passes.py/pipeline()
+    # insert after the last pass in the existing pass sequence.
     # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
     named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
     first_op_in_block = named_sequence_op_block.operations[0].operation
@@ -529,11 +528,9 @@ def _apply_registered_pass_lowering(
         """
 
     if first_op_in_block.name == "transform.apply_registered_pass":
-        """
         _ = len(named_sequence_op_block.operations)
         yield_op = named_sequence_op_block.operations[_ - 1].operation
         current_last_pass = named_sequence_op_block.operations[_ - 2].operation
-
         with ir.InsertionPoint(yield_op):
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
@@ -541,16 +538,6 @@ def _apply_registered_pass_lowering(
                 pass_name=pass_name,
                 options=options,
             )
-        """
-        current_first_pass = named_sequence_op_block.operations[0].operation
-        with ir.InsertionPoint(first_op_in_block):
-            apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_mod_type,
-                target=named_sequence_op.regions[0].blocks[0].arguments[0],
-                pass_name=pass_name,
-                options=options,
-            )
-            current_first_pass.operands[0] = apply_registered_pass_op.result
 
     # otherwise it's the first pass, i.e. only a yield op is in the block
     # so insert right before the yield op

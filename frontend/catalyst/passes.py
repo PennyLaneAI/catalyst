@@ -51,19 +51,6 @@ def pipeline(fn=None, *, pass_pipeline=None):
     Here are documentation words
     """
 
-    """
-    Implementation design: it just stacks the decorators for the user automatically.
-    e.g.pass_pipeline = {
-            "mitigate_with_zne": {"scale_factors": [1, 2, 3]},
-            "cancel_inverses": {}
-        }
-    will just do 
-    fn = mitigate_with_zne(scale_factors=[1, 2, 3])(fn)
-    fn = cancel_inverses(fn)
-
-    Note that since python 3.7, dictionary order is guaranteed to be in insertion order
-    https://docs.python.org/3/library/stdtypes.html#dict.values
-    """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
@@ -77,20 +64,22 @@ def pipeline(fn=None, *, pass_pipeline=None):
         # TODO: design a default peephole pipeline
         return fn
 
-    API_calls = API_name_to_API_calls()
-
     fn_original_name = fn.__name__
+    wrapped_qnode_function = fn.func
     fn_clone = copy.copy(fn)
     fn_clone.__name__ = fn_original_name + "_transformed"
 
-    # Note: we create wrappers to inject the apply_registered_pass primitive
-    # In other words, the last API call, aka the last wrapper, will be the outermost primitive
-    # Therefore when lowering these primitives to mlir (in jax_primitives.py), lower them in reverse order!
-    for decorator, decorator_args in pass_pipeline.items():
-        if decorator not in API_calls.keys():
-            raise RuntimeError(f"{decorator} is not a valid quantum transformation pass")
+    pass_names = API_name_to_pass_name()
+    def wrapper(*args, **kwrags):
+        if EvaluationContext.is_tracing():
+            for API_name, pass_options in pass_pipeline.items():
+                apply_registered_pass_p.bind(
+                    pass_name=pass_names[API_name],
+                    options=f"func-name={fn_original_name}" + "_transformed",
+                )
+        return wrapped_qnode_function(*args, **kwrags)
 
-        fn_clone = API_calls[decorator](fn_clone, keep_original=False, **decorator_args)
+    fn_clone.func = wrapper
 
     return fn_clone
 
@@ -233,17 +222,10 @@ def cancel_inverses(fn=None, keep_original=True):
         return fn
 
 
-def mitigate_with_zne(*args, keep_original=False, **kwrags):
-    """
-    An alias of catalyst.mitigate_with_zne.
-    See https://docs.pennylane.ai/projects/catalyst/en/stable/code/api/catalyst.mitigate_with_zne.html
-    """
-    return _mitigate_with_zne_api_extensions(*args, **kwrags)
-
-
 ## IMPL and helpers ##
-def API_name_to_API_calls():
-    return {"cancel_inverses": cancel_inverses, "mitigate_with_zne": mitigate_with_zne}
+def API_name_to_pass_name():
+    return {"cancel_inverses": "remove-chained-self-inverse", 
+            "merge_rotations": "merge-rotation"}
 
 
 def _inject_transform_named_sequence():
