@@ -33,6 +33,28 @@
   `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`. 
   [(#1139)](https://github.com/PennyLaneAI/catalyst/pull/1139)
 
+* The decorator `self_inverses` now supports all Hermitian Gates.
+  [(#1136)](https://github.com/PennyLaneAI/catalyst/pull/1136)
+
+  The full list of supported gates are as follows:
+
+  One-bit Gates:
+  - [`qml.Hadamard`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Hadamard.html)
+  - [`qml.PauliX`](https://docs.pennylane.ai/en/stable/code/api/pennylane.PauliX.html)
+  - [`qml.PauliY`](https://docs.pennylane.ai/en/stable/code/api/pennylane.PauliY.html)
+  - [`qml.PauliZ`](https://docs.pennylane.ai/en/stable/code/api/pennylane.PauliZ.html)
+
+  Two-bit Gates:
+  - [`qml.CNOT`](https://docs.pennylane.ai/en/stable/code/api/pennylane.CNOT.html)
+  - [`qml.CY`](https://docs.pennylane.ai/en/stable/code/api/pennylane.CY.html)
+  - [`qml.CZ`](https://docs.pennylane.ai/en/stable/code/api/pennylane.CZ.html)
+  - [`qml.SWAP`](https://docs.pennylane.ai/en/stable/code/api/pennylane.SWAP.html)
+
+  Three-bit Gates: Toffoli
+  - [`qml.Toffoli`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Toffoli.html)
+  
+  
+
 * Support is expanded for backend devices that exculsively return samples in the measurement 
   basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`, 
   `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
