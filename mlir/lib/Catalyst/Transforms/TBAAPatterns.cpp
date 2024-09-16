@@ -26,6 +26,32 @@
 using namespace mlir;
 
 namespace catalyst {
+void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ctx,
+            mlir::LLVM::AliasAnalysisOpInterface newOp)
+{
+    mlir::LLVM::TBAATagAttr tag;
+    if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
+        tag = tree->getTag("int");
+        newOp.setTBAATags(ArrayAttr::get(ctx, tag));
+    }
+    else if (isa<FloatType>(baseType)) {
+        if (baseType.isF32()) {
+            tag = tree->getTag("float");
+        }
+        else if (baseType.isF64()) {
+            tag = tree->getTag("double");
+        }
+
+        newOp.setTBAATags(ArrayAttr::get(ctx, tag));
+    }
+    else if (isa<MemRefType>(baseType)) {
+        tag = tree->getTag("any pointer");
+
+        newOp.setTBAATags(ArrayAttr::get(ctx, tag));
+    }
+}
+
+template <typename... Types> bool isAnyOf(Type baseType) { return (isa<Types>(baseType) || ...); }
 
 struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::LoadOp> {
     using ConvertOpToLLVMPattern<memref::LoadOp>::ConvertOpToLLVMPattern;
@@ -38,33 +64,18 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto type = loadOp.getMemRefType();
+        auto baseType = type.getElementType();
         Value dataPtr = getStridedElementPtr(loadOp.getLoc(), type, adaptor.getMemref(),
                                              adaptor.getIndices(), rewriter);
         auto op = rewriter.replaceOpWithNewOp<LLVM::LoadOp>(
             loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0, false,
             loadOp.getNontemporal());
-        auto baseType = loadOp.getMemRefType().getElementType();
 
-        mlir::LLVM::TBAATagAttr tag;
-
-        if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
-            tag = tree->getTag("int");
-            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
+        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+            setTag(baseType, tree, loadOp.getContext(), op);
         }
-        else if (isa<FloatType>(baseType)) {
-            if (baseType.isF32()) {
-                tag = tree->getTag("float");
-            }
-            else if (baseType.isF64()) {
-                tag = tree->getTag("double");
-            }
-
-            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
-        }
-        else if (isa<MemRefType>(baseType)) {
-            tag = tree->getTag("any pointer");
-
-            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
+        else {
+            return failure();
         }
         return success();
     }
@@ -91,27 +102,7 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
                                                              0, false, storeOp.getNontemporal());
 
-        mlir::LLVM::TBAATagAttr tag;
-
-        if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
-            tag = tree->getTag("int");
-            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
-        }
-        else if (isa<FloatType>(baseType)) {
-            if (baseType.isF32()) {
-                tag = tree->getTag("float");
-            }
-            else if (baseType.isF64()) {
-                tag = tree->getTag("double");
-            }
-
-            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
-        }
-        else if (isa<MemRefType>(baseType)) {
-            tag = tree->getTag("any pointer");
-
-            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
-        }
+        setTag(baseType, tree, storeOp.getContext(), op);
         return success();
     }
 

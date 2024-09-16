@@ -32,6 +32,7 @@ module @my_model {
 // CHECK: [[typedesc:#.+]] = #llvm.tbaa_type_desc<id = "int", members = {<[[root]], 0>}>
 // CHECK: [[tag:#.+]] = #llvm.tbaa_tag<base_type = [[typedesc]], access_type = [[typedesc]], offset = 0>
 module @my_model {
+    llvm.func @my_func(...)
     llvm.func @__enzyme_autodiff0(...)
     func.func @func_i32(%arg0: memref<i32>, %arg1: memref<4xi32>) -> (memref<i32>, memref<4xi32>) {
         // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<i32> to !llvm.struct<(ptr, ptr, i64)>
@@ -133,5 +134,23 @@ module @my_model {
         %idx1 = index.constant 1
         memref.store %1, %arg3[%idx1] : memref<3xindex>
         return %arg1, %arg3: memref<4xf64>, memref<3xindex>
+    }
+}
+
+
+// -----
+
+// CHECK: [[root:#.+]] = #llvm.tbaa_root<id = "Catalyst TBAA">
+// CHECK: [[typedespointer:#.+]] = #llvm.tbaa_type_desc<id = "any pointer", members = {<[[root]], 0>}>
+// CHECK: [[tagpointer:#.+]] = #llvm.tbaa_tag<base_type = [[typedespointer]], access_type = [[typedespointer]], offset = 0>
+module @my_model {
+    llvm.func @__enzyme_autodiff3(...)
+    func.func @func_pointer(%arg0: memref<memref<f64>>) -> (memref<f64>, memref<memref<f64>>) {
+        %alloc = memref.alloc() : memref<memref<f64>>
+        // CHECK: llvm.load [[ANY:%[0-9]+]] {tbaa = [[[tagpointer]]]} : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+        %0 = memref.load %arg0[] : memref<memref<f64>>
+        // CHECK: llvm.store [[ANY:%[0-9]+]], [[ANY:%[0-9]+]] {tbaa = [#tbaa_tag]} : !llvm.struct<(ptr, ptr, i64)>, !llvm.ptr
+        memref.store %0, %alloc[] : memref<memref<f64>>
+        return %0, %alloc: memref<f64>, memref<memref<f64>>
     }
 }

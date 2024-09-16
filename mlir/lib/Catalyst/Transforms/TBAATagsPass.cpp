@@ -54,8 +54,9 @@ void MemrefToLLVMWithTBAAPass::runOnOperation()
     mod.walk([&](LLVM::LLVMFuncOp op) {
         if (op.getName().starts_with("__enzyme_autodiff")) {
             containGradients = true;
+            return WalkResult::interrupt();
         }
-        return WalkResult::interrupt();
+        return WalkResult::advance();
     });
     if (containGradients) {
         lowerMemrefWithTBAA(mod);
