@@ -47,11 +47,11 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
 
         mlir::LLVM::TBAATagAttr tag;
 
-        if (isa<IndexType>(baseType) || dyn_cast<IntegerType>(baseType)) {
+        if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
             tag = tree->getTag("int");
             op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
         }
-        else if (dyn_cast<FloatType>(baseType)) {
+        else if (isa<FloatType>(baseType)) {
             if (baseType.isF32()) {
                 tag = tree->getTag("float");
             }
@@ -61,7 +61,7 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
 
             op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
         }
-        else if (dyn_cast<MemRefType>(baseType)) {
+        else if (isa<MemRefType>(baseType)) {
             tag = tree->getTag("any pointer");
 
             op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
@@ -93,11 +93,11 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
 
         mlir::LLVM::TBAATagAttr tag;
 
-        if (isa<IndexType>(baseType) || dyn_cast<IntegerType>(baseType)) {
+        if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
             tag = tree->getTag("int");
             op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
         }
-        else if (dyn_cast<FloatType>(baseType)) {
+        else if (isa<FloatType>(baseType)) {
             if (baseType.isF32()) {
                 tag = tree->getTag("float");
             }
@@ -107,7 +107,7 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
 
             op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
         }
-        else if (dyn_cast<MemRefType>(baseType)) {
+        else if (isa<MemRefType>(baseType)) {
             tag = tree->getTag("any pointer");
 
             op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
