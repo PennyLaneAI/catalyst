@@ -136,12 +136,8 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         SmallVector<Type> bufferRets;
 
         // Prepare for arg insertion.
-        unsigned appendingSize = 2 * forwardArgc + forwardResc;
-        SmallVector<unsigned> argIndices(/*size=*/appendingSize,
-                                         /*values=*/0);
-        SmallVector<Type> argTypes;
-        SmallVector<DictionaryAttr> argAttrs{appendingSize};
-        SmallVector<Location> argLocs{appendingSize, op.getLoc()};
+        SmallVector<Type> newArgInTypes;
+        SmallVector<Type> newArgResTypes;
 
         // For the function format of ReverseOP should follow that of ForwardOp,
         // so the returns go to the front.
@@ -149,30 +145,39 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
             bufferArgs.push_back(ty);
             bufferArgs.push_back(ty);
 
-            // create new argument to insert
-            argTypes.push_back(ty);
-            argTypes.push_back(ty);
+            // create new arguments (which are actually returns) to insert
+            newArgResTypes.push_back(ty);
+            newArgResTypes.push_back(ty);
         }
 
-        // Tape is with the arguments for ReversOp/
+        // Tape is with the arguments for ReversOp.
         for (size_t i = 0; i < op.getNumArguments(); i++) {
             auto ty = argTys[i];
             if (i < forwardResc) {
-                llvm::outs() << "A\n";
                 bufferArgs.push_back(ty);
                 bufferArgs.push_back(ty);
-                argTypes.push_back(ty);
+                newArgInTypes.push_back(ty);
             }
             else {
-                llvm::outs() << "T\n";
                 bufferArgs.push_back(ty);
             }
         }
 
         auto reverseTy = rewriter.getFunctionType(bufferArgs, bufferRets);
-        llvm::outs() << reverseTy << "\n";
         rewriter.modifyOpInPlace(op, [&] {
-            op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
+            // Insert new argIn in interleaving way.
+            size_t idx = 0;
+            for (auto ty : newArgInTypes) {
+                op.insertArgument(2 * idx, ty, {}, op.getLoc());
+                idx++;
+            }
+            // Append newArgRes.
+            unsigned appendingSize = 2 * forwardArgc;
+            SmallVector<unsigned> argIndices(/*size=*/appendingSize,
+                                             /*values=*/0);
+            SmallVector<DictionaryAttr> argAttrs{appendingSize};
+            SmallVector<Location> argLocs{appendingSize, op.getLoc()};
+            op.insertArguments(argIndices, newArgResTypes, argAttrs, argLocs);
             op.setFunctionType(reverseTy);
         });
 
