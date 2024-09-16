@@ -43,7 +43,6 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto resc = op.getResc();
         auto tapeCount = op.getTape();
 
-        // if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
         if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 &&
             op.getFunctionType().getNumResults() == tapeCount)
             return failure();
@@ -95,7 +94,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
             size_t idx = 0;
             for (Value operand : returnOp.getOperands()) {
                 if (isa<MemRefType>(operand.getType()) && idx < resc) {
-                    BlockArgument output = op.getArgument(idx + argc * 2);
+                    BlockArgument output = op.getArgument(idx * 2 + argc * 2);
                     rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
                     idx++;
                 }
@@ -116,12 +115,11 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
                                         mlir::PatternRewriter &rewriter) const override
     {
         // Check if the numbers of args and returns match Enzyme's format.
-        auto argc = op.getArgc();
-        auto resc = op.getResc();
+        auto forwardArgc = op.getArgc();
+        auto forwardResc = op.getResc();
         auto tape = op.getTape();
 
-        // if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
-        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 + tape)
+        if (op.getFunctionType().getNumInputs() == (forwardArgc + forwardResc) * 2 + tape)
             return failure();
 
         auto argTys = op.getArgumentTypes();
@@ -130,7 +128,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         SmallVector<Type> bufferRets;
 
         // Prepare for arg insertion.
-        unsigned appendingSize = argc + 2 * resc;
+        unsigned appendingSize = 2 * forwardArgc + forwardResc;
         SmallVector<unsigned> argIndices(/*size=*/appendingSize,
                                          /*values=*/0);
         SmallVector<Type> argTypes;
@@ -140,6 +138,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         // For the function format of ReverseOP should follow that of ForwardOp,
         // so the returns go to the front.
         for (Type ty : retTys) {
+            llvm::outs() << "R\n";
             bufferArgs.push_back(ty);
             bufferArgs.push_back(ty);
 
@@ -151,17 +150,20 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         // Tape is with the arguments for ReversOp/
         for (size_t i = 0; i < op.getNumArguments(); i++) {
             auto ty = argTys[i];
-            if (i < resc) {
+            if (i < forwardResc) {
+                llvm::outs() << "A\n";
                 bufferArgs.push_back(ty);
                 bufferArgs.push_back(ty);
                 argTypes.push_back(ty);
             }
             else {
+                llvm::outs() << "T\n";
                 bufferArgs.push_back(ty);
             }
         }
 
         auto reverseTy = rewriter.getFunctionType(bufferArgs, bufferRets);
+        llvm::outs() << reverseTy << "\n";
         rewriter.modifyOpInPlace(op, [&] {
             op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
             op.setFunctionType(reverseTy);
@@ -173,8 +175,8 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
             SmallVector<Value> tapeReturns;
             size_t idx = 0;
             for (Value operand : returnOp.getOperands()) {
-                if (isa<MemRefType>(operand.getType()) && idx < resc) {
-                    BlockArgument output = op.getArgument(idx + argc);
+                if (isa<MemRefType>(operand.getType()) && idx < forwardArgc) {
+                    BlockArgument output = op.getArgument(2 * idx + forwardResc);
                     rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
                     idx++;
                 }
