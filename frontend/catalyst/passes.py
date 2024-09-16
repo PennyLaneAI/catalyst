@@ -37,9 +37,6 @@ import functools
 
 import pennylane as qml
 
-from catalyst.api_extensions import (
-    mitigate_with_zne as _mitigate_with_zne_api_extensions,
-)
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
 from catalyst.tracing.contexts import EvaluationContext
 
