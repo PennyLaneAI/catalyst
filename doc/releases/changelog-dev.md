@@ -29,6 +29,9 @@
 
 <h3>Improvements</h3>
 
+* Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`, 
+  `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`. 
+  [(#1139)](https://github.com/PennyLaneAI/catalyst/pull/1139)
 
 * Support is expanded for backend devices that exculsively return samples in the measurement 
   basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`, 
