@@ -98,8 +98,8 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tapeInputs);
         SmallVector<Value> outputs(callOp.getResults());
 
-        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, F);
+        auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, T);
 
         return success();
     }
