@@ -14,6 +14,8 @@
 
 // RUN: quantum-opt --memref-to-llvm-tbaa --split-input-file %s | FileCheck %s
 
+// Test that no tbaa metadata is inserted if we are not taking the gradient of a function
+
 // CHECK-NOT: = #llvm.tbaa_root
 module @my_model {
     func.func @func_noenzyme_notbaa(%arg0: memref<i32>, %arg1: memref<4xi32>) -> (memref<i32>, memref<4xi32>) {
