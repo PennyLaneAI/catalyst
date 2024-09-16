@@ -53,6 +53,7 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
+from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -484,9 +485,14 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    self.user_sig or ()
-                )
+                if self.compile_options.experimental_capture:
+                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = (
+                        self.experimental_capture(self.user_sig or ())
+                    )
+                else:
+                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                        self.user_sig or ()
+                    )
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()
@@ -634,6 +640,67 @@ class QJIT:
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
+
+    @instrument(size_from=0)
+    @debug_logger
+    def experimental_capture(self, args, **kwargs):
+        """Capture the JAX program representation (JAXPR) of the wrapped function.
+
+        Args:
+            args (Iterable): arguments to use for program capture
+
+        Returns:
+            ClosedJaxpr: captured JAXPR
+            PyTreeDef: PyTree metadata of the function output
+            Tuple[Any]: the dynamic argument signature
+        """
+
+        verify_static_argnums(args, self.compile_options.static_argnums)
+        static_argnums = self.compile_options.static_argnums
+        abstracted_axes = self.compile_options.abstracted_axes
+        experimental_capture = self.compile_options.experimental_capture
+
+        dynamic_args = filter_static_args(args, static_argnums)
+        dynamic_sig = get_abstract_signature(dynamic_args)
+        full_sig = merge_static_args(dynamic_sig, args, static_argnums)
+
+        def fn_with_transform_named_sequence(*args, **kwargs):
+            """
+            This function behaves exactly like the user function being jitted,
+            taking in the same arguments and producing the same results, except
+            it injects a transform_named_sequence jax primitive at the beginning
+            of the jaxpr when being traced.
+
+            Note that we do not overwrite self.original_function and self.user_function;
+            this fn_with_transform_named_sequence is ONLY used here to produce tracing
+            results with a transform_named_sequence primitive at the beginning of the
+            jaxpr. It is never executed or used anywhere, except being traced here.
+            """
+            _inject_transform_named_sequence()
+            return self.user_function(*args, **kwargs)
+        
+        with transient_jax_config({"jax_dynamic_shapes": True}):
+        
+            make_jaxpr_kwargs = {
+                "static_argnums": static_argnums,
+                "abstracted_axes": abstracted_axes,
+            }
+            if qml.capture.enable():
+                capture_on = True
+            else:
+                capture_on = False
+            
+            if not capture_on:
+                qml.capture.enable()
+
+            plxpr, out_type, out_treedef = make_jaxpr2(fn_with_transform_named_sequence, **make_jaxpr_kwargs)(*args, **kwargs)
+
+            if not capture_on:
+                qml.capture.disable()
+
+            jaxpr = catalyst.from_plxpr(plxpr)(*args, **kwargs)
+
+        return jaxpr, out_type, out_treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
     @debug_logger

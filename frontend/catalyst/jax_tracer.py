@@ -530,16 +530,8 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, experimental_capture, 
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
         }
-        if experimental_capture:
-            qml.capture.enable()
-            plxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
-            qml.capture.disable()
-            jaxpr = catalyst.from_plxpr(plxpr)(*args, **kwargs)
-        else:
-            with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-                jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(
-                    *args, **kwargs
-                )
+        with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+            jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef
 
