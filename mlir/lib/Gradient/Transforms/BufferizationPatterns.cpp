@@ -354,7 +354,6 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
     }
 };
 
-
 class BufferizeReturnOp : public OpConversionPattern<ReturnOp> {
   public:
     using OpConversionPattern::OpConversionPattern;
@@ -363,14 +362,13 @@ class BufferizeReturnOp : public OpConversionPattern<ReturnOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         if (!llvm::any_of(op->getOperands().getType(),
-                         [](Type argType) { return isa<TensorType>(argType); })) {
+                          [](Type argType) { return isa<TensorType>(argType); })) {
             return failure();
         }
 
         auto outTypes = op->getParentOfType<FunctionOpInterface>().getResultTypes();
 
-        if (llvm::any_of(outTypes,
-                         [](Type argType) { return isa<TensorType>(argType); })) {
+        if (llvm::any_of(outTypes, [](Type argType) { return isa<TensorType>(argType); })) {
             return failure();
         }
 
@@ -385,12 +383,11 @@ class BufferizeReturnOp : public OpConversionPattern<ReturnOp> {
                 returnValues.push_back(returnVal);
                 continue;
             }
-            Value toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
-                loc, outType, returnVal);
+            Value toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(loc, outType, returnVal);
             returnValues.push_back(toMemrefOp);
         }
 
-        rewriter.modifyOpInPlace(op, [&] {op->setOperands(returnValues);});
+        rewriter.modifyOpInPlace(op, [&] { op->setOperands(returnValues); });
 
         return success();
     }

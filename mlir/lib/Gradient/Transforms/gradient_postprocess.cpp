@@ -34,7 +34,8 @@ namespace gradient {
 #define GEN_PASS_DEF_GRADIENTPOSTPROCESSINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
-struct GradientPostprocessingPass : impl::GradientPostprocessingPassBase<GradientPostprocessingPass> {
+struct GradientPostprocessingPass
+    : impl::GradientPostprocessingPassBase<GradientPostprocessingPass> {
     using GradientPostprocessingPassBase::GradientPostprocessingPassBase;
 
     void runOnOperation() final

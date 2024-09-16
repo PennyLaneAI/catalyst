@@ -42,8 +42,8 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto argc = op.getArgc();
         auto resc = op.getResc();
         auto tapeCount = op.getTape();
-        
-        //if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
+
+        // if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
         if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 &&
             op.getFunctionType().getNumResults() == tapeCount)
             return failure();
@@ -76,15 +76,16 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
                 bufferArgs.push_back(ty);
                 argTypes.push_back(ty);
                 argTypes.push_back(ty);
-            } else {
+            }
+            else {
                 bufferRets.push_back(ty);
             }
         }
 
         auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
-        rewriter.modifyOpInPlace(op, [&] { 
+        rewriter.modifyOpInPlace(op, [&] {
             op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
-            op.setFunctionType(forwardTy); 
+            op.setFunctionType(forwardTy);
         });
 
         op.walk([&](ReturnOp returnOp) {
@@ -118,8 +119,8 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto argc = op.getArgc();
         auto resc = op.getResc();
         auto tape = op.getTape();
-        
-        //if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
+
+        // if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
         if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 + tape)
             return failure();
 
@@ -154,19 +155,17 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
                 bufferArgs.push_back(ty);
                 bufferArgs.push_back(ty);
                 argTypes.push_back(ty);
-            } else {
+            }
+            else {
                 bufferArgs.push_back(ty);
             }
         }
 
         auto reverseTy = rewriter.getFunctionType(bufferArgs, bufferRets);
-        llvm::outs() << reverseTy << "\n";
-        rewriter.modifyOpInPlace(op, [&] { 
+        rewriter.modifyOpInPlace(op, [&] {
             op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
-            op.setFunctionType(reverseTy); 
+            op.setFunctionType(reverseTy);
         });
-
-        llvm::outs() << op.getNumArguments() << "\n";
 
         op.walk([&](ReturnOp returnOp) {
             PatternRewriter::InsertionGuard guard(rewriter);
