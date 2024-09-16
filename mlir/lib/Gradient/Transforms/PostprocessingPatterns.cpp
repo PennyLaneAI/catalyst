@@ -44,7 +44,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto tapeCount = op.getTape();
         
         //if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
-        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 ||
+        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 &&
             op.getFunctionType().getNumResults() == tapeCount)
             return failure();
 
@@ -114,15 +114,13 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
     mlir::LogicalResult matchAndRewrite(ReverseOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        return failure();
         // Check if the numbers of args and returns match Enzyme's format.
         auto argc = op.getArgc();
         auto resc = op.getResc();
-        auto tapeCount = op.getTape();
+        auto tape = op.getTape();
         
         //if (op.getNumArguments() == (argc + resc) * 2 && op.getNumResults() == tapeCount)
-        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 ||
-            op.getFunctionType().getNumResults() == tapeCount)
+        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 + tape)
             return failure();
 
         auto argTys = op.getArgumentTypes();
@@ -133,36 +131,42 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         // Prepare for arg insertion.
         unsigned appendingSize = argc + 2 * resc;
         SmallVector<unsigned> argIndices(/*size=*/appendingSize,
-                                         /*values=*/op.getNumArguments());
+                                         /*values=*/0);
         SmallVector<Type> argTypes;
         SmallVector<DictionaryAttr> argAttrs{appendingSize};
         SmallVector<Location> argLocs{appendingSize, op.getLoc()};
 
-        for (Type ty : argTys) {
+        // For the function format of ReverseOP should follow that of ForwardOp,
+        // so the returns go to the front.
+        for (Type ty : retTys) {
             bufferArgs.push_back(ty);
             bufferArgs.push_back(ty);
 
             // create new argument to insert
             argTypes.push_back(ty);
+            argTypes.push_back(ty);
         }
 
-        for (size_t i = 0; i < op.getNumResults(); i++) {
-            auto ty = retTys[i];
+        // Tape is with the arguments for ReversOp/
+        for (size_t i = 0; i < op.getNumArguments(); i++) {
+            auto ty = argTys[i];
             if (i < resc) {
                 bufferArgs.push_back(ty);
                 bufferArgs.push_back(ty);
                 argTypes.push_back(ty);
-                argTypes.push_back(ty);
             } else {
-                bufferRets.push_back(ty);
+                bufferArgs.push_back(ty);
             }
         }
 
-        auto forwardTy = rewriter.getFunctionType(bufferArgs, bufferRets);
+        auto reverseTy = rewriter.getFunctionType(bufferArgs, bufferRets);
+        llvm::outs() << reverseTy << "\n";
         rewriter.modifyOpInPlace(op, [&] { 
             op.insertArguments(argIndices, argTypes, argAttrs, argLocs);
-            op.setFunctionType(forwardTy); 
+            op.setFunctionType(reverseTy); 
         });
+
+        llvm::outs() << op.getNumArguments() << "\n";
 
         op.walk([&](ReturnOp returnOp) {
             PatternRewriter::InsertionGuard guard(rewriter);
@@ -171,16 +175,14 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
             size_t idx = 0;
             for (Value operand : returnOp.getOperands()) {
                 if (isa<MemRefType>(operand.getType()) && idx < resc) {
-                    BlockArgument output = op.getArgument(idx + argc * 2);
+                    BlockArgument output = op.getArgument(idx + argc);
                     rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
                     idx++;
-                }
-                else {
-                    tapeReturns.push_back(operand);
                 }
             }
             rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, tapeReturns, returnOp.getEmpty());
         });
+
         return success();
     }
 };

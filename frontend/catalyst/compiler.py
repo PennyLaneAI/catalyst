@@ -208,6 +208,7 @@ BUFFERIZATION_PASS = (
     [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
+        "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
@@ -223,6 +224,7 @@ BUFFERIZATION_PASS = (
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
