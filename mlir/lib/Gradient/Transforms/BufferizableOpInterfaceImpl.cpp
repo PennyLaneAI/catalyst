@@ -24,6 +24,28 @@ using namespace catalyst::gradient;
 
 namespace {
 
+static BaseMemRefType
+getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
+                             const bufferization::BufferizationOptions &options) {
+    auto tensorType =
+        dyn_cast<TensorType>(funcOp.getArgument(index).getType());
+    assert(tensorType && "expected TensorType");
+
+    BaseMemRefType memrefType = options.functionArgTypeConverterFn(
+        tensorType, *options.defaultMemorySpaceFn(tensorType), funcOp, options);
+
+    auto layoutAttr = funcOp.getArgAttrOfType<AffineMapAttr>(
+        index, bufferization::BufferizationDialect::kBufferLayoutAttrName);
+    if (!layoutAttr)
+        return memrefType;
+
+    auto rankedMemrefType = dyn_cast<MemRefType>(memrefType);
+    assert(rankedMemrefType && "buffer layout not supported on unranked tensors");
+    return MemRefType::get(
+        rankedMemrefType.getShape(), rankedMemrefType.getElementType(),
+        layoutAttr.getValue(), rankedMemrefType.getMemorySpace());
+}
+
 Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 {
     auto origMemrefType = cast<MemRefType>(reference.getType());
@@ -276,6 +298,21 @@ struct ForwardOpInterface
         return {};
     }
 
+    FailureOr<BaseMemRefType>
+    getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
+                  SmallVector<Value> &invocationStack) const {
+        auto funcOp = cast<ForwardOp>(op);
+        auto bbArg = cast<BlockArgument>(value);
+
+        // Function arguments are special.
+        if (bbArg.getOwner() == &funcOp.getBody().front())
+            return getBufferizedFunctionArgType(funcOp, bbArg.getArgNumber(),
+                                              options);
+
+        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::
+            getBufferType(op, value, options, invocationStack);
+    }
+
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
@@ -392,6 +429,21 @@ struct ReverseOpInterface
                       const bufferization::AnalysisState &state) const
     {
         return {};
+    }
+
+    FailureOr<BaseMemRefType>
+    getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
+                  SmallVector<Value> &invocationStack) const {
+        auto funcOp = cast<ForwardOp>(op);
+        auto bbArg = cast<BlockArgument>(value);
+
+        // Function arguments are special.
+        if (bbArg.getOwner() == &funcOp.getBody().front())
+            return getBufferizedFunctionArgType(funcOp, bbArg.getArgNumber(),
+                                              options);
+
+        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::
+            getBufferType(op, value, options, invocationStack);
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
