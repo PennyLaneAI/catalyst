@@ -30,6 +30,10 @@ from jax._src.tree_util import tree_flatten
 from catalyst.jax_primitives import Folding, zne_p
 
 
+def _is_odd_positive(numbers_list):
+    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in numbers_list)
+
+
 ## API ##
 def mitigate_with_zne(
     fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="global"
@@ -47,17 +51,19 @@ def mitigate_with_zne(
 
     Args:
         fn (qml.QNode): the circuit to be mitigated.
-        scale_factors (array[int]): the range of noise scale factors used.
+        scale_factors (list[int]): the range of noise scale factors used.
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
-            By default, perfect polynomial fitting will be used.
+            By default, perfect polynomial fitting :func:`~.polynomial_extrapolate` will be used,
+            the :func:`~.exponential_extrapolate` function from PennyLane may also be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
+            - local-all: per-gate folding sequences replace original gates in-place in the circuit
 
     Returns:
-        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
+        Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
         for the given arguments.
 
     **Example:**
@@ -89,7 +95,34 @@ def mitigate_with_zne(
         def mitigated_circuit(args, n):
             s = jax.numpy.array([1, 2, 3])
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+
+    Exponential extrapolation can also be performed via the
+    :func:`~.exponential_extrapolate` function from PennyLane:
+
+    .. code-block:: python
+
+        from pennylane.transforms import exponential_extrapolate
+
+        dev = qml.device("lightning.qubit", wires=2, shots=100000)
+
+        @qml.qnode(dev)
+        def circuit(weights):
+            qml.StronglyEntanglingLayers(weights, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+        @qjit
+        def workflow(weights, s):
+            zne_circuit = mitigate_with_zne(
+                circuit, scale_factors=s, extrapolate=exponential_extrapolate
+            )
+            return zne_circuit(weights)
+
+    >>> weights = jnp.ones([3, 2, 3])
+    >>> scale_factors = [1, 3, 5]
+    >>> workflow(weights, scale_factors)
+    Array(-0.19946598, dtype=float64)
     """
+
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
@@ -101,7 +134,12 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    return ZNE(fn, scale_factors, extrapolate, folding)
+    if not _is_odd_positive(scale_factors):
+        raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
+
+    num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
+
+    return ZNE(fn, num_folds, extrapolate, folding)
 
 
 ## IMPL ##
@@ -120,7 +158,7 @@ class ZNE:
     def __init__(
         self,
         fn: Callable,
-        scale_factors: jnp.ndarray,
+        num_folds: jnp.ndarray,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
@@ -128,7 +166,7 @@ class ZNE:
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
-        self.scale_factors = scale_factors
+        self.num_folds = num_folds
         self.extrapolate = extrapolate
         self.folding = folding
 
@@ -148,14 +186,12 @@ class ZNE:
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
         # TODO: remove the following check once #755 is completed
-        if folding != Folding.GLOBAL:
+        if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
-        results = zne_p.bind(
-            *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
-        )
-        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = self.extrapolate(float_scale_factors, results[0])
+        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=self.fn)
+        float_num_folds = jnp.array(self.num_folds, dtype=float)
+        results = self.extrapolate(float_num_folds, results[0])
         # Single measurement
         if results.shape == ():
             return results

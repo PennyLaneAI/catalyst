@@ -33,11 +33,13 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.transforms.dynamic_one_shot import (
+    gather_non_mcm,
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
 )
 
 import catalyst
+from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import (
     BackendInfo,
     QJITDevice,
@@ -45,7 +47,6 @@ from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
-    validate_device_capabilities,
 )
 from catalyst.jax_extras import (
     deduce_avals,
@@ -127,9 +128,6 @@ class QFunc:
         program_features = ProgramFeatures(shots_present=bool(self.device.shots))
         device_capabilities = get_device_capabilities(self.device, program_features)
         backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
-
-        # Validate decive operations against the declared capabilities
-        validate_device_capabilities(self.device, device_capabilities)
 
         if isinstance(self.device, qml.devices.Device):
             qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
@@ -257,8 +255,8 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = get_device_shots(dev)
 
     new_dev = copy(dev)
-    if isinstance(new_dev, qml.devices.LegacyDevice):
-        new_dev.shots = 1  # pragma: no cover
+    if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
+        new_dev.target_device.shots = 1  # pragma: no cover
     else:
         new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
@@ -271,12 +269,22 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-
-        out = parse_native_mid_circuit_measurements(
-            cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
-        )
-        if len(cpy_tape.measurements) == 1:
-            out = (out,)
+        has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+        out = list(results)
+        if has_mcm:
+            out = parse_native_mid_circuit_measurements(
+                cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+            )
+            if len(cpy_tape.measurements) == 1:
+                out = (out,)
+        else:
+            for m_count, m in enumerate(cpy_tape.measurements):
+                # Without MCMs and postselection, all samples are valid for use in MP computation.
+                is_valid = jnp.array([True] * len(out[m_count]))
+                out[m_count] = gather_non_mcm(
+                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
+                )
+            out = tuple(out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
         return out

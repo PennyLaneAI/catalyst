@@ -20,6 +20,8 @@ file(GLOB SRC
     MemrefCopyToLinalgCopyPatterns.cpp
     MemrefCopyToLinalgCopyPass.cpp
     RegisterInactiveCallbackPass.cpp
+    TBAAPatterns.cpp
+    TBAATagsPass.cpp
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
     ApplyTransformSequencePass.cpp

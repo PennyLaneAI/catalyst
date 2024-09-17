@@ -23,6 +23,7 @@ namespace gradient {
 
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populatePreprocessingPatterns(mlir::RewritePatternSet &);
+void populatePostprocessingPatterns(mlir::RewritePatternSet &);
 void populateLoweringPatterns(mlir::RewritePatternSet &);
 void populateConversionPatterns(mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
 

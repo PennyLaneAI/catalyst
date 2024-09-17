@@ -7,6 +7,8 @@ file(GLOB SRC
     gradient_bufferize.cpp
     PreprocessingPatterns.cpp
     gradient_preprocess.cpp
+    PostprocessingPatterns.cpp
+    gradient_postprocess.cpp
     LoweringPatterns.cpp
     gradient_lowering.cpp
     ConversionPatterns.cpp

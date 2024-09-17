@@ -39,7 +39,7 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        git checkout v0.7.0-rc
+        git checkout v0.8.1-rc
 
     - name: Install deps
       run: |
@@ -132,15 +132,9 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=v0.37.0_rc \
+        LIGHTNING_GIT_TAG_VALUE=v0.38.0_rc \
         ENABLE_OPENQASM=ON \
         make runtime
-
-    - name: Install PennyLane-Lightning (latest)
-      if: ${{ inputs.lightning == 'latest' }}
-      run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
-        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -148,11 +142,32 @@ jobs:
         pip install --upgrade pennylane-lightning
         pip install --upgrade pennyLane-lightning-kokkos
 
-    - name: Install PennyLane-Lightning (release-candidate)
+    - name: Download PennyLane-Lightning (latest)
+      if: ${{ inputs.lightning == 'latest' }}
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: master
+        path: lightning_build
+        fetch-depth: 0
+
+    - name: Download PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'release-candidate' }}
+      uses: actions/checkout@v4
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        ref: v0.38.0_rc
+        path: lightning_build
+        fetch-depth: 0
+
+    - name: Install PennyLane-Lightning (latest/release-candidate)
+      if: ${{ inputs.lightning != 'stable' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.37.0_rc
-        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.37.0_rc
+        # Lightning-Kokkos can no longer be installed with pip from git
+        cd lightning_build
+        pip install --upgrade .
+        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
+        pip install --upgrade .
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -171,8 +186,8 @@ jobs:
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.37.0-rc0
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
 
     - name: Add Frontend Dependencies to PATH
       run: |

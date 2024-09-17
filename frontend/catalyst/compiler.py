@@ -159,6 +159,19 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
+TAPE_SPLITTING_PASS = (
+    # We clump multiple tapes into a single function and split them
+    # in mlir with a pass (frontend/jax_tracer.py).
+    # Therefore before the splitting the quantum mlir is "illegal",
+    # as each function will have multiple devices.
+    # Thus, the split must be the very first pass before anything else
+    # happens.
+    "QuantumTapeSplittingPass",
+    [
+        "split-multiple-tapes",
+    ],
+)
+
 HLO_LOWERING_PASS = (
     "HLOLoweringPass",
     [
@@ -195,7 +208,10 @@ BUFFERIZATION_PASS = (
     [
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
+        "gradient-preprocess",
         "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops}",
+        "canonicalize",
+        "gradient-postprocess",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         "canonicalize",
@@ -233,6 +249,7 @@ MLIR_TO_LLVM_PASS = (
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "convert-math-to-libm",
         "convert-arith-to-llvm",
+        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
@@ -258,6 +275,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
+    TAPE_SPLITTING_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -275,6 +293,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
+    TAPE_SPLITTING_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,

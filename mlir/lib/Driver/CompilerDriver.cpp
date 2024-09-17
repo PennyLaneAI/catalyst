@@ -452,7 +452,14 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
     // options.
-    llvm::PassBuilder PB;
+    llvm::PassInstrumentationCallbacks PIC;
+    PIC.registerShouldRunOptionalPassCallback([](llvm::StringRef P, llvm::Any) {
+        if (P == "MemCpyOptPass") {
+            return false;
+        }
+        return true;
+    });
+    llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);
     // Register all the basic analyses with the managers.
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);

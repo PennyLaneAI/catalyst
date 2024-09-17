@@ -32,7 +32,8 @@ struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
 
   private:
     static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, PatternRewriter &builder,
-                                                      mitigation::ZneOp op, Type scalarType);
+                                                      mitigation::ZneOp op,
+                                                      Folding foldingAlgorithm);
     static FlatSymbolRefAttr getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
                                                      mitigation::ZneOp op);
     static FlatSymbolRefAttr

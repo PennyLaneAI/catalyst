@@ -145,9 +145,6 @@ class AbstractQreg(AbstractValue):
 
     hash_value = hash("AbstractQreg")
 
-    def __init__(self, length):
-        self.length = length
-
     def __eq__(self, other):
         return isinstance(other, AbstractQreg)
 
@@ -227,8 +224,8 @@ class Folding(Enum):
     """
 
     GLOBAL = "global"
-    RANDOM = "random"
-    ALL = "all"
+    RANDOM = "local-random"
+    ALL = "local-all"
 
 
 ##############
@@ -377,12 +374,8 @@ def _python_callback_lowering(
     # the tape is found in the mlir_fwd.type
     tape_ty = mlir_fwd.type.results[-len_tape:] if len_tape > 0 else []
 
-    args_zip = list(sum(zip(args_ty, args_ty), ()))
-    rets_zip = list(sum(zip(output_ty, output_ty), ()))
-
-    s = args_zip + rets_zip
-    fn_fwd_ty = FunctionType.get(inputs=s, results=tape_ty)
-    fn_rev_ty = FunctionType.get(inputs=s + tape_ty, results=[])
+    fn_fwd_ty = FunctionType.get(inputs=args_ty, results=output_ty + tape_ty)
+    fn_rev_ty = FunctionType.get(inputs=output_ty + tape_ty, results=args_ty)
 
     fwd_fn_ty_attr = ir.TypeAttr.get(fn_fwd_ty)
     fwd_callee_attr = ir.FlatSymbolRefAttr.get(mlir_fwd.sym_name.value)
@@ -512,7 +505,7 @@ def _apply_registered_pass_lowering(
     assert (
         named_sequence_op is not None
     ), """
-            transform.apply_registered_pass must be placed in a transform.named_sequence, 
+            transform.apply_registered_pass must be placed in a transform.named_sequence,
             but none exist in the module.
             """
 
@@ -526,7 +519,7 @@ def _apply_registered_pass_lowering(
         "transform.apply_registered_pass",
         "transform.yield",
     ), """
-            Unexpected operation in transform.named_sequence! 
+            Unexpected operation in transform.named_sequence!
             Only transform.apply_registered_pass and transform.yield are allowed.
         """
 
@@ -662,6 +655,15 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     return tuple(transformed_signature.get_results())
 
 
+def _get_call_jaxpr(jaxpr):
+    """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
+    for eqn in jaxpr.eqns:
+        primitive = eqn.primitive
+        if primitive is func_p:
+            return eqn.params["call_jaxpr"]
+    raise AssertionError("No call_jaxpr found in the JAXPR.")
+
+
 def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     """Lowering function to gradient.
     Args:
@@ -684,8 +686,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-
-    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    _func_lowering(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
     func_op = mlir_fn_cache[fn]
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -755,7 +757,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         constants.append(constantVals)
 
     consts_and_args = constants + args
-    func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    func_call_jaxpr = _get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
@@ -813,7 +815,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    func_call_jaxpr = _get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
@@ -871,7 +873,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    func_call_jaxpr = _get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
@@ -921,7 +923,7 @@ def _folding_attribute(ctx, folding):
     ctx = ctx.module_context.context
     return ir.OpaqueAttr.get(
         "mitigation",
-        ("folding " + Folding(folding).value).encode("utf-8"),
+        ("folding " + Folding(folding).name.lower()).encode("utf-8"),
         ir.NoneType.get(ctx),
         ctx,
     )
@@ -935,18 +937,19 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         jaxpr: the jaxpr representation of the circuit
         fn: the function to be mitigated
     """
-    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    _func_lowering(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
     func_op = mlir_fn_cache[fn]
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    scale_factors = args[-1]
+    num_folds = args[-1]
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args[0:-1]),
         _folding_attribute(ctx, folding),
-        scale_factors,
+        num_folds,
     ).results
 
 
@@ -977,17 +980,17 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
 # qalloc
 #
 @qalloc_p.def_impl
-def _qalloc_def_impl(ctx, size_value, static_size=None):  # pragma: no cover
+def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qalloc_p.def_abstract_eval
-def _qalloc_abstract_eval(size, static_size=None):
+def _qalloc_abstract_eval(size):
     """This function is called with abstract arguments for tracing."""
-    return AbstractQreg(static_size)
+    return AbstractQreg()
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value, static_size=None):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1047,18 +1050,14 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg.type).data == "reg"
 
-    if ir.RankedTensorType.isinstance(qubit_idx.type):
-        baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        if ir.RankedTensorType(qubit_idx.type).shape == []:
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
-        elif ir.RankedTensorType(qubit_idx.type).shape == [1]:
-            c0 = ConstantOp(ir.IndexType.get(), 0)
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
-    assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for extract op!"
+    qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+    if not ir.IntegerType.isinstance(qubit_idx.type):
+        raise TypeError(f"Operator wires expected to be integers, got {qubit_idx.type}!")
 
     if ir.IntegerType(qubit_idx.type).width < 64:
         qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
-    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for extract op!"
+    elif not ir.IntegerType(qubit_idx.type).width == 64:
+        raise TypeError(f"Operator wires expected to be 64-bit integers, got {qubit_idx.type}!")
 
     qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
     return ExtractOp(qubit_type, qreg, idx=qubit_idx).results
@@ -1077,7 +1076,7 @@ def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
     assert isinstance(qubit, AbstractQbit)
-    return AbstractQreg(qreg_old.length)
+    return AbstractQreg()
 
 
 def _qinsert_lowering(
@@ -1090,18 +1089,14 @@ def _qinsert_lowering(
     assert ir.OpaqueType(qreg_old.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg_old.type).data == "reg"
 
-    if ir.RankedTensorType.isinstance(qubit_idx.type):
-        baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        if ir.RankedTensorType(qubit_idx.type).shape == []:
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
-        elif ir.RankedTensorType(qubit_idx.type).shape == [1]:
-            c0 = ConstantOp(ir.IndexType.get(), 0)
-            qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
-    assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for insert op!"
+    qubit_idx = extract_scalar(qubit_idx, "wires", "index")
+    if not ir.IntegerType.isinstance(qubit_idx.type):
+        raise TypeError(f"Operator wires expected to be integers, got {qubit_idx.type}!")
 
     if ir.IntegerType(qubit_idx.type).width < 64:
         qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
-    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for insert op!"
+    elif not ir.IntegerType(qubit_idx.type).width == 64:
+        raise TypeError(f"Operator wires expected to be 64-bit integers, got {qubit_idx.type}!")
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
     return InsertOp(qreg_type, qreg_old, qubit, idx=qubit_idx).results
@@ -1111,7 +1106,7 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len=0, adjoint=False):
+def _gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
@@ -1131,7 +1126,7 @@ def _gphase_def_impl(*args, **kwargs):
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, op=None, ctrl_len=0, adjoint=False
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -1140,15 +1135,8 @@ def _gphase_lowering(
     ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
     ctrl_values = qubits_or_params[1 + ctrl_len :]
 
-    if ir.RankedTensorType.isinstance(param.type) and ir.RankedTensorType(param.type).shape == []:
-        baseType = ir.RankedTensorType(param.type).element_type
-
-    if not ir.F64Type.isinstance(baseType):
-        baseType = ir.F64Type.get()
-        resultTensorType = ir.RankedTensorType.get((), baseType)
-        param = StableHLOConvertOp(resultTensorType, param).results
-
-    param = TensorExtractOp(baseType, param, []).result
+    param = safe_cast_to_f64(param, "GlobalPhase")
+    param = extract_scalar(param, "GlobalPhase")
 
     assert ir.F64Type.isinstance(
         param.type
@@ -1217,15 +1205,8 @@ def _qinst_lowering(
 
     float_params = []
     for p in params:
-        if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
-            baseType = ir.RankedTensorType(p.type).element_type
-
-        if not ir.F64Type.isinstance(baseType):
-            baseType = ir.F64Type.get()
-            resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = StableHLOConvertOp(resultTensorType, p).results
-
-        p = TensorExtractOp(baseType, p, []).result
+        p = safe_cast_to_f64(p, op)
+        p = extract_scalar(p, op)
 
         assert ir.F64Type.isinstance(
             p.type
@@ -1324,7 +1305,7 @@ def _qunitary_lowering(
         f64_type = ir.F64Type.get()
         complex_f64_type = ir.ComplexType.get(f64_type)
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
-        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).results
+        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).result
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -1512,12 +1493,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    baseType = ir.RankedTensorType(coeffs.type).element_type
-    shape = ir.RankedTensorType(coeffs.type).shape
-    if not ir.F64Type.isinstance(baseType):
-        baseType = ir.F64Type.get()
-        resultTensorType = ir.RankedTensorType.get(shape, baseType)
-        coeffs = StableHLOConvertOp(resultTensorType, coeffs).results
+    coeffs = safe_cast_to_f64(coeffs, "Hamiltonian", "coefficient")
 
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
@@ -2171,6 +2147,47 @@ def _adjoint_lowering(
         QYieldOp([a[0] for a in out[-1:]])
 
     return op.results
+
+
+def safe_cast_to_f64(value, op, kind="parameter"):
+    """Utility function to allow upcasting from integers and floats, while preventing downcasting
+    from larger bitwidths or complex numbers."""
+    assert ir.RankedTensorType.isinstance(value.type)
+
+    baseType = ir.RankedTensorType(value.type).element_type
+    if ir.ComplexType.isinstance(baseType) or (
+        ir.FloatType.isinstance(baseType) and ir.FloatType(baseType).width > 64
+    ):
+        raise TypeError(
+            f"Operator {op} expected a float64 {kind}, got {baseType}.\n"
+            "If you didn't specify this operator directly, it may have come from the decomposition "
+            "of a non-Unitary operator, such as an exponential with real exponent."
+        )
+
+    shape = ir.RankedTensorType(value.type).shape
+    if not ir.F64Type.isinstance(baseType):
+        targetBaseType = ir.F64Type.get()
+        targetTensorType = ir.RankedTensorType.get(shape, targetBaseType)
+        value = StableHLOConvertOp(targetTensorType, value).result
+
+    return value
+
+
+def extract_scalar(value, op, kind="parameter"):
+    """Utility function to extract real scalars from scalar tensors or one-element 1-D tensors."""
+    assert ir.RankedTensorType.isinstance(value.type)
+
+    baseType = ir.RankedTensorType(value.type).element_type
+    shape = ir.RankedTensorType(value.type).shape
+    if shape == []:
+        value = TensorExtractOp(baseType, value, []).result
+    elif shape == [1]:
+        c0 = ConstantOp(ir.IndexType.get(), 0)
+        value = TensorExtractOp(baseType, value, [c0]).result
+    else:
+        raise TypeError(f"Operator {op} expected a scalar {kind}, got tensor of shape {shape}")
+
+    return value
 
 
 #

@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [{major_minor: "3.9",  patch: "19", package: "python39"}]
+        python_version: [{major_minor: "3.10", patch: "14", package: "python3.10"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
@@ -206,8 +206,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        python_version: [{major_minor: "3.9",  patch: "19", package: "python39",   alternative: "39"},
-                         {major_minor: "3.10", patch: "14", package: "python3.10", alternative: "310"},
+        python_version: [{major_minor: "3.10", patch: "14", package: "python3.10", alternative: "310"},
                          {major_minor: "3.11", patch: "9",  package: "python3.11", alternative: "311"},
                          {major_minor: "3.12", patch: "3",  package: "python3.12", alternative: "312"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
@@ -302,8 +301,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        python_version: [{major_minor: "3.9",  patch: "19", package: "python39"},
-                         {major_minor: "3.10", patch: "14", package: "python3.10"},
+        python_version: [{major_minor: "3.10", patch: "14", package: "python3.10"},
                          {major_minor: "3.11", patch: "9",  package: "python3.11"},
                          {major_minor: "3.12", patch: "3",  package: "python3.12"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
