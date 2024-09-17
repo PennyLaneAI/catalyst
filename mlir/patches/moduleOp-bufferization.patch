@@ -34,7 +34,7 @@ index 0b91d3d675b7..8bed0dfc5814 100644
  
  void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry);
 diff --git a/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp b/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp
-index 053ea7935260..fed1c49d22be 100644
+index 9fbe574ec392..9749a71f3514 100644
 --- a/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp
 +++ b/mlir/lib/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.cpp
 @@ -22,7 +22,7 @@ namespace mlir {
@@ -842,7 +842,7 @@ index f2e9e839b7c4..5e5657980ba1 100644
  
  module attributes {transform.with_named_sequence} {
 diff --git a/mlir/test/Dialect/Vector/transform-vector.mlir b/mlir/test/Dialect/Vector/transform-vector.mlir
-index 75b29e22b4d2..21e615e60438 100644
+index 4b38db79bff3..0439844dc66c 100644
 --- a/mlir/test/Dialect/Vector/transform-vector.mlir
 +++ b/mlir/test/Dialect/Vector/transform-vector.mlir
 @@ -1,16 +1,18 @@
@@ -894,3 +894,36 @@ index 75b29e22b4d2..21e615e60438 100644
  }
  
  module attributes {transform.with_named_sequence} {
+diff --git a/mlir/test/Examples/transform/ChH/full.mlir b/mlir/test/Examples/transform/ChH/full.mlir
+index 259475ebdbf4..85dbf6702332 100644
+--- a/mlir/test/Examples/transform/ChH/full.mlir
++++ b/mlir/test/Examples/transform/ChH/full.mlir
+@@ -1,8 +1,6 @@
+-// RUN: mlir-opt %s --transform-interpreter \
+-// RUN:             --test-transform-dialect-erase-schedule \
+-// RUN:             --math-uplift-to-fma \
+-// RUN:             --convert-bufferization-to-memref \
+-// RUN:             --test-lower-to-llvm |\
++// RUN: mlir-opt %s --transform-interpreter="debug-payload-root-tag=payload" \
++// RUN:             --test-transform-dialect-erase-schedule |\
++// RUN: mlir-opt -pass-pipeline='builtin.module(builtin.module(math-uplift-to-fma,convert-bufferization-to-memref,test-lower-to-llvm))' - |\
+ // RUN: FileCheck %s
+ 
+ // Fixed-size tensor types to be used in convolution.
+@@ -19,6 +17,7 @@
+ // tensors annotated with attributes from the `bufferization` dialect. These
+ // attributes hint the bufferization pass to assume buffers can be directly
+ // used for these tensors without reshaping.
++module @payload attributes { transform.target_tag = "payload" } {
+ func.func @conv(
+     %input: !tinput {bufferization.writable = false,
+                      bufferization.access = "read",
+@@ -84,7 +83,7 @@ func.func @conv(
+ 
+   return %relued : !toutput
+ }
+-
++}
+ // Module containing the transformation script to be applied. The attribute
+ // is required to correctly verify the use of named (macro-like) sequences.
+ module attributes { transform.with_named_sequence } {
