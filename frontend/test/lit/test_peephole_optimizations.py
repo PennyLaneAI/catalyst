@@ -86,7 +86,7 @@ def test_pipeline_lowering():
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {},
+        "merge_rotations": {"my-option":"aloha"},
     }
 
     @qjit(keep_intermediate=True)
@@ -104,14 +104,14 @@ def test_pipeline_lowering():
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   options=func-name=test_pipeline_lowering_workflow_transformed0
+    # CHECK:   options=func-name=test_pipeline_lowering_workflow_transformed0 my-option=aloha
     # CHECK:   pass_name=merge-rotation
     # CHECK: ]
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_transformed0"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_transformed0"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_transformed0 my-option=aloha"}
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_workflow, 1.2)
 
