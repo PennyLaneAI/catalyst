@@ -34,6 +34,7 @@ for enabling and configuring individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
+from typing import Optional
 
 import pennylane as qml
 
@@ -43,7 +44,7 @@ from catalyst.tracing.contexts import EvaluationContext
 
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(fn=None, *, pass_pipeline=None):
+def pipeline(fn=None, *, pass_pipeline:Optional[dict[str, dict[str, str]]] = None):
     """
     Here are documentation words
     """
