@@ -44,9 +44,9 @@ void QuantumDialect::initialize()
 #define GET_OP_LIST
 #include "Quantum/IR/QuantumOps.cpp.inc"
         >();
-    declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp,
-                            HermitianOp, HamiltonianOp, SampleOp, StateOp, ProbsOp,
-                            CountsOp, SetStateOp, SetBasisStateOp>();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
+                              HamiltonianOp, SampleOp, StateOp, ProbsOp, CountsOp, SetStateOp,
+                              SetBasisStateOp>();
 }
 
 //===----------------------------------------------------------------------===//

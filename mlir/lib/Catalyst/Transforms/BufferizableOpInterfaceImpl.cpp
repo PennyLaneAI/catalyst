@@ -124,7 +124,6 @@ struct CustomCallOpInterface
 struct CallbackOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           CallbackOpInterface, CallbackOp> {
-
     static bool supportsUnstructuredControlFlow() { return true; }
 
     bool hasTensorSemantics(Operation *op) const

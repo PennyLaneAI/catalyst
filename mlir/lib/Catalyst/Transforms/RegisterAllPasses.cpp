@@ -27,7 +27,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createGradientPostprocessingPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
-    mlir::registerPass(catalyst::createGradientPreprocessingPass);
     mlir::registerPass(catalyst::createScatterLoweringPass);
     mlir::registerPass(catalyst::createAdjointLoweringPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);

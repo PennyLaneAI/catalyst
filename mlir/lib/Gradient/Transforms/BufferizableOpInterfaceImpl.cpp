@@ -47,8 +47,8 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 ///
 /// The allocation size and shape is deduced from a list of existing memref values.
 ///
-void generateAllocations(RewriterBase &rewriter, Location loc,
-                         SmallVectorImpl<Value> &allocations, ValueRange referenceValues)
+void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<Value> &allocations,
+                         ValueRange referenceValues)
 {
     for (Value memref : referenceValues) {
         allocations.push_back(
@@ -106,16 +106,16 @@ struct AdjointOpInterface
             bufferArgs.push_back(*opBuffer);
         }
 
-
-        rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(), adjointOp.getGradSize(),
-                                   bufferArgs, memrefValues);
+        rewriter.create<AdjointOp>(loc, TypeRange{}, adjointOp.getCalleeAttr(),
+                                   adjointOp.getGradSize(), bufferArgs, memrefValues);
         bufferization::replaceOpWithBufferizedValues(rewriter, op, memrefValues);
         return success();
     }
 };
 
 struct BackpropOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface, BackpropOp> {
+    : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface,
+                                                                   BackpropOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -153,15 +153,15 @@ struct BackpropOpInterface
         SmallVector<Value> bufferArgs;
         ValueRange operands = backpropOp.getArgs();
         for (Value operand : operands) {
-            if(isa<TensorType>(operand.getType())) {
+            if (isa<TensorType>(operand.getType())) {
                 FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
                 if (failed(opBuffer))
                     return failure();
                 bufferArgs.push_back(*opBuffer);
-            } else {
+            }
+            else {
                 bufferArgs.push_back(operand);
             }
-
         }
 
         std::vector<Value> diffArgs =
@@ -238,10 +238,8 @@ struct BackpropOpInterface
 
 struct ForwardOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
-        ForwardOpInterface, ForwardOp> {
-
+          ForwardOpInterface, ForwardOp> {
     static bool supportsUnstructuredControlFlow() { return true; }
-
     bool hasTensorSemantics(Operation *op) const
     {
         auto isaTensor = llvm::IsaPred<TensorType>;
@@ -305,10 +303,10 @@ struct ForwardOpInterface
                     MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
         }
         auto forwardTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-        
+
         Block *block;
-        rewriter.modifyOpInPlace(op, [&] { 
-            forwardOp.setFunctionType(forwardTy); 
+        rewriter.modifyOpInPlace(op, [&] {
+            forwardOp.setFunctionType(forwardTy);
             block = forwardOp.addEntryBlock();
         });
 
@@ -337,16 +335,19 @@ struct ForwardOpInterface
 
         SmallVector<Value> tensorInputs;
         for (auto input : inputs) {
-            Value tensorIn = (isa<TensorType>(input.getType())) ? input :
-                rewriter.create<bufferization::ToTensorOp>(loc, input);
+            Value tensorIn = (isa<TensorType>(input.getType()))
+                                 ? input
+                                 : rewriter.create<bufferization::ToTensorOp>(loc, input);
             tensorInputs.push_back(tensorIn);
         }
         auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
         SmallVector<Value> tensorOutputs(callOp.getResults());
 
         for (auto [memrefOutput, tensorOutput] : llvm::zip(outputs, tensorOutputs)) {
-            Value castVal = (isa<MemRefType>(tensorOutput.getType())) ? tensorOutput :
-                rewriter.create<bufferization::ToMemrefOp>(loc, memrefOutput.getType(), tensorOutput);
+            Value castVal = (isa<MemRefType>(tensorOutput.getType()))
+                                ? tensorOutput
+                                : rewriter.create<bufferization::ToMemrefOp>(
+                                      loc, memrefOutput.getType(), tensorOutput);
             rewriter.create<memref::CopyOp>(loc, castVal, memrefOutput);
         }
 
@@ -358,8 +359,10 @@ struct ForwardOpInterface
         SmallVector<Value> tapeMemrefOutputs;
         for (auto [tapeTensorOutput, memrefTapeOutput] :
              llvm::zip(tapeOutputs, forwardOp.getResultTypes())) {
-            Value castVal = (isa<MemRefType>(tapeTensorOutput.getType())) ? tapeTensorOutput :
-                rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput, tapeTensorOutput);
+            Value castVal = (isa<MemRefType>(tapeTensorOutput.getType()))
+                                ? tapeTensorOutput
+                                : rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput,
+                                                                             tapeTensorOutput);
             tapeMemrefOutputs.push_back(castVal);
         }
 
@@ -372,7 +375,7 @@ struct ForwardOpInterface
 
 struct ReverseOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
-        ReverseOpInterface, ReverseOp> {
+          ReverseOpInterface, ReverseOp> {
 
     static bool supportsUnstructuredControlFlow() { return true; }
 
@@ -440,10 +443,10 @@ struct ReverseOpInterface
                     MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
         }
         auto reverseTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-        
+
         Block *block;
-        rewriter.modifyOpInPlace(op, [&] { 
-            reverseOp.setFunctionType(reverseTy); 
+        rewriter.modifyOpInPlace(op, [&] {
+            reverseOp.setFunctionType(reverseTy);
             block = reverseOp.addEntryBlock();
         });
 
@@ -472,20 +475,23 @@ struct ReverseOpInterface
 
         auto implAttr = reverseOp.getImplementationAttr();
         auto impl = reverseOp.getImplementation();
-        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(reverseOp, implAttr);
+        auto implOp =
+            SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(reverseOp, implAttr);
         auto implResTy = implOp.getResultTypes();
         Location loc = reverseOp.getLoc();
 
         SmallVector<Value> tensorInputs;
         for (auto tapeElement : tapeElements) {
-            Value tensorIn = (isa<TensorType>(tapeElement.getType())) ? tapeElement :
-                rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
+            Value tensorIn = (isa<TensorType>(tapeElement.getType()))
+                                 ? tapeElement
+                                 : rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
             tensorInputs.push_back(tensorIn);
         }
 
         for (auto cotangent : cotangents) {
-            Value tensorIn = (isa<TensorType>(cotangent.getType())) ? cotangent :
-                rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
+            Value tensorIn = (isa<TensorType>(cotangent.getType()))
+                                 ? cotangent
+                                 : rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
             tensorInputs.push_back(tensorIn);
         }
 
@@ -493,8 +499,10 @@ struct ReverseOpInterface
         SmallVector<Value> tensorOutputs(callOp.getResults());
 
         for (auto [differential, tensorOutput] : llvm::zip(differentials, tensorOutputs)) {
-            Value castVal = (isa<MemRefType>(tensorOutput.getType())) ? tensorOutput :
-                rewriter.create<bufferization::ToMemrefOp>(loc, differential.getType(), tensorOutput);
+            Value castVal = (isa<MemRefType>(tensorOutput.getType()))
+                                ? tensorOutput
+                                : rewriter.create<bufferization::ToMemrefOp>(
+                                      loc, differential.getType(), tensorOutput);
             rewriter.create<memref::CopyOp>(loc, castVal, differential);
         }
 

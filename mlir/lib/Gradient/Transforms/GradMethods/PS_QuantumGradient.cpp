@@ -58,7 +58,8 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
 {
     constexpr double shift = PI / 2;
     ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
-    Value selectorVector = rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer, /*restrict=*/true);
+    Value selectorVector =
+        rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer, /*restrict=*/true);
 
     // Define the shift vectors (pos/neg) as sparse tensor constants.
     DenseElementsAttr nonZeroIndices = rewriter.getI64TensorAttr(currentShift);
@@ -284,8 +285,8 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 std::vector<Value> gradientTensors;
                 gradientTensors.reserve(gradResTypes.size());
                 for (Value gradientBuffer : gradientBuffers) {
-                    gradientTensors.push_back(
-                        rewriter.create<bufferization::ToTensorOp>(loc, gradientBuffer, /*restrict=*/true));
+                    gradientTensors.push_back(rewriter.create<bufferization::ToTensorOp>(
+                        loc, gradientBuffer, /*restrict=*/true));
                 }
                 op->setOperands(gradientTensors);
             }
