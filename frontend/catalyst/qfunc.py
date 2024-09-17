@@ -128,8 +128,9 @@ class QFunc:
         device_capabilities = get_device_capabilities(self.device, program_features)
         backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
 
-        if not isinstance(self.device, qml.devices.Device):
-            raise TypeError("Unsupported device API. Please use 'qml.devices.Device' instead.")
+        assert isinstance(
+            self.device, qml.devices.Device
+        ), "Unsupported device API. Please use 'qml.devices.Device' instead."
 
         qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
