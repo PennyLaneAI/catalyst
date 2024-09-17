@@ -44,7 +44,7 @@ from catalyst.tracing.contexts import EvaluationContext
 
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(fn=None, *, pass_pipeline:Optional[dict[str, dict[str, str]]] = None):
+def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
     """
     Here are documentation words
     """
