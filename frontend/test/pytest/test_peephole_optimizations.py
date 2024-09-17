@@ -92,14 +92,14 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_pipeline_functionality(theta, backend):
+def test_pipeline_functionality(capfd, theta, backend):
     """
     Test that the @pipeline decorator does not change functionality
     when all the passes in the pipeline does not change functionality.
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {},
+        "merge_rotations": {"my-option": "aloha"},
     }
 
     @qjit
@@ -118,6 +118,13 @@ def test_pipeline_functionality(theta, backend):
 
     res = workflow()
     assert np.allclose(res[0], res[1])
+
+    # TODO: the boilerplate merge rotation pass prints out different messages based on
+    # the pass option.
+    # The purpose is to test the integration of pass options with pipeline decorator.
+    # Remove the string check when merge rotation becomes the actual merge rotation pass.
+    output_message = capfd.readouterr().err
+    assert output_message == "merge rotation pass, aloha!\n"
 
 
 ### Test bad usages of pass decorators ###
