@@ -20,14 +20,53 @@ import pytest
 import catalyst
 
 
+def circuit_aot_builder(dev):
+    """Test AOT builder."""
+
+    @catalyst.qjit(experimental_capture=True)
+    @qml.qnode(device=dev)
+    def catalyst_circuit_aot(x: float):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    return catalyst_circuit_aot
+
+
 class TestCapture:
     """Integration tests for Catalyst adjoint functionality."""
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
-    def test_simple_circuit(self, backend, theta):
+    def test_simple_circuit_aot(self, backend, theta):
         """Test the integration for a simple circuit."""
         dev = qml.device(backend, wires=2)
 
+        @qml.qnode(device=dev)
+        def pl_circuit(x):
+            qml.Hadamard(wires=0)
+            qml.RZ(x, wires=0)
+            qml.RZ(x, wires=0)
+            qml.CNOT(wires=[1, 0])
+            qml.Hadamard(wires=1)
+            return qml.expval(qml.PauliY(wires=0))
+
+        actual = circuit_aot_builder(dev)(theta)
+        desired = pl_circuit(theta)
+        assert jnp.allclose(actual, desired)
+
+    @pytest.mark.parametrize("capture", (True, False))
+    @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
+    def test_simple_circuit(self, backend, theta, capture):
+        """Test the integration for a simple circuit."""
+        if capture:
+            qml.capture.enable()
+
+        dev = qml.device(backend, wires=2)
+
+        @catalyst.qjit(experimental_capture=True)
         @qml.qnode(device=dev)
         def catalyst_circuit(x):
             qml.Hadamard(wires=0)
@@ -48,6 +87,13 @@ class TestCapture:
 
         actual = catalyst_circuit(theta)
         desired = pl_circuit(theta)
+
+        if capture:
+            assert qml.capture.enabled()
+        else:
+            assert not qml.capture.enabled()
+
+        qml.capture.disable()
         assert jnp.allclose(actual, desired)
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
