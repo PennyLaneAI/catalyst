@@ -109,6 +109,7 @@ class QFunc:
         return extract_backend_info(device, capabilities)
 
     # pylint: disable=no-member
+    # pylint: disable=self-cls-assignment
     @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
@@ -119,7 +120,7 @@ class QFunc:
             if not hasattr(self, "_peephole_transformed"):
                 self = pipeline(pass_pipeline=pass_pipeline)(
                     self
-                )  # pylint: disable=self-cls-assignment
+                )
             kwargs.pop("pass_pipeline")
 
         # Mid-circuit measurement configuration/execution

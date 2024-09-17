@@ -148,7 +148,7 @@ def test_pipeline_lowering_keep_original():
 
     @qjit(keep_intermediate=True)
     def test_pipeline_lowering_keep_original_workflow(x):
-        return f(1.2), f_pipeline(1.2)
+        return f(x), f_pipeline(x)
 
     # CHECK: transform_named_sequence
     # CHECK: call_jaxpr=

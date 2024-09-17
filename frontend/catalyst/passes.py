@@ -79,7 +79,7 @@ def pipeline(fn=None, *, pass_pipeline=None):
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone.func = wrapper
-    fn_clone._peephole_transformed = True
+    fn_clone._peephole_transformed = True # pylint: disable=protected-access
 
     return fn_clone
 
@@ -209,6 +209,7 @@ def cancel_inverses(fn=None):
 
 
 ## IMPL and helpers ##
+# pylint: disable=missing-function-docstring
 class _PipelineNameUniquer:
     def __init__(self, i):
         self.i = i
