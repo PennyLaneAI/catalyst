@@ -65,10 +65,10 @@ def pipeline(fn=None, *, pass_pipeline:Optional[dict[str, dict[str, str]]] = Non
     fn_original_name = fn.__name__
     wrapped_qnode_function = fn.func
     fn_clone = copy.copy(fn)
-    uniquer = str(rename_to_unique())
+    uniquer = str(_rename_to_unique())
     fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
 
-    pass_names = API_name_to_pass_name()
+    pass_names = _API_name_to_pass_name()
 
     def wrapper(*args, **kwrags):
         if EvaluationContext.is_tracing():
@@ -199,7 +199,7 @@ def cancel_inverses(fn=None):
 
     funcname = fn.__name__
     wrapped_qnode_function = fn.func
-    uniquer = str(rename_to_unique())
+    uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
         # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
@@ -242,11 +242,11 @@ class _PipelineNameUniquer:
 PipelineNameUniquer = _PipelineNameUniquer(-1)
 
 
-def rename_to_unique():
+def _rename_to_unique():
     return PipelineNameUniquer.get()
 
 
-def API_name_to_pass_name():
+def _API_name_to_pass_name():
     return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotation"}
 
 
