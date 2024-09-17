@@ -29,6 +29,10 @@
 
 <h3>Improvements</h3>
 
+* Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`, 
+  `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`. 
+  [(#1139)](https://github.com/PennyLaneAI/catalyst/pull/1139)
+
 * The decorator `self_inverses` now supports all Hermitian Gates.
   [(#1136)](https://github.com/PennyLaneAI/catalyst/pull/1136)
 
