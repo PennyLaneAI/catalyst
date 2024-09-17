@@ -240,6 +240,7 @@ struct ForwardOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ForwardOpInterface, ForwardOp> {
     static bool supportsUnstructuredControlFlow() { return true; }
+
     bool hasTensorSemantics(Operation *op) const
     {
         auto isaTensor = llvm::IsaPred<TensorType>;
@@ -280,14 +281,7 @@ struct ForwardOpInterface
     {
         auto forwardOp = cast<ForwardOp>(op);
 
-        auto argc = forwardOp.getArgc();
-        auto resc = forwardOp.getResc();
-        SmallVector<Value> inputs;
-        SmallVector<Value> differentials;
-        SmallVector<Value> outputs;
-        SmallVector<Value> cotangents;
-
-        // Update signature
+        // Update ForwardOp's signature
         auto argTys = forwardOp.getArgumentTypes();
         auto retTys = forwardOp.getResultTypes();
         SmallVector<Type> emptyRets;
@@ -303,72 +297,59 @@ struct ForwardOpInterface
                     MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
         }
         auto forwardTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-
-        Block *block;
         rewriter.modifyOpInPlace(op, [&] {
             forwardOp.setFunctionType(forwardTy);
-            block = forwardOp.addEntryBlock();
         });
 
+        // Get ForwardOp's block.
+        auto &block = forwardOp.getBody().front();
         PatternRewriter::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(block);
-        auto params = forwardOp.getArguments();
+        rewriter.setInsertionPointToStart(&block);
 
-        for (size_t i = 0; i < argc * 2; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? differentials.push_back(val) : inputs.push_back(val);
-        }
+        auto argc = forwardOp.getArgc();
+        auto resc = forwardOp.getResc();
 
-        auto upperLimit = (argc * 2) + (resc * 2);
-        for (size_t i = argc * 2; i < upperLimit; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? cotangents.push_back(val) : outputs.push_back(val);
-        }
-
+        // Get callee's implementation.
         auto implAttr = forwardOp.getImplementationAttr();
         auto impl = forwardOp.getImplementation();
         auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
         auto implResTy = implOp.getResultTypes();
         Location loc = forwardOp.getLoc();
 
-        SmallVector<Value> tensorInputs;
+        // Create to_tensor if callee is not yet bufferized.
+        SmallVector<Value> inputs(forwardOp.getArguments());
+        SmallVector<Value> calleeInputs;
         for (auto input : inputs) {
-            Value tensorIn = (isa<TensorType>(input.getType()))
-                                 ? input
+            auto tensorIn = (isa<MemRefType>(input.getType())) ? input
                                  : rewriter.create<bufferization::ToTensorOp>(loc, input);
-            tensorInputs.push_back(tensorIn);
-        }
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
-        SmallVector<Value> tensorOutputs(callOp.getResults());
-
-        for (auto [memrefOutput, tensorOutput] : llvm::zip(outputs, tensorOutputs)) {
-            Value castVal = (isa<MemRefType>(tensorOutput.getType()))
-                                ? tensorOutput
-                                : rewriter.create<bufferization::ToMemrefOp>(
-                                      loc, memrefOutput.getType(), tensorOutput);
-            rewriter.create<memref::CopyOp>(loc, castVal, memrefOutput);
+            calleeInputs.push_back(tensorIn);
         }
 
-        auto tapeCount = forwardOp.getTape();
-        SmallVector<Value> tapeOutputs;
-        tapeOutputs.insert(tapeOutputs.begin(), tensorOutputs.end() - tapeCount,
-                           tensorOutputs.end());
+        forwardOp.walk([&](func::CallOp callOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(callOp);
+            SmallVector<Value> inputs(callOp.getOperands());
+            SmallVector<Value> calleeInputs;
+            for (auto input : inputs) {
+                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
+                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
+                calleeInputs.push_back(tensorIn);
+            }
+            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, impl, implResTy, calleeInputs);
+        });
 
-        SmallVector<Value> tapeMemrefOutputs;
-        for (auto [tapeTensorOutput, memrefTapeOutput] :
-             llvm::zip(tapeOutputs, forwardOp.getResultTypes())) {
-            Value castVal = (isa<MemRefType>(tapeTensorOutput.getType()))
-                                ? tapeTensorOutput
-                                : rewriter.create<bufferization::ToMemrefOp>(loc, memrefTapeOutput,
-                                                                             tapeTensorOutput);
-            tapeMemrefOutputs.push_back(castVal);
-        }
-
-        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeMemrefOutputs, F);
-
+        forwardOp.walk([&](ReturnOp returnOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(returnOp);
+            SmallVector<Value> inputs(returnOp.getOperands());
+            SmallVector<Value> returnInputs;
+            for (auto input : inputs) {
+                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
+                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
+                returnInputs.push_back(tensorIn);
+            }
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnInputs, returnOp.getEmpty());
+        });
         return success();
     }
 };
@@ -376,7 +357,6 @@ struct ForwardOpInterface
 struct ReverseOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ReverseOpInterface, ReverseOp> {
-
     static bool supportsUnstructuredControlFlow() { return true; }
 
     bool hasTensorSemantics(Operation *op) const
@@ -417,6 +397,7 @@ struct ReverseOpInterface
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
+        return failure();
         auto reverseOp = cast<ReverseOp>(op);
 
         auto argc = reverseOp.getArgc();
