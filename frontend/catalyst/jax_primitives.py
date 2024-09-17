@@ -377,12 +377,8 @@ def _python_callback_lowering(
     # the tape is found in the mlir_fwd.type
     tape_ty = mlir_fwd.type.results[-len_tape:] if len_tape > 0 else []
 
-    args_zip = list(sum(zip(args_ty, args_ty), ()))
-    rets_zip = list(sum(zip(output_ty, output_ty), ()))
-
-    s = args_zip + rets_zip
-    fn_fwd_ty = FunctionType.get(inputs=s, results=tape_ty)
-    fn_rev_ty = FunctionType.get(inputs=s + tape_ty, results=[])
+    fn_fwd_ty = FunctionType.get(inputs=args_ty, results=output_ty + tape_ty)
+    fn_rev_ty = FunctionType.get(inputs=output_ty + tape_ty, results=args_ty)
 
     fwd_fn_ty_attr = ir.TypeAttr.get(fn_fwd_ty)
     fwd_callee_attr = ir.FlatSymbolRefAttr.get(mlir_fwd.sym_name.value)
