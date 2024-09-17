@@ -687,11 +687,11 @@ class QJIT:
             plxpr, out_type, out_treedef = make_jaxpr2(
                 fn_with_transform_named_sequence, **make_jaxpr_kwargs
             )(*args, **kwargs)
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
 
             if not capture_on:
                 qml.capture.disable()
 
+            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
         return jaxpr, out_type, out_treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
