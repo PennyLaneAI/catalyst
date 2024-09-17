@@ -3,8 +3,8 @@
 pip>=22.3
 
 # Build dependencies for non-Python components
-numpy==2
-pybind11>=2.8.0
+numpy==2.0
+pybind11>=2.12.0
 PyYAML
 
 # formatting/linting
@@ -26,5 +26,3 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
-# TODO: remove pin once we support jax>=0.4.27
-# optax<0.2.3
