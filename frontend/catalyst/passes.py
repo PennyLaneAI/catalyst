@@ -79,7 +79,7 @@ def pipeline(fn=None, *, pass_pipeline=None):
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone.func = wrapper
-    fn_clone._peephole_transformed = True # pylint: disable=protected-access
+    fn_clone._peephole_transformed = True  # pylint: disable=protected-access
 
     return fn_clone
 
