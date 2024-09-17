@@ -74,6 +74,10 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order, and optionally
+            arguments for each pass in the pipeline.
+            Default is None.
     """
 
     verbose: Optional[bool] = False

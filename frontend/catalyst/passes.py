@@ -45,8 +45,88 @@ from catalyst.tracing.contexts import EvaluationContext
 ## API ##
 # pylint: disable=line-too-long
 def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
-    """
-    Here are documentation words
+    """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
+
+    Args:
+        fn (QNode): The QNode to run the pass pipeline on.
+        pass_pipeline (dict[str, dict[str, str]]): A dictionary that specifies the pass pipeline order, and optionally
+            arguments for each pass in the pipeline. Keys of this dictionary should correspond to names of passes
+            found in the ``catalyst.passes`` module, values should either be empty dictionaries
+            (for default pass options) or dictionaries of valid keyword arguments and values for the specific pass.
+            The order of keys in this dictionary will determine the pass pipeline.
+            If not specified, the default pass pipeline will be applied.
+
+    Returns:
+        ~.QNode:
+
+    For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
+
+    The default pass pipeline when used with Catalyst is currently empty.
+
+    **Example**
+
+    ``pipeline`` can be used to configure the pass pipeline order and options
+    of a QNode within a qjit-compiled function.
+
+    Configuration options are passed to specific passes via dictionaries:
+
+    .. code-block:: python
+
+        my_pass_pipeline = {
+            "cancel_inverses": {},
+            "merge_rotations": {},
+        }
+
+        @pipeline(my_pass_pipeline)
+        @qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qjit
+        def fn(x):
+            return jnp.sin(circuit(x ** 2))
+
+    ``pipeline`` can also be used to specify different pass pipelines for different parts of the
+    same qjit-compiled workflow:
+
+    .. code-block:: python
+
+        my_pipeline = {
+            "cancel_inverses": {},
+            "merge_rotations": {},
+        }
+
+        no_rotation_pipeline = {"cancel_inverses": {}}
+
+        @qjit
+        def fn(x):
+            circuit_pipeline = pipeline(my_pipeline)(circuit)
+            circuit_no_rotation = pipeline(no_rotation_pipeline)(circuit)
+            return jnp.abs(circuit_pipeline(x) - circuit_no_rotation(x))
+
+    .. note::
+
+        As of Python 3.7, the CPython dictionary implementation orders dictionaries based on
+        insertion order. However, for an API gaurantee of dictionary order, ``collections.OrderedDict``
+        may also be used.
+
+    Note that the pass pipeline order and options can be configured *globally* for a
+    qjit-compiled function, by using the `pipeline` argument of the :func:`~.qjit` decorator.
+
+    .. code-block:: python
+
+        my_pass_pipeline = {
+            "cancel_inverses": {},
+            "merge_rotations": {},
+        }
+
+        @qjit(pipeline=my_pass_pipeline)
+        def fn(x):
+            return jnp.sin(circuit(x ** 2))
+
+    Global and local (via ``@pipeline``) configurations can coexist, however local pass pipelines
+    will always take precedence over global pass pipelines.
     """
 
     kwargs = copy.copy(locals())
