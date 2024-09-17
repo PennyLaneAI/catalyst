@@ -279,18 +279,6 @@ struct ForwardOpInterface
         return false;
     }
 
-    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
-        return true;
-    }
-
-    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
-        return true;
-    }
-
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
                       const bufferization::AnalysisState &state) const
@@ -410,18 +398,6 @@ struct ReverseOpInterface
             return true;
 
         return false;
-    }
-
-    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
-        return true;
-    }
-
-    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
-        return true;
     }
 
     bufferization::AliasingValueList
