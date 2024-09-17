@@ -11,6 +11,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -44,6 +45,18 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
     return MemRefType::get(
         rankedMemrefType.getShape(), rankedMemrefType.getElementType(),
         layoutAttr.getValue(), rankedMemrefType.getMemorySpace());
+}
+
+static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp) {
+  ReturnOp returnOp;
+  for (Block &b : funcOp.getFunctionBody()) {
+    if (auto candidateOp = dyn_cast<ReturnOp>(b.getTerminator())) {
+      if (returnOp)
+        return nullptr;
+      returnOp = candidateOp;
+    }
+  }
+  return returnOp;
 }
 
 Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
@@ -279,11 +292,10 @@ struct ForwardOpInterface
         return false;
     }
 
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
-        return {};
+    bufferization::AliasingOpOperandList
+    getAliasingOpOperands(Operation *op, Value value,
+                          const bufferization::AnalysisState &state) const {
+        return getAliasingBranchOpOperands(op, cast<BlockArgument>(value), state);
     }
 
     FailureOr<BaseMemRefType>
@@ -299,6 +311,15 @@ struct ForwardOpInterface
 
         return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::
             getBufferType(op, value, options, invocationStack);
+    }
+
+    LogicalResult verifyAnalysis(Operation *op,
+                               const bufferization::AnalysisState &state) const {
+    auto funcOp = cast<ForwardOp>(op);
+        // TODO: func.func with multiple returns are not supported.
+        if (!getAssumedUniqueReturnOp(funcOp) && !funcOp.isExternal())
+          return op->emitOpError("op without unique func.return is not supported");
+        return success();
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -400,11 +421,10 @@ struct ReverseOpInterface
         return false;
     }
 
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
-        return {};
+    bufferization::AliasingOpOperandList
+    getAliasingOpOperands(Operation *op, Value value,
+                          const bufferization::AnalysisState &state) const {
+        return getAliasingBranchOpOperands(op, cast<BlockArgument>(value), state);
     }
 
     FailureOr<BaseMemRefType>
@@ -420,6 +440,15 @@ struct ReverseOpInterface
 
         return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::
             getBufferType(op, value, options, invocationStack);
+    }
+
+    LogicalResult verifyAnalysis(Operation *op,
+                               const bufferization::AnalysisState &state) const {
+    auto funcOp = cast<ReverseOp>(op);
+        // TODO: func.func with multiple returns are not supported.
+        if (!getAssumedUniqueReturnOp(funcOp) && !funcOp.isExternal())
+          return op->emitOpError("op without unique func.return is not supported");
+        return success();
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
