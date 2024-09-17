@@ -212,6 +212,7 @@ BUFFERIZATION_PASS = (
     [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
+        "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
@@ -227,6 +228,7 @@ BUFFERIZATION_PASS = (
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
@@ -264,6 +266,7 @@ MLIR_TO_LLVM_PASS = (
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "convert-math-to-libm",
         "convert-arith-to-llvm",
+        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
