@@ -39,13 +39,12 @@ struct MergeRotationPass : impl::MergeRotationPassBase<MergeRotationPass> {
         LLVM_DEBUG(dbgs() << "merge rotation pass"
                           << "\n");
 
-        if (MyOption == "aloha"){
+        if (MyOption == "aloha") {
             llvm::errs() << "merge rotation pass, aloha!\n";
         }
-        else{
+        else {
             llvm::errs() << "merge rotation pass, hi!\n";
         }
-
     }
 };
 

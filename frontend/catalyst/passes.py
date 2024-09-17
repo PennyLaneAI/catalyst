@@ -74,7 +74,7 @@ def pipeline(fn=None, *, pass_pipeline=None):
             for API_name, pass_options in pass_pipeline.items():
                 opt = ""
                 for option, option_value in pass_options.items():
-                    opt += (" "+str(option)+"="+str(option_value))
+                    opt += " " + str(option) + "=" + str(option_value)
                 apply_registered_pass_p.bind(
                     pass_name=pass_names[API_name],
                     options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,

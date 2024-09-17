@@ -86,7 +86,7 @@ def test_pipeline_lowering():
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {"my-option":"aloha"},
+        "merge_rotations": {"my-option": "aloha"},
     }
 
     @qjit(keep_intermediate=True)
