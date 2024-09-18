@@ -114,6 +114,9 @@
 * Remove the old `QJITDevice` API.
   [(#1138)](https://github.com/PennyLaneAI/catalyst/pull/1138)
 
+* The device capability loading mechanism has been moved into the `QJITDevice` constructor.
+  [(#1141)](https://github.com/PennyLaneAI/catalyst/pull/1141)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
