@@ -57,13 +57,13 @@
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
 
   ```python
-    my_pass_pipeline = {
+    my_passes = {
         "cancel_inverses": {},
         "merge_rotations": {},
     }
     dev = qml.device("lightning.qubit", wires=2)
 
-    @pipeline(my_pass_pipeline)
+    @pipeline(my_passes)
     @qnode(dev)
     def circuit(x):
         qml.RX(x, wires=0)
@@ -98,12 +98,12 @@
   qjit-compiled function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit` decorator.
 
   ```python
-    my_pass_pipeline = {
+    my_passes = {
         "cancel_inverses": {},
         "merge_rotations": {},
     }
 
-    @qjit(circuit_transform_pipeline=my_pass_pipeline)
+    @qjit(circuit_transform_pipeline=my_passes)
     def fn(x):
         return jnp.sin(circuit(x ** 2))
   ```
