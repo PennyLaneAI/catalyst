@@ -430,7 +430,7 @@ struct ReverseOpInterface
     FailureOr<BaseMemRefType>
     getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
                   SmallVector<Value> &invocationStack) const {
-        auto funcOp = cast<ForwardOp>(op);
+        auto funcOp = cast<ReverseOp>(op);
         auto bbArg = cast<BlockArgument>(value);
 
         // Function arguments are special.
@@ -454,18 +454,9 @@ struct ReverseOpInterface
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options) const
     {
-        return failure();
         auto reverseOp = cast<ReverseOp>(op);
 
-        auto argc = reverseOp.getArgc();
-        auto resc = reverseOp.getResc();
-        SmallVector<Value> inputs;
-        SmallVector<Value> differentials;
-        SmallVector<Value> outputs;
-        SmallVector<Value> cotangents;
-        SmallVector<Value> tapeElements;
-
-        // Update signature
+        // Update ReverseOp's signature
         auto argTys = reverseOp.getArgumentTypes();
         auto retTys = reverseOp.getResultTypes();
         SmallVector<Type> emptyRets;
@@ -481,72 +472,59 @@ struct ReverseOpInterface
                     MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
         }
         auto reverseTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-
-        Block *block;
         rewriter.modifyOpInPlace(op, [&] {
             reverseOp.setFunctionType(reverseTy);
-            block = reverseOp.addEntryBlock();
         });
 
+        // Get ForwardOp's block.
+        auto &block = reverseOp.getBody().front();
         PatternRewriter::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(block);
-        auto params = reverseOp.getArguments();
+        rewriter.setInsertionPointToStart(&block);
 
-        for (size_t i = 0; i < argc * 2; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? differentials.push_back(val) : inputs.push_back(val);
-        }
+        auto argc = reverseOp.getArgc();
+        auto resc = reverseOp.getResc();
 
-        auto upperLimit = (argc * 2) + (resc * 2);
-        for (size_t i = argc * 2; i < upperLimit; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? cotangents.push_back(val) : outputs.push_back(val);
-        }
-
-        auto tapeCount = reverseOp.getTape();
-        auto uppestLimit = upperLimit + tapeCount;
-        for (size_t i = upperLimit; i < uppestLimit; i++) {
-            tapeElements.push_back(params[i]);
-        }
-
+        // Get callee's implementation.
         auto implAttr = reverseOp.getImplementationAttr();
         auto impl = reverseOp.getImplementation();
-        auto implOp =
-            SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(reverseOp, implAttr);
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
         auto implResTy = implOp.getResultTypes();
         Location loc = reverseOp.getLoc();
 
-        SmallVector<Value> tensorInputs;
-        for (auto tapeElement : tapeElements) {
-            Value tensorIn = (isa<TensorType>(tapeElement.getType()))
-                                 ? tapeElement
-                                 : rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
-            tensorInputs.push_back(tensorIn);
+        // Create to_tensor if callee is not yet bufferized.
+        SmallVector<Value> inputs(reverseOp.getArguments());
+        SmallVector<Value> calleeInputs;
+        for (auto input : inputs) {
+            auto tensorIn = (isa<MemRefType>(input.getType())) ? input
+                                 : rewriter.create<bufferization::ToTensorOp>(loc, input);
+            calleeInputs.push_back(tensorIn);
         }
 
-        for (auto cotangent : cotangents) {
-            Value tensorIn = (isa<TensorType>(cotangent.getType()))
-                                 ? cotangent
-                                 : rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
-            tensorInputs.push_back(tensorIn);
-        }
+        reverseOp.walk([&](func::CallOp callOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(callOp);
+            SmallVector<Value> inputs(callOp.getOperands());
+            SmallVector<Value> calleeInputs;
+            for (auto input : inputs) {
+                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
+                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
+                calleeInputs.push_back(tensorIn);
+            }
+            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, impl, implResTy, calleeInputs);
+        });
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
-        SmallVector<Value> tensorOutputs(callOp.getResults());
-
-        for (auto [differential, tensorOutput] : llvm::zip(differentials, tensorOutputs)) {
-            Value castVal = (isa<MemRefType>(tensorOutput.getType()))
-                                ? tensorOutput
-                                : rewriter.create<bufferization::ToMemrefOp>(
-                                      loc, differential.getType(), tensorOutput);
-            rewriter.create<memref::CopyOp>(loc, castVal, differential);
-        }
-
-        auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{}, T);
-
+        reverseOp.walk([&](ReturnOp returnOp) {
+            PatternRewriter::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPoint(returnOp);
+            SmallVector<Value> inputs(returnOp.getOperands());
+            SmallVector<Value> returnInputs;
+            for (auto input : inputs) {
+                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
+                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
+                returnInputs.push_back(tensorIn);
+            }
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnInputs, returnOp.getEmpty());
+        });
         return success();
     }
 };
