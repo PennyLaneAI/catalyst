@@ -20,7 +20,7 @@ import pytest
 
 import catalyst
 from catalyst import CompileError, grad, measure, qjit
-from catalyst.device.qjit_device import QJITDeviceNewAPI
+from catalyst.device.qjit_device import QJITDevice
 
 
 @pytest.mark.parametrize("_in,_out", [(0, False), (1, True)])
@@ -125,7 +125,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     """Test that the grad_method specified on the qnode is updated on the ExecutionConfig
     that is passed to the preprocess method"""
 
-    spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+    spy = mocker.spy(QJITDevice, "preprocess")
 
     @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=grad_method)
     def circ(x):
