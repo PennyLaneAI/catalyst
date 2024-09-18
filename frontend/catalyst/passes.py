@@ -122,7 +122,7 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
             "merge_rotations": {},
         }
 
-        @qjit(pipeline=my_pass_pipeline)
+        @qjit(circuit_transform_pipeline=my_pass_pipeline)
         def fn(x):
             return jnp.sin(circuit(x ** 2))
 
@@ -152,6 +152,18 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
     pass_names = _API_name_to_pass_name()
 
     def wrapper(*args, **kwrags):
+        # TODO: we should not match pass targets by function name.
+        # The quantum scope work will likely put each qnode into a module
+        # instead of a `func.func ... attributes {qnode}`.
+        # When that is in place, the qnode's module can have a proper attribute
+        # (as opposed to discardable) that records its transform schedule, i.e.
+        #    module_with_transform @name_of_module {
+        #      // transform schedule
+        #    } {
+        #      // contents of the module
+        #    }
+        # This eliminates the need for matching target functions by name.
+
         if EvaluationContext.is_tracing():
             for API_name, pass_options in pass_pipeline.items():
                 opt = ""
@@ -283,15 +295,6 @@ def cancel_inverses(fn=None):
     uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
-        # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
-        # instead of the qnode name. That way the clone can have this attribute and
-        # the original can just not have it.
-        # We are not doing this right now and passing by name because this would
-        # be a discardable attribute (i.e. a user/developer wouldn't know that this
-        # attribute exists just by looking at qnode's documentation)
-        # But when we add the full peephole pipeline in the future, the attribute
-        # could get properly documented.
-
         if EvaluationContext.is_tracing():
             apply_registered_pass_p.bind(
                 pass_name="remove-chained-self-inverse",

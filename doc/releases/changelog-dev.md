@@ -69,7 +69,7 @@
   For a list of available passes, please see the [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
   The pass pipeline order and options can be configured *globally* for a
-  qjit-compiled function, by using the `pipeline` argument of the :func:`~.qjit` decorator.
+  qjit-compiled function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit` decorator.
 
   ```python
     my_pass_pipeline = {
