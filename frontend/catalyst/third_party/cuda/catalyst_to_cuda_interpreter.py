@@ -39,7 +39,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
-from catalyst.device import BackendInfo
+from catalyst.device import BackendInfo, QJITDevice
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
@@ -837,7 +837,7 @@ class QJIT_CUDAQ:
             return BackendInfo(device_name, interface_name, "", {})
 
         with Patcher(
-            (QFunc, "extract_backend_info", cudaq_backend_info),
+            (QJITDevice, "extract_backend_info", cudaq_backend_info),
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
