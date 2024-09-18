@@ -22,13 +22,14 @@ from jax.extend.linear_util import wrap_init
 from pennylane.capture import (
     AbstractMeasurement,
     AbstractOperator,
-    qnode_prim,
+    disable,
     enable,
     enabled,
-    disable,
+    qnode_prim,
 )
 
 from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -50,7 +51,6 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.utils.toml import ProgramFeatures
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 
 measurement_map = {
     "sample_wires": sample_p,
