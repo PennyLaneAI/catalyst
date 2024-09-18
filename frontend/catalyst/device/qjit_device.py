@@ -282,6 +282,14 @@ class QJITDevice(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
+    @staticmethod
+    @debug_logger
+    def extract_backend_info(
+        device: qml.QubitDevice, capabilities: DeviceCapabilities
+    ) -> BackendInfo:
+        """Wrapper around extract_backend_info in the runtime module."""
+        return extract_backend_info(device, capabilities)
+
     @debug_logger_init
     def __init__(
         self,
@@ -305,7 +313,7 @@ class QJITDevice(qml.devices.Device):
                 original_device, program_features
             )
         if backend is None:
-            backend = extract_backend_info(original_device, original_device_capabilities)
+            backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
