@@ -6,6 +6,7 @@ pip>=22.3
 numpy==2.0
 pybind11>=2.12.0
 PyYAML
+scipy==1.13
 
 # formatting/linting
 black
