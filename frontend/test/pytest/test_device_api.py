@@ -28,13 +28,11 @@ from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import (
     QJITDevice,
-    extract_backend_info,
     get_device_capabilities,
     get_device_toml_config,
     qjit_device,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import ProgramFeatures
 
 # pylint:disable = protected-access,attribute-defined-outside-init
 

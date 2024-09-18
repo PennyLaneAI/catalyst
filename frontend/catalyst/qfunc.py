@@ -40,13 +40,7 @@ from pennylane.transforms.dynamic_one_shot import (
 
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
-from catalyst.device import (
-    BackendInfo,
-    QJITDevice,
-    extract_backend_info,
-    get_device_capabilities,
-    get_device_shots,
-)
+from catalyst.device import QJITDevice, get_device_shots
 from catalyst.jax_extras import (
     deduce_avals,
     get_implicit_and_explicit_flat_args,
@@ -56,7 +50,6 @@ from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.tracing.type_signatures import filter_static_args
-from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

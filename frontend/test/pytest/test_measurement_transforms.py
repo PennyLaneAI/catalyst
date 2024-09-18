@@ -34,12 +34,7 @@ from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.compiler import get_lib_path
-from catalyst.device import (
-    QJITDevice,
-    extract_backend_info,
-    get_device_capabilities,
-    get_device_toml_config,
-)
+from catalyst.device import QJITDevice, get_device_capabilities, get_device_toml_config
 from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
