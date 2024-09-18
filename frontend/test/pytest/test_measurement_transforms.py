@@ -267,9 +267,7 @@ class TestMeasurementTransforms:
         ) as dev:
 
             # transform is added to transform program
-            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
-            backend_info = extract_backend_info(dev, dev_capabilities)
-            qjit_dev = QJITDevice(dev, dev_capabilities, backend_info)
+            qjit_dev = QJITDevice(dev)
 
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 transform_program, _ = qjit_dev.preprocess(ctx)
@@ -542,24 +540,20 @@ class TestMeasurementTransforms:
         assert "Sum" in dev_capabilities.native_obs
         assert "Hamiltonian" in dev_capabilities.native_obs
         assert dev_capabilities.non_commuting_observables_flag is True
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev1 = QJITDevice(dev, dev_capabilities, backend_info)
+        qjit_dev1 = QJITDevice(dev, dev_capabilities)
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
         del dev_capabilities.native_obs["Sum"]
         del dev_capabilities.native_obs["Hamiltonian"]
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev2 = QJITDevice(dev, dev_capabilities, backend_info)
+        qjit_dev2 = QJITDevice(dev, dev_capabilities)
 
         # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
         dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev3 = QJITDevice(dev, dev_capabilities, backend_info)
+        qjit_dev3 = QJITDevice(dev, dev_capabilities)
 
         # dev4 supports sums but NOT non-commuting observables - split_non_commuting
         dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev4 = QJITDevice(dev, dev_capabilities, backend_info)
+        qjit_dev4 = QJITDevice(dev, dev_capabilities)
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:

@@ -98,14 +98,6 @@ class QFunc:
     def __new__(cls):
         raise NotImplementedError()  # pragma: no-cover
 
-    @staticmethod
-    @debug_logger
-    def extract_backend_info(
-        device: qml.QubitDevice, capabilities: DeviceCapabilities
-    ) -> BackendInfo:
-        """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device, capabilities)
-
     # pylint: disable=no-member
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -122,13 +114,7 @@ class QFunc:
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
                 return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
 
-        # TODO: Move the capability loading and validation to the device constructor when the
-        # support for old device api is dropped.
-        program_features = ProgramFeatures(shots_present=bool(self.device.shots))
-        device_capabilities = get_device_capabilities(self.device, program_features)
-        backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
-
-        qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
+        qjit_device = QJITDevice(self.device)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])

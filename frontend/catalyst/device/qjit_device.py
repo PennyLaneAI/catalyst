@@ -286,7 +286,7 @@ class QJITDevice(qml.devices.Device):
     def __init__(
         self,
         original_device,
-        original_device_capabilities: DeviceCapabilities,
+        original_device_capabilities: DeviceCapabilities = None,
         backend: Optional[BackendInfo] = None,
     ):
         self.original_device = original_device
@@ -298,9 +298,18 @@ class QJITDevice(qml.devices.Device):
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
-        self.backend_name = backend.c_interface_name if backend else "default"
-        self.backend_lib = backend.lpath if backend else ""
-        self.backend_kwargs = backend.kwargs if backend else {}
+        # Capability loading
+        if original_device_capabilities is None:
+            program_features = ProgramFeatures(shots_present=bool(original_device.shots))
+            original_device_capabilities = get_device_capabilities(
+                original_device, program_features
+            )
+        if backend is None:
+            backend = extract_backend_info(original_device, original_device_capabilities)
+
+        self.backend_name = backend.c_interface_name
+        self.backend_lib = backend.lpath
+        self.backend_kwargs = backend.kwargs
 
         self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
