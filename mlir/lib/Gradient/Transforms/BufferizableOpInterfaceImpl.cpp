@@ -301,12 +301,12 @@ struct ForwardOpInterface
     FailureOr<BaseMemRefType>
     getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
                   SmallVector<Value> &invocationStack) const {
-        auto funcOp = cast<ForwardOp>(op);
+        auto forwardOp = cast<ForwardOp>(op);
         auto bbArg = cast<BlockArgument>(value);
 
         // Function arguments are special.
-        if (bbArg.getOwner() == &funcOp.getBody().front())
-            return getBufferizedFunctionArgType(funcOp, bbArg.getArgNumber(),
+        if (bbArg.getOwner() == &forwardOp.getBody().front())
+            return getBufferizedFunctionArgType(forwardOp, bbArg.getArgNumber(),
                                               options);
 
         return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::
@@ -315,9 +315,9 @@ struct ForwardOpInterface
 
     LogicalResult verifyAnalysis(Operation *op,
                                const bufferization::AnalysisState &state) const {
-    auto funcOp = cast<ForwardOp>(op);
+    auto forwardOp = cast<ForwardOp>(op);
         // TODO: func.func with multiple returns are not supported.
-        if (!getAssumedUniqueReturnOp(funcOp) && !funcOp.isExternal())
+        if (!getAssumedUniqueReturnOp(forwardOp))
           return op->emitOpError("op without unique func.return is not supported");
         return success();
     }
@@ -326,76 +326,64 @@ struct ForwardOpInterface
                             const bufferization::BufferizationOptions &options) const
     {
         auto forwardOp = cast<ForwardOp>(op);
+        FunctionType funcType = forwardOp.getFunctionType();
 
-        // Update ForwardOp's signature
-        auto argTys = forwardOp.getArgumentTypes();
-        auto retTys = forwardOp.getResultTypes();
-        SmallVector<Type> emptyRets;
-        SmallVector<Type> args(argTys.begin(), argTys.end());
-        args.insert(args.end(), retTys.begin(), retTys.end());
-        SmallVector<Type> bufferArgs;
-        for (Type ty : args) {
-            auto tensorType = dyn_cast<RankedTensorType>(ty);
-            if (!tensorType)
-                bufferArgs.push_back(ty);
-            else
-                bufferArgs.push_back(
-                    MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
-        }
-        auto forwardTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-        rewriter.modifyOpInPlace(op, [&] {
-            forwardOp.setFunctionType(forwardTy);
-        });
-
-        // Get ForwardOp's block.
-        auto &block = forwardOp.getBody().front();
-        PatternRewriter::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(&block);
-
-        auto argc = forwardOp.getArgc();
-        auto resc = forwardOp.getResc();
-
-        // Get callee's implementation.
-        auto implAttr = forwardOp.getImplementationAttr();
-        auto impl = forwardOp.getImplementation();
-        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
-        auto implResTy = implOp.getResultTypes();
-        Location loc = forwardOp.getLoc();
-
-        // Create to_tensor if callee is not yet bufferized.
-        SmallVector<Value> inputs(forwardOp.getArguments());
-        SmallVector<Value> calleeInputs;
-        for (auto input : inputs) {
-            auto tensorIn = (isa<MemRefType>(input.getType())) ? input
-                                 : rewriter.create<bufferization::ToTensorOp>(loc, input);
-            calleeInputs.push_back(tensorIn);
-        }
-
-        forwardOp.walk([&](func::CallOp callOp) {
-            PatternRewriter::InsertionGuard guard(rewriter);
-            rewriter.setInsertionPoint(callOp);
-            SmallVector<Value> inputs(callOp.getOperands());
-            SmallVector<Value> calleeInputs;
-            for (auto input : inputs) {
-                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
-                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
-                calleeInputs.push_back(tensorIn);
+        // Construct the bufferized function type.
+        SmallVector<Type> argTypes;
+        for (const auto &it : llvm::enumerate(funcType.getInputs())) {
+            Type argType = it.value();
+            if (dyn_cast<TensorType>(argType)) {
+                argTypes.push_back(
+                    getBufferizedFunctionArgType(forwardOp, it.index(), options));
+                continue;
             }
-            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, impl, implResTy, calleeInputs);
-        });
+            argTypes.push_back(argType);
+        }
 
+        ReturnOp returnOp = getAssumedUniqueReturnOp(forwardOp);
+        assert(returnOp && "expected func with single return op");
+        Location loc = returnOp.getLoc();
+
+        // 1. Bufferize every block.
+        for (Block &block : forwardOp.getBody())
+          if (failed(bufferization::bufferizeBlockSignature(&block, rewriter,
+                                                            options)))
+            return failure();
+
+        // 2. For each result, keep track of which inplace argument it reuses.
+        SmallVector<Value> returnValues;
+        for (OpOperand &returnOperand : returnOp->getOpOperands()) {
+            Value returnVal = returnOperand.get();
+            auto tensorType = dyn_cast<TensorType>(returnVal.getType());
+            rewriter.setInsertionPoint(returnOp);
+
+            // If not a tensor type just forward it.
+            if (!tensorType) {
+              returnValues.push_back(returnVal);
+              continue;
+            }
+
+            // Note: If `inferFunctionResultLayout = true`, cast are later folded
+            // away.
+            BaseMemRefType resultType = options.functionArgTypeConverterFn(
+                tensorType, *options.defaultMemorySpaceFn(tensorType), forwardOp,
+                options);
+            Value toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
+                loc, resultType, returnVal);
+            returnValues.push_back(toMemrefOp);
+        }
+
+        // 3. Rewrite the terminator.
         forwardOp.walk([&](ReturnOp returnOp) {
             PatternRewriter::InsertionGuard guard(rewriter);
             rewriter.setInsertionPoint(returnOp);
-            SmallVector<Value> inputs(returnOp.getOperands());
-            SmallVector<Value> returnInputs;
-            for (auto input : inputs) {
-                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
-                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
-                returnInputs.push_back(tensorIn);
-            }
-            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnInputs, returnOp.getEmpty());
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnValues, returnOp.getEmpty());
         });
+
+        // 4. Rewrite the FuncOp type to buffer form.
+        forwardOp.setType(FunctionType::get(op->getContext(), argTypes,
+                                         ValueRange(returnValues).getTypes()));
+
         return success();
     }
 };
@@ -430,12 +418,12 @@ struct ReverseOpInterface
     FailureOr<BaseMemRefType>
     getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
                   SmallVector<Value> &invocationStack) const {
-        auto funcOp = cast<ReverseOp>(op);
+        auto reverseOp = cast<ReverseOp>(op);
         auto bbArg = cast<BlockArgument>(value);
 
         // Function arguments are special.
-        if (bbArg.getOwner() == &funcOp.getBody().front())
-            return getBufferizedFunctionArgType(funcOp, bbArg.getArgNumber(),
+        if (bbArg.getOwner() == &reverseOp.getBody().front())
+            return getBufferizedFunctionArgType(reverseOp, bbArg.getArgNumber(),
                                               options);
 
         return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::
@@ -444,9 +432,9 @@ struct ReverseOpInterface
 
     LogicalResult verifyAnalysis(Operation *op,
                                const bufferization::AnalysisState &state) const {
-    auto funcOp = cast<ReverseOp>(op);
+    auto reverseOp = cast<ReverseOp>(op);
         // TODO: func.func with multiple returns are not supported.
-        if (!getAssumedUniqueReturnOp(funcOp) && !funcOp.isExternal())
+        if (!getAssumedUniqueReturnOp(reverseOp))
           return op->emitOpError("op without unique func.return is not supported");
         return success();
     }
@@ -455,76 +443,64 @@ struct ReverseOpInterface
                             const bufferization::BufferizationOptions &options) const
     {
         auto reverseOp = cast<ReverseOp>(op);
+        FunctionType funcType = reverseOp.getFunctionType();
 
-        // Update ReverseOp's signature
-        auto argTys = reverseOp.getArgumentTypes();
-        auto retTys = reverseOp.getResultTypes();
-        SmallVector<Type> emptyRets;
-        SmallVector<Type> args(argTys.begin(), argTys.end());
-        args.insert(args.end(), retTys.begin(), retTys.end());
-        SmallVector<Type> bufferArgs;
-        for (Type ty : args) {
-            auto tensorType = dyn_cast<RankedTensorType>(ty);
-            if (!tensorType)
-                bufferArgs.push_back(ty);
-            else
-                bufferArgs.push_back(
-                    MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
-        }
-        auto reverseTy = rewriter.getFunctionType(bufferArgs, emptyRets);
-        rewriter.modifyOpInPlace(op, [&] {
-            reverseOp.setFunctionType(reverseTy);
-        });
-
-        // Get ForwardOp's block.
-        auto &block = reverseOp.getBody().front();
-        PatternRewriter::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(&block);
-
-        auto argc = reverseOp.getArgc();
-        auto resc = reverseOp.getResc();
-
-        // Get callee's implementation.
-        auto implAttr = reverseOp.getImplementationAttr();
-        auto impl = reverseOp.getImplementation();
-        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
-        auto implResTy = implOp.getResultTypes();
-        Location loc = reverseOp.getLoc();
-
-        // Create to_tensor if callee is not yet bufferized.
-        SmallVector<Value> inputs(reverseOp.getArguments());
-        SmallVector<Value> calleeInputs;
-        for (auto input : inputs) {
-            auto tensorIn = (isa<MemRefType>(input.getType())) ? input
-                                 : rewriter.create<bufferization::ToTensorOp>(loc, input);
-            calleeInputs.push_back(tensorIn);
-        }
-
-        reverseOp.walk([&](func::CallOp callOp) {
-            PatternRewriter::InsertionGuard guard(rewriter);
-            rewriter.setInsertionPoint(callOp);
-            SmallVector<Value> inputs(callOp.getOperands());
-            SmallVector<Value> calleeInputs;
-            for (auto input : inputs) {
-                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
-                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
-                calleeInputs.push_back(tensorIn);
+        // Construct the bufferized function type.
+        SmallVector<Type> argTypes;
+        for (const auto &it : llvm::enumerate(funcType.getInputs())) {
+            Type argType = it.value();
+            if (dyn_cast<TensorType>(argType)) {
+                argTypes.push_back(
+                    getBufferizedFunctionArgType(reverseOp, it.index(), options));
+                continue;
             }
-            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, impl, implResTy, calleeInputs);
-        });
+            argTypes.push_back(argType);
+        }
 
+        ReturnOp returnOp = getAssumedUniqueReturnOp(reverseOp);
+        assert(returnOp && "expected func with single return op");
+        Location loc = returnOp.getLoc();
+
+        // 1. Bufferize every block.
+        for (Block &block : reverseOp.getBody())
+          if (failed(bufferization::bufferizeBlockSignature(&block, rewriter,
+                                                            options)))
+            return failure();
+
+        // 2. For each result, keep track of which inplace argument it reuses.
+        SmallVector<Value> returnValues;
+        for (OpOperand &returnOperand : returnOp->getOpOperands()) {
+            Value returnVal = returnOperand.get();
+            auto tensorType = dyn_cast<TensorType>(returnVal.getType());
+            rewriter.setInsertionPoint(returnOp);
+
+            // If not a tensor type just forward it.
+            if (!tensorType) {
+              returnValues.push_back(returnVal);
+              continue;
+            }
+
+            // Note: If `inferFunctionResultLayout = true`, cast are later folded
+            // away.
+            BaseMemRefType resultType = options.functionArgTypeConverterFn(
+                tensorType, *options.defaultMemorySpaceFn(tensorType), reverseOp,
+                options);
+            Value toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
+                loc, resultType, returnVal);
+            returnValues.push_back(toMemrefOp);
+        }
+
+        // 3. Rewrite the terminator.
         reverseOp.walk([&](ReturnOp returnOp) {
             PatternRewriter::InsertionGuard guard(rewriter);
             rewriter.setInsertionPoint(returnOp);
-            SmallVector<Value> inputs(returnOp.getOperands());
-            SmallVector<Value> returnInputs;
-            for (auto input : inputs) {
-                auto tensorIn = (isa<MemRefType>(input.getType())) ? input :
-                                        rewriter.create<bufferization::ToTensorOp>(loc, input);
-                returnInputs.push_back(tensorIn);
-            }
-            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnInputs, returnOp.getEmpty());
+            rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnValues, returnOp.getEmpty());
         });
+
+        // 4. Rewrite the FuncOp type to buffer form.
+        reverseOp.setType(FunctionType::get(op->getContext(), argTypes,
+                                         ValueRange(returnValues).getTypes()));
+
         return success();
     }
 };
