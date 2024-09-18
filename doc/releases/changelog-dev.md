@@ -2,7 +2,33 @@
 
 <h3>New features</h3>
 
-* Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`. Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be structured using Python containers. For example, a program can return a dictionary like `return {"first": qml.sample(), "second": qml.sample()}`.
+* Experimental integration of the PennyLane capture module is available. It currently only supports 
+  quantum gates, without control flow.
+  [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
+
+  To trigger the PennyLane pipeline for capturing the program as a JaxPR, one needs to simply
+  set `experimental_capture=True` in the qjit decorator.
+  
+  ```python 
+  import pennylane as qml
+  from catalyst import qjit
+  
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  @qml.qnode(dev)
+  def circuit():
+      qml.Hadamard(0)
+      qml.CNOT([0, 1])
+      return qml.expval(qml.Z(0))
+  ```
+
+* Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently
+  available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow
+  elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`.
+  Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be
+  structured using Python containers. For example, a program can return a dictionary like
+  `return {"first": qml.sample(), "second": qml.sample()}`.
   [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
   For example,
@@ -85,6 +111,12 @@
   case the `DefaultExecutionConfig` object becomes modified from its original state.
   [(#1137)](https://github.com/PennyLaneAI/catalyst/pull/1137)
 
+* Remove the old `QJITDevice` API.
+  [(#1138)](https://github.com/PennyLaneAI/catalyst/pull/1138)
+
+* The device capability loading mechanism has been moved into the `QJITDevice` constructor.
+  [(#1141)](https://github.com/PennyLaneAI/catalyst/pull/1141)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -95,4 +127,5 @@ Romain Moyard,
 Erick Ochoa Lopez,
 Paul Haochen Wang,
 Sengthai Heng,
-Daniel Strano.
+Daniel Strano,
+Raul Torres.
