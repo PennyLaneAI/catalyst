@@ -206,9 +206,9 @@ QUANTUM_COMPILATION_PASS = (
 BUFFERIZATION_PASS = (
     "BufferizationPass",
     [
+        "gradient-preprocess",
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
-        "gradient-preprocess",
         "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops}",
         "canonicalize",
         "gradient-postprocess",
