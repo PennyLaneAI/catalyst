@@ -86,6 +86,9 @@
   `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
   [(#1106)](https://github.com/PennyLaneAI/catalyst/pull/1106)
 
+* Catalyst now supports numpy 2.0
+  [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
@@ -125,6 +128,7 @@ Joey Carter,
 Lillian M.A. Frederiksen,
 Romain Moyard,
 Erick Ochoa Lopez,
+Mehrdad Malekmohammadi,
 Paul Haochen Wang,
 Sengthai Heng,
 Daniel Strano,
