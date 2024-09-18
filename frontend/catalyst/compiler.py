@@ -209,8 +209,7 @@ BUFFERIZATION_PASS = (
         "gradient-preprocess",
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
-        "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops"
-            " function-boundary-type-conversion=identity-layout-map}",
+        "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops}",
         "canonicalize",
         "gradient-postprocess",
         "convert-arraylist-to-memref",
