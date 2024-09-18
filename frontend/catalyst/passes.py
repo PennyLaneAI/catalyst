@@ -112,7 +112,8 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
         may also be used.
 
     Note that the pass pipeline order and options can be configured *globally* for a
-    qjit-compiled function, by using the `pipeline` argument of the :func:`~.qjit` decorator.
+    qjit-compiled function, by using the `circuit_transform_pipeline` argument of
+    the :func:`~.qjit` decorator.
 
     .. code-block:: python
 

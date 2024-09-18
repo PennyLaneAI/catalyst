@@ -77,7 +77,7 @@
         "merge_rotations": {},
     }
 
-    @qjit(pipeline=my_pass_pipeline)
+    @qjit(circuit_transform_pipeline=my_pass_pipeline)
     def fn(x):
         return jnp.sin(circuit(x ** 2))
   ```
