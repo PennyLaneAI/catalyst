@@ -27,7 +27,7 @@ from pennylane.transforms.core import TransformProgram
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import (
-    QJITDeviceNewAPI,
+    QJITDevice,
     extract_backend_info,
     get_device_capabilities,
     get_device_toml_config,
@@ -101,7 +101,7 @@ def test_qjit_device():
     # Create qjit device
     capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
     backend_info = extract_backend_info(device, capabilities)
-    device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
+    device_qjit = QJITDevice(device, capabilities, backend_info)
 
     # Check attributes of the new device
     assert device_qjit.shots == qml.measurements.Shots(2032)
@@ -143,7 +143,7 @@ def test_qjit_device_no_wires():
     with pytest.raises(
         AttributeError, match="Catalyst does not support device instances without set wires."
     ):
-        QJITDeviceNewAPI(device, capabilities, backend_info)
+        QJITDevice(device, capabilities, backend_info)
 
 
 @pytest.mark.parametrize(
@@ -166,7 +166,7 @@ def test_qjit_device_invalid_wires(wires):
     with pytest.raises(
         AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
     ):
-        QJITDeviceNewAPI(device, capabilities, backend_info)
+        QJITDevice(device, capabilities, backend_info)
 
 
 @pytest.mark.parametrize("shots", [2048, None])
