@@ -35,8 +35,7 @@ from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
-from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.passes import _inject_transform_named_sequence
@@ -578,9 +577,6 @@ class QJIT:
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
-        if self.compile_options.experimental_capture:
-            return self.experimental_capture(args, **kwargs)
-
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
@@ -603,6 +599,11 @@ class QJIT:
             """
             _inject_transform_named_sequence()
             return self.user_function(*args, **kwargs)
+
+        if self.compile_options.experimental_capture:
+            return trace_from_pennylane(
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
+            )
 
         def closure(qnode, *args, **kwargs):
             params = {}
@@ -623,66 +624,6 @@ class QJIT:
             )
 
         return jaxpr, out_type, treedef, dynamic_sig
-
-    def experimental_capture(self, args, **kwargs):
-        """Capture the JAX program representation (JAXPR) of the wrapped function, using
-        PL capure module.
-
-        Args:
-            args (Iterable): arguments to use for program capture
-
-        Returns:
-            ClosedJaxpr: captured JAXPR
-            PyTreeDef: PyTree metadata of the function output
-            Tuple[Any]: the dynamic argument signature
-        """
-
-        verify_static_argnums(args, self.compile_options.static_argnums)
-        static_argnums = self.compile_options.static_argnums
-        abstracted_axes = self.compile_options.abstracted_axes
-
-        dynamic_args = filter_static_args(args, static_argnums)
-        dynamic_sig = get_abstract_signature(dynamic_args)
-        full_sig = merge_static_args(dynamic_sig, args, static_argnums)
-
-        def fn_with_transform_named_sequence(*args, **kwargs):
-            """
-            This function behaves exactly like the user function being jitted,
-            taking in the same arguments and producing the same results, except
-            it injects a transform_named_sequence jax primitive at the beginning
-            of the jaxpr when being traced.
-
-            Note that we do not overwrite self.original_function and self.user_function;
-            this fn_with_transform_named_sequence is ONLY used here to produce tracing
-            results with a transform_named_sequence primitive at the beginning of the
-            jaxpr. It is never executed or used anywhere, except being traced here.
-            """
-            _inject_transform_named_sequence()
-            return self.user_function(*args, **kwargs)
-
-        with transient_jax_config({"jax_dynamic_shapes": True}):
-
-            make_jaxpr_kwargs = {
-                "static_argnums": static_argnums,
-                "abstracted_axes": abstracted_axes,
-            }
-
-            if qml.capture.enabled():
-                capture_on = True
-            else:
-                capture_on = False
-                qml.capture.enable()
-
-            args = full_sig
-            plxpr, out_type, out_treedef = make_jaxpr2(
-                fn_with_transform_named_sequence, **make_jaxpr_kwargs
-            )(*args, **kwargs)
-
-            if not capture_on:
-                qml.capture.disable()
-
-            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
-        return jaxpr, out_type, out_treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
     @debug_logger

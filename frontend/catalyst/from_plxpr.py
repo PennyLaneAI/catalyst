@@ -19,7 +19,14 @@ from typing import Callable
 
 import jax
 from jax.extend.linear_util import wrap_init
-from pennylane.capture import AbstractMeasurement, AbstractOperator, qnode_prim
+from pennylane.capture import (
+    AbstractMeasurement,
+    AbstractOperator,
+    qnode_prim,
+    enable,
+    enabled,
+    disable,
+)
 
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.jax_primitives import (
@@ -43,6 +50,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.utils.toml import ProgramFeatures
+from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 
 measurement_map = {
     "sample_wires": sample_p,
@@ -381,3 +389,39 @@ class QFuncPlxprInterpreter:
         self.cleanup()
         # Read the final result of the Jaxpr from the environment
         return [self.read(outvar) for outvar in jaxpr.outvars]
+
+
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
+    """Capture the JAX program representation (JAXPR) of the wrapped function, using
+    PL capure module.
+
+    Args:
+        args (Iterable): arguments to use for program capture
+
+    Returns:
+        ClosedJaxpr: captured JAXPR
+        PyTreeDef: PyTree metadata of the function output
+        Tuple[Any]: the dynamic argument signature
+    """
+
+    with transient_jax_config({"jax_dynamic_shapes": True}):
+
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
+
+        if enabled():
+            capture_on = True
+        else:
+            capture_on = False
+            enable()
+
+        args = sig
+        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+
+        if not capture_on:
+            disable()
+
+        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+    return jaxpr, out_type, out_treedef, sig
