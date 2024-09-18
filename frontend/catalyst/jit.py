@@ -486,14 +486,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                if self.compile_options.experimental_capture:
-                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = (
-                        self.experimental_capture(self.user_sig or ())
-                    )
-                else:
-                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                        self.user_sig or ()
-                    )
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    self.user_sig or ()
+                )
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()
@@ -536,14 +531,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                if self.compile_options.experimental_capture:
-                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = (
-                        self.experimental_capture(args, **kwargs)
-                    )
-                else:
-                    self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                        args, **kwargs
-                    )
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    args, **kwargs
+                )
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -588,6 +578,8 @@ class QJIT:
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
+        if self.compile_options.experimental_capture:
+            return self.experimental_capture(args, **kwargs)
 
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
@@ -632,8 +624,6 @@ class QJIT:
 
         return jaxpr, out_type, treedef, dynamic_sig
 
-    @instrument(size_from=0)
-    @debug_logger
     def experimental_capture(self, args, **kwargs):
         """Capture the JAX program representation (JAXPR) of the wrapped function, using
         PL capure module.
