@@ -43,7 +43,6 @@ from catalyst.api_extensions import MidCircuitMeasure
 from catalyst.device import (
     BackendInfo,
     QJITDevice,
-    QJITDeviceNewAPI,
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
@@ -129,10 +128,7 @@ class QFunc:
         device_capabilities = get_device_capabilities(self.device, program_features)
         backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
 
-        if isinstance(self.device, qml.devices.Device):
-            qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
-        else:
-            qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
+        qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
