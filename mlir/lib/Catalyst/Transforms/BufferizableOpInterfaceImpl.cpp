@@ -3,6 +3,8 @@
 #include "mlir/Dialect/Bufferization/IR/UnstructuredControlFlow.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
@@ -85,7 +87,16 @@ struct CustomCallOpInterface
             FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
             if (failed(opBuffer))
                 return failure();
-            bufferArgs.push_back(*opBuffer);
+            MemRefType memrefType = dyn_cast<MemRefType>(opBuffer->getType());
+            if (!memrefType)
+                return failure();
+            if (!memrefType.getLayout().isIdentity()) {
+                auto nonStrideType = MemRefType::get(memrefType.getShape(), memrefType.getElementType());
+                auto newMemRef = rewriter.create<memref::CastOp>(op->getLoc(), nonStrideType, *opBuffer);
+                bufferArgs.push_back(newMemRef);
+            } else {
+                bufferArgs.push_back(*opBuffer);
+            }
         }
 
         // Add bufferized return values to the arguments
