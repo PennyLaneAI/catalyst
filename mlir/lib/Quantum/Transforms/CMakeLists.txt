@@ -12,6 +12,8 @@ file(GLOB SRC
     AdjointPatterns.cpp
     ChainedHadamard.cpp
     remove_chained_self_inverse.cpp
+    SplitMultipleTapes.cpp
+    merge_rotation.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

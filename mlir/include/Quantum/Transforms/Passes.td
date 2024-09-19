@@ -85,7 +85,11 @@ def AnnotateFunctionPass : Pass<"annotate-function"> {
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
-class QuantumCircuitTransformationPass<string CmdlineName> : Pass<CmdlineName> {
+class QuantumCircuitTransformationPassBase {
+    list<Option> options = [];
+}
+
+def QuantumCircuitTransformationPass: QuantumCircuitTransformationPassBase {
     let options = [
     Option<"FuncNameOpt", "func-name",
            "std::string", /*default=*/"\"\"",
@@ -93,10 +97,25 @@ class QuantumCircuitTransformationPass<string CmdlineName> : Pass<CmdlineName> {
     ];
 }
 
-def RemoveChainedSelfInversePass : QuantumCircuitTransformationPass<"remove-chained-self-inverse"> {
+def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
+def MergeRotationPass : Pass<"merge-rotation"> {
+    let summary = "merge rotation boilerplate words";
+
+    let constructor = "catalyst::createMergeRotationPass()";
+    let options = !listconcat(
+    QuantumCircuitTransformationPass.options,
+    [
+    Option<"MyOption", "my-option",
+            "std::string", /*default=*/"\"\"",
+           "Boilerplate option. Delete if unnecessary.">,
+    ]
+    );
 }
 
 // ----- Quantum circuit transformation passes end ----- //

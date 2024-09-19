@@ -9,6 +9,67 @@
   a program can return a dictionary like `return {"first": qml.sample(), "second": qml.sample()}`.
   [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
+* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline for QNodes within a qjit-compiled workflow to be configured.
+  [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
+
+  ```python
+    my_passes = {
+        "cancel_inverses": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+    }
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @pipeline(my_passes)
+    @qnode(dev)
+    def circuit(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def fn(x):
+        return jnp.sin(circuit(x ** 2))
+  ```
+
+  `pipeline` can also be used to specify different pass pipelines for different parts of the
+  same qjit-compiled workflow:
+
+  ```python
+    my_pipeline = {
+        "cancel_inverses": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+    }
+
+    my_other_pipeline = {"cancel_inverses": {}}
+
+    @qjit
+    def fn(x):
+        circuit_pipeline = pipeline(my_pipeline)(circuit)
+        circuit_other = pipeline(my_other_pipeline)(circuit)
+        return jnp.abs(circuit_pipeline(x) - circuit_other(x))
+  ```
+
+  For a list of available passes, please see the [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+
+  The pass pipeline order and options can be configured *globally* for a
+  qjit-compiled function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit` decorator.
+
+  ```python
+    my_passes = {
+        "cancel_inverses": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+    }
+
+    @qjit(circuit_transform_pipeline=my_passes)
+    def fn(x):
+        return jnp.sin(circuit(x ** 2))
+  ```
+
+  Global and local (via `@pipeline`) configurations can coexist, however local pass pipelines
+  will always take precedence over global pass pipelines.
+
+  Available MLIR passes are now documented and available within the
+  [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+
 <h3>Improvements</h3>
 
 * Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`, 
