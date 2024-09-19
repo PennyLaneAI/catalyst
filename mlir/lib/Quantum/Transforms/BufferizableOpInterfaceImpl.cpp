@@ -44,14 +44,11 @@ struct QubitUnitaryOpInterface
         auto toMemrefOp =
             rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
         auto memref = toMemrefOp.getResult();
-        auto newQubitUnitaryOp = rewriter.create<QubitUnitaryOp>(
-            loc, qubitUnitaryOp.getOutQubits().getTypes(),
+        bufferization::replaceOpWithNewBufferizedOp<QubitUnitaryOp>(rewriter, op, 
+             qubitUnitaryOp.getOutQubits().getTypes(),
             qubitUnitaryOp.getOutCtrlQubits().getTypes(), memref, qubitUnitaryOp.getInQubits(),
             qubitUnitaryOp.getAdjointAttr(), qubitUnitaryOp.getInCtrlQubits(),
             qubitUnitaryOp.getInCtrlValues());
-        bufferization::replaceOpWithBufferizedValues(rewriter, op,
-                                                     newQubitUnitaryOp.getOutQubits());
-
         return success();
     }
 };
