@@ -466,18 +466,18 @@ class TestCProgramGeneration:
             ),
             (
                 "MLIRToLLVMDialect",
-                "%5 = llvm.fmul %4, %4  : f64\n",
-                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
+                "%6 = llvm.fmul %5, %5  : f64\n",
+                "%t = llvm.fmul %5, %5  : f64\n" + "    %6 = llvm.fmul %t, %5  : f64\n",
             ),
             (
                 "llvm_ir",
-                "%5 = fmul double %4, %4\n",
-                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
+                "%6 = fmul double %5, %5\n",
+                "%t = fmul double %5, %5\n" + "%6 = fmul double %t, %5\n",
             ),
             (
                 "last",
-                "%5 = fmul double %4, %4\n",
-                "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
+                "%6 = fmul double %5, %5\n",
+                "%t = fmul double %5, %5\n" + "%6 = fmul double %t, %5\n",
             ),
         ],
     )
