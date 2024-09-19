@@ -191,9 +191,9 @@ class TestMeasurementTransforms:
             1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == 1),
         }
 
-        # +/- 100 shots is pretty reasonable with 3000 shots total
-        assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=100)
-        assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=100)
+        # +/- 200 shots is pretty reasonable with 5000 shots total
+        assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=200)
+        assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=200)
 
     def test_measurements_from_samples_multiple_measurements(self):
         """Test the transform measurements_from_samples with multiple measurement types
@@ -250,9 +250,10 @@ class TestMeasurementTransforms:
     def test_measurement_from_readout_integration_multiple_measurements_device(
         self, device_measurements, measurement_transform, target_measurement
     ):
-        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
-        if the device only supports sample, and measurement_from_counts transform is applied if
-        the device only supports counts. If both are supported, sample takes precedence."""
+        """Test that for devices without observable support,  measurment_from_samples transform
+        is applied as part of the Catalyst pipeline if the device only supports sample, and
+        measurement_from_counts transform is applied if the device only supports counts. If
+        both are supported, sample takes precedence."""
 
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements
@@ -261,34 +262,61 @@ class TestMeasurementTransforms:
             wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
-            # transform is added to transform program
-            qjit_dev = QJITDevice(dev)
+            config = get_device_toml_config(dev)
+            config["operators"]["observables"] = {}
 
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx)
+            with patch(
+                "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
+            ):
+                # transform is added to transform program
+                qjit_dev = QJITDevice(dev)
 
-            assert measurement_transform in transform_program
+                with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+                    transform_program, _ = qjit_dev.preprocess(ctx)
 
-            # MLIR only contains target measurement
-            @qml.qjit
-            @qml.qnode(dev)
-            def circuit(theta: float):
-                qml.X(0)
-                qml.X(1)
-                qml.X(2)
-                qml.X(3)
-                return (
-                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                    qml.probs(wires=[3, 4]),
-                )
+                assert measurement_transform in transform_program
 
-            mlir = qml.qjit(circuit, target="mlir").mlir
+                # MLIR only contains target measurement
+                @qml.qjit
+                @qml.qnode(dev)
+                def circuit(theta: float):
+                    qml.X(0)
+                    qml.X(1)
+                    qml.X(2)
+                    qml.X(3)
+                    return (
+                        qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                        qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                        qml.probs(wires=[3, 4]),
+                    )
+
+                mlir = qml.qjit(circuit, target="mlir").mlir
 
             assert "expval" not in mlir
             assert "quantum.var" not in mlir
             assert "probs" not in mlir
             assert target_measurement in mlir
+
+    def test_error_is_raised_if_no_observables_and_no_samples_or_counts(self, mocker):
+        """Test that for a device that doesn't support observables, if counts
+        and sample are also both unsupported, an error is raised."""
+
+        # no shots - samples/counts unsupported
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @qml.qnode(dev)
+        def circuit():
+            return qml.expval(qml.X(0)), qml.var(qml.Y(1))
+
+        # modify config to indicate no observables supported
+        config = get_device_toml_config(dev)
+        config["operators"]["observables"] = {}
+
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            with pytest.raises(
+                RuntimeError, match="The device does not support observables or sample/counts"
+            ):
+                qml.qjit(circuit)()
 
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
@@ -522,6 +550,142 @@ class TestMeasurementTransforms:
             NotImplementedError, match="not implemented with measurements_from_samples"
         ):
             qml.qjit(circuit)
+
+    @pytest.mark.parametrize(
+        "unsupported_obs",
+        [
+            ("PauliX",),
+            ("PauliY",),
+            ("Hadamard",),
+            ("PauliX", "PauliY"),
+            ("PauliX", "Hadamard"),
+            ("PauliY", "Hadamard"),
+            ("PauliX", "PauliY", "Hadamard"),
+        ],
+    )
+    def test_diagonalize_measurements_added_to_transforms(self, unsupported_obs, mocker):
+        """Test that the diagonalize_measurements transform is included in the TransformProgram
+        as expected when we are not diagonalizing everything to counts or samples, but some of
+        {X, Y, Z, H} are not supported."""
+
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RY(0.89, 1)
+            return qml.expval(qml.X(0)), qml.var(qml.Y(1)), qml.expval(qml.Hadamard(2))
+
+        expected_result = circuit(1.2)
+
+        config = get_device_toml_config(dev)
+        for obs in unsupported_obs:
+            del config["operators"]["observables"][obs]
+
+        spy = mocker.spy(QJITDevice, "preprocess")
+
+        # mock TOML file output to indicate some observables are not supported
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            jitted_circuit = qml.qjit(circuit)
+
+            transform_program, _ = spy.spy_return
+            assert split_non_commuting in transform_program
+            assert qml.transforms.diagonalize_measurements in transform_program
+
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 3
+            assert np.allclose(jitted_circuit(1.2), expected_result)
+
+    @pytest.mark.parametrize(
+        "unsupported_obs",
+        [
+            ("PauliX",),
+            ("PauliY",),
+            ("Hadamard",),
+            ("PauliX", "PauliY"),
+            ("PauliX", "Hadamard"),
+            ("PauliY", "Hadamard"),
+            ("PauliX", "PauliY", "Hadamard"),
+        ],
+    )
+    def test_diagonalize_measurements_applied_to_mlir(self, unsupported_obs, mocker):
+        """Test that the diagonalize_measurements transform is applied or not as when
+        we are not diagonalizing everything to counts or samples, but not all of
+        {X, Y, Z, H} are supported."""
+
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @qml.qnode(dev)
+        def circuit():
+            return qml.expval(qml.X(0)), qml.var(qml.Y(1)), qml.expval(qml.Hadamard(2))
+
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        for obs in unsupported_obs:
+            assert f"{obs}] : !quantum.obs" in mlir
+
+        config = get_device_toml_config(dev)
+        for obs in unsupported_obs:
+            del config["operators"]["observables"][obs]
+
+        # mock TOML file output to indicate some observables are not supported
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            mlir = qml.qjit(circuit, target="mlir").mlir
+
+            for obs in unsupported_obs:
+                assert f"{obs}] : !quantum.obs" not in mlir
+
+    @pytest.mark.parametrize("non_commuting_flag", (True, False))
+    def test_split_non_commuting_is_added_for_partial_diagonalization(
+        self, non_commuting_flag, mocker
+    ):
+        """Test that the split_non_commuting transform is added to the transform program from
+        preprocess when diagonalizing some observables, regarless of the non_commuting_observables
+        flag"""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        config = get_device_toml_config(dev)
+
+        del config["operators"]["observables"]["Hadamard"]
+        config["compilation"]["non_commuting_observables"] = non_commuting_flag
+
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            qjit_dev = QJITDevice(dev)
+
+        # dev1 supports non-commuting observables and sum observables - no splitting
+        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
+
+        # Check the preprocess
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            transform_program, _ = qjit_dev.preprocess(ctx)
+
+        assert split_non_commuting in transform_program
+
+    @pytest.mark.parametrize("non_commuting_flag", (True, False))
+    def test_split_non_commuting_is_added_for_full_diagonalization(
+        self, non_commuting_flag, mocker
+    ):
+        """Test that the split_non_commuting transform is added to the transform program from
+        preprocess when diagonalizing all observables, regarless of the non_commuting_observables
+        flag"""
+
+        dev = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        config = get_device_toml_config(dev)
+
+        config["operators"]["observables"] = {}
+        config["compilation"]["non_commuting_observables"] = non_commuting_flag
+
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            qjit_dev = QJITDevice(dev)
+
+        # dev1 supports non-commuting observables and sum observables - no splitting
+        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
+
+        # Check the preprocess
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            transform_program, _ = qjit_dev.preprocess(ctx)
+
+        assert split_non_commuting in transform_program
 
     def test_measurements_are_split(self, mocker):
         """Test that the split_to_single_terms or split_non_commuting transform

@@ -27,7 +27,12 @@ from functools import partial
 from typing import Any, Dict, Optional, Set
 
 import pennylane as qml
-from pennylane.transforms import split_non_commuting, split_to_single_terms
+from pennylane.measurements import MidMeasureMP
+from pennylane.transforms import (
+    diagonalize_measurements,
+    split_non_commuting,
+    split_to_single_terms,
+)
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -421,10 +426,44 @@ class QJITDevice(qml.devices.Device):
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
-        if self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}]:
-            measurement_program.add_transform(measurements_from_samples, self.wires)
-        if self.measurement_processes == {"Counts"}:
-            measurement_program.add_transform(measurements_from_counts, self.wires)
+        # if no observables are supported, we apply a transform to convert *everything* to the readout basis,
+        # using either sample or counts based on device specification
+        if not self.observables:
+            if not split_non_commuting in measurement_program:
+                # this *should* be redundant, a TOML that doesn't have observables should have
+                # a False non_commuting_observables flag, but we aren't enforcing that
+                measurement_program.add_transform(split_non_commuting)
+            if "Sample" in self.measurement_processes:
+                measurement_program.add_transform(measurements_from_samples, self.wires)
+            elif "Counts" in self.measurement_processes:
+                measurement_program.add_transform(measurements_from_counts, self.wires)
+            else:
+                raise RuntimeError("The device does not support observables or sample/counts")
+
+        # if only some observables are supported, we try to diagonalize those that aren't
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
+            if not split_non_commuting in measurement_program:
+                # the device might support non commuting measurements but not all the
+                # Pauli + Hadamard observables, so here it is needed
+                measurement_program.add_transform(split_non_commuting)
+            _obs_dict = {
+                "PauliX": qml.X,
+                "PauliY": qml.Y,
+                "PauliZ": qml.Z,
+                "Hadamard": qml.Hadamard,
+            }
+            # checking which base observables are unsupported and need to be diagonalized
+            supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
+                self.observables
+            )
+            supported_observables = [_obs_dict[obs] for obs in supported_observables]
+
+            measurement_program.add_transform(
+                diagonalize_measurements, supported_base_obs=supported_observables
+            )
+
+        # ToDo: if some measurement types are unsupported, convert the unsupported MPs to
+        # samples or counts (without diagonalizing or modifying observables)
 
         return measurement_program
 

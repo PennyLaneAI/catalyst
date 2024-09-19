@@ -41,10 +41,6 @@ U3 = { }
 
 [operators.observables]
 # Observables supported by the device
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-Hadamard = {}
 
 [measurement_processes]
 
