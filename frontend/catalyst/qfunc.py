@@ -49,6 +49,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
+from catalyst.passes import pipeline
 from catalyst.tracing.type_signatures import filter_static_args
 
 logger = logging.getLogger(__name__)
@@ -92,9 +93,17 @@ class QFunc:
         raise NotImplementedError()  # pragma: no-cover
 
     # pylint: disable=no-member
+    # pylint: disable=self-cls-assignment
     @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
+
+        # Update the qnode with peephole pipeline
+        if "pass_pipeline" in kwargs.keys():
+            pass_pipeline = kwargs["pass_pipeline"]
+            if not hasattr(self, "_peephole_transformed"):
+                self = pipeline(pass_pipeline=pass_pipeline)(self)
+            kwargs.pop("pass_pipeline")
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
