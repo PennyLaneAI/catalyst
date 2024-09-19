@@ -14,12 +14,14 @@
 
 #include "iostream"
 #include "llvm/Support/raw_ostream.h"
+#include <cstddef>
 
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -41,11 +43,13 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         // Check if the numbers of args and returns match Enzyme's format.
         auto argc = op.getArgc();
         auto resc = op.getResc();
-        auto tapeCount = op.getTape();
+        auto tape = op.getTape();
 
-        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 &&
-            op.getFunctionType().getNumResults() == tapeCount)
+        // If function signature is modified, this pass cannot be processed.
+        if (op.getFunctionType().getNumInputs() != argc || 
+           op.getFunctionType().getNumResults() != (resc + tape))
             return failure();
+
 
         auto argTys = op.getArgumentTypes();
         auto retTys = op.getResultTypes();
@@ -127,7 +131,9 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto forwardResc = op.getResc();
         auto tape = op.getTape();
 
-        if (op.getFunctionType().getNumInputs() == (forwardArgc + forwardResc) * 2 + tape)
+        // If function signature is modified, this pass cannot be processed.
+        if (op.getFunctionType().getNumInputs() != (forwardResc + tape) || 
+           op.getFunctionType().getNumResults() != forwardArgc)
             return failure();
 
         auto argTys = op.getArgumentTypes();
@@ -200,6 +206,68 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
     }
 };
 
+struct RestoreReverseOp : public OpRewritePattern<ReverseOp> {
+    using OpRewritePattern<ReverseOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(ReverseOp op,
+                                        mlir::PatternRewriter &rewriter) const override
+    {
+        // ReverseOp's output is optimized away by one-shot bufferize.
+        auto forwardArgc = op.getArgc();
+        auto forwardResc = op.getResc();
+        auto tape = op.getTape();
+
+        // Check if the Op is post-processed.
+        if (op.getFunctionType().getNumInputs() == (forwardResc + forwardArgc) * 2 + tape)
+            return failure();
+
+        // If function signature is modified, this pass cannot be processed.
+        if (op.getFunctionType().getNumResults() >= forwardArgc)
+            return failure();
+
+        // get parenet module
+        auto module = op->getParentOfType<mlir::ModuleOp>();
+
+        // Get GradOp
+        CustomGradOp gradCaller = nullptr;
+        for (auto gradOp : module.getOps<CustomGradOp>()) {
+            if (gradOp.getReverse() == op.getSymName()) {
+                gradCaller = gradOp;
+            }
+        }
+
+        if (!gradCaller)
+            return failure();
+
+        ForwardOp target = nullptr;
+        // get corresponding FowardOp
+        for (auto forwardOp : module.getOps<ForwardOp>()) {
+            if (forwardOp.getSymName() == gradCaller.getForward()) {
+                target = forwardOp;
+            }
+        }
+
+        if (!target)
+            return failure();
+
+        auto forwardArgTys = target.getArgumentTypes();
+        SmallVector<Type> noTapeTys;
+        for (size_t i = 0 ; i < forwardArgTys.size(); ++i) {
+            if (i < op.getArgc()) {
+                noTapeTys.push_back(forwardArgTys[i]);
+            }
+        }
+
+        auto reverseTy = rewriter.getFunctionType(op.getArgumentTypes(), noTapeTys);
+
+        rewriter.modifyOpInPlace(op, [&] {
+            op.setFunctionType(reverseTy);
+        });
+
+        return failure();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -207,6 +275,7 @@ namespace gradient {
 
 void populatePostprocessingPatterns(RewritePatternSet &patterns)
 {
+    patterns.add<RestoreReverseOp>(patterns.getContext());
     patterns.add<PostprocessForwardOp>(patterns.getContext());
     patterns.add<PostprocessReverseOp>(patterns.getContext());
 }
