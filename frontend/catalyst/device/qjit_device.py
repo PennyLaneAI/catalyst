@@ -426,6 +426,8 @@ class QJITDevice(qml.devices.Device):
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
+        # if no observables are supported, we apply a transform to convert *everything* to the readout basis,
+        # using either sample or counts based on device specification
         if not self.observables:
             if not split_non_commuting in measurement_program:
                 # this *should* be redundant, a TOML that doesn't have observables should have
@@ -437,6 +439,8 @@ class QJITDevice(qml.devices.Device):
                 measurement_program.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
+
+        # if only some observables are supported, we try to diagonalize those that aren't
         elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
             if not split_non_commuting in measurement_program:
                 # the device might support non commuting measurements but not all the
@@ -457,6 +461,9 @@ class QJITDevice(qml.devices.Device):
             measurement_program.add_transform(
                 diagonalize_measurements, supported_base_obs=supported_observables
             )
+
+        # ToDo: if some measurement types are unsupported, convert the unsupported MPs to
+        # samples or counts (without diagonalizing or modifying observables)
 
         return measurement_program
 
