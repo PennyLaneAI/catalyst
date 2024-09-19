@@ -14,9 +14,6 @@
 
 """Test built-in differentiation support in Catalyst."""
 
-import os
-import shutil
-
 import jax
 import numpy as np
 import pennylane as qml
@@ -1623,22 +1620,12 @@ def test_forloop_vmap_worflow_derivation(backend):
 
         return body(transposed_result)
 
-    cat_res_func = qjit(
+    cat_res = qjit(
         jacobian(
             my_model,
             argnums=1,
-        ),
-        keep_intermediate=True,
-    )
-
-    # Since the above compilation fails and this test is xfail, the intermediate
-    # will not be properly cleaned up, so we delete it manually
-    try:
-        cat_res = cat_res_func(data, params["weights"])
-    finally:
-        if os.path.isdir("grad.my_model"):
-            shutil.rmtree("grad.my_model")
-
+        )
+    )(data, params["weights"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
 
     data_cat, pytree_enzyme = tree_flatten(jax_res)
