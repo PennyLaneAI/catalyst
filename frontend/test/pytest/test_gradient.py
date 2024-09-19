@@ -14,6 +14,7 @@
 
 """Test built-in differentiation support in Catalyst."""
 
+import os
 import shutil
 
 import jax
@@ -1629,7 +1630,11 @@ def test_forloop_vmap_worflow_derivation(backend):
         ),
         keep_intermediate=True,
     )
-    shutil.rmtree("grad.my_model")
+    # Since the above compilation fails and this test is xfail, the intermediate
+    # will not be properly cleaned up, so we delete it manually
+    if os.path.isdir("grad.my_model"):
+        shutil.rmtree("grad.my_model")
+
     cat_res = cat_res_func(data, params["weights"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
 
