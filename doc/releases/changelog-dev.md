@@ -140,8 +140,6 @@
   Three-bit Gates: Toffoli
   - [`qml.Toffoli`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Toffoli.html)
   
-  
-
 * Support is expanded for backend devices that exculsively return samples in the measurement 
   basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`, 
   `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
@@ -149,6 +147,20 @@
 
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+
+* Catalyst now generates nested modules denoting quantum programs.
+  [(#1144)](https://github.com/PennyLaneAI/catalyst/pull/1144)
+
+  Similar to MLIR's `gpu.launch_kernel` function, Catalyst, now supports
+  a `call_function_in_module`. This allows Catalyst to call functions in modules
+  and have modules denote a quantum kernel. This will allow for device specific
+  optimizations and compilation pipelines.
+
+  At the moment, no one is using this. This is just the necessary scaffolding to
+  supporting device specific transformations. As such, the module will be inlined
+  to preserve current semantics. However, in the future, we will explore lowering
+  this nested module into other IRs/binary formats and lowering `call_function_in_module`
+  to something that can dispatch calls to another runtime / VM.
 
 <h3>Breaking changes</h3>
 
