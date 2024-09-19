@@ -38,7 +38,7 @@ from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import _inject_transform_named_sequence
+from catalyst.passes import PipelineNameUniquer, _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -85,6 +85,7 @@ def qjit(
     disable_assertions=False,
     seed=None,
     experimental_capture=False,
+    circuit_transform_pipeline=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -141,6 +142,15 @@ def qjit(
         experimental_capture (bool): If set to ``True``, the qjit decorator
             will use PennyLane's experimental program capture capabilities
             to capture the decorated function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline. Keys of this dictionary
+            should correspond to names of passes found in the `catalyst.passes <https://docs.
+            pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes>`_
+            module, values should either be empty dictionaries (for default pass options) or
+            dictionaries of valid keyword arguments and values for the specific pass.
+            The order of keys in this dictionary will determine the pass pipeline.
+            If not specified, the default pass pipeline will be applied.
 
     Returns:
         QJIT object.
@@ -609,7 +619,12 @@ class QJIT:
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
-            return QFunc.__call__(qnode, *args, **dict(params, **kwargs))
+            return QFunc.__call__(
+                qnode,
+                pass_pipeline=self.compile_options.circuit_transform_pipeline,
+                *args,
+                **dict(params, **kwargs),
+            )
 
         with Patcher(
             (qml.QNode, "__call__", closure),
@@ -623,6 +638,7 @@ class QJIT:
                 kwargs,
             )
 
+        PipelineNameUniquer.reset()
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
