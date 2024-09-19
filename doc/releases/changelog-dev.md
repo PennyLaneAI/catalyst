@@ -161,6 +161,9 @@
 
 <h3>Internal changes</h3>
 
+* Update Enzyme to version `v0.0.149`.
+  [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
+
 * Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
   running gradient like functions.
   [(#1063)](https://github.com/PennyLaneAI/catalyst/pull/1063)
