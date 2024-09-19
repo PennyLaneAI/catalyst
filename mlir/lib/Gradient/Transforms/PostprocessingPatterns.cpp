@@ -46,10 +46,9 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto tape = op.getTape();
 
         // If function signature is modified, this pass cannot be processed.
-        if (op.getFunctionType().getNumInputs() != argc || 
-           op.getFunctionType().getNumResults() != (resc + tape))
+        if (op.getFunctionType().getNumInputs() != argc ||
+            op.getFunctionType().getNumResults() != (resc + tape))
             return failure();
-
 
         auto argTys = op.getArgumentTypes();
         auto retTys = op.getResultTypes();
@@ -132,8 +131,8 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto tape = op.getTape();
 
         // If function signature is modified, this pass cannot be processed.
-        if (op.getFunctionType().getNumInputs() != (forwardResc + tape) || 
-           op.getFunctionType().getNumResults() != forwardArgc)
+        if (op.getFunctionType().getNumInputs() != (forwardResc + tape) ||
+            op.getFunctionType().getNumResults() != forwardArgc)
             return failure();
 
         auto argTys = op.getArgumentTypes();
@@ -252,7 +251,7 @@ struct RestoreReverseOp : public OpRewritePattern<ReverseOp> {
 
         auto forwardArgTys = target.getArgumentTypes();
         SmallVector<Type> noTapeTys;
-        for (size_t i = 0 ; i < forwardArgTys.size(); ++i) {
+        for (size_t i = 0; i < forwardArgTys.size(); ++i) {
             if (i < op.getArgc()) {
                 noTapeTys.push_back(forwardArgTys[i]);
             }
@@ -260,9 +259,7 @@ struct RestoreReverseOp : public OpRewritePattern<ReverseOp> {
 
         auto reverseTy = rewriter.getFunctionType(op.getArgumentTypes(), noTapeTys);
 
-        rewriter.modifyOpInPlace(op, [&] {
-            op.setFunctionType(reverseTy);
-        });
+        rewriter.modifyOpInPlace(op, [&] { op.setFunctionType(reverseTy); });
 
         return failure();
     }

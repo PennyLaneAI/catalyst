@@ -210,14 +210,17 @@ BUFFERIZATION_PASS = (
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
         "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops}",
-        "canonicalize",
+        "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
+        # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
-        "canonicalize",
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
+        # "cse",
         "cp-global-memref",
     ],
 )

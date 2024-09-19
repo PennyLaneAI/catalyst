@@ -378,7 +378,7 @@ struct ForwardOpInterface
             rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnValues, returnOp.getEmpty());
         });
 
-        // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types. 
+        // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types.
         SmallVector<Type> returnTypes;
         for (auto retTy : forwardOp.getResultTypes()) {
             auto tensorType = dyn_cast<TensorType>(retTy);
@@ -386,8 +386,7 @@ struct ForwardOpInterface
                 tensorType, *options.defaultMemorySpaceFn(tensorType), forwardOp, options);
             returnTypes.push_back(resultType);
         }
-        forwardOp.setType(
-            FunctionType::get(op->getContext(), argTypes, returnTypes));
+        forwardOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
 
         return success();
     }
@@ -500,7 +499,7 @@ struct ReverseOpInterface
             rewriter.replaceOpWithNewOp<ReturnOp>(returnOp, returnValues, returnOp.getEmpty());
         });
 
-        // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types. 
+        // 4. Rewrite the FuncOp type to buffer form. Also preserve unused return types.
         SmallVector<Type> returnTypes;
         for (auto retTy : reverseOp.getResultTypes()) {
             auto tensorType = dyn_cast<TensorType>(retTy);
@@ -508,8 +507,7 @@ struct ReverseOpInterface
                 tensorType, *options.defaultMemorySpaceFn(tensorType), reverseOp, options);
             returnTypes.push_back(resultType);
         }
-        reverseOp.setType(
-            FunctionType::get(op->getContext(), argTypes, returnTypes));
+        reverseOp.setType(FunctionType::get(op->getContext(), argTypes, returnTypes));
 
         return success();
     }
