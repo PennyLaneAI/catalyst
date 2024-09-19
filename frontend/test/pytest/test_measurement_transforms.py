@@ -28,7 +28,6 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
-from flaky import flaky
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting, split_to_single_terms
@@ -143,7 +142,6 @@ class DummyDeviceLimitedMPs(Device):
 class TestMeasurementTransforms:
     """Tests for transforms modifying measurements"""
 
-    @flaky
     def test_measurements_from_counts_multiple_measurements(self):
         """Test the transforms for measurements_from_counts to other measurement types
         as part of the Catalyst pipeline."""
@@ -193,11 +191,10 @@ class TestMeasurementTransforms:
             1.0: sum(count for count, eigval in zip(counts, eigvals) if eigval == 1),
         }
 
-        # +/- 100 shots is pretty reasonable with 3000 shots total
-        assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=100)
-        assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=100)
+        # +/- 200 shots is pretty reasonable with 5000 shots total
+        assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=200)
+        assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=200)
 
-    @flaky
     def test_measurements_from_samples_multiple_measurements(self):
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
@@ -272,9 +269,7 @@ class TestMeasurementTransforms:
                 "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
             ):
                 # transform is added to transform program
-                dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
-                backend_info = extract_backend_info(dev, dev_capabilities)
-                qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+                qjit_dev = QJITDevice(dev)
 
                 with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                     transform_program, _ = qjit_dev.preprocess(ctx)
@@ -323,7 +318,6 @@ class TestMeasurementTransforms:
             ):
                 qml.qjit(circuit)()
 
-    @flaky
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
@@ -378,7 +372,6 @@ class TestMeasurementTransforms:
                 assert res[0] == expected_res[0]
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
-    @flaky
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
         "measurement",
@@ -413,7 +406,6 @@ class TestMeasurementTransforms:
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
     # pylint: disable=unnecessary-lambda
-    @flaky
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -472,7 +464,6 @@ class TestMeasurementTransforms:
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
     # pylint: disable=unnecessary-lambda
-    @flaky
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -591,7 +582,7 @@ class TestMeasurementTransforms:
         for obs in unsupported_obs:
             del config["operators"]["observables"][obs]
 
-        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+        spy = mocker.spy(QJITDevice, "preprocess")
 
         # mock TOML file output to indicate some observables are not supported
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
@@ -658,12 +649,10 @@ class TestMeasurementTransforms:
         config["compilation"]["non_commuting_observables"] = non_commuting_flag
 
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
-            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
-            backend_info = extract_backend_info(dev, dev_capabilities)
-            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+            qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert dev_capabilities.non_commuting_observables_flag is non_commuting_flag
+        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -687,12 +676,10 @@ class TestMeasurementTransforms:
         config["compilation"]["non_commuting_observables"] = non_commuting_flag
 
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
-            dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
-            backend_info = extract_backend_info(dev, dev_capabilities)
-            qjit_dev = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+            qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert dev_capabilities.non_commuting_observables_flag is non_commuting_flag
+        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
