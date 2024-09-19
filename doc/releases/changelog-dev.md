@@ -83,13 +83,13 @@
         "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
     }
 
-    no_rotation_pipeline = {"cancel_inverses": {}}
+    my_other_pipeline = {"cancel_inverses": {}}
 
     @qjit
     def fn(x):
         circuit_pipeline = pipeline(my_pipeline)(circuit)
-        circuit_no_rotation = pipeline(no_rotation_pipeline)(circuit)
-        return jnp.abs(circuit_pipeline(x) - circuit_no_rotation(x))
+        circuit_other = pipeline(my_other_pipeline)(circuit)
+        return jnp.abs(circuit_pipeline(x) - circuit_other(x))
   ```
 
   For a list of available passes, please see the [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
