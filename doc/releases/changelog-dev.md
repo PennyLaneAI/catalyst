@@ -59,7 +59,7 @@
   ```python
     my_passes = {
         "cancel_inverses": {},
-        "merge_rotations": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
     }
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -80,7 +80,7 @@
   ```python
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
     }
 
     no_rotation_pipeline = {"cancel_inverses": {}}
@@ -100,7 +100,7 @@
   ```python
     my_passes = {
         "cancel_inverses": {},
-        "merge_rotations": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
     }
 
     @qjit(circuit_transform_pipeline=my_passes)

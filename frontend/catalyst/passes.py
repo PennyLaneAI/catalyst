@@ -74,7 +74,7 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
 
         my_pass_pipeline = {
             "cancel_inverses": {},
-            "merge_rotations": {},
+            "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
         }
 
         @pipeline(my_pass_pipeline)
@@ -94,7 +94,7 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
 
         my_pipeline = {
             "cancel_inverses": {},
-            "merge_rotations": {},
+            "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
         }
 
         no_rotation_pipeline = {"cancel_inverses": {}}
@@ -119,7 +119,7 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
 
         my_pass_pipeline = {
             "cancel_inverses": {},
-            "merge_rotations": {},
+            "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
         }
 
         @qjit(circuit_transform_pipeline=my_pass_pipeline)
