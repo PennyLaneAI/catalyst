@@ -240,65 +240,6 @@ def qjit(
         appearing as is.
 
 
-    .. details::
-        :title: Adding modules for Autograph conversion
-
-        Library code is not meant to be targeted by Autograph conversion, hence
-        ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
-        But sometimes it might make sense enabling specific submodules from the
-        excluded modules for which conversion may be appropriate. For these cases
-        one can use the ``autograph_include`` parameter, which provides a list
-        of modules/submodules that will always be enabled for conversion no matter
-        if the default conversion rules were excluding them before.
-
-        .. code-block:: python
-
-            import excluded_module
-
-            @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
-            def g(x: int):
-                return excluded_module.submodule.f(x)
-
-        Notice that ``autograph=True`` must be set in order to process the
-        ``autograph_include`` list. Otherwise an error will be reported.
-
-
-    .. details::
-        :title: In-place JAX array updates with Autograph
-
-        To update array values when using JAX, the JAX syntax for array assignment
-        (which uses the array ``at`` and ``set`` methods) must be used:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result = result.at[i].set(x[i]* 2)
-
-            return result
-
-        However, if updating a single index of the array, Autograph supports conversion of
-        standard Python array assignment syntax:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result[i] = x[i] * 2
-
-            return result
-
-        Under the hood, Catalyst converts anything coming in the latter notation into the
-        former one.
-
         Similarly, to update array values with an operation when using JAX, the JAX syntax for array
         update (which uses the array ``at`` and the ``add``, ``sub``, etc. methods) must be used:
 
