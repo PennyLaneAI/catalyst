@@ -19,7 +19,7 @@ from malt.core import converter
 from malt.pyct import templates
 
 
-# The methods from this class should be migrated to the SliceTransformer class in DiastaticMalt
+# TODO: The methods from this class should be migrated to the SliceTransformer class in DiastaticMalt
 class SingleIndexArrayOperatorUpdateTransformer(converter.Base):
     """Converts array element operator assignment statements into calls to update_item_with_{op},
     where op is one of the following:

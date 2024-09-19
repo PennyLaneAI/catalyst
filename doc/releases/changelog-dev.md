@@ -124,7 +124,7 @@
     * `x[i] /= y` in favor of `x.at[i].divide(y)`
     * `x[i] **= y` in favor of `x.at[i].power(y)`
 
-    ```py
+    ```python
     @qjit(autograph=True)
     def f(x):
       first_dim = x.shape[0]
@@ -134,6 +134,11 @@
         result[i] *= 2  # This is now supported
 
       return result
+    ```
+
+    ```pycon
+    >>> f(jnp.array([1, 2, 3]))
+    Array([2, 4, 6], dtype=int64)
     ```
 
 <h3>Improvements</h3>
