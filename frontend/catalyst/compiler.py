@@ -77,6 +77,10 @@ class CompileOptions:
         experimental_capture (bool): If set to ``True``,
             use PennyLane's experimental program capture capabilities
             to capture the function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline.
+            Default is None.
     """
 
     verbose: Optional[bool] = False
@@ -94,6 +98,7 @@ class CompileOptions:
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
     experimental_capture: Optional[bool] = False
+    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded
