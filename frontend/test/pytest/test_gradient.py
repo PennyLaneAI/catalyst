@@ -14,6 +14,8 @@
 
 """Test built-in differentiation support in Catalyst."""
 
+import shutil
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -1620,13 +1622,15 @@ def test_forloop_vmap_worflow_derivation(backend):
 
         return body(transposed_result)
 
-    cat_res = qjit(
+    cat_res_func = qjit(
         jacobian(
             my_model,
             argnums=1,
         ),
         keep_intermediate=True,
-    )(data, params["weights"])
+    )
+    shutil.rmtree("grad.my_model")
+    cat_res = cat_res_func(data, params["weights"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
 
     data_cat, pytree_enzyme = tree_flatten(jax_res)
