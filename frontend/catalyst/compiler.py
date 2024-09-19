@@ -74,6 +74,9 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
+        experimental_capture (bool): If set to ``True``,
+            use PennyLane's experimental program capture capabilities
+            to capture the function for compilation.
     """
 
     verbose: Optional[bool] = False
@@ -90,6 +93,7 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
+    experimental_capture: Optional[bool] = False
 
     def __post_init__(self):
         # Check that async runs must not be seeded
@@ -208,6 +212,7 @@ BUFFERIZATION_PASS = (
     [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
+        "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
@@ -223,6 +228,7 @@ BUFFERIZATION_PASS = (
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
@@ -260,6 +266,7 @@ MLIR_TO_LLVM_PASS = (
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "convert-math-to-libm",
         "convert-arith-to-llvm",
+        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",

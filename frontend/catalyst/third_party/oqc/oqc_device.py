@@ -15,8 +15,9 @@
 """This module contains the OQC device."""
 
 import os
+from typing import Optional
 
-from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
+from pennylane.devices import Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
 try:
@@ -59,10 +60,13 @@ class OQCDevice(Device):
 
     def preprocess(
         self,
-        execution_config: ExecutionConfig = DefaultExecutionConfig,
+        execution_config: Optional[ExecutionConfig] = None,
     ):
         """This function defines the device transform program to be applied and an
         updated device configuration."""
+        if execution_config is None:
+            execution_config = ExecutionConfig()
+
         transform_program = TransformProgram()
         # TODO: Add transforms (check wires, check shots, no sample, only commuting measurements,
         # measurement from counts)

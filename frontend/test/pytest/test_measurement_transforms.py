@@ -22,6 +22,7 @@ import platform
 import tempfile
 from dataclasses import replace
 from functools import partial
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -29,17 +30,12 @@ import pennylane as qml
 import pytest
 from flaky import flaky
 from pennylane.devices import Device
-from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.compiler import get_lib_path
-from catalyst.device import (
-    QJITDeviceNewAPI,
-    extract_backend_info,
-    get_device_capabilities,
-    get_device_toml_config,
-)
+from catalyst.device import QJITDevice, get_device_capabilities, get_device_toml_config
 from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
@@ -77,8 +73,11 @@ class DummyDevice(Device):
         """Execution."""
         return circuits, execution_config
 
-    def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
         """Preprocessing."""
+        if execution_config is None:
+            execution_config = ExecutionConfig()
+
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
@@ -713,24 +712,20 @@ class TestMeasurementTransforms:
         assert "Sum" in dev_capabilities.native_obs
         assert "Hamiltonian" in dev_capabilities.native_obs
         assert dev_capabilities.non_commuting_observables_flag is True
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev1 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+        qjit_dev1 = QJITDevice(dev, dev_capabilities)
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
         del dev_capabilities.native_obs["Sum"]
         del dev_capabilities.native_obs["Hamiltonian"]
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev2 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+        qjit_dev2 = QJITDevice(dev, dev_capabilities)
 
         # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
         dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev3 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+        qjit_dev3 = QJITDevice(dev, dev_capabilities)
 
         # dev4 supports sums but NOT non-commuting observables - split_non_commuting
         dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
-        backend_info = extract_backend_info(dev, dev_capabilities)
-        qjit_dev4 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
+        qjit_dev4 = QJITDevice(dev, dev_capabilities)
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -774,7 +769,7 @@ class TestMeasurementTransforms:
         expected_result = unjitted_circuit(1.2)
 
         config = get_device_toml_config(dev)
-        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+        spy = mocker.spy(QJITDevice, "preprocess")
 
         # mock TOML file output to indicate non-commuting observables are supported
         config["compilation"]["non_commuting_observables"] = True
@@ -812,7 +807,7 @@ class TestMeasurementTransforms:
         expected_result = unjitted_circuit(1.2)
 
         config = get_device_toml_config(dev)
-        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+        spy = mocker.spy(QJITDevice, "preprocess")
 
         # make sure non_commuting_observables_flag is True - otherwise we use
         # split_non_commuting instead of split_to_single_terms

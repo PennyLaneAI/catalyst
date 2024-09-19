@@ -129,13 +129,10 @@ def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
+    execution_config = qml.devices.ExecutionConfig()
     if qnode:
-        _gradient_method = _in_gradient_tracing(qnode)
-    else:
-        _gradient_method = None
+        execution_config.gradient_method = _in_gradient_tracing(qnode)
 
-    execution_config = qml.devices.DefaultExecutionConfig
-    execution_config.gradient_method = _gradient_method
     return execution_config
 
 
@@ -528,11 +525,11 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "static_argnums": static_argnums,
-                "abstracted_axes": abstracted_axes,
-            }
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef

@@ -23,6 +23,8 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
     mlir::registerPass(catalyst::createCatalystBufferizationPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
+    mlir::registerPass(catalyst::createGradientPreprocessingPass);
+    mlir::registerPass(catalyst::createGradientPostprocessingPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
     mlir::registerPass(catalyst::createScatterLoweringPass);
@@ -42,6 +44,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
     mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
+    mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createApplyTransformSequencePass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);

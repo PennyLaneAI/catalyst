@@ -15,6 +15,7 @@
 """
 import pathlib
 import platform
+from typing import Optional
 
 import pennylane as qml
 import pytest
@@ -26,14 +27,12 @@ from pennylane.transforms.core import TransformProgram
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import (
-    QJITDeviceNewAPI,
-    extract_backend_info,
+    QJITDevice,
     get_device_capabilities,
     get_device_toml_config,
     qjit_device,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import ProgramFeatures
 
 # pylint:disable = protected-access,attribute-defined-outside-init
 
@@ -60,10 +59,11 @@ class DummyDevice(Device):
         """Execution."""
         return circuits, execution_config
 
-    def preprocess(self, execution_config=None):
+    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
         """Preprocessing."""
         if execution_config is None:
             execution_config = ExecutionConfig()
+
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
@@ -97,9 +97,7 @@ def test_qjit_device():
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
-    backend_info = extract_backend_info(device, capabilities)
-    device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
+    device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
     assert device_qjit.shots == qml.measurements.Shots(2032)
@@ -107,8 +105,7 @@ def test_qjit_device():
 
     # Check the preprocess of the new device
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-        execution_config = ExecutionConfig()
-        transform_program, _ = device_qjit.preprocess(ctx, execution_config)
+        transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
     assert len(transform_program) == 3
     assert transform_program[-2]._transform.__name__ == "verify_operations"
@@ -135,14 +132,11 @@ def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
     device = DummyDeviceNoWires(shots=2032)
 
-    # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
-    backend_info = extract_backend_info(device, capabilities)
-
     with pytest.raises(
         AttributeError, match="Catalyst does not support device instances without set wires."
     ):
-        QJITDeviceNewAPI(device, capabilities, backend_info)
+        # Create qjit device
+        QJITDevice(device)
 
 
 @pytest.mark.parametrize(
@@ -158,14 +152,11 @@ def test_qjit_device_invalid_wires(wires):
     device = DummyDeviceNoWires(shots=2032)
     device._wires = wires
 
-    # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
-    backend_info = extract_backend_info(device, capabilities)
-
     with pytest.raises(
         AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
     ):
-        QJITDeviceNewAPI(device, capabilities, backend_info)
+        # Create qjit device
+        QJITDevice(device)
 
 
 @pytest.mark.parametrize("shots", [2048, None])
