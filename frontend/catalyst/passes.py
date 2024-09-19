@@ -51,7 +51,8 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
         fn (QNode): The QNode to run the pass pipeline on.
         pass_pipeline (dict[str, dict[str, str]]): A dictionary that specifies the pass pipeline order, and optionally
             arguments for each pass in the pipeline. Keys of this dictionary should correspond to names of passes
-            found in the ``catalyst.passes`` module, values should either be empty dictionaries
+            found in the `catalyst.passes <https://docs.pennylane.ai/projects/catalyst/en/stable/code
+            /__init__.html#module-catalyst.passes>`_ module, values should either be empty dictionaries
             (for default pass options) or dictionaries of valid keyword arguments and values for the specific pass.
             The order of keys in this dictionary will determine the pass pipeline.
             If not specified, the default pass pipeline will be applied.
