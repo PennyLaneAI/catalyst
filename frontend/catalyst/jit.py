@@ -278,13 +278,7 @@ def qjit(
         Under the hood, Catalyst converts anything coming in the latter notation into the
         former one.
 
-        The list of supported operators includes:
-        - ``=`` (set)
-        - ``+=`` (add)
-        - ``-=`` (add with negation)
-        - ``*=`` (multiply)
-        - ``/=`` (divide)
-        - ``**=`` (power)
+        The list of supported operators includes: ``=``, ``+=``, ``-=``, ``*=``, ``/=``, and ``**=``.
 
     .. details::
         :title: Static arguments
