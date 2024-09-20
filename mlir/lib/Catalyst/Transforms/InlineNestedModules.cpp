@@ -70,6 +70,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Gradient/IR/GradientInterfaces.h"
 
 #include <deque>
 
@@ -234,6 +235,38 @@ void InlineNestedModule::rewrite(Operation *op, PatternRewriter &rewriter) const
     rewriter.eraseOp(op);
 }
 
+struct SymbolReplacerPattern
+    : public OpInterfaceRewritePattern<catalyst::gradient::GradientOpInterface> {
+    using OpInterfaceRewritePattern<
+        catalyst::gradient::GradientOpInterface>::OpInterfaceRewritePattern;
+
+    SymbolReplacerPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
+        : OpInterfaceRewritePattern<
+              catalyst::gradient::GradientOpInterface>::OpInterfaceRewritePattern(context),
+          _map(map)
+    {
+    }
+
+    LogicalResult match(catalyst::gradient::GradientOpInterface user) const override;
+    void rewrite(catalyst::gradient::GradientOpInterface user,
+                 PatternRewriter &rewriter) const override;
+
+    const DenseMap<SymbolRefAttr, SymbolRefAttr> *_map;
+};
+
+LogicalResult SymbolReplacerPattern::match(catalyst::gradient::GradientOpInterface user) const
+{
+    auto found = _map->find(user.getCallee()) != _map->end();
+    return found ? success() : failure();
+}
+
+void SymbolReplacerPattern::rewrite(catalyst::gradient::GradientOpInterface user,
+                                    PatternRewriter &rewriter) const
+{
+    auto newSymbolRefAttr = _map->find(user.getCallee())->getSecond();
+    rewriter.modifyOpInPlace(user, [&] { user->setAttr("callee", newSymbolRefAttr); });
+}
+
 struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::CallNestedModuleOp> {
     using OpRewritePattern<catalyst::CallNestedModuleOp>::OpRewritePattern;
     /// This overload constructs a pattern that matches any operation type.
@@ -381,7 +414,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         RewritePatternSet nestedToFlat(context);
-        nestedToFlat.add<NestedToFlatCallPattern>(context, &old_to_new);
+        nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern>(context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
         if (run &&
             failed(applyPatternsAndFoldGreedily(symbolTable, std::move(nestedToFlat), config))) {

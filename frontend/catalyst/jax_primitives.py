@@ -590,14 +590,23 @@ def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _module_to_mlir(ctx, *args, call_jaxpr, fn):
+def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
+
+    if not isinstance(fn, qml.QNode) and not call:
+        _func_lowering(ctx, *args, call_jaxpr=call_jaxpr, fn=fn, call=call)
+        return
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
+    if mlir_fn_cache.get(fn) and not call:
+        return None
+
+    symbol_table = ctx.module_context.symbol_table
     if mlir_fn_cache.get(fn):
         func_op = mlir_fn_cache[fn]
-        symbol_name = ir.SymbolRefAttr.get(["module_" + fn.__name__, func_op.name.value])
+        parent = func_op.parent.operation.attributes["sym_name"].value
+        symbol_name = ir.SymbolRefAttr.get([parent, func_op.name.value])
         call = CallNestedModuleOp(
             flat_output_types,
             symbol_name,
@@ -612,6 +621,7 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn):
         module = ModuleOp()
         symbol_attr = ir._symbolNameAttr("module_" + fn.__name__, ctx.module_context.context)
         module.operation.attributes["sym_name"] = symbol_attr
+        symbol_table.insert(module)
     nrep = jaxpr_replicas(call_jaxpr)
     ctx_params = {}
     ctx_params["backend_or_name"] = "cpu"
@@ -626,12 +636,14 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn):
 
     with ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         ctx_params["ip"] = ip
-
         nested_context = mlir.ModuleContext(**ctx_params)
         nested_context.allow_unregistered_dialects = True
         func_op = _func_def_lowering(nested_context, fn, call_jaxpr, name_stack=ctx.name_stack)
         func_op.sym_visibility = ir.StringAttr.get("private")
         func_op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+
+    if not call:
+        return None
 
     symbol_name = ir.SymbolRefAttr.get(
         [module.operation.attributes["sym_name"].value, func_op.name.value]
@@ -777,9 +789,15 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
-    _func_lowering(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
+    _module_to_mlir(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
     func_op = mlir_fn_cache[fn]
-    symbol_name = func_op.name.value
+    parent_name = func_op.parent.operation.attributes["sym_name"].value
+    is_qnode = isinstance(fn, qml.QNode)
+    symbol_name = (
+        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+        if is_qnode
+        else ir.FlatSymbolRefAttr.get(func_op.name.value)
+    )
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
@@ -799,7 +817,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     return GradOp(
         flat_output_types,
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(symbol_name),
+        symbol_name,
         mlir.flatten_lowering_ir_args(args_and_consts),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
@@ -852,7 +870,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    _func_lowering(
+    _module_to_mlir(
         ctx,
         *func_args,
         call_jaxpr=func_call_jaxpr,
@@ -861,12 +879,19 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     )
 
     func_op = mlir_fn_cache[fn]
-    symbol_name = func_op.name.value
+    parent_name = func_op.parent.operation.attributes["sym_name"].value
+    # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+    is_qnode = isinstance(fn, qml.QNode)
+    symbol_name = (
+        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+        if is_qnode
+        else ir.FlatSymbolRefAttr.get(func_op.name.value)
+    )
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(symbol_name),
+        symbol_name,
         mlir.flatten_lowering_ir_args(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
@@ -909,7 +934,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    _func_lowering(
+    _module_to_mlir(
         ctx,
         *func_args,
         call_jaxpr=func_call_jaxpr,
@@ -921,12 +946,19 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
     func_op = mlir_fn_cache[fn]
-    symbol_name = func_op.name.value
+    parent_name = func_op.parent.operation.attributes["sym_name"].value
+    # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+    is_qnode = isinstance(fn, qml.QNode)
+    symbol_name = (
+        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+        if is_qnode
+        else ir.FlatSymbolRefAttr.get(func_op.name.value)
+    )
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
         flat_output_types[len(flat_output_types) // 2 :],
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(symbol_name),
+        symbol_name,
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -969,7 +1001,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    _func_lowering(
+    _module_to_mlir(
         ctx,
         *func_args,
         call_jaxpr=func_call_jaxpr,
@@ -978,12 +1010,19 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     )
 
     func_op = mlir_fn_cache[fn]
-    symbol_name = func_op.name.value
+    parent_name = func_op.parent.operation.attributes["sym_name"].value
+    # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+    is_qnode = isinstance(fn, qml.QNode)
+    symbol_name = (
+        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
+        if is_qnode
+        else ir.FlatSymbolRefAttr.get(func_op.name.value)
+    )
     return VJPOp(
         func_result_types,
         vjp_result_types,
         ir.StringAttr.get(method),
-        ir.FlatSymbolRefAttr.get(symbol_name),
+        symbol_name,
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
