@@ -206,6 +206,7 @@ QUANTUM_COMPILATION_PASS = (
 BUFFERIZATION_PASS = (
     "BufferizationPass",
     [
+        "inline",
         "gradient-preprocess",
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
