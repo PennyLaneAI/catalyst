@@ -106,6 +106,12 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
 
     Value newMemRef = rewriter.create<memref::AllocOp>(loc, memrefType, dynDims);
     // Cast memrefType back to maintain memory layout.
+    if (!memref::CastOp::areCastCompatible(memrefType, origMemrefType)) {
+        auto subview = rewriter.create<memref::SubViewOp>(loc, origMemrefType, memref);
+        rewriter.create<memref::CopyOp>(loc, memref, subview);
+        return subview;
+    }
+
     Value castMemRef = rewriter.create<memref::CastOp>(loc, origMemrefType, newMemRef);
     rewriter.create<memref::CopyOp>(loc, memref, newMemRef);
     return castMemRef;
