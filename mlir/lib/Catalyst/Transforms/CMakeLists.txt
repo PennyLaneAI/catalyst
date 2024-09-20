@@ -1,6 +1,7 @@
 set(LIBRARY_NAME MLIRCatalystTransforms)
 
 file(GLOB SRC
+
     ApplyTransformSequencePass.cpp
     ArrayListToMemRefPass.cpp
     AsyncUtils.cpp
@@ -24,6 +25,8 @@ file(GLOB SRC
     scatter_lowering.cpp
     ScatterPatterns.cpp
     SplitMultipleTapes.cpp
+    TBAAPatterns.cpp
+    TBAATagsPass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

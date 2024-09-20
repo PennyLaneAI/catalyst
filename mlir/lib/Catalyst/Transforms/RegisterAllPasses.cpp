@@ -34,9 +34,13 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
+    mlir::registerPass(catalyst::createGradientPreprocessingPass);
+    mlir::registerPass(catalyst::createGradientPostprocessingPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
+    mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
+    mlir::registerPass(catalyst::createMergeRotationPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);

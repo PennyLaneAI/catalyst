@@ -10,9 +10,10 @@ file(GLOB SRC
     adjoint_lowering.cpp
     annotate_function.cpp
     AdjointPatterns.cpp
-    ChainedHadamard.cpp
+    ChainedSelfInversePatterns.cpp
     remove_chained_self_inverse.cpp
     SplitMultipleTapes.cpp
+    merge_rotation.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

@@ -2,13 +2,13 @@
 jax=0.4.28
 mhlo=89a891c986650c33df76885f5620e0a92150d90f
 llvm=3a8316216807d64a586b971f51695e23883331f7
-enzyme=v0.0.130
+enzyme=v0.0.149
 
 # Always remove custom PL/LQ versions before release.
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt
-pennylane=0.39.0.dev10
+pennylane=0.39.0.dev16
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'. Also, update the 'LIGHTNING_GIT_TAG' at

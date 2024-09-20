@@ -40,14 +40,7 @@ from pennylane.transforms.dynamic_one_shot import (
 
 import catalyst
 from catalyst.api_extensions import MidCircuitMeasure
-from catalyst.device import (
-    BackendInfo,
-    QJITDevice,
-    QJITDeviceNewAPI,
-    extract_backend_info,
-    get_device_capabilities,
-    get_device_shots,
-)
+from catalyst.device import QJITDevice, get_device_shots
 from catalyst.jax_extras import (
     deduce_avals,
     get_implicit_and_explicit_flat_args,
@@ -56,8 +49,8 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
+from catalyst.passes import pipeline
 from catalyst.tracing.type_signatures import filter_static_args
-from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -99,18 +92,18 @@ class QFunc:
     def __new__(cls):
         raise NotImplementedError()  # pragma: no-cover
 
-    @staticmethod
-    @debug_logger
-    def extract_backend_info(
-        device: qml.QubitDevice, capabilities: DeviceCapabilities
-    ) -> BackendInfo:
-        """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device, capabilities)
-
     # pylint: disable=no-member
+    # pylint: disable=self-cls-assignment
     @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
+
+        # Update the qnode with peephole pipeline
+        if "pass_pipeline" in kwargs.keys():
+            pass_pipeline = kwargs["pass_pipeline"]
+            if not hasattr(self, "_peephole_transformed"):
+                self = pipeline(pass_pipeline=pass_pipeline)(self)
+            kwargs.pop("pass_pipeline")
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
@@ -123,16 +116,7 @@ class QFunc:
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
                 return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
 
-        # TODO: Move the capability loading and validation to the device constructor when the
-        # support for old device api is dropped.
-        program_features = ProgramFeatures(shots_present=bool(self.device.shots))
-        device_capabilities = get_device_capabilities(self.device, program_features)
-        backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
-
-        if isinstance(self.device, qml.devices.Device):
-            qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
-        else:
-            qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
+        qjit_device = QJITDevice(self.device)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])

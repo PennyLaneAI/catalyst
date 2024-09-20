@@ -35,9 +35,10 @@ from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
+from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import _inject_transform_named_sequence
+from catalyst.passes import PipelineNameUniquer, _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -83,6 +84,8 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
+    experimental_capture=False,
+    circuit_transform_pipeline=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -136,6 +139,18 @@ def qjit(
             Note that seeding samples on simulator devices is not yet supported. As such,
             shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
             ``expval`` will remain.
+        experimental_capture (bool): If set to ``True``, the qjit decorator
+            will use PennyLane's experimental program capture capabilities
+            to capture the decorated function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline. Keys of this dictionary
+            should correspond to names of passes found in the `catalyst.passes <https://docs.
+            pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes>`_
+            module, values should either be empty dictionaries (for default pass options) or
+            dictionaries of valid keyword arguments and values for the specific pass.
+            The order of keys in this dictionary will determine the pass pipeline.
+            If not specified, the default pass pipeline will be applied.
 
     Returns:
         QJIT object.
@@ -223,6 +238,47 @@ def qjit(
         ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
         be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
         appearing as is.
+
+    .. details::
+        :title: In-place JAX array updates with Autograph
+
+        To update array values when using JAX, the JAX syntax for array modification
+        (which uses methods like ``at``, ``set``, ``multiply``, etc) must be used:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+                first_dim = x.shape[0]
+                result = jnp.empty((first_dim,), dtype=x.dtype)
+                for i in range(first_dim):
+                    result = result.at[i].set(x[i])
+                    result = result.at[i].multiply(10)
+                    result = result.at[i].add(5)
+
+                return result
+
+        However, if updating a single index or slice of the array, Autograph supports conversion of
+        Python's standard arithmatic array assignment operators to the equivalent in-place
+        expressions listed in the JAX documentation for ``jax.numpy.ndarray.at``:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+                first_dim = x.shape[0]
+                result = jnp.empty((first_dim,), dtype=x.dtype)
+                for i in range(first_dim):
+                    result[i] = x[i]
+                    result[i] *= 10
+                    result[i] += 5
+
+                return result
+
+        Under the hood, Catalyst converts anything coming in the latter notation into the
+        former one.
+
+        The list of supported operators includes: ``=``, ``+=``, ``-=``, ``*=``, ``/=``, and ``**=``.
 
     .. details::
         :title: Static arguments
@@ -572,7 +628,6 @@ class QJIT:
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
-
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
@@ -581,36 +636,50 @@ class QJIT:
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
+        def fn_with_transform_named_sequence(*args, **kwargs):
+            """
+            This function behaves exactly like the user function being jitted,
+            taking in the same arguments and producing the same results, except
+            it injects a transform_named_sequence jax primitive at the beginning
+            of the jaxpr when being traced.
+
+            Note that we do not overwrite self.original_function and self.user_function;
+            this fn_with_transform_named_sequence is ONLY used here to produce tracing
+            results with a transform_named_sequence primitive at the beginning of the
+            jaxpr. It is never executed or used anywhere, except being traced here.
+            """
+            _inject_transform_named_sequence()
+            return self.user_function(*args, **kwargs)
+
+        if self.compile_options.experimental_capture:
+            return trace_from_pennylane(
+                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
+            )
+
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
-            return QFunc.__call__(qnode, *args, **dict(params, **kwargs))
+            return QFunc.__call__(
+                qnode,
+                pass_pipeline=self.compile_options.circuit_transform_pipeline,
+                *args,
+                **dict(params, **kwargs),
+            )
 
         with Patcher(
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
-
-            def fn_with_transform_named_sequence(*args, **kwargs):
-                """
-                This function behaves exactly like the user function being jitted,
-                taking in the same arguments and producing the same results, except
-                it injects a transform_named_sequence jax primitive at the beginning
-                of the jaxpr when being traced.
-
-                Note that we do not overwrite self.original_function and self.user_function;
-                this fn_with_transform_named_sequence is ONLY used here to produce tracing
-                results with a transform_named_sequence primitive at the beginning of the
-                jaxpr. It is never executed or used anywhere, except being traced here.
-                """
-                _inject_transform_named_sequence()
-                return self.user_function(*args, **kwargs)
-
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
+                fn_with_transform_named_sequence,
+                static_argnums,
+                abstracted_axes,
+                full_sig,
+                kwargs,
             )
 
+        PipelineNameUniquer.reset()
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)

@@ -169,6 +169,16 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
+def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
+  let summary = "Lower the memref load and store operation to LLVM and add the TBAA tags.";
+
+  let dependentDialects = [
+        "mlir::LLVM::LLVMDialect"
+  ];
+
+  let constructor = "::catalyst::createMemrefToLLVMWithTBAAPass()";
+}
+
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 
