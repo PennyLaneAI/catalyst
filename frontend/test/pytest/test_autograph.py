@@ -2354,7 +2354,7 @@ class TestJaxIndexOperatorUpdate:
 
             """Test that TypeError is raised when using an array as index."""
 
-            def test_array_index(x, i):
+            def test_array_index(x):
                 """Test that TypeError is raised when using an array as index."""
                 x[np.array([1, 2])] += 3
                 return x
