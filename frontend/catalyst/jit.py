@@ -244,7 +244,9 @@ def qjit(
 
         To update array values when using JAX, the JAX syntax for array modification
         (which uses methods like ``at``, ``set``, ``multiply``, etc) must be used:
+
         .. code-block:: python
+
             @qjit(autograph=True)
             def f(x):
                 first_dim = x.shape[0]
@@ -259,7 +261,9 @@ def qjit(
         However, if updating a single index or slice of the array, Autograph supports conversion of
         Python's standard arithmatic array assignment operators to the equivalent in-place
         expressions listed in the JAX documentation for ``jax.numpy.ndarray.at``:
+
         .. code-block:: python
+
             @qjit(autograph=True)
             def f(x):
                 first_dim = x.shape[0]
@@ -270,6 +274,7 @@ def qjit(
                     result[i] += 5
 
                 return result
+
         Under the hood, Catalyst converts anything coming in the latter notation into the
         former one.
 
