@@ -16,7 +16,7 @@
 
 // CHECK-LABEL:      @workflow_plain
 func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
-  %c1_i64 = arith.constant 1 : i64
+  %val = "test.op" () : () -> (i64)
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
   quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
@@ -37,15 +37,15 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
     %11 = quantum.custom "PauliX"() %10 : !quantum.bit
     %12 = quantum.custom "PauliY"() %11 : !quantum.bit
     %13 = quantum.insert %arg0[%c0_i64], %12 : !quantum.reg, !quantum.bit
-    %15 = quantum.extract %13[%c1_i64] : !quantum.reg -> !quantum.bit
+    %15 = quantum.extract %13[%val] : !quantum.reg -> !quantum.bit
     %16 = quantum.custom "PauliZ"() %15 : !quantum.bit
-    %17 = quantum.insert %13[%c1_i64], %16 : !quantum.reg, !quantum.bit
+    %17 = quantum.insert %13[%val], %16 : !quantum.reg, !quantum.bit
     quantum.yield %17 : !quantum.reg
   }
   %5 = quantum.extract %4[%c0_i64] : !quantum.reg -> !quantum.bit
   // CHECK:        RY
   %6 = quantum.custom "RY"(%cst) %5 : !quantum.bit
-  %7 = quantum.extract %4[%c1_i64] : !quantum.reg -> !quantum.bit
+  %7 = quantum.extract %4[%val] : !quantum.reg -> !quantum.bit
   %8 = quantum.compbasis %6, %7 : !quantum.obs
   %9 = quantum.state %8 : tensor<4xcomplex<f64>>
   quantum.dealloc %0 : !quantum.reg
