@@ -13,8 +13,8 @@
 # limitations under the License.
 
 """
-This module contains which provides Python decorators
-for enabling and configuring individual Catalyst MLIR compiler passes.
+This module contains Python decorators for enabling and configuring
+individual Catalyst MLIR compiler passes.
 
 .. note::
 
