@@ -103,12 +103,33 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
             ndim++;
         }
     }
-
+    
     Value newMemRef = rewriter.create<memref::AllocOp>(loc, memrefType, dynDims);
     // Cast memrefType back to maintain memory layout.
-    if (!memref::CastOp::areCastCompatible(memrefType, origMemrefType)) {
-        auto subview = rewriter.create<memref::SubViewOp>(loc, origMemrefType, memref);
-        rewriter.create<memref::CopyOp>(loc, memref, subview);
+    //if (!memref::CastOp::areCastCompatible(memrefType, origMemrefType)) {
+    if (!origMemrefType.getLayout().isIdentity()) {
+            SmallVector<OpFoldResult> sizes =
+        memref::getMixedSizes(rewriter, loc, newMemRef);
+
+        // getlayout
+        auto layout = origMemrefType.getLayout();
+        auto stridedAttr = cast<mlir::StridedLayoutAttr>(layout);
+        auto offset = stridedAttr.getOffset();
+        auto strideArr = stridedAttr.getStrides();
+
+        // Rebuild strides and offsets info
+        SmallVector<OpFoldResult> strides;
+        for (auto stride : strideArr) {
+            strides.push_back(rewriter.getIndexAttr(stride));
+        }
+        SmallVector<OpFoldResult> offsets(origMemrefType.getRank(),
+                                      rewriter.getIndexAttr(0));
+        offsets[0] = rewriter.getIndexAttr(offset);
+        auto subview = rewriter.create<memref::SubViewOp>(
+            loc, origMemrefType, newMemRef, 
+            offsets, sizes, strides);
+        subview.print(llvm::outs());
+        rewriter.create<memref::CopyOp>(loc, memref, newMemRef);
         return subview;
     }
 
