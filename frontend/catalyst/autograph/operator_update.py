@@ -35,7 +35,7 @@ class SingleIndexArrayOperatorUpdateTransformer(converter.Base):
         if not isinstance(target, gast.Subscript):
             return None
         s = target.slice
-        if isinstance(s, (gast.Tuple)):
+        if isinstance(s, (gast.Tuple, gast.Call)):
             return None
         if not isinstance(op, (gast.Mult, gast.Add, gast.Sub, gast.Div, gast.Pow)):
             return None

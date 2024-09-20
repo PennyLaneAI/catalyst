@@ -1001,7 +1001,7 @@ update (which uses the array `at` and the `add`, `multiply`, etc. methods) must 
 ...
 ...     return result
 
-Again, if updating a single index or slice of the array, Autograph supports conversion of
+Again, if updating a single index or slice of the array, then Autograph supports conversion of
 standard Python array operator assignment syntax for the equivalent in-place expressions
 listed in the `JAX documentation for jax.numpy.ndarray.at
 <https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html#jax.numpy.ndarray.at>`__:

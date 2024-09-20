@@ -241,6 +241,7 @@ def qjit(
 
     .. details::
         :title: In-place JAX array updates with Autograph
+
         To update array values when using JAX, the JAX syntax for array modification
         (which uses methods like ``at``, ``set``, ``multiply``, etc) must be used:
         .. code-block:: python

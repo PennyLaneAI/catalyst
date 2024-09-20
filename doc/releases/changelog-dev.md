@@ -118,7 +118,7 @@
   [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
   [(#1143)](https://github.com/PennyLaneAI/catalyst/pull/1143)
 
-  Using operator assignment syntax in favor of at...operation expressions is now possible for the following operations:
+  Using operator assignment syntax in favor of at...op expressions is now possible for the following operations:
   * `x[i] += y` in favor of `x.at[i].add(y)`
   * `x[i] -= y` in favor of `x.at[i].add(-y)`
   * `x[i] *= y` in favor of `x.at[i].multiply(y)`
