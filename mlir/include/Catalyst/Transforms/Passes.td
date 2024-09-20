@@ -20,6 +20,10 @@ include "mlir/Pass/PassBase.td"
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let summary = "Detensorize for, if, while operations from the SCF dialect.";
 
+    let dependentDialects = [
+        "tensor::TensorDialect"
+    ];
+
     let constructor = "catalyst::createDetensorizeSCFPass()";
 }
 
@@ -145,7 +149,7 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
 
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
-    
+
     let dependentDialects = [
         "memref::MemRefDialect",
         "linalg::LinalgDialect"
