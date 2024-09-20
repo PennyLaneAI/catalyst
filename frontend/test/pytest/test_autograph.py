@@ -2341,18 +2341,16 @@ class TestJaxIndexOperatorUpdate:
 
             x = jnp.array([[1, 2], [3, 4]])
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
-                result = test_multi_dimensional_index(x)
+                test_multi_dimensional_index(x)
 
             def test_unsupported_operator(x):
                 """Test that TypeError is raised when using an unsupported operator."""
-                x[1] %= y
+                x[1] %= 2
                 return x
 
             x = jnp.array([4, 2, 3])
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
-                result = test_unsupported_operator(x)
-
-            """Test that TypeError is raised when using an array as index."""
+                test_unsupported_operator(x)
 
             def test_array_index(x):
                 """Test that TypeError is raised when using an array as index."""
@@ -2360,7 +2358,7 @@ class TestJaxIndexOperatorUpdate:
                 return x
 
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
-                result = test_array_index(x)
+                test_array_index(x)
 
 
 if __name__ == "__main__":
