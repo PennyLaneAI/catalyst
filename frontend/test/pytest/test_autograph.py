@@ -2065,227 +2065,223 @@ class TestJaxIndexOperatorUpdate:
         """Test single index operator update for Jax arrays for one array item."""
 
         @qjit(autograph=True)
-        def double_first_element_single_operator_assignment_syntax(x):
-            """Double the first element of x using single index assignment"""
+        def workflow(x):
+            def f(x):
+                """Double the first element of x using single index assignment"""
 
-            x[0] *= 2
-            return x
+                x[0] *= 2
+                return x
 
-        @qjit(autograph=True)
-        def double_first_element_at_multiply_syntax(x):
-            """Double the first element of x using at and multiply"""
+            def g(x):
+                """Double the first element of x using at and multiply"""
 
-            x = x.at[0].multiply(2)
-            return x
+                x = x.at[0].multiply(2)
+                return x
 
-        result_assignment_syntax = double_first_element_single_operator_assignment_syntax(
-            jnp.array([5, 3, 4])
-        )
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([10, 3, 4]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            double_first_element_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([10, 3, 4]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_operator_update_one_item(self):
         """Test single index operator update for Jax arrays for one array item."""
 
         @qjit(autograph=True)
-        def double_last_element_single_operator_assignment_syntax(x):
-            """Double the last element of x using single index assignment"""
+        def workflow(x):
+            def f(x):
+                """Double the last element of x using single index assignment"""
 
-            last_element = x.shape[0] - 1
-            x[last_element] *= 2
-            return x
+                last_element = x.shape[0] - 1
+                x[last_element] *= 2
+                return x
 
-        @qjit(autograph=True)
-        def double_last_element_at_multiply_syntax(x):
-            """Double the last element of x using at and multiply"""
+            def g(x):
+                """Double the last element of x using at and multiply"""
 
-            last_element = x.shape[0] - 1
-            x = x.at[last_element].multiply(2)
-            return x
+                last_element = x.shape[0] - 1
+                x = x.at[last_element].multiply(2)
+                return x
 
-        result_assignment_syntax = double_last_element_single_operator_assignment_syntax(
-            jnp.array([5, 3, 4])
-        )
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([5, 3, 8]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            double_last_element_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([5, 3, 8]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_mult_update_all_items(self):
         """Test single index mult update for Jax arrays for all array items."""
 
         @qjit(autograph=True)
-        def double_all_operator_update_syntax(x):
-            """Create a new array that is equal to 2 * x using single index mult update"""
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to 2 * x using single index mult update"""
 
-            first_dim = x.shape[0]
+                first_dim = x.shape[0]
 
-            for i in range(first_dim):
-                x[i] *= 2
+                for i in range(first_dim):
+                    x[i] *= 2
 
-            return x
+                return x
 
-        @qjit(autograph=True)
-        def double_all_at_multiply_syntax(x):
-            """Create a new array that is equal to 2 * x using at and multiply"""
+            def g(x):
+                """Create a new array that is equal to 2 * x using at and multiply"""
 
-            first_dim = x.shape[0]
-            result = jnp.copy(x)
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
 
-            for i in range(first_dim):
-                result = result.at[i].multiply(2)
+                for i in range(first_dim):
+                    result = result.at[i].multiply(2)
 
-            return result
+                return result
 
-        result_assignment_syntax = double_all_operator_update_syntax(jnp.array([5, 3, 4]))
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([10, 6, 8]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            double_all_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([10, 6, 8]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_add_update_all_items(self):
         """Test single index add update for Jax arrays for all array items."""
 
         @qjit(autograph=True)
-        def inc_all_operator_update_syntax(x):
-            """Create a new array that is equal to x + 1 using single index add update"""
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x + 1 using single index add update"""
 
-            first_dim = x.shape[0]
+                first_dim = x.shape[0]
 
-            for i in range(first_dim):
-                x[i] += 1
+                for i in range(first_dim):
+                    x[i] += 1
 
-            return x
+                return x
 
-        @qjit(autograph=True)
-        def inc_all_at_multiply_syntax(x):
-            """Create a new array that is equal to x + 1 using at and multiply"""
+            def g(x):
+                """Create a new array that is equal to x + 1 using at and multiply"""
 
-            first_dim = x.shape[0]
-            result = jnp.copy(x)
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
 
-            for i in range(first_dim):
-                result = result.at[i].add(1)
+                for i in range(first_dim):
+                    result = result.at[i].add(1)
 
-            return result
+                return result
 
-        result_assignment_syntax = inc_all_operator_update_syntax(jnp.array([5, 3, 4]))
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([6, 4, 5]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            inc_all_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([6, 4, 5]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_sub_update_all_items(self):
         """Test single index sub update for Jax arrays for all array items."""
 
         @qjit(autograph=True)
-        def dec_all_operator_update_syntax(x):
-            """Create a new array that is equal to x - 1 using single index sub update"""
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x - 1 using single index sub update"""
 
-            first_dim = x.shape[0]
+                first_dim = x.shape[0]
 
-            for i in range(first_dim):
-                x[i] -= 1
+                for i in range(first_dim):
+                    x[i] -= 1
 
-            return x
+                return x
 
-        @qjit(autograph=True)
-        def dec_all_at_multiply_syntax(x):
-            """Create a new array that is equal to x - 1 using at and add"""
+            def g(x):
+                """Create a new array that is equal to x - 1 using at and add"""
 
-            first_dim = x.shape[0]
-            result = jnp.copy(x)
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
 
-            for i in range(first_dim):
-                result = result.at[i].add(-1)
+                for i in range(first_dim):
+                    result = result.at[i].add(-1)
 
-            return result
+                return result
 
-        result_assignment_syntax = dec_all_operator_update_syntax(jnp.array([5, 3, 4]))
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([4, 2, 3]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            dec_all_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([4, 2, 3]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_div_update_all_items(self):
         """Test single index div update for Jax arrays for all array items."""
 
         @qjit(autograph=True)
-        def half_all_operator_update_syntax(x):
-            """Create a new array that is equal to x / 2 using single index div update"""
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x / 2 using single index div update"""
 
-            first_dim = x.shape[0]
+                first_dim = x.shape[0]
 
-            for i in range(first_dim):
-                x[i] /= 2
+                for i in range(first_dim):
+                    x[i] /= 2
 
-            return x
+                return x
 
-        @qjit(autograph=True)
-        def half_all_at_multiply_syntax(x):
-            """Create a new array that is equal to x / 2 using at and divide"""
+            def g(x):
+                """Create a new array that is equal to x / 2 using at and divide"""
 
-            first_dim = x.shape[0]
-            result = jnp.copy(x)
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
 
-            for i in range(first_dim):
-                result = result.at[i].divide(2)
+                for i in range(first_dim):
+                    result = result.at[i].divide(2)
 
-            return result
+                return result
 
-        result_assignment_syntax = half_all_operator_update_syntax(jnp.array([5, 3, 4]))
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([2.5, 1.5, 2]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            half_all_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([2.5, 1.5, 2]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_pow_update_all_items(self):
         """Test single index pow update for Jax arrays for all array items."""
 
         @qjit(autograph=True)
-        def square_all_operator_update_syntax(x):
-            """Create a new array that is equal to x ** 2 using single index sub update"""
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x ** 2 using single index sub update"""
 
-            first_dim = x.shape[0]
+                first_dim = x.shape[0]
 
-            for i in range(first_dim):
-                x[i] **= 2
+                for i in range(first_dim):
+                    x[i] **= 2
 
-            return x
+                return x
 
-        @qjit(autograph=True)
-        def square_all_at_multiply_syntax(x):
-            """Create a new array that is equal to x ** 2 using at and pow"""
+            def g(x):
+                """Create a new array that is equal to x ** 2 using at and pow"""
 
-            first_dim = x.shape[0]
-            result = jnp.copy(x)
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
 
-            for i in range(first_dim):
-                result = result.at[i].power(2)
+                for i in range(first_dim):
+                    result = result.at[i].power(2)
 
-            return result
+                return result
 
-        result_assignment_syntax = square_all_operator_update_syntax(jnp.array([5, 3, 4]))
+            result = f(x)
+            expected = g(x)
+            return result, expected
 
-        assert jnp.allclose(result_assignment_syntax, jnp.array([25, 9, 16]))
-        assert jnp.allclose(
-            result_assignment_syntax,
-            square_all_at_multiply_syntax(jnp.array([5, 3, 4])),
-        )
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([25, 9, 16]))
+        assert jnp.allclose(result, expected)
 
     def test_single_index_operator_update_python_array(self):
         """Test single index operator update for Non-Jax arrays for one array item."""
@@ -2301,6 +2297,36 @@ class TestJaxIndexOperatorUpdate:
         assert jnp.allclose(
             jnp.array(double_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 8])
         )
+
+    def test_single_index_mult_update_slice(self):
+        """Test slice (start, None, None)x mult update for Jax arrays."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+
+            def f(x):
+                """Create a new array that is equal to 2 * x for even indecies"""
+
+                first_dim = x.shape[0]
+                x[0:first_dim:2] *= 2
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to 2 * x using at and multiply"""
+
+                first_dim = x.shape[0]
+                x = x.at[0:first_dim:2].multiply(2)
+
+                return x
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(jnp.array([5, 4, 3, 2, 1]))
+        assert jnp.allclose(result, jnp.array([10, 4, 6, 2, 2]))
+        assert jnp.allclose(result, expected)
 
 
 if __name__ == "__main__":

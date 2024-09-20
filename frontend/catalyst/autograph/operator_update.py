@@ -19,7 +19,7 @@ from malt.core import converter
 from malt.pyct import templates
 
 
-# TODO: The methods from this class should be migrated to the SliceTransformer class in DiastaticMalt
+# TODO: The methods from this class should be moved to the SliceTransformer class in DiastaticMalt
 class SingleIndexArrayOperatorUpdateTransformer(converter.Base):
     """Converts array element operator assignment statements into calls to update_item_with_{op},
     where op is one of the following:
@@ -35,16 +35,35 @@ class SingleIndexArrayOperatorUpdateTransformer(converter.Base):
         if not isinstance(target, gast.Subscript):
             return None
         s = target.slice
-        if isinstance(s, (gast.Tuple, gast.Slice)):
+        if isinstance(s, (gast.Tuple)):
             return None
         if not isinstance(op, (gast.Mult, gast.Add, gast.Sub, gast.Div, gast.Pow)):
             return None
 
         template = f"""
-            target = ag__.update_item_with_{type(op).__name__.lower()}(target, i, x)
+            target = ag__.update_item_with_op(target, index, x, "{type(op).__name__.lower()}")
         """
+        lower, upper, step = None, None, None
 
-        return templates.replace(template, target=target.value, i=target.slice, x=value)
+        if isinstance(s, (gast.Slice)):
+            # Replace unused arguments in the string template with "None" to preserve each arguments' position.
+            # malt.pyct.templates.replace ignores None and does not accept string so the change need to be applied here.
+            lower_str = "lower" if s.lower is not None else "None"
+            upper_str = "upper" if s.upper is not None else "None"
+            step_str = "step" if s.step is not None else "None"
+            template = template.replace("index", f"slice({lower_str}, {upper_str}, {step_str})")
+
+            lower, upper, step = s.lower, s.upper, s.step
+
+        return templates.replace(
+            template,
+            target=target.value,
+            index=target.slice,
+            lower=lower,
+            upper=upper,
+            step=step,
+            x=value,
+        )
 
     def visit_AugAssign(self, node):
         """The AugAssign node is replaced with a call to ag__.update_item_with_{op}

@@ -18,6 +18,7 @@ functions. The purpose is to convert imperative style code to functional or grap
 """
 import copy
 import functools
+import operator
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
@@ -47,11 +48,7 @@ __all__ = [
     "or_",
     "not_",
     "set_item",
-    "update_item_with_add",
-    "update_item_with_sub",
-    "update_item_with_mult",
-    "update_item_with_div",
-    "update_item_with_pow",
+    "update_item_with_op",
 ]
 
 
@@ -587,9 +584,8 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 def set_item(target, i, x):
     """An implementation of the AutoGraph 'set_item' function. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives.
-    The idea is to accept the much simpler single index assigment syntax for Jax arrays,
-    to subsequently transform it under the hood into the set of 'at' and 'set' calls that
-    Autograph supports. E.g.:
+    The idea is to accept a simple assigment syntax for Jax arrays, to subsequently transform
+    it under the hood into the set of 'at' and 'set' calls that Autograph supports. E.g.:
         target[i] = x -> target = target.at[i].set(x)
 
     .. note::
@@ -612,112 +608,12 @@ def set_item(target, i, x):
     return target
 
 
-def update_item_with_add(target, i, x):
-    """An implementation of the 'update_item_with_add' function from operator_update. The interface
+def update_item_with_op(target, index, x, op):
+    """An implementation of the 'update_item_with_op' function from operator_update. The interface
     is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept the simpler single index
-    operator assignment syntax for Jax arrays, to subsequently transform it under the hood into the
-    set of 'at' and 'add' calls that Autograph supports. E.g.:
-        target[i] += x -> target = target.at[i].add(x)
-
-    .. note::
-        For this feature to work, 'converter.Feature.LISTS' had to be added to the
-        TOP_LEVEL_OPTIONS and NESTED_LEVEL_OPTIONS conversion options of our own Catalyst
-        Autograph transformer. If you create a new transformer and want to support this feature,
-        make sure you enable such option there as well.
-    """
-
-    # Apply the 'at...add' transformation only to Jax arrays.
-    # Otherwise, fallback to Python's default syntax.
-    if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].add(x)
-    else:
-        target[i] += x
-
-    return target
-
-
-def update_item_with_sub(target, i, x):
-    """An implementation of the 'update_item_with_sub' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept the simpler single index
-    operator assignment syntax for Jax arrays, to subsequently transform it under the hood into the
-    set of 'at' and 'add' calls that Autograph supports. E.g.:
-        target[i] -= x -> target = target.at[i].add(-x)
-
-    .. note::
-        For this feature to work, 'converter.Feature.LISTS' had to be added to the
-        TOP_LEVEL_OPTIONS and NESTED_LEVEL_OPTIONS conversion options of our own Catalyst
-        Autograph transformer. If you create a new transformer and want to support this feature,
-        make sure you enable such option there as well.
-    """
-
-    # Apply the 'at...add' transformation only to Jax arrays.
-    # Otherwise, fallback to Python's default syntax.
-    if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].add(-x)
-    else:
-        target[i] -= x
-
-    return target
-
-
-def update_item_with_mult(target, i, x):
-    """An implementation of the 'update_item_with_mult' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept the simpler single index
-    operator assignment syntax for Jax arrays, to subsequently transform it under the hood into the
-    set of 'at' and 'multiply' calls that Autograph supports. E.g.:
-        target[i] *= x -> target = target.at[i].multiply(x)
-
-    .. note::
-        For this feature to work, 'converter.Feature.LISTS' had to be added to the
-        TOP_LEVEL_OPTIONS and NESTED_LEVEL_OPTIONS conversion options of our own Catalyst
-        Autograph transformer. If you create a new transformer and want to support this feature,
-        make sure you enable such option there as well.
-    """
-
-    # Apply the 'at...multiply' transformation only to Jax arrays.
-    # Otherwise, fallback to Python's default syntax.
-    if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].multiply(x)
-    else:
-        target[i] *= x
-
-    return target
-
-
-def update_item_with_div(target, i, x):
-    """An implementation of the 'update_item_with_div' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept the simpler single index
-    operator assignment syntax for Jax arrays, to subsequently transform it under the hood into the
-    set of 'at' and 'divide' calls that Autograph supports. E.g.:
-        target[i] /= x -> target = target.at[i].divide(x)
-
-    .. note::
-        For this feature to work, 'converter.Feature.LISTS' had to be added to the
-        TOP_LEVEL_OPTIONS and NESTED_LEVEL_OPTIONS conversion options of our own Catalyst
-        Autograph transformer. If you create a new transformer and want to support this feature,
-        make sure you enable such option there as well.
-    """
-
-    # Apply the 'at...divide' transformation only to Jax arrays.
-    # Otherwise, fallback to Python's default syntax.
-    if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].divide(x)
-    else:
-        target[i] /= x
-
-    return target
-
-
-def update_item_with_pow(target, i, x):
-    """An implementation of the 'update_item_with_pow' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept the simpler single index
-    operator assignment syntax for Jax arrays, to subsequently transform it under the hood into the
-    set of 'at' and 'power' calls that Autograph supports. E.g.:
+    implementation in terms of Catalyst primitives. The idea is to accept an operator assignment
+    syntax for Jax arrays, to subsequently transform it under the hood into the set of 'at' and
+    operator calls that Autograph supports. E.g.:
         target[i] **= x -> target = target.at[i].power(x)
 
     .. note::
@@ -726,14 +622,30 @@ def update_item_with_pow(target, i, x):
         Autograph transformer. If you create a new transformer and want to support this feature,
         make sure you enable such option there as well.
     """
+    # Mapping of the gast attributes to the corresponding JAX operation
+    gast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
+    # Mapping of the gast attributes to the corresponding in-place operation
+    inplace_operation_map = {
+        "mult": "mul",
+        "div": "truediv",
+        "add": "add",
+        "sub": "add",
+        "pow": "pow",
+    }
+    ## For sub, we need to use add and negate the value of x
+    if op == "sub":
+        x = -x
 
-    # Apply the 'at...power' transformation only to Jax arrays.
+    # Apply the 'at...op' transformation only to Jax arrays.
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
-        target = target.at[i].power(x)
+        if isinstance(index, slice):
+            target = getattr(target.at[index.start : index.stop : index.step], gast_op_map[op])(x)
+        else:
+            target = getattr(target.at[index], gast_op_map[op])(x)
     else:
-        target[i] **= x
-
+        # Use Python's in-place operator
+        target[index] = getattr(operator, f"__i{inplace_operation_map[op]}__")(target[index], x)
     return target
 
 

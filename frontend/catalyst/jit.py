@@ -255,9 +255,9 @@ def qjit(
 
                 return result
 
-        However, if updating a single index of the array, Autograph supports conversion of
-        standard Python array assignment operators to the equivalent in-place expressions
-        listed in the JAX documentation for ``jax.numpy.ndarray.at``:
+        However, if updating a single index or slice of the array, Autograph supports conversion of
+        Python's standard arithmatic array assignment operators to the equivalent in-place
+        expressions listed in the JAX documentation for ``jax.numpy.ndarray.at``:
         .. code-block:: python
             @qjit(autograph=True)
             def f(x):
@@ -271,6 +271,14 @@ def qjit(
                 return result
         Under the hood, Catalyst converts anything coming in the latter notation into the
         former one.
+
+        The list of supported operators includes:
+        - ``=`` (set)
+        - ``+=`` (add)
+        - ``-=`` (add with negation)
+        - ``*=`` (multiply)
+        - ``/=`` (divide)
+        - ``**=`` (power)
 
     .. details::
         :title: Static arguments
