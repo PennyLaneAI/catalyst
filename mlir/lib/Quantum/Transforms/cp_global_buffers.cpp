@@ -89,13 +89,13 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
 {
     auto origMemrefType = cast<MemRefType>(memref.getType());
     // Rebuild MemRefType without memory layout.
-    auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
+    auto newMemrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
 
     llvm::SmallVector<Value> dynDims;
     {
         llvm::SmallVector<int64_t> dynIndices;
         int64_t ndim = 0;
-        for (auto dim : memrefType.getShape()) {
+        for (auto dim : newMemrefType.getShape()) {
             if (dim < 0) {
                 Value dynValue = rewriter.create<memref::DimOp>(loc, memref, ndim);
                 dynDims.push_back(dynValue);
@@ -104,10 +104,10 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
         }
     }
     
-    Value newMemRef = rewriter.create<memref::AllocOp>(loc, memrefType, dynDims);
+    Value newMemRef = rewriter.create<memref::AllocOp>(loc, newMemrefType, dynDims);
     // Cast memrefType back to maintain memory layout.
-    //if (!memref::CastOp::areCastCompatible(memrefType, origMemrefType)) {
-    if (!origMemrefType.getLayout().isIdentity()) {
+    if (!memref::CastOp::areCastCompatible(newMemrefType, origMemrefType)) {
+    //if (!origMemrefType.getLayout().isIdentity()) {
             SmallVector<OpFoldResult> sizes =
         memref::getMixedSizes(rewriter, loc, newMemRef);
 
@@ -128,7 +128,7 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
         auto subview = rewriter.create<memref::SubViewOp>(
             loc, origMemrefType, newMemRef, 
             offsets, sizes, strides);
-        subview.print(llvm::outs());
+
         rewriter.create<memref::CopyOp>(loc, memref, newMemRef);
         return subview;
     }

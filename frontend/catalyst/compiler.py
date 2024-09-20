@@ -209,7 +209,7 @@ BUFFERIZATION_PASS = (
         "gradient-preprocess",
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
-        "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops}",
+        "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map}",
         "canonicalize",  # Remove dead memrefToTensorOp's
         "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
