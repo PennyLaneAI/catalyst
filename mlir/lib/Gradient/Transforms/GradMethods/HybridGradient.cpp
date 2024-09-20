@@ -368,7 +368,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
     const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
-    std::string fnName = op.getCallee().str() + ".fullgrad" + uniquer.str();
+    std::string fnName = op.getCallee().getLeafReference().str() + ".fullgrad" + uniquer.str();
 
     func::FuncOp fullGradFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
@@ -413,7 +413,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
 
                         auto backpropOp = rewriter.create<gradient::BackpropOp>(
                             loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
-                            callee.getName(), entryBlock->getArguments(),
+                            SymbolRefAttr::get(callee), entryBlock->getArguments(),
                             /*arg_shadows=*/ValueRange{},
                             /*primal results=*/ValueRange{}, cotangents, diffArgIndicesAttr,
                             keepValueResults);
@@ -483,7 +483,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                      loc, cotangents);
 
                 auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                    loc, valTypes, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
+                    loc, valTypes, computeBackpropTypes(callee, diffArgIndices), SymbolRefAttr::get(callee),
                     entryBlock->getArguments(),
                     /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                     diffArgIndicesAttr, keepValueResults);

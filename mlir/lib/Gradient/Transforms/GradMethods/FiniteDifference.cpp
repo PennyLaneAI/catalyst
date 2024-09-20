@@ -44,7 +44,7 @@ void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
-    std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
+    std::string fnName = op.getCallee().getLeafReference().str() + ".finitediff" + uniquer.str();
     FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
     StringAttr visibility = rewriter.getStringAttr("private");
     func::FuncOp callee =
