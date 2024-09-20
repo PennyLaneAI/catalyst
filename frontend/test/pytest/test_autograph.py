@@ -2333,9 +2333,9 @@ class TestJaxIndexOperatorUpdate:
 
         @qjit(autograph=True)
         def workflow(x):
-            """Test that TypeError is raised when updating a JAX array with multi-dimensional indexing."""
 
             def test_multi_dimensional_index(x):
+                """Test that TypeError is raised when updating a JAX array with multi-dimx indexing."""
                 x[0, 1] += 5
                 return x
 
@@ -2343,24 +2343,24 @@ class TestJaxIndexOperatorUpdate:
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
                 result = test_multi_dimensional_index(x)
 
-            """Test that TypeError is raised when updating a JAX array using an unsupported operator."""
-
             def test_unsupported_operator(x, i, y):
-                x[i] %= y
+                """Test that TypeError is raised when updating a JAX array using an unsupported operator."""
+                x[1] %= y
                 return x
 
             x = jnp.array([4, 2, 3])
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
-                result = test_multi_dimensional_index(x)
+                result = test_unsupported_operator(x)
 
             """Test that TypeError is raised when updating a JAX array using an array as index."""
 
             def test_array_index(x, i):
+                """Test that TypeError is raised when updating a JAX array using an array as index."""
                 x[np.array([1, 2])] += 3
                 return x
 
             with pytest.raises(TypeError, match="JAX arrays are immutable"):
-                result = test_multi_dimensional_index(x)
+                result = test_array_index(x)
 
 
 if __name__ == "__main__":
