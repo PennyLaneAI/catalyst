@@ -370,7 +370,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnWithoutMeasurementsName = op.getCallee().getLeafReference().str() + ".withoutMeasurements";
+    std::string fnWithoutMeasurementsName =
+        op.getCallee().getLeafReference().str() + ".withoutMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
     }
@@ -423,7 +424,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
-    std::string fnWithMeasurementsName = op.getCallee().getLeafReference().str() + ".withMeasurements";
+    std::string fnWithMeasurementsName =
+        op.getCallee().getLeafReference().str() + ".withMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
     }

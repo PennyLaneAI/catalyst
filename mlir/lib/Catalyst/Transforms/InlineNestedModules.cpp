@@ -71,6 +71,7 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Mitigation/IR/MitigationOps.h"
 
 #include <deque>
 
@@ -267,6 +268,32 @@ void SymbolReplacerPattern::rewrite(catalyst::gradient::GradientOpInterface user
     rewriter.modifyOpInPlace(user, [&] { user->setAttr("callee", newSymbolRefAttr); });
 }
 
+struct ZNEReplacerPattern : public OpRewritePattern<catalyst::mitigation::ZneOp> {
+    using OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern;
+
+    ZNEReplacerPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
+        : OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern(context), _map(map)
+    {
+    }
+
+    LogicalResult match(catalyst::mitigation::ZneOp op) const override;
+    void rewrite(catalyst::mitigation::ZneOp op, PatternRewriter &rewriter) const override;
+
+    const DenseMap<SymbolRefAttr, SymbolRefAttr> *_map;
+};
+
+LogicalResult ZNEReplacerPattern::match(catalyst::mitigation::ZneOp op) const
+{
+    auto found = _map->find(op.getCallee()) != _map->end();
+    return found ? success() : failure();
+}
+
+void ZNEReplacerPattern::rewrite(catalyst::mitigation::ZneOp op, PatternRewriter &rewriter) const
+{
+    auto newSymbolRefAttr = _map->find(op.getCallee())->getSecond();
+    rewriter.modifyOpInPlace(op, [&] { op->setAttr("callee", newSymbolRefAttr); });
+}
+
 struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::CallNestedModuleOp> {
     using OpRewritePattern<catalyst::CallNestedModuleOp>::OpRewritePattern;
     /// This overload constructs a pattern that matches any operation type.
@@ -414,7 +441,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         RewritePatternSet nestedToFlat(context);
-        nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern>(context, &old_to_new);
+        nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern>(
+            context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
         if (run &&
             failed(applyPatternsAndFoldGreedily(symbolTable, std::move(nestedToFlat), config))) {
