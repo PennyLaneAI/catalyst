@@ -208,23 +208,6 @@ def _transform_mod_lowering(aval):
 
 
 #
-# ModuleType
-#
-class AbstractModule(AbstractValue):
-    """Abstract module type."""
-
-    def __init__(self, jaxpr_module):
-        self.jaxpr_module = jaxpr_module
-
-    def __call__(self, *args, **kwargs):
-        return self.jaxpr_module(*args, **kwargs)
-
-
-def _module_lowering(aval):
-    return Module()
-
-
-#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -238,9 +221,6 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
-
-core.raise_to_shaped_mappings[AbstractModule] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractModule] = _module_lowering
 
 
 class Folding(Enum):
@@ -594,7 +574,7 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
 
     if not isinstance(fn, qml.QNode) and not call:
         _func_lowering(ctx, *args, call_jaxpr=call_jaxpr, fn=fn, call=call)
-        return
+        return None
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
