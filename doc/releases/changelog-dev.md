@@ -114,7 +114,7 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* Support for usage of single index JAX array operator update inside Autograph annotated functions.
+* Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's array assignment operator syntax.
   [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
   [(#1143)](https://github.com/PennyLaneAI/catalyst/pull/1143)
 
