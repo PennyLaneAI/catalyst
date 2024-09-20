@@ -114,6 +114,34 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
+* Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's array assignment operator syntax.
+  [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
+  [(#1143)](https://github.com/PennyLaneAI/catalyst/pull/1143)
+
+  Using operator assignment syntax in favor of `at...op` expressions is now possible for the following operations:
+  * `x[i] += y` in favor of `x.at[i].add(y)`
+  * `x[i] -= y` in favor of `x.at[i].add(-y)`
+  * `x[i] *= y` in favor of `x.at[i].multiply(y)`
+  * `x[i] /= y` in favor of `x.at[i].divide(y)`
+  * `x[i] **= y` in favor of `x.at[i].power(y)`
+
+  ```python
+  @qjit(autograph=True)
+  def f(x):
+    first_dim = x.shape[0]
+    result = jnp.copy(x)
+
+    for i in range(first_dim):
+      result[i] *= 2  # This is now supported
+
+    return result
+  ```
+
+  ```pycon
+  >>> f(jnp.array([1, 2, 3]))
+  Array([2, 4, 6], dtype=int64)
+  ```
+
 <h3>Improvements</h3>
 
 * Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`, 
@@ -195,5 +223,6 @@ Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 Paul Haochen Wang,
 Sengthai Heng,
+Spencer Comin,
 Daniel Strano,
 Raul Torres.

@@ -240,6 +240,47 @@ def qjit(
         appearing as is.
 
     .. details::
+        :title: In-place JAX array updates with Autograph
+
+        To update array values when using JAX, the JAX syntax for array modification
+        (which uses methods like ``at``, ``set``, ``multiply``, etc) must be used:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+                first_dim = x.shape[0]
+                result = jnp.empty((first_dim,), dtype=x.dtype)
+                for i in range(first_dim):
+                    result = result.at[i].set(x[i])
+                    result = result.at[i].multiply(10)
+                    result = result.at[i].add(5)
+
+                return result
+
+        However, if updating a single index or slice of the array, Autograph supports conversion of
+        Python's standard arithmatic array assignment operators to the equivalent in-place
+        expressions listed in the JAX documentation for ``jax.numpy.ndarray.at``:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+                first_dim = x.shape[0]
+                result = jnp.empty((first_dim,), dtype=x.dtype)
+                for i in range(first_dim):
+                    result[i] = x[i]
+                    result[i] *= 10
+                    result[i] += 5
+
+                return result
+
+        Under the hood, Catalyst converts anything coming in the latter notation into the
+        former one.
+
+        The list of supported operators includes: ``=``, ``+=``, ``-=``, ``*=``, ``/=``, and ``**=``.
+
+    .. details::
         :title: Static arguments
 
         ``static_argnums`` defines which elements should be treated as static. If it takes an
