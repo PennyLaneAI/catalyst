@@ -46,8 +46,8 @@ class SingleIndexArrayOperatorUpdateTransformer(converter.Base):
         lower, upper, step = None, None, None
 
         if isinstance(s, (gast.Slice)):
-            # Replace unused arguments in the string template with "None" to preserve each arguments' position.
-            # malt.pyct.templates.replace ignores None and does not accept string so the change need to be applied here.
+            # Replace unused arguments in template with "None" to preserve each arguments' position.
+            # templates.replace ignores None and does not accept string so change is applied here.
             lower_str = "lower" if s.lower is not None else "None"
             upper_str = "upper" if s.upper is not None else "None"
             step_str = "step" if s.step is not None else "None"
