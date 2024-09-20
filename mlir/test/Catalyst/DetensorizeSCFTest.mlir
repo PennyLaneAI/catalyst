@@ -14,241 +14,129 @@
 
 // RUN: quantum-opt --detensorize-scf --canonicalize --split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: @test0
-module @test0 {
-  // CHECK-LABEL: @test_while_loop
-  // CHECK:       [[WHILE_RESULTS:.+]]:2 = scf.while {{.*}} (f64, i64) -> (f64, i64)
-  // CHECK:         scf.condition{{.*}} : f64, i64
-  // CHECK:       do
-  // CHECK-NOT:     tensor<
-  // CHECK:         tensor.from_elements
-  // CHECK:         scf.if {{.*}} -> (f64)
-  // CHECK-NOT:       tensor<
-  // CHECK:           scf.yield {{.*}} : f64
-  // CHECK-NOT:       tensor<
-  // CHECK:         else
-  // CHECK-NOT:       tensor<
-  // CHECK:           scf.yield {{.*}} : f64
-  // CHECK-NOT:       tensor<
-  // CHECK:         scf.yield  {{.*}} : f64, i64
-  // CHECK-NOT:     tensor<
-  // CHECK:       tensor.from_elements [[WHILE_RESULTS:.+]]#0 : tensor<f64>
-  func.func public @test_while_loop(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %c10_i64 = arith.constant 10 : i64
-    %cst = arith.constant 0.000000e+00 : f64
-    %cst_0 = arith.constant 1.000000e+00 : f64
-    %c1_i64 = arith.constant 1 : i64
-    %cst_1 = arith.constant dense<0> : tensor<i64>
-    %cst_2 = arith.constant dense<2> : tensor<i64>
-    %extracted = tensor.extract %arg0[] : tensor<f64>
-    %extracted_3 = tensor.extract %arg1[] : tensor<f64>
-    %0 = arith.addf %extracted, %extracted_3 : f64
-    %from_elements = tensor.from_elements %0 : tensor<f64>
-    %1:2 = scf.while (%arg2 = %from_elements, %arg3 = %cst_1) : (tensor<f64>, tensor<i64>) -> (tensor<f64>, tensor<i64>) {
-      %extracted_6 = tensor.extract %arg3[] : tensor<i64>
-      %3 = arith.cmpi slt, %extracted_6, %c10_i64 : i64
-      scf.condition(%3) %arg2, %arg3 : tensor<f64>, tensor<i64>
-    } do {
-    ^bb0(%arg2: tensor<f64>, %arg3: tensor<i64>):
-      %extracted_6 = tensor.extract %arg2[] : tensor<f64>
-      %extracted_7 = tensor.extract %arg3[] : tensor<i64>
-      %3 = func.call @fun(%arg2, %cst_2) : (tensor<f64>, tensor<i64>) -> tensor<f64>
-      %extracted_8 = tensor.extract %3[] : tensor<f64>
-      %4 = arith.cmpf une, %extracted_8, %cst : f64
-      %5 = scf.if %4 -> (tensor<f64>) {
-        %7 = arith.subf %extracted_6, %extracted_6 : f64
-        %from_elements_10 = tensor.from_elements %7 : tensor<f64>
-        scf.yield %from_elements_10 : tensor<f64>
-      } else {
-        %7 = arith.addf %extracted_6, %cst_0 : f64
-        %from_elements_10 = tensor.from_elements %7 : tensor<f64>
-        scf.yield %from_elements_10 : tensor<f64>
-      }
-      %6 = arith.addi %extracted_7, %c1_i64 : i64
-      %from_elements_9 = tensor.from_elements %6 : tensor<i64>
-      scf.yield %5, %from_elements_9 : tensor<f64>, tensor<i64>
-    }
-    %extracted_4 = tensor.extract %1#0[] : tensor<f64>
-    %from_elements_5 = tensor.from_elements %extracted_4 : tensor<f64>
-    return %from_elements_5 : tensor<f64>
-  }
-  module attributes {llvm.linkage = #llvm.linkage<internal>, transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-      transform.yield 
-    }
-  }
-  func.func private @fun(%arg0: tensor<f64> {mhlo.layout_mode = "default"}, %arg1: tensor<i64> {mhlo.layout_mode = "default"}) -> (tensor<f64> {mhlo.layout_mode = "default"}) attributes {llvm.linkage = #llvm.linkage<internal>} {
-    %cst = arith.constant 0.000000e+00 : f64
-    %extracted = tensor.extract %arg1[] : tensor<i64>
-    %extracted_0 = tensor.extract %arg0[] : tensor<f64>
-    %0 = arith.sitofp %extracted : i64 to f64
-    %1 = arith.remf %extracted_0, %0 : f64
+// CHECK-LABEL: @test_for_loop
+// CHECK-NOT:     scf.for {{.*}} -> (tensor<f64>)
+// CHECK:         [[FOR_RES:%.+]] = scf.for {{.*}} -> (f64)
+// CHECK:           arith.addf
+// CHECK:           scf.yield {{.*}} : f64
+// CHECK-NOT:     scf.for {{.*}} -> (tensor<f64>)
+// CHECK:         [[FUN_RES:%.+]] = tensor.from_elements [[FOR_RES]]
+// CHECK:         return [[FUN_RES]] : tensor<f64>
+func.func public @test_for_loop(%arg0: tensor<f64>) -> tensor<f64> {
+  %c0 = arith.constant 0 : index
+  %c10 = arith.constant 10 : index
+  %c1 = arith.constant 1 : index
+
+  %0 = scf.for %arg1 = %c0 to %c10 step %c1 iter_args(%arg2 = %arg0) -> (tensor<f64>) {
+    %extracted = tensor.extract %arg2[] : tensor<f64>
+    %1 = arith.addf %extracted, %extracted : f64
     %from_elements = tensor.from_elements %1 : tensor<f64>
-    return %from_elements : tensor<f64>
+    scf.yield %from_elements : tensor<f64>
   }
+
+  return %0 : tensor<f64>
 }
 
 // -----
 
-// CHECK-LABEL: @test1
-module @test1 {
-  // CHECK-LABEL: func.func public @test_nested_ifs
-  // CHECK:     %[[IF0_RESULTS:.+]]:2 = scf.if {{.*}}-> (f64, f64)
-  // CHECK-NOT:   tensor<
-  // CHECK:       %[[IF1_RESULTS:.+]] = scf.if {{.*}}-> (f64)
-  // CHECK-NOT:     tensor<
-  // CHECK:         scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:       else
-  // CHECK:         scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:       }
-  // CHECK:       scf.yield {{.*}}, %[[IF1_RESULTS]] : f64, f64
-  // CHECK-NOT:   tensor<
-  // CHECK:     else
-  // CHECK:       %[[IF1_RESULTS:.+]] = scf.if {{.*}}-> (f64)
-  // CHECK-NOT:     tensor<
-  // CHECK:         scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:       else
-  // CHECK:         scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:       }
-  // CHECK:       scf.yield %[[IF1_RESULTS]], {{.*}} : f64, f64
-  // CHECK-NOT:   tensor<
-  // CHECK:     }
-  // CHECK:     %[[MULF_RES:.+]] = arith.mulf %[[IF0_RESULTS]]#0, %[[IF0_RESULTS]]#1 : f64
-  // CHECK:     tensor.from_elements %[[MULF_RES]] : tensor<f64>
-  func.func public @test_nested_ifs(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %cst = arith.constant 2.000000e+00 : f64
-    %extracted = tensor.extract %arg0[] : tensor<f64>
-    %extracted_0 = tensor.extract %arg1[] : tensor<f64>
-    %0 = arith.cmpf ogt, %extracted, %extracted_0 : f64
-    %1:2 = scf.if %0 -> (tensor<f64>, tensor<f64>) {
-      %8 = arith.mulf %extracted_0, %cst : f64
-      %9 = arith.cmpf ogt, %extracted, %8 : f64
-      %10 = scf.if %9 -> (tensor<f64>) {
-        %11 = arith.mulf %extracted, %cst : f64
-        %from_elements_3 = tensor.from_elements %11 : tensor<f64>
-        scf.yield %from_elements_3 : tensor<f64>
-      } else {
-        %11 = arith.divf %extracted, %cst : f64
-        %from_elements_3 = tensor.from_elements %11 : tensor<f64>
-        scf.yield %from_elements_3 : tensor<f64>
-      }
-      scf.yield %arg0, %10 : tensor<f64>, tensor<f64>
+// CHECK-LABEL: @test_if_mixed_return_types
+// CHECK-NOT:     scf.if {{.*}} -> (f64, tensor<f64>)
+// CHECK:         [[IF_RES:%.*]]:2 = scf.if {{.*}} -> (f64, f64)
+// CHECK:           arith.addf
+// CHECK:           arith.subf
+// CHECK:           scf.yield {{.*}} : f64, f64
+// CHECK:         else
+// CHECK:           arith.subf
+// CHECK:           scf.yield {{.*}} : f64, f64
+// CHECK-NOT:     scf.if {{.*}} -> (f64, tensor<f64>)
+// CHECK:         [[FUN_RES:%.+]] = tensor.from_elements [[IF_RES]]#1
+// CHECK:         return [[IF_RES]]#0, [[FUN_RES]] : f64, tensor<f64>
+func.func public @test_if_mixed_return_types(%arg0: f64, %arg1: f64) -> (f64, tensor<f64>) {
+  %0 = arith.cmpf ogt, %arg0, %arg1 : f64
+
+  %1:2 = scf.if %0 -> (f64, tensor<f64>) {
+    %2 = arith.addf %arg0, %arg1 : f64
+    %3 = arith.subf %arg0, %arg1 : f64
+    %from_elements_0 = tensor.from_elements %3 : tensor<f64>
+    scf.yield %2, %from_elements_0 : f64, tensor<f64>
+  } else {
+    %3 = arith.subf %arg1, %arg0 : f64
+    %from_elements_0 = tensor.from_elements %3 : tensor<f64>
+    scf.yield %arg0, %from_elements_0 : f64, tensor<f64>
+  }
+
+  return %1#0, %1#1 : f64, tensor<f64>
+}
+
+// -----
+
+// CHECK-LABEL: @test_while_loop
+// CHECK-NOT:     scf.while {{.*}} -> (tensor<i64>)
+// CHECK:         [[WHILE_RES:%.*]] = scf.while {{.*}} (i64) -> i64
+// CHECK:           arith.cmpi
+// CHECK:           scf.condition{{.*}} : i64
+// CHECK:         do
+// CHECK:         ^bb0({{.*}}: i64)
+// CHECK:           arith.addi
+// CHECK:           scf.yield {{.*}} : i64
+// CHECK-NOT:     scf.while {{.*}} -> (tensor<i64>)
+// CHECK:         [[FUN_RES:%.+]] = tensor.from_elements [[WHILE_RES]]
+// CHECK:         return [[FUN_RES]] : tensor<i64>
+func.func public @test_while_loop(%arg0: tensor<i64>) -> tensor<i64> {
+  %cst = arith.constant dense<10> : tensor<i64>
+
+  %0 = scf.while (%arg1 = %arg0) : (tensor<i64>) -> (tensor<i64>) {
+    %1 = arith.cmpi slt, %arg1, %cst : tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i1>
+    scf.condition(%extracted) %arg1 : tensor<i64>
+  } do {
+  ^bb0(%arg2: tensor<i64>):
+    %2 = arith.addi %arg2, %cst : tensor<i64>
+    scf.yield %2 : tensor<i64>
+  }
+
+  return %0 : tensor<i64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func public @test_nested_ifs
+// CHECK-NOT:     scf.if {{.*}} -> (tensor<f64>)
+// CHECK:         [[IF_RES:%.+]] = scf.if {{.*}} -> (f64)
+// CHECK:           arith.cmpf
+// CHECK-NOT:       scf.if {{.*}} -> (tensor<f64>)
+// CHECK:           [[IF1_RES:%.+]] = scf.if {{.*}} -> (f64)
+// CHECK:             arith.mulf
+// CHECK:             scf.yield {{.*}} : f64
+// CHECK:           else
+// CHECK:             scf.yield {{.*}} : f64
+// CHECK-NOT:       scf.if {{.*}} -> (tensor<f64>)
+// CHECK:           scf.yield [[IF1_RES]] : f64
+// CHECK:         else
+// CHECK:           scf.yield {{.*}} : f64
+// CHECK-NOT:     scf.if {{.*}} -> (tensor<f64>)
+// CHECK:         [[FUN_RES:%.+]] = tensor.from_elements [[IF_RES]]
+// CHECK:         return [[FUN_RES]] : tensor<f64>
+func.func public @test_nested_ifs(%arg0: tensor<f64>) -> tensor<f64> {
+  %cst = arith.constant 2.000000e+00 : f64
+  %extracted = tensor.extract %arg0[] : tensor<f64>
+  %0 = arith.cmpf ogt, %extracted, %cst : f64
+
+  %1 = scf.if %0 -> (tensor<f64>) {
+    %2 = arith.cmpf ogt, %cst, %extracted : f64
+
+    %3 = scf.if %2 -> (tensor<f64>) {
+      %4 = arith.mulf %arg0, %arg0 : tensor<f64>
+      scf.yield %4 : tensor<f64>
     } else {
-      %8 = arith.mulf %extracted, %cst : f64
-      %9 = arith.cmpf ogt, %extracted_0, %8 : f64
-      %10 = scf.if %9 -> (tensor<f64>) {
-        %11 = arith.mulf %extracted_0, %cst : f64
-        %from_elements_3 = tensor.from_elements %11 : tensor<f64>
-        scf.yield %from_elements_3 : tensor<f64>
-      } else {
-        %11 = arith.divf %extracted_0, %cst : f64
-        %from_elements_3 = tensor.from_elements %11 : tensor<f64>
-        scf.yield %from_elements_3 : tensor<f64>
-      }
-      scf.yield %10, %arg1 : tensor<f64>, tensor<f64>
+      %from_elements = tensor.from_elements %cst : tensor<f64>
+      scf.yield %from_elements : tensor<f64>
     }
-    %extracted_1 = tensor.extract %1#0[] : tensor<f64>
-    %extracted_2 = tensor.extract %1#1[] : tensor<f64>
-    %2 = arith.mulf %extracted_1, %extracted_2 : f64
-    %from_elements = tensor.from_elements %2 : tensor<f64>
-    return %from_elements : tensor<f64>
-  }
-}
 
-// -----
-
-// CHECK-LABEL: @test2
-module @test2 {
-  // CHECK-LABEL: @test_for_loop
-  func.func public @test_for_loop(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-  // CHECK:     [[FOR_RESULT:.+]] = scf.for {{.*}} iter_args(%[[ARG:.+]] = {{.*}}) -> (f64) {
-  // CHECK-NOT:   tensor<
-  // CHECK:       tensor.from_elements %[[ARG]] : tensor<f64>
-  // CHECK:       [[IF_RESULT:.+]] = scf.if {{.*}} -> (f64)
-  // CHECK:         scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:       else
-  // CHECK:         scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:       }
-  // CHECK:       scf.yield {{.*}} : f64
-  // CHECK-NOT:     tensor<
-  // CHECK:     }
-  // CHECK:     arith.mulf {{.*}} [[FOR_RESULT:.+]] : f64
-    %cst = arith.constant 0.000000e+00 : f64
-    %cst_0 = arith.constant 1.000000e+00 : f64
-    %cst_1 = arith.constant dense<2> : tensor<i64>
-    %c0 = arith.constant 0 : index
-    %c10 = arith.constant 10 : index
-    %c1 = arith.constant 1 : index
-    %extracted = tensor.extract %arg0[] : tensor<f64>
-    %extracted_2 = tensor.extract %arg1[] : tensor<f64>
-    %0 = arith.addf %extracted, %extracted_2 : f64
-    %from_elements = tensor.from_elements %0 : tensor<f64>
-    %1 = scf.for %arg2 = %c0 to %c10 step %c1 iter_args(%arg3 = %from_elements) -> (tensor<f64>) {
-      %extracted_5 = tensor.extract %arg3[] : tensor<f64>
-      %3 = func.call @remainder(%arg3, %cst_1) : (tensor<f64>, tensor<i64>) -> tensor<f64>
-      %extracted_6 = tensor.extract %3[] : tensor<f64>
-      %4 = arith.cmpf une, %extracted_6, %cst : f64
-      %5 = scf.if %4 -> (f64) {
-        %6 = arith.subf %extracted_5, %extracted_5 : f64
-        scf.yield %6 : f64
-      } else {
-        %6 = arith.addf %extracted_5, %cst_0 : f64
-        scf.yield %6 : f64
-      }
-      %from_elements_7 = tensor.from_elements %5 : tensor<f64>
-      scf.yield %from_elements_7 : tensor<f64>
-    }
-    %extracted_3 = tensor.extract %1[] : tensor<f64>
-    %2 = arith.mulf %extracted, %extracted_3 : f64
-    %from_elements_4 = tensor.from_elements %2 : tensor<f64>
-    return %from_elements_4 : tensor<f64>
+    scf.yield %3 : tensor<f64>
+  } else {
+    scf.yield %arg0 : tensor<f64>
   }
-  func.func private @remainder(%arg0: tensor<f64> {mhlo.layout_mode = "default"}, %arg1: tensor<i64> {mhlo.layout_mode = "default"}) -> (tensor<f64> {mhlo.layout_mode = "default"}) attributes {llvm.linkage = #llvm.linkage<internal>} {
-    %cst = arith.constant 0.000000e+00 : f64
-    %extracted = tensor.extract %arg1[] : tensor<i64>
-    %extracted_0 = tensor.extract %arg0[] : tensor<f64>
-    %0 = arith.sitofp %extracted : i64 to f64
-    %1 = arith.remf %extracted_0, %0 : f64
-    %from_elements = tensor.from_elements %1 : tensor<f64>
-    return %from_elements : tensor<f64>
-  }
-}
 
-// -----
-
-// CHECK-LABEL: @test3
-module @test3 {
-  // CHECK-LABEL: @test_if_mixed_return_types
-  func.func public @test_if_mixed_return_types(%arg0: f64, %arg1: f64) -> tensor<f64> attributes {llvm.emit_c_interface} {
-  // CHECK:     scf.if {{.*}} -> (f64)
-  // CHECK-NOT:   tensor<
-  // CHECK:       scf.yield {{.*}} : f64
-  // CHECK-NOT:   tensor<
-  // CHECK:     else
-  // CHECK:       scf.yield {{.*}} : f64
-  // CHECK-NOT:   tensor<
-  // CHECK:     }
-  // CHECK:     %[[ADDF_RES:.+]] = arith.addf {{.*}} : f64
-  // CHECK:     tensor.from_elements %[[ADDF_RES]] : tensor<f64>
-    %0 = arith.cmpf ogt, %arg0, %arg1 : f64
-    %1:2 = scf.if %0 -> (f64, tensor<f64>) {
-      %3 = arith.subf %arg0, %arg1 : f64
-      %from_elements_0 = tensor.from_elements %3 : tensor<f64>
-      scf.yield %arg0, %from_elements_0 : f64, tensor<f64>
-    } else {
-      %3 = arith.subf %arg1, %arg0 : f64
-      %from_elements_0 = tensor.from_elements %3 : tensor<f64>
-      scf.yield %arg0, %from_elements_0 : f64, tensor<f64>
-    }
-    %extracted = tensor.extract %1#1[] : tensor<f64>
-    %2 = arith.addf %1#0, %extracted : f64
-    %from_elements = tensor.from_elements %2 : tensor<f64>
-    return %from_elements : tensor<f64>
-  }
+  return %1 : tensor<f64>
 }
