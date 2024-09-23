@@ -21,6 +21,8 @@ import pytest
 
 from catalyst import qjit, vmap
 
+# pylint: disable=bug-vmap-shape
+
 
 class TestVectorizeMap:
     """Test QJIT compatibility with JAX vectorization."""
