@@ -13,12 +13,10 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
-# pylint: disable=unused-argument
-import pathlib
 
-# pylint: disable=unused-argument
+import pathlib
 import platform
-from functools import partial
+from dataclasses import replace
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
@@ -45,11 +43,7 @@ from catalyst.api_extensions.control_flow import (
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.device.decomposition import (
-    catalyst_acceptance,
-    catalyst_decompose,
-    decompose_ops_to_unitary,
-)
+from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import (
@@ -58,9 +52,10 @@ from catalyst.utils.toml import (
     ProgramFeatures,
     TOMLDocument,
     load_device_capabilities,
-    pennylane_operation_set,
     read_toml_file,
 )
+
+# pylint: disable=unused-argument
 
 
 def get_test_config(config_text: str) -> TOMLDocument:
@@ -90,8 +85,7 @@ class DummyDevice(Device):
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
-        program_features = ProgramFeatures(bool(shots))
-        dummy_capabilities = get_device_capabilities(self, program_features)
+        dummy_capabilities = get_device_capabilities(self)
         dummy_capabilities.native_ops.pop("BlockEncode")
         dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
         self.qjit_capabilities = dummy_capabilities
@@ -276,8 +270,6 @@ capabilities = get_test_device_capabilities(
     ),
 )
 
-expected_ops = pennylane_operation_set(capabilities.native_ops)
-
 
 class TestPreprocessHybridOp:
     """Test that the operators on the tapes nested inside HybridOps are also decomposed"""
@@ -287,8 +279,6 @@ class TestPreprocessHybridOp:
         """Tests that for a tape containing a HybridOp that contains unsupported
         Operators, the unsupported Operators are decomposed"""
 
-        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
-
         # hack for unit test (since it doesn't create a full context)
         for region in op.regions:
             region.trace = None
@@ -296,7 +286,7 @@ class TestPreprocessHybridOp:
         # create and decompose the tape
         tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
 
         old_op = tape[0]
         new_op = new_tape[0]
@@ -308,6 +298,7 @@ class TestPreprocessHybridOp:
 
         # the HybridOp on the original tape is unmodified, i.e. continues to contain ops
         # not in `expected_ops`. The post-decomposition HybridOp tape does not
+        expected_ops = capabilities.native_ops
         for i in range(num_regions):
             if old_op.regions[i].quantum_tape:
                 assert not np.all(
@@ -456,8 +447,6 @@ class TestPreprocessHybridOp:
     def test_decomposition_of_nested_HybridOp(self):
         """Tests that HybridOps with HybridOps nested inside them are still decomposed correctly"""
 
-        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
-
         # make a weird nested op
         adjoint_op = HybridAdjoint([], [], [region1])
         ops = [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]  # Hadamard will decompose
@@ -479,7 +468,7 @@ class TestPreprocessHybridOp:
 
         # do the decomposition and get the new tape
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
 
         # unsupported ops on the top-level tape have been decomposed (no more Hadamard)
         assert "Hadamard" not in [op.name for op in new_tape.operations]
@@ -500,7 +489,7 @@ class TestPreprocessHybridOp:
         )
         # unsupported ops in the subtape decomposed (original tapes contained Hadamard)
         for subtape in cond_subtapes:
-            assert np.all([op.name in expected_ops for op in subtape.operations])
+            assert np.all([op.name in capabilities.native_ops for op in subtape.operations])
             assert "Hadamard" not in [op.name for op in subtape.operations]
             assert "RZ" in [op.name for op in subtape.operations]
 
@@ -514,12 +503,10 @@ class TestPreprocessHybridOp:
     def test_controlled_decomposes_to_unitary_listed(self):
         """Test that a PennyLane toml-listed operation is decomposed to a QubitUnitary"""
 
-        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
-
         tape = qml.tape.QuantumScript([qml.PauliX(0), qml.S(0)])
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
 
         assert len(new_tape.operations) == 2
         assert isinstance(new_tape.operations[0], qml.PauliX)
@@ -528,12 +515,10 @@ class TestPreprocessHybridOp:
     def test_controlled_decomposes_to_unitary_controlled(self):
         """Test that a PennyLane controlled operation is decomposed to a QubitUnitary"""
 
-        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
-
         tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
 
         assert len(new_tape.operations) == 1
         new_op = new_tape.operations[0]
@@ -544,8 +529,6 @@ class TestPreprocessHybridOp:
     def test_error_for_pennylane_midmeasure_decompose(self):
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
-
-        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
 
         with qml.queuing.AnnotatedQueue() as q:
             qml.RX(1.23, wires=0)
@@ -558,13 +541,11 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+                _ = catalyst_decompose(tape, ctx, capabilities)
 
     def test_error_for_pennylane_midmeasure_decompose_nested(self):
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
-
-        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
 
         with qml.queuing.AnnotatedQueue() as q:
             qml.RX(1.23, wires=0)
@@ -583,14 +564,11 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+                _ = catalyst_decompose(tape, ctx, capabilities)
 
     def test_unsupported_op_with_no_decomposition_raises_error(self):
         """Test that an unsupported operator that doesn't provide a decomposition
         raises a CompileError"""
-
-        # operations=[], all ops are unsupported
-        stopping_condition = partial(catalyst_acceptance, operations=[])
 
         tape = qml.tape.QuantumScript([qml.Y(0)])
 
@@ -599,13 +577,10 @@ class TestPreprocessHybridOp:
             match="not supported with catalyst on this device and does not provide a decomposition",
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+                _ = catalyst_decompose(tape, ctx, replace(capabilities, native_ops={}))
 
     def test_decompose_to_matrix_raises_error(self):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
-
-        # operations=[], all ops are unsupported
-        stopping_condition = partial(catalyst_acceptance, operations=[])
 
         class NoMatrixMultiControlledX(qml.MultiControlledX):
             """A version of MulitControlledX with no matrix defined"""
@@ -618,7 +593,11 @@ class TestPreprocessHybridOp:
 
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+                _ = catalyst_decompose(
+                    tape,
+                    ctx,
+                    replace(capabilities, native_ops={"QubitUnitary": OperationProperties()}),
+                )
 
 
 if __name__ == "__main__":
