@@ -15,6 +15,8 @@ BUILD_TYPE?=Release
 LLVM_ROOT=$(MK_DIR)/llvm-project
 LLVM_MODULE_PATCH_FILE=$(MK_DIR)/patches/moduleOp-bufferization.patch
 LLVM_FUNC_CALL_PATCH_FILE=$(MK_DIR)/patches/callOp-bufferization.patch
+MHLO_ROOT?=$(MK_DIR)/mlir-hlo
+MHLO_MODULE_PATCH_FILE=$(MK_DIR)/patches/moduleOp-mhlo.patch
 TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 
@@ -93,6 +95,9 @@ mhlo:
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
+	@if patch --dry-run -p1 -N --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE) > /dev/null 2>&1; then \
+        patch -p1 --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE); \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
