@@ -50,7 +50,6 @@ from catalyst.jax_primitives import (
     state_p,
     var_p,
 )
-from catalyst.utils.toml import ProgramFeatures
 
 measurement_map = {
     "sample_wires": sample_p,
