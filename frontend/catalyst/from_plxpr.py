@@ -78,10 +78,9 @@ def _read(var, env: dict):
     return var.val if type(var) is jax.core.Literal else env[var]
 
 
-def _get_device_kwargs(device: "pennylane.devices.Device") -> dict:
+def _get_device_kwargs(device) -> dict:
     """Calulcate the params for a device equation."""
-    features = ProgramFeatures(device.shots is not None)
-    capabilities = get_device_capabilities(device, features)
+    capabilities = get_device_capabilities(device)
     info = extract_backend_info(device, capabilities)
     # Note that the value of rtd_kwargs is a string version of
     # the info kwargs, not the info kwargs itself
@@ -217,7 +216,7 @@ class QFuncPlxprInterpreter:
 
     wire_map: dict
     """A map from wire values to ``AbstractQbit`` instances.
-    
+
     If a value is not present in this dictionary, it needs to be extracted
     from the ``qreg`` property.
     """

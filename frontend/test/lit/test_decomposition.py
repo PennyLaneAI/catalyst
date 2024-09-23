@@ -24,11 +24,7 @@ import pennylane as qml
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
+from catalyst.utils.toml import OperationProperties, pennylane_operation_set
 
 
 def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
@@ -51,10 +47,7 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(self.shots))
-            lightning_capabilities = get_device_capabilities(
-                self.lightning_device, program_features
-            )
+            lightning_capabilities = get_device_capabilities(self.lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in discards:
                 custom_capabilities.native_ops.pop(gate, None)

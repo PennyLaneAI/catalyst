@@ -313,10 +313,7 @@ class QJITDevice(qml.devices.Device):
 
         # Capability loading
         if original_device_capabilities is None:
-            program_features = ProgramFeatures(shots_present=bool(original_device.shots))
-            original_device_capabilities = get_device_capabilities(
-                original_device, program_features
-            )
+            original_device_capabilities = get_device_capabilities(original_device)
         if backend is None:
             backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
 
@@ -519,20 +516,18 @@ def get_device_toml_config(device) -> TOMLDocument:
     return config
 
 
-def get_device_capabilities(
-    device, program_features: Optional[ProgramFeatures] = None
-) -> DeviceCapabilities:
+def get_device_capabilities(device) -> DeviceCapabilities:
     """Get or load DeviceCapabilities structure from device"""
+    assert not isinstance(device, QJITDevice)
+
+    # TODO: This code exists purely for testing. Find another way to customize device
+    #       support easily without injecting code into the package.
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
-    else:
-        program_features = (
-            program_features
-            if program_features
-            else ProgramFeatures(shots_present=bool(device.shots))
-        )
-        device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features)
+
+    program_features = ProgramFeatures(shots_present=bool(device.shots))
+    device_config = get_device_toml_config(device)
+    return load_device_capabilities(device_config, program_features)
 
 
 def check_device_wires(wires):

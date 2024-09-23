@@ -36,11 +36,7 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
+from catalyst.utils.toml import OperationProperties, pennylane_operation_set
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
@@ -70,8 +66,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(kwargs.get("shots")))
-            lightning_capabilities = get_device_capabilities(lightning_device, program_features)
+            lightning_capabilities = get_device_capabilities(lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
                 custom_capabilities.native_ops[gate] = OperationProperties(True, True, True)

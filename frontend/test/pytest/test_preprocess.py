@@ -90,8 +90,7 @@ class DummyDevice(Device):
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
-        program_features = ProgramFeatures(bool(shots))
-        dummy_capabilities = get_device_capabilities(self, program_features)
+        dummy_capabilities = get_device_capabilities(self)
         dummy_capabilities.native_ops.pop("BlockEncode")
         dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
         self.qjit_capabilities = dummy_capabilities
