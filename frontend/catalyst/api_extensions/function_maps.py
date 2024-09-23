@@ -320,7 +320,7 @@ class VmapCallable:
 
         batch_sizes = []
         for arg, d in zip(args_flat, axes_flat):
-            shape = np.shape(arg) if arg.shape else (1,)
+            shape = np.shape(arg)
             if d is not None and len(shape) > d:
                 batch_sizes.append(shape[d])
 

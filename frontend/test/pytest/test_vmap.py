@@ -782,3 +782,13 @@ class TestVectorizeMap:
         expected = jnp.array([0.93005586, 0.00498127, -0.88789978])
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
+
+    def test_vmap_with_static_args(self):
+        """Confirm that vmap works when used with shape-less values."""
+
+        @vmap(in_axes=(None, 0))
+        def f(n, arr):
+            return n * arr
+
+        batch_size = f._get_batch_size((10, jnp.zeros((2, 5))), (None, 0), None)
+        assert batch_size == 2
