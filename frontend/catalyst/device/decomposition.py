@@ -38,7 +38,7 @@ from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import DeviceCapabilities, pennylane_operation_set
+from catalyst.utils.toml import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -49,10 +49,8 @@ def check_alternative_support(op, capabilities):
 
     if isinstance(op, qml.ops.Controlled):
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
-        if (
-            capabilities.native_ops.get(op.base.name)
-            and capabilities.native_ops.get(op.base.name).controllable
-        ):
+        supported = capabilities.native_ops.get(op.base.name)
+        if supported and supported.controllable:
             return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
@@ -71,7 +69,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
     if capabilities.native_ops.get("QubitUnitary"):
         # If the device supports unitary matrices, apply the relevant conversions and fallbacks.
-        if capabilities.to_matrix_ops.get(op.name) or (
+        if op.name in capabilities.to_matrix_ops or (
             op.has_matrix and isinstance(op, qml.ops.Controlled)
         ):
             return _decompose_to_matrix(op)
@@ -96,10 +94,9 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     the HybridOps have been passed to the decompose function.
     """
 
-    op_capabilities = pennylane_operation_set(capabilities.native_ops)
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: catalyst_acceptance(op, op_capabilities)),
+        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
         skip_initial_state_prep=capabilities.initial_state_prep_flag,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         name="catalyst on this device",
@@ -188,9 +185,22 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
-    """Specify whether or not an Operator is supported."""
-    return op.name in operations
+def catalyst_acceptance(op: qml.operation.Operation, capabilities: DeviceCapabilities) -> str:
+    """Check whether or not an Operator is supported."""
+    op_support = capabilities.native_ops
+
+    if isinstance(op, qml.ops.Adjoint):
+        match = catalyst_acceptance(op.base, capabilities)
+        if not match or not op_support[match].invertible:
+            return None
+    elif type(op) is qml.ops.ControlledOp:
+        match = catalyst_acceptance(op.base, capabilities)
+        if not match or not op_support[match].controllable:
+            return None
+    else:
+        match = op.name if op.name in op_support else None
+
+    return match
 
 
 @transform
