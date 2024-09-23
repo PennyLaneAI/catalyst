@@ -24,7 +24,7 @@ import pennylane as qml
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import OperationProperties, pennylane_operation_set
+from catalyst.utils.toml import OperationProperties
 
 
 def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
@@ -62,20 +62,6 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
         def apply(self, operations, **kwargs):
             """Unused"""
             raise RuntimeError("Only C/C++ interface is defined")
-
-        @property
-        def operations(self):
-            """Return operations using PennyLane's C(.) syntax"""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Return PennyLane observables"""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         @staticmethod
         def get_c_interface():

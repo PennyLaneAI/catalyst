@@ -55,7 +55,7 @@ class DummyDevice(Device):
         dummy_capabilities = get_device_capabilities(self)
         dummy_capabilities.native_ops.pop("BlockEncode")
         dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.qjit_capabilities = dummy_capabilities
+        self.capabilities = dummy_capabilities
 
     @staticmethod
     def get_c_interface():
@@ -650,7 +650,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
+        assert qjit_dev.capabilities.non_commuting_observables_flag is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -677,7 +677,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
+        assert qjit_dev.capabilities.non_commuting_observables_flag is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -694,24 +694,24 @@ class TestMeasurementTransforms:
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)
-        assert "Sum" in qjit_dev1.qjit_capabilities.native_obs
-        assert "Hamiltonian" in qjit_dev1.qjit_capabilities.native_obs
-        assert qjit_dev1.qjit_capabilities.non_commuting_observables_flag is True
+        assert "Sum" in qjit_dev1.capabilities.native_obs
+        assert "Hamiltonian" in qjit_dev1.capabilities.native_obs
+        assert qjit_dev1.capabilities.non_commuting_observables_flag is True
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
         qjit_dev2 = QJITDevice(dev)
-        del qjit_dev2.qjit_capabilities.native_obs["Sum"]
-        del qjit_dev2.qjit_capabilities.native_obs["Hamiltonian"]
+        del qjit_dev2.capabilities.native_obs["Sum"]
+        del qjit_dev2.capabilities.native_obs["Hamiltonian"]
 
         # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
         qjit_dev3 = QJITDevice(dev)
-        del qjit_dev3.qjit_capabilities.native_obs["Sum"]
-        del qjit_dev3.qjit_capabilities.native_obs["Hamiltonian"]
-        qjit_dev3.qjit_capabilities.non_commuting_observables_flag = False
+        del qjit_dev3.capabilities.native_obs["Sum"]
+        del qjit_dev3.capabilities.native_obs["Hamiltonian"]
+        qjit_dev3.capabilities.non_commuting_observables_flag = False
 
         # dev4 supports sums but NOT non-commuting observables - split_non_commuting
         qjit_dev4 = QJITDevice(dev)
-        qjit_dev4.qjit_capabilities.non_commuting_observables_flag = False
+        qjit_dev4.capabilities.non_commuting_observables_flag = False
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:

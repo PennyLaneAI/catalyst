@@ -22,7 +22,7 @@ import pennylane as qml
 
 from catalyst import qjit
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import OperationProperties, pennylane_operation_set
+from catalyst.utils.toml import OperationProperties
 
 
 def get_custom_qjit_device(num_wires, discards, additions):
@@ -50,20 +50,6 @@ def get_custom_qjit_device(num_wires, discards, additions):
                 custom_capabilities.native_ops.pop(gate)
             custom_capabilities.native_ops.update(additions)
             self.qjit_capabilities = custom_capabilities
-
-        @property
-        def operations(self):
-            """Get PennyLane operations."""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Get PennyLane observables."""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         def execute(self, circuits, execution_config):
             """Exececute the device (no)."""

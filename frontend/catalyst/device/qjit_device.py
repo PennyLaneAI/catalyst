@@ -56,7 +56,6 @@ from catalyst.utils.toml import (
     TOMLDocument,
     intersect_operations,
     load_device_capabilities,
-    pennylane_operation_set,
     read_toml_file,
 )
 
@@ -309,22 +308,7 @@ class QJITDevice(qml.devices.Device):
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
 
-        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
-
-    @property
-    def operations(self) -> Set[str]:
-        """Get the device operations"""
-        return pennylane_operation_set(self.qjit_capabilities.native_ops)
-
-    @property
-    def observables(self) -> Set[str]:
-        """Get the device observables"""
-        return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
-    @property
-    def measurement_processes(self) -> Set[str]:
-        """Get the device measurement processes"""
-        return self.qjit_capabilities.measurement_processes
+        self.capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @debug_logger
     def preprocess(
@@ -376,7 +360,7 @@ class QJITDevice(qml.devices.Device):
         )
         program.add_transform(
             validate_measurements,
-            self.qjit_capabilities,
+            self.capabilities,
             self.original_device.name,
             self.original_device.shots,
         )
@@ -397,30 +381,30 @@ class QJITDevice(qml.devices.Device):
             return measurement_program
 
         supports_sum_observables = any(
-            obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
+            obs in self.capabilities.native_obs for obs in ("Sum", "Hamiltonian")
         )
 
-        if self.qjit_capabilities.non_commuting_observables_flag is False:
+        if self.capabilities.non_commuting_observables_flag is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
-        # if no observables are supported, we apply a transform to convert *everything* to the readout basis,
-        # using either sample or counts based on device specification
-        if not self.observables:
+        # if no observables are supported, we apply a transform to convert *everything* to the
+        # readout basis, using either sample or counts based on device specification
+        if not self.capabilities.native_obs:
             if not split_non_commuting in measurement_program:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
                 measurement_program.add_transform(split_non_commuting)
-            if "Sample" in self.measurement_processes:
+            if "Sample" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
-            elif "Counts" in self.measurement_processes:
+            elif "Counts" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
         # if only some observables are supported, we try to diagonalize those that aren't
-        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.native_obs):
             if not split_non_commuting in measurement_program:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
@@ -433,7 +417,7 @@ class QJITDevice(qml.devices.Device):
             }
             # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
-                self.observables
+                self.capabilities.native_obs
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
