@@ -319,10 +319,17 @@ class VmapCallable:
         """
 
         batch_sizes = []
-        for arg, d in zip(args_flat, axes_flat):
+        for i, (arg, d) in enumerate(zip(args_flat, axes_flat)):
             shape = np.shape(arg)
-            if d is not None and len(shape) > d:
+            if d is None:
+                continue
+            elif len(shape) > d:
                 batch_sizes.append(shape[d])
+            else:
+                raise ValueError(
+                    f"Axis specifier {d} is out of bounds for argument {i}. "
+                    f"The argument only has {len(shape)} dimensions."
+                )
 
         if any(size != batch_sizes[0] for size in batch_sizes[1:]):
             raise ValueError(
