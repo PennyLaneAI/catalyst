@@ -403,14 +403,14 @@ class QJITDevice(qml.devices.Device):
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
-        elif self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}, {"Counts"}]:
+        elif not self.capabilities.measurement_processes - {"Counts", "Sample"}:
             # ToDo: this branch should become unneccessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
             if not split_non_commuting in measurement_program:
                 measurement_program.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
-                if "Sample" in self.measurement_processes
+                if "Sample" in self.capabilities.measurement_processes
                 else measurements_from_counts
             )
             measurement_program.add_transform(mp_transform, self.wires)
