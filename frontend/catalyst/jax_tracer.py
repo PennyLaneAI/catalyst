@@ -525,11 +525,11 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "static_argnums": static_argnums,
-                "abstracted_axes": abstracted_axes,
-            }
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef

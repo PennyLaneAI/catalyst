@@ -1624,8 +1624,7 @@ def test_forloop_vmap_worflow_derivation(backend):
         jacobian(
             my_model,
             argnums=1,
-        ),
-        keep_intermediate=True,
+        )
     )(data, params["weights"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
 

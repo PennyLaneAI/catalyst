@@ -13,8 +13,8 @@
 # limitations under the License.
 
 """
-This module contains which provides Python decorators
-for enabling and configuring individual Catalyst MLIR compiler passes.
+This module contains Python decorators for enabling and configuring
+individual Catalyst MLIR compiler passes.
 
 .. note::
 
@@ -33,14 +33,155 @@ for enabling and configuring individual Catalyst MLIR compiler passes.
 """
 
 import copy
+import functools
+from typing import Optional
 
 import pennylane as qml
 
 from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
+from catalyst.tracing.contexts import EvaluationContext
 
 
 ## API ##
 # pylint: disable=line-too-long
+def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
+    """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
+
+    Args:
+        fn (QNode): The QNode to run the pass pipeline on.
+        pass_pipeline (dict[str, dict[str, str]]): A dictionary that specifies the pass pipeline order, and optionally
+            arguments for each pass in the pipeline. Keys of this dictionary should correspond to names of passes
+            found in the `catalyst.passes <https://docs.pennylane.ai/projects/catalyst/en/stable/code
+            /__init__.html#module-catalyst.passes>`_ module, values should either be empty dictionaries
+            (for default pass options) or dictionaries of valid keyword arguments and values for the specific pass.
+            The order of keys in this dictionary will determine the pass pipeline.
+            If not specified, the default pass pipeline will be applied.
+
+    Returns:
+        ~.QNode:
+
+    For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
+
+    The default pass pipeline when used with Catalyst is currently empty.
+
+    **Example**
+
+    ``pipeline`` can be used to configure the pass pipeline order and options
+    of a QNode within a qjit-compiled function.
+
+    Configuration options are passed to specific passes via dictionaries:
+
+    .. code-block:: python
+
+        my_pass_pipeline = {
+            "cancel_inverses": {},
+            "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+        }
+
+        @pipeline(my_pass_pipeline)
+        @qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qjit
+        def fn(x):
+            return jnp.sin(circuit(x ** 2))
+
+    ``pipeline`` can also be used to specify different pass pipelines for different parts of the
+    same qjit-compiled workflow:
+
+    .. code-block:: python
+
+        my_pipeline = {
+            "cancel_inverses": {},
+            "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+        }
+
+        my_other_pipeline = {"cancel_inverses": {}}
+
+        @qjit
+        def fn(x):
+            circuit_pipeline = pipeline(my_pipeline)(circuit)
+            circuit_other = pipeline(my_other_pipeline)(circuit)
+            return jnp.abs(circuit_pipeline(x) - circuit_other(x))
+
+    .. note::
+
+        As of Python 3.7, the CPython dictionary implementation orders dictionaries based on
+        insertion order. However, for an API gaurantee of dictionary order, ``collections.OrderedDict``
+        may also be used.
+
+    Note that the pass pipeline order and options can be configured *globally* for a
+    qjit-compiled function, by using the ``circuit_transform_pipeline`` argument of
+    the :func:`~.qjit` decorator.
+
+    .. code-block:: python
+
+        my_pass_pipeline = {
+            "cancel_inverses": {},
+            "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+        }
+
+        @qjit(circuit_transform_pipeline=my_pass_pipeline)
+        def fn(x):
+            return jnp.sin(circuit(x ** 2))
+
+    Global and local (via ``@pipeline``) configurations can coexist, however local pass pipelines
+    will always take precedence over global pass pipelines.
+    """
+
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(pipeline, **kwargs)
+
+    if not isinstance(fn, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+
+    if pass_pipeline is None:
+        # TODO: design a default peephole pipeline
+        return fn
+
+    fn_original_name = fn.__name__
+    wrapped_qnode_function = fn.func
+    fn_clone = copy.copy(fn)
+    uniquer = str(_rename_to_unique())
+    fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
+
+    pass_names = _API_name_to_pass_name()
+
+    def wrapper(*args, **kwrags):
+        # TODO: we should not match pass targets by function name.
+        # The quantum scope work will likely put each qnode into a module
+        # instead of a `func.func ... attributes {qnode}`.
+        # When that is in place, the qnode's module can have a proper attribute
+        # (as opposed to discardable) that records its transform schedule, i.e.
+        #    module_with_transform @name_of_module {
+        #      // transform schedule
+        #    } {
+        #      // contents of the module
+        #    }
+        # This eliminates the need for matching target functions by name.
+
+        if EvaluationContext.is_tracing():
+            for API_name, pass_options in pass_pipeline.items():
+                opt = ""
+                for option, option_value in pass_options.items():
+                    opt += " " + str(option) + "=" + str(option_value)
+                apply_registered_pass_p.bind(
+                    pass_name=pass_names[API_name],
+                    options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
+                )
+        return wrapped_qnode_function(*args, **kwrags)
+
+    fn_clone.func = wrapper
+    fn_clone._peephole_transformed = True  # pylint: disable=protected-access
+
+    return fn_clone
+
+
 def cancel_inverses(fn=None):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
@@ -150,33 +291,50 @@ def cancel_inverses(fn=None):
     if not isinstance(fn, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    wrapped_qnode_function = fn.func
     funcname = fn.__name__
+    wrapped_qnode_function = fn.func
+    uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
-        # TODO: hint the compiler which qnodes to run the pass on via an func attribute,
-        # instead of the qnode name. That way the clone can have this attribute and
-        # the original can just not have it.
-        # We are not doing this right now and passing by name because this would
-        # be a discardable attribute (i.e. a user/developer wouldn't know that this
-        # attribute exists just by looking at qnode's documentation)
-        # But when we add the full peephole pipeline in the future, the attribute
-        # could get properly documented.
-
-        apply_registered_pass_p.bind(
-            pass_name="remove-chained-self-inverse",
-            options=f"func-name={funcname}" + "_cancel_inverses",
-        )
+        if EvaluationContext.is_tracing():
+            apply_registered_pass_p.bind(
+                pass_name="remove-chained-self-inverse",
+                options=f"func-name={funcname}" + "_cancel_inverses" + uniquer,
+            )
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone = copy.copy(fn)
     fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_cancel_inverses"
+    fn_clone.__name__ = funcname + "_cancel_inverses" + uniquer
 
     return fn_clone
 
 
 ## IMPL and helpers ##
+# pylint: disable=missing-function-docstring
+class _PipelineNameUniquer:
+    def __init__(self, i):
+        self.i = i
+
+    def get(self):
+        self.i += 1
+        return self.i
+
+    def reset(self):
+        self.i = -1
+
+
+PipelineNameUniquer = _PipelineNameUniquer(-1)
+
+
+def _rename_to_unique():
+    return PipelineNameUniquer.get()
+
+
+def _API_name_to_pass_name():
+    return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotation"}
+
+
 def _inject_transform_named_sequence():
     """
     Inject a transform_named_sequence jax primitive.

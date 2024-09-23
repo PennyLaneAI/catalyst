@@ -152,7 +152,7 @@ Integration with Python devices
 
 There are two things that are needed in order to integrate with PennyLane devices:
 
-* Adding a ``get_c_interface`` method to your ``qml.Device`` or  ``qml.devices.Device`` class.
+* Adding a ``get_c_interface`` method to your ``qml.devices.Device`` class.
 * Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
@@ -163,40 +163,7 @@ The ``get_c_interface`` method should be a static method that takes no parameter
     The first result of ``get_c_interface`` needs to match the ``<DeviceIdentifier>``
     as described in the first section.
 
-With the old device API, you can simply build a QJIT compatible device:
-
-.. code-block:: python
-
-    class CustomDevice(qml.Device):
-        """Dummy Device"""
-
-        name = "Dummy Device"
-        short_name = "dummy.device"
-        pennylane_requires = "0.33.0"
-        version = "0.0.1"
-        author = "An Author"
-        config = pathlib.Path("absolute/path/to/configuration/file.toml")
-
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
-
-        def apply(self, operations, **kwargs):
-            """Your normal definitions"""
-
-        @staticmethod
-        def get_c_interface():
-            """ Returns a tuple consisting of the device name, and
-            the location to the shared object with the C/C++ device implementation.
-            """
-
-            return "CustomDevice", "absolute/path/to/librtd_dummy.so"
-
-    @qjit
-    @qml.qnode(CustomDevice(wires=1))
-    def f():
-        return measure(0)
-
-or with the new device API:
+The Pennylane device API allows you to build a QJIT compatible device in a simple way:
 
 .. code-block:: python
 

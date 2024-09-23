@@ -2,7 +2,33 @@
 
 <h3>New features</h3>
 
-* Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`. Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be structured using Python containers. For example, a program can return a dictionary like `return {"first": qml.sample(), "second": qml.sample()}`.
+* Experimental integration of the PennyLane capture module is available. It currently only supports 
+  quantum gates, without control flow.
+  [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
+
+  To trigger the PennyLane pipeline for capturing the program as a JaxPR, one needs to simply
+  set `experimental_capture=True` in the qjit decorator.
+  
+  ```python 
+  import pennylane as qml
+  from catalyst import qjit
+  
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  @qml.qnode(dev)
+  def circuit():
+      qml.Hadamard(0)
+      qml.CNOT([0, 1])
+      return qml.expval(qml.Z(0))
+  ```
+
+* Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently
+  available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow
+  elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`.
+  Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be
+  structured using Python containers. For example, a program can return a dictionary like
+  `return {"first": qml.sample(), "second": qml.sample()}`.
   [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
   For example,
@@ -25,6 +51,95 @@
   (Array([[0], [1], [0], [1], [1]], dtype=int64),
   Array([[0], [1], [1], [0], [1]], dtype=int64),
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
+  ```
+
+* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline for QNodes within a qjit-compiled workflow to be configured.
+  [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
+
+  ```python
+    my_passes = {
+        "cancel_inverses": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+    }
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @pipeline(my_passes)
+    @qnode(dev)
+    def circuit(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def fn(x):
+        return jnp.sin(circuit(x ** 2))
+  ```
+
+  `pipeline` can also be used to specify different pass pipelines for different parts of the
+  same qjit-compiled workflow:
+
+  ```python
+    my_pipeline = {
+        "cancel_inverses": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+    }
+
+    my_other_pipeline = {"cancel_inverses": {}}
+
+    @qjit
+    def fn(x):
+        circuit_pipeline = pipeline(my_pipeline)(circuit)
+        circuit_other = pipeline(my_other_pipeline)(circuit)
+        return jnp.abs(circuit_pipeline(x) - circuit_other(x))
+  ```
+
+  For a list of available passes, please see the [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+
+  The pass pipeline order and options can be configured *globally* for a
+  qjit-compiled function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit` decorator.
+
+  ```python
+    my_passes = {
+        "cancel_inverses": {},
+        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+    }
+
+    @qjit(circuit_transform_pipeline=my_passes)
+    def fn(x):
+        return jnp.sin(circuit(x ** 2))
+  ```
+
+  Global and local (via `@pipeline`) configurations can coexist, however local pass pipelines
+  will always take precedence over global pass pipelines.
+
+  Available MLIR passes are now documented and available within the
+  [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+
+* Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's array assignment operator syntax.
+  [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
+  [(#1143)](https://github.com/PennyLaneAI/catalyst/pull/1143)
+
+  Using operator assignment syntax in favor of `at...op` expressions is now possible for the following operations:
+  * `x[i] += y` in favor of `x.at[i].add(y)`
+  * `x[i] -= y` in favor of `x.at[i].add(-y)`
+  * `x[i] *= y` in favor of `x.at[i].multiply(y)`
+  * `x[i] /= y` in favor of `x.at[i].divide(y)`
+  * `x[i] **= y` in favor of `x.at[i].power(y)`
+
+  ```python
+  @qjit(autograph=True)
+  def f(x):
+    first_dim = x.shape[0]
+    result = jnp.copy(x)
+
+    for i in range(first_dim):
+      result[i] *= 2  # This is now supported
+
+    return result
+  ```
+
+  ```pycon
+  >>> f(jnp.array([1, 2, 3]))
+  Array([2, 4, 6], dtype=int64)
   ```
 
 <h3>Improvements</h3>
@@ -60,6 +175,9 @@
   `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
   [(#1106)](https://github.com/PennyLaneAI/catalyst/pull/1106)
 
+* Catalyst now supports numpy 2.0
+  [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
@@ -70,6 +188,9 @@
 <h3>Bug fixes</h3>
 
 <h3>Internal changes</h3>
+
+* Update Enzyme to version `v0.0.149`.
+  [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
 
 * Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
   running gradient like functions.
@@ -85,6 +206,12 @@
   case the `DefaultExecutionConfig` object becomes modified from its original state.
   [(#1137)](https://github.com/PennyLaneAI/catalyst/pull/1137)
 
+* Remove the old `QJITDevice` API.
+  [(#1138)](https://github.com/PennyLaneAI/catalyst/pull/1138)
+
+* The device capability loading mechanism has been moved into the `QJITDevice` constructor.
+  [(#1141)](https://github.com/PennyLaneAI/catalyst/pull/1141)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -93,6 +220,9 @@ Joey Carter,
 Lillian M.A. Frederiksen,
 Romain Moyard,
 Erick Ochoa Lopez,
+Mehrdad Malekmohammadi,
 Paul Haochen Wang,
 Sengthai Heng,
-Daniel Strano.
+Spencer Comin,
+Daniel Strano,
+Raul Torres.

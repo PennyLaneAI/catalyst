@@ -27,14 +27,12 @@ from pennylane.transforms.core import TransformProgram
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import (
-    QJITDeviceNewAPI,
-    extract_backend_info,
+    QJITDevice,
     get_device_capabilities,
     get_device_toml_config,
     qjit_device,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import ProgramFeatures
 
 # pylint:disable = protected-access,attribute-defined-outside-init
 
@@ -99,9 +97,7 @@ def test_qjit_device():
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
-    backend_info = extract_backend_info(device, capabilities)
-    device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
+    device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
     assert device_qjit.shots == qml.measurements.Shots(2032)
@@ -136,14 +132,11 @@ def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
     device = DummyDeviceNoWires(shots=2032)
 
-    # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
-    backend_info = extract_backend_info(device, capabilities)
-
     with pytest.raises(
         AttributeError, match="Catalyst does not support device instances without set wires."
     ):
-        QJITDeviceNewAPI(device, capabilities, backend_info)
+        # Create qjit device
+        QJITDevice(device)
 
 
 @pytest.mark.parametrize(
@@ -159,14 +152,11 @@ def test_qjit_device_invalid_wires(wires):
     device = DummyDeviceNoWires(shots=2032)
     device._wires = wires
 
-    # Create qjit device
-    capabilities = get_device_capabilities(device, ProgramFeatures(bool(device.shots)))
-    backend_info = extract_backend_info(device, capabilities)
-
     with pytest.raises(
         AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
     ):
-        QJITDeviceNewAPI(device, capabilities, backend_info)
+        # Create qjit device
+        QJITDevice(device)
 
 
 @pytest.mark.parametrize("shots", [2048, None])
