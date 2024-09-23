@@ -2,17 +2,17 @@
 
 <h3>New features</h3>
 
-* Experimental integration of the PennyLane capture module is available. It currently only supports 
+* Experimental integration of the PennyLane capture module is available. It currently only supports
   quantum gates, without control flow.
   [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
 
   To trigger the PennyLane pipeline for capturing the program as a JaxPR, one needs to simply
   set `experimental_capture=True` in the qjit decorator.
-  
-  ```python 
+
+  ```python
   import pennylane as qml
   from catalyst import qjit
-  
+
   dev = qml.device("lightning.qubit", wires=1)
 
   @qjit(experimental_capture=True)
@@ -33,10 +33,10 @@
 
   For example,
 
-  ```python 
+  ```python
   import pennylane as qml
   from catalyst import qjit
-  
+
   dev = qml.device("lightning.qubit", wires=1, shots=((5, 2), 7))
 
   @qjit
@@ -144,8 +144,8 @@
 
 <h3>Improvements</h3>
 
-* Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`, 
-  `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`. 
+* Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`,
+  `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`.
   [(#1139)](https://github.com/PennyLaneAI/catalyst/pull/1139)
 
 * The decorator `self_inverses` now supports all Hermitian Gates.
@@ -167,11 +167,11 @@
 
   Three-bit Gates: Toffoli
   - [`qml.Toffoli`](https://docs.pennylane.ai/en/stable/code/api/pennylane.Toffoli.html)
-  
-  
 
-* Support is expanded for backend devices that exculsively return samples in the measurement 
-  basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`, 
+
+
+* Support is expanded for backend devices that exculsively return samples in the measurement
+  basis. Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`,
   `qml.var` and `qml.probs` measurements in addiiton to `qml.sample`, using the `measurements_from_samples` transform.
   [(#1106)](https://github.com/PennyLaneAI/catalyst/pull/1106)
 
@@ -192,11 +192,11 @@
 * Update Enzyme to version `v0.0.149`.
   [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
 
-* Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
+* Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when
   running gradient like functions.
   [(#1063)](https://github.com/PennyLaneAI/catalyst/pull/1063)
 
-* Functions with multiple tapes are now split with a new mlir pass `--split-multiple-tapes`, with one tape per function. 
+* Functions with multiple tapes are now split with a new mlir pass `--split-multiple-tapes`, with one tape per function.
   The reset routine that makes a maeasurement between tapes and inserts a X gate if measured one is no longer used.
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
@@ -211,6 +211,13 @@
 
 * The device capability loading mechanism has been moved into the `QJITDevice` constructor.
   [(#1141)](https://github.com/PennyLaneAI/catalyst/pull/1141)
+
+* Several functions related to device capabilities have been refactored.
+  [(#1149)](https://github.com/PennyLaneAI/catalyst/pull/1149)
+
+  In particular, the signatures of `get_device_capability`, `catalyst_decompose`,
+ `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
+  function has been removed entirely.
 
 <h3>Contributors</h3>
 
