@@ -21,7 +21,7 @@ import pytest
 
 from catalyst import qjit, vmap
 
-# pylint: disable=bug-vmap-shape
+# pylint: disable=protected-access
 
 
 class TestVectorizeMap:
