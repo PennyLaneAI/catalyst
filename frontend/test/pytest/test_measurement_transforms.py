@@ -269,6 +269,7 @@ class TestMeasurementTransforms:
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 transform_program, _ = qjit_dev.preprocess(ctx)
 
+            assert split_non_commuting in transform_program
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
@@ -292,59 +293,57 @@ class TestMeasurementTransforms:
         assert "probs" not in mlir
         assert target_measurement in mlir
 
-        @pytest.mark.parametrize(
-            "device_measurements, measurement_transform, target_measurement",
-            [
-                (["counts"], measurements_from_counts, "counts"),
-                (["sample"], measurements_from_samples, "sample"),
-                (["counts", "sample"], measurements_from_samples, "sample"),
-            ],
-        )
-        def test_measurement_from_readout_if_only_readout_measurements_supported(
-            self, device_measurements, measurement_transform, target_measurement
-        ):
-            """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
-            if the device only supports sample, and measurement_from_counts transform is applied if
-            the device only supports counts. If both are supported, sample takes precedence."""
+    @pytest.mark.parametrize(
+        "device_measurements, measurement_transform, target_measurement",
+        [
+            (["counts"], measurements_from_counts, "counts"),
+            (["sample"], measurements_from_samples, "sample"),
+            (["counts", "sample"], measurements_from_samples, "sample"),
+        ],
+    )
+    def test_measurement_from_readout_if_only_readout_measurements_supported(
+        self, device_measurements, measurement_transform, target_measurement
+    ):
+        """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
+        if the device only supports sample, and measurement_from_counts transform is applied if
+        the device only supports counts. If both are supported, sample takes precedence."""
 
-            allow_sample = "sample" in device_measurements
-            allow_counts = "counts" in device_measurements
+        allow_sample = "sample" in device_measurements
+        allow_counts = "counts" in device_measurements
 
-            with DummyDeviceLimitedMPs(
-                wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
-            ) as dev:
+        with DummyDeviceLimitedMPs(
+            wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
+        ) as dev:
 
-                with patch(
-                    "catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)
-                ):
-                    # transform is added to transform program
-                    qjit_dev = QJITDevice(dev)
+            # transform is added to transform program
+            qjit_dev = QJITDevice(dev)
 
-                    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                        transform_program, _ = qjit_dev.preprocess(ctx)
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+                transform_program, _ = qjit_dev.preprocess(ctx)
 
-                    assert measurement_transform in transform_program
+            assert split_non_commuting in transform_program
+            assert measurement_transform in transform_program
 
-                    # MLIR only contains target measurement
-                    @qml.qjit
-                    @qml.qnode(dev)
-                    def circuit(theta: float):
-                        qml.X(0)
-                        qml.X(1)
-                        qml.X(2)
-                        qml.X(3)
-                        return (
-                            qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                            qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                            qml.probs(wires=[3, 4]),
-                        )
+            # MLIR only contains target measurement
+            @qml.qjit
+            @qml.qnode(dev)
+            def circuit(theta: float):
+                qml.X(0)
+                qml.X(1)
+                qml.X(2)
+                qml.X(3)
+                return (
+                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                    qml.probs(wires=[3, 4]),
+                )
 
-                    mlir = qml.qjit(circuit, target="mlir").mlir
+            mlir = qml.qjit(circuit, target="mlir").mlir
 
-                assert "expval" not in mlir
-                assert "quantum.var" not in mlir
-                assert "probs" not in mlir
-                assert target_measurement in mlir
+        assert "expval" not in mlir
+        assert "quantum.var" not in mlir
+        assert "probs" not in mlir
+        assert target_measurement in mlir
 
     def test_error_is_raised_if_no_observables_and_no_samples_or_counts(self, mocker):
         """Test that for a device that doesn't support observables, if counts
