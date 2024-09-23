@@ -23,11 +23,9 @@ import platform
 import re
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from functools import partial
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional
 
 import pennylane as qml
-from pennylane.measurements import MidMeasureMP
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
@@ -36,7 +34,6 @@ from pennylane.transforms import (
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
-    catalyst_acceptance,
     catalyst_decompose,
     measurements_from_counts,
     measurements_from_samples,
@@ -212,7 +209,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
 
 
 @debug_logger
-def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
+def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> DeviceCapabilities:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
@@ -380,13 +377,7 @@ class QJITDevice(qml.devices.Device):
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
-        ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(
-            catalyst_decompose,
-            ctx=ctx,
-            stopping_condition=ops_acceptance,
-            capabilities=self.qjit_capabilities,
-        )
+        program.add_transform(catalyst_decompose, ctx=ctx, capabilities=self.capabilities)
 
         # Catalyst program verification and validation
         program.add_transform(
