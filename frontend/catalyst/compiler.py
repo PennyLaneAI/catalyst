@@ -197,6 +197,8 @@ HLO_LOWERING_PASS = (
         "hlo-custom-call-lowering",
         "cse",
         "func.func(linalg-detensorize{aggressive-mode})",
+        "detensorize-scf",
+        "canonicalize",
     ],
 )
 
