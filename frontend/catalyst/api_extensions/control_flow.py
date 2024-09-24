@@ -19,6 +19,7 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
+import inspect
 from typing import Any, Callable, List
 
 import jax
@@ -236,7 +237,7 @@ def cond(pred: DynamicJaxprTracer):
     """
 
     def _decorator(true_fn: Callable):
-        if true_fn.__code__.co_argcount != 0:
+        if len(inspect.signature(true_fn).parameters):
             raise TypeError("Conditional 'True' function is not allowed to have any arguments")
         return CondCallable(pred, true_fn)
 
@@ -584,7 +585,7 @@ class CondCallable:
         """
 
         def decorator(branch_fn):
-            if branch_fn.__code__.co_argcount != 0:
+            if len(inspect.signature(branch_fn).parameters):
                 raise TypeError(
                     "Conditional 'else if' function is not allowed to have any arguments"
                 )
@@ -603,7 +604,7 @@ class CondCallable:
         Returns:
             self
         """
-        if otherwise_fn.__code__.co_argcount != 0:
+        if len(inspect.signature(otherwise_fn).parameters):
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self

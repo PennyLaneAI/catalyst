@@ -13,6 +13,9 @@
 
 <h3>Bug fixes</h3>
 
+* Fix error message displayed when using `qml.cond` on callables with arguments.
+  [(#1151)](https://github.com/PennyLaneAI/catalyst/pull/1151)
+
 * Resolve a bug in the `vmap` function when passing shapeless values to the target.
   [(#1150)](https://github.com/PennyLaneAI/catalyst/pull/1150)
 
@@ -20,8 +23,8 @@
   supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
   [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
-* Resolve a bug where `mitigate_with_zne` does not work properly with qnode using `mcm_method="one-shot"`,
-  the transform is correctly applied.
+* Resolve a bug where `mitigate_with_zne` does not work properly with qnode using
+  `mcm_method="one-shot"`, the transform is correctly applied.
   [(#1169)](https://github.com/PennyLaneAI/catalyst/pull/1169)
 
 <h3>Contributors</h3>
