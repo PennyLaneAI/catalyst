@@ -23,11 +23,9 @@ import platform
 import re
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from functools import partial
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional
 
 import pennylane as qml
-from pennylane.measurements import MidMeasureMP
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
@@ -36,7 +34,6 @@ from pennylane.transforms import (
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
-    catalyst_acceptance,
     catalyst_decompose,
     measurements_from_counts,
     measurements_from_samples,
@@ -59,7 +56,6 @@ from catalyst.utils.toml import (
     TOMLDocument,
     intersect_operations,
     load_device_capabilities,
-    pennylane_operation_set,
     read_toml_file,
 )
 
@@ -212,7 +208,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
 
 
 @debug_logger
-def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
+def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> DeviceCapabilities:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
@@ -289,19 +285,12 @@ class QJITDevice(qml.devices.Device):
 
     @staticmethod
     @debug_logger
-    def extract_backend_info(
-        device: qml.QubitDevice, capabilities: DeviceCapabilities
-    ) -> BackendInfo:
+    def extract_backend_info(device, capabilities: DeviceCapabilities) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, capabilities)
 
     @debug_logger_init
-    def __init__(
-        self,
-        original_device,
-        original_device_capabilities: DeviceCapabilities = None,
-        backend: Optional[BackendInfo] = None,
-    ):
+    def __init__(self, original_device):
         self.original_device = original_device
 
         for key, value in original_device.__dict__.items():
@@ -312,34 +301,14 @@ class QJITDevice(qml.devices.Device):
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         # Capability loading
-        if original_device_capabilities is None:
-            program_features = ProgramFeatures(shots_present=bool(original_device.shots))
-            original_device_capabilities = get_device_capabilities(
-                original_device, program_features
-            )
-        if backend is None:
-            backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
+        original_device_capabilities = get_device_capabilities(original_device)
+        backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
 
-        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
-
-    @property
-    def operations(self) -> Set[str]:
-        """Get the device operations"""
-        return pennylane_operation_set(self.qjit_capabilities.native_ops)
-
-    @property
-    def observables(self) -> Set[str]:
-        """Get the device observables"""
-        return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
-    @property
-    def measurement_processes(self) -> Set[str]:
-        """Get the device measurement processes"""
-        return self.qjit_capabilities.measurement_processes
+        self.capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @debug_logger
     def preprocess(
@@ -383,13 +352,7 @@ class QJITDevice(qml.devices.Device):
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
-        ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(
-            catalyst_decompose,
-            ctx=ctx,
-            stopping_condition=ops_acceptance,
-            capabilities=self.qjit_capabilities,
-        )
+        program.add_transform(catalyst_decompose, ctx=ctx, capabilities=self.capabilities)
 
         # Catalyst program verification and validation
         program.add_transform(
@@ -397,7 +360,7 @@ class QJITDevice(qml.devices.Device):
         )
         program.add_transform(
             validate_measurements,
-            self.qjit_capabilities,
+            self.capabilities,
             self.original_device.name,
             self.original_device.shots,
         )
@@ -418,42 +381,42 @@ class QJITDevice(qml.devices.Device):
             return measurement_program
 
         supports_sum_observables = any(
-            obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
+            obs in self.capabilities.native_obs for obs in ("Sum", "Hamiltonian")
         )
 
-        if self.qjit_capabilities.non_commuting_observables_flag is False:
+        if self.capabilities.non_commuting_observables_flag is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
-        # if no observables are supported, we apply a transform to convert *everything* to the readout basis,
-        # using either sample or counts based on device specification
-        if not self.observables:
+        # if no observables are supported, we apply a transform to convert *everything* to the
+        # readout basis, using either sample or counts based on device specification
+        if not self.capabilities.native_obs:
             if not split_non_commuting in measurement_program:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
                 measurement_program.add_transform(split_non_commuting)
-            if "Sample" in self.measurement_processes:
+            if "Sample" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
-            elif "Counts" in self.measurement_processes:
+            elif "Counts" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
-        elif self.measurement_processes in [{"Sample"}, {"Counts", "Sample"}, {"Counts"}]:
+        elif not self.capabilities.measurement_processes - {"Counts", "Sample"}:
             # ToDo: this branch should become unneccessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
             if not split_non_commuting in measurement_program:
                 measurement_program.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
-                if "Sample" in self.measurement_processes
+                if "Sample" in self.capabilities.measurement_processes
                 else measurements_from_counts
             )
             measurement_program.add_transform(mp_transform, self.wires)
 
         # if only some observables are supported, we try to diagonalize those that aren't
-        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.observables):
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.native_obs):
             if not split_non_commuting in measurement_program:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
@@ -466,7 +429,7 @@ class QJITDevice(qml.devices.Device):
             }
             # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
-                self.observables
+                self.capabilities.native_obs
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
@@ -531,20 +494,18 @@ def get_device_toml_config(device) -> TOMLDocument:
     return config
 
 
-def get_device_capabilities(
-    device, program_features: Optional[ProgramFeatures] = None
-) -> DeviceCapabilities:
+def get_device_capabilities(device) -> DeviceCapabilities:
     """Get or load DeviceCapabilities structure from device"""
+    assert not isinstance(device, QJITDevice)
+
+    # TODO: This code exists purely for testing. Find another way to customize device
+    #       support easily without injecting code into the package.
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
-    else:
-        program_features = (
-            program_features
-            if program_features
-            else ProgramFeatures(shots_present=bool(device.shots))
-        )
-        device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features)
+
+    program_features = ProgramFeatures(shots_present=bool(device.shots))
+    device_config = get_device_toml_config(device)
+    return load_device_capabilities(device_config, program_features)
 
 
 def check_device_wires(wires):

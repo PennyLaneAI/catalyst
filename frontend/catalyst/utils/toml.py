@@ -82,7 +82,7 @@ class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     to_decomp_ops: Dict[str, OperationProperties] = field(default_factory=dict)
     to_matrix_ops: Dict[str, OperationProperties] = field(default_factory=dict)
     native_obs: Dict[str, OperationProperties] = field(default_factory=dict)
-    measurement_processes: Set[str] = field(default_factory=dict)
+    measurement_processes: Set[str] = field(default_factory=set)
     qjit_compatible_flag: bool = False
     mid_circuit_measurement_flag: bool = False
     runtime_code_generation_flag: bool = False
@@ -97,22 +97,6 @@ def intersect_operations(
 ) -> Dict[str, OperationProperties]:
     """Intersects two sets of oepration properties"""
     return {k: _intersect_properties(a[k], b[k]) for k in (a.keys() & b.keys())}
-
-
-def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[str]:
-    """Returns a config section into a set of strings using PennyLane syntax"""
-    ops = set()
-    # Back-mapping from class names to string names
-    for g, props in config_ops.items():
-        ops.update({g})
-        if props.controllable:
-            ops.update({f"C({g})"})
-        if props.invertible:
-            ops.update({f"Adjoint({g})"})
-        if props.controllable and props.invertible:
-            ops.update({f"Adjoint(C({g}))"})
-            ops.update({f"C(Adjoint({g}))"})
-    return ops
 
 
 @dataclass

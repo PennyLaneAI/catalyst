@@ -20,7 +20,6 @@ import pathlib
 # pylint: disable=unused-argument
 import platform
 import tempfile
-from dataclasses import replace
 from functools import partial
 from typing import Optional
 from unittest.mock import Mock, patch
@@ -40,7 +39,7 @@ from catalyst.device.decomposition import (
     measurements_from_samples,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import OperationProperties, ProgramFeatures
+from catalyst.utils.toml import OperationProperties
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -53,11 +52,10 @@ class DummyDevice(Device):
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
-        program_features = ProgramFeatures(bool(shots))
-        dummy_capabilities = get_device_capabilities(self, program_features)
+        dummy_capabilities = get_device_capabilities(self)
         dummy_capabilities.native_ops.pop("BlockEncode")
         dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.qjit_capabilities = dummy_capabilities
+        self.capabilities = dummy_capabilities
 
     @staticmethod
     def get_c_interface():
@@ -700,7 +698,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
+        assert qjit_dev.capabilities.non_commuting_observables_flag is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -727,7 +725,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert qjit_dev.qjit_capabilities.non_commuting_observables_flag is non_commuting_flag
+        assert qjit_dev.capabilities.non_commuting_observables_flag is non_commuting_flag
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -741,26 +739,27 @@ class TestMeasurementTransforms:
         sum_observables_flag and the non_commuting_observables_flag"""
 
         dev = DummyDevice(wires=4, shots=1000)
-        dev_capabilities = get_device_capabilities(dev, ProgramFeatures(bool(dev.shots)))
 
         # dev1 supports non-commuting observables and sum observables - no splitting
-        assert "Sum" in dev_capabilities.native_obs
-        assert "Hamiltonian" in dev_capabilities.native_obs
-        assert dev_capabilities.non_commuting_observables_flag is True
-        qjit_dev1 = QJITDevice(dev, dev_capabilities)
+        qjit_dev1 = QJITDevice(dev)
+        assert "Sum" in qjit_dev1.capabilities.native_obs
+        assert "Hamiltonian" in qjit_dev1.capabilities.native_obs
+        assert qjit_dev1.capabilities.non_commuting_observables_flag is True
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
-        del dev_capabilities.native_obs["Sum"]
-        del dev_capabilities.native_obs["Hamiltonian"]
-        qjit_dev2 = QJITDevice(dev, dev_capabilities)
+        qjit_dev2 = QJITDevice(dev)
+        del qjit_dev2.capabilities.native_obs["Sum"]
+        del qjit_dev2.capabilities.native_obs["Hamiltonian"]
 
         # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
-        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
-        qjit_dev3 = QJITDevice(dev, dev_capabilities)
+        qjit_dev3 = QJITDevice(dev)
+        del qjit_dev3.capabilities.native_obs["Sum"]
+        del qjit_dev3.capabilities.native_obs["Hamiltonian"]
+        qjit_dev3.capabilities.non_commuting_observables_flag = False
 
         # dev4 supports sums but NOT non-commuting observables - split_non_commuting
-        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
-        qjit_dev4 = QJITDevice(dev, dev_capabilities)
+        qjit_dev4 = QJITDevice(dev)
+        qjit_dev4.capabilities.non_commuting_observables_flag = False
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
