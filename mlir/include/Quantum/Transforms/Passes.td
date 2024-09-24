@@ -124,6 +124,13 @@ def MergeRotationPass : Pass<"merge-rotation"> {
     );
 }
 
+def PropagateSimpleStatesPass : Pass<"propagate-simple-states"> {
+    let summary = "Propagate simple states through their corresponding gates down the circuit. The simple states are the six Pauli basis states.";
+
+    let constructor = "catalyst::createPropagateSimpleStatesPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
