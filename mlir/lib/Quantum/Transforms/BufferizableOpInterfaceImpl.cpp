@@ -312,7 +312,7 @@ struct SetStateOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return true;
+        return false;
     }
 
     bufferization::AliasingValueList
@@ -353,7 +353,7 @@ struct SetBasisStateOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return true;
+        return false;
     }
 
     bufferization::AliasingValueList
