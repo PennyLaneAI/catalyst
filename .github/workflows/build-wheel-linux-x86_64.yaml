@@ -172,7 +172,6 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
         export LLVM_ROOT=mlir/llvm-project
         export LLVM_MODULE_PATCH_FILE=mlir/llvm-project/patches/moduleOp-bufferization.patch
         export LLVM_FUNC_CALL_PATCH_FILE=mlir/llvm-project/patches/callOp-bufferization.patch
@@ -212,7 +211,6 @@ jobs:
       # building with LLD is a strong requirement for mhlo
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
         export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
         export MHLO_ROOT?=mlir/mlir-hlo
