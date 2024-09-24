@@ -45,7 +45,7 @@ from jax._src.interpreters.partial_eval import (
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.lax import _abstractify
-from jax._src.lax.slicing import _gather_lower
+from jax._src.lax.slicing import gather_p, _gather_lower
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as jax_current
@@ -506,11 +506,7 @@ def make_jaxpr2(
 
     register_lowering(gather2_p, _gather_lower)
 
-    primitive_batchers2 = jax._src.interpreters.batching.primitive_batchers.copy()
-    for primitive in jax._src.interpreters.batching.primitive_batchers.keys():
-        if primitive.name == "gather":
-            gather_batching_rule = jax._src.interpreters.batching.primitive_batchers[primitive]
-            primitive_batchers2[gather2_p] = gather_batching_rule
+    jax._src.interpreters.batching.primitive_batchers[gather2_p] = jax._src.interpreters.batching.primitive_batchers[gather_p]
 
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
@@ -518,7 +514,6 @@ def make_jaxpr2(
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
-            (jax._src.interpreters.batching, "primitive_batchers", primitive_batchers2),
         ), ExitStack():
             f = wrap_init(fun)
             if static_argnums:

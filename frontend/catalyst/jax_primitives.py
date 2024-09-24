@@ -25,8 +25,9 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
-from jax._src.lax.lax import cos_p, sin_p
+from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
+from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -2190,6 +2191,7 @@ def extract_scalar(value, op, kind="parameter"):
 
     return value
 
+
 def _sin_lowering2(ctx, x):
     """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
     return _nary_lower_hlo(hlo.sine, ctx, x)
@@ -2198,6 +2200,7 @@ def _sin_lowering2(ctx, x):
 def _cos_lowering2(ctx, x):
     """Use hlo.cosine lowering instead of the new cosine lowering from jax 0.4.28"""
     return _nary_lower_hlo(hlo.cosine, ctx, x)
+
 
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),

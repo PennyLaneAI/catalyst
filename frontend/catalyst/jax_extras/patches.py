@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import jax
-from jax._src.lax.lax import _nary_lower_hlo
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
@@ -29,7 +28,6 @@ from jax._src.lax.slicing import (
     _sorted_dims_in_range,
     standard_primitive,
 )
-from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue, Tracer, concrete_aval
 
 __all__ = (
@@ -196,4 +194,3 @@ gather2_p = standard_primitive(
     "gather",
     weak_type_rule=_argnum_weak_type(0),
 )
-
