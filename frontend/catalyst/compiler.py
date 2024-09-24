@@ -235,6 +235,28 @@ BUFFERIZATION_PASS = (
     ],
 )
 
+BUFFERIZATION_ASYNC_PASS = (
+    "BufferizationPass",
+    [
+        "inline",
+        "gradient-preprocess",
+        "eliminate-empty-tensors",
+        "convert-elementwise-to-linalg",
+        "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map copy-before-write}",
+        "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
+        # introduced during gradient-bufferize of callbacks
+        "func.func(buffer-hoisting)",
+        "func.func(buffer-loop-hoisting)",
+        "func.func(buffer-deallocation)",
+        "convert-arraylist-to-memref",
+        "convert-bufferization-to-memref",
+        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # otherwise there are issues in lowering of dynamic tensors.
+        # "cse",
+        "cp-global-memref",
+    ],
+)
 
 MLIR_TO_LLVM_PASS = (
     "MLIRToLLVMDialect",
@@ -289,8 +311,6 @@ DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
-    # BUFFERIZATION_PASS2,
-    # BUFFERIZATION_PASS3,
     MLIR_TO_LLVM_PASS,
 ]
 
@@ -306,9 +326,7 @@ DEFAULT_ASYNC_PIPELINES = [
     TAPE_SPLITTING_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    # BUFFERIZATION_PASS2,
-    # BUFFERIZATION_PASS3,
+    BUFFERIZATION_ASYNC_PASS,
     MLIR_TO_LLVM_ASYNC_PASS,
 ]
 
