@@ -36,8 +36,6 @@ __all__ = (
     "get_aval2",
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
-    "_sin_lowering2",
-    "_cos_lowering2",
     "gather2_p",
 )
 
@@ -199,12 +197,3 @@ gather2_p = standard_primitive(
     weak_type_rule=_argnum_weak_type(0),
 )
 
-
-def _sin_lowering2(ctx, x):
-    """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
-    return _nary_lower_hlo(hlo.sine, ctx, x)
-
-
-def _cos_lowering2(ctx, x):
-    """Use hlo.cosine lowering instead of the new cosine lowering from jax 0.4.28"""
-    return _nary_lower_hlo(hlo.cosine, ctx, x)
