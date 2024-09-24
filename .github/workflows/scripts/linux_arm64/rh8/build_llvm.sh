@@ -33,11 +33,8 @@ export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/o
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja
 
-export LLVM_ROOT=mlir/llvm-project
-export LLVM_MODULE_PATCH_FILE=mlir/llvm-project/patches/moduleOp-bufferization.patch
-export LLVM_FUNC_CALL_PATCH_FILE=mlir/llvm-project/patches/callOp-bufferization.patch
-if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE); fi
-if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE); fi
+if patch --dry-run -p1 -N --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/moduleOp-bufferization.patch; fi
+if patch --dry-run -p1 -N --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/callOp-bufferization.patch; fi
 
 # Build LLVM
 cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja \

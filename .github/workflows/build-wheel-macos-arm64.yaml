@@ -137,12 +137,9 @@ jobs:
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        export LLVM_ROOT=mlir/llvm-project
-        export LLVM_MODULE_PATCH_FILE=mlir/llvm-project/patches/moduleOp-bufferization.patch
-        export LLVM_FUNC_CALL_PATCH_FILE=mlir/llvm-project/patches/callOp-bufferization.patch
-        if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE); fi
-        if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE); fi
-        
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
+
         cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_BUILD_EXAMPLES=OFF \
@@ -178,10 +175,8 @@ jobs:
 
         export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
-        export MHLO_ROOT?=mlir/mlir-hlo
-        export MHLO_MODULE_PATCH_FILE=mlir/patches/moduleOp-mhlo.patch
         if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-        if patch --dry-run -p1 -N --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE); fi
+        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch; fi
 
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
