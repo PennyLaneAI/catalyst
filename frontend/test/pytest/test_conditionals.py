@@ -415,6 +415,19 @@ class TestCond:
         assert circuit(False) == 0
         assert circuit(True) == 1
 
+    def test_argument_error_with_callables(self):
+        """Test for the error when arguments are supplied and the target is not a function."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x: int):
+
+            qml.cond(x < 5, qml.Hadamard)(0)
+
+            return qml.probs()
+
+        with pytest.raises(TypeError, match="not allowed to have any arguments"):
+            qjit(f)
+
 
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent
