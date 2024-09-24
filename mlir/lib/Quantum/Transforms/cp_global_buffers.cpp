@@ -89,7 +89,8 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
 {
     auto origMemrefType = cast<MemRefType>(memref.getType());
     // Rebuild MemRefType without memory layout.
-    auto newMemrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
+    auto newMemrefType =
+        MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
 
     llvm::SmallVector<Value> dynDims;
     {
@@ -103,7 +104,7 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
             ndim++;
         }
     }
-    
+
     Value newMemRef = rewriter.create<memref::AllocOp>(loc, newMemrefType, dynDims);
     // Cast memrefType back to maintain memory layout.
     Value castMemRef = rewriter.create<memref::CastOp>(loc, origMemrefType, newMemRef);

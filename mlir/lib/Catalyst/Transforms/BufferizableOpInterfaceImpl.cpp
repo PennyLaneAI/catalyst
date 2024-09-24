@@ -91,10 +91,13 @@ struct CustomCallOpInterface
             if (!memrefType)
                 return failure();
             if (!memrefType.getLayout().isIdentity()) {
-                auto nonStrideType = MemRefType::get(memrefType.getShape(), memrefType.getElementType());
-                auto newMemRef = rewriter.create<memref::CastOp>(op->getLoc(), nonStrideType, *opBuffer);
+                auto nonStrideType =
+                    MemRefType::get(memrefType.getShape(), memrefType.getElementType());
+                auto newMemRef =
+                    rewriter.create<memref::CastOp>(op->getLoc(), nonStrideType, *opBuffer);
                 bufferArgs.push_back(newMemRef);
-            } else {
+            }
+            else {
                 bufferArgs.push_back(*opBuffer);
             }
         }
