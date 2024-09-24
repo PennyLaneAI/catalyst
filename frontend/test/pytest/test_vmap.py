@@ -797,7 +797,7 @@ class TestVectorizeMap:
         assert batch_size == 2
 
     def test_vmap_axis_out_of_bounds(self):
-        """Confirm that vmap works when used with shape-less values."""
+        """Confirm that vmap works when used with shapeless values."""
 
         @vmap(in_axes=(0, 2))
         def f(a, b):

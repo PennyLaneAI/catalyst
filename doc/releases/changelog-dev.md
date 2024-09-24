@@ -187,7 +187,7 @@
 
 <h3>Bug fixes</h3>
 
-* Resolve a bug in the `vmap` function when passing shape-less values to the target. 
+* Resolve a bug in the `vmap` function when passing shapeless values to the target. 
   [(#1150)](https://github.com/PennyLaneAI/catalyst/pull/1150)
 
 <h3>Internal changes</h3>
