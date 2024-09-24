@@ -161,6 +161,7 @@ jobs:
     - name: Build LLD
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
+        pwd
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/llvm-project/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/llvm-project/patches/moduleOp-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/llvm-project/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/llvm-project/patches/callOp-bufferization.patch; fi
         cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
