@@ -335,6 +335,7 @@ def compile_executable(fn, *args):
         f"-Wl,-rpath,{python_lib_dir_path}",
         f"-L{python_lib_dir_path}",
         "-lpython" + version_str,
+        "-lcurses"
     ]
 
     # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
