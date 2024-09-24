@@ -2,17 +2,17 @@
 
 <h3>New features</h3>
 
-* Experimental integration of the PennyLane capture module is available. It currently only supports 
+* Experimental integration of the PennyLane capture module is available. It currently only supports
   quantum gates, without control flow.
   [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
 
   To trigger the PennyLane pipeline for capturing the program as a JaxPR, one needs to simply
   set `experimental_capture=True` in the qjit decorator.
-  
-  ```python 
+
+  ```python
   import pennylane as qml
   from catalyst import qjit
-  
+
   dev = qml.device("lightning.qubit", wires=1)
 
   @qjit(experimental_capture=True)
@@ -201,7 +201,7 @@
 * Update Enzyme to version `v0.0.149`.
   [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
 
-* Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
+* Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when
   running gradient like functions.
   [(#1063)](https://github.com/PennyLaneAI/catalyst/pull/1063)
 
@@ -221,6 +221,13 @@
 
 * The device capability loading mechanism has been moved into the `QJITDevice` constructor.
   [(#1141)](https://github.com/PennyLaneAI/catalyst/pull/1141)
+
+* Several functions related to device capabilities have been refactored.
+  [(#1149)](https://github.com/PennyLaneAI/catalyst/pull/1149)
+
+  In particular, the signatures of `get_device_capability`, `catalyst_decompose`,
+ `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
+  function has been removed entirely.
 
 <h3>Contributors</h3>
 

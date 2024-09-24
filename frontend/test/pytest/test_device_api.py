@@ -122,11 +122,6 @@ def test_qjit_device():
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
         device_qjit.execute(10, 2)
 
-    assert isinstance(device_qjit.operations, set)
-    assert len(device_qjit.operations) > 0
-    assert isinstance(device_qjit.observables, set)
-    assert len(device_qjit.observables) > 0
-
 
 def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
