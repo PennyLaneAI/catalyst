@@ -161,6 +161,11 @@ jobs:
     - name: Build LLD
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
+        export LLVM_ROOT=mlir/llvm-project
+        export LLVM_MODULE_PATCH_FILE=mlir/llvm-project/patches/moduleOp-bufferization.patch
+        export LLVM_FUNC_CALL_PATCH_FILE=mlir/llvm-project/patches/callOp-bufferization.patch
+        if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_MODULE_PATCH_FILE); fi
+        if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE) > /dev/null 2>&1; then patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE); fi
         cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_TARGETS_TO_BUILD="host" \
