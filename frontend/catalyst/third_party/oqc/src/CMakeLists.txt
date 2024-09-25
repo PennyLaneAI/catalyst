@@ -6,7 +6,6 @@ set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/include")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/lib/backend/common")
 set(runtime_lib "${RUNTIME_BUILD_DIR}/lib")
 set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
-set(catalyst_python_interpreter_path "${RUNTIME_BUILD_DIR}/utils/runtime-build/lib")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
