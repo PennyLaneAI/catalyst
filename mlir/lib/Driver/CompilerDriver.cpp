@@ -546,6 +546,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (!options.generateQir && pipeline.name == "QIRPass") {
             continue;
         }
+        if (options.generateQir && pipeline.name == "MLIRToLLVMDialect") {
+            continue;
+        }
         if (options.generateQir && pipeline.name == "QIRPass") {
             llvm::outs() << "Generate QIR\n";
         }

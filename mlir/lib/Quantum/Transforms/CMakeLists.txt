@@ -5,6 +5,8 @@ file(GLOB SRC
     quantum_bufferize.cpp
     ConversionPatterns.cpp
     quantum_to_llvm.cpp
+    QireeConversionPatterns.cpp
+    quantum_to_qiree.cpp
     emit_catalyst_pyface.cpp
     cp_global_buffers.cpp
     adjoint_lowering.cpp

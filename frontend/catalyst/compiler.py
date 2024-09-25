@@ -299,12 +299,13 @@ MLIR_TO_LLVM_PASS = (
     ],
 )
 
+NEW_LLVM_PASS = MLIR_TO_LLVM_PASS[1]
+NEW_LLVM_PASS[NEW_LLVM_PASS.index("convert-quantum-to-llvm")] = "convert-quantum-to-qiree"
+
 QIR_PASS = (
     "QIRPass",
-    [
-    ],
+    NEW_LLVM_PASS,
 )
-
 
 DEFAULT_PIPELINES = [
     TAPE_SPLITTING_PASS,
