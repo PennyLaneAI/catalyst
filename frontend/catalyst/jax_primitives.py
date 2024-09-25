@@ -26,6 +26,7 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
@@ -2347,9 +2348,10 @@ def extract_scalar(value, op, kind="parameter"):
     return value
 
 
-#
-# registration
-#
+# TODO: remove these patches after https://github.com/jax-ml/jax/pull/23886
+def _sin_lowering2(ctx, x):
+    """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
+    return _nary_lower_hlo(hlo.sine, ctx, x)
 
 
 def _cos_lowering2(ctx, x):

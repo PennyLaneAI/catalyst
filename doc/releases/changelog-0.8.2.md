@@ -86,6 +86,9 @@
   `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`. 
   [(#1139)](https://github.com/PennyLaneAI/catalyst/pull/1139)
 
+* Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
+  [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
+
 <h3>Internal changes</h3>
 
 * Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 

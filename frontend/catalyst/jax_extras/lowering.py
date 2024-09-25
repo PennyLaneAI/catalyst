@@ -37,6 +37,7 @@ from jax.interpreters.mlir import (
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import FuncOp
 
+import catalyst
 from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
 
@@ -122,7 +123,8 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
-    lowering_params = LoweringParameters()
+    custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+    lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
         backend_or_name=None,
         platforms=[platform],
