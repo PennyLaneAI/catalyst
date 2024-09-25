@@ -49,6 +49,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createApplyTransformSequencePass);
     mlir::registerPass(catalyst::createSplitMultipleTapesPass);
     mlir::registerPass(catalyst::createMergeRotationPass);
-    mlir::registerPass(catalyst::createPropagateSimpleStatesPass);
+    mlir::registerPass(catalyst::createPropagateSimpleStatesTesterPass);
     mlir::registerPass(catalyst::createDisentangleCNOTPass);
 }

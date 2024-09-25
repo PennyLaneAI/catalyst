@@ -14,7 +14,7 @@
 
 #define DEBUG_TYPE "propagatesimplestates"
 
-#include "PropagateSimpleStates.hpp"
+#include "PropagateSimpleStatesAnalysis.hpp"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -34,15 +34,15 @@ namespace catalyst {
 #define GEN_PASS_DECL_PROPAGATESIMPLESTATESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
+struct PropagateSimpleStatesTesterPass
+    : public impl::PropagateSimpleStatesTesterPassBase<PropagateSimpleStatesTesterPass> {
+    using impl::PropagateSimpleStatesTesterPassBase<
+        PropagateSimpleStatesTesterPass>::PropagateSimpleStatesTesterPassBase;
 
-struct PropagateSimpleStatesPass
-    : public impl::PropagateSimpleStatesPassBase<PropagateSimpleStatesPass> {
-    using impl::PropagateSimpleStatesPassBase<
-        PropagateSimpleStatesPass>::PropagateSimpleStatesPassBase;
-
-  bool canScheduleOn(RegisteredOperationName opInfo) const override {
-    return opInfo.hasInterface<FunctionOpInterface>();
-  }
+    bool canScheduleOn(RegisteredOperationName opInfo) const override
+    {
+        return opInfo.hasInterface<FunctionOpInterface>();
+    }
 
     void runOnOperation() override
     {
@@ -50,7 +50,7 @@ struct PropagateSimpleStatesPass
                           << "\n");
 
         func::FuncOp func = cast<func::FuncOp>(getOperation());
-        if (func.getSymName() != FuncNameOpt){
+        if (func.getSymName() != FuncNameOpt) {
             // not the function to run the pass on
             return;
         }
@@ -67,9 +67,9 @@ struct PropagateSimpleStatesPass
     }
 };
 
-std::unique_ptr<Pass> createPropagateSimpleStatesPass()
+std::unique_ptr<Pass> createPropagateSimpleStatesTesterPass()
 {
-    return std::make_unique<PropagateSimpleStatesPass>();
+    return std::make_unique<PropagateSimpleStatesTesterPass>();
 }
 
 } // namespace catalyst

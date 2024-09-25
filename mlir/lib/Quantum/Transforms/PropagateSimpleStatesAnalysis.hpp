@@ -29,7 +29,7 @@ using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
-namespace catalyst{
+namespace catalyst {
 
 // The six Pauli eigenstates
 enum class QubitState {
@@ -41,7 +41,6 @@ enum class QubitState {
     RIGHT,
     NOT_A_BASIS,
 };
-
 
 // {input state : {gate, output state}}
 static std::map<QubitState, std::map<StringRef, QubitState>> QubitTransitions = {
@@ -102,10 +101,11 @@ static std::map<QubitState, std::map<StringRef, QubitState>> QubitTransitions = 
      }},
 };
 
-class PropagateSimpleStatesAnalysis{
-public:
-	PropagateSimpleStatesAnalysis(Operation *target){
-		// `target` is a qnode function
+class PropagateSimpleStatesAnalysis {
+  public:
+    PropagateSimpleStatesAnalysis(Operation *target)
+    {
+        // `target` is a qnode function
         target->walk([&](Operation *op) {
             if (op->getNumResults() != 1) {
                 // restrict to single-qubit gates
@@ -185,62 +185,48 @@ public:
             }
             return;
         });
-	}
-
-	llvm::DenseMap<Value, QubitState> getQubitValues(){
-		return qubitValues;
-	}
-
-// Function to convert enum values to strings
-static std::string QubitState2String(QubitState state)
-{
-    switch (state) {
-    case QubitState::ZERO:
-        return "ZERO";
-    case QubitState::ONE:
-        return "ONE";
-    case QubitState::PLUS:
-        return "PLUS";
-    case QubitState::MINUS:
-        return "MINUS";
-    case QubitState::LEFT:
-        return "LEFT";
-    case QubitState::RIGHT:
-        return "RIGHT";
-    case QubitState::NOT_A_BASIS:
-        return "NOT_A_BASIS";
     }
-}
 
-bool isZero(QubitState qs){
-	return qs == QubitState::ZERO;
-}
+    llvm::DenseMap<Value, QubitState> getQubitValues() { return qubitValues; }
 
-bool isOne(QubitState qs){
-	return qs == QubitState::ONE;
-}
+    // Function to convert enum values to strings
+    static std::string QubitState2String(QubitState state)
+    {
+        switch (state) {
+        case QubitState::ZERO:
+            return "ZERO";
+        case QubitState::ONE:
+            return "ONE";
+        case QubitState::PLUS:
+            return "PLUS";
+        case QubitState::MINUS:
+            return "MINUS";
+        case QubitState::LEFT:
+            return "LEFT";
+        case QubitState::RIGHT:
+            return "RIGHT";
+        case QubitState::NOT_A_BASIS:
+            return "NOT_A_BASIS";
+        }
+    }
 
-bool isPlus(QubitState qs){
-	return qs == QubitState::PLUS;
-}
+    bool isZero(QubitState qs) { return qs == QubitState::ZERO; }
 
-bool isMinus(QubitState qs){
-	return qs == QubitState::MINUS;
-}
+    bool isOne(QubitState qs) { return qs == QubitState::ONE; }
 
-bool isLeft(QubitState qs){
-	return qs == QubitState::LEFT;
-}
+    bool isPlus(QubitState qs) { return qs == QubitState::PLUS; }
 
-bool isRight(QubitState qs){
-	return qs == QubitState::RIGHT;
-}
+    bool isMinus(QubitState qs) { return qs == QubitState::MINUS; }
 
-private:
+    bool isLeft(QubitState qs) { return qs == QubitState::LEFT; }
+
+    bool isRight(QubitState qs) { return qs == QubitState::RIGHT; }
+
+  private:
     // The object `qubitValues` contains all the analysis results
-    // It is a map of the form 
+    // It is a map of the form
     // <mlir Value representing a qubit, its abstract QubitState>
-	llvm::DenseMap<Value, QubitState> qubitValues;
+    llvm::DenseMap<Value, QubitState> qubitValues;
 };
 
 } // namespace catalyst

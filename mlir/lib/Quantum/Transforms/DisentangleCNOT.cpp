@@ -14,7 +14,7 @@
 
 #define DEBUG_TYPE "disentanglecnot"
 
-#include "PropagateSimpleStates.hpp"
+#include "PropagateSimpleStatesAnalysis.hpp"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -34,23 +34,20 @@ namespace catalyst {
 #define GEN_PASS_DECL_DISENTANGLECNOTPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
+struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
+    using impl::DisentangleCNOTPassBase<DisentangleCNOTPass>::DisentangleCNOTPassBase;
 
-struct DisentangleCNOTPass
-    : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
-    using impl::DisentangleCNOTPassBase<
-        DisentangleCNOTPass>::DisentangleCNOTPassBase;
-
-  bool canScheduleOn(RegisteredOperationName opInfo) const override {
-    return opInfo.hasInterface<FunctionOpInterface>();
-  }
+    bool canScheduleOn(RegisteredOperationName opInfo) const override
+    {
+        return opInfo.hasInterface<FunctionOpInterface>();
+    }
 
     void runOnOperation() override
     {
         LLVM_DEBUG(dbgs() << "disentangle CNOT pass\n");
 
-
         func::FuncOp func = cast<func::FuncOp>(getOperation());
-        if (func.getSymName() != FuncNameOpt){
+        if (func.getSymName() != FuncNameOpt) {
             // not the function to run the pass on
             return;
         }
@@ -60,44 +57,37 @@ struct DisentangleCNOTPass
         PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
         llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
 
-        func->walk([&](quantum::CustomOp op){
-        	StringRef gate = op.getGateName();
-        	if (gate != "CNOT"){
-        		return;
-        	}
+        func->walk([&](quantum::CustomOp op) {
+            StringRef gate = op.getGateName();
+            if (gate != "CNOT") {
+                return;
+            }
 
-        	llvm::errs() << "visiting " << op << "!\n";
+            llvm::errs() << "visiting " << op << "!\n";
 
-        	Value control_in = op->getOperand(0);
-        	Value target_in = op->getOperand(1);
-        	Value control_out = op->getResult(0);
-        	Value target_out = op->getResult(1);
+            Value control_in = op->getOperand(0);
+            Value target_in = op->getOperand(1);
+            Value control_out = op->getResult(0);
+            Value target_out = op->getResult(1);
 
+            // |0> control, always do nothing
+            if (pssa.isZero(qubitValues[control_in])) {
+                control_out.replaceAllUsesWith(control_in);
+                target_out.replaceAllUsesWith(target_in);
+                op->erase();
+                return;
+            }
 
-        	// |0> control, always do nothing
-        	if (pssa.isZero(qubitValues[control_in])){
-        		control_out.replaceAllUsesWith(control_in);
-        		target_out.replaceAllUsesWith(target_in);
-        		op->erase();
-        		return;
-        	}
-
-
-
-        	/*
-        	for (auto operand : op->getOperands()){
-        		llvm::errs() << operand << " : " << qubitValues.contains(operand) << "\n";
-        		if (qubitValues.contains(operand)){
-        			llvm::errs() << QubitState2String(qubitValues[operand]) << 
-        			pssa.isZero(qubitValues[operand]) << "\n";
-        		}
-        	}
-        	*/
+            /*
+            for (auto operand : op->getOperands()){
+                llvm::errs() << operand << " : " << qubitValues.contains(operand) << "\n";
+                if (qubitValues.contains(operand)){
+                    llvm::errs() << QubitState2String(qubitValues[operand]) <<
+                    pssa.isZero(qubitValues[operand]) << "\n";
+                }
+            }
+            */
         });
-
-
-
-
     }
 };
 
