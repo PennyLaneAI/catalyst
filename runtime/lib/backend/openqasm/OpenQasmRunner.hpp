@@ -109,9 +109,11 @@ struct BraketRunner : public OpenQasmRunner {
         namespace py = pybind11;
         using namespace py::literals;
 
-        py::gil_scoped_acquire lock;
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
                                "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
@@ -165,9 +167,10 @@ struct BraketRunner : public OpenQasmRunner {
         namespace py = pybind11;
         using namespace py::literals;
 
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
         py::gil_scoped_acquire lock;
-
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
         auto locals =
             py::dict("circuit"_a = circuit, "braket_device"_a = device, "kwargs"_a = kwargs,
@@ -232,9 +235,11 @@ struct BraketRunner : public OpenQasmRunner {
     {
         namespace py = pybind11;
         using namespace py::literals;
-        py::gil_scoped_acquire lock;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+        py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
                                "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
@@ -295,9 +300,10 @@ struct BraketRunner : public OpenQasmRunner {
     {
         namespace py = pybind11;
         using namespace py::literals;
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
         py::gil_scoped_acquire lock;
-
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
                                "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
@@ -351,9 +357,10 @@ struct BraketRunner : public OpenQasmRunner {
     {
         namespace py = pybind11;
         using namespace py::literals;
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
         py::gil_scoped_acquire lock;
-
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
                                "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");

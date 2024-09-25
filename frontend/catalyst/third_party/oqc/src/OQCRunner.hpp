@@ -28,6 +28,7 @@
 #include "Exception.hpp"
 #include "Python.hpp"
 
+#include <pybind11>
 #include <pybind11/embed.h>
 
 namespace Catalyst::Runtime::Device {
@@ -122,7 +123,10 @@ struct OQCRunner : public OQCRunnerBase {
         namespace py = pybind11;
         using namespace py::literals;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+        py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "device"_a = device, "kwargs"_a = kwargs,
                                "shots"_a = shots, "msg"_a = "");
