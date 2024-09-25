@@ -35,6 +35,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 
+import catalyst
 from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
 
@@ -108,8 +109,6 @@ def custom_lower_jaxpr_to_module(
     Copyright 2021 The JAX Authors.
     """
 
-    from catalyst.jax_primitives import CUSTOM_LOWERING_RULES
-
     if any(lowerable_effects.filter_not_in(jaxpr.effects)):  # pragma: no cover
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
 
@@ -122,7 +121,8 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
-    lowering_params = LoweringParameters(override_lowering_rules=CUSTOM_LOWERING_RULES)
+    custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+    lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
         backend_or_name=None,
         platforms=[platform],
