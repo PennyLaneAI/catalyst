@@ -26,9 +26,7 @@
 #include <iostream>
 
 #include "Exception.hpp"
-#include "Python.hpp"
 
-#include <pybind11>
 #include <pybind11/embed.h>
 
 namespace Catalyst::Runtime::Device {

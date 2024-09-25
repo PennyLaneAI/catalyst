@@ -105,7 +105,6 @@ struct BraketRunner : public OpenQasmRunner {
                                   size_t shots, const std::string &kwargs = "") const
         -> std::string override
     {
-
         namespace py = pybind11;
         using namespace py::literals;
 
