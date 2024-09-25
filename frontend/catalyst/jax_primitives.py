@@ -2192,6 +2192,7 @@ def extract_scalar(value, op, kind="parameter"):
     return value
 
 
+# TODO: remove these patches after https://github.com/jax-ml/jax/pull/23886
 def _sin_lowering2(ctx, x):
     """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
     return _nary_lower_hlo(hlo.sine, ctx, x)
