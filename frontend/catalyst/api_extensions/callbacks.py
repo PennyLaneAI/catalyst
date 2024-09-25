@@ -364,19 +364,18 @@ def accelerate_impl(users_func=None, *, dev=None):
     # wraps total which wraps user
     @functools.wraps(total, assigned=WRAPPER_ASSIGNMENTS)
     def back_to_user(*args, **kwargs):
-        with AccelerateContext():
-            absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
-            try:
-                # Find the shape of the return value
-                with transient_jax_config({"jax_dynamic_shapes": False}):
-                    _, returnshape = jax.make_jaxpr(jitted_fn, return_shape=True)(
-                        absextra, *absargs, **abskwargs
-                    )
-            except Exception as e:
-                name = users_func.__name__
-                msg = f"Function {name} must be jax.jit-able."
-                msg += f"But failed with error message {str(e)}."
-                raise ValueError(msg) from e
+        absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
+        try:
+            # Find the shape of the return value
+            with transient_jax_config({"jax_dynamic_shapes": False}), AccelerateContext():
+                _, returnshape = jax.make_jaxpr(jitted_fn, return_shape=True)(
+                    absextra, *absargs, **abskwargs
+                )
+        except Exception as e:
+            name = users_func.__name__
+            msg = f"Function {name} must be jax.jit-able."
+            msg += f"But failed with error message {str(e)}."
+            raise ValueError(msg) from e
         annotated = AnnotatedFunctionImpl(jitted_fn, returnshape)
         with_custom_grad = CallbackWithPotentialCustomGrad(annotated, dev)
 
