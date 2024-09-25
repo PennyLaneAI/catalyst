@@ -630,7 +630,7 @@ void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM:
     }
 }
 
-void RemoveCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter)
+void removeCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter)
 {
     for (Block *block : blocks) {
         block->walk([&](LLVM::CallOp op) {
