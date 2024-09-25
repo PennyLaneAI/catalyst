@@ -196,6 +196,9 @@
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
 
+* Compiling `qnode`s to asynchronous functions will no longer print to stderr in case of an error.
+  [(#645)](https://github.com/PennyLaneAI/catalyst/pull/645)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
