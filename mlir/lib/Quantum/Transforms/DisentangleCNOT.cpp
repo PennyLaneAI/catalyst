@@ -47,6 +47,9 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
         LLVM_DEBUG(dbgs() << "disentangle CNOT pass\n");
 
         func::FuncOp func = cast<func::FuncOp>(getOperation());
+        mlir::IRRewriter builder(func->getContext());
+        Location loc = func->getLoc();
+
         if (func.getSymName() != FuncNameOpt) {
             // not the function to run the pass on
             return;
@@ -63,8 +66,6 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                 return;
             }
 
-            llvm::errs() << "visiting " << op << "!\n";
-
             Value control_in = op->getOperand(0);
             Value target_in = op->getOperand(1);
             Value control_out = op->getResult(0);
@@ -78,15 +79,36 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                 return;
             }
 
-            /*
-            for (auto operand : op->getOperands()){
-                llvm::errs() << operand << " : " << qubitValues.contains(operand) << "\n";
-                if (qubitValues.contains(operand)){
-                    llvm::errs() << QubitState2String(qubitValues[operand]) <<
-                    pssa.isZero(qubitValues[operand]) << "\n";
+            // |1> control, insert PauliX gate on target
+            if (pssa.isOne(qubitValues[control_in])) {
+                if ((pssa.isPlus(qubitValues[target_in])) ||
+                    (pssa.isMinus(qubitValues[target_in]))) {
+                    control_out.replaceAllUsesWith(control_in);
+                    target_out.replaceAllUsesWith(target_in);
+                    op->erase();
+                    return;
+                }
+                else {
+                    control_out.replaceAllUsesWith(control_in);
+
+                    OpBuilder::InsertionGuard insertionGuard(builder);
+                    builder.setInsertionPointAfter(op);
+                    quantum::CustomOp xgate = builder.create<quantum::CustomOp>(
+                        loc,
+                        /*out_qubits=*/mlir::TypeRange({target_out.getType()}),
+                        /*out_ctrl_qubits=*/mlir::TypeRange(),
+                        /*params=*/mlir::ValueRange(),
+                        /*in_qubits=*/mlir::ValueRange({target_in}),
+                        /*gate_name=*/"PauliX",
+                        /*adjoint=*/nullptr,
+                        /*in_ctrl_qubits=*/mlir::ValueRange(),
+                        /*in_ctrl_values=*/mlir::ValueRange());
+
+                    target_out.replaceAllUsesWith(xgate->getResult(0));
+                    op->erase();
+                    return;
                 }
             }
-            */
         });
     }
 };

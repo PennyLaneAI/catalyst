@@ -222,6 +222,8 @@ class PropagateSimpleStatesAnalysis {
 
     bool isRight(QubitState qs) { return qs == QubitState::RIGHT; }
 
+    bool isOther(QubitState qs) { return qs == QubitState::NOT_A_BASIS; }
+
   private:
     // The object `qubitValues` contains all the analysis results
     // It is a map of the form

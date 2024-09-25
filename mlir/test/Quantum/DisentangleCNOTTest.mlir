@@ -74,6 +74,11 @@
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ZERO_0]], [[ONE_1]] : !quantum.bit, !quantum.bit
 
 
+    %5:2 = quantum.custom "CNOT"() %ONE_0, %ZERO_1 : !quantum.bit, !quantum.bit
+    %user_5:2 = quantum.custom "CRZ"(%cst) %5#0, %5#1 : !quantum.bit, !quantum.bit
+    // CHECK-NOT: quantum.custom "CNOT"
+    // CHECK: [[mid_5:%.+]] = quantum.custom "PauliX"() [[ZERO_1]] : !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ONE_0]], [[mid_5]] : !quantum.bit, !quantum.bit
 
 
 
