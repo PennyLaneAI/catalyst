@@ -20,8 +20,6 @@
 #include "OpenQasmRunner.hpp"
 #include "RuntimeCAPI.h"
 
-Catalyst::Runtime::PythonInterpreterGuard guard{};
-
 #include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime::Device;
