@@ -390,7 +390,7 @@ void RemoveAbortAndPutsInsertCallTransform::rewrite(LLVM::CallOp callOp,
     collectPutsBlocks(potentialConditions, putsBlocks);
 
     // Remove puts calls
-    RemoveCallsToPutsInBlocks(putsBlocks, rewriter);
+    removeCallsToPutsInBlocks(putsBlocks, rewriter);
 
     // This is a subtlety, but it is a very important one!
     // In order for the (liveness) dataflow analysis, the values need to flow from failure block
