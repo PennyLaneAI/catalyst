@@ -15,6 +15,7 @@ file(GLOB SRC
     SplitMultipleTapes.cpp
     merge_rotation.cpp
     PropagateSimpleStates.cpp
+    DisentangleCNOT.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

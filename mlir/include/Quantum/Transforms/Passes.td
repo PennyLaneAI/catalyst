@@ -131,6 +131,13 @@ def PropagateSimpleStatesPass : Pass<"propagate-simple-states"> {
     let options = QuantumCircuitTransformationPass.options;
 }
 
+def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+    let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleCNOTPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
