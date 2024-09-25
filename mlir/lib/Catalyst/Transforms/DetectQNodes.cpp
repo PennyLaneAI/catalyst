@@ -37,7 +37,7 @@ void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *>
                             SmallVector<Block *> &success);
 void collectPutsBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &puts);
 void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls);
-void RemoveCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter);
+void removeCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter);
 void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
                                   SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter);
 void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> abortBlocks,
