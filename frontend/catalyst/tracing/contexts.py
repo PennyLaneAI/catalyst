@@ -115,17 +115,17 @@ class GradContext:
 
 
 class AccelerateContext:
-    _am_inside_accelerate: bool = False
+    _am_inside_accelerate: int = 0
 
     def __enter__(self):
-        AccelerateContext._am_inside_accelerate = True
+        AccelerateContext._am_inside_accelerate += 1
 
     def __exit__(self, _exc_type, _exc, _exc_tb):
-        AccelerateContext._am_inside_accelerate = False
+        AccelerateContext._am_inside_accelerate -= 1
 
     @staticmethod
     def am_inside_accelerate():
-        return AccelerateContext._am_inside_accelerate
+        return AccelerateContext._am_inside_accelerate > 0
 
 
 class EvaluationMode(Enum):

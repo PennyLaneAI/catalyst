@@ -211,6 +211,9 @@
 * Fix error message displayed when using `qml.cond` on callables with arguments.
   [(#1151)](https://github.com/PennyLaneAI/catalyst/pull/1151)
 
+* Fixes taking gradient of nested accelerate callbacks.
+  [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
+
 <h3>Internal changes</h3>
 
 * Update Enzyme to version `v0.0.149`.
