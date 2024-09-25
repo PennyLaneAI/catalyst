@@ -30,8 +30,8 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
-#define GEN_PASS_DEF_PROPAGATESIMPLESTATESPASS
-#define GEN_PASS_DECL_PROPAGATESIMPLESTATESPASS
+#define GEN_PASS_DEF_PROPAGATESIMPLESTATESTESTERPASS
+#define GEN_PASS_DECL_PROPAGATESIMPLESTATESTESTERPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct PropagateSimpleStatesTesterPass
