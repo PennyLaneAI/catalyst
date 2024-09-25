@@ -80,7 +80,7 @@ PYBIND11_MODULE(compiler_driver, m)
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
            bool asyncQnodes, bool verbose, py::list pipelines, bool lower_to_llvm,
-           const char *checkpointStage) -> std::unique_ptr<CompilerOutput> {
+           const char *checkpointStage, bool generateQir) -> std::unique_ptr<CompilerOutput> {
             // Install signal handler to catch user interrupts (e.g. CTRL-C).
             signal(SIGINT,
                    [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
@@ -99,7 +99,8 @@ PYBIND11_MODULE(compiler_driver, m)
                                     .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
                                     .lowerToLLVM = lower_to_llvm,
-                                    .checkpointStage = checkpointStage};
+                                    .checkpointStage = checkpointStage,
+                                    .generateQir = generateQir};
 
             errStream.flush();
 
@@ -111,5 +112,6 @@ PYBIND11_MODULE(compiler_driver, m)
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("keep_intermediate") = false, py::arg("async_qnodes") = false,
         py::arg("verbose") = false, py::arg("pipelines") = py::list(),
-        py::arg("lower_to_llvm") = true, py::arg("checkpoint_stage") = "");
+        py::arg("lower_to_llvm") = true, py::arg("checkpoint_stage") = "",
+        py::arg("generate_qir") = false);
 }

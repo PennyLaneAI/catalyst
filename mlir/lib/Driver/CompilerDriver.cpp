@@ -684,6 +684,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 llvmModule->print(rawStringOstream, nullptr);
                 auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
                 dumpToFile(options, outFile, outputs["llvm_ir"]);
+                if (options.generateQir) {
+                    llvm::outs() << "Generate QIR.\n";
+                }
             }
         }
     }

@@ -82,6 +82,8 @@ struct CompilerOptions {
     bool lowerToLLVM;
     /// Specify that the compiler should start after reaching the given pass.
     std::string checkpointStage;
+    /// QIR
+    bool generateQir;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const

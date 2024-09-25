@@ -81,6 +81,7 @@ class CompileOptions:
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
             Default is None.
+        generate_qir (bool): TBD
     """
 
     verbose: Optional[bool] = False
@@ -99,6 +100,7 @@ class CompileOptions:
     seed: Optional[int] = None
     experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
+    generate_qir: Optional[bool] = False
 
     def __post_init__(self):
         # Check that async runs must not be seeded
@@ -580,6 +582,7 @@ class Compiler:
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
                 checkpoint_stage=self.options.checkpoint_stage,
+                generate_qir=self.options.generate_qir
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e
