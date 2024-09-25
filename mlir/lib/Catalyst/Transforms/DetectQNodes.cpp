@@ -946,7 +946,7 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         }
 
         RewritePatternSet patterns3(context);
-        patterns3.add<RemoveAbortInsertCallTransform>(context);
+        patterns3.add<RemoveAbortAndPutsInsertCallTransform>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3), config))) {
             signalPassFailure();
         }
