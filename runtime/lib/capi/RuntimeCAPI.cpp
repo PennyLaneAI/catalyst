@@ -110,10 +110,7 @@ using timer = catalyst::utils::Timer;
 
 void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
-    // We need to guard calls to callback.
-    // These are implemented in Python.
-    std::lock_guard<std::mutex> lock(getPythonMutex());
-
+    
     // LIBREGISTRY is a compile time macro. It is defined based on the output
     // name of the callback library. And since it is stored in the same location
     // as this library, it shares the ORIGIN variable. Do a `git grep LIBREGISTRY`

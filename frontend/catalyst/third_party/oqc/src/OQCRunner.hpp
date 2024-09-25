@@ -119,7 +119,6 @@ struct OQCRunner : public OQCRunnerBase {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
