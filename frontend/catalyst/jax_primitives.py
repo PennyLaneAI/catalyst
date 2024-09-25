@@ -25,7 +25,9 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
+from jax._src.lib.mlir.dialects import hlo
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -2190,47 +2192,58 @@ def extract_scalar(value, op, kind="parameter"):
     return value
 
 
-#
-# registration
-#
+# TODO: remove these patches after https://github.com/jax-ml/jax/pull/23886
+def _sin_lowering2(ctx, x):
+    """Use hlo.sine lowering instead of the new sin lowering from jax 0.4.28"""
+    return _nary_lower_hlo(hlo.sine, ctx, x)
 
-mlir.register_lowering(zne_p, _zne_lowering)
-mlir.register_lowering(qdevice_p, _qdevice_lowering)
-mlir.register_lowering(qalloc_p, _qalloc_lowering)
-mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
-mlir.register_lowering(qextract_p, _qextract_lowering)
-mlir.register_lowering(qinsert_p, _qinsert_lowering)
-mlir.register_lowering(qinst_p, _qinst_lowering)
-mlir.register_lowering(gphase_p, _gphase_lowering)
-mlir.register_lowering(qunitary_p, _qunitary_lowering)
-mlir.register_lowering(qmeasure_p, _qmeasure_lowering)
-mlir.register_lowering(compbasis_p, _compbasis_lowering)
-mlir.register_lowering(namedobs_p, _named_obs_lowering)
-mlir.register_lowering(hermitian_p, _hermitian_lowering)
-mlir.register_lowering(tensorobs_p, _tensor__obs_lowering)
-mlir.register_lowering(hamiltonian_p, _hamiltonian_lowering)
-mlir.register_lowering(sample_p, _sample_lowering)
-mlir.register_lowering(counts_p, _counts_lowering)
-mlir.register_lowering(expval_p, _expval_lowering)
-mlir.register_lowering(var_p, _var_lowering)
-mlir.register_lowering(probs_p, _probs_lowering)
-mlir.register_lowering(state_p, _state_lowering)
-mlir.register_lowering(cond_p, _cond_lowering)
-mlir.register_lowering(while_p, _while_loop_lowering)
-mlir.register_lowering(for_p, _for_loop_lowering)
-mlir.register_lowering(grad_p, _grad_lowering)
-mlir.register_lowering(func_p, _func_lowering)
-mlir.register_lowering(jvp_p, _jvp_lowering)
-mlir.register_lowering(vjp_p, _vjp_lowering)
-mlir.register_lowering(adjoint_p, _adjoint_lowering)
-mlir.register_lowering(print_p, _print_lowering)
-mlir.register_lowering(assert_p, _assert_lowering)
-mlir.register_lowering(python_callback_p, _python_callback_lowering)
-mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
-mlir.register_lowering(apply_registered_pass_p, _apply_registered_pass_lowering)
-mlir.register_lowering(transform_named_sequence_p, _transform_named_sequence_lowering)
-mlir.register_lowering(set_state_p, _set_state_lowering)
-mlir.register_lowering(set_basis_state_p, _set_basis_state_lowering)
+
+def _cos_lowering2(ctx, x):
+    """Use hlo.cosine lowering instead of the new cosine lowering from jax 0.4.28"""
+    return _nary_lower_hlo(hlo.cosine, ctx, x)
+
+
+CUSTOM_LOWERING_RULES = (
+    (zne_p, _zne_lowering),
+    (qdevice_p, _qdevice_lowering),
+    (qalloc_p, _qalloc_lowering),
+    (qdealloc_p, _qdealloc_lowering),
+    (qextract_p, _qextract_lowering),
+    (qinsert_p, _qinsert_lowering),
+    (qinst_p, _qinst_lowering),
+    (gphase_p, _gphase_lowering),
+    (qunitary_p, _qunitary_lowering),
+    (qmeasure_p, _qmeasure_lowering),
+    (compbasis_p, _compbasis_lowering),
+    (namedobs_p, _named_obs_lowering),
+    (hermitian_p, _hermitian_lowering),
+    (tensorobs_p, _tensor__obs_lowering),
+    (hamiltonian_p, _hamiltonian_lowering),
+    (sample_p, _sample_lowering),
+    (counts_p, _counts_lowering),
+    (expval_p, _expval_lowering),
+    (var_p, _var_lowering),
+    (probs_p, _probs_lowering),
+    (state_p, _state_lowering),
+    (cond_p, _cond_lowering),
+    (while_p, _while_loop_lowering),
+    (for_p, _for_loop_lowering),
+    (grad_p, _grad_lowering),
+    (func_p, _func_lowering),
+    (jvp_p, _jvp_lowering),
+    (vjp_p, _vjp_lowering),
+    (adjoint_p, _adjoint_lowering),
+    (print_p, _print_lowering),
+    (assert_p, _assert_lowering),
+    (python_callback_p, _python_callback_lowering),
+    (value_and_grad_p, _value_and_grad_lowering),
+    (apply_registered_pass_p, _apply_registered_pass_lowering),
+    (transform_named_sequence_p, _transform_named_sequence_lowering),
+    (set_state_p, _set_state_lowering),
+    (set_basis_state_p, _set_basis_state_lowering),
+    (sin_p, _sin_lowering2),
+    (cos_p, _cos_lowering2),
+)
 
 
 def _scalar_abstractify(t):
