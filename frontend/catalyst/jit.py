@@ -433,7 +433,6 @@ def qjit(
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
-    '''
     # Map static_argnames to static_argnums
     # no need to propagate static_argnames further
     if static_argnames is not None:
@@ -447,9 +446,7 @@ def qjit(
         static_argnums = list(dict.fromkeys(static_argnums))
         static_argnums.sort()
         kwargs["static_argnums"] = static_argnums
-    '''
     kwargs.pop("static_argnames")
-
 
     return QJIT(fn, CompileOptions(**kwargs))
 
