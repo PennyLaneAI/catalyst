@@ -147,6 +147,24 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
+* Static arguments of a jit-ted function can now be indicated by a `static_argnames`
+  argument to `qjit`.
+  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+
+  ```python
+  @qjit(static_argnames="y")
+  def f(x, y):
+      if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+          return x + y
+
+  res = f(1, 2)
+  print(res)
+  ```
+
+  ```pycon
+  >>> 3
+  ```
+
 <h3>Improvements</h3>
 
 * Scalar tensors are eliminated from control flow operations in the program, and are replaced with
