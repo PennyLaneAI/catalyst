@@ -24,8 +24,6 @@ target_include_directories(rtd_openqasm PRIVATE .
     ${backend_includes}
     )
 
-target_link_libraries(rtd_openqasm pybind11::module)
-
 pybind11_add_module(openqasm_python_module SHARED openqasm_python_module.cpp)
 
 add_dependencies(rtd_openqasm openqasm_python_module)
