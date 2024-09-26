@@ -26,8 +26,9 @@ target_include_directories(rtd_openqasm PRIVATE .
 
 target_link_libraries(rtd_openqasm pybind11::module)
 
-pybind11_add_module(openqasm_py SHARED openqasm_python_module.cpp)
+pybind11_add_module(openqasm_python_module SHARED openqasm_python_module.cpp)
 
-add_dependencies(rtd_openqasm openqasm_py)
-target_compile_definitions(rtd_openqasm PUBLIC -DOPENQASM_PY=\"$<TARGET_FILE_NAME:openqasm_py>\")
+add_dependencies(rtd_openqasm openqasm_python_module)
+target_compile_definitions(rtd_openqasm PUBLIC -DOPENQASM_PY=\"$<TARGET_FILE_NAME:openqasm_python_module>\")
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:openqasm_python_module>")

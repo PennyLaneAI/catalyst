@@ -17,6 +17,76 @@
 #include <string.h>
 
 extern "C" {
+[[gnu::visibility("default")]] void probs(const char *_circuit, const char *_device, size_t shots,
+                                          size_t num_qubits, const char *_kwargs, void *_vector)
+{
+    namespace py = pybind11;
+    py::gil_scoped_acquire lock;
+
+    std::string circuit(_circuit);
+    std::string device(_device);
+    std::string kwargs(_kwargs);
+
+    std::vector<double> *probs = reinterpret_cast<std::vector<double> *>(_vector);
+
+    using namespace py::literals;
+
+    auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device, "kwargs"_a = kwargs,
+                           "shots"_a = shots, "num_qubits"_a = num_qubits, "msg"_a = "");
+
+    py::exec(
+        R"(
+            from braket.aws import AwsDevice
+            from braket.devices import LocalSimulator
+            from braket.ir.openqasm import Program as OpenQasmProgram
+
+            try:
+                if braket_device in ["default", "braket_sv", "braket_dm"]:
+                    device = LocalSimulator(braket_device)
+                elif "arn:aws:braket" in braket_device:
+                    device = AwsDevice(braket_device)
+                else:
+                    raise ValueError(
+                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
+                    )
+                if kwargs != "":
+                    kwargs = kwargs.replace("'", "")
+                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
+                    if len(kwargs) != 2:
+                        raise ValueError(
+                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
+                        )
+                    result = device.run(
+                        OpenQasmProgram(source=circuit),
+                        shots=int(shots),
+                        s3_destination_folder=tuple(kwargs),
+                    ).result()
+                else:
+                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
+                probs_dict = {int(s, 2): p for s, p in result.measurement_probabilities.items()}
+                probs_list = []
+                for i in range(2 ** int(num_qubits)):
+                    probs_list.append(probs_dict[i] if i in probs_dict else 0)
+            except Exception as e:
+                print(f"circuit: {circuit}")
+                msg = str(e)
+              )",
+        py::globals(), locals);
+
+    auto &&msg = locals["msg"].cast<std::string>();
+    if (!msg.empty()) {
+        throw std::runtime_error(msg);
+    }
+
+    py::list results = locals["probs_list"];
+
+    probs->reserve(std::pow(2, num_qubits));
+    for (py::handle item : results) {
+        probs->push_back(item.cast<double>());
+    }
+
+    return;
+}
 [[gnu::visibility("default")]] char *runCircuit(const char *_circuit, const char *_device,
                                                 size_t shots, const char *_kwargs)
 {
@@ -80,4 +150,7 @@ extern "C" {
 }
 }
 
-PYBIND11_MODULE(catalyst_callback_registry, m) {}
+PYBIND11_MODULE(openqasm_python_module, m)
+{
+    m.doc() = "openqasm";
+}
