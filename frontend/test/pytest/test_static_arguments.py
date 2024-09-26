@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 import pennylane as qml
 import pytest
+from jax.errors import TracerBoolConversionError
 
 from catalyst import qjit
 from catalyst.utils.exceptions import CompileError
@@ -220,6 +221,54 @@ class TestStaticArguments:
         wrapper(0.5, 0.5)
         captured = capsys.readouterr()
         assert captured.out.strip() == "Inside QNode: 0.5"
+
+    def test_static_argnames(self):
+        """Test static arguments specified by names"""
+
+        @qjit(static_argnames="y")
+        def f(x, y):
+            if y < 10:
+                return x + y
+
+        assert f(1, 2) == 3
+
+        @qjit(static_argnames="x")
+        def g(x, y):
+            if y < 10:
+                return x + y
+
+        with pytest.raises(
+            TracerBoolConversionError, match="Attempted boolean conversion of traced"
+        ):
+            g(1, 2)
+
+        @qjit(static_argnames=("x", "y"))
+        def h(x, y):
+            if x < 10 and y < 10:
+                return x + y
+
+        assert h(1, 2) == 3
+
+        @qjit(static_argnames=("x"), static_argnums=[1])
+        def p(x, y):
+            if x < 10 and y < 10:
+                return x + y
+
+        assert p(1, 2) == 3
+
+        @qjit(static_argnames=("y"), static_argnums=[0])
+        def q(x, y):
+            if x < 10 and y < 10:
+                return x + y
+
+        assert q(1, 2) == 3
+
+        @qjit(static_argnames=("y"), static_argnums=[1])
+        def r(x, y):
+            if y < 10:
+                return x + y
+
+        assert r(1, 2) == 3
 
 
 if __name__ == "__main__":
