@@ -81,6 +81,7 @@ def qjit(
     logfile=None,
     pipelines=None,
     static_argnums=None,
+    static_argnames=None,
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
@@ -123,6 +124,8 @@ def qjit(
             considered to be used by advanced users for low-level debugging purposes.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
+        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+            names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -429,6 +432,24 @@ def qjit(
 
     if fn is None:
         return functools.partial(qjit, **kwargs)
+
+    '''
+    # Map static_argnames to static_argnums
+    # no need to propagate static_argnames further
+    if static_argnames is not None:
+        static_argnums = [] if (static_argnums is None) else list(kwargs["static_argnums"])
+        fn_argnames = inspect.getfullargspec(fn).args
+        for argname in fn_argnames:
+            if argname in static_argnames:
+                static_argnums.append(fn_argnames.index(argname))
+
+        # Remove potential duplicates from static_argnums and static_argnames
+        static_argnums = list(dict.fromkeys(static_argnums))
+        static_argnums.sort()
+        kwargs["static_argnums"] = static_argnums
+    '''
+    kwargs.pop("static_argnames")
+
 
     return QJIT(fn, CompileOptions(**kwargs))
 
