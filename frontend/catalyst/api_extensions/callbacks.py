@@ -367,7 +367,7 @@ def accelerate_impl(users_func=None, *, dev=None):
         absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
             # Find the shape of the return value
-            with transient_jax_config({"jax_dynamic_shapes": False}):
+            with transient_jax_config({"jax_dynamic_shapes": False}), AccelerateContext():
                 _, returnshape = jax.make_jaxpr(jitted_fn, return_shape=True)(
                     absextra, *absargs, **abskwargs
                 )
@@ -512,7 +512,7 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
     # Since we are building this feature step by step.
     @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def bind_callback(*args, **kwargs):
-        if not EvaluationContext.is_tracing():
+        if not EvaluationContext.is_tracing() or AccelerateContext.am_inside_accelerate():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 

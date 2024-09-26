@@ -49,10 +49,8 @@ def check_alternative_support(op, capabilities):
 
     if isinstance(op, qml.ops.Controlled):
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
-        if (
-            capabilities.native_ops.get(op.base.name)
-            and capabilities.native_ops.get(op.base.name).controllable
-        ):
+        supported = capabilities.native_ops.get(op.base.name)
+        if supported and supported.controllable:
             return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
@@ -71,7 +69,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
     if capabilities.native_ops.get("QubitUnitary"):
         # If the device supports unitary matrices, apply the relevant conversions and fallbacks.
-        if capabilities.to_matrix_ops.get(op.name) or (
+        if op.name in capabilities.to_matrix_ops or (
             op.has_matrix and isinstance(op, qml.ops.Controlled)
         ):
             return _decompose_to_matrix(op)
@@ -81,13 +79,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
 @transform
 @debug_logger
-def catalyst_decompose(
-    tape: qml.tape.QuantumTape,
-    ctx,
-    stopping_condition,
-    capabilities,
-    max_expansion=None,
-):
+def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -104,10 +96,9 @@ def catalyst_decompose(
 
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition,
+        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
         skip_initial_state_prep=capabilities.initial_state_prep_flag,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
-        max_expansion=max_expansion,
         name="catalyst on this device",
         error=CompileError,
     )
@@ -115,7 +106,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion)
+            op = _decompose_nested_tapes(op, ctx, capabilities)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -133,7 +124,7 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion):
+def _decompose_nested_tapes(op, ctx, capabilities):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
@@ -141,11 +132,7 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
         else:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 tapes, _ = catalyst_decompose(
-                    region.quantum_tape,
-                    ctx=ctx,
-                    stopping_condition=stopping_condition,
-                    capabilities=capabilities,
-                    max_expansion=max_expansion,
+                    region.quantum_tape, ctx=ctx, capabilities=capabilities
                 )
                 new_tape = tapes[0]
         new_regions.append(
@@ -198,9 +185,22 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
-    """Specify whether or not an Operator is supported."""
-    return op.name in operations
+def catalyst_acceptance(op: qml.operation.Operation, capabilities: DeviceCapabilities) -> str:
+    """Check whether or not an Operator is supported."""
+    op_support = capabilities.native_ops
+
+    if isinstance(op, qml.ops.Adjoint):
+        match = catalyst_acceptance(op.base, capabilities)
+        if not match or not op_support[match].invertible:
+            return None
+    elif type(op) is qml.ops.ControlledOp:
+        match = catalyst_acceptance(op.base, capabilities)
+        if not match or not op_support[match].controllable:
+            return None
+    else:
+        match = op.name if op.name in op_support else None
+
+    return match
 
 
 @transform
