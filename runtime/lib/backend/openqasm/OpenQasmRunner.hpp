@@ -26,6 +26,9 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eval.h>
+#ifdef INITIALIZE_PYTHON
+#include <pybind11/embed.h>
+#endif
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
@@ -108,7 +111,11 @@ struct BraketRunner : public OpenQasmRunner {
     {
         namespace py = pybind11;
         using namespace py::literals;
-
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
         py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
@@ -163,6 +170,11 @@ struct BraketRunner : public OpenQasmRunner {
         namespace py = pybind11;
         using namespace py::literals;
 
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
         py::gil_scoped_acquire lock;
 
         auto locals =
@@ -229,6 +241,11 @@ struct BraketRunner : public OpenQasmRunner {
         namespace py = pybind11;
         using namespace py::literals;
 
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
         py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
@@ -290,6 +307,11 @@ struct BraketRunner : public OpenQasmRunner {
     {
         namespace py = pybind11;
         using namespace py::literals;
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
         py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
@@ -344,6 +366,11 @@ struct BraketRunner : public OpenQasmRunner {
     {
         namespace py = pybind11;
         using namespace py::literals;
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
         py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,

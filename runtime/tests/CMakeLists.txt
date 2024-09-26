@@ -77,6 +77,7 @@ if(ENABLE_OPENQASM)
     add_executable(runner_tests_openqasm runner_main.cpp)
 
     # To avoid link to libpython, we use pybind11::module interface library.
+    target_compile_definitions(runner_tests_openqasm PUBLIC INITIALIZE_PYTHON)
     target_link_libraries(runner_tests_openqasm PRIVATE
         Catch2::Catch2
         pybind11::embed
