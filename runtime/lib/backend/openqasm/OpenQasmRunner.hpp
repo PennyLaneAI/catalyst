@@ -24,11 +24,13 @@
 
 #include "Exception.hpp"
 
-#include <pybind11/pybind11.h>
 #include <pybind11/eval.h>
+#include <pybind11/pybind11.h>
 #ifdef INITIALIZE_PYTHON
 #include <pybind11/embed.h>
 #endif
+
+#include <dlfcn.h>
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
@@ -109,58 +111,29 @@ struct BraketRunner : public OpenQasmRunner {
                                   size_t shots, const std::string &kwargs = "") const
         -> std::string override
     {
-        namespace py = pybind11;
-        using namespace py::literals;
 #ifdef INITIALIZE_PYTHON
         if (!Py_IsInitialized()) {
             pybind11::initialize_interpreter();
         }
 #endif
-        py::gil_scoped_acquire lock;
+        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+        char *(*runCircuitImpl)(const char *, const char *, size_t, const char *);
+        typedef char *(*func_ptr_t)(const char *, const char *, size_t, const char *);
 
-        py::exec(
-            R"(
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
+        runCircuitImpl = (func_ptr_t)dlsym(handle, "runCircuit");
+        if (!runCircuitImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                result = str(result)
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        return locals["result"].cast<std::string>();
+        char *message = runCircuitImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
+        std::string messageStr(message);
+        return messageStr;
     }
 
     [[nodiscard]] auto Probs(const std::string &circuit, const std::string &device, size_t shots,
