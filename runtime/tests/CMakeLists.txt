@@ -76,6 +76,12 @@ endif()
 if(ENABLE_OPENQASM)
     add_executable(runner_tests_openqasm runner_main.cpp)
     add_dependencies(runner_tests_openqasm openqasm_python_module)
+    set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:openqasm_python_module>")
+    if(NOT APPLE)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
+    else()
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
+    endif()
 
     # To avoid link to libpython, we use pybind11::module interface library.
     target_compile_definitions(runner_tests_openqasm PUBLIC INITIALIZE_PYTHON)

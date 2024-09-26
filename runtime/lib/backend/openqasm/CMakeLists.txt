@@ -34,5 +34,4 @@ if(NOT APPLE)
     set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
 else()
     set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
-    
 endif()
