@@ -44,7 +44,7 @@ set_property(TARGET catalyst_qir_qis_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(rt_capi SHARED)
 
 target_link_libraries(rt_capi ${CMAKE_DL_LIBS} catalyst_qir_qis_obj)
-add_dependencies(rt_capi catalyst_callback_registry openqasm_python_module)
+add_dependencies(rt_capi catalyst_callback_registry)
 
 
 target_include_directories(rt_capi PUBLIC .
