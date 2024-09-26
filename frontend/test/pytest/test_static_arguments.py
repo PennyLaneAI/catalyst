@@ -223,6 +223,7 @@ class TestStaticArguments:
         assert captured.out.strip() == "Inside QNode: 0.5"
 
     def test_static_argnames(self):
+        # pylint: disable=inconsistent-return-statements
         """Test static arguments specified by names"""
 
         @qjit(static_argnames="y")
