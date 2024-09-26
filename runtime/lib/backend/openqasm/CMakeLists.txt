@@ -24,6 +24,6 @@ target_include_directories(rtd_openqasm PRIVATE .
     ${backend_includes}
     )
 
-target_link_libraries(rtd_openqasm pybind11::embed)
+target_link_libraries(rtd_openqasm pybind11::module)
 
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
