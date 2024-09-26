@@ -119,6 +119,33 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                     return;
                 }
             }
+
+            // |+> target, always do nothing
+            if (pssa.isPlus(qubitValues[targetIn])) {
+                controlOut.replaceAllUsesWith(controlIn);
+                targetOut.replaceAllUsesWith(targetIn);
+                op->erase();
+                return;
+            }
+
+            // |-> target, insert PauliZ on control
+            if (pssa.isMinus(qubitValues[targetIn])) {
+                targetOut.replaceAllUsesWith(targetIn);
+
+                // PauliZ on |01> is unnecessary: they are eigenstates!
+                if ((pssa.isZero(qubitValues[controlIn])) || (pssa.isOne(qubitValues[controlIn]))) {
+                    controlOut.replaceAllUsesWith(controlIn);
+                    op->erase();
+                    return;
+                }
+                else {
+                    quantum::CustomOp zgate =
+                        createSimpleOneBitGate("PauliZ", controlIn, controlOut, builder, loc, op);
+                    controlOut.replaceAllUsesWith(zgate->getResult(0));
+                    op->erase();
+                    return;
+                }
+            }
         });
     }
 };
