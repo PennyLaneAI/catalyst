@@ -206,54 +206,8 @@ extern "C" {
 
     std::vector<size_t> *samples = reinterpret_cast<std::vector<size_t> *>(_vector);
 
-    using namespace py::literals;
-
-    auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device, "kwargs"_a = kwargs,
-                           "shots"_a = shots, "msg"_a = "");
-    py::exec(
-        R"(
-            import numpy as np
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
-
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                samples = np.array(result.measurements).flatten()
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-        py::globals(), locals);
-
-    auto &&msg = locals["msg"].cast<std::string>();
-
-    if (!msg.empty()) {
-        throw std::runtime_error(msg);
-    }
-
-    py::list results = locals["samples"];
+    py::exec(program, py::globals(), py::globals());
+    auto results = py::globals()["py_samples"](circuit, device, kwargs, shots);
 
     samples->reserve(shots * num_qubits);
     for (py::handle item : results) {
