@@ -154,15 +154,21 @@
   ```python
   @qjit(static_argnames="y")
   def f(x, y):
-      if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
-          return x + y
+    if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+        return x + y
 
-  res = f(1, 2)
-  print(res)
+  @qjit(static_argnames=["x","y"])
+  def g(x, y):
+    if x < 10 and y < 10:
+        return x + y
+
+  res_f = f(1, 2)
+  res_g = g(3, 4)
+  print(res_f, res_g)
   ```
 
   ```pycon
-  >>> 3
+  >>> 3 7
   ```
 
 <h3>Improvements</h3>
