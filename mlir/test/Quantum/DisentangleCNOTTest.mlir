@@ -74,11 +74,37 @@
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ZERO_0]], [[ONE_1]] : !quantum.bit, !quantum.bit
 
 
-    %5:2 = quantum.custom "CNOT"() %ONE_0, %ZERO_1 : !quantum.bit, !quantum.bit
+    %5:2 = quantum.custom "CNOT"() %ONE_0, %OTHERS_1 : !quantum.bit, !quantum.bit
     %user_5:2 = quantum.custom "CRZ"(%cst) %5#0, %5#1 : !quantum.bit, !quantum.bit
     // CHECK-NOT: quantum.custom "CNOT"
-    // CHECK: [[mid_5:%.+]] = quantum.custom "PauliX"() [[ZERO_1]] : !quantum.bit
+    // CHECK: [[mid_5:%.+]] = quantum.custom "PauliX"() [[OTHERS_1]] : !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ONE_0]], [[mid_5]] : !quantum.bit, !quantum.bit
+
+
+    %6:2 = quantum.custom "CNOT"() %ONE_0, %PLUS_1 : !quantum.bit, !quantum.bit
+    %user_6:2 = quantum.custom "CRZ"(%cst) %6#0, %6#1 : !quantum.bit, !quantum.bit
+    // CHECK-NOT: quantum.custom "CNOT"
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ONE_0]], [[PLUS_1]] : !quantum.bit, !quantum.bit
+
+
+    %7:2 = quantum.custom "CNOT"() %ONE_0, %MINUS_1 : !quantum.bit, !quantum.bit
+    %user_7:2 = quantum.custom "CRZ"(%cst) %7#0, %7#1 : !quantum.bit, !quantum.bit
+    // CHECK-NOT: quantum.custom "CNOT"
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ONE_0]], [[MINUS_1]] : !quantum.bit, !quantum.bit
+
+
+    %8:2 = quantum.custom "CNOT"() %ONE_0, %ZERO_1 : !quantum.bit, !quantum.bit
+    %user_8:2 = quantum.custom "CRZ"(%cst) %8#0, %8#1 : !quantum.bit, !quantum.bit
+    // CHECK-NOT: quantum.custom "CNOT"
+    // CHECK: [[mid_8:%.+]] = quantum.custom "PauliX"() [[ZERO_1]] : !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ONE_0]], [[mid_8]] : !quantum.bit, !quantum.bit
+
+
+    %9:2 = quantum.custom "CNOT"() %ONE_0, %ONE_1 : !quantum.bit, !quantum.bit
+    %user_9:2 = quantum.custom "CRZ"(%cst) %9#0, %9#1 : !quantum.bit, !quantum.bit
+    // CHECK-NOT: quantum.custom "CNOT"
+    // CHECK: [[mid_9:%.+]] = quantum.custom "PauliX"() [[ONE_1]] : !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[ONE_0]], [[mid_9]] : !quantum.bit, !quantum.bit
 
 
 

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This algorithm is taken from https://arxiv.org/pdf/2012.07711, table 1
+
 #define DEBUG_TYPE "disentanglecnot"
 
 #include "PropagateSimpleStatesAnalysis.hpp"
@@ -36,6 +38,26 @@ namespace catalyst {
 
 struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
     using impl::DisentangleCNOTPassBase<DisentangleCNOTPass>::DisentangleCNOTPassBase;
+
+    quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
+                                             const Value &outQubit, mlir::IRRewriter &builder,
+                                             Location &loc, const quantum::CustomOp &originalCNOT)
+    {
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPointAfter(originalCNOT);
+        quantum::CustomOp newGate =
+            builder.create<quantum::CustomOp>(loc,
+                                              /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
+                                              /*out_ctrl_qubits=*/mlir::TypeRange(),
+                                              /*params=*/mlir::ValueRange(),
+                                              /*in_qubits=*/mlir::ValueRange({inQubit}),
+                                              /*gate_name=*/gateName,
+                                              /*adjoint=*/nullptr,
+                                              /*in_ctrl_qubits=*/mlir::ValueRange(),
+                                              /*in_ctrl_values=*/mlir::ValueRange());
+
+        return newGate;
+    }
 
     bool canScheduleOn(RegisteredOperationName opInfo) const override
     {
@@ -66,45 +88,33 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                 return;
             }
 
-            Value control_in = op->getOperand(0);
-            Value target_in = op->getOperand(1);
-            Value control_out = op->getResult(0);
-            Value target_out = op->getResult(1);
+            Value controlIn = op->getOperand(0);
+            Value targetIn = op->getOperand(1);
+            Value controlOut = op->getResult(0);
+            Value targetOut = op->getResult(1);
 
             // |0> control, always do nothing
-            if (pssa.isZero(qubitValues[control_in])) {
-                control_out.replaceAllUsesWith(control_in);
-                target_out.replaceAllUsesWith(target_in);
+            if (pssa.isZero(qubitValues[controlIn])) {
+                controlOut.replaceAllUsesWith(controlIn);
+                targetOut.replaceAllUsesWith(targetIn);
                 op->erase();
                 return;
             }
 
             // |1> control, insert PauliX gate on target
-            if (pssa.isOne(qubitValues[control_in])) {
-                if ((pssa.isPlus(qubitValues[target_in])) ||
-                    (pssa.isMinus(qubitValues[target_in]))) {
-                    control_out.replaceAllUsesWith(control_in);
-                    target_out.replaceAllUsesWith(target_in);
+            if (pssa.isOne(qubitValues[controlIn])) {
+                controlOut.replaceAllUsesWith(controlIn);
+
+                // PauliX on |+-> is unnecessary: they are eigenstates!
+                if ((pssa.isPlus(qubitValues[targetIn])) || (pssa.isMinus(qubitValues[targetIn]))) {
+                    targetOut.replaceAllUsesWith(targetIn);
                     op->erase();
                     return;
                 }
                 else {
-                    control_out.replaceAllUsesWith(control_in);
-
-                    OpBuilder::InsertionGuard insertionGuard(builder);
-                    builder.setInsertionPointAfter(op);
-                    quantum::CustomOp xgate = builder.create<quantum::CustomOp>(
-                        loc,
-                        /*out_qubits=*/mlir::TypeRange({target_out.getType()}),
-                        /*out_ctrl_qubits=*/mlir::TypeRange(),
-                        /*params=*/mlir::ValueRange(),
-                        /*in_qubits=*/mlir::ValueRange({target_in}),
-                        /*gate_name=*/"PauliX",
-                        /*adjoint=*/nullptr,
-                        /*in_ctrl_qubits=*/mlir::ValueRange(),
-                        /*in_ctrl_values=*/mlir::ValueRange());
-
-                    target_out.replaceAllUsesWith(xgate->getResult(0));
+                    quantum::CustomOp xgate =
+                        createSimpleOneBitGate("PauliX", targetIn, targetOut, builder, loc, op);
+                    targetOut.replaceAllUsesWith(xgate->getResult(0));
                     op->erase();
                     return;
                 }
