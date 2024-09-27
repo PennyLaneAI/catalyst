@@ -17,6 +17,16 @@
 
 include "mlir/Pass/PassBase.td"
 
+def DetensorizeSCFPass : Pass<"detensorize-scf"> {
+    let summary = "Detensorize for, if, while operations from the SCF dialect.";
+
+    let dependentDialects = [
+        "tensor::TensorDialect"
+    ];
+
+    let constructor = "catalyst::createDetensorizeSCFPass()";
+}
+
 def CatalystBufferizationPass : Pass<"catalyst-bufferize"> {
     let summary = "Bufferize tensors in catalyst utility ops.";
 

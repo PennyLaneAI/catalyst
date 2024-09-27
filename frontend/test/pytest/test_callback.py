@@ -1522,5 +1522,21 @@ def test_error_incomplete_grad_only_reverse():
         wrapper(1.0)
 
 
+def test_nested_accelerate_grad():
+    """https://github.com/PennyLaneAI/catalyst/issues/1086"""
+
+    @qml.qjit
+    @grad
+    def hypothesis(x):
+        return accelerate(accelerate(jnp.sin))(x)
+
+    @jax.jit
+    @jax.grad
+    def ground_truth(x):
+        return jax.jit(jax.jit(jnp.sin))(x)
+
+    assert np.allclose(hypothesis(0.43), ground_truth(0.43))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

@@ -17,6 +17,7 @@ set(LIBS
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest
+    MLIRTestDialect
     ${ALL_MHLO_PASSES}
 )
 
