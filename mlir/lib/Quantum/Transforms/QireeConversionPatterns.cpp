@@ -47,8 +47,14 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
         auto numQubitsName = rewriter.getStringAttr("num_required_qubits");
         auto numQubitsVal = rewriter.getStringAttr("2");
         auto numQubits = rewriter.getArrayAttr({numQubitsName, numQubitsVal});
+        auto numResultsName = rewriter.getStringAttr("num_required_results");
+        auto numResultsVal = rewriter.getStringAttr("0");
+        auto numResults = rewriter.getArrayAttr({numResultsName, numResultsVal});
         auto outputLabel = rewriter.getStringAttr("output_labeling_schema");
-        SmallVector<Attribute> passthrough = {entryPoint, numQubits, outputLabel};
+        auto qirProfilesName = rewriter.getStringAttr("qir_profiles");
+        auto qirProfilesVal = rewriter.getStringAttr("custom");
+        auto qirProfiles = rewriter.getArrayAttr({qirProfilesName, qirProfilesVal});
+        SmallVector<Attribute> passthrough = {entryPoint, numQubits, numResults, outputLabel, qirProfiles};
 
         fnOp->setAttr("passthrough", ArrayAttr::get(rewriter.getContext(), passthrough));
         
