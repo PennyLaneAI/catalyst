@@ -15,6 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import copy
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -26,7 +27,7 @@ import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.dispatch import jaxpr_replicas
-from jax._src.lax.lax import _nary_lower, cos_p, sin_p, xla
+from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p, xla
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax._src.sharding_impls import ReplicaAxisContext
@@ -603,25 +604,14 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
         symbol_attr = ir._symbolNameAttr("module_" + fn.__name__, ctx.module_context.context)
         module.operation.attributes["sym_name"] = symbol_attr
         symbol_table.insert(module)
-    nrep = jaxpr_replicas(call_jaxpr)
-    ctx_params = {}
-    ctx_params["backend_or_name"] = "cpu"
-    ctx_params["platforms"] = ["cpu"]
-    ctx_params["axis_context"] = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    ctx_params["keepalives"] = []
-    ctx_params["channel_iterator"] = 1
-    ctx_params["host_callbacks"] = []
-    ctx_params["lowering_parameters"] = mlir.LoweringParameters()
-    ctx_params["module"] = module
-    ctx_params["context"] = ctx.module_context.context
 
     with ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        ctx_params["ip"] = ip
-        nested_context = mlir.ModuleContext(**ctx_params)
-        nested_context.allow_unregistered_dialects = True
+        nested_context = copy.copy(ctx.module_context)
+        nested_context.module = module
+        nested_context.ip = ip
+        nested_context.cached_primitive_lowerings = dict()
         func_op = _func_def_lowering(nested_context, fn, call_jaxpr, name_stack=ctx.name_stack)
         func_op.sym_visibility = ir.StringAttr.get("private")
-        func_op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
     if not call:
         return None
