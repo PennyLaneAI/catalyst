@@ -71,7 +71,6 @@ from catalyst.jax_primitives import (
     gphase_p,
     hamiltonian_p,
     hermitian_p,
-    mlir_fn_cache,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -548,11 +547,6 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
         ir.Context: the MLIR context
     """
 
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
     MemrefCallable.clearcache()
     CALLBACK_OP_CACHE.clear()
 
