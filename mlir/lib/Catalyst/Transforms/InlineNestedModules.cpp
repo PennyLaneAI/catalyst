@@ -231,8 +231,12 @@ void InlineNestedModule::rewrite(Operation *op, PatternRewriter &rewriter) const
 {
     auto parent = op->getParentOp();
     // Can't generalize getting a region other than the zero-th one.
-    rewriter.inlineRegionBefore(op->getRegion(0), &parent->getRegion(0).front());
-    rewriter.mergeBlocks(&parent->getRegion(0).front(), &parent->getRegion(0).back());
+    rewriter.inlineRegionBefore(op->getRegion(0), &parent->getRegion(0).back());
+    Block *inlinedBlock = &parent->getRegion(0).front();
+    Block *originalBlock = &parent->getRegion(0).back();
+    Block *after = rewriter.splitBlock(originalBlock, rewriter.getInsertionPoint());
+    rewriter.mergeBlocks(inlinedBlock, originalBlock);
+    rewriter.mergeBlocks(after, originalBlock);
     rewriter.eraseOp(op);
 }
 
