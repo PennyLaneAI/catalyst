@@ -44,10 +44,11 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
         auto fnOp = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
 
         auto entryPoint = rewriter.getStringAttr("entry_point");
-        auto numQubit = rewriter.getStringAttr("num_required_qubits");
-        auto numQubitVal = rewriter.getStringAttr("2");
+        auto numQubitsName = rewriter.getStringAttr("num_required_qubits");
+        auto numQubitsVal = rewriter.getStringAttr("2");
+        auto numQubits = rewriter.getArrayAttr({numQubitsName, numQubitsVal});
         auto outputLabel = rewriter.getStringAttr("output_labeling_schema");
-        SmallVector<Attribute> passthrough = {entryPoint, outputLabel};
+        SmallVector<Attribute> passthrough = {entryPoint, numQubits, outputLabel};
 
         fnOp->setAttr("passthrough", ArrayAttr::get(rewriter.getContext(), passthrough));
         
