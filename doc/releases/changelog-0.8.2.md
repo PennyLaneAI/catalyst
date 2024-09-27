@@ -89,6 +89,9 @@
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
 
+* Cached primitive lowerings is used instead of a custom cache structure.
+  [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
+
 <h3>Internal changes</h3>
 
 * Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when 
