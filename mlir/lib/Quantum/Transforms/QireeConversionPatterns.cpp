@@ -20,6 +20,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -29,6 +30,41 @@ namespace {
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 constexpr int32_t NO_POSTSELECT = -1;
 
+
+LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
+                                           StringRef fnSymbol, Type fnType)
+{
+    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
+
+    if (!fnDecl) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto fnOp = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
+
+        auto entryPoint = rewriter.getStringAttr("entry_point");
+        auto numQubit = rewriter.getStringAttr("num_required_qubits");
+        auto numQubitVal = rewriter.getStringAttr("2");
+        auto outputLabel = rewriter.getStringAttr("output_labeling_schema");
+        SmallVector<Attribute> passthrough = {entryPoint, outputLabel};
+
+        fnOp->setAttr("passthrough", ArrayAttr::get(rewriter.getContext(), passthrough));
+        
+        Block *entryBlock = new Block();
+        fnOp.getBody().push_back(entryBlock);
+        rewriter.setInsertionPointToEnd(entryBlock);
+
+         // Create a return operation (returning void)
+        rewriter.create<LLVM::ReturnOp>(mod.getLoc(), ValueRange{});
+        fnDecl = fnOp;
+    }
+    else {
+        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
+    }
+
+    return cast<LLVM::LLVMFuncOp>(fnDecl);
+}
 
 ////////////////////////
 // Runtime Management //
@@ -40,6 +76,25 @@ template <typename T> struct RTBasedPattern : public OpRewritePattern<T> {
     LogicalResult matchAndRewrite(T op,
                                   PatternRewriter &rewriter) const override
     {
+        MLIRContext *ctx = this->getContext();
+
+        ModuleOp parentModule = op->template getParentOfType<ModuleOp>();
+
+        if (parentModule) {
+            bool insertMain = true;
+            for (auto func : parentModule.getOps<LLVM::LLVMFuncOp>()) {
+                if (func.getName() == "main") {
+                    insertMain = false;
+                }
+            }
+            if (insertMain) {
+                StringRef qirName = "main";
+                Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+                LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            }
+        }
+
+        
         rewriter.eraseOp(op);
 
         return success();
