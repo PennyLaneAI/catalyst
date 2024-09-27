@@ -80,7 +80,7 @@ struct QIREEConversionPass : impl::QIREEConversionPassBase<QIREEConversionPass> 
         RewritePatternSet patterns(context);
         cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-        populateQIREEConversionPatterns(typeConverter, patterns);
+        populateQIREEConversionPatterns(patterns);
 
         LLVMConversionTarget target(*context);
         target.addLegalOp<ModuleOp>();
