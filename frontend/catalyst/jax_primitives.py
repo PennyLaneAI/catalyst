@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Dict, Iterable, List, Union
+from typing import Iterable, List, Union
 
 import jax
 import numpy as np
