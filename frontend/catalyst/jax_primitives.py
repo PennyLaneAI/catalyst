@@ -564,7 +564,6 @@ def _apply_registered_pass_lowering(
 # module
 #
 
-mlir_fn_cache: Dict[Any, Any] = {}
 
 
 @module_p.def_impl
@@ -581,12 +580,12 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-    if mlir_fn_cache.get(fn) and not call:
+    if ctx.module_context.cached_primitive_lowerings.get(fn) and not call:
         return None
 
     symbol_table = ctx.module_context.symbol_table
-    if mlir_fn_cache.get(fn):
-        func_op = mlir_fn_cache[fn]
+    if ctx.module_context.cached_primitive_lowerings.get(fn):
+        func_op = ctx.module_context.cached_primitive_lowerings[fn]
         parent = func_op.parent.operation.attributes["sym_name"].value
         symbol_name = ir.SymbolRefAttr.get([parent, func_op.name.value])
         call = CallNestedModuleOp(
@@ -612,6 +611,8 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
         nested_context.cached_primitive_lowerings = dict()
         func_op = _func_def_lowering(nested_context, fn, call_jaxpr, name_stack=ctx.name_stack)
         func_op.sym_visibility = ir.StringAttr.get("private")
+
+    ctx.module_context.cached_primitive_lowerings[fn] = func_op
 
     if not call:
         return None
@@ -649,7 +650,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
         diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
-    mlir_fn_cache[fn] = func_op
+    ctx.cached_primitive_lowerings[fn] = func_op
     return func_op
 
 
@@ -678,8 +679,8 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
-    if fn in mlir_fn_cache:
-        func_op = mlir_fn_cache[fn]
+    if fn in ctx.module_context.cached_primitive_lowerings:
+        func_op = ctx.module_context.cached_primitive_lowerings[fn]
     else:
         func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr, name_stack=ctx.name_stack)
 
@@ -761,7 +762,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     _module_to_mlir(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     is_qnode = isinstance(fn, qml.QNode)
     symbol_name = (
@@ -849,7 +850,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
     is_qnode = isinstance(fn, qml.QNode)
@@ -916,7 +917,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
     is_qnode = isinstance(fn, qml.QNode)
@@ -980,7 +981,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
     is_qnode = isinstance(fn, qml.QNode)
@@ -1039,7 +1040,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     """
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     _module_to_mlir(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     is_qnode = isinstance(fn, qml.QNode)
     symbol_name = (
