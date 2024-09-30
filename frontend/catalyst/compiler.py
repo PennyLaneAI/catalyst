@@ -292,6 +292,7 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "register-inactive-callback",
+        "ensure-debug-info-scope-on-llvm-func"
     ],
 )
 
@@ -618,7 +619,7 @@ class Compiler:
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
+                binary=False, print_generic_op_form=False, assume_verified=True, enable_debug_info=True
             ),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,

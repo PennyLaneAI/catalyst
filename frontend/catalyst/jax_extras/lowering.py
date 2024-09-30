@@ -33,6 +33,7 @@ from jax.interpreters.mlir import (
     ir,
     lower_jaxpr_to_fun,
     lowerable_effects,
+    make_ir_context,
 )
 
 from catalyst.logging import debug_logger
@@ -121,6 +122,8 @@ def custom_lower_jaxpr_to_module(
     keepalives = []
     host_callbacks = []
     lowering_params = LoweringParameters()
+    context = make_ir_context()
+    module = ir.Module.create(loc=ir.Location.file("hello.py", 0, 0, context))
     ctx = ModuleContext(
         backend_or_name=None,
         platforms=[platform],
@@ -129,6 +132,8 @@ def custom_lower_jaxpr_to_module(
         channel_iterator=channel_iter,
         host_callbacks=host_callbacks,
         lowering_parameters=lowering_params,
+        context = context,
+        module = module,
     )
     ctx.context.allow_unregistered_dialects = True
     with ctx.context, ir.Location.unknown(ctx.context):
@@ -137,7 +142,7 @@ def custom_lower_jaxpr_to_module(
         # XLA computation preserves the module name.
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
-        lower_jaxpr_to_fun(
+        op = lower_jaxpr_to_fun(
             ctx,
             func_name,
             jaxpr,
@@ -149,6 +154,7 @@ def custom_lower_jaxpr_to_module(
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
             name_stack=name_stack,
+            arg_names = "m"
         )
 
         for op in ctx.module.body.operations:

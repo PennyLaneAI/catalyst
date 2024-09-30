@@ -414,7 +414,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
 
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["CoroOpt"]};
-        llvmModule->print(rawStringOstream, nullptr);
+        llvmModule->print(rawStringOstream, nullptr, false, true);
         auto outFile = output.nextPipelineDumpFilename("CoroOpt", ".ll");
         dumpToFile(options, outFile, outputs["CoroOpt"]);
     }
@@ -467,7 +467,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
 
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["O2Opt"]};
-        llvmModule->print(rawStringOstream, nullptr);
+        llvmModule->print(rawStringOstream, nullptr, false, true);
         auto outFile = output.nextPipelineDumpFilename("O2Opt", ".ll");
         dumpToFile(options, outFile, outputs["O2Opt"]);
     }
@@ -516,7 +516,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
-        llvmModule->print(rawStringOstream, nullptr);
+        llvmModule->print(rawStringOstream, nullptr, false, true);
         auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
         dumpToFile(options, outFile, outputs["Enzyme"]);
     }
@@ -557,13 +557,22 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     }
 
+    // if (options.keepIntermediate && options.checkpointStage == "") {
+    //     llvm::raw_string_ostream s{outputs["mlir"]};
+    //     s << moduleOp;
+    //     dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
+    //                outputs["mlir"]);
+    // }
+
     if (options.keepIntermediate && options.checkpointStage == "") {
         llvm::raw_string_ostream s{outputs["mlir"]};
-        s << moduleOp;
-        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
-                   outputs["mlir"]);
-    }
 
+        // Print the moduleOp to the stream with the specified flags
+        moduleOp->print(s, OpPrintingFlags().enableDebugInfo());
+
+        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
+                outputs["mlir"]);
+    }
     catalyst::utils::Timer timer{};
 
     auto beforePassCallback = [&](Pass *pass, Operation *op) {
@@ -584,7 +593,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
             auto pipelineName = res->second;
             llvm::raw_string_ostream s{outputs[pipelineName]};
-            s << *op;
+            // s << *op;
+            op->print(s, OpPrintingFlags().enableDebugInfo());
             dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
                        outputs[pipelineName]);
         }
@@ -597,7 +607,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         options.diagnosticStream << "While processing '" << pass->getName() << "' pass "
                                  << "of the '" << res->second << "' pipeline\n";
         llvm::raw_string_ostream s{outputs[res->second]};
-        s << *op;
+        // s << *op;
+        op->print(s, OpPrintingFlags().enableDebugInfo());
         if (options.keepIntermediate) {
             dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"),
                        outputs[res->second]);
@@ -666,7 +677,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         output.outIR.clear();
-        outIRStream << *op;
+        // outIRStream << *op;
+        op->print(outIRStream, OpPrintingFlags().enableDebugInfo());
 
         if (options.lowerToLLVM) {
             llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
@@ -681,7 +693,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             if (options.keepIntermediate) {
                 auto &outputs = output.pipelineOutputs;
                 llvm::raw_string_ostream rawStringOstream{outputs["llvm_ir"]};
-                llvmModule->print(rawStringOstream, nullptr);
+                llvmModule->print(rawStringOstream, nullptr, false, true);
                 auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
                 dumpToFile(options, outFile, outputs["llvm_ir"]);
             }
