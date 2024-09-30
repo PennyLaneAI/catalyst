@@ -606,6 +606,36 @@ def create_call_op(ctx, func_op, *args):
     return out_nodes
 
 
+def create_module_op(ctx, name):
+    """Create a module with name name"""
+
+    symbol_table = ctx.module_context.symbol_table
+    parent = ctx.module_context.module
+    with ir.InsertionPoint(parent.body):
+        module = ModuleOp()
+        symbol_attr = ir._symbolNameAttr(name, ctx.module_context.context)
+        module.operation.attributes["sym_name"] = symbol_attr
+        symbol_table.insert(module)
+
+    return module
+
+class NestedModule:
+
+     def __init__(self, ctx, name):
+         self.ctx = ctx
+         self.moduleOp = create_module_op(ctx, name)
+         self.old_module_context = ctx.module_context
+
+     def __enter__(self):
+         self.ctx.module_context = copy.copy(self.ctx.module_context)
+         self.ctx.module_context.module = self.moduleOp
+         self.ctx.module_context.cached_primitive_lowerings = dict()
+         return self.moduleOp
+
+     def __exit__(self, exc_type, exc_val, exc_tb):
+         self.ctx.module_context = self.old_module_context
+
+
 @module_p.def_impl
 def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
@@ -629,7 +659,6 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
     if ctx.module_context.cached_primitive_lowerings.get(fn) and not call:
         return None
 
-    symbol_table = ctx.module_context.symbol_table
     if ctx.module_context.cached_primitive_lowerings.get(fn):
         func_op = ctx.module_context.cached_primitive_lowerings[fn]
         parent = func_op.parent.operation.attributes["sym_name"].value
@@ -642,24 +671,13 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
 
         return call.results
 
-    root = ctx.module_context.module
-    with ir.InsertionPoint(root.body):
-        module = ModuleOp()
-        symbol_attr = ir._symbolNameAttr("module_" + fn.__name__, ctx.module_context.context)
-        module.operation.attributes["sym_name"] = symbol_attr
-        symbol_table.insert(module)
+    name = "module_" + fn.__name__
 
-    old_module_context = ctx.module_context
-    with ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        nested_context = copy.copy(ctx.module_context)
-        nested_context.module = module
-        nested_context.ip = ip
-        nested_context.cached_primitive_lowerings = dict()
-        ctx.module_context = nested_context
+    with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
         func_op.sym_visibility = ir.StringAttr.get("private")
 
-    ctx.module_context = old_module_context
     ctx.module_context.cached_primitive_lowerings[fn] = func_op
 
     if not call:
