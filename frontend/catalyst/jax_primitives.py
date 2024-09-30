@@ -364,8 +364,8 @@ def _python_callback_lowering(
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
     ctx = jax_ctx.module_context
-    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd, name_stack=jax_ctx.name_stack)
-    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev, name_stack=jax_ctx.name_stack)
+    mlir_fwd = get_or_create_funcop(ctx, fwd, fwd_jaxpr, jax_ctx.name_stack)
+    mlir_rev = get_or_create_funcop(ctx, rev, rev_jaxpr, jax_ctx.name_stack)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
 
     argc = len(args)
@@ -585,6 +585,7 @@ def lower_callable_to_funcop(ctx, _callable, call_jaxpr, name_stack):
 
     return func_op
 
+
 def get_or_create_funcop(ctx, _callable, call_jaxpr, name_stack):
     """Get funcOp from cache, or create it from scratch"""
     if func_op := ctx.cached_primitive_lowerings.get(_callable):
@@ -637,7 +638,7 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
         nested_context.module = module
         nested_context.ip = ip
         nested_context.cached_primitive_lowerings = dict()
-        func_op = _func_def_lowering(nested_context, fn, call_jaxpr, name_stack=ctx.name_stack)
+        func_op = get_or_create_funcop(nested_context, fn, call_jaxpr, ctx.name_stack)
         func_op.sym_visibility = ir.StringAttr.get("private")
 
     ctx.module_context.cached_primitive_lowerings[fn] = func_op
@@ -661,10 +662,6 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
 @func_p.def_impl
 def _func_def_impl(*args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
-
-
-def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
-    return get_or_create_funcop(ctx, fn, call_jaxpr, name_stack)
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
@@ -695,7 +692,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in ctx.module_context.cached_primitive_lowerings:
         func_op = ctx.module_context.cached_primitive_lowerings[fn]
     else:
-        func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr, name_stack=ctx.name_stack)
+        func_op = get_or_create_funcop(ctx.module_context, fn, call_jaxpr, ctx.name_stack)
         ctx.module_context.cached_primitive_lowerings[fn] = func_op
 
     symbol_name = func_op.name.value
