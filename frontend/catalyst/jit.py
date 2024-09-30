@@ -438,9 +438,22 @@ def qjit(
     if static_argnames is not None:
         static_argnums = [] if (static_argnums is None) else list(kwargs["static_argnums"])
         fn_argnames = inspect.getfullargspec(fn).args
-        for argname in fn_argnames:
-            if argname in static_argnames:
-                static_argnums.append(fn_argnames.index(argname))
+
+        # static_argnames can be a single str, or a list/tuple of strs
+        # convert all of them to list
+        if isinstance(static_argnames, str):
+            static_argnames = [static_argnames]
+
+        for static_argname in static_argnames:
+            if static_argname not in fn_argnames:
+                raise ValueError(
+                    f"""
+    qjitted function has invalid argname {{{static_argname}}} in static_argnames.
+    Function does not take these args.
+                    """
+                )
+            else:
+                static_argnums.append(fn_argnames.index(static_argname))
 
         # Remove potential duplicates from static_argnums and static_argnames
         static_argnums = list(dict.fromkeys(static_argnums))

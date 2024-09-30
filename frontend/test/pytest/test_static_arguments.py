@@ -233,6 +233,20 @@ class TestStaticArguments:
 
         assert f(1, 2) == 3
 
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {yy}"):
+
+            @qjit(static_argnames="yy")
+            def f_badname(x, y):
+                if y < 10:
+                    return x + y
+
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {yy}"):
+
+            @qjit(static_argnames=["y", "yy"])
+            def f_badname_list(x, y):
+                if y < 10:
+                    return x + y
+
         @qjit(static_argnames="x")
         def g(x, y):
             if y < 10:
