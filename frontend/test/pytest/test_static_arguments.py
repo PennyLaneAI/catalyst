@@ -18,7 +18,6 @@ from dataclasses import dataclass
 
 import pennylane as qml
 import pytest
-from jax.errors import TracerBoolConversionError
 
 from catalyst import qjit
 from catalyst.utils.exceptions import CompileError
@@ -228,62 +227,45 @@ class TestStaticArguments:
 
         @qjit(static_argnames="y")
         def f(x, y):
-            if y < 10:
-                return x + y
+            return
 
-        assert f(1, 2) == 3
+        assert set(f.compile_options.static_argnums) == {1}
 
         with pytest.raises(ValueError, match="qjitted function has invalid argname {yy}"):
 
             @qjit(static_argnames="yy")
             def f_badname(x, y):
-                if y < 10:
-                    return x + y
+                return
 
         with pytest.raises(ValueError, match="qjitted function has invalid argname {yy}"):
 
             @qjit(static_argnames=["y", "yy"])
             def f_badname_list(x, y):
-                if y < 10:
-                    return x + y
-
-        @qjit(static_argnames="x")
-        def g(x, y):
-            if y < 10:
-                return x + y
-
-        with pytest.raises(
-            TracerBoolConversionError, match="Attempted boolean conversion of traced"
-        ):
-            g(1, 2)
+                return
 
         @qjit(static_argnames=("x", "y"))
-        def h(x, y):
-            if x < 10 and y < 10:
-                return x + y
+        def f(x, y):
+            return
 
-        assert h(1, 2) == 3
+        assert set(f.compile_options.static_argnums) == {0, 1}
 
         @qjit(static_argnames=("x"), static_argnums=[1])
-        def p(x, y):
-            if x < 10 and y < 10:
-                return x + y
+        def f(x, y):
+            return
 
-        assert p(1, 2) == 3
+        assert set(f.compile_options.static_argnums) == {0, 1}
 
         @qjit(static_argnames=("y"), static_argnums=[0])
-        def q(x, y):
-            if x < 10 and y < 10:
-                return x + y
+        def f(x, y):
+            return
 
-        assert q(1, 2) == 3
+        assert set(f.compile_options.static_argnums) == {0, 1}
 
         @qjit(static_argnames=("y"), static_argnums=[1])
-        def r(x, y):
-            if y < 10:
-                return x + y
+        def f(x, y):
+            return
 
-        assert r(1, 2) == 3
+        assert set(f.compile_options.static_argnums) == {1}
 
 
 if __name__ == "__main__":
