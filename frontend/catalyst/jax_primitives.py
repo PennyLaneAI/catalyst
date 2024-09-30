@@ -364,8 +364,8 @@ def _python_callback_lowering(
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
     ctx = jax_ctx.module_context
-    mlir_fwd = get_or_create_funcop(ctx, fwd, fwd_jaxpr, jax_ctx.name_stack)
-    mlir_rev = get_or_create_funcop(ctx, rev, rev_jaxpr, jax_ctx.name_stack)
+    mlir_fwd = get_or_create_funcop(jax_ctx, fwd, fwd_jaxpr)
+    mlir_rev = get_or_create_funcop(jax_ctx, rev, rev_jaxpr)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
 
     argc = len(args)
@@ -559,17 +559,17 @@ def _apply_registered_pass_lowering(
 #
 # module
 #
-def lower_callable_to_funcop(ctx, _callable, call_jaxpr, name_stack):
+def lower_callable_to_funcop(ctx, _callable, call_jaxpr):
     """Lower callable to either a FuncOp"""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
 
     kwargs = dict()
-    kwargs["ctx"] = ctx
+    kwargs["ctx"] = ctx.module_context
     kwargs["name"] = _callable.__name__
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
-    kwargs["name_stack"] = name_stack
+    kwargs["name_stack"] = ctx.name_stack
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
     if isinstance(_callable, qml.QNode):
@@ -586,12 +586,12 @@ def lower_callable_to_funcop(ctx, _callable, call_jaxpr, name_stack):
     return func_op
 
 
-def get_or_create_funcop(ctx, _callable, call_jaxpr, name_stack):
+def get_or_create_funcop(ctx, _callable, call_jaxpr):
     """Get funcOp from cache, or create it from scratch"""
-    if func_op := ctx.cached_primitive_lowerings.get(_callable):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get(_callable):
         return func_op
-    func_op = lower_callable_to_funcop(ctx, _callable, call_jaxpr, name_stack)
-    ctx.cached_primitive_lowerings[_callable] = func_op
+    func_op = lower_callable_to_funcop(ctx, _callable, call_jaxpr)
+    ctx.module_context.cached_primitive_lowerings[_callable] = func_op
     return func_op
 
 
@@ -644,14 +644,17 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
         module.operation.attributes["sym_name"] = symbol_attr
         symbol_table.insert(module)
 
+    old_module_context = ctx.module_context
     with ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         nested_context = copy.copy(ctx.module_context)
         nested_context.module = module
         nested_context.ip = ip
         nested_context.cached_primitive_lowerings = dict()
-        func_op = get_or_create_funcop(nested_context, fn, call_jaxpr, ctx.name_stack)
+        ctx.module_context = nested_context
+        func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
         func_op.sym_visibility = ir.StringAttr.get("private")
 
+    ctx.module_context = old_module_context
     ctx.module_context.cached_primitive_lowerings[fn] = func_op
 
     if not call:
@@ -687,7 +690,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
-    func_op = get_or_create_funcop(ctx.module_context, fn, call_jaxpr, ctx.name_stack)
+    func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
     if not call:
         return None
     out_nodes = create_call_op(ctx, func_op, *args)
