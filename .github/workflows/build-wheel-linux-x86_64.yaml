@@ -294,6 +294,9 @@ jobs:
         key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
+      run: |
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -311,6 +314,11 @@ jobs:
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
+      run: |
+        export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
+        export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+        if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch; fi
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
