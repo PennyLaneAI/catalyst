@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Dict, Iterable, List, Union
+from typing import Iterable, List, Union
 
 import jax
 import numpy as np
@@ -315,9 +315,6 @@ def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # p
     raise NotImplementedError()
 
 
-CALLBACK_OP_CACHE = {}
-
-
 def _python_callback_lowering(
     jax_ctx: mlir.LoweringRuleContext, *args, callback, custom_grad, results_aval
 ):
@@ -333,8 +330,8 @@ def _python_callback_lowering(
     fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
     fn_ty_attr = ir.TypeAttr.get(fn_ty)
     cache_key = (callback_id, *params_ty, *results_ty)
-    if cache_key in CALLBACK_OP_CACHE:
-        callbackOp = CALLBACK_OP_CACHE[cache_key]
+    if cache_key in jax_ctx.module_context.cached_primitive_lowerings:
+        callbackOp = jax_ctx.module_context.cached_primitive_lowerings[cache_key]
         symbol = callbackOp.sym_name.value
         symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
         return CallbackCallOp(results_ty, symbol_attr, args).results
@@ -346,8 +343,7 @@ def _python_callback_lowering(
         # TODO: Name mangling for callbacks
         name = callback.__name__
         callbackOp = CallbackOp(f"callback_{name}_{callback_id}", *attrs)
-    CALLBACK_OP_CACHE[cache_key] = callbackOp
-    callbackOp = CALLBACK_OP_CACHE[cache_key]
+    jax_ctx.module_context.cached_primitive_lowerings[cache_key] = callbackOp
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
     retval = CallbackCallOp(results_ty, symbol_attr, args).results
@@ -555,7 +551,6 @@ def _apply_registered_pass_lowering(
 #
 # func
 #
-mlir_fn_cache: Dict["catalyst.jax_tracer.Function", Any] = {}
 
 
 @func_p.def_impl
@@ -578,6 +573,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
         diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
+    ctx.cached_primitive_lowerings[fn] = func_op
     return func_op
 
 
@@ -606,11 +602,11 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
-    if fn in mlir_fn_cache:
-        func_op = mlir_fn_cache[fn]
+    if fn in ctx.module_context.cached_primitive_lowerings:
+        func_op = ctx.module_context.cached_primitive_lowerings[fn]
     else:
         func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr, name_stack=ctx.name_stack)
-        mlir_fn_cache[fn] = func_op
+        ctx.module_context.cached_primitive_lowerings[fn] = func_op
 
     symbol_name = func_op.name.value
 
@@ -690,7 +686,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     _func_lowering(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -772,7 +768,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_name = func_op.name.value
     return ValueAndGradOp(
         val_result_types,
@@ -832,7 +828,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_name = func_op.name.value
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
@@ -889,7 +885,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_name = func_op.name.value
     return VJPOp(
         func_result_types,
@@ -941,7 +937,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     """
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     _func_lowering(ctx, *args, call_jaxpr=func_call_jaxpr, fn=fn, call=False)
-    func_op = mlir_fn_cache[fn]
+    func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_name = func_op.name.value
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)

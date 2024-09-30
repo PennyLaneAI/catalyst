@@ -223,6 +223,9 @@
 * Compiling `qnode`s to asynchronous functions will no longer print to stderr in case of an error.
   [(#645)](https://github.com/PennyLaneAI/catalyst/pull/645)
 
+* Cached primitive lowerings is used instead of a custom cache structure.
+  [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
