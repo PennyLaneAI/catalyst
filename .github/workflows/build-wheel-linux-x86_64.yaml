@@ -387,6 +387,9 @@ jobs:
 
     - name: Build wheel
       run: |
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
+        
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
         MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
