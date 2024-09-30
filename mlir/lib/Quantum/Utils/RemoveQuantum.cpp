@@ -70,7 +70,8 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
             rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, shape, elemType);
         }
         else {
-            rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op->getResults().front().getType(), ValueRange{});
+            rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op->getResults().front().getType(),
+                                                         ValueRange{});
         }
     }
 }
