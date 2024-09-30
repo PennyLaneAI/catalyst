@@ -559,7 +559,33 @@ def _apply_registered_pass_lowering(
 #
 # module
 #
+def lower_callable_to_func(ctx, _callable, call_jaxpr, name_stack):
+    """Lower callable to either a FuncOp"""
 
+    if isinstance(call_jaxpr, core.Jaxpr):
+        call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
+
+    kwargs = dict()
+    kwargs["ctx"] = ctx
+    kwargs["name"] = _callable.__name__
+    kwargs["jaxpr"] = call_jaxpr
+    kwargs["effects"] = []
+    kwargs["name_stack"] = name_stack
+    func_op = mlir.lower_jaxpr_to_fun(**kwargs)
+
+    if isinstance(_callable, qml.QNode):
+        func_op.attributes["qnode"] = ir.UnitAttr.get()
+        # "best", the default option in PennyLane, chooses backprop on the device
+        # if supported and parameter-shift otherwise. Emulating the same behaviour
+        # would require generating code to query the device.
+        # For simplicity, Catalyst instead defaults to parameter-shift.
+        diff_method = (
+            "parameter-shift" if _callable.diff_method == "best" else str(_callable.diff_method)
+        )
+        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+
+    ctx.cached_primitive_lowerings[_callable] = func_op
+    return func_op
 
 
 @module_p.def_impl
@@ -632,22 +658,7 @@ def _func_def_impl(*args, call_jaxpr, fn, call=True):  # pragma: no cover
 
 
 def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
-    """Create a func::FuncOp from JAXPR."""
-    if isinstance(call_jaxpr, core.Jaxpr):
-        call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
-    func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple(), name_stack=name_stack)
-
-    if isinstance(fn, qml.QNode):
-        func_op.attributes["qnode"] = ir.UnitAttr.get()
-        # "best", the default option in PennyLane, chooses backprop on the device
-        # if supported and parameter-shift otherwise. Emulating the same behaviour
-        # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
-        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
-
-    ctx.cached_primitive_lowerings[fn] = func_op
-    return func_op
+    return lower_callable_to_func(ctx, fn, call_jaxpr, name_stack)
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
