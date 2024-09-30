@@ -689,12 +689,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
-    if fn in ctx.module_context.cached_primitive_lowerings:
-        func_op = ctx.module_context.cached_primitive_lowerings[fn]
-    else:
-        func_op = get_or_create_funcop(ctx.module_context, fn, call_jaxpr, ctx.name_stack)
-        ctx.module_context.cached_primitive_lowerings[fn] = func_op
-
+    func_op = get_or_create_funcop(ctx.module_context, fn, call_jaxpr, ctx.name_stack)
     symbol_name = func_op.name.value
 
     if not call:
