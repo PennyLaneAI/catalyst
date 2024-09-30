@@ -319,7 +319,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                              fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
-
     rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
 
     Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
@@ -412,7 +411,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
-    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
+    quantum::replaceQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
     return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
