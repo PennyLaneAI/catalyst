@@ -173,7 +173,7 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
-        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
 
         cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
@@ -212,7 +212,7 @@ jobs:
         export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
         if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
-        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch; fi
 
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -368,9 +368,9 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
-        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch; fi
         
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
