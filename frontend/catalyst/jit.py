@@ -452,8 +452,7 @@ def qjit(
     Function does not take these args.
                     """
                 )
-            else:
-                static_argnums.append(fn_argnames.index(static_argname))
+            static_argnums.append(fn_argnames.index(static_argname))
 
         # Remove potential duplicates from static_argnums and static_argnames
         static_argnums = list(dict.fromkeys(static_argnums))
