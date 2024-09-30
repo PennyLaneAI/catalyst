@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Dict, Iterable, List, Union
+from typing import Iterable, List, Union
 
 import jax
 import numpy as np
@@ -322,9 +322,6 @@ def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # p
     raise NotImplementedError()
 
 
-CALLBACK_OP_CACHE = {}
-
-
 def _python_callback_lowering(
     jax_ctx: mlir.LoweringRuleContext, *args, callback, custom_grad, results_aval
 ):
@@ -340,8 +337,8 @@ def _python_callback_lowering(
     fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
     fn_ty_attr = ir.TypeAttr.get(fn_ty)
     cache_key = (callback_id, *params_ty, *results_ty)
-    if cache_key in CALLBACK_OP_CACHE:
-        callbackOp = CALLBACK_OP_CACHE[cache_key]
+    if cache_key in jax_ctx.module_context.cached_primitive_lowerings:
+        callbackOp = jax_ctx.module_context.cached_primitive_lowerings[cache_key]
         symbol = callbackOp.sym_name.value
         symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
         return CallbackCallOp(results_ty, symbol_attr, args).results
@@ -353,8 +350,7 @@ def _python_callback_lowering(
         # TODO: Name mangling for callbacks
         name = callback.__name__
         callbackOp = CallbackOp(f"callback_{name}_{callback_id}", *attrs)
-    CALLBACK_OP_CACHE[cache_key] = callbackOp
-    callbackOp = CALLBACK_OP_CACHE[cache_key]
+    jax_ctx.module_context.cached_primitive_lowerings[cache_key] = callbackOp
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
     retval = CallbackCallOp(results_ty, symbol_attr, args).results
@@ -683,6 +679,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
         func_op = ctx.module_context.cached_primitive_lowerings[fn]
     else:
         func_op = _func_def_lowering(ctx.module_context, fn, call_jaxpr, name_stack=ctx.name_stack)
+        ctx.module_context.cached_primitive_lowerings[fn] = func_op
 
     symbol_name = func_op.name.value
 
