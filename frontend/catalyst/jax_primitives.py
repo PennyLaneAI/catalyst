@@ -559,9 +559,8 @@ def _apply_registered_pass_lowering(
 #
 # module
 #
-def lower_callable_to_func(ctx, _callable, call_jaxpr, name_stack):
+def lower_callable_to_funcop(ctx, _callable, call_jaxpr, name_stack):
     """Lower callable to either a FuncOp"""
-
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
 
@@ -584,6 +583,13 @@ def lower_callable_to_func(ctx, _callable, call_jaxpr, name_stack):
         )
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
+    return func_op
+
+def get_or_create_funcop(ctx, _callable, call_jaxpr, name_stack):
+    """Get funcOp from cache, or create it from scratch"""
+    if func_op := ctx.cached_primitive_lowerings.get(_callable):
+        return func_op
+    func_op = lower_callable_to_funcop(ctx, _callable, call_jaxpr, name_stack)
     ctx.cached_primitive_lowerings[_callable] = func_op
     return func_op
 
@@ -658,7 +664,7 @@ def _func_def_impl(*args, call_jaxpr, fn, call=True):  # pragma: no cover
 
 
 def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
-    return lower_callable_to_func(ctx, fn, call_jaxpr, name_stack)
+    return get_or_create_funcop(ctx, fn, call_jaxpr, name_stack)
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
