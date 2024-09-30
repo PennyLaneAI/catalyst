@@ -595,6 +595,17 @@ def get_or_create_funcop(ctx, _callable, call_jaxpr, name_stack):
     return func_op
 
 
+def create_call_op(ctx, func_op, *args):
+    """Create a func::CallOp from JAXPR."""
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    symbol_ref = ir.FlatSymbolRefAttr.get(func_op.name.value)
+    mlir_args = mlir.flatten_lowering_ir_args(args)
+    call = CallOp(flat_output_types, symbol_ref, mlir_args)
+    out_nodes = util.unflatten(call.results, map(len, output_types))
+    return out_nodes
+
+
 @module_p.def_impl
 def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
@@ -664,19 +675,6 @@ def _func_def_impl(*args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_call_lowering(symbol_name, avals_out, *args):
-    """Create a func::CallOp from JAXPR."""
-    output_types = list(map(mlir.aval_to_ir_types, avals_out))
-    flat_output_types = util.flatten(output_types)
-    call = CallOp(
-        flat_output_types,
-        ir.FlatSymbolRefAttr.get(symbol_name),
-        mlir.flatten_lowering_ir_args(args),
-    )
-    out_nodes = util.unflatten(call.results, map(len, output_types))
-    return out_nodes
-
-
 def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     """Lower a quantum function into MLIR in a two step process.
     The first step is the compilation of the definition of the function fn.
@@ -690,16 +688,9 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       fn: the function being compiled
     """
     func_op = get_or_create_funcop(ctx.module_context, fn, call_jaxpr, ctx.name_stack)
-    symbol_name = func_op.name.value
-
     if not call:
         return None
-
-    out_nodes = _func_call_lowering(
-        symbol_name,
-        ctx.avals_out,
-        *args,
-    )
+    out_nodes = create_call_op(ctx, func_op, *args)
     return out_nodes
 
 
