@@ -37,6 +37,11 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
 
+# Patch LLVM and MHLO
+if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
+if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
+if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch; fi
+
 # Build Catalyst runtime
 cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \

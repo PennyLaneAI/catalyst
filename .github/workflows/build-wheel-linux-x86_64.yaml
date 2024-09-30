@@ -371,6 +371,7 @@ jobs:
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/moduleOp-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/moduleOp-mhlo.patch; fi
+        
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
