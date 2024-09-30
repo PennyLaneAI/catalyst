@@ -14,11 +14,13 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
-#include "mlir/Pass/Pass.h"
-#include "llvm/Support/Debug.h"
-
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -39,18 +41,38 @@ struct MergeRotationPass : impl::MergeRotationPassBase<MergeRotationPass> {
         LLVM_DEBUG(dbgs() << "merge rotation pass"
                           << "\n");
 
-        if (MyOption == "aloha") {
-            llvm::errs() << "merge rotation pass, aloha!\n";
+        Operation *module = getOperation();
+        Operation *targetfunc;
+
+        WalkResult result = module->walk([&](func::FuncOp op) {
+            StringRef funcName = op.getSymName();
+
+            if (funcName != FuncNameOpt) {
+                // not the function to run the pass on, visit the next function
+                return WalkResult::advance();
+            }
+            targetfunc = op;
+            return WalkResult::interrupt();
+        });
+
+        if (!result.wasInterrupted()) {
+            // Never met a target function
+            // Do nothing and exit!
+            return;
         }
-        else {
-            llvm::errs() << "merge rotation pass, hi!\n";
+
+        RewritePatternSet patterns(&getContext());
+        populateMergeRotationsPatterns(patterns);
+
+        if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
+            return signalPassFailure();
         }
     }
 };
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createMergeRotationPass()
+std::unique_ptr<Pass> createMergeRotationsPass()
 {
     return std::make_unique<quantum::MergeRotationPass>();
 }
