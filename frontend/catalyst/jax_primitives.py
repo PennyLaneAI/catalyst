@@ -619,10 +619,9 @@ def lower_callable(ctx, _callable, call_jaxpr, *args):
 
 
 def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
+    """Lower's qnodes to moduleOp"""
 
-    if not isinstance(fn, qml.QNode) and not call:
-        _func_lowering(ctx, *args, call_jaxpr=call_jaxpr, fn=fn, call=call)
-        return None
+    assert isinstance(fn, qml.QNode), "This function expects qnodes"
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -643,7 +642,6 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
 
         return call.results
 
-    ctx.allow_unregistered_dialects = True
     root = ctx.module_context.module
     with ir.InsertionPoint(root.body):
         module = ModuleOp()
