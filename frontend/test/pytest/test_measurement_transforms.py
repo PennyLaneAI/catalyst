@@ -441,7 +441,7 @@ class TestMeasurementTransforms:
             return measurement()
 
         theta = 2.5
-        res = qml.qjit(measurements_from_samples(circuit, dev.wires))(theta)
+        res = qml.qjit(measurements_from_samples(circuit, dev.wires), seed=37)(theta)
 
         if len(measurement().wires) == 1:
             samples_expected = qml.qjit(circuit)(theta)
