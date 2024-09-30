@@ -36,6 +36,10 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
+namespace test {
+void registerTestDialect(mlir::DialectRegistry &);
+} // namespace test
+
 int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
@@ -44,6 +48,7 @@ int main(int argc, char **argv)
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
+    test::registerTestDialect(registry);
     mlir::mhlo::registerAllMhloDialects(registry);
     mlir::stablehlo::registerAllDialects(registry);
     mlir::func::registerAllExtensions(registry);

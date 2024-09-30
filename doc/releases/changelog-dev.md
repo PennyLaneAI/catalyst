@@ -53,7 +53,8 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
-* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline for QNodes within a qjit-compiled workflow to be configured.
+* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline
+  for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
 
   ```python
@@ -92,10 +93,12 @@
         return jnp.abs(circuit_pipeline(x) - circuit_other(x))
   ```
 
-  For a list of available passes, please see the [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+  For a list of available passes, please see the
+  [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-  The pass pipeline order and options can be configured *globally* for a
-  qjit-compiled function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit` decorator.
+  The pass pipeline order and options can be configured *globally* for a qjit-compiled
+  function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit`
+  decorator.
 
   ```python
     my_passes = {
@@ -114,11 +117,13 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's array assignment operator syntax.
+* Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's
+  array assignment operator syntax.
   [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
   [(#1143)](https://github.com/PennyLaneAI/catalyst/pull/1143)
 
-  Using operator assignment syntax in favor of `at...op` expressions is now possible for the following operations:
+  Using operator assignment syntax in favor of `at...op` expressions is now possible for the
+  following operations:
   * `x[i] += y` in favor of `x.at[i].add(y)`
   * `x[i] -= y` in favor of `x.at[i].add(-y)`
   * `x[i] *= y` in favor of `x.at[i].multiply(y)`
@@ -154,8 +159,9 @@
   in the program in tensors, including scalars, leading to unnecessary memory allocations for
   programs compiled to CPU via MLIR to LLVM pipeline.
 
-* Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps: `gradient-preprocessing`, 
-  `gradient-bufferize`, and `gradient-postprocessing`. `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`. 
+* Bufferization of `gradient.ForwardOp` and `gradient.ReverseOp` now requires 3 steps:
+  `gradient-preprocessing`, `gradient-bufferize`, and `gradient-postprocessing`.
+  `gradient-bufferize` has a new rewrite for `gradient.ReturnOp`.
   [(#1139)](https://github.com/PennyLaneAI/catalyst/pull/1139)
 
 * The decorator `self_inverses` now supports all Hermitian Gates.
@@ -187,6 +193,15 @@
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
 
+* Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
+  [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
+
+* Compiling `qnode`s to asynchronous functions will no longer print to stderr in case of an error.
+  [(#645)](https://github.com/PennyLaneAI/catalyst/pull/645)
+
+* Cached primitive lowerings is used instead of a custom cache structure.
+  [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
@@ -196,8 +211,14 @@
 
 <h3>Bug fixes</h3>
 
-* Resolve a bug in the `vmap` function when passing shapeless values to the target. 
+* Resolve a bug in the `vmap` function when passing shapeless values to the target.
   [(#1150)](https://github.com/PennyLaneAI/catalyst/pull/1150)
+
+* Fix error message displayed when using `qml.cond` on callables with arguments.
+  [(#1151)](https://github.com/PennyLaneAI/catalyst/pull/1151)
+
+* Fixes taking gradient of nested accelerate callbacks.
+  [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
 <h3>Internal changes</h3>
 
