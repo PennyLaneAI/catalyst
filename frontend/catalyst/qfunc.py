@@ -20,7 +20,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 import logging
 from copy import copy
 from typing import Callable, Sequence
-
+import numpy as np
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
@@ -264,7 +264,7 @@ def dynamic_one_shot(qnode, **kwargs):
         else:
             for m_count, m in enumerate(cpy_tape.measurements):
                 # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = jnp.array([True] * len(out[m_count]))
+                is_valid = np.array([True] * len(out[m_count]))
                 out[m_count] = gather_non_mcm(
                     m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
                 )
