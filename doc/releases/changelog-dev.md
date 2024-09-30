@@ -202,6 +202,8 @@
 * Cached primitive lowerings is used instead of a custom cache structure.
   [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
 
+* Catalyst now supports `one-shot bufferize` from MLIR, which is required for JAX v0.4.29 or higher. [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
@@ -262,6 +264,7 @@ Spencer Comin,
 Lillian M.A. Frederiksen,
 Sengthai Heng,
 David Ittah,
+Tzung-Han Juang,
 Mehrdad Malekmohammadi,
 Vincent Michaud-Rioux,
 Romain Moyard,
