@@ -79,7 +79,8 @@ def FinalizeOp : Quantum_Op<"finalize"> {
     }];
 }
 
-def DeviceInitOp : Quantum_Op<"device"> {
+def DeviceInitOp : Quantum_Op<"device",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Initialize a quantum device.";
 
     let arguments = (ins

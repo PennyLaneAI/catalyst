@@ -306,3 +306,10 @@ LogicalResult AdjointOp::verify()
 
     return success();
 }
+
+void DeviceInitOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    // Assume all effects
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
+}
