@@ -31,7 +31,7 @@ from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p, xla
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
 from jax._src.sharding_impls import ReplicaAxisContext
-from jax.core import AbstractValue
+from jax.core import AbstractValue, call_p
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
@@ -754,7 +754,7 @@ def _get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
-        if primitive is func_p or primitive is module_p:
+        if primitive is call_p or primitive is module_p:
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
