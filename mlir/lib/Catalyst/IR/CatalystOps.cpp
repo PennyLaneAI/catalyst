@@ -32,6 +32,12 @@ void ListInitOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
 }
 
+void ListDeallocOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Free::get());
+}
+
 void ListPushOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {

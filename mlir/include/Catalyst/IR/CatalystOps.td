@@ -33,7 +33,8 @@ def ListInitOp : Catalyst_Op<"list_init",
     let assemblyFormat = [{ attr-dict `:` type($list) }];
 }
 
-def ListDeallocOp : Catalyst_Op<"list_dealloc"> {
+def ListDeallocOp : Catalyst_Op<"list_dealloc",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Deallocate the underlying memory of an arraylist.";
     let arguments = (ins ArrayListType:$list);
     let assemblyFormat = [{ $list attr-dict `:` type($list) }];
