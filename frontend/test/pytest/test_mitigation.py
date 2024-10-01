@@ -401,7 +401,6 @@ def test_jaxpr_with_const():
             extrapolate=quadratic_extrapolation,
         )()
 
-    assert False
     assert np.allclose(mitigated_qnode(), circuit())
 
 
