@@ -965,7 +965,8 @@ def ProbsOp : Measurement_Op<"probs"> {
     let hasVerifier = 1;
 }
 
-def StateOp : Measurement_Op<"state"> {
+def StateOp : Measurement_Op<"state",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Return the current statevector";
     let description = [{
         The `quantum.state` operation represents the measurement process of returning the current
