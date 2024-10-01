@@ -595,23 +595,26 @@ def get_or_create_funcop(ctx, _callable, call_jaxpr):
     return func_op
 
 
+def get_symbolref(ctx, func_op):
+    """Get symbolref by deciding whether to constructo a symbolref or flatsymbolref"""
+    is_call_same_module = ctx.module_context.module.operation == func_op.parent
+    if is_call_same_module:
+        return ir.FlatSymbolRefAttr.get(func_op.name.value)
+    parent = func_op.parent
+    parent_name = parent.operation.attributes["sym_name"].value
+    child_name = func_op.name.value
+    return ir.SymbolRefAttr.get([parent_name, child_name])
+
+
 def create_call_op(ctx, func_op, *args):
     """Create a func::CallOp from JAXPR."""
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     mlir_args = mlir.flatten_lowering_ir_args(args)
-
+    symbol_ref = get_symbolref(ctx, func_op)
     is_call_same_module = ctx.module_context.module.operation == func_op.parent
-    if is_call_same_module:
-        symbol_ref = ir.FlatSymbolRefAttr.get(func_op.name.value)
-        callOp = CallOp(flat_output_types, symbol_ref, mlir_args)
-    else:
-        parent = func_op.parent
-        parent_name = parent.operation.attributes["sym_name"].value
-        child_name = func_op.name.value
-        symbol_ref = ir.SymbolRefAttr.get([parent_name, child_name])
-        callOp = CallNestedModuleOp(flat_output_types, symbol_ref, mlir_args)
-    return callOp
+    constructor = CallOp if is_call_same_module else CallNestedModuleOp
+    return constructor(flat_output_types, symbol_ref, mlir_args)
 
 
 def create_module_op(ctx, name):
@@ -783,13 +786,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
 
-    parent_name = func_op.parent.operation.attributes["sym_name"].value
-    is_qnode = isinstance(fn, qml.QNode)
-    symbol_name = (
-        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-        if is_qnode
-        else ir.FlatSymbolRefAttr.get(func_op.name.value)
-    )
+    symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
@@ -809,7 +806,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     return GradOp(
         flat_output_types,
         ir.StringAttr.get(method),
-        symbol_name,
+        symbol_ref,
         mlir.flatten_lowering_ir_args(args_and_consts),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
@@ -865,19 +862,12 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     lower_callable(ctx, fn, func_call_jaxpr)
 
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
-    parent_name = func_op.parent.operation.attributes["sym_name"].value
-    # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-    is_qnode = isinstance(fn, qml.QNode)
-    symbol_name = (
-        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-        if is_qnode
-        else ir.FlatSymbolRefAttr.get(func_op.name.value)
-    )
+    symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
         ir.StringAttr.get(method),
-        symbol_name,
+        symbol_ref,
         mlir.flatten_lowering_ir_args(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
@@ -926,19 +916,12 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
-    parent_name = func_op.parent.operation.attributes["sym_name"].value
-    # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-    is_qnode = isinstance(fn, qml.QNode)
-    symbol_name = (
-        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-        if is_qnode
-        else ir.FlatSymbolRefAttr.get(func_op.name.value)
-    )
+    symbol_ref = get_symbolref(ctx, func_op)
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
         flat_output_types[len(flat_output_types) // 2 :],
         ir.StringAttr.get(method),
-        symbol_name,
+        symbol_ref,
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -984,19 +967,12 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     lower_callable(ctx, fn, func_call_jaxpr)
 
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
-    parent_name = func_op.parent.operation.attributes["sym_name"].value
-    # symbol_name = ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-    is_qnode = isinstance(fn, qml.QNode)
-    symbol_name = (
-        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-        if is_qnode
-        else ir.FlatSymbolRefAttr.get(func_op.name.value)
-    )
+    symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
         func_result_types,
         vjp_result_types,
         ir.StringAttr.get(method),
-        symbol_name,
+        symbol_ref,
         mlir.flatten_lowering_ir_args(func_args),
         mlir.flatten_lowering_ir_args(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -1043,19 +1019,13 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
-    parent_name = func_op.parent.operation.attributes["sym_name"].value
-    is_qnode = isinstance(fn, qml.QNode)
-    symbol_name = (
-        ir.SymbolRefAttr.get([parent_name, func_op.name.value])
-        if is_qnode
-        else ir.FlatSymbolRefAttr.get(func_op.name.value)
-    )
+    symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     num_folds = args[-1]
     return ZneOp(
         flat_output_types,
-        symbol_name,
+        symbol_ref,
         mlir.flatten_lowering_ir_args(args[0:-1]),
         _folding_attribute(ctx, folding),
         num_folds,
