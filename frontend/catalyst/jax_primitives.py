@@ -26,11 +26,9 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
-from jax._src.dispatch import jaxpr_replicas
-from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p, xla
+from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
-from jax._src.sharding_impls import ReplicaAxisContext
 from jax.core import AbstractValue, call_p
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -44,7 +42,7 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
-from jaxlib.mlir.dialects.builtin import Module, ModuleOp
+from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
@@ -361,7 +359,6 @@ def _python_callback_lowering(
     rev = custom_grad._bwd
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
-    ctx = jax_ctx.module_context
     mlir_fwd = get_or_create_funcop(jax_ctx, fwd, fwd_jaxpr)
     mlir_rev = get_or_create_funcop(jax_ctx, rev, rev_jaxpr)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
@@ -562,7 +559,7 @@ def lower_callable_to_funcop(ctx, _callable, call_jaxpr):
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
 
-    kwargs = dict()
+    kwargs = {}
     kwargs["ctx"] = ctx.module_context
     kwargs["name"] = _callable.__name__
     kwargs["jaxpr"] = call_jaxpr
@@ -630,6 +627,7 @@ def create_module_op(ctx, name):
 
 
 class NestedModule:
+    """Context manager for the nested module"""
 
     def __init__(self, ctx, name):
         self.ctx = ctx
@@ -639,7 +637,7 @@ class NestedModule:
     def __enter__(self):
         self.ctx.module_context = copy.copy(self.ctx.module_context)
         self.ctx.module_context.module = self.moduleOp
-        self.ctx.module_context.cached_primitive_lowerings = dict()
+        self.ctx.module_context.cached_primitive_lowerings = {}
         return self.moduleOp
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -652,6 +650,20 @@ def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
 
 
 def lower_callable(ctx, _callable, call_jaxpr):
+    """Lowers _callable to MLIR.
+
+    If _callable is a qnode, then we will first create a module, then
+    create a FuncOp corresponding to call_jaxpr. Otherwise, a FuncOp
+    will be created in the current module. This function might
+    add more than one FuncOps. This depends on the contents of call_jaxpr.
+
+    Args:
+      ctx: LoweringRuleContext
+      _callable: python function
+      call_jaxpr: jaxpr representing _callable
+    Returns:
+      FuncOp
+    """
     if not isinstance(_callable, qml.QNode):
         return get_or_create_funcop(ctx, _callable, call_jaxpr)
 
@@ -659,6 +671,19 @@ def lower_callable(ctx, _callable, call_jaxpr):
 
 
 def lower_qnode_to_funcop(ctx, _callable, call_jaxpr):
+    """Lowers _callable to MLIR.
+
+    Will create ModuleOp and then lower the _callable to a
+    FuncOp inside the ModuleOp. The ModuleOp may have more
+    than one FuncOp. This depends on the contents of call_jaxpr.
+
+    Args:
+      ctx: LoweringRuleContext
+      _callable: qml.Qnode
+      call_jaxpr: jaxpr representing _callable
+    Returns:
+      FuncOp
+    """
     assert isinstance(_callable, qml.QNode), "This function expects qnodes"
 
     name = "module_" + _callable.__name__
@@ -671,6 +696,15 @@ def lower_qnode_to_funcop(ctx, _callable, call_jaxpr):
 
 
 def get_or_create_qnode_funcop(ctx, _callable, call_jaxpr):
+    """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
+
+    Args:
+      ctx: LoweringRuleContext
+      _callable: qml.Qnode
+      call_jaxpr: jaxpr representing _callable
+    Returns:
+      FuncOp
+    """
     if func_op := ctx.module_context.cached_primitive_lowerings.get(_callable):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, _callable, call_jaxpr)
@@ -679,11 +713,18 @@ def get_or_create_qnode_funcop(ctx, _callable, call_jaxpr):
 
 
 def _module_to_mlir(ctx, *args, call_jaxpr, fn):
-    """Lower's qnodes to moduleOp"""
+    """Lower's qnodes to moduleOp
+
+    Args:
+      ctx: LoweringRuleContext
+      *args: List[mlir.Value] corresponding to argument values
+      fn: qml.Qnode
+      call_jaxpr: jaxpr representing fn
+    Returns:
+      List[mlir.Value] corresponding
+    """
 
     assert isinstance(fn, qml.QNode), "This function expects qnodes"
-
-    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
 
     if func_op := ctx.module_context.cached_primitive_lowerings.get(fn):
         call_op = create_call_op(ctx, func_op, *args)
