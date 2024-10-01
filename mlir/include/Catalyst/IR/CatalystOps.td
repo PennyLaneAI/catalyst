@@ -52,7 +52,8 @@ def ListPushOp : Catalyst_Op<"list_push",
 def ListPopOp : Catalyst_Op<"list_pop",
         [TypesMatchWith<"type of 'result' matches element type of 'list'",
                         "list", "result",
-                        "mlir::cast<ArrayListType>($_self).getElementType()">]> {
+                        "mlir::cast<ArrayListType>($_self).getElementType()">,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Remove an element from the end of an array list and return it.";
     let arguments = (ins ArrayListType:$list);
     let results = (outs AnyType:$result);
