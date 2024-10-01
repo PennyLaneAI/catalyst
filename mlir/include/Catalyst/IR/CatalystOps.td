@@ -26,7 +26,8 @@ include "mlir/IR/OpBase.td"
 
 include "Catalyst/IR/CatalystDialect.td"
 
-def ListInitOp : Catalyst_Op<"list_init"> {
+def ListInitOp : Catalyst_Op<"list_init",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Initialize a dynamically resizable arraylist.";
     let results = (outs ArrayListType:$list);
     let assemblyFormat = [{ attr-dict `:` type($list) }];

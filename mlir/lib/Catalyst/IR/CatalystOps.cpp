@@ -26,6 +26,12 @@ using namespace catalyst;
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.cpp.inc"
 
+void ListInitOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
+}
+
 void CustomCallOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
