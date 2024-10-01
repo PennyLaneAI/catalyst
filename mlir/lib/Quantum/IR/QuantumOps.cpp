@@ -307,11 +307,24 @@ LogicalResult AdjointOp::verify()
     return success();
 }
 
+void InitializeOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    // Assume all effects
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
+}
+
 void DeviceInitOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
     // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
+}
+
+void DeviceReleaseOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Free::get());
 }
 
 void DeallocOp::getEffects(
