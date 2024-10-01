@@ -926,7 +926,8 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 }
 
-def ProbsOp : Measurement_Op<"probs"> {
+def ProbsOp : Measurement_Op<"probs",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Compute computational basis probabilities for the current state";
     let description = [{
         The `quantum.probs` operation represents the measurement process of computing probabilities

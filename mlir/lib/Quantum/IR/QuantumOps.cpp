@@ -18,6 +18,7 @@
 #include <optional>
 
 #include "Quantum/IR/QuantumDialect.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -335,6 +336,13 @@ void DeallocOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
     effects.emplace_back(mlir::MemoryEffects::Free::get());
+}
+
+void ProbsOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Read::get());
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
 }
 
 void StateOp::getEffects(
