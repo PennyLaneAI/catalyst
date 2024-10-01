@@ -713,9 +713,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
     """
     func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
-    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
-    out_nodes = util.unflatten(call_op.results, map(len, output_types))
-    return out_nodes
+    return call_op.results
 
 
 #
