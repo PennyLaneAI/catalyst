@@ -711,11 +711,11 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
 
 
 @func_p.def_impl
-def _func_def_impl(*args, call_jaxpr, fn, call=True):  # pragma: no cover
+def _func_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
+def _func_lowering(ctx, *args, call_jaxpr, fn):
     """Lower a quantum function into MLIR in a two step process.
     The first step is the compilation of the definition of the function fn.
     The second step is compiling a call to function fn.
@@ -728,8 +728,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
       fn: the function being compiled
     """
     func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
-    if not call:
-        return None
     out_nodes = create_call_op(ctx, func_op, *args)
     return out_nodes
 
