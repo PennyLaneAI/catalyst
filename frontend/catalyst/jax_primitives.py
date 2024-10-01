@@ -295,7 +295,7 @@ set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
-module_p = core.CallPrimitive("module_with_implicit_entry_point")
+module_p = core.CallPrimitive("quantum_kernel")
 module_p.multiple_results = True
 
 

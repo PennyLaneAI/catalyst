@@ -41,7 +41,7 @@ def test_qnode_dynamic_arg(a):
     """Test passing a dynamic argument to qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[] [[b:.]]:i64[[[a]]]. let
-    # CHECK:         [[c:.]]:i64[[[a]]] = module_with_implicit_entry_point[
+    # CHECK:         [[c:.]]:i64[[[a]]] = quantum_kernel[
     # CHECK:                                  ] [[a]] [[b]]
     # CHECK:       in ([[c]],) }
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -74,7 +74,7 @@ def test_qnode_dynamic_result(a):
     """Test getting a dynamic result from qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
-    # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[[[b]]] = module_with_implicit_entry_point[
+    # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[[[b]]] = quantum_kernel[
     # CHECK:                                                ] [[a]]
     # CHECK:       in ([[b]], [[c]]) }
     @qml.qnode(qml.device("lightning.qubit", wires=1))
