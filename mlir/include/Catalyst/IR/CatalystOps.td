@@ -42,7 +42,8 @@ def ListDeallocOp : Catalyst_Op<"list_dealloc"> {
 def ListPushOp : Catalyst_Op<"list_push",
         [TypesMatchWith<"type of 'value' matches element type of 'list'",
                         "list", "value",
-                        "mlir::cast<ArrayListType>($_self).getElementType()">]> {
+                        "mlir::cast<ArrayListType>($_self).getElementType()">,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Append an element to the end of an array list.";
     let arguments = (ins AnyType:$value, ArrayListType:$list);
     let assemblyFormat = [{ $value `,` $list attr-dict `:` type($list) }];
