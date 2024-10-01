@@ -310,21 +310,18 @@ LogicalResult AdjointOp::verify()
 void InitializeOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
-    // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
 }
 
 void FinalizeOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
-    // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Free::get());
 }
 
 void DeviceInitOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
-    // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
 }
 
@@ -343,6 +340,6 @@ void DeallocOp::getEffects(
 void StateOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
-    // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Read::get());
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
 }
