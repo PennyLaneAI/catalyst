@@ -47,7 +47,7 @@ from catalyst.jax_extras import (
     unzip2,
 )
 from catalyst.jax_primitives import func_p
-from catalyst.jax_tracer import trace_quantum_function
+from catalyst.jax_tracer import trace_quantum_function, Function
 from catalyst.logging import debug_logger
 from catalyst.passes import pipeline
 from catalyst.tracing.type_signatures import filter_static_args
@@ -114,7 +114,7 @@ class QFunc:
 
             if mcm_config.mcm_method == "one-shot":
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
-                return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
+                return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         qjit_device = QJITDevice(self.device)
 

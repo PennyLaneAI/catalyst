@@ -48,11 +48,23 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Folding type
     auto foldingAlgorithm = op.getFolding();
 
-    // Create the folded circuit function
-    FlatSymbolRefAttr foldedCircuitRefAttr =
-        getOrInsertFoldedCircuit(loc, rewriter, op, foldingAlgorithm);
-    func::FuncOp foldedCircuit =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
+
+    std::string calleeName = op.getCallee().str();
+    auto ctx = op.getContext();
+    func::FuncOp calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+
+    calleeOp.walk([&](func::CallOp *callOp) {
+        // TODO: check if already in
+        func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, callOp->getCalleeAttr());
+        if (funcOp->hasAttr("qnode")) {
+            // Create the folded circuit function
+            FlatSymbolRefAttr foldedCircuitRefAttr =
+                getOrInsertFoldedCircuit(loc, rewriter, op, foldingAlgorithm);
+            // TODO: update the function above
+            func::FuncOp foldedCircuit =
+                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
+        }
+    });
 
     RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
 

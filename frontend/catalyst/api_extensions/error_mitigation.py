@@ -188,8 +188,8 @@ class ZNE:
         # TODO: remove the following check once #755 is completed
         if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
-
-        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=self.fn)
+        fn = jaxpr.eqns[0].params.get("fn")
+        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=fn)
         float_num_folds = jnp.array(self.num_folds, dtype=float)
         results = self.extrapolate(float_num_folds, results[0])
         # Single measurement

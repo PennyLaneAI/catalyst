@@ -563,7 +563,6 @@ def _func_def_lowering(ctx, fn, call_jaxpr, name_stack) -> str:
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
     func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple(), name_stack=name_stack)
-
     if isinstance(fn, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
         # "best", the default option in PennyLane, chooses backprop on the device
@@ -947,11 +946,11 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     for const in jaxpr.consts:
         const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
         nparray = np.asarray(const)
-        # TODO: Fix bool case
-        if not const.dtype == bool:
-            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-            constantVals = StableHLOConstantOp(attr).results
-            constants.append(constantVals)
+        if const.dtype == bool:
+            nparray = np.packbits(nparray, bitorder="little")
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
 
     args_and_consts = constants + list(args[0:-1])
 
