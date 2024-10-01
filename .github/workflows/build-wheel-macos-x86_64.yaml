@@ -103,14 +103,14 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-${{matrix.python_version}}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         lookup-only: True
 
     - name: Restore Enzyme Build
@@ -162,7 +162,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-${{matrix.python_version}}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -192,7 +192,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -250,7 +250,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -267,7 +267,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
