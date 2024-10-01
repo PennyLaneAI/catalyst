@@ -640,6 +640,7 @@ def trace_quantum_operations(
     #       emit the corresponding equations only now by ``bind``-ing primitives, we might get
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
+
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
