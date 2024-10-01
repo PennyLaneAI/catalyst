@@ -35,8 +35,8 @@ from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
     expval_p,
-    func_p,
     gphase_p,
+    module_p,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -166,7 +166,7 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
     `Writing custom interpreters in JAX <https://jax.readthedocs.io/en/latest/notebooks/Writing_custom_interpreters_in_Jax.html>`_
     for a walkthrough on the general architecture and behavior of this function.
 
-    Given that ``catalyst.jax_primitives.func_p`` does not define a concrete implementation, this
+    Given that ``catalyst.jax_primitives.module_p`` does not define a concrete implementation, this
     function will fail outside of an abstract evaluation call.
 
     """
@@ -188,10 +188,10 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
                 eqn.params["qfunc_jaxpr"],
                 n_consts=eqn.params["n_consts"],
             )
-            # func_p is a CallPrimitive, so interpreter passed as first arg
+            # module_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
             # transformations
-            outvals = func_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
+            outvals = module_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
         else:
             outvals = eqn.primitive.bind(*invals, **eqn.params)
         # Primitives may return multiple outputs or not

@@ -259,7 +259,7 @@ class TestCatalystCompareJaxpr:
         qml.capture.disable()
         converted = from_plxpr(plxpr)(0.5)
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.module_p
         assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
@@ -290,7 +290,7 @@ class TestCatalystCompareJaxpr:
 
         converted = from_plxpr(plxpr)(0.5)
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.module_p
         assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
@@ -325,7 +325,7 @@ class TestCatalystCompareJaxpr:
 
         converted = from_plxpr(plxpr)(phi)
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.module_p
         assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
@@ -364,7 +364,7 @@ class TestCatalystCompareJaxpr:
 
         converted = from_plxpr(plxpr)(np.array(0.724))
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.module_p
         assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
@@ -396,7 +396,7 @@ class TestCatalystCompareJaxpr:
 
         converted = from_plxpr(plxpr)()
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.module_p
         assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)()
@@ -430,7 +430,7 @@ class TestCatalystCompareJaxpr:
 
         converted = from_plxpr(plxpr)(x, y, z)
 
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.module_p
         assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x, y, z)

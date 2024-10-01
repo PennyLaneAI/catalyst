@@ -686,7 +686,6 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn):
     assert isinstance(fn, qml.QNode), "This function expects qnodes"
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
-    flat_output_types = util.flatten(output_types)
 
     if func_op := ctx.module_context.cached_primitive_lowerings.get(fn):
         call_op = create_call_op(ctx, func_op, *args)
