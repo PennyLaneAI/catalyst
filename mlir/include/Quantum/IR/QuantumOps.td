@@ -72,7 +72,8 @@ def InitializeOp : Quantum_Op<"init",
     }];
 }
 
-def FinalizeOp : Quantum_Op<"finalize"> {
+def FinalizeOp : Quantum_Op<"finalize",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Teardown the quantum runtime.";
 
     let assemblyFormat = [{
