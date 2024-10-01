@@ -239,10 +239,7 @@ BUFFERIZATION_PASS = (
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        #"buffer-results-to-out-params",
-        #"drop-equivalent-buffer-results",
-        #"func.func(promote-buffers-to-stack)",
-        #"buffer-deallocation-pipeline",
+        "buffer-deallocation-pipeline",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
