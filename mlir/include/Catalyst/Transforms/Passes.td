@@ -201,8 +201,8 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
             /*type=*/"int",
             /*default=*/"0",
             /*description=*/
-            "Useful for tests. This will stop the execution of the transformation after a "
-            "N step has been executed. Defaults to 0 which is equivalent to running "
+            "Useful for tests. This will stop the pass after the given step has been executed "
+            "(steps run from 1 to 5). Defaults to 0 which is equivalent to running "
             "all steps to completion."
         >
     ];

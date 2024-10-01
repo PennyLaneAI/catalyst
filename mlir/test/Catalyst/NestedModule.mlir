@@ -44,7 +44,7 @@ module {
 // -----
 
 module {
-  // Test that when the root module is not a symbol
+  // Test that when the inner module is not a symbol
   // (i.e., it doesn't have a name)
   // we still succeed
   module {
