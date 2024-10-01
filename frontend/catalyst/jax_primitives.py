@@ -599,11 +599,19 @@ def create_call_op(ctx, func_op, *args):
     """Create a func::CallOp from JAXPR."""
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    symbol_ref = ir.FlatSymbolRefAttr.get(func_op.name.value)
     mlir_args = mlir.flatten_lowering_ir_args(args)
-    call = CallOp(flat_output_types, symbol_ref, mlir_args)
-    out_nodes = util.unflatten(call.results, map(len, output_types))
-    return out_nodes
+
+    is_call_same_module = ctx.module_context.module.operation == func_op.parent
+    if is_call_same_module:
+        symbol_ref = ir.FlatSymbolRefAttr.get(func_op.name.value)
+        callOp = CallOp(flat_output_types, symbol_ref, mlir_args)
+    else:
+        parent = func_op.parent
+        parent_name = parent.operation.attributes["sym_name"].value
+        child_name = func_op.name.value
+        symbol_ref = ir.SymbolRefAttr.get([parent_name, child_name])
+        callOp = CallNestedModuleOp(flat_output_types, symbol_ref, mlir_args)
+    return callOp
 
 
 def create_module_op(ctx, name):
@@ -678,30 +686,12 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn):
     flat_output_types = util.flatten(output_types)
 
     if func_op := ctx.module_context.cached_primitive_lowerings.get(fn):
-        parent = func_op.parent.operation.attributes["sym_name"].value
-        symbol_name = ir.SymbolRefAttr.get([parent, func_op.name.value])
-        call = CallNestedModuleOp(
-            flat_output_types,
-            symbol_name,
-            mlir.flatten_lowering_ir_args(args),
-        )
-
-        return call.results
+        call_op = create_call_op(ctx, func_op, *args)
+        return call_op.results
 
     func_op = get_or_create_qnode_funcop(ctx, fn, call_jaxpr)
-
-    module = func_op.parent
-    symbol_name = ir.SymbolRefAttr.get(
-        [module.operation.attributes["sym_name"].value, func_op.name.value]
-    )
-
-    call = CallNestedModuleOp(
-        flat_output_types,
-        symbol_name,
-        mlir.flatten_lowering_ir_args(args),
-    )
-
-    return call.results
+    call_op = create_call_op(ctx, func_op, *args)
+    return call_op.results
 
 
 @func_p.def_impl
@@ -722,7 +712,9 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
       fn: the function being compiled
     """
     func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
-    out_nodes = create_call_op(ctx, func_op, *args)
+    call_op = create_call_op(ctx, func_op, *args)
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    out_nodes = util.unflatten(call_op.results, map(len, output_types))
     return out_nodes
 
 
@@ -792,6 +784,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
+
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     is_qnode = isinstance(fn, qml.QNode)
     symbol_name = (
