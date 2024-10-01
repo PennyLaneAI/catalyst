@@ -49,7 +49,6 @@ from catalyst.jax_primitives import (
     counts_p,
     expval_p,
     for_p,
-    func_p,
     grad_p,
     hamiltonian_p,
     hermitian_p,
@@ -756,7 +755,6 @@ INST_IMPL = {
     while_p: unimplemented_impl,
     for_p: unimplemented_impl,
     grad_p: unimplemented_impl,
-    func_p: unimplemented_impl,
     jvp_p: unimplemented_impl,
     vjp_p: unimplemented_impl,
     print_p: unimplemented_impl,
@@ -902,7 +900,7 @@ def interpret(fun):
         #
         # So, a good solution to get rid of this call here is to just interpret the host context.
         # This is not too difficult to do. The only changes would be that we now need to provide
-        # semantics for func_p.
+        # semantics for module_p.
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
 
         # Because they become args...

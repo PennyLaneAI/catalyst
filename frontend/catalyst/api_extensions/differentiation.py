@@ -35,7 +35,6 @@ from catalyst.jax_extras import Jaxpr
 from catalyst.jax_primitives import (
     GradParams,
     expval_p,
-    func_p,
     grad_p,
     jvp_p,
     module_p,
