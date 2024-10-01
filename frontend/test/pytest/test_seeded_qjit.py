@@ -113,8 +113,8 @@ def test_seeded_measurement(seed, backend):
 def test_seeded_sample(seed, shots, backend):
     """Test that different calls to qjits with the same seed produce the same sample results"""
 
-    if backend != "lightning.qubit":
-        pytest.skip("Sample seeding is only supported on lightning.qubit")
+    #if backend != "lightning.qubit":
+    #    pytest.skip("Sample seeding is only supported on lightning.qubit")
 
     dev = qml.device(backend, wires=2, shots=shots)
 

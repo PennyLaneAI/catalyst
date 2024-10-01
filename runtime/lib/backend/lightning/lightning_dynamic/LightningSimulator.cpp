@@ -315,7 +315,7 @@ std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
     //
     // Return Value Optimization (RVO)
     if (this->gen) {
-        return m.generate_samples(shots, *(this->gen));
+        return m.generate_samples(shots, (*(this->gen))());
     }
     return m.generate_samples(shots);
 }
