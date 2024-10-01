@@ -63,7 +63,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Source
@@ -71,7 +71,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
-        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache Enzyme Source
@@ -112,14 +112,14 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         lookup-only: True
 
     - name: Restore Enzyme Build
@@ -160,7 +160,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -179,7 +179,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path:  mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -240,7 +240,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -257,7 +257,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: mhlo-build
-        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -334,7 +334,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
+        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Run Python Pytest Tests
