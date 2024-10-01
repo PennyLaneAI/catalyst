@@ -508,6 +508,7 @@ def test_flip_sign(backend):
     assert np.allclose(jitted_fn(), interpreted_fn())
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_single(backend):
     """Test broadcast single."""
 
@@ -522,6 +523,7 @@ def test_broadcast_single(backend):
     assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_double(backend):
     """Test broadcast double."""
 
@@ -536,6 +538,7 @@ def test_broadcast_double(backend):
     assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_chain(backend):
     """Test broadcast chain."""
 
@@ -550,6 +553,7 @@ def test_broadcast_chain(backend):
     assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_ring(backend):
     """Test broadcast ring."""
 
@@ -564,6 +568,7 @@ def test_broadcast_ring(backend):
     assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_pyramid(backend):
     """Test broadcast pyramid."""
 
@@ -578,6 +583,7 @@ def test_broadcast_pyramid(backend):
     assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_all_to_all(backend):
     """Test broadcast all to all."""
 

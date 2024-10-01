@@ -149,7 +149,7 @@ class BackendInfo:
 
 # pylint: disable=too-many-branches
 @debug_logger
-def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
+def extract_backend_info(device: qml.devices.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
@@ -472,7 +472,7 @@ def get_device_toml_config(device) -> TOMLDocument:
         # The expected case: device specifies its own config.
         toml_file = device.config
     else:
-        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # TODO: Remove this section when `qml.devices.Device`s are guaranteed to have their own config file
         # field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
