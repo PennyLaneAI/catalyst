@@ -62,7 +62,6 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
-    CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
     counts_p,
@@ -71,7 +70,6 @@ from catalyst.jax_primitives import (
     gphase_p,
     hamiltonian_p,
     hermitian_p,
-    mlir_fn_cache,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -129,13 +127,10 @@ def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
+    execution_config = qml.devices.ExecutionConfig()
     if qnode:
-        _gradient_method = _in_gradient_tracing(qnode)
-    else:
-        _gradient_method = None
+        execution_config.gradient_method = _in_gradient_tracing(qnode)
 
-    execution_config = qml.devices.DefaultExecutionConfig
-    execution_config.gradient_method = _gradient_method
     return execution_config
 
 
@@ -528,11 +523,11 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "static_argnums": static_argnums,
-                "abstracted_axes": abstracted_axes,
-            }
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef
@@ -551,13 +546,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
         ir.Context: the MLIR context
     """
 
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
     MemrefCallable.clearcache()
-    CALLBACK_OP_CACHE.clear()
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
@@ -640,6 +629,7 @@ def trace_quantum_operations(
     #       emit the corresponding equations only now by ``bind``-ing primitives, we might get
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
+
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
