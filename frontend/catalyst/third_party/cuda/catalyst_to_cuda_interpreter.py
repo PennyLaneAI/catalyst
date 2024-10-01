@@ -36,8 +36,8 @@ from typing import Hashable
 
 import cudaq
 import jax
-from jax.core import call_p
 import pennylane as qml
+from jax.core import call_p
 from jax.tree_util import tree_unflatten
 
 from catalyst.device import BackendInfo, QJITDevice
