@@ -22,7 +22,6 @@ from copy import copy
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -265,7 +264,7 @@ def dynamic_one_shot(qnode, **kwargs):
         else:
             for m_count, m in enumerate(cpy_tape.measurements):
                 # Without MCMs and postselection, all samples are valid for use in MP computation.
-                is_valid = np.array([True] * len(out[m_count]))
+                is_valid = jnp.array([True] * len(out[m_count]))
                 out[m_count] = gather_non_mcm(
                     m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
                 )
