@@ -128,7 +128,8 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
 }
 
 
-def DeallocOp : Memory_Op<"dealloc"> {
+def DeallocOp : Memory_Op<"dealloc",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Deallocate a quantum register.";
     let description = [{
     }];

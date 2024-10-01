@@ -314,6 +314,12 @@ void DeviceInitOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
 }
 
+void DeallocOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Free::get());
+}
+
 void StateOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
