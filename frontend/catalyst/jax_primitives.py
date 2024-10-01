@@ -642,11 +642,11 @@ def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
-def lower_callable(ctx, _callable, call_jaxpr, *args):
+def lower_callable(ctx, _callable, call_jaxpr):
     if not isinstance(_callable, qml.QNode):
         return get_or_create_funcop(ctx, _callable, call_jaxpr)
 
-    return _module_to_mlir(ctx, *args, call_jaxpr=call_jaxpr, fn=_callable, call=False)
+    return get_or_create_qnode_funcop(ctx, _callable, call_jaxpr)
 
 
 def lower_qnode_to_funcop(ctx, _callable, call_jaxpr):
@@ -669,16 +669,13 @@ def get_or_create_qnode_funcop(ctx, _callable, call_jaxpr):
     return func_op
 
 
-def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
+def _module_to_mlir(ctx, *args, call_jaxpr, fn):
     """Lower's qnodes to moduleOp"""
 
     assert isinstance(fn, qml.QNode), "This function expects qnodes"
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-
-    if ctx.module_context.cached_primitive_lowerings.get(fn) and not call:
-        return None
 
     if func_op := ctx.module_context.cached_primitive_lowerings.get(fn):
         parent = func_op.parent.operation.attributes["sym_name"].value
@@ -692,9 +689,6 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
         return call.results
 
     func_op = get_or_create_qnode_funcop(ctx, fn, call_jaxpr)
-
-    if not call:
-        return None
 
     module = func_op.parent
     symbol_name = ir.SymbolRefAttr.get(
@@ -796,7 +790,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
-    lower_callable(ctx, fn, func_call_jaxpr, *args)
+    lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     is_qnode = isinstance(fn, qml.QNode)
@@ -877,7 +871,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr, *func_args)
+    lower_callable(ctx, fn, func_call_jaxpr)
 
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
@@ -935,7 +929,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr, *func_args)
+    lower_callable(ctx, fn, func_call_jaxpr)
 
     assert (
         len(flat_output_types) % 2 == 0
@@ -996,7 +990,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr, *func_args)
+    lower_callable(ctx, fn, func_call_jaxpr)
 
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
@@ -1056,7 +1050,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         fn: the function to be mitigated
     """
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
-    lower_callable(ctx, fn, func_call_jaxpr, *args)
+    lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
     parent_name = func_op.parent.operation.attributes["sym_name"].value
     is_qnode = isinstance(fn, qml.QNode)
