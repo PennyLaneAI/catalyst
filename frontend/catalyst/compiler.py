@@ -240,7 +240,6 @@ BUFFERIZATION_PASS = (
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "buffer-deallocation-pipeline",
-        "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         "canonicalize",  # Must be after convert-bufferization-to-memref
