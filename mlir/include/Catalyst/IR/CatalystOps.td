@@ -85,7 +85,8 @@ def PrintOp : Catalyst_Op<"print"> {
     );
 }
 
-def AssertionOp : Catalyst_Op<"assert"> {
+def AssertionOp : Catalyst_Op<"assert",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Asserts condition at runtime.";
 
     let arguments = (ins
