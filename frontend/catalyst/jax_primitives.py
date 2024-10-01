@@ -619,21 +619,22 @@ def create_module_op(ctx, name):
 
     return module
 
+
 class NestedModule:
 
-     def __init__(self, ctx, name):
-         self.ctx = ctx
-         self.moduleOp = create_module_op(ctx, name)
-         self.old_module_context = ctx.module_context
+    def __init__(self, ctx, name):
+        self.ctx = ctx
+        self.moduleOp = create_module_op(ctx, name)
+        self.old_module_context = ctx.module_context
 
-     def __enter__(self):
-         self.ctx.module_context = copy.copy(self.ctx.module_context)
-         self.ctx.module_context.module = self.moduleOp
-         self.ctx.module_context.cached_primitive_lowerings = dict()
-         return self.moduleOp
+    def __enter__(self):
+        self.ctx.module_context = copy.copy(self.ctx.module_context)
+        self.ctx.module_context.module = self.moduleOp
+        self.ctx.module_context.cached_primitive_lowerings = dict()
+        return self.moduleOp
 
-     def __exit__(self, exc_type, exc_val, exc_tb):
-         self.ctx.module_context = self.old_module_context
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.ctx.module_context = self.old_module_context
 
 
 @module_p.def_impl
@@ -648,6 +649,26 @@ def lower_callable(ctx, _callable, call_jaxpr, *args):
     return _module_to_mlir(ctx, *args, call_jaxpr=call_jaxpr, fn=_callable, call=False)
 
 
+def lower_qnode_to_funcop(ctx, _callable, call_jaxpr):
+    assert isinstance(_callable, qml.QNode), "This function expects qnodes"
+
+    name = "module_" + _callable.__name__
+    with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        ctx.module_context.ip = ip
+        func_op = get_or_create_funcop(ctx, _callable, call_jaxpr)
+        func_op.sym_visibility = ir.StringAttr.get("private")
+
+    return func_op
+
+
+def get_or_create_qnode_funcop(ctx, _callable, call_jaxpr):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get(_callable):
+        return func_op
+    func_op = lower_qnode_to_funcop(ctx, _callable, call_jaxpr)
+    ctx.module_context.cached_primitive_lowerings[_callable] = func_op
+    return func_op
+
+
 def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
     """Lower's qnodes to moduleOp"""
 
@@ -659,8 +680,7 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
     if ctx.module_context.cached_primitive_lowerings.get(fn) and not call:
         return None
 
-    if ctx.module_context.cached_primitive_lowerings.get(fn):
-        func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    if func_op := ctx.module_context.cached_primitive_lowerings.get(fn):
         parent = func_op.parent.operation.attributes["sym_name"].value
         symbol_name = ir.SymbolRefAttr.get([parent, func_op.name.value])
         call = CallNestedModuleOp(
@@ -671,18 +691,12 @@ def _module_to_mlir(ctx, *args, call_jaxpr, fn, call=True):
 
         return call.results
 
-    name = "module_" + fn.__name__
-
-    with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
-        func_op.sym_visibility = ir.StringAttr.get("private")
-
-    ctx.module_context.cached_primitive_lowerings[fn] = func_op
+    func_op = get_or_create_qnode_funcop(ctx, fn, call_jaxpr)
 
     if not call:
         return None
 
+    module = func_op.parent
     symbol_name = ir.SymbolRefAttr.get(
         [module.operation.attributes["sym_name"].value, func_op.name.value]
     )
