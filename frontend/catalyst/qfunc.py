@@ -20,8 +20,9 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 import logging
 from copy import copy
 from typing import Callable, Sequence
-import numpy as np
+
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten

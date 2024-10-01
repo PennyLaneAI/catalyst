@@ -378,5 +378,32 @@ def test_exponential_extrapolation_with_kwargs():
     assert np.allclose(mitigated_qnode(), circuit())
 
 
+def test_jaxpr_with_const():
+    """test mitigate_with_zne with a circuit that generates arguments in MLIR"""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit():
+        a = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
+        b = jax.numpy.take(a, 2)
+        qml.Hadamard(wires=0)
+        qml.RZ(0.1, wires=0)
+        qml.RZ(b, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @catalyst.qjit
+    def mitigated_qnode():
+        return catalyst.mitigate_with_zne(
+            circuit,
+            scale_factors=[1, 3, 5, 7],
+            extrapolate=quadratic_extrapolation,
+        )()
+
+    assert False
+    assert np.allclose(mitigated_qnode(), circuit())
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
