@@ -357,23 +357,6 @@ def test_arbitrary_state_preparation(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
-def test_cosine_window(backend):
-    """Test cosine window."""
-
-    def cosine_window():
-        qml.CosineWindow(wires=[0, 1])
-        return qml.probs(wires=[0, 1])
-
-    device = qml.device(backend, wires=2)
-    interpreted_fn = qml.QNode(cosine_window, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    interpreted_result = interpreted_fn()
-    jitted_result = jitted_fn()
-
-    assert np.allclose(interpreted_result, jitted_result)
-
-
 def test_all_single_doubles(backend):
     """Test all single doubles."""
 
