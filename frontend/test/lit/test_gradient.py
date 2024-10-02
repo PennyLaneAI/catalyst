@@ -140,3 +140,20 @@ def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
 
 
 print(grad_hoist_constant.mlir)
+
+
+# CHECK-LABEL: @test_gradient_used_twice
+@qjit(target="mlir")
+def test_gradient_used_twice(x: float):
+
+    # CHECK-NOT: @identity_0
+    # CHECK-LABEL: @identity
+    # CHECK-NOT: @identity_0
+    def identity(x):
+        return x
+
+    diff_identity = grad(identity)
+    return diff_identity(x) + diff_identity(x)
+
+
+print(test_gradient_used_twice.mlir)
