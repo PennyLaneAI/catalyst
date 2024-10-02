@@ -157,6 +157,7 @@ def test_basic_entangler_layers(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.filterwarnings("ignore::pennylane.PennyLaneDeprecationWarning")
 def test_basis_state_preparation(backend):
     """Test basis state preparation."""
 
