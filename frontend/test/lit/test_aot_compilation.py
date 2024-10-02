@@ -431,3 +431,20 @@ def multiple_stablehlo_custom_call(A: ShapedArray([2, 2], jax.numpy.float64)):
 
 
 print(multiple_stablehlo_custom_call.mlir)
+
+
+@qjit(target="mlir")
+# CHECK-LABEL: module @test_nested_module
+def test_nested_module():
+    # CHECK-LABEL: catalyst.call_function_in_module @module_function::@function
+
+    # CHECK-LABEL: module @module_function
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK-LABEL: func.func private @function
+    def function():
+        return qml.state()
+
+    return function()
+
+
+print(test_nested_module.mlir)
