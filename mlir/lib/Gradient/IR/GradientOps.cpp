@@ -536,8 +536,8 @@ void AdjointOp::getEffects(
 void BackpropOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
     effects.emplace_back(mlir::MemoryEffects::Write::get());
+    effects.emplace_back(mlir::MemoryEffects::Read::get());
 }
 
 void JVPOp::getEffects(
