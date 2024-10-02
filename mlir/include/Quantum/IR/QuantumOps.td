@@ -732,7 +732,7 @@ def MeasureOp : Quantum_Op<"measure",
     }];
 }
 
-def SampleOp : Measurement_Op<"sample"> {
+def SampleOp : Measurement_Op<"sample", [NoMemoryEffect]> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
