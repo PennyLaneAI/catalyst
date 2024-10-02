@@ -186,6 +186,7 @@ print(test_gradient_taken_twice.mlir)
 # CHECK-LABEL: @test_higher_order_used_twice
 @qjit(target="mlir")
 def test_higher_order_used_twice(x: float):
+    """Test that a single function is generated when using higher order derivatives"""
 
     # CHECK-NOT: @identity_0
     # CHECK-LABEL: @identity
