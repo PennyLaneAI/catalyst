@@ -22,8 +22,6 @@ import subprocess
 from os import path
 from typing import Optional
 
-import numpy as np
-from pybind11.setup_helpers import intree_extensions
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
