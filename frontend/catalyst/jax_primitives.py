@@ -712,7 +712,7 @@ def get_or_create_qnode_funcop(ctx, _callable, call_jaxpr):
     return func_op
 
 
-def _module_to_mlir(ctx, *args, call_jaxpr, fn):
+def _module_lowering(ctx, *args, call_jaxpr, fn):
     """Lower's qnodes to moduleOp
 
     Args:
@@ -2335,7 +2335,7 @@ CUSTOM_LOWERING_RULES = (
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
-    (module_p, _module_to_mlir),
+    (module_p, _module_lowering),
 )
 
 
