@@ -183,7 +183,7 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
 # is constrained to occur before all subsequent equations in the quantum operations trace.
-FORCED_ORDER_PRIMITIVES = {qdevice_p, gphase_p}
+FORCED_ORDER_PRIMITIVES = {qdevice_p, gphase_p, set_basis_state_p, set_state_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
