@@ -32,7 +32,7 @@ from catalyst.utils.toml import (
 )
 
 
-class DeviceToBeTested(qml.QubitDevice):
+class DeviceToBeTested(qml.devices.QubitDevice):
     """Test device"""
 
     name = "Dummy Device"
