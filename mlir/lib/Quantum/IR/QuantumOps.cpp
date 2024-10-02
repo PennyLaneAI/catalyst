@@ -338,6 +338,18 @@ void DeallocOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Free::get());
 }
 
+void SetStateOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
+}
+
+void SetBasisStateOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
+}
+
 void GlobalPhaseOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {

@@ -297,7 +297,8 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state", []> {
+def SetStateOp : Gate_Op<"set_state", 
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -328,7 +329,8 @@ def SetStateOp : Gate_Op<"set_state", []> {
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
+def SetBasisStateOp : Gate_Op<"set_basis_state", 
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
