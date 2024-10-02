@@ -338,6 +338,12 @@ void DeallocOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Free::get());
 }
 
+void ExpvalOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Read::get());
+}
+
 void ProbsOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {

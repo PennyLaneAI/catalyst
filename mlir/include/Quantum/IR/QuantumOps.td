@@ -851,7 +851,8 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     let hasVerifier = 1;
 }
 
-def ExpvalOp : Measurement_Op<"expval", [NoMemoryEffect]> {
+def ExpvalOp : Measurement_Op<"expval", 
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Compute the expectation value of the given observable for the current state";
     let description = [{
         The `quantum.expval` operation represents the measurement process of computing the
