@@ -687,6 +687,7 @@ def lower_qnode_to_funcop(ctx, _callable, call_jaxpr):
     assert isinstance(_callable, qml.QNode), "This function expects qnodes"
 
     name = "module_" + _callable.__name__
+    # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, _callable, call_jaxpr)
