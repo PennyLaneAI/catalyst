@@ -391,7 +391,8 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     }];
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Global Phase.";
     let description = [{
     }];
@@ -732,7 +733,8 @@ def MeasureOp : Quantum_Op<"measure",
     }];
 }
 
-def SampleOp : Measurement_Op<"sample", [NoMemoryEffect]> {
+def SampleOp : Measurement_Op<"sample",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
@@ -890,7 +892,7 @@ def ExpvalOp : Measurement_Op<"expval", [NoMemoryEffect]> {
     }];
 }
 
-def VarianceOp : Measurement_Op<"var"> {
+def VarianceOp : Measurement_Op<"var", [NoMemoryEffect]> {
     let summary = "Compute the variance of the given observable for the current state";
     let description = [{
         The `quantum.var` operation represents the measurement process of computing the variance of
