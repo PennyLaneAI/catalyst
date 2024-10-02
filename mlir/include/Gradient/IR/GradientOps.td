@@ -17,6 +17,7 @@
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -128,7 +129,8 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
 def BackpropOp : Gradient_Op<"backprop", [
         AttrSizedOperandSegments,
         AttrSizedResultSegments,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
         ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
@@ -173,7 +175,8 @@ def JVPOp : Gradient_Op<"jvp", [
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
         ]> {
     let summary = "Compute the jvp of a function.";
 
@@ -206,7 +209,8 @@ def VJPOp : Gradient_Op<"vjp", [
         AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
         ]> {
     let summary = "Compute the vjp of a function.";
 
