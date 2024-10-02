@@ -25,7 +25,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane import QubitUnitary, QueuingManager
+from pennylane.devices import QubitDevice
 from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp

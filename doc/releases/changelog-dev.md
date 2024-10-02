@@ -225,6 +225,9 @@
 
 <h3>Internal changes</h3>
 
+* Remove deprecated pennylane code across the frontend.
+  [(#1168)](https://github.com/PennyLaneAI/catalyst/pull/1168)
+
 * Update Enzyme to version `v0.0.149`.
   [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
 
