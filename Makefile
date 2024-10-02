@@ -87,6 +87,7 @@ catalyst: runtime dialects frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
+	$(MAKE) -C frontend all
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane

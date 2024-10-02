@@ -205,14 +205,6 @@ elif system_platform == "Darwin":
 
 ext_modules = [custom_calls_extension]
 
-lib_path_npymath = path.join(np.get_include(), "..", "lib")
-intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
-for ext in intree_extension_list:
-    ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
-    ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
-    ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
-    ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
-ext_modules.extend(intree_extension_list)
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
 # the following entry points:
