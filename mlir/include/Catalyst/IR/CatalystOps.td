@@ -75,7 +75,8 @@ def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
     let assemblyFormat = [{ $list attr-dict `:` type($list) `->` type($data) }];
 }
 
-def PrintOp : Catalyst_Op<"print"> {
+def PrintOp : Catalyst_Op<"print",
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Prints numeric values or constant strings at runtime.";
 
     let arguments = (ins
