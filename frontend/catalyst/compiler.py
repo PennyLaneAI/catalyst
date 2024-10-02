@@ -544,7 +544,6 @@ class Compiler:
     @debug_logger_init
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
-        self.last_compiler_output = None
 
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
@@ -601,7 +600,6 @@ class Compiler:
         else:
             output_filename = filename
 
-        self.last_compiler_output = compiler_output
         return output_filename, out_IR
 
     @debug_logger
@@ -630,7 +628,7 @@ class Compiler:
         )
 
     @debug_logger
-    def get_output_of(self, pipeline) -> Optional[str]:
+    def get_output_of(self, pipeline, workspace) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
             pipeline (str): name of pass class
@@ -638,12 +636,23 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
-            pipeline
-        ):
+        file_content = None
+        for dirpath, _, filenames in os.walk(str(workspace)):
+            filename = list(filter(lambda x: pipeline in x, filenames))
+            if len(filename) != 1:
+                msg = f"Attempting to get output for pipeline: {pipeline},"
+                msg += " but no file was found.\n"
+                msg += "Are you sure the file exists?"
+                raise CompileError(msg)
+            filename = filename[0]
+
+            full_path = os.path.join(dirpath, filename)
+            with open(full_path, "r") as file:
+                file_content = file.read()
+
+        if file_content is None:
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
             raise CompileError(msg)
-
-        return self.last_compiler_output.get_pipeline_output(pipeline)
+        return file_content
