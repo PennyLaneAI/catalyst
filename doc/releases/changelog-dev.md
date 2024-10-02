@@ -202,6 +202,9 @@
 * Cached primitive lowerings is used instead of a custom cache structure.
   [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
 
+* Calling gradients twice (with same GradParams) will now only lower to a single MLIR function.
+  [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
