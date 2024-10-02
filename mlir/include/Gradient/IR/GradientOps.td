@@ -100,7 +100,8 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
 }
 
 
-def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
+def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
