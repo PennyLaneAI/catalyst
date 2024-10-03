@@ -150,7 +150,7 @@ class QFunc:
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
-        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, fn=self)
+        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, qnode=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 

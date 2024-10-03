@@ -149,7 +149,7 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
                 j:AbstractQreg() = qinsert d 0 f
                 qdealloc j
                 in (i,) }
-            fn=<QNode: device='<lightning.qubit device (wires=2) at 0x302761c90>', interface='auto', diff_method='best'>
+            qnode=<QNode: device='<lightning.qubit device (wires=2) at 0x302761c90>', interface='auto', diff_method='best'>
             ] a
         in (b,) }
 
@@ -191,7 +191,7 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
             # quantum_kernel_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
             # transformations
-            outvals = quantum_kernel_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
+            outvals = quantum_kernel_p.bind(wrap_init(f), *invals, qnode=eqn.params["qnode"])
         else:
             outvals = eqn.primitive.bind(*invals, **eqn.params)
         # Primitives may return multiple outputs or not

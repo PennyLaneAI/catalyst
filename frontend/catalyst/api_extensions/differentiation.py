@@ -834,7 +834,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
-            if primitive is call_p or primitive is quantum_kernel_p:
+            if primitive in {call_p, quantum_kernel_p}:
                 child_jaxpr = eqn.params.get("call_jaxpr")
             elif primitive is grad_p:
                 child_jaxpr = eqn.params.get("jaxpr")
@@ -843,7 +843,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
             _check_primitive_is_differentiable(primitive, method)
 
-            py_callable = eqn.params.get("fn")
+            py_callable = eqn.params.get("qnode")
             if py_callable not in visited:
                 if isinstance(py_callable, QNode):
                     _check_qnode_against_grad_method(py_callable, method, child_jaxpr)

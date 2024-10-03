@@ -667,7 +667,7 @@ class NestedModule:
 
 
 @quantum_kernel_p.def_impl
-def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
+def _quantum_kernel_def_impl(*args, call_jaxpr, qnode):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -735,25 +735,25 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
     return func_op
 
 
-def _module_lowering(ctx, *args, call_jaxpr, fn):
+def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
     """Lower's qnodes to moduleOp
 
     Args:
       ctx: LoweringRuleContext
       *args: List[mlir.Value] corresponding to argument values
-      fn: qml.Qnode
+      qnode: qml.Qnode
       call_jaxpr: jaxpr representing fn
     Returns:
       List[mlir.Value] corresponding
     """
 
-    assert isinstance(fn, qml.QNode), "This function expects qnodes"
+    assert isinstance(qnode, qml.QNode), "This function expects qnodes"
 
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(fn):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get(qnode):
         call_op = create_call_op(ctx, func_op, *args)
         return call_op.results
 
-    func_op = get_or_create_qnode_funcop(ctx, fn, call_jaxpr)
+    func_op = get_or_create_qnode_funcop(ctx, qnode, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
@@ -2358,7 +2358,7 @@ CUSTOM_LOWERING_RULES = (
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
-    (quantum_kernel_p, _module_lowering),
+    (quantum_kernel_p, _quantum_kernel_lowering),
 )
 
 
