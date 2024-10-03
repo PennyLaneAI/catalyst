@@ -1498,13 +1498,25 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
     return HamiltonianOp(result_type, coeffs, terms).results
 
 
+def _is_dynamic_shape(shape):
+    for s in shape:
+        if isinstance(s, jax.core.Tracer):
+            return True
+
+    return False
+
+
 #
 # sample measurement
 #
 @sample_p.def_abstract_eval
 def _sample_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
-    return core.DShapedArray(shape, np.dtype("float64"))
+
+    if _is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64"))
+
+    return core.ShapedArray(shape, jax.numpy.float64)
 
 
 @sample_p.def_impl
@@ -1535,9 +1547,13 @@ def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
 @counts_p.def_abstract_eval
 def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
-    return core.DShapedArray(shape, np.dtype("float64")), core.DShapedArray(
-        shape, np.dtype("int64")
-    )
+
+    if _is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64")), core.DShapedArray(
+            shape, np.dtype("int64")
+        )
+
+    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
 
 
 def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
@@ -1627,7 +1643,10 @@ def _probs_abstract_eval(obs, shape, shots=None):
     if obs.primitive is not compbasis_p:
         raise TypeError("probs only supports computational basis")
 
-    return core.DShapedArray(shape, np.dtype("float64"))
+    if _is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64"))
+
+    return core.ShapedArray(shape, jax.numpy.float64)
 
 
 @var_p.def_impl
@@ -1654,7 +1673,10 @@ def _state_abstract_eval(obs, shape, shots=None):
     if obs.primitive is not compbasis_p:
         raise TypeError("state only supports computational basis")
 
-    return core.DShapedArray(shape, np.dtype("complex128"))
+    if _is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("complex128"))
+
+    return core.ShapedArray(shape, jax.numpy.complex128)
 
 
 @state_p.def_impl

@@ -40,6 +40,22 @@ def test_sample():
     assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
 
+def test_sample_dynamic():
+    """Test that the sample primitive can be captured into jaxpr
+    when using tracers."""
+
+    shots = 5
+
+    def f(shots):
+        obs = compbasis_p.bind()
+        return sample_p.bind(obs, shots=shots, shape=(shots, 0))
+
+    jaxpr = jax.make_jaxpr(f)(shots).jaxpr
+    assert jaxpr.eqns[1].primitive == sample_p
+    assert jaxpr.eqns[1].params == {"shape": (shots, 0), "shots": shots}
+    assert jaxpr.eqns[1].outvars[0].aval.shape == (shots, 0)
+
+
 def test_counts():
     """Test that the counts primitive can be captured by jaxpr."""
 
@@ -103,19 +119,4 @@ def test_state():
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == state_p
     assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
-    assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
-
-
-def test_state_dynamic():
-    """Test that the state primitive can be captured by jaxpr
-    using a tracer as parameter."""
-
-    def f(shots):
-        obs = compbasis_p.bind()
-        return state_p.bind(obs, shots=shots, shape=(1,))
-
-    shots = 5
-    jaxpr = jax.make_jaxpr(f)(shots)
-    assert jaxpr.eqns[1].primitive == state_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": shots}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
