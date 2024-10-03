@@ -30,5 +30,5 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.
     %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
     %3 = quantum.custom "RX"(%arg1) %2 : !quantum.bit
     %4 = quantum.custom "RX"(%arg2) %3 : !quantum.bit
-    return %3 : !quantum.bit
+    return %4 : !quantum.bit
 }

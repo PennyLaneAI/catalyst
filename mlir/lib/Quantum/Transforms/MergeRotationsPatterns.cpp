@@ -50,9 +50,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != ParentOutQubits[Idx])
                 return failure();
         }
-        // Add angles
-        // Create new op
-        // Replace
+
         if (OpGateName == "RX" || OpGateName == "RY" || OpGateName == "RZ") {
             TypeRange OutQubitsTypes = op.getOutQubits().getTypes();
             TypeRange OutQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
@@ -63,10 +61,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
             ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
             auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes, sumParams, parentInQubits, OpGateName, nullptr, parentInCtrlQubits, parentInCtrlValues);
-            ModuleOp mod = op->getParentOfType<ModuleOp>();
-            mod.dump();
             op.replaceAllUsesWith(mergeOp);
             op.erase();
+            parentOp.erase();
         }
         return success();
     }
