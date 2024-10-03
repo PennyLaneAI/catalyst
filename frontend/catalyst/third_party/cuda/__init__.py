@@ -96,7 +96,7 @@ def cudaqjit(fn=None, **kwargs):
 
 
 # Do we need to reimplement apply for every child?
-class BaseCudaInstructionSet(qml.QubitDevice):
+class BaseCudaInstructionSet(qml.devices.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 
     pennylane_requires = ">=0.34"
