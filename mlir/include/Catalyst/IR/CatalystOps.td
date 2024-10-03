@@ -26,15 +26,13 @@ include "mlir/IR/OpBase.td"
 
 include "Catalyst/IR/CatalystDialect.td"
 
-def ListInitOp : Catalyst_Op<"list_init",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def ListInitOp : Catalyst_Op<"list_init", [MemoryEffects<[MemAlloc]>]> {
     let summary = "Initialize a dynamically resizable arraylist.";
     let results = (outs ArrayListType:$list);
     let assemblyFormat = [{ attr-dict `:` type($list) }];
 }
 
-def ListDeallocOp : Catalyst_Op<"list_dealloc",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def ListDeallocOp : Catalyst_Op<"list_dealloc", [MemoryEffects<[MemFree]>]> {
     let summary = "Deallocate the underlying memory of an arraylist.";
     let arguments = (ins ArrayListType:$list);
     let assemblyFormat = [{ $list attr-dict `:` type($list) }];
@@ -44,7 +42,7 @@ def ListPushOp : Catalyst_Op<"list_push",
         [TypesMatchWith<"type of 'value' matches element type of 'list'",
                         "list", "value",
                         "mlir::cast<ArrayListType>($_self).getElementType()">,
-        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+        MemoryEffects<[MemAlloc, MemWrite]>]> {
     let summary = "Append an element to the end of an array list.";
     let arguments = (ins AnyType:$value, ArrayListType:$list);
     let assemblyFormat = [{ $value `,` $list attr-dict `:` type($list) }];
@@ -54,7 +52,7 @@ def ListPopOp : Catalyst_Op<"list_pop",
         [TypesMatchWith<"type of 'result' matches element type of 'list'",
                         "list", "result",
                         "mlir::cast<ArrayListType>($_self).getElementType()">,
-        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+        MemoryEffects<[MemRead, MemFree]>]> {
     let summary = "Remove an element from the end of an array list and return it.";
     let arguments = (ins ArrayListType:$list);
     let results = (outs AnyType:$result);
@@ -75,8 +73,7 @@ def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
     let assemblyFormat = [{ $list attr-dict `:` type($list) `->` type($data) }];
 }
 
-def PrintOp : Catalyst_Op<"print",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def PrintOp : Catalyst_Op<"print", [MemoryEffects<[MemWrite]>]> {
     let summary = "Prints numeric values or constant strings at runtime.";
 
     let arguments = (ins
@@ -86,8 +83,7 @@ def PrintOp : Catalyst_Op<"print",
     );
 }
 
-def AssertionOp : Catalyst_Op<"assert",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def AssertionOp : Catalyst_Op<"assert", [MemoryEffects<[MemWrite]>]> {
     let summary = "Asserts condition at runtime.";
 
     let arguments = (ins
@@ -97,7 +93,7 @@ def AssertionOp : Catalyst_Op<"assert",
 }
 
 def CustomCallOp: Catalyst_Op<"custom_call",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+    [MemoryEffects<[MemAlloc, MemFree, MemWrite, MemRead]>]> {
   let summary = "CustomCall operation";
   let description = [{
     Encapsulates an implementation-defined operation `call_target_name` that
@@ -169,7 +165,7 @@ def CallbackOp : Catalyst_Op<"callback",
 }
 
 def CallbackCallOp : Catalyst_Op<"callback_call",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    [MemoryEffects<[MemAlloc, MemFree, MemWrite, MemRead]>,
      DeclareOpInterfaceMethods<CallOpInterface>,
      DeclareOpInterfaceMethods<SymbolUserOpInterface>
     ]> {

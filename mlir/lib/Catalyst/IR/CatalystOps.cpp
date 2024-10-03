@@ -26,66 +26,6 @@ using namespace catalyst;
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.cpp.inc"
 
-void ListInitOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
-}
-
-void ListDeallocOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    effects.emplace_back(mlir::MemoryEffects::Free::get());
-}
-
-void ListPushOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
-}
-
-void ListPopOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    effects.emplace_back(mlir::MemoryEffects::Free::get());
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
-}
-
-void PrintOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
-}
-
-
-void AssertionOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
-}
-
-void CustomCallOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    // Assume all effects
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
-    effects.emplace_back(mlir::MemoryEffects::Free::get());
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
-}
-
-void CallbackCallOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
-    // Assume all effects
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
-    effects.emplace_back(mlir::MemoryEffects::Free::get());
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
-}
-
 LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 {
     auto callee = this->getCalleeAttr();
