@@ -61,9 +61,7 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
 
 void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
-    std::vector<Operation *> opsToReplace;
-    function.walk([&](MeasurementProcess op) { opsToReplace.push_back(op); });
-    for (auto op : opsToReplace) {
+    function.walk([&](MeasurementProcess op) {
         if (auto tensorType = dyn_cast<RankedTensorType>(op->getResults().front().getType())) {
             auto shape = tensorType.getShape();
             auto elemType = tensorType.getElementType();
@@ -73,7 +71,7 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
             rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op->getResults().front().getType(),
                                                          ValueRange{});
         }
-    }
+    });
 }
 
 LogicalResult verifyQuantumFree(func::FuncOp function)
