@@ -101,8 +101,8 @@ namespace {
  * will finish executing when:
  * output = { @bar, @baz }
  */
-void getFullyQualifiedName(SymbolOpInterface symbol, const Operation *op,
-                           std::deque<FlatSymbolRefAttr> &hierarchy)
+void computeFullyQualifiedName(SymbolOpInterface symbol, const Operation *op,
+                               std::deque<FlatSymbolRefAttr> &hierarchy)
 {
     auto stringRef = symbol.getNameAttr();
     auto flatSymbolRef = SymbolRefAttr::get(stringRef);
@@ -115,7 +115,7 @@ void getFullyQualifiedName(SymbolOpInterface symbol, const Operation *op,
     if (!isValidParent)
         return;
 
-    getFullyQualifiedName(parentSymbol, op, hierarchy);
+    computeFullyQualifiedName(parentSymbol, op, hierarchy);
 }
 
 /* Obtains the fully qualified name for a symbol up to but not including op.
@@ -138,7 +138,7 @@ SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operati
            "symbolTable must have OpTrait::SymbolTable");
 
     std::deque<FlatSymbolRefAttr> hierarchy;
-    getFullyQualifiedName(symbol, op, hierarchy);
+    computeFullyQualifiedName(symbol, op, hierarchy);
     assert(hierarchy.size() > 0 && "At least one symbol is expected here.");
     bool inNamelessModule = hierarchy.size() == 1;
     if (inNamelessModule) {
