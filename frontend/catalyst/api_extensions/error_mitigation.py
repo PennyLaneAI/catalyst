@@ -93,8 +93,12 @@ def mitigate_with_zne(
 
         @qjit
         def mitigated_circuit(args, n):
-            s = jax.numpy.array([1, 2, 3])
+            s = [1, 3, 5]
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+
+    Alternatively the `mitigate_with_zne` function can be applied directly on a qjitted
+    function containing :class:`~.QNode`, the mitigation will be applied on each
+    :class:`~.QNode` individually.
 
     Exponential extrapolation can also be performed via the
     :func:`~.exponential_extrapolate` function from PennyLane:
