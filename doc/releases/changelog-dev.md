@@ -262,6 +262,9 @@
  `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
   function has been removed entirely.
 
+* Replace pybind11 with nanobind for C++/Python bindings in frontend.
+  [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
