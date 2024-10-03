@@ -29,12 +29,12 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_MERGEROTATIONPASS
-#define GEN_PASS_DECL_MERGEROTATIONPASS
+#define GEN_PASS_DEF_MERGEROTATIONSPASS
+#define GEN_PASS_DECL_MERGEROTATIONSPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct MergeRotationPass : impl::MergeRotationPassBase<MergeRotationPass> {
-    using MergeRotationPassBase::MergeRotationPassBase;
+struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
+    using MergeRotationsPassBase::MergeRotationsPassBase;
 
     void runOnOperation() final
     {
@@ -74,7 +74,7 @@ struct MergeRotationPass : impl::MergeRotationPassBase<MergeRotationPass> {
 
 std::unique_ptr<Pass> createMergeRotationsPass()
 {
-    return std::make_unique<quantum::MergeRotationPass>();
+    return std::make_unique<quantum::MergeRotationsPass>();
 }
 
 } // namespace catalyst

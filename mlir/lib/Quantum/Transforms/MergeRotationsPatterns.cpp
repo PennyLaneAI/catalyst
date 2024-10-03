@@ -16,6 +16,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
@@ -24,6 +25,7 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::quantum;
 
+static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
 
 namespace {
 
@@ -33,7 +35,39 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
+        auto loc = op.getLoc();
+        StringRef OpGateName = op.getGateName();
+        if (!rotationsSet.contains(OpGateName))
+            return failure();
+        ValueRange InQubits = op.getInQubits();
+        auto parentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
+        if (!parentOp || parentOp.getGateName() != OpGateName)
+            return failure();
 
+        ValueRange ParentOutQubits = parentOp.getOutQubits();
+        // Check if the input qubits to the current operation match the output qubits of the parent.
+        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
+            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != ParentOutQubits[Idx])
+                return failure();
+        }
+        // Add angles
+        // Create new op
+        // Replace
+        if (OpGateName == "RX" || OpGateName == "RY" || OpGateName == "RZ") {
+            TypeRange OutQubitsTypes = op.getOutQubits().getTypes();
+            TypeRange OutQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
+            auto parentParams = parentOp.getParams().front();
+            auto params = op.getParams().front();
+            Value sumParams = rewriter.create<arith::AddFOp>(loc, parentParams, params).getResult();
+            ValueRange parentInQubits = parentOp.getInQubits();
+            ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
+            ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
+            auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes, sumParams, parentInQubits, OpGateName, nullptr, parentInCtrlQubits, parentInCtrlValues);
+            ModuleOp mod = op->getParentOfType<ModuleOp>();
+            mod.dump();
+            op.replaceAllUsesWith(mergeOp);
+            op.erase();
+        }
         return success();
     }
 };
