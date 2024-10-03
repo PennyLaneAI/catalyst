@@ -224,6 +224,8 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
 NB_MODULE(wrapper, m)
 {
     m.doc() = "wrapper module";
+    // We have to annotate all the arguments to `wrap` to allow `result_desc` to be None
+    // See https://nanobind.readthedocs.io/en/latest/functions.html#none-arguments
     m.def("wrap", &wrap, "A wrapper function.", nb::arg("func"), nb::arg("py_args"),
           nb::arg("result_desc").none(), nb::arg("transfer"), nb::arg("numpy_arrays"));
     int retval = _import_array();
