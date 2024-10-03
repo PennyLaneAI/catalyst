@@ -11,7 +11,7 @@ export PYTHON_PACKAGE=$4
 
 # Install system dependencies (gcc gives access to c99, which is needed by some tests)
 dnf update -y 
-dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
+dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc ncurses-devel
 if [ "$PYTHON_MAJOR_MINOR" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
 else
