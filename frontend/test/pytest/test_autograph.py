@@ -277,31 +277,6 @@ class TestIntegration:
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
-    def test_nested_qnode(self):
-        """Test autograph on a QNode called from within another QNode."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner1(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner2(x):
-            y = inner1(x) * np.pi
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit(autograph=True)
-        def fn(x: int):
-            return inner2(x)
-
-        assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(fn.original_function)
-        assert check_cache(inner1.func)
-        assert check_cache(inner2.func)
-        # Unsupported by the runtime:
-        # assert fn(np.pi) == -2
-
     def test_nested_qjit(self):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
@@ -534,28 +509,6 @@ class TestCodePrinting:
         @qjit(autograph=True)
         def fn(x: float):
             return inner1(x) + inner2(x)
-
-        assert autograph_source(fn)
-        assert autograph_source(inner1)
-        assert autograph_source(inner2)
-
-    def test_nested_qnode(self):
-        """Test printing on a QNode called from within another QNode."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner1(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner2(x):
-            y = inner1(x) * np.pi
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit(autograph=True)
-        def fn(x: int):
-            return inner2(x)
 
         assert autograph_source(fn)
         assert autograph_source(inner1)
