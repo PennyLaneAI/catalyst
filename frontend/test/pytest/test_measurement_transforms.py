@@ -389,7 +389,7 @@ class TestMeasurementTransforms:
 
         theta = 2.5
         counts_expected = circuit(theta)
-        res = qml.qjit(measurements_from_counts(circuit, dev.wires))(theta)
+        res = qml.qjit(measurements_from_counts(circuit, dev.wires), seed=37)(theta)
 
         # counts comparison by converting catalyst format to PL style eigvals dict
         basis_states, counts = res
