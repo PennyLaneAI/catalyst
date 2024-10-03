@@ -37,8 +37,8 @@ from catalyst.jax_primitives import (
     expval_p,
     grad_p,
     jvp_p,
-    module_p,
     probs_p,
+    quantum_kernel_p,
     value_and_grad_p,
     vjp_p,
 )
@@ -834,7 +834,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
-            if primitive is call_p or primitive is module_p:
+            if primitive is call_p or primitive is quantum_kernel_p:
                 child_jaxpr = eqn.params.get("call_jaxpr")
             elif primitive is grad_p:
                 child_jaxpr = eqn.params.get("jaxpr")

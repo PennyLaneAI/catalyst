@@ -295,8 +295,8 @@ set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
-module_p = core.CallPrimitive("quantum_kernel")
-module_p.multiple_results = True
+quantum_kernel_p = core.CallPrimitive("quantum_kernel")
+quantum_kernel_p.multiple_results = True
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -666,7 +666,7 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-@module_p.def_impl
+@quantum_kernel_p.def_impl
 def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
@@ -794,7 +794,7 @@ def _get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
-        if primitive is call_p or primitive is module_p:
+        if primitive is call_p or primitive is quantum_kernel_p:
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
@@ -2358,7 +2358,7 @@ CUSTOM_LOWERING_RULES = (
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
-    (module_p, _module_lowering),
+    (quantum_kernel_p, _module_lowering),
 )
 
 

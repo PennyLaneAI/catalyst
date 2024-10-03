@@ -53,7 +53,7 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     jvp_p,
-    module_p,
+    quantum_kernel_p,
     namedobs_p,
     print_p,
     probs_p,
@@ -137,7 +137,7 @@ def remove_host_context(jaxpr):
     """
     is_one_equation = len(jaxpr.jaxpr.eqns) == 1
     prim = jaxpr.jaxpr.eqns[0].primitive
-    is_single_equation_call = prim in {call_p, module_p}
+    is_single_equation_call = prim in {call_p, quantum_kernel_p}
     is_valid = is_one_equation and is_single_equation_call
     if is_valid:
         return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
@@ -900,7 +900,7 @@ def interpret(fun):
         #
         # So, a good solution to get rid of this call here is to just interpret the host context.
         # This is not too difficult to do. The only changes would be that we now need to provide
-        # semantics for module_p.
+        # semantics for quantum_kernel_p.
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
 
         # Because they become args...
