@@ -995,5 +995,29 @@ class TestParamsAnnotations:
         assert not params_are_annotated(foo)
 
 
+class TestErrorNestedQNode:
+    """Test error is raised with nested qnodes"""
+
+    def test_nested_qnode(self):
+        """Test autograph on a QNode raises error."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def inner():
+            return qml.state()
+
+        @qml.qnode(dev)
+        def outer():
+            inner()
+            return qml.state()
+
+        with pytest.raises(RuntimeError):
+
+            @qjit
+            def fn():
+                return outer()
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
