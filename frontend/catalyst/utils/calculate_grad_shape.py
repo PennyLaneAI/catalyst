@@ -17,7 +17,7 @@ Deduce the function signatures after taking their gradients with respect to some
 """
 
 
-from jax.core import DShapedArray, ShapedArray
+from jax.core import DShapedArray, ShapedArray, Tracer
 
 
 class Signature:
@@ -86,6 +86,14 @@ class Signature:
         """
         return isinstance(x, (DShapedArray, ShapedArray))
 
+    @staticmethod
+    def is_dynamic_shape(shape):
+        for s in shape:
+            if isinstance(s, Tracer):
+                return True
+
+        return False
+
     def __eq__(self, other):
         return self.xs == other.xs and self.ys == other.ys
 
@@ -123,8 +131,12 @@ def calculate_grad_shape(signature, indices) -> Signature:
                 grad_res_shape.append(axis)
             element_type = diff_arg_type.dtype
 
-            grad_res_type = (
-                DShapedArray(grad_res_shape, element_type) if grad_res_shape else diff_arg_type
-            )
+            grad_res_type = diff_arg_type
+            if grad_res_shape:
+                XShapedArray = (
+                    DShapedArray if Signature.is_dynamic_shape(grad_res_shape) else ShapedArray
+                )
+                grad_res_type = XShapedArray(grad_res_shape, element_type)
+
             grad_result_types.append(grad_res_type)
     return Signature(signature.get_inputs(), grad_result_types)
