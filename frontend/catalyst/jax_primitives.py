@@ -497,8 +497,30 @@ def _apply_registered_pass_lowering(
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
     named_sequence_op = None
-    for op in reversed(module.parent.regions[0].blocks[0].operations):
-        # transformer module usually is at the end of the module, so look for it from the end
+    # module is a nested module
+    # parent_module is the root module
+    # E.g.,
+    #
+    # ```mlir/pseudocode
+    # module @root {
+    #   module @inner {
+    #     func.func @qnode
+    #   }
+    #   module @transform {
+    #   }
+    # }
+    # ```
+    #
+    # When this function is executed we are likely
+    # somewhere around func.func @qnode.
+    #
+    # jax_ctx.module_context.module holds a reference to @inner
+    #
+    # This means that it's parent is @root.
+    parent_module = module.parent
+    for op in reversed(parent_module.regions[0].blocks[0].operations):
+        # Look for the module @transform that holds the transformation schedule
+        # TODO: Find a better way to search for the module with the transform schedule.
         if op.operation.name == "builtin.module":
             named_sequence_op = get_named_sequence_in_module(op)
             if named_sequence_op:
