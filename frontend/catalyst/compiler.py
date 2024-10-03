@@ -168,17 +168,23 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
-TAPE_SPLITTING_PASS = (
-    # We clump multiple tapes into a single function and split them
-    # in mlir with a pass (frontend/jax_tracer.py).
-    # Therefore before the splitting the quantum mlir is "illegal",
-    # as each function will have multiple devices.
-    # Thus, the split must be the very first pass before anything else
-    # happens.
-    "QuantumTapeSplittingPass",
+ENFORCE_RUNTIME_INVARIANTS_PASS = (
+    "EnforeRuntimeInvariantsPass",
     [
+        # We want the invariant that transforms that generate multiple
+        # tapes will generate multiple qnodes. One for each tape.
+        # Split multiple tapes enforces that invariant.
         "split-multiple-tapes",
-        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
+        # Run the transform sequence defined in the MLIR module
+        "apply-transform-sequence",
+        # Nested modules are something that will be used in the future
+        # for making device specific transformations.
+        # Since at the moment, nothing in the runtime is using them
+        # and there is no lowering for them,
+        # we inline them to preserve the semantics. We may choose to
+        # keep inlining modules targetting the Catalyst runtime.
+        # But qnodes targetting other backends may choose to lower
+        # this into something else.
         "inline-nested-module",
     ],
 )
@@ -300,7 +306,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
-    TAPE_SPLITTING_PASS,
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -316,7 +322,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
-    TAPE_SPLITTING_PASS,
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
