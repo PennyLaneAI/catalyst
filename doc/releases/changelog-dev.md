@@ -202,6 +202,9 @@
 * Cached primitive lowerings is used instead of a custom cache structure.
   [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
 
+* Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
+  [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
