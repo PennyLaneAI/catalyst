@@ -60,7 +60,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             ValueRange parentInQubits = parentOp.getInQubits();
             ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
             ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
-            auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes, sumParams, parentInQubits, OpGateName, nullptr, parentInCtrlQubits, parentInCtrlValues);
+            auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes,
+                                                     sumParams, parentInQubits, OpGateName, nullptr,
+                                                     parentInCtrlQubits, parentInCtrlValues);
             op.replaceAllUsesWith(mergeOp);
             op.erase();
             parentOp.erase();
