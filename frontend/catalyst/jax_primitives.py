@@ -748,11 +748,6 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
     """
 
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
-
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(qnode):
-        call_op = create_call_op(ctx, func_op, *args)
-        return call_op.results
-
     func_op = get_or_create_qnode_funcop(ctx, qnode, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
