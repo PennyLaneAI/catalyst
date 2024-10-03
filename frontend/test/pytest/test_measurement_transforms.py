@@ -167,7 +167,7 @@ class TestMeasurementTransforms:
         assert "counts" in mlir
 
         theta = 1.9
-        expval_res, var_res, counts_res, probs_res = qml.qjit(transformed_circuit)(theta)
+        expval_res, var_res, counts_res, probs_res = qml.qjit(transformed_circuit, seed=37)(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -221,7 +221,7 @@ class TestMeasurementTransforms:
 
         theta = 1.9
 
-        expval_res, var_res, sample_res, probs_res = qml.qjit(transformed_circuit)(theta)
+        expval_res, var_res, sample_res, probs_res = qml.qjit(transformed_circuit, seed=37)(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
