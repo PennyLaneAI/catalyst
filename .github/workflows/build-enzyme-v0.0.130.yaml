@@ -1,0 +1,292 @@
+name: Check Catalyst Build
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  determine_runner:
+    if: github.event.pull_request.draft == false
+    name: Determine runner type to use
+    uses: ./.github/workflows/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-latest
+
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    needs: [determine_runner]
+    with:
+      multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
+
+  runtime:
+    name: Catalyst-Runtime Build
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
+
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+
+      - name: Build Catalyst-Runtime
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          ENABLE_ASAN=OFF \
+          make runtime
+
+          # This is needed in the artifact for the pytests
+          # Note the lack of sanitizers.
+          # Left other flags the same.
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          make dummy_device
+
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          OQC_BUILD_DIR="$(pwd)/oqc-build" \
+          make oqc
+
+
+      - name: Upload Catalyst-Runtime Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-build-${{ matrix.compiler }}
+          path: |
+            runtime-build/lib/*.so
+            runtime-build/lib/backend/*.toml
+          retention-days: 1
+
+      - name: Upload OQC-Runtime Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oqc-build-${{ matrix.compiler }}
+          path: |
+            oqc-build/*.so
+            oqc-build/*.toml
+          retention-days: 1
+
+  llvm:
+    name: LLVM Build
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    # Both the LLVM source and build folder are required for further dialect builds.
+    # Caching is significantly faster than git cloning since LLVM is such a large repository.
+
+    - name: Cache LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        enableCrossOsArchive: true
+
+    - name: Clone LLVM Submodule
+      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ needs.constants.outputs.llvm_version }}
+        path: mlir/llvm-project
+
+    - name: Cache LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v4
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
+
+    - name: Install Deps
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install numpy pybind11
+
+    - name: Build LLVM
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      # Note: Disable instrumentation for the mlir runtime support library,
+      #       as user programs aren't instrumented.
+      run: |
+        # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
+        #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        COMPILER_LAUNCHER="" \
+        make llvm
+
+  mhlo:
+    name: MHLO Dialect Build
+    needs: [constants, llvm, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/mlir-hlo
+        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: true
+
+    - name: Clone MHLO Submodule
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ needs.constants.outputs.mhlo_version }}
+        path: mlir/mlir-hlo
+
+    - name: Cache MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v4
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
+        fail-on-cache-miss: true
+
+    - name: Install Deps
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang lld
+
+    - name: Build MHLO Dialect
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: |
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        COMPILER_LAUNCHER="" \
+        make mhlo
+
+  enzyme:
+    name: Enzyme Build
+    needs: [constants, llvm, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Cache Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v4
+      with:
+        path:  mlir/Enzyme
+        key: enzyme-v0.0.130-default-source
+        enableCrossOsArchive: true
+
+    - name: Clone Enzyme Submodule
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: v0.0.130
+        path: mlir/Enzyme
+
+    - name: Cache Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v4
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-v0.0.130-default-build-${{ matrix.compiler }}
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
+        fail-on-cache-miss: true
+
+    - name: Install Deps
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang lld
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+        COMPILER_LAUNCHER="" \
+        make enzyme
