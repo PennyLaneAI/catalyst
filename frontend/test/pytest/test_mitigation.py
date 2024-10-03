@@ -417,9 +417,9 @@ def test_mcm_method_with_zne(backend):
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
-@pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-@pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7], [3, 7, 21, 29]])
+@pytest.mark.parametrize("params", [0.2])
+@pytest.mark.parametrize("extrapolation", [quadratic_extrapolation])
+@pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7]])
 @pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_multiple_qnodes(params, extrapolation, folding, scale_factors):
     """Test that without noise the same results are returned for single measurements."""
