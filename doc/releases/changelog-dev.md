@@ -209,6 +209,12 @@
 
   This reverts a previous breaking change.
 
+* Nesting qnodes now raises an error.
+  [(#1176)](https://github.com/PennyLaneAI/catalyst/pull/1176)
+
+  This is unlikely to affect users since only under certain conditions did
+  nesting qnodes worked successfully.
+
 <h3>Bug fixes</h3>
 
 * Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices 

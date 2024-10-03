@@ -50,7 +50,9 @@ from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes import pipeline
+from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
+from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -96,6 +98,10 @@ class QFunc:
     # pylint: disable=self-cls-assignment
     @debug_logger
     def __call__(self, *args, **kwargs):
+
+        if EvaluationContext.is_quantum_tracing():
+            raise CompileError("Can't nest qnodes under qjit")
+
         assert isinstance(self, qml.QNode)
 
         # Update the qnode with peephole pipeline
