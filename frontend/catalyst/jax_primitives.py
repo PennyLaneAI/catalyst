@@ -56,7 +56,7 @@ from mlir_quantum.dialects.catalyst import (
     AssertionOp,
     CallbackCallOp,
     CallbackOp,
-    CallNestedModuleOp,
+    LaunchKernelOp,
     PrintOp,
 )
 from mlir_quantum.dialects.gradient import (
@@ -608,7 +608,7 @@ def create_call_op(ctx, func_op, *args):
     mlir_args = mlir.flatten_lowering_ir_args(args)
     symbol_ref = get_symbolref(ctx, func_op)
     is_call_same_module = ctx.module_context.module.operation == func_op.parent
-    constructor = CallOp if is_call_same_module else CallNestedModuleOp
+    constructor = CallOp if is_call_same_module else LaunchKernelOp
     return constructor(flat_output_types, symbol_ref, mlir_args)
 
 

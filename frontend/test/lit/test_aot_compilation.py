@@ -436,7 +436,7 @@ print(multiple_stablehlo_custom_call.mlir)
 @qjit(target="mlir")
 # CHECK-LABEL: module @test_nested_module
 def test_nested_module():
-    # CHECK-LABEL: catalyst.call_function_in_module @module_function::@function
+    # CHECK-LABEL: catalyst.launch_kernel @module_function::@function
 
     # CHECK-LABEL: module @module_function
     @qml.qnode(qml.device("lightning.qubit", wires=1))

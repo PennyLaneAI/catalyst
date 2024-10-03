@@ -24,7 +24,7 @@ module @outer {
   }
 
   // CHECK: func.call @f_0
-  catalyst.call_function_in_module @inner::@f() : () -> ()
+  catalyst.launch_kernel @inner::@f() : () -> ()
 }
 
 

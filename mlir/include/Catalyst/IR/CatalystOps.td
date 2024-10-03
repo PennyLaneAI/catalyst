@@ -181,7 +181,7 @@ def CallbackCallOp : Catalyst_Op<"callback_call",
 
 }
 
-def CallNestedModuleOp : Catalyst_Op<"call_function_in_module",
+def LaunchKernelOp : Catalyst_Op<"launch_kernel",
     [DeclareOpInterfaceMethods<CallOpInterface>,
      DeclareOpInterfaceMethods<SymbolUserOpInterface>
     ]> {

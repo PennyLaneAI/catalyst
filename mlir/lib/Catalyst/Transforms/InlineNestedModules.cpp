@@ -48,7 +48,7 @@
  *     ```mlir
  *     module @foo {
  *       func.func @baz() attributes { catalyst.fully_qualified_name = @bar::@baz }
- *       catalyst.call_function_in_module @bar::baz() : () : ()
+ *       catalyst.launch_kernel @bar::baz() : () : ()
  *     }
  *     ```
  *     results in
@@ -324,15 +324,15 @@ struct ZNEReplacerPattern : public OpRewritePattern<catalyst::mitigation::ZneOp>
     const DenseMap<SymbolRefAttr, SymbolRefAttr> *_map;
 };
 
-struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::CallNestedModuleOp> {
-    using OpRewritePattern<catalyst::CallNestedModuleOp>::OpRewritePattern;
+struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelOp> {
+    using OpRewritePattern<catalyst::LaunchKernelOp>::OpRewritePattern;
     /// This overload constructs a pattern that matches any operation type.
     NestedToFlatCallPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
-        : OpRewritePattern<catalyst::CallNestedModuleOp>::OpRewritePattern(context), _map(map)
+        : OpRewritePattern<catalyst::LaunchKernelOp>::OpRewritePattern(context), _map(map)
     {
     }
 
-    LogicalResult matchAndRewrite(catalyst::CallNestedModuleOp op,
+    LogicalResult matchAndRewrite(catalyst::LaunchKernelOp op,
                                   PatternRewriter &rewriter) const override
     {
         auto found = _map->find(op.getCallee()) != _map->end();

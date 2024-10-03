@@ -83,26 +83,26 @@ Operation::operand_range CallbackCallOp::getArgOperands() { return getInputs(); 
 MutableOperandRange CallbackCallOp::getArgOperandsMutable() { return getInputsMutable(); }
 
 //===----------------------------------------------------------------------===//
-// CallNestedModuleOp
+// LaunchKernelOp
 //===----------------------------------------------------------------------===//
 
-CallInterfaceCallable CallNestedModuleOp::getCallableForCallee()
+CallInterfaceCallable LaunchKernelOp::getCallableForCallee()
 {
     return (*this)->getAttrOfType<SymbolRefAttr>("callee");
 }
 
-void CallNestedModuleOp::setCalleeFromCallable(CallInterfaceCallable callee)
+void LaunchKernelOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
     (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
 }
 
-Operation::operand_range CallNestedModuleOp::getArgOperands() { return getInputs(); }
+Operation::operand_range LaunchKernelOp::getArgOperands() { return getInputs(); }
 
-MutableOperandRange CallNestedModuleOp::getArgOperandsMutable() { return getInputsMutable(); }
+MutableOperandRange LaunchKernelOp::getArgOperandsMutable() { return getInputsMutable(); }
 
-StringAttr CallNestedModuleOp::getCalleeModuleName() { return getCallee().getRootReference(); }
+StringAttr LaunchKernelOp::getCalleeModuleName() { return getCallee().getRootReference(); }
 
-StringAttr CallNestedModuleOp::getCalleeName() { return getCallee().getLeafReference(); }
+StringAttr LaunchKernelOp::getCalleeName() { return getCallee().getLeafReference(); }
 
 //===----------------------------------------------------------------------===//
 // Catalyst type definitions.
