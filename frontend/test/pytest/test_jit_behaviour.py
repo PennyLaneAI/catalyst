@@ -32,6 +32,7 @@ from catalyst.tracing.type_signatures import (
     params_are_annotated,
     typecheck_signatures,
 )
+from catalyst.utils.exceptions import CompileError
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
@@ -1012,7 +1013,7 @@ class TestErrorNestedQNode:
             inner()
             return qml.state()
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CompileError):
 
             @qjit
             def fn():
