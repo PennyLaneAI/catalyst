@@ -292,8 +292,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state", 
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def SetStateOp : Gate_Op<"set_state", [MemoryEffects<[MemWrite]>]> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -324,8 +323,7 @@ def SetStateOp : Gate_Op<"set_state",
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state", 
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def SetBasisStateOp : Gate_Op<"set_basis_state", [MemoryEffects<[MemWrite]>]> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -389,7 +387,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
-        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+        MemoryEffects<[MemWrite]>]> {
     let summary = "Global Phase.";
     let description = [{
     }];
@@ -709,8 +707,7 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
-def MeasureOp : Quantum_Op<"measure",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def MeasureOp : Quantum_Op<"measure", [MemoryEffects<[MemWrite]>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];
@@ -730,8 +727,7 @@ def MeasureOp : Quantum_Op<"measure",
     }];
 }
 
-def SampleOp : Measurement_Op<"sample",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def SampleOp : Measurement_Op<"sample", [MemoryEffects<[MemWrite]>]> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
@@ -794,7 +790,7 @@ def SampleOp : Measurement_Op<"sample",
 }
 
 def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicResultSize, 
-        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+        MemoryEffects<[MemWrite]>]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
@@ -852,8 +848,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     let hasVerifier = 1;
 }
 
-def ExpvalOp : Measurement_Op<"expval",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def ExpvalOp : Measurement_Op<"expval", [MemoryEffects<[MemWrite]>]> {
     let summary = "Compute the expectation value of the given observable for the current state";
     let description = [{
         The `quantum.expval` operation represents the measurement process of computing the
@@ -891,7 +886,7 @@ def ExpvalOp : Measurement_Op<"expval",
     }];
 }
 
-def VarianceOp : Measurement_Op<"var", [NoMemoryEffect]> {
+def VarianceOp : Measurement_Op<"var", [MemoryEffects<[MemWrite]>]> {
     let summary = "Compute the variance of the given observable for the current state";
     let description = [{
         The `quantum.var` operation represents the measurement process of computing the variance of
@@ -928,8 +923,7 @@ def VarianceOp : Measurement_Op<"var", [NoMemoryEffect]> {
     }];
 }
 
-def ProbsOp : Measurement_Op<"probs",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def ProbsOp : Measurement_Op<"probs", [MemoryEffects<[MemWrite]>]> {
     let summary = "Compute computational basis probabilities for the current state";
     let description = [{
         The `quantum.probs` operation represents the measurement process of computing probabilities
@@ -972,8 +966,7 @@ def ProbsOp : Measurement_Op<"probs",
     let hasVerifier = 1;
 }
 
-def StateOp : Measurement_Op<"state",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def StateOp : Measurement_Op<"state", [MemoryEffects<[MemWrite]>]> {
     let summary = "Return the current statevector";
     let description = [{
         The `quantum.state` operation represents the measurement process of returning the current
