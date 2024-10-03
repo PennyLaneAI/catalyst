@@ -1327,7 +1327,7 @@ def _qunitary_lowering(
 @qmeasure_p.def_abstract_eval
 def _qmeasure_abstract_eval(qubit, postselect: int = None):
     assert isinstance(qubit, AbstractQbit)
-    return core.DShapedArray((), np.dtype("bool")), qubit
+    return core.ShapedArray((), bool), qubit
 
 
 @qmeasure_p.def_impl
@@ -1559,7 +1559,7 @@ def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 @expval_p.def_abstract_eval
 def _expval_abstract_eval(obs, shots, shape=None):
     assert isinstance(obs, AbstractObs)
-    return core.DShapedArray((), np.dtype("float64"))
+    return core.ShapedArray((), jax.numpy.float64)
 
 
 @expval_p.def_impl
@@ -1591,7 +1591,7 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 @var_p.def_abstract_eval
 def _var_abstract_eval(obs, shots, shape=None):
     assert isinstance(obs, AbstractObs)
-    return core.DShapedArray((), np.dtype("float64"))
+    return core.ShapedArray((), jax.numpy.float64)
 
 
 @var_p.def_impl

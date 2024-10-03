@@ -104,3 +104,18 @@ def test_state():
     assert jaxpr.eqns[1].primitive == state_p
     assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
+
+
+def test_state_dynamic():
+    """Test that the state primitive can be captured by jaxpr
+    using a tracer as parameter."""
+
+    def f(shots):
+        obs = compbasis_p.bind()
+        return state_p.bind(obs, shots=shots, shape=(1,))
+
+    shots = 5
+    jaxpr = jax.make_jaxpr(f)(shots)
+    assert jaxpr.eqns[1].primitive == state_p
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": shots}
+    assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
