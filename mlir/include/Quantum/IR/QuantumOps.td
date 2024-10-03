@@ -63,8 +63,7 @@ def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_obser
 
 class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, mnemonic, traits>;
 
-def InitializeOp : Quantum_Op<"init",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def InitializeOp : Quantum_Op<"init", [MemoryEffects<[MemWrite]>]> {
     let summary = "Initialize the quantum runtime.";
 
     let assemblyFormat = [{
@@ -72,8 +71,7 @@ def InitializeOp : Quantum_Op<"init",
     }];
 }
 
-def FinalizeOp : Quantum_Op<"finalize",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def FinalizeOp : Quantum_Op<"finalize", [MemoryEffects<[MemWrite]>]> {
     let summary = "Teardown the quantum runtime.";
 
     let assemblyFormat = [{
@@ -81,8 +79,7 @@ def FinalizeOp : Quantum_Op<"finalize",
     }];
 }
 
-def DeviceInitOp : Quantum_Op<"device",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def DeviceInitOp : Quantum_Op<"device", [MemoryEffects<[MemWrite]>]> {
     let summary = "Initialize a quantum device.";
 
     let arguments = (ins
@@ -96,8 +93,7 @@ def DeviceInitOp : Quantum_Op<"device",
     }];
 }
 
-def DeviceReleaseOp : Quantum_Op<"device_release",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def DeviceReleaseOp : Quantum_Op<"device_release", [MemoryEffects<[MemWrite]>]> {
     let summary = "Release the active quantum device.";
 
     let assemblyFormat = [{
@@ -131,8 +127,7 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
 }
 
 
-def DeallocOp : Memory_Op<"dealloc",
-        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def DeallocOp : Memory_Op<"dealloc", [MemoryEffects<[MemWrite]>]> {
     let summary = "Deallocate a quantum register.";
     let description = [{
     }];
