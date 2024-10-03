@@ -162,8 +162,6 @@ class ZNE:
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
-        if not isinstance(fn, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.num_folds = num_folds
