@@ -576,39 +576,39 @@ def _apply_registered_pass_lowering(
 #
 # module
 #
-def lower_callable_to_funcop(ctx, _callable, call_jaxpr):
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     """Lower callable to either a FuncOp"""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
 
     kwargs = {}
     kwargs["ctx"] = ctx.module_context
-    kwargs["name"] = _callable.__name__
+    kwargs["name"] = callable_.__name__
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
     kwargs["name_stack"] = ctx.name_stack
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
-    if isinstance(_callable, qml.QNode):
+    if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
         # "best", the default option in PennyLane, chooses backprop on the device
         # if supported and parameter-shift otherwise. Emulating the same behaviour
         # would require generating code to query the device.
         # For simplicity, Catalyst instead defaults to parameter-shift.
         diff_method = (
-            "parameter-shift" if _callable.diff_method == "best" else str(_callable.diff_method)
+            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
         )
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op
 
 
-def get_or_create_funcop(ctx, _callable, call_jaxpr):
+def get_or_create_funcop(ctx, callable_, call_jaxpr):
     """Get funcOp from cache, or create it from scratch"""
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(_callable):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
         return func_op
-    func_op = lower_callable_to_funcop(ctx, _callable, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[_callable] = func_op
+    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
+    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
     return func_op
 
 
@@ -671,67 +671,67 @@ def _module_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
-def lower_callable(ctx, _callable, call_jaxpr):
+def lower_callable(ctx, callable_, call_jaxpr):
     """Lowers _callable to MLIR.
 
-    If _callable is a qnode, then we will first create a module, then
+    If callable_ is a qnode, then we will first create a module, then
     create a FuncOp corresponding to call_jaxpr. Otherwise, a FuncOp
     will be created in the current module. This function might
     add more than one FuncOps. This depends on the contents of call_jaxpr.
 
     Args:
       ctx: LoweringRuleContext
-      _callable: python function
-      call_jaxpr: jaxpr representing _callable
+      callable_: python function
+      call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
     """
-    if not isinstance(_callable, qml.QNode):
-        return get_or_create_funcop(ctx, _callable, call_jaxpr)
+    if not isinstance(callable_, qml.QNode):
+        return get_or_create_funcop(ctx, callable_, call_jaxpr)
 
-    return get_or_create_qnode_funcop(ctx, _callable, call_jaxpr)
+    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr)
 
 
-def lower_qnode_to_funcop(ctx, _callable, call_jaxpr):
-    """Lowers _callable to MLIR.
+def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
+    """Lowers callable_ to MLIR.
 
-    Will create ModuleOp and then lower the _callable to a
+    Will create ModuleOp and then lower the callable_ to a
     FuncOp inside the ModuleOp. The ModuleOp may have more
     than one FuncOp. This depends on the contents of call_jaxpr.
 
     Args:
       ctx: LoweringRuleContext
-      _callable: qml.Qnode
-      call_jaxpr: jaxpr representing _callable
+      callable_: qml.Qnode
+      call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
     """
-    assert isinstance(_callable, qml.QNode), "This function expects qnodes"
+    assert isinstance(callable_, qml.QNode), "This function expects qnodes"
 
-    name = "module_" + _callable.__name__
+    name = "module_" + callable_.__name__
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, _callable, call_jaxpr)
+        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
         func_op.sym_visibility = ir.StringAttr.get("private")
 
     return func_op
 
 
-def get_or_create_qnode_funcop(ctx, _callable, call_jaxpr):
+def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
     """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
 
     Args:
       ctx: LoweringRuleContext
-      _callable: qml.Qnode
-      call_jaxpr: jaxpr representing _callable
+      callable_: qml.Qnode
+      call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
     """
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(_callable):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
         return func_op
-    func_op = lower_qnode_to_funcop(ctx, _callable, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[_callable] = func_op
+    func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr)
+    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
     return func_op
 
 
