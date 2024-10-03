@@ -76,18 +76,28 @@ class Signature:
 
     @staticmethod
     def is_tensor(x):
-        """Determine whether a type ``x`` is a ``jax.core.DShapedArray`` or ``jax.core.ShapedArray``.
+        """Determine whether a type ``x`` is a ``jax.core.DShapedArray``
+        or ``jax.core.ShapedArray``.
 
         Args:
             x: The type to be tested.
 
         Returns:
-            bool: Whether the type ``x`` is a ``jax.core.DShapedArray`` or ``jax.core.ShapedArray``
+            bool: Whether the type ``x`` is a ``jax.core.DShapedArray``
+            or ``jax.core.ShapedArray``
         """
         return isinstance(x, (DShapedArray, ShapedArray))
 
     @staticmethod
     def is_dynamic_shape(shape):
+        """Determine whether a shape contains a tracer or not.
+
+        Args:
+            shape: The shape to be tested.
+
+        Returns:
+            bool: Whether the shape contains a tracer or not.
+        """
         for s in shape:
             if isinstance(s, Tracer):
                 return True
