@@ -61,7 +61,7 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
 
 void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
-    std::deque<Operation *> opsToReplace;
+    std::vector<Operation *> opsToReplace;
     function.walk([&](MeasurementProcess op) { opsToReplace.push_back(op); });
     for (auto op : opsToReplace) {
         if (auto tensorType = dyn_cast<RankedTensorType>(op->getResults().front().getType())) {
