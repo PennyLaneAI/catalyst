@@ -130,20 +130,19 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments,
 def BackpropOp : Gradient_Op<"backprop", [
         AttrSizedOperandSegments,
         AttrSizedResultSegments,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        MemoryEffects<[MemWrite]>
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
         ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$args,
-        Variadic<MemRefOf<[AnyFloat]>>:$diffArgShadows,
-        Variadic<MemRefOf<[AnyFloat]>>:$calleeResults,
-        Variadic<AnyTypeOf<[
+        Arg<Variadic<AnyType>, "", [MemRead]>:$args,
+        Arg<Variadic<MemRefOf<[AnyFloat]>>, "", [MemWrite]>:$diffArgShadows,
+        Arg<Variadic<MemRefOf<[AnyFloat]>>, "", [MemWrite]>:$calleeResults,
+        Arg<Variadic<AnyTypeOf<[
             RankedTensorOf<[AnyFloat]>,
             MemRefOf<[AnyFloat]>
-        ]>>:$cotangents,
+        ]>>, "", [MemRead]>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<BoolAttr>:$keepValueResults
     );
