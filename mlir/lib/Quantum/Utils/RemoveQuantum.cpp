@@ -63,20 +63,26 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
 void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
     function.walk([&](MeasurementProcess op) {
-        auto type = op->getResults().front().getType();
-        if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
-            auto shape = tensorType.getShape();
-            auto elemType = tensorType.getElementType();
-            rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, shape, elemType);
-        }
-        else {
-            if (type.isInteger()) {
-                rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, type,
-                                                               rewriter.getIntegerAttr(type, 0));
+        auto types = op->getResults().getTypes();
+
+        for (auto type : types) {
+            if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+                auto shape = tensorType.getShape();
+                auto elemType = tensorType.getElementType();
+                rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, shape, elemType);
             }
             else {
-                rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, type,
-                                                               rewriter.getFloatAttr(type, 0.0));
+                if (type.isInteger()) {
+                    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+                        op, type, rewriter.getIntegerAttr(type, 0));
+                }
+                else if (type.isIntOrFloat()) {
+                    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+                        op, type, rewriter.getFloatAttr(type, 0.0));
+                }
+                else {
+                    op.emitError() << "Unexpected measurement type " << *op;
+                }
             }
         }
     });
