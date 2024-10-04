@@ -3,7 +3,7 @@
 pip>=22.3
 
 # Build dependencies for non-Python components
-numpy==2.0
+numpy<2.1,!=2.0.0
 pybind11>=2.12.0
 PyYAML
 scipy==1.13
