@@ -348,7 +348,7 @@ jobs:
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_device
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
