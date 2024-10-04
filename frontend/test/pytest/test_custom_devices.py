@@ -189,8 +189,8 @@ def test_custom_device_bad_directory():
     class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
-        name = "Dummy Device"
-        short_name = "dummy.device"
+        name = "Null Device"
+        short_name = "null.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -229,8 +229,8 @@ def test_custom_device_no_c_interface():
     class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
-        name = "Dummy Device"
-        short_name = "dummy.device"
+        name = "Null Device"
+        short_name = "null.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
