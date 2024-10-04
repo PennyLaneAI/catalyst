@@ -375,6 +375,32 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         Variadic<QubitType>:$out_ctrl_qubits
     );
 
+    let builders = [
+        OpBuilder<
+        // Convenience builder for a single-qubit gate with no parameters
+        (ins "mlir::MLIRContext *":$ctx,
+                       "mlir::ValueRange":$inQubit,
+                       "std::string":$gate,
+                       "bool":$isAdjoint
+                       ),[{
+
+            CustomOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange({quantum::QubitType::get(ctx)}),
+            /*out_ctrl_qubits=*/ mlir::TypeRange(),
+            /*params=*/ mlir::ValueRange(),
+            /*in_qubits=*/ inQubit,
+            /*gate_name=*/ $_builder.getStringAttr(gate),
+            /*(optional) adjoint=*/ nullptr,
+            /*in_ctrl_qubits=*/ mlir::ValueRange(),
+            /*n_ctrl_values=*/ mlir::ValueRange()
+            );
+            if (isAdjoint){
+                $_state.addAttribute("adjoint", $_builder.getUnitAttr());
+            }
+
+        }]>
+    ];
+
     let assemblyFormat = [{
         $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
