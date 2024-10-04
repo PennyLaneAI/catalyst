@@ -37,10 +37,10 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
-class DummyDevice(Device):
-    """A dummy device from the device API."""
+class NullDevice(Device):
+    """A null device from the device API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -52,8 +52,10 @@ class DummyDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+        )
+        return "NullDevice", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -69,10 +71,10 @@ class DummyDevice(Device):
         return transform_program, execution_config
 
 
-class DummyDeviceNoWires(Device):
-    """A dummy device from the device API without wires."""
+class NullDeviceNoWires(Device):
+    """A null device from the device API without wires."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 
     def __init__(self, shots=1024):
         super().__init__(shots=shots)
@@ -84,8 +86,10 @@ class DummyDeviceNoWires(Device):
         """
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+        )
+        return "NullDevice", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -94,7 +98,7 @@ class DummyDeviceNoWires(Device):
 
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
-    device = DummyDevice(wires=10, shots=2032)
+    device = NullDevice(wires=10, shots=2032)
 
     # Create qjit device
     device_qjit = QJITDevice(device)
@@ -125,7 +129,7 @@ def test_qjit_device():
 
 def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
-    device = DummyDeviceNoWires(shots=2032)
+    device = NullDeviceNoWires(shots=2032)
 
     with pytest.raises(
         AttributeError, match="Catalyst does not support device instances without set wires."
@@ -144,7 +148,7 @@ def test_qjit_device_no_wires():
 )
 def test_qjit_device_invalid_wires(wires):
     """Test the qjit device from a device using the new api without wires set."""
-    device = DummyDeviceNoWires(shots=2032)
+    device = NullDeviceNoWires(shots=2032)
     device._wires = wires
 
     with pytest.raises(
@@ -198,7 +202,7 @@ def test_qjit_device_measurements(shots, mocker):
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = DummyDevice(wires=2, shots=2048)
+    dev = NullDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)

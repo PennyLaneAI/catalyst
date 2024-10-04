@@ -44,10 +44,10 @@ from catalyst.utils.toml import OperationProperties
 # pylint: disable=attribute-defined-outside-init
 
 
-class DummyDevice(Device):
-    """A dummy device from the device API."""
+class NullDevice(Device):
+    """A null device from the device API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -63,8 +63,10 @@ class DummyDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+        )
+        return "NullDevice", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -80,10 +82,10 @@ class DummyDevice(Device):
         return transform_program, execution_config
 
 
-class DummyDeviceLimitedMPs(Device):
-    """A dummy device from the device API without wires."""
+class NullDeviceLimitedMPs(Device):
+    """A null device from the device API without wires."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
@@ -98,16 +100,18 @@ class DummyDeviceLimitedMPs(Device):
         """
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+        )
+        return "NullDevice", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
 
     def __enter__(self, *args, **kwargs):
-        dummy_toml = self.config
-        with open(dummy_toml, mode="r", encoding="UTF-8") as f:
+        toml_file_path = self.config
+        with open(toml_file_path, mode="r", encoding="UTF-8") as f:
             toml_contents = f.readlines()
 
         updated_toml_contents = []
@@ -309,7 +313,7 @@ class TestMeasurementTransforms:
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements
 
-        with DummyDeviceLimitedMPs(
+        with NullDeviceLimitedMPs(
             wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
@@ -738,7 +742,7 @@ class TestMeasurementTransforms:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        dev = DummyDevice(wires=4, shots=1000)
+        dev = NullDevice(wires=4, shots=1000)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)

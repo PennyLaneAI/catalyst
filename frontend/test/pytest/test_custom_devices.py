@@ -133,11 +133,11 @@ RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
-    class DummyDevice(qml.devices.QubitDevice):
-        """Dummy Device"""
+    class NullDevice(qml.devices.QubitDevice):
+        """Null Device"""
 
-        name = "Dummy Device"
-        short_name = "dummy.device"
+        name = "Null Device"
+        short_name = "null.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -160,11 +160,13 @@ def test_custom_device_load():
             """
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+                get_lib_path("runtime", "RUNTIME_LIB_DIR")
+                + "/librtd_null_device"
+                + system_extension
             )
-            return "DummyDevice", lib_path
+            return "NullDevice", lib_path
 
-    device = DummyDevice(wires=1)
+    device = NullDevice(wires=1)
     capabilities = get_device_capabilities(device)
     backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
@@ -174,7 +176,7 @@ def test_custom_device_load():
     @qml.qnode(device)
     def f():
         """This function would normally return False.
-        However, DummyDevice as defined in librtd_dummy.so
+        However, NullDevice as defined in librtd_null_device.so
         has been implemented to always return True."""
         return measure(0)
 
