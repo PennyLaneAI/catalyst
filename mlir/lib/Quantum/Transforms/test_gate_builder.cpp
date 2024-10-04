@@ -62,7 +62,6 @@ struct GateBuilderTesterPass
         builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit}), "PauliZ");
         builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit}), "PauliY", true);
     }
-
 };
 
 } // namespace quantum
