@@ -136,9 +136,6 @@ def qjit(
             on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
-            Note that seeding samples on simulator devices is not yet supported. As such,
-            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
-            ``expval`` will remain.
         experimental_capture (bool): If set to ``True``, the qjit decorator
             will use PennyLane's experimental program capture capabilities
             to capture the decorated function for compilation.
