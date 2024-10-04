@@ -21,6 +21,7 @@
 
 // CHECK: [[ANGLE:%.+]] = arith.constant {{.+}} : f64
 // CHECK: [[IN:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
-// CHECK:  {{%.+}} = quantum.custom "PauliZ"() [[IN]] : !quantum.bit
+// CHECK: [[PZ:%.+]] = quantum.custom "PauliZ"() [[IN]] : !quantum.bit
 // CHECK:  {{%.+}} = quantum.custom "PauliY"() [[IN]] {adjoint} : !quantum.bit
 // CHECK:  {{%.+}} = quantum.custom "RX"([[ANGLE]]) [[IN]] : !quantum.bit
+// CHECK:  {{%.+}}:2 = quantum.custom "SWAP"() [[IN]], [[PZ]] : !quantum.bit

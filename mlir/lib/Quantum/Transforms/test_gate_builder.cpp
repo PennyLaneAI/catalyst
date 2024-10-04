@@ -63,10 +63,13 @@ struct GateBuilderTesterPass
 
         builder.setInsertionPointAfter(&bit0);
 
-        builder.create<quantum::CustomOp>(loc, inQubit, "PauliZ");
+        auto pz = builder.create<quantum::CustomOp>(loc, inQubit, "PauliZ");
         builder.create<quantum::CustomOp>(loc, inQubit, "PauliY", true);
 
         builder.create<quantum::CustomOp>(loc, inQubit, "RX", mlir::ValueRange({angle}));
+
+        builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit, pz->getResult(0)}),
+                                                        "SWAP");
     }
 };
 
