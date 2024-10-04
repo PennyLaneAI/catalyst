@@ -128,20 +128,21 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
         FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
         fnFoldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
 
-        fnFoldedOp.walk([&](func::CallOp callOp) {
-            std::string fnName = callOp.getCallee().str() + ".zne";
-            FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
-            auto currentFnFoldedOp =
-                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+        traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+            funcOp.walk([&](func::CallOp callOp) {
+                std::string fnName = callOp.getCallee().str() + ".zne";
+                FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+                auto currentFnFoldedOp =
+                    SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+                if (currentFnFoldedOp) {
+                    PatternRewriter::InsertionGuard insertionGuard(rewriter);
+                    rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());
 
-            if (currentFnFoldedOp) {
-                PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());
-
-                callOp.setCallee(currentFnFoldedOp.getName());
-                auto parentFunc = callOp->getParentOfType<func::FuncOp>();
-                callOp.getOperandsMutable().append(parentFunc.getArguments().back());
-            }
+                    callOp.setCallee(currentFnFoldedOp.getName());
+                    auto parentFunc = callOp->getParentOfType<func::FuncOp>();
+                    callOp.getOperandsMutable().append(parentFunc.getArguments().back());
+                }
+            });
         });
     }
     else {
