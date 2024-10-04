@@ -126,6 +126,7 @@ RUNTIME_OBSERVABLES = {
 # TODO: This should be removed after implementing `get_c_interface`
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
+    "null.qubit": ("NullDevice", "librtd_null_device"),
     "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
