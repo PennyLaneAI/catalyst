@@ -22,6 +22,7 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 
+#include "Catalyst/Utils/CallGraph.h"
 #include "Mitigation/IR/MitigationOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
@@ -50,54 +51,97 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     auto foldingAlgorithm = op.getFolding();
     auto calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
-    TypeRange originalTypes = calleeOp.getArgumentTypes();
-    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
-    Type indexType = rewriter.getIndexType();
-    typesFolded.push_back(indexType);
     func::FuncOp fnFoldedOp;
+
     // Traverse the callgraph and replace qnodes with folded qnodes.
     if (!calleeOp->hasAttr("qnode")) {
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
-        FunctionType fnFoldedType = FunctionType::get(op.getContext(),
-                                                       /*inputs=*/typesFolded,
-                                                      /*outputs=*/calleeOp.getResultTypes());
-        std::string fnFoldedName = calleeOp.getName().str() + ".zne";
-        fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
+        traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+            if (!funcOp->hasAttr("qnode")) {
 
-        rewriter.cloneRegionBefore(calleeOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+                rewriter.setInsertionPointToStart(moduleOp.getBody());
+                TypeRange originalTypes = funcOp.getArgumentTypes();
+                SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
+                Type indexType = rewriter.getIndexType();
+                typesFolded.push_back(indexType);
+                FunctionType fnFoldedType = FunctionType::get(op.getContext(),
+                                                              /*inputs=*/typesFolded,
+                                                              /*outputs=*/funcOp.getResultTypes());
+                std::string fnFoldedName = funcOp.getName().str() + ".zne";
+                auto currentFnFoldedOp =
+                    rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
 
-        Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
-        rewriter.setInsertionPointToStart(fnFoldedOpBlock);
-        fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
+                rewriter.cloneRegionBefore(funcOp.getBody(), currentFnFoldedOp.getBody(),
+                                           currentFnFoldedOp.end());
 
-        fnFoldedOp.walk([&](func::CallOp callOp) {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            func::FuncOp funcOp =
-                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, callOp.getCalleeAttr());
-            std::string foldedName = callOp.getCalleeAttrName().str() + ".folded";
-            func::FuncOp foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                moduleOp, rewriter.getStringAttr(foldedName));
-            if (funcOp->hasAttr("qnode") and !foldedOp) {
-                // Create the folded circuit function
-                auto foldedCircuitAttr =
-                    getOrInsertFoldedCircuit(loc, rewriter, funcOp, foldingAlgorithm);
-                func::FuncOp foldedOp =
-                    SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedCircuitAttr);
-                std::vector<Value> args = {callOp.getArgOperands().begin(),
-                                           callOp.getArgOperands().end()};
-                args.push_back(fnFoldedOp.getArguments().back());
-                rewriter.setInsertionPoint(callOp);
-                rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
-            }
-            else if (funcOp->hasAttr("qnode") and foldedOp) {
-                rewriter.setInsertionPoint(callOp);
-                std::vector<Value> args = {callOp.getArgOperands().begin(),
-                                           callOp.getArgOperands().end()};
-                args.push_back(fnFoldedOp.getArguments().back());
-                rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
+                Block *currentFnFoldedOpBlock = &currentFnFoldedOp.getBody().front();
+                rewriter.setInsertionPointToStart(currentFnFoldedOpBlock);
+                currentFnFoldedOpBlock->addArgument(currentFnFoldedOp.getArgumentTypes().back(),
+                                                    loc);
+
+                bool containQnodes = false;
+                funcOp.walk([&](func::CallOp op) {
+                    auto insideFuncOp =
+                        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+                    if (insideFuncOp->hasAttr("qnode")) {
+                        containQnodes = true;
+                        return WalkResult::interrupt();
+                    }
+                    return WalkResult::advance();
+                });
+
+                // Replace calls with calls.zne
+                if (containQnodes) {
+
+                    currentFnFoldedOp.walk([&](func::CallOp callOp) {
+                        PatternRewriter::InsertionGuard insertGuard(rewriter);
+                        func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                            op, callOp.getCalleeAttr());
+                        std::string foldedName = callOp.getCalleeAttrName().str() + ".folded";
+                        func::FuncOp foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                            moduleOp, rewriter.getStringAttr(foldedName));
+                        if (funcOp->hasAttr("qnode") and !foldedOp) {
+                            // Create the folded circuit function
+                            auto foldedCircuitAttr =
+                                getOrInsertFoldedCircuit(loc, rewriter, funcOp, foldingAlgorithm);
+                            func::FuncOp foldedOp =
+                                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                                    moduleOp, foldedCircuitAttr);
+                            std::vector<Value> args = {callOp.getArgOperands().begin(),
+                                                       callOp.getArgOperands().end()};
+                            args.push_back(currentFnFoldedOp.getArguments().back());
+                            rewriter.setInsertionPoint(callOp);
+                            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
+                        }
+                        else if (funcOp->hasAttr("qnode") and foldedOp) {
+                            rewriter.setInsertionPoint(callOp);
+                            std::vector<Value> args = {callOp.getArgOperands().begin(),
+                                                       callOp.getArgOperands().end()};
+                            args.push_back(currentFnFoldedOp.getArguments().back());
+                            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
+                        }
+                    });
+                    rewriter.restoreInsertionPoint(point);
+                }
             }
         });
-        rewriter.restoreInsertionPoint(point);
+        std::string fnName = calleeOp.getName().str() + ".zne";
+        FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+        fnFoldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+
+        fnFoldedOp.walk([&](func::CallOp callOp) {
+            std::string fnName = callOp.getCallee().str() + ".zne";
+            FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+            auto currentFnFoldedOp =
+                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+            if (currentFnFoldedOp) {
+                PatternRewriter::InsertionGuard insertionGuard(rewriter);
+                rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());
+
+                callOp.setCallee(currentFnFoldedOp.getName());
+                auto parentFunc = callOp->getParentOfType<func::FuncOp>();
+                callOp.getOperandsMutable().append(parentFunc.getArguments().back());
+            }
+        });
     }
     else {
         // Create the folded circuit function
