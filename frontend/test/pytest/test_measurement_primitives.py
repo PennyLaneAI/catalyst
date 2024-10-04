@@ -51,9 +51,14 @@ def test_sample_dynamic():
         return sample_p.bind(obs, shots=shots, shape=(shots, 0))
 
     jaxpr = jax.make_jaxpr(f)(shots).jaxpr
+    shots_tracer, shape_value = jaxpr.eqns[1].params.values()
+
     assert jaxpr.eqns[1].primitive == sample_p
-    assert jaxpr.eqns[1].params == {"shape": (shots, 0), "shots": shots}
-    assert jaxpr.eqns[1].outvars[0].aval.shape == (shots, 0)
+    assert isinstance(shots_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer)
+    assert isinstance(shape_value[0], jax._src.interpreters.partial_eval.DynamicJaxprTracer)
+    assert shape_value[1] == 0
+    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax._src.core.Var)
+    assert jaxpr.eqns[1].outvars[0].aval.shape[1] == 0
 
 
 def test_counts():
