@@ -28,6 +28,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import Folding, zne_p
+from catalyst.jax_tracer import Function
 
 
 def _is_odd_positive(numbers_list):
@@ -174,6 +175,10 @@ class ZNE:
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
+        if isinstance(self.fn, (Function, qml.QNode)):
+            self.fn = self.fn
+        elif isinstance(self.fn, Callable):  # Keep at the bottom
+            self.fn = Function(self.fn)
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]

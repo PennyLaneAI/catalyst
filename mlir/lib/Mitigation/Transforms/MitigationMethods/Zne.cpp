@@ -150,6 +150,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
             getOrInsertFoldedCircuit(loc, rewriter, calleeOp, foldingAlgorithm);
         fnFoldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(calleeOp, foldedOpRefAttr);
     }
+    rewriter.setInsertionPoint(op);
     RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
 
     // Loop over the num fold to create a folded circuit per factor
