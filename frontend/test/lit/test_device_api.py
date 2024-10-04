@@ -65,8 +65,7 @@ class NullDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK
-    # quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullDevice", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullDevice", "{'shots': 2048}"]
     dev = NullDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
