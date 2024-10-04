@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "test-gate-builder"
 
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Value.h"
@@ -44,6 +45,7 @@ struct GateBuilderTesterPass
         /*
         Tests are of the form
         module {
+          %angle = arith.constant 37.420000e+00 : f64  // to be used as parameter
           %0 = quantum.alloc( 2) : !quantum.reg
           %bit0 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
         }
@@ -55,12 +57,16 @@ struct GateBuilderTesterPass
         Location loc = module->getLoc();
 
         Operation &bit0 = module->getRegion(0).front().back();
+        Operation &angleOp = module->getRegion(0).front().front();
         Value inQubit = bit0.getResult(0);
+        Value angle = angleOp.getResult(0);
 
         builder.setInsertionPointAfter(&bit0);
 
-        builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit}), "PauliZ");
-        builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit}), "PauliY", true);
+        builder.create<quantum::CustomOp>(loc, inQubit, "PauliZ");
+        builder.create<quantum::CustomOp>(loc, inQubit, "PauliY", true);
+
+        builder.create<quantum::CustomOp>(loc, inQubit, "RX", mlir::ValueRange({angle}));
     }
 };
 

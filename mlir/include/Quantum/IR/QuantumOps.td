@@ -379,7 +379,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         OpBuilder<
         // Convenience builder for a single-qubit gate with no parameters
         (ins
-             "mlir::ValueRange":$inQubit,
+             "mlir::Value":$inQubit,
              "std::string":$gate,
              CArg<"bool", "false">:$isAdjoint
         ),[{
@@ -388,6 +388,30 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             /*out_qubits=*/ mlir::TypeRange({quantum::QubitType::get(ctx)}),
             /*out_ctrl_qubits=*/ mlir::TypeRange(),
             /*params=*/ mlir::ValueRange(),
+            /*in_qubits=*/ mlir::ValueRange({inQubit}),
+            /*gate_name=*/ $_builder.getStringAttr(gate),
+            /*(optional) adjoint=*/ nullptr,
+            /*in_ctrl_qubits=*/ mlir::ValueRange(),
+            /*in_ctrl_values=*/ mlir::ValueRange()
+            );
+            if (isAdjoint){
+                $_state.addAttribute("adjoint", $_builder.getUnitAttr());
+            }
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a single-qubit gate with parameters
+        (ins
+             "mlir::ValueRange":$inQubit,
+             "std::string":$gate,
+             "mlir::ValueRange":$params,
+             CArg<"bool", "false">:$isAdjoint
+        ),[{
+            mlir::MLIRContext *ctx =$_builder.getContext();
+            CustomOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange({quantum::QubitType::get(ctx)}),
+            /*out_ctrl_qubits=*/ mlir::TypeRange(),
+            /*params=*/ params,
             /*in_qubits=*/ inQubit,
             /*gate_name=*/ $_builder.getStringAttr(gate),
             /*(optional) adjoint=*/ nullptr,

@@ -15,11 +15,12 @@
 // RUN: quantum-opt --test-gate-builder --split-input-file -verify-diagnostics %s | FileCheck %s
 
 
+%angle = arith.constant 37.420000e+00 : f64
 %_ = quantum.alloc( 2) : !quantum.reg
 %IN = quantum.extract %_[ 0] : !quantum.reg -> !quantum.bit
 
+// CHECK: [[ANGLE:%.+]] = arith.constant {{.+}} : f64
 // CHECK: [[IN:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
 // CHECK:  {{%.+}} = quantum.custom "PauliZ"() [[IN]] : !quantum.bit
 // CHECK:  {{%.+}} = quantum.custom "PauliY"() [[IN]] {adjoint} : !quantum.bit
-
-
+// CHECK:  {{%.+}} = quantum.custom "RX"([[ANGLE]]) [[IN]] : !quantum.bit
