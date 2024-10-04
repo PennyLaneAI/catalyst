@@ -192,6 +192,7 @@
 
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+  [(#1182)](https://github.com/PennyLaneAI/catalyst/pull/1182)
 
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
@@ -268,11 +269,6 @@
   In particular, the signatures of `get_device_capability`, `catalyst_decompose`,
  `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
   function has been removed entirely.
-
-* Update NumPy dependency to `numpy<2.1,!=2.0.0` to keep Catalyst in line with the NumPy dependency
-  currently employed in PennyLane (`numpy<2.1`) and to ensure that NumPy version 2.0.0 is not used,
-  as it contains a bug preventing the use of the Python Stable ABI.
-  [(#1182)](https://github.com/PennyLaneAI/catalyst/pull/1182)
 
 <h3>Contributors</h3>
 
