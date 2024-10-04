@@ -28,3 +28,4 @@
 // CHECK: [[RX:%.+]] = quantum.custom "RX"([[ANGLE]]) [[IN]] : !quantum.bit
 // CHECK:  {{%.+}}:2 = quantum.custom "SWAP"() [[IN]], [[PZ]] : !quantum.bit
 // CHECK:  {{%.+}}:2, {{%.+}} = quantum.custom "Rot"([[ANGLE]]) [[IN]], [[PZ]] ctrls([[RX]]) ctrlvals([[TRUE]]) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+// CHECK:  {{%.+}}:2, {{%.+}} = quantum.custom "my_controlled_U"() [[IN]], [[PZ]] ctrls([[RX]]) ctrlvals([[TRUE]]) : !quantum.bit, !quantum.bit ctrls !quantum.bit

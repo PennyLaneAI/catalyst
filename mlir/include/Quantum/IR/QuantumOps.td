@@ -418,6 +418,20 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         }]>,
 
         OpBuilder<
+        // Convenience builder for a gate with controls and no parameters
+        (ins
+             "std::string":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$in_ctrl_qubits,
+             "mlir::ValueRange":$in_ctrl_values,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, in_ctrl_qubits, in_ctrl_values,
+            mlir::ValueRange(), adjoint);
+        }]>,
+
+        OpBuilder<
         // Convenience builder for a gate with no parameters and no controls
         (ins
              "std::string":$gate,

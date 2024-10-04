@@ -89,7 +89,13 @@ struct GateBuilderTesterPass
             mlir::ValueRange({rx->getResult(0)}),
             mlir::ValueRange({trueVal}),
             mlir::ValueRange({angle})
-            );
+        );
+
+        builder.create<quantum::CustomOp>(loc, "my_controlled_U",
+            mlir::ValueRange({inQubit, pz->getResult(0)}),
+            mlir::ValueRange({rx->getResult(0)}),
+            mlir::ValueRange({trueVal})
+        );
     }
 };
 
