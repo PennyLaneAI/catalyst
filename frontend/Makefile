@@ -30,7 +30,7 @@ configure:
 
 .PHONY: frontend
 frontend: configure
-	cmake --build $(FRONTEND_BUILD_DIR) --target install -j$(NPROC) -v
+	cmake --build $(FRONTEND_BUILD_DIR) --target install -j$(NPROC)
 
 .PHONY: clean
 clean:

@@ -87,12 +87,13 @@ catalyst: runtime dialects frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
-	$(MAKE) -C frontend all
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
+	# Need to install dependencies (specifically numpy) before building frontend
+	$(MAKE) -C frontend all
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:

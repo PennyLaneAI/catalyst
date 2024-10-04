@@ -1,7 +1,9 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Python 3 COMPONENTS Interpreter Development REQUIRED)
+find_package(Python 3
+    REQUIRED COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule)
 
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
@@ -32,7 +34,9 @@ set(WRAPPER_SRC_FILES
 )
 
 # Create the Python `wrapper` module
-nanobind_add_module(wrapper ${WRAPPER_SRC_FILES})
+# Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
+# built (`STABLE_ABI` does nothing on older Python versions).
+nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
 
 # Add the NumPy include directory to the library's include paths
 target_include_directories(wrapper PRIVATE ${NUMPY_INCLUDE_DIR})
