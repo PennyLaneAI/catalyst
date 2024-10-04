@@ -24,6 +24,24 @@ using namespace mlir;
 using namespace catalyst::gradient;
 
 namespace {
+/**
+ * The new bufferization interface requires `bufferizesToMemoryRead`, `bufferizesToMemoryWrite`, 
+ * and `getAliasingValues`.
+ * 
+ * `bufferizesToMemoryRead`: Return `true` if the buffer of the given tensor OpOperand is read.
+ *
+ * `bufferizesToMemoryWrite`: Return `true` if the buffer of the given tensor OpOperand is written 
+ * (if bufferizing in-place).
+ *
+ * `getAliasingOpOperands`: Return the OpResults that may share the same buffer as the given OpOperand. 
+ * Note that MLIR documentation does not mention `getAliasingValues` but it seems to serve the same purpose. 
+ *
+ * Bufferizing FunctionOpInterface is also not documented by MLIR. It requires 
+ * `OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel`, which requires the implementation of
+ * `supportsUnstructuredControlFlow`, `hasTensorSemantics`, and `getAliasingOpOperands`.
+ *
+ * Link: https://mlir.llvm.org/docs/Bufferization/#extending-one-shot-bufferize
+ */
 
 static BaseMemRefType
 getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
