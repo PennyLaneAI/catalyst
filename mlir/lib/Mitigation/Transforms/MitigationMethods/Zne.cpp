@@ -133,6 +133,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
             FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
             auto currentFnFoldedOp =
                 SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+
             if (currentFnFoldedOp) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());

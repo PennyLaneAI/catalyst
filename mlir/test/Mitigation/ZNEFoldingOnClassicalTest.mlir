@@ -161,7 +161,7 @@ func.func @intermediateClassical(%arg0: f64) -> f64 {
 }
 
 func.func @intermediateWithQ(%arg0: tensor<3xf64>) -> f64 {
-    %1 = call @circuit2(%arg0) : (tensor<3xf64>) -> f64
+    %1 = call @circuit1(%arg0) : (tensor<3xf64>) -> f64
     func.return %1 : f64
 }
 
@@ -175,22 +175,30 @@ func.func @multipleQnodes(%arg0: tensor<3xf64>, %arg1: f64) -> f64 {
     return %4 : f64
 }
 
-// CHECK:    func.func private @circuit2.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
-// CHECK:    func.func private @circuit2.quantumAlloc(%arg0: i64) -> !quantum.reg {
-// CHECK:    func.func private @circuit2.withoutMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> !quantum.reg {
-// CHECK:    func.func private @circuit2.withMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> f64 {
-
 // CHECK:    func.func private @circuit1.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
 // CHECK:    func.func private @circuit1.quantumAlloc(%arg0: i64) -> !quantum.reg {
 // CHECK:    func.func private @circuit1.withoutMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> !quantum.reg {
 // CHECK:    func.func private @circuit1.withMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> f64 {
 
-// CHECK:    func.func @multipleQnodes.zne(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
+// CHECK:    func.func @intermediateWithQ.zne(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
+// CHECK:      call @circuit1.folded(%arg0, %arg1) : (tensor<3xf64>, index) -> f64
 
+// CHECK:    func.func @intermediateClassical.zne(%arg0: f64, %arg1: index) -> f64 {
+// CHECK-NEXT:    return %arg0 : f64
 
-// CHECK:    func.func @qjitZne(%arg0: tensor<3xf64>) -> tensor<5xf64> {
-// CHECK:    scf.for
-// CHECK:      func.call @multipleQnodes.zne
+// CHECK:    func.func private @circuit2.folded(%arg0: tensor<3xf64>, %arg1: index) -> f64 {
+// CHECK:    func.func private @circuit2.quantumAlloc(%arg0: i64) -> !quantum.reg {
+// CHECK:    func.func private @circuit2.withoutMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> !quantum.reg {
+// CHECK:    func.func private @circuit2.withMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> f64 {
+
+// CHECK:    func.func @multipleQnodes.zne(%arg0: tensor<3xf64>, %arg1: f64, %arg2: index) -> f64 {
+// CHECK:      call @intermediateClassical.zne(%arg1, %arg2) : (f64, index) -> f64
+// CHECK:      call @intermediateWithQ.zne(%arg0, %arg2) : (tensor<3xf64>, index) -> f64
+// CHECK:     call @circuit2.folded(%arg0, %arg2) : (tensor<3xf64>, index) -> f64
+
+// CHECK:    func.func @qjitZne(%arg0: tensor<3xf64>, %arg1: f64) -> tensor<5xf64> {
+// CHECK:      scf.for
+// CHECK:        func.call @multipleQnodes.zne(%arg0, %arg1, %extracted) : (tensor<3xf64>, f64, index) -> f64
 
 func.func @qjitZne(%arg0: tensor<3xf64>, %arg1: f64) -> tensor<5xf64> {
     %numFolds = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
