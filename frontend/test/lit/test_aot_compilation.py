@@ -440,7 +440,7 @@ def test_nested_module():
 
     # CHECK-LABEL: module @module_function
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK-LABEL: func.func private @function
+    # CHECK-LABEL: func.func public @function
     def function():
         return qml.state()
 
