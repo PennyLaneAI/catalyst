@@ -17,7 +17,7 @@ ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?=6f3e0d5d371ff9823a3177dd2c66052668883d42
 ENABLE_LAPACK?=OFF
 
-BUILD_TARGETS := rt_capi rtd_dummy
+BUILD_TARGETS := rt_capi rtd_null_device
 TEST_TARGETS := ""
 
 ifeq ($(ENABLE_LIGHTNING), ON)
@@ -119,9 +119,9 @@ runtime: configure
 $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
-.PHONY: dummy_device
-dummy_device:
-	cmake --build $(RT_BUILD_DIR) --target rtd_dummy -j$(NPROC)
+.PHONY: null_device
+null_device:
+	cmake --build $(RT_BUILD_DIR) --target rtd_null_device -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
