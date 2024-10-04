@@ -246,7 +246,7 @@ def test_custom_device_no_c_interface():
             raise RuntimeError("Dummy device")
 
     with pytest.raises(
-        CompileError, match="The dummy.device device does not provide C interface for compilation."
+        CompileError, match="The null.device device does not provide C interface for compilation."
     ):
 
         @qjit
