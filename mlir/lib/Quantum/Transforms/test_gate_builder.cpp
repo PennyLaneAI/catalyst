@@ -45,6 +45,7 @@ struct GateBuilderTesterPass
         /*
         Tests are of the form
         module {
+          %true = llvm.mlir.constant (1 : i1) :i1
           %angle = arith.constant 37.420000e+00 : f64  // to be used as parameter
           %0 = quantum.alloc( 2) : !quantum.reg
           %bit0 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -56,20 +57,39 @@ struct GateBuilderTesterPass
         mlir::IRRewriter builder(ctx);
         Location loc = module->getLoc();
 
-        Operation &bit0 = module->getRegion(0).front().back();
-        Operation &angleOp = module->getRegion(0).front().front();
-        Value inQubit = bit0.getResult(0);
-        Value angle = angleOp.getResult(0);
+        Operation *bit0;
+        Operation *angleOp;
+        Operation *trueOp;
+        Block &b = module->getRegion(0).front();
+        for (const auto &[idx, op] : llvm::enumerate(b.getOperations())) {
+            if (idx == 0){
+                trueOp = &op;
+            }
+            if (idx == 1){
+                angleOp = &op;
+            }
+            if (idx == 3){
+                bit0 = &op;
+            }
+        }
 
-        builder.setInsertionPointAfter(&bit0);
+        Value inQubit = bit0->getResult(0);
+        Value angle = angleOp->getResult(0);
+        Value trueVal = trueOp->getResult(0);
 
-        auto pz = builder.create<quantum::CustomOp>(loc, inQubit, "PauliZ");
-        builder.create<quantum::CustomOp>(loc, inQubit, "PauliY", true);
+        builder.setInsertionPointAfter(bit0);
 
-        builder.create<quantum::CustomOp>(loc, inQubit, "RX", mlir::ValueRange({angle}));
+        auto pz = builder.create<quantum::CustomOp>(loc, "PauliZ", inQubit);
+        builder.create<quantum::CustomOp>(loc, "PauliY", inQubit, true);
+        auto rx = builder.create<quantum::CustomOp>(loc, "RX", inQubit, mlir::ValueRange({angle}));
+        builder.create<quantum::CustomOp>(loc, "SWAP", mlir::ValueRange({inQubit, pz->getResult(0)}));
 
-        builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit, pz->getResult(0)}),
-                                                        "SWAP");
+        builder.create<quantum::CustomOp>(loc, "Rot",
+            mlir::ValueRange({inQubit, pz->getResult(0)}),
+            mlir::ValueRange({rx->getResult(0)}),
+            mlir::ValueRange({trueVal}),
+            mlir::ValueRange({angle})
+            );
     }
 };
 

@@ -15,13 +15,16 @@
 // RUN: quantum-opt --test-gate-builder --split-input-file -verify-diagnostics %s | FileCheck %s
 
 
+%true = llvm.mlir.constant (1 : i1) :i1
 %angle = arith.constant 37.420000e+00 : f64
 %_ = quantum.alloc( 2) : !quantum.reg
 %IN = quantum.extract %_[ 0] : !quantum.reg -> !quantum.bit
 
+// CHECK: [[TRUE:%.+]] = llvm.mlir.constant(
 // CHECK: [[ANGLE:%.+]] = arith.constant {{.+}} : f64
 // CHECK: [[IN:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
 // CHECK: [[PZ:%.+]] = quantum.custom "PauliZ"() [[IN]] : !quantum.bit
 // CHECK:  {{%.+}} = quantum.custom "PauliY"() [[IN]] {adjoint} : !quantum.bit
-// CHECK:  {{%.+}} = quantum.custom "RX"([[ANGLE]]) [[IN]] : !quantum.bit
+// CHECK: [[RX:%.+]] = quantum.custom "RX"([[ANGLE]]) [[IN]] : !quantum.bit
 // CHECK:  {{%.+}}:2 = quantum.custom "SWAP"() [[IN]], [[PZ]] : !quantum.bit
+// CHECK:  {{%.+}}:2, {{%.+}} = quantum.custom "Rot"([[ANGLE]]) [[IN]], [[PZ]] ctrls([[RX]]) ctrlvals([[TRUE]]) : !quantum.bit, !quantum.bit ctrls !quantum.bit
