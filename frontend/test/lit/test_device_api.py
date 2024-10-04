@@ -65,7 +65,7 @@ class NullDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:
+    # CHECK
     # quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullDevice", "{'shots': 2048}"]
     dev = NullDevice(wires=2, shots=2048)
 
@@ -91,7 +91,7 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:
+    # CHECK
     # quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullDevice", "{'shots': 2048}"]
     dev = NullDevice(wires=2, shots=2048)
 
