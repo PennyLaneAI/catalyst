@@ -140,3 +140,63 @@ def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
 
 
 print(grad_hoist_constant.mlir)
+
+
+# CHECK-LABEL: @test_gradient_used_twice
+@qjit(target="mlir")
+def test_gradient_used_twice(x: float):
+    """This tests that calling the return of grad
+    more than once does not define multiple functions.
+    """
+
+    # CHECK-NOT: @identity_0
+    # CHECK-LABEL: @identity
+    # CHECK-NOT: @identity_0
+    def identity(x):
+        return x
+
+    diff_identity = grad(identity)
+    return diff_identity(x) + diff_identity(x)
+
+
+print(test_gradient_used_twice.mlir)
+
+
+# CHECK-LABEL: @test_gradient_taken_twice
+@qjit(target="mlir")
+def test_gradient_taken_twice(x: float):
+    """This tests that calling grad
+    more than once does not define multiple functions.
+    """
+
+    # CHECK-NOT: @identity_0
+    # CHECK-LABEL: @identity
+    # CHECK-NOT: @identity_0
+    def identity(x):
+        return x
+
+    diff_identity0 = grad(identity)
+    diff_identity1 = grad(identity)
+    return diff_identity0(x) + diff_identity1(x)
+
+
+print(test_gradient_taken_twice.mlir)
+
+
+# CHECK-LABEL: @test_higher_order_used_twice
+@qjit(target="mlir")
+def test_higher_order_used_twice(x: float):
+    """Test that a single function is generated when using higher order derivatives"""
+
+    # CHECK-NOT: @identity_0
+    # CHECK-LABEL: @identity
+    # CHECK-NOT: @identity_0
+    def identity(x):
+        return x
+
+    dydx_identity = grad(identity, method="fd")
+    dy2dx2_identity = grad(dydx_identity, method="fd")
+    return dy2dx2_identity(x) + dy2dx2_identity(x)
+
+
+print(test_higher_order_used_twice.mlir)
