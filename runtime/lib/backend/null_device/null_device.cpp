@@ -1,13 +1,13 @@
 #include <QuantumDevice.hpp>
 
-struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
-    DummyDevice([[maybe_unused]] const std::string &kwargs) {}
-    ~DummyDevice() = default; // LCOV_EXCL_LINE
+struct NullDevice final : public Catalyst::Runtime::QuantumDevice {
+    NullDevice([[maybe_unused]] const std::string &kwargs) {}
+    ~NullDevice() = default; // LCOV_EXCL_LINE
 
-    DummyDevice &operator=(const QuantumDevice &) = delete;
-    DummyDevice(const DummyDevice &) = delete;
-    DummyDevice(DummyDevice &&) = delete;
-    DummyDevice &operator=(QuantumDevice &&) = delete;
+    NullDevice &operator=(const QuantumDevice &) = delete;
+    NullDevice(const NullDevice &) = delete;
+    NullDevice(NullDevice &&) = delete;
+    NullDevice &operator=(QuantumDevice &&) = delete;
 
     auto AllocateQubit() -> QubitIdType override { return 0; }
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
@@ -74,4 +74,4 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
 };
 
-GENERATE_DEVICE_FACTORY(DummyDevice, DummyDevice);
+GENERATE_DEVICE_FACTORY(NullDevice, NullDevice);
