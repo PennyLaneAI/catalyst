@@ -16,6 +16,7 @@ This file contains a couple of tests for the capture of measurement primitives i
 """
 import jax
 
+from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
@@ -54,10 +55,10 @@ def test_sample_dynamic():
     shots_tracer, shape_value = jaxpr.eqns[1].params.values()
 
     assert jaxpr.eqns[1].primitive == sample_p
-    assert isinstance(shots_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer)
-    assert isinstance(shape_value[0], jax._src.interpreters.partial_eval.DynamicJaxprTracer)
+    assert isinstance(shots_tracer, DynamicJaxprTracer)
+    assert isinstance(shape_value[0], DynamicJaxprTracer)
     assert shape_value[1] == 0
-    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax._src.core.Var)
+    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)
     assert jaxpr.eqns[1].outvars[0].aval.shape[1] == 0
 
 
