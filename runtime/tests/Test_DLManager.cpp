@@ -57,10 +57,10 @@ TEST_CASE("Test error message if init device fails", "[Third Party]")
 }
 #endif
 
-TEST_CASE("Test success of loading dummy device", "[Third Party]")
+TEST_CASE("Test success of loading a device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    CHECK(loadDevice("DummyDevice", "librtd_dummy" + get_dylib_ext()));
+    CHECK(loadDevice("NullDevice", "librtd_null_device" + get_dylib_ext()));
 }
 
 TEST_CASE("Test __catalyst__rt__device_init registering a custom device with shots=500 and "
