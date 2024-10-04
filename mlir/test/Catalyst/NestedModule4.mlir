@@ -18,7 +18,7 @@
 // CHECK-LABEL: @outer
 module @outer {
   module @inner {
-    func.func @f() {
+    func.func public @f() {
       return
     }
   }
@@ -27,4 +27,44 @@ module @outer {
   catalyst.launch_kernel @inner::@f() : () -> ()
 }
 
+// -----
+
+module @outer {
+  module @inner {
+    func.func private @f() {
+      return
+    }
+  }
+
+  // expected-error @below {{invalid function}}
+  catalyst.launch_kernel @inner::@f() : () -> ()
+}
+
+// -----
+
+module @outer {
+  module @inner {
+    func.func nested @f() {
+      return
+    }
+  }
+
+  // expected-error @below {{invalid function}}
+  catalyst.launch_kernel @inner::@f() : () -> ()
+}
+
+// -----
+
+// Default visibility is public
+// CHECK-LABEL: @outer
+module @outer {
+  module @inner {
+    func.func @f() {
+      return
+    }
+  }
+
+  // CHECK: func.call @f_0
+  catalyst.launch_kernel @inner::@f() : () -> ()
+}
 

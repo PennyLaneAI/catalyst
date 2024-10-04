@@ -61,10 +61,11 @@ LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTabl
 LogicalResult LaunchKernelOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 {
     auto callee = this->getCalleeAttr();
-    auto sym = symbolTable.lookupNearestSymbolFrom(this->getOperation(), callee);
-    if (!sym) {
-        this->emitOpError("invalid function:") << callee;
-        return failure();
+    SymbolOpInterface sym =
+        symbolTable.lookupNearestSymbolFrom<SymbolOpInterface>(this->getOperation(), callee);
+    if (sym && sym.getVisibility() == mlir::SymbolTable::Visibility::Public) {
+        return success();
     }
-    return success();
+    this->emitOpError("invalid function:") << callee;
+    return failure();
 }

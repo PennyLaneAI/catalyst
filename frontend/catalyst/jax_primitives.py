@@ -713,7 +713,7 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
-        func_op.sym_visibility = ir.StringAttr.get("private")
+        func_op.sym_visibility = ir.StringAttr.get("public")
 
     return func_op
 
