@@ -392,7 +392,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             /*gate_name=*/ $_builder.getStringAttr(gate),
             /*(optional) adjoint=*/ nullptr,
             /*in_ctrl_qubits=*/ mlir::ValueRange(),
-            /*n_ctrl_values=*/ mlir::ValueRange()
+            /*in_ctrl_values=*/ mlir::ValueRange()
             );
             if (isAdjoint){
                 $_state.addAttribute("adjoint", $_builder.getUnitAttr());
