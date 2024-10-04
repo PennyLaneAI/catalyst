@@ -19,6 +19,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.interpreters import mlir
 from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit, value_and_grad
@@ -315,7 +316,10 @@ module @workflow {
 }
 """
         )
-        compiled_function = compile_from_mlir(ir)
+        with mlir.ir.Context():
+            result_types = [mlir.ir.RankedTensorType.parse("tensor<f64>")]
+
+        compiled_function = compile_from_mlir(ir, "catalyst.entry_point", result_types)
         assert compiled_function(0.1) == [-1]
 
     def test_compile_from_ir_with_compiler(self):
@@ -344,8 +348,11 @@ module @workflow {
   }
 }
 """
-
-        compiled_function = compile_from_mlir(ir, compiler=compiler)
+        with mlir.ir.Context():
+            result_types = [mlir.ir.RankedTensorType.parse("tensor<f64>")]
+        compiled_function = compile_from_mlir(
+            ir, "catalyst.entry_point", result_types, compiler=compiler
+        )
         assert compiled_function(0.1, 0.2) == [0.1]  # allow call with one extra argument
 
     def test_parsing_errors(self):
@@ -359,8 +366,11 @@ module @workflow {
   }
 }
 """
+        with mlir.ir.Context():
+            result_types = [mlir.ir.RankedTensorType.parse("tensor<f64>")]
+
         with pytest.raises(CompileError) as e:
-            compile_from_mlir(ir)(0.1)
+            compile_from_mlir(ir, "catalyst.entry_point", result_types)(0.1)
 
         assert "Failed to parse module as MLIR source" in e.value.args[0]
         assert "Failed to parse module as LLVM source" in e.value.args[0]

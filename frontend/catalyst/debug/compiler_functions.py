@@ -25,8 +25,6 @@ import sys
 import sysconfig
 from itertools import product
 
-from jax.interpreters import mlir
-
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler, LinkerDriver
@@ -134,11 +132,13 @@ def get_cmain(fn, *args):
 
 # pylint: disable=line-too-long
 @debug_logger
-def compile_from_mlir(ir, compiler=None, compile_options=None):
+def compile_from_mlir(ir, entry_point, result_types, compiler=None, compile_options=None):
     r"""Compile a Catalyst function to binary code from the provided MLIR.
 
     Args:
         ir (str): the MLIR to compile in string form
+        entry_point (str): Name of MLIR function which is the entry point
+        result_types List[mlir.Type]: Return types
         compile_options: options to use during compilation
 
     Returns:
@@ -148,8 +148,7 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
     **Example**
 
-    The main entry point of the program is required to start with ``catalyst.entry_point``, and
-    the program is required to contain ``setup`` and ``teardown`` functions.
+    The program is required to contain ``setup`` and ``teardown`` functions.
 
     .. code-block:: python
 
@@ -169,7 +168,9 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
             }
         \"""
 
-        compiled_function = debug.compile_from_mlir(ir)
+        with mlir.ir.Context():
+            result_types = [mlir.ir.RankedTensorType.parse("tensor<f64>")]
+        compiled_function = debug.compile_from_mlir(ir, "catalyst.entry_point", result_types)
 
     >>> compiled_function(0.1)
     [0.1]
@@ -182,14 +183,8 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
     module_name = "debug_module"
     workspace_dir = os.getcwd() if compiler.options.keep_intermediate else None
     workspace = WorkspaceManager.get_or_create_workspace("debug_workspace", workspace_dir)
-    shared_object, _llvm_ir, func_data = compiler.run_from_ir(ir, module_name, workspace)
-
-    # Parse inferred function data, like name and return types.
-    qfunc_name = func_data[0]
-    with mlir.ir.Context():
-        result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
-
-    return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
+    shared_object, _llvm_ir = compiler.run_from_ir(ir, module_name, workspace)
+    return CompiledFunction(shared_object, entry_point, result_types, None, compiler.options)
 
 
 @debug_logger
