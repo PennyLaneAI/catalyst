@@ -205,12 +205,22 @@
 * Calling gradients twice (with same GradParams) will now only lower to a single MLIR function.
   [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
 
+* Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
+  [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
   [(#1113)](https://github.com/PennyLaneAI/catalyst/pull/1113)
 
   This reverts a previous breaking change.
+
+* Nesting qnodes now raises an error.
+  [(#1176)](https://github.com/PennyLaneAI/catalyst/pull/1176)
+
+  This is unlikely to affect users since only under certain conditions did
+  nesting qnodes worked successfully.
 
 <h3>Bug fixes</h3>
 
@@ -224,6 +234,9 @@
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
 <h3>Internal changes</h3>
+
+* Remove deprecated pennylane code across the frontend.
+  [(#1168)](https://github.com/PennyLaneAI/catalyst/pull/1168)
 
 * Update Enzyme to version `v0.0.149`.
   [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
