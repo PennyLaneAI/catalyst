@@ -190,6 +190,9 @@ class ZNE:
         # TODO: remove the following check once #755 is completed
         if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
+
+        # Certain callables, like QNodes, may introduce additional wrappers during tracing.
+        # Make sure to grab the top-level callable object in the traced function.
         fn = jaxpr.eqns[0].params.get("fn")
         results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=fn)
         float_num_folds = jnp.array(self.num_folds, dtype=float)

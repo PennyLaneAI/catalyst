@@ -55,10 +55,11 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     Type indexType = rewriter.getIndexType();
     typesFolded.push_back(indexType);
     func::FuncOp fnFoldedOp;
+    // Traverse the callgraph and replace qnodes with folded qnodes.
     if (!calleeOp->hasAttr("qnode")) {
         rewriter.setInsertionPointToStart(moduleOp.getBody());
-        FunctionType fnFoldedType = FunctionType::get(op.getContext(), /*inputs=*/
-                                                      typesFolded,
+        FunctionType fnFoldedType = FunctionType::get(op.getContext(),
+                                                       /*inputs=*/typesFolded,
                                                       /*outputs=*/calleeOp.getResultTypes());
         std::string fnFoldedName = calleeOp.getName().str() + ".zne";
         fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
