@@ -19,6 +19,7 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 using namespace mlir;
@@ -61,19 +62,24 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
 
 void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
 {
-    std::deque<Operation *> opsToReplace;
-    function.walk([&](MeasurementProcess op) { opsToReplace.push_back(op); });
-    for (auto op : opsToReplace) {
-        if (auto tensorType = dyn_cast<RankedTensorType>(op->getResults().front().getType())) {
+    function.walk([&](MeasurementProcess op) {
+        auto type = op->getResults().front().getType();
+        if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
             auto shape = tensorType.getShape();
             auto elemType = tensorType.getElementType();
             rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, shape, elemType);
         }
         else {
-            rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op->getResults().front().getType(),
-                                                         ValueRange{});
+            if (type.isInteger()) {
+                rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, type,
+                                                               rewriter.getIntegerAttr(type, 0));
+            }
+            else {
+                rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, type,
+                                                               rewriter.getFloatAttr(type, 0.0));
+            }
         }
-    }
+    });
 }
 
 LogicalResult verifyQuantumFree(func::FuncOp function)

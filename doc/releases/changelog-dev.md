@@ -202,6 +202,9 @@
 * Cached primitive lowerings is used instead of a custom cache structure.
   [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
 
+* Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
+  [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+
 <h3>Breaking changes</h3>
 
 * Remove `static_size` field from `AbstractQreg` class.
@@ -209,9 +212,16 @@
 
   This reverts a previous breaking change.
 
+* Nesting qnodes now raises an error.
+  [(#1176)](https://github.com/PennyLaneAI/catalyst/pull/1176)
+
+  This is unlikely to affect users since only under certain conditions did
+  nesting qnodes worked successfully.
+
 <h3>Bug fixes</h3>
 
-* Resolve a bug where `mitigate_with_zne` is not working with the transform `measurements_from_sample`.
+* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices 
+  supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
   [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
 * Resolve a bug in the `vmap` function when passing shapeless values to the target.

@@ -167,7 +167,7 @@ class TestMeasurementTransforms:
         assert "counts" in mlir
 
         theta = 1.9
-        expval_res, var_res, counts_res, probs_res = qml.qjit(transformed_circuit)(theta)
+        expval_res, var_res, counts_res, probs_res = qml.qjit(transformed_circuit, seed=37)(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -221,7 +221,7 @@ class TestMeasurementTransforms:
 
         theta = 1.9
 
-        expval_res, var_res, sample_res, probs_res = qml.qjit(transformed_circuit)(theta)
+        expval_res, var_res, sample_res, probs_res = qml.qjit(transformed_circuit, seed=37)(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -389,7 +389,7 @@ class TestMeasurementTransforms:
 
         theta = 2.5
         counts_expected = circuit(theta)
-        res = qml.qjit(measurements_from_counts(circuit, dev.wires))(theta)
+        res = qml.qjit(measurements_from_counts(circuit, dev.wires), seed=37)(theta)
 
         # counts comparison by converting catalyst format to PL style eigvals dict
         basis_states, counts = res
@@ -441,7 +441,7 @@ class TestMeasurementTransforms:
             return measurement()
 
         theta = 2.5
-        res = qml.qjit(measurements_from_samples(circuit, dev.wires))(theta)
+        res = qml.qjit(measurements_from_samples(circuit, dev.wires), seed=37)(theta)
 
         if len(measurement().wires) == 1:
             samples_expected = qml.qjit(circuit)(theta)
