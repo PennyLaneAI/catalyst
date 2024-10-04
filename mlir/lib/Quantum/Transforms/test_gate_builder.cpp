@@ -59,8 +59,8 @@ struct GateBuilderTesterPass
 
         builder.setInsertionPointAfter(&bit0);
 
-        builder.create<quantum::CustomOp>(loc, ctx, mlir::ValueRange({inQubit}), "PauliZ", false);
-        builder.create<quantum::CustomOp>(loc, ctx, mlir::ValueRange({inQubit}), "PauliY", true);
+        builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit}), "PauliZ");
+        builder.create<quantum::CustomOp>(loc, mlir::ValueRange({inQubit}), "PauliY", true);
     }
 
 };
