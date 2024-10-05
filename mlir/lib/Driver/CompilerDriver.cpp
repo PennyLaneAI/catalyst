@@ -24,6 +24,7 @@
 #include <string_view>
 #include <unordered_map>
 
+#include "Gradient/IR/GradientOps.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -272,6 +273,12 @@ bool containsGradients(mlir::ModuleOp moduleOp)
         contain = true;
         return WalkResult::interrupt();
     });
+
+    moduleOp.walk([&](catalyst::gradient::BackpropOp op) {
+        contain = true;
+        return WalkResult::interrupt();
+    });
+
     return contain;
 }
 

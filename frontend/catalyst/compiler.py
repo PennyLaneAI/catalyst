@@ -239,7 +239,7 @@ BUFFERIZATION_PASS = (
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        "func.func(buffer-deallocation)",
+        "buffer-deallocation-pipeline",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         "canonicalize",  # Must be after convert-bufferization-to-memref

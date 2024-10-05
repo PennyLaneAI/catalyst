@@ -17,6 +17,7 @@
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -99,7 +100,8 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
 }
 
 
-def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
+def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments,
+        MemoryEffects<[MemWrite]>]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
@@ -134,13 +136,13 @@ def BackpropOp : Gradient_Op<"backprop", [
 
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$args,
-        Variadic<MemRefOf<[AnyFloat]>>:$diffArgShadows,
-        Variadic<MemRefOf<[AnyFloat]>>:$calleeResults,
-        Variadic<AnyTypeOf<[
+        Arg<Variadic<AnyType>, "", [MemRead]>:$args,
+        Arg<Variadic<MemRefOf<[AnyFloat]>>, "", [MemWrite]>:$diffArgShadows,
+        Arg<Variadic<MemRefOf<[AnyFloat]>>, "", [MemWrite]>:$calleeResults,
+        Arg<Variadic<AnyTypeOf<[
             RankedTensorOf<[AnyFloat]>,
             MemRefOf<[AnyFloat]>
-        ]>>:$cotangents,
+        ]>>, "", [MemRead]>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<BoolAttr>:$keepValueResults
     );
@@ -173,7 +175,8 @@ def JVPOp : Gradient_Op<"jvp", [
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        MemoryEffects<[MemWrite]>
         ]> {
     let summary = "Compute the jvp of a function.";
 
@@ -206,7 +209,8 @@ def VJPOp : Gradient_Op<"vjp", [
         AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-        GradientOpInterface
+        GradientOpInterface,
+        MemoryEffects<[MemWrite]>
         ]> {
     let summary = "Compute the vjp of a function.";
 

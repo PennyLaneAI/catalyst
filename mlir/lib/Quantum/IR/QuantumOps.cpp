@@ -18,6 +18,7 @@
 #include <optional>
 
 #include "Quantum/IR/QuantumDialect.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
