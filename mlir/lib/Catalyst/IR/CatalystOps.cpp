@@ -57,3 +57,15 @@ LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTabl
 
     return success();
 }
+
+LogicalResult LaunchKernelOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    auto callee = this->getCalleeAttr();
+    SymbolOpInterface sym =
+        symbolTable.lookupNearestSymbolFrom<SymbolOpInterface>(this->getOperation(), callee);
+    if (sym && sym.getVisibility() == mlir::SymbolTable::Visibility::Public) {
+        return success();
+    }
+    this->emitOpError("invalid function:") << callee;
+    return failure();
+}

@@ -29,6 +29,7 @@ std::unique_ptr<mlir::Pass> createDetensorizeSCFPass();
 std::unique_ptr<mlir::Pass> createDisableAssertionPass();
 std::unique_ptr<mlir::Pass> createGEPInboundsPass();
 std::unique_ptr<mlir::Pass> createHloCustomCallLoweringPass();
+std::unique_ptr<mlir::Pass> createInlineNestedModulePass();
 std::unique_ptr<mlir::Pass> createMemrefCopyToLinalgCopyPass();
 std::unique_ptr<mlir::Pass> createMemrefToLLVMWithTBAAPass();
 std::unique_ptr<mlir::Pass> createQnodeToAsyncLoweringPass();
