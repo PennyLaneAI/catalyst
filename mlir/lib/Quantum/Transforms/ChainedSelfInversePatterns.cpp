@@ -29,7 +29,7 @@ static const mlir::StringSet<> HermitianOps = {"Hadamard", "PauliX", "PauliY", "
 
 namespace {
 
-struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
+struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
     /// We simplify consecutive Hermitian quantum gates by removing them.
@@ -68,7 +68,7 @@ namespace quantum {
 
 void populateSelfInversePatterns(RewritePatternSet &patterns)
 {
-    patterns.add<ChainedHadamardOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
