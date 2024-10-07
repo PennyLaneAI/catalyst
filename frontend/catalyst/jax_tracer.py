@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.core import call_p
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
@@ -67,7 +68,6 @@ from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
     expval_p,
-    func_p,
     gphase_p,
     hamiltonian_p,
     hermitian_p,
@@ -158,6 +158,15 @@ class Function:
         AssertionError: Invalid function type.
     """
 
+    CACHE = {}
+
+    def __new__(cls, fn):
+        if cached_instance := cls.CACHE.get(fn):
+            return cached_instance
+        new_instance = super().__new__(cls)
+        cls.CACHE[fn] = new_instance
+        return new_instance
+
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
@@ -174,7 +183,7 @@ class Function:
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
         args, _ = jax.tree_util.tree_flatten((args, kwargs))
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
+        retval = call_p.bind(wrap_init(_eval_jaxpr), *args)
         return tree_unflatten(out_tree, retval)
 
 

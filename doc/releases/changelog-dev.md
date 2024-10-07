@@ -192,6 +192,7 @@
 
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+  [(#1182)](https://github.com/PennyLaneAI/catalyst/pull/1182)
 
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
@@ -202,8 +203,12 @@
 * Cached primitive lowerings is used instead of a custom cache structure.
   [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
 
+* Calling gradients twice (with same GradParams) will now only lower to a single MLIR function.
+  [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
+
 * Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
   [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+
 
 <h3>Breaking changes</h3>
 
@@ -217,6 +222,11 @@
 
   This is unlikely to affect users since only under certain conditions did
   nesting qnodes worked successfully.
+
+* Removes `debug.compile_from_mlir`.
+  [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
+
+  Please use `debug.replace_ir`.
 
 <h3>Bug fixes</h3>
 
@@ -268,6 +278,21 @@
   In particular, the signatures of `get_device_capability`, `catalyst_decompose`,
  `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
   function has been removed entirely.
+
+* Catalyst now generates nested modules denoting quantum programs.
+  [(#1144)](https://github.com/PennyLaneAI/catalyst/pull/1144)
+
+  Similar to MLIR's `gpu.launch_kernel` function, Catalyst, now supports
+  a `call_function_in_module`. This allows Catalyst to call functions in modules
+  and have modules denote a quantum kernel. This will allow for device specific
+  optimizations and compilation pipelines.
+
+  At the moment, no one is using this. This is just the necessary scaffolding to
+  supporting device specific transformations. As such, the module will be inlined
+  to preserve current semantics. However, in the future, we will explore lowering
+  this nested module into other IRs/binary formats and lowering `call_function_in_module`
+  to something that can dispatch calls to another runtime / VM.
+
 
 <h3>Contributors</h3>
 

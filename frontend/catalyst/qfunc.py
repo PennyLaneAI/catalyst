@@ -46,7 +46,7 @@ from catalyst.jax_extras import (
     get_implicit_and_explicit_flat_args,
     unzip2,
 )
-from catalyst.jax_primitives import func_p
+from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import trace_quantum_function, Function
 from catalyst.logging import debug_logger
 from catalyst.passes import pipeline
@@ -150,7 +150,7 @@ class QFunc:
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
-        res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
+        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, qnode=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
