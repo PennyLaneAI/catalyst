@@ -312,3 +312,28 @@ func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
     // CHECK: return [[IN]]
     return %out_qubits_1 : !quantum.bit
 }
+
+
+// -----
+
+
+// test with explicit rotation angles
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> !quantum.bit {
+    // CHECK: quantum.alloc
+    // CHECK: [[IN:%.+]] = quantum.extract
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    %cst_0 = stablehlo.constant dense<1.234000e+01> : tensor<f64>
+    %extracted_0 = tensor.extract %cst_0[] : tensor<f64>
+    %out_qubits_0 = quantum.custom "RY"(%extracted_0) %1 {adjoint} : !quantum.bit
+
+    %cst_1 = stablehlo.constant dense<1.234000e+01> : tensor<f64>
+    %extracted_1 = tensor.extract %cst_1[] : tensor<f64>
+    %out_qubits_1 = quantum.custom "RY"(%extracted_1) %out_qubits_0 : !quantum.bit
+
+    // CHECK-NOT: quantum.custom
+    // CHECK: return [[IN]]
+    return %out_qubits_1 : !quantum.bit
+}
