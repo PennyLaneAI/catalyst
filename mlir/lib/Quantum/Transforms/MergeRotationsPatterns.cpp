@@ -20,12 +20,13 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
+
 using llvm::dbgs;
 using namespace mlir;
-using namespace catalyst;
 using namespace catalyst::quantum;
 
-static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ", "CRX", "CRY", "CRZ"};
+static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift",           "Rot",
+                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift", "CRot"};
 
 namespace {
 
@@ -37,10 +38,12 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
         StringRef OpGateName = op.getGateName();
+
         if (!rotationsSet.contains(OpGateName))
             return failure();
         ValueRange InQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
+
         if (!parentOp || parentOp.getGateName() != OpGateName)
             return failure();
 
@@ -51,25 +54,28 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                 return failure();
         }
 
+        TypeRange OutQubitsTypes = op.getOutQubits().getTypes();
+        TypeRange OutQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
+        ValueRange parentInQubits = parentOp.getInQubits();
+        ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
+        ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
-        static const mlir::StringSet<> rotationsSetCase1 = {"RX", "RY", "RZ", "CRX", "CRY", "CRZ"};
+        // One param rot case
+        auto parentParams = parentOp.getParams();
+        auto params = op.getParams();
+        std::vector<Value> sumParams;
+        for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
+            Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
+            sumParams.push_back(sumParam);
+        };
+        auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes, sumParams,
+                                                 parentInQubits, OpGateName, nullptr,
+                                                 parentInCtrlQubits, parentInCtrlValues);
 
-        if (rotationsSetCase1.find(OpGateName) != rotationsSetCase1.end()) {
-            TypeRange OutQubitsTypes = op.getOutQubits().getTypes();
-            TypeRange OutQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
-            auto parentParams = parentOp.getParams().front();
-            auto params = op.getParams().front();
-            Value sumParams = rewriter.create<arith::AddFOp>(loc, parentParams, params).getResult();
-            ValueRange parentInQubits = parentOp.getInQubits();
-            ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
-            ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
-            auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes,
-                                                     sumParams, parentInQubits, OpGateName, nullptr,
-                                                     parentInCtrlQubits, parentInCtrlValues);
-            op.replaceAllUsesWith(mergeOp);
-            op.erase();
-            parentOp.erase();
-        }
+        op.replaceAllUsesWith(mergeOp);
+        op.erase();
+        parentOp.erase();
+
         return success();
     }
 };
