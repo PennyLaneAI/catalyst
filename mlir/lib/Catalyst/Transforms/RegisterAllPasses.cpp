@@ -38,6 +38,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createGradientPostprocessingPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
+    mlir::registerPass(catalyst::createInlineNestedModulePass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
     mlir::registerPass(catalyst::createMergeRotationPass);
