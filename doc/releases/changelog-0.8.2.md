@@ -111,6 +111,12 @@
   this nested module into other IRs/binary formats and lowering `call_function_in_module`
   to something that can dispatch calls to another runtime / VM.
 
+<h3>Bug fixes</h3>
+
+* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices 
+  supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
+  [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
