@@ -60,7 +60,6 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
-        // One param rot case
         auto parentParams = parentOp.getParams();
         auto params = op.getParams();
         std::vector<Value> sumParams;
