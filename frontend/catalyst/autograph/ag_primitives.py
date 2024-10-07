@@ -539,10 +539,12 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.adjoint,
             catalyst.ctrl,
             catalyst.grad,
+            catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
             catalyst.jvp,
             catalyst.vmap,
+            catalyst.mitigate_with_zne,
         ):
             assert args and callable(args[0])
             wrapped_fn = args[0]
