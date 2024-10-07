@@ -139,7 +139,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        llvm::errs() << "visiting " << op << "\n";
+        //llvm::errs() << "visiting " << op << "\n";
 
         ValueRange InQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<OpType>(InQubits[0].getDefiningOp());
@@ -158,13 +158,11 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
             return failure();
         }
 
-        llvm::errs() << "matched!\n";
+        //llvm::errs() << "matched!\n";
         ValueRange simplifiedVal = parentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();
     }
-
-
 };
 
 } // namespace

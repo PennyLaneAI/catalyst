@@ -53,11 +53,14 @@ struct RemoveChainedSelfInversePass
                           << "\n");
 
         // Run cse pass before running remove-chained-self-inverse,
-        // to aid identifiying equivalent SSA values when verifying
+        // to aid identifying equivalent SSA values when verifying
         // the gates have the same params
         MLIRContext *ctx = &getContext();
-        auto pm = PassManager::on<ModuleOp>(ctx);
-        pm.addPass(mlir::createCSEPass());
+        auto earlyCSEpm = PassManager::on<ModuleOp>(ctx);
+        earlyCSEpm.addPass(mlir::createCSEPass());
+        if (failed(runPipeline(earlyCSEpm, getOperation()))){
+            return signalPassFailure();
+        }
 
         Operation *module = getOperation();
         Operation *targetfunc;
