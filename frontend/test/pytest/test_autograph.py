@@ -38,6 +38,7 @@ from catalyst import (
     jacobian,
     jvp,
     measure,
+    mitigate_with_zne,
     qjit,
     run_autograph,
     vjp,
@@ -422,6 +423,57 @@ class TestIntegration:
 
         # If transforms are missed, the output will be all ones.
         assert not np.all(func(0.9) == 1)
+
+
+class TestTransforms:
+    """Test that autograph correctly transforms wrapped functions from Catalyst decorators."""
+
+    @staticmethod
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit(c, data):
+        if c:
+            qml.RY(data, wires=0)
+        return qml.probs()
+
+    def test_qjit(self):
+        """Test autograph on nested QJIT object."""
+        fn = qjit(self.circuit)
+        transformed_fn = qjit(autograph=True)(fn)
+
+        assert np.allclose(transformed_fn(True, np.pi / 2), [0.5, 0.5])
+        assert np.allclose(transformed_fn(False, np.pi / 2), [1.0, 0.0])
+
+    def test_vmap(self):
+        """Test autograph on nested VMAP object."""
+        fn = vmap(self.circuit, in_axes=(None, 0))
+        transformed_fn = qjit(autograph=True)(fn)
+
+        data = jnp.array([np.pi / 2] * 5)
+        assert np.allclose(transformed_fn(True, data), [[0.5, 0.5]] * 5)
+        assert np.allclose(transformed_fn(False, data), [[1.0, 0.0]] * 5)
+
+    def test_grad(self):
+        """Test autograph on nested Grad object."""
+        fn = jacobian(self.circuit, argnums=1)
+        transformed_fn = qjit(autograph=True)(fn)
+
+        assert np.allclose(transformed_fn(True, np.pi / 2), [-0.5, 0.5])
+        assert np.allclose(transformed_fn(False, np.pi / 2), [0.0, 0.0])
+
+    def test_zne(self):
+        """Test autograph on nested ZNE object."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(c, data):
+            if c:
+                qml.RY(data, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        fn = mitigate_with_zne(circuit, scale_factors=[1, 3, 5])
+        transformed_fn = qjit(autograph=True)(fn)
+
+        assert np.allclose(transformed_fn(True, np.pi / 4), 1 / np.sqrt(2))
+        assert np.allclose(transformed_fn(False, np.pi / 4), 1.0)
 
 
 class TestCodePrinting:
