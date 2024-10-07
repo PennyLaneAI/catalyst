@@ -192,6 +192,7 @@
 
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+  [(#1182)](https://github.com/PennyLaneAI/catalyst/pull/1182)
 
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
