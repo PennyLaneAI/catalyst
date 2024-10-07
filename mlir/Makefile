@@ -12,6 +12,7 @@ ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
+# TODO: remove after JAX upgrade
 LLVM_ROOT=$(MK_DIR)/llvm-project
 LLVM_FUNCOP_PATCH_FILE=$(MK_DIR)/patches/FunctionOpInterface-bufferization.patch
 LLVM_FUNC_CALL_PATCH_FILE=$(MK_DIR)/patches/callOp-bufferization.patch
