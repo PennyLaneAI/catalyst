@@ -65,7 +65,7 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
     function.walk([&](MeasurementProcess op) {
         auto types = op->getResults().getTypes();
         auto loc = op.getLoc();
-        std::vector<Value> results;
+        SmallVector<Value> results;
         for (auto type : types) {
             if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
                 auto shape = tensorType.getShape();
