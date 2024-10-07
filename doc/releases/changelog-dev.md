@@ -222,6 +222,11 @@
   This is unlikely to affect users since only under certain conditions did
   nesting qnodes worked successfully.
 
+* Removes `debug.compile_from_mlir`.
+  [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
+
+  Please use `debug.replace_ir`.
+
 <h3>Bug fixes</h3>
 
 * Resolve a bug in the `vmap` function when passing shapeless values to the target.

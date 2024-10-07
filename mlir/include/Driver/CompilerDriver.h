@@ -27,17 +27,6 @@
 namespace catalyst {
 namespace driver {
 
-/// Data about the JIT function that is optionally inferred and returned to the caller.
-///
-/// This is important for calling a function when invoking the compiler on an MLIR or LLVM textual
-/// representation intead of from Python.
-struct FunctionAttributes {
-    /// The name of the primary JIT entry point function.
-    std::string functionName;
-    /// The return type of the JIT entry point function.
-    std::string returnType;
-};
-
 /// Verbosity level
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
 // low-level messages, we might want to hide these.
@@ -96,7 +85,6 @@ struct CompilerOutput {
     std::string objectFilename;
     std::string outIR;
     std::string diagnosticMessages;
-    FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
     size_t pipelineCounter = 0;
     /// if the compiler reach the pass specified by startAfterPass.

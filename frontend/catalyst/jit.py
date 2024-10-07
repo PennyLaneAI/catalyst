@@ -700,7 +700,7 @@ class QJIT:
         canonicalizer = Compiler(options)
 
         # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
+        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
 
         return mlir_module, mlir_string
 
@@ -729,13 +729,13 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir, _ = self.compiler.run_from_ir(
+            shared_object, llvm_ir = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
