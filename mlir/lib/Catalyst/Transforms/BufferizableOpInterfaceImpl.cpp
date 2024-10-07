@@ -117,7 +117,8 @@ struct CustomCallOpInterface
             Type resultType = result.getType();
             RankedTensorType tensorType = dyn_cast<RankedTensorType>(resultType);
             if (!tensorType) {
-                return failure();
+                bufferArgs.push_back(result);
+                continue;
             }
             auto options = bufferization::BufferizationOptions();
             FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
