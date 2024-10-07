@@ -407,7 +407,6 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
             LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), modifiersPtr.getType()});
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams());
         args.insert(args.end(), modifiersPtr);
