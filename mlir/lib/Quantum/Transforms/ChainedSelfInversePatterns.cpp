@@ -79,9 +79,9 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         }
 
         if (isa<CustomOp>(op)){
-            StringRef OpGateName = cast<CustomOp>(op).getGateName();
-            StringRef ParentGateName = cast<CustomOp>(parentOp).getGateName();
-            if (OpGateName != ParentGateName){
+            StringRef opGateName = cast<CustomOp>(op).getGateName();
+            StringRef parentGateName = cast<CustomOp>(parentOp).getGateName();
+            if (opGateName != parentGateName){
                 return false;
             }
         }
@@ -100,7 +100,28 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
 
     bool verifyParentGateParams(OpType op, OpType parentOp) const {
         // Verify that the parent gate has the same parameters
+
+        ValueRange opParams = op.getAllParams();
+        ValueRange parentOpParams = parentOp.getAllParams();
+
+        if (opParams.size() != parentOpParams.size()){
+            return false;
+        }
+
+        for (auto [opParam, parentOpParam] : llvm::zip(opParams, parentOpParams)){
+            if (opParam != parentOpParam){
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    bool verifyOneAdjoint(OpType op, OpType parentOp) const {
+        // Verify that exactly one of the neighbouring pair is an adjoint
+        bool opIsAdj = op->hasAttr("adjoint");
+        bool parentIsAdj = parentOp->hasAttr("adjoint");
+        return opIsAdj != parentIsAdj; // "XOR" to check just one true
     }
 
     /// Remove generic neighbouring gate pairs of the form
@@ -111,6 +132,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     ///  2. The results of the parent gate must map one-to-one, in order,
     ///     to the operands of the second gate
     ///  3. If there are parameters, both gate must have the same parameters.
+    ///     [This pattern assumes the IR is already processed by CSE]
     ///  4. If the gates are controlled, both gates' control wires and values
     ///     must be the same. The control wires must be in the same order
     mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
@@ -127,6 +149,14 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         }
 
 
+        if (!verifyParentGateParams(op, parentOp)){
+            return failure();
+        }
+
+
+        if (!verifyOneAdjoint(op, parentOp)){
+            return failure();
+        }
 
         llvm::errs() << "matched!\n";
         ValueRange simplifiedVal = parentOp.getInQubits();

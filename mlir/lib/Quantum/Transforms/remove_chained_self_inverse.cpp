@@ -24,6 +24,8 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -49,6 +51,13 @@ struct RemoveChainedSelfInversePass
     {
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
+
+        // Run cse pass before running remove-chained-self-inverse,
+        // to aid identifiying equivalent SSA values when verifying
+        // the gates have the same params
+        MLIRContext *ctx = &getContext();
+        auto pm = PassManager::on<ModuleOp>(ctx);
+        pm.addPass(mlir::createCSEPass());
 
         Operation *module = getOperation();
         Operation *targetfunc;

@@ -274,7 +274,7 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 
 // test parametrized gates labeled with adjoint attribute
 // CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg0: tensor<2x2xf64>) -> !quantum.bit {
+func.func @test_chained_self_inverse(%arg0: tensor<2x2xf64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> (!quantum.bit, !quantum.bit) {
     // CHECK: quantum.alloc
     // CHECK: quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -285,5 +285,11 @@ func.func @test_chained_self_inverse(%arg0: tensor<2x2xf64>) -> !quantum.bit {
     %3 = stablehlo.convert %arg0 : (tensor<2x2xf64>) -> tensor<2x2xcomplex<f64>>
     %out_qubits_1 = quantum.unitary(%3 : tensor<2x2xcomplex<f64>>) %out_qubits {adjoint} : !quantum.bit
 
-    return %out_qubits_1 : !quantum.bit
+    %extracted_3 = tensor.extract %arg1[] : tensor<f64>
+    %out_qubits_4 = quantum.custom "RX"(%extracted_3) %out_qubits_1 : !quantum.bit
+    %extracted_5 = tensor.extract %arg1[] : tensor<f64>
+    %out_qubits_6 = quantum.custom "RX"(%extracted_5) %out_qubits_4 {adjoint} : !quantum.bit
+
+
+    return %out_qubits_1, %out_qubits_6 : !quantum.bit, !quantum.bit
 }
