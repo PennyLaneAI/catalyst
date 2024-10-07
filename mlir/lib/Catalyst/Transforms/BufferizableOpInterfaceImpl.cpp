@@ -164,22 +164,9 @@ struct CallbackOpInterface
         return false;
     }
 
-    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
-        return true;
-    }
-
-    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
-        return false;
-    }
-
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+    bufferization::AliasingOpOperandList
+    getAliasingOpOperands(Operation *op, Value value,
+                        const bufferization::AnalysisState &state) const {
         return {};
     }
 
