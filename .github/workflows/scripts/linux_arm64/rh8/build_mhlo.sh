@@ -38,6 +38,7 @@ sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mli
 
 export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
 export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+# TODO: Jax has merged this fix. Remove after JAX upgrade.
 if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
 # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
 if patch --dry-run -p1 -N --directory=/catalyst/mlir/mlir-hlo < /catalyst/mlir/patches/FunctionOpInterface-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=/catalyst/mlir/mlir-hlo < /catalyst/mlir/patches/FunctionOpInterface-mhlo.patch; fi
