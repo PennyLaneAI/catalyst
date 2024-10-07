@@ -136,8 +136,8 @@ def test_pipeline_lowering():
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_workflow, 1.2)
 
-    # CHECK: {{%.+}} = call @test_pipeline_lowering_workflow_transformed0(
-    # CHECK: func.func private @test_pipeline_lowering_workflow_transformed0
+    # CHECK: {{%.+}} = call @test_pipeline_lowering_workflow_transformed0_0(
+    # CHECK: func.func public @test_pipeline_lowering_workflow_transformed0_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -192,13 +192,13 @@ def test_pipeline_lowering_keep_original():
     print_mlir(test_pipeline_lowering_keep_original_workflow, 1.2)
 
     # CHECK: func.func public @jit_test_pipeline_lowering_keep_original_workflow
-    # CHECK: {{%.+}} = call @f(
-    # CHECK: {{%.+}} = call @f_transformed0(
-    # CHECK: func.func private @f(
+    # CHECK: {{%.+}} = call @f_0(
+    # CHECK: {{%.+}} = call @f_transformed0_0(
+    # CHECK: func.func public @f_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func private @f_transformed0
+    # CHECK: func.func public @f_transformed0_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -267,11 +267,11 @@ def test_pipeline_lowering_global():
     # CHECK: func.func public @jit_global_wf()
     # CHECK {{%.+}} = call @g_transformed0(
     # CHECK {{%.+}} = call @h_transformed1(
-    # CHECK: func.func private @g_transformed0
+    # CHECK: func.func public @g_transformed0
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func private @h_transformed1
+    # CHECK: func.func public @h_transformed1
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -342,11 +342,11 @@ def test_pipeline_lowering_globloc_override():
     # CHECK: func.func public @jit_global_wf()
     # CHECK {{%.+}} = call @g_transformed1(
     # CHECK {{%.+}} = call @h_transformed0(
-    # CHECK: func.func private @g_transformed1
+    # CHECK: func.func public @g_transformed1
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func private @h_transformed0
+    # CHECK: func.func public @h_transformed0
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -535,13 +535,13 @@ def test_cancel_inverses_keep_original():
     g = cancel_inverses(f)
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow0
-    # CHECK: {{%.+}} = call @f({{%.+}})
-    # CHECK-NOT: {{%.+}} = call @f_cancel_inverses0({{%.+}})
-    # CHECK-LABEL: private @f({{%.+}})
+    # CHECK: {{%.+}} = call @f_0({{%.+}})
+    # CHECK-NOT: {{%.+}} = call @f_cancel_inverses0_0({{%.+}})
+    # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-NOT: private @f_cancel_inverses
+    # CHECK-NOT: public @f_cancel_inverses_0
     @qjit(keep_intermediate=True)
     def test_cancel_inverses_keep_original_workflow0():
         return f(1.0)
@@ -550,13 +550,13 @@ def test_cancel_inverses_keep_original():
     flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow0)
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow1
-    # CHECK: {{%.+}} = call @f_cancel_inverses0({{%.+}})
-    # CHECK-NOT: {{%.+}} = call @f({{%.+}})
-    # CHECK-LABEL: private @f_cancel_inverses0({{%.+}})
+    # CHECK: {{%.+}} = call @f_cancel_inverses0_0({{%.+}})
+    # CHECK-NOT: {{%.+}} = call @f_0({{%.+}})
+    # CHECK-LABEL: public @f_cancel_inverses0_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-NOT: private @f
+    # CHECK-NOT: public @f_0
     @qjit(keep_intermediate=True)
     def test_cancel_inverses_keep_original_workflow1():
         return g(1.0)
@@ -565,13 +565,13 @@ def test_cancel_inverses_keep_original():
     flush_peephole_opted_mlir_to_iostream(test_cancel_inverses_keep_original_workflow1)
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow2
-    # CHECK: {{%.+}} = call @f({{%.+}})
-    # CHECK: {{%.+}} = call @f_cancel_inverses0({{%.+}})
-    # CHECK-LABEL: private @f({{%.+}})
+    # CHECK: {{%.+}} = call @f_0({{%.+}})
+    # CHECK: {{%.+}} = call @f_cancel_inverses0_0({{%.+}})
+    # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-LABEL: private @f_cancel_inverses0({{%.+}})
+    # CHECK-LABEL: public @f_cancel_inverses0_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit

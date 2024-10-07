@@ -66,6 +66,23 @@ class TestGradShape:
             infer.calculate_grad_shape(in_signature, [0])
 
 
+def test_gradient_generate_once():
+    """Test that gradients are only generated once even if
+    they are called multiple times. This is already tested
+    in lit tests, but lit tests are not counted in coverage
+    """
+
+    def identity(x):
+        return x
+
+    @qml.qjit
+    def wrap(x: float):
+        diff = grad(identity)
+        return diff(x) + diff(x)
+
+    assert "@identity_0" not in wrap.mlir
+
+
 def test_grad_outside_qjit():
     """Test that grad can be used outside of a jitting context."""
 

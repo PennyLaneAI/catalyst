@@ -16,6 +16,7 @@ file(GLOB SRC
     GEPInboundsPatterns.cpp
     hlo_custom_call_lowering.cpp
     HloCustomCallPatterns.cpp
+    InlineNestedModules.cpp
     MemrefCopyToLinalgCopyPass.cpp
     MemrefCopyToLinalgCopyPatterns.cpp
     qnode_to_async_lowering.cpp

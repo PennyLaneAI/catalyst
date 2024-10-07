@@ -25,8 +25,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
+from jax.core import call_p
+from pennylane import QubitUnitary, QueuingManager
+from pennylane.devices import QubitDevice
+from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -67,7 +69,6 @@ from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
     expval_p,
-    func_p,
     gphase_p,
     hamiltonian_p,
     hermitian_p,
@@ -173,7 +174,7 @@ class Function:
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
         args, _ = jax.tree_util.tree_flatten((args, kwargs))
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
+        retval = call_p.bind(wrap_init(_eval_jaxpr), *args)
         return tree_unflatten(out_tree, retval)
 
 
