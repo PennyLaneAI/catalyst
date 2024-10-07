@@ -13,46 +13,47 @@
 // limitations under the License.
 
 #include <csignal>
-#include <iostream>
 #include <string>
 #include <vector>
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/optional.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/unique_ptr.h>
+#include <nanobind/stl/unordered_map.h>
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Driver/CompilerDriver.h"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 using namespace catalyst::driver;
 
-std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
+std::vector<Pipeline> parseCompilerSpec(const nb::list &pipelines)
 {
+    // nb::print(pipelines);
     std::vector<Pipeline> out;
-    for (py::handle obj : pipelines) {
-        py::tuple t = obj.cast<py::tuple>();
-        auto i = t.begin();
-        auto py_name = i++;
-        auto py_passes = i++;
-        assert(i == t.end());
-        std::string name = py_name->attr("__str__")().cast<std::string>();
+    for (nb::handle obj : pipelines) {
+        nb::tuple t = nb::cast<nb::tuple>(obj);
+        assert(nb::len(t) == 2);
+        std::string name = nb::cast<std::string>(t[0]);
+        nb::list py_passes = t[1];
         Pipeline::PassList passes;
-        std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
-                       [](py::handle p) { return p.attr("__str__")().cast<std::string>(); });
+        std::transform(py_passes.begin(), py_passes.end(), std::back_inserter(passes),
+                       [](nb::handle p) { return nb::cast<std::string>(p.attr("__str__")()); });
         out.push_back(Pipeline({name, passes}));
     }
     return out;
 }
 
-PYBIND11_MODULE(compiler_driver, m)
+NB_MODULE(compiler_driver, m)
 {
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
     //===--------------------------------------------------------------------===//
-    py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
-    compout_class.def(py::init<>())
+    nb::class_<CompilerOutput> compout_class(m, "CompilerOutput");
+    compout_class.def(nb::init<>())
         .def("get_pipeline_output",
              [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
                  auto res = co.pipelineOutputs.find(name);
@@ -70,7 +71,7 @@ PYBIND11_MODULE(compiler_driver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool asyncQnodes, bool verbose, py::list pipelines, bool lower_to_llvm,
+           bool asyncQnodes, bool verbose, nb::list pipelines, bool lower_to_llvm,
            const char *checkpointStage) -> std::unique_ptr<CompilerOutput> {
             // Install signal handler to catch user interrupts (e.g. CTRL-C).
             signal(SIGINT,
@@ -99,8 +100,8 @@ PYBIND11_MODULE(compiler_driver, m)
             }
             return output;
         },
-        py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
-        py::arg("keep_intermediate") = false, py::arg("async_qnodes") = false,
-        py::arg("verbose") = false, py::arg("pipelines") = py::list(),
-        py::arg("lower_to_llvm") = true, py::arg("checkpoint_stage") = "");
+        nb::arg("source"), nb::arg("workspace"), nb::arg("module_name") = "jit source",
+        nb::arg("keep_intermediate") = false, nb::arg("async_qnodes") = false,
+        nb::arg("verbose") = false, nb::arg("pipelines") = nb::list(),
+        nb::arg("lower_to_llvm") = true, nb::arg("checkpoint_stage") = "");
 }
