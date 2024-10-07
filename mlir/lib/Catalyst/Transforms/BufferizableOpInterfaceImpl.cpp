@@ -106,8 +106,9 @@ struct CustomCallOpInterface
         for (Value operand : operands) {
             FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options);
             if (failed(opBuffer))
-                return failure();
-            bufferArgs.push_back(*opBuffer);
+                bufferArgs.push_back(operand);
+            else
+                bufferArgs.push_back(*opBuffer);
         }
 
         // Add bufferized return values to the arguments
