@@ -10,7 +10,6 @@
 # limitations under the License.
 
 import os
-import platform
 import re
 import shutil
 import subprocess
@@ -19,11 +18,9 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
-from jax.interpreters import mlir
 from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit, value_and_grad
-from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import (
     compile_executable,
     get_cmain,
@@ -31,7 +28,6 @@ from catalyst.debug import (
     replace_ir,
 )
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import get_lib_path
 
 
 class TestDebugPrint:
