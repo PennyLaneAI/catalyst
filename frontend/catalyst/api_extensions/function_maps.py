@@ -30,6 +30,7 @@ from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_u
 
 from catalyst.api_extensions.control_flow import for_loop
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.callables import CatalystCallable
 
 
 ## API ##
@@ -129,7 +130,7 @@ def vmap(
     return VmapCallable(fn, **kwargs)
 
 
-class VmapCallable:
+class VmapCallable(CatalystCallable):
     """Class that creates a function which maps an input function over argument axes.
 
     .. note::
@@ -163,6 +164,8 @@ class VmapCallable:
         self.out_axes = out_axes
         self.axis_size = axis_size
         self._validate_configuration()
+
+        super().__init__("fn")
 
     def _validate_configuration(self):
         # Check the validity of in_axes and out_axes

@@ -50,6 +50,7 @@ from catalyst.tracing.type_signatures import (
     verify_static_argnums,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
@@ -437,7 +438,7 @@ def qjit(
 
 
 # pylint: disable=too-many-instance-attributes
-class QJIT:
+class QJIT(CatalystCallable):
     """Class representing a just-in-time compiled hybrid quantum-classical function.
 
     .. note::
@@ -499,6 +500,8 @@ class QJIT:
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
+
+        super().__init__("user_function")
 
     @debug_logger
     def __call__(self, *args, **kwargs):

@@ -29,6 +29,7 @@ from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import Folding, zne_p
 from catalyst.jax_tracer import Function
+from catalyst.utils.callables import CatalystCallable
 
 
 def _is_odd_positive(numbers_list):
@@ -144,11 +145,11 @@ def mitigate_with_zne(
 
     num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
 
-    return ZNE(fn, num_folds, extrapolate, folding)
+    return ZNECallable(fn, num_folds, extrapolate, folding)
 
 
 ## IMPL ##
-class ZNE:
+class ZNECallable(CatalystCallable):
     """An object that specifies how a circuit is mitigated with ZNE.
 
     Args:
@@ -173,11 +174,11 @@ class ZNE:
         self.extrapolate = extrapolate
         self.folding = folding
 
+        super().__init__("fn")
+
     def __call__(self, *args, **kwargs):
-        """Specifies the an actual call to the folded circuit."""
-        if isinstance(self.fn, (Function, qml.QNode)):
-            self.fn = self.fn
-        elif isinstance(self.fn, Callable):  # Keep at the bottom
+        """Specifies the actual call to the folded circuit."""
+        if isinstance(self.fn, Callable) and not isinstance(self.fn, (Function, qml.QNode)):
             self.fn = Function(self.fn)
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]

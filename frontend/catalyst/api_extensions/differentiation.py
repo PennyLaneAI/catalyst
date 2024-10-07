@@ -43,6 +43,7 @@ from catalyst.jax_primitives import (
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 Differentiable = Union[Function, QNode]
@@ -183,7 +184,7 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
 
     scalar_out = True
 
-    return Grad(fn, GradParams(method, scalar_out, h, argnums))
+    return GradCallable(fn, GradParams(method, scalar_out, h, argnums))
 
 
 def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
@@ -297,7 +298,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
 
     scalar_out = True
 
-    return Grad(fn, GradParams(method, scalar_out, h, argnums, with_value=True))
+    return GradCallable(fn, GradParams(method, scalar_out, h, argnums, with_value=True))
 
 
 def jacobian(fn=None, *, method=None, h=None, argnums=None):
@@ -369,7 +370,7 @@ def jacobian(fn=None, *, method=None, h=None, argnums=None):
 
     scalar_out = False
 
-    return Grad(fn, GradParams(method, scalar_out, h, argnums))
+    return GradCallable(fn, GradParams(method, scalar_out, h, argnums))
 
 
 # pylint: disable=too-many-arguments
@@ -618,7 +619,7 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
 
 
 ## IMPL ##
-class Grad:
+class GradCallable(CatalystCallable):
     """An object that specifies that a function will be differentiated.
 
     Args:
@@ -637,6 +638,8 @@ class Grad:
         self.fn = fn
         self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
+
+        super().__init__("fn")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
