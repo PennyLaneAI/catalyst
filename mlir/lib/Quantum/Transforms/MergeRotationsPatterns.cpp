@@ -37,25 +37,25 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
-        StringRef OpGateName = op.getGateName();
+        StringRef opGateName = op.getGateName();
 
-        if (!rotationsSet.contains(OpGateName))
+        if (!rotationsSet.contains(opGateName))
             return failure();
-        ValueRange InQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
+        ValueRange inQubits = op.getInQubits();
+        auto parentOp = dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
 
-        if (!parentOp || parentOp.getGateName() != OpGateName)
+        if (!parentOp || parentOp.getGateName() != opGateName)
             return failure();
 
-        ValueRange ParentOutQubits = parentOp.getOutQubits();
+        ValueRange parentOutQubits = parentOp.getOutQubits();
         // Check if the input qubits to the current operation match the output qubits of the parent.
-        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != ParentOutQubits[Idx])
+        for (const auto &[Idx, Qubit] : llvm::enumerate(inQubits)) {
+            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != parentOutQubits[Idx])
                 return failure();
         }
 
-        TypeRange OutQubitsTypes = op.getOutQubits().getTypes();
-        TypeRange OutQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
+        TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+        TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
         ValueRange parentInQubits = parentOp.getInQubits();
         ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
@@ -68,8 +68,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         };
-        auto mergeOp = rewriter.create<CustomOp>(loc, OutQubitsTypes, OutQubitsCtrlTypes, sumParams,
-                                                 parentInQubits, OpGateName, nullptr,
+        auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
+                                                 parentInQubits, opGateName, nullptr,
                                                  parentInCtrlQubits, parentInCtrlValues);
 
         op.replaceAllUsesWith(mergeOp);
@@ -80,6 +80,55 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     }
 };
 
+struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
+    using mlir::OpRewritePattern<MultiRZOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(MultiRZOp op,
+                                        mlir::PatternRewriter &rewriter) const override
+    {
+        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
+        auto loc = op.getLoc();
+        ValueRange InQubits = op.getInQubits();
+
+        // Check parent op
+        auto parentOp = dyn_cast_or_null<MultiRZOp>(InQubits[0].getDefiningOp());
+
+        if (!parentOp)
+            return failure();
+
+        // Check the target qubit
+        ValueRange parentOutQubits = parentOp.getOutQubits();
+        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
+            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != parentOutQubits[Idx])
+                return failure();
+        }
+
+        // Check the control qubits
+        ValueRange inCtrlQubits = op.getInCtrlQubits();
+        ValueRange parentOutCtrlQubits = parentOp.getOutCtrlQubits();
+        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
+            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != parentOutCtrlQubits[Idx])
+                return failure();
+        }
+        // Check the control values
+
+        // ...
+
+        // Sum the angles control values
+
+        // Replace operation
+        TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+        TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
+        ValueRange parentInQubits = parentOp.getInQubits();
+        ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
+        ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
+        // op.replaceAllUsesWith(mergeOp);
+        // op.erase();
+        // parentOp.erase();
+
+        return success();
+    }
+};
 } // namespace
 
 namespace catalyst {
@@ -88,6 +137,7 @@ namespace quantum {
 void populateMergeRotationsPatterns(RewritePatternSet &patterns)
 {
     patterns.add<MergeRotationsRewritePattern>(patterns.getContext(), 1);
+    patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
