@@ -72,7 +72,7 @@ struct PrintOpInterface
     }
 };
 
-/// Bufferization of catalyst.print. Mainly get buffers for arguments.
+/// Bufferization of catalyst.custom_call. Mainly get buffers for arguments.
 struct CustomCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CustomCallOpInterface,
                                                                    CustomCallOp> {
@@ -85,7 +85,7 @@ struct CustomCallOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return false;
+        return true;
     }
 
     bufferization::AliasingValueList
