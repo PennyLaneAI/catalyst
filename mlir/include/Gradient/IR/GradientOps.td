@@ -55,7 +55,7 @@ def GradOp : Gradient_Op<"grad", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
@@ -79,7 +79,7 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
@@ -104,7 +104,7 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Index:$gradSize,
         Variadic<AnyType>:$args,
         Variadic<MemRefOf<[AnyFloat]>>:$data_in
@@ -134,7 +134,7 @@ def BackpropOp : Gradient_Op<"backprop", [
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
         Variadic<MemRefOf<[AnyFloat]>>:$diffArgShadows,
         Variadic<MemRefOf<[AnyFloat]>>:$calleeResults,
@@ -180,7 +180,7 @@ def JVPOp : Gradient_Op<"jvp", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
@@ -213,7 +213,7 @@ def VJPOp : Gradient_Op<"vjp", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,

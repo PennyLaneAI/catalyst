@@ -25,16 +25,12 @@ import sys
 import sysconfig
 from itertools import product
 
-from jax.interpreters import mlir
-
 import catalyst
-from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler, LinkerDriver
+from catalyst.compiler import LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.filesystem import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -71,7 +67,7 @@ def get_compilation_stage(fn, stage):
     Returns:
         str: output ir from the target compiler stage
 
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`, :func:`~.compile_from_mlir`.
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`.
 
     **Example**
 
@@ -132,66 +128,6 @@ def get_cmain(fn, *args):
     return fn.compiled_function.get_cmain(*args)
 
 
-# pylint: disable=line-too-long
-@debug_logger
-def compile_from_mlir(ir, compiler=None, compile_options=None):
-    r"""Compile a Catalyst function to binary code from the provided MLIR.
-
-    Args:
-        ir (str): the MLIR to compile in string form
-        compile_options: options to use during compilation
-
-    Returns:
-        CompiledFunction: A callable that manages the compiled shared library and its invocation.
-
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.replace_ir`.
-
-    **Example**
-
-    The main entry point of the program is required to start with ``catalyst.entry_point``, and
-    the program is required to contain ``setup`` and ``teardown`` functions.
-
-    .. code-block:: python
-
-        ir = r\"""
-            module @workflow {
-                func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-                    return %arg0 : tensor<f64>
-                }
-                func.func @setup() {
-                    quantum.init
-                    return
-                }
-                func.func @teardown() {
-                    quantum.finalize
-                    return
-                }
-            }
-        \"""
-
-        compiled_function = debug.compile_from_mlir(ir)
-
-    >>> compiled_function(0.1)
-    [0.1]
-    """
-    EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-
-    if compiler is None:
-        compiler = Compiler(compile_options)
-
-    module_name = "debug_module"
-    workspace_dir = os.getcwd() if compiler.options.keep_intermediate else None
-    workspace = WorkspaceManager.get_or_create_workspace("debug_workspace", workspace_dir)
-    shared_object, _llvm_ir, func_data = compiler.run_from_ir(ir, module_name, workspace)
-
-    # Parse inferred function data, like name and return types.
-    qfunc_name = func_data[0]
-    with mlir.ir.Context():
-        result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
-
-    return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
-
-
 @debug_logger
 def replace_ir(fn, stage, new_ir):
     r"""Replace the IR at any compilation stage that will be used the next time the function runs.
@@ -215,7 +151,7 @@ def replace_ir(fn, stage, new_ir):
         stage (str): Recompilation picks up after this stage.
         new_ir (str): The replacement IR to use for recompilation.
 
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.compile_from_mlir`.
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`.
 
     **Example**
 
