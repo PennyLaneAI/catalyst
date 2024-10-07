@@ -460,6 +460,7 @@ class QJIT(CatalystCallable):
 
     @debug_logger_init
     def __init__(self, fn, compile_options):
+        functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
@@ -481,7 +482,6 @@ class QJIT(CatalystCallable):
         self.out_type = None
         self.overwrite_ir = None
 
-        functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
 
