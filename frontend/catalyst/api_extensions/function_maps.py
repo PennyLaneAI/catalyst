@@ -60,6 +60,11 @@ def vmap(
     Raises:
         ValueError: Invalid ``in_axes``, ``out_axes``, and ``axis_size`` values.
 
+    .. note::
+
+        Using vmap will prevent AOT compilation from working, since annotated type information
+        will no longer be valid when batching arguments/results.
+
     **Example**
 
     For example, consider the following QNode:
@@ -160,6 +165,7 @@ class VmapCallable(CatalystCallable):
         axis_size: Optional[int],
     ):
         self.fn = fn
+        self.__name__ = f"vmap.{getattr(fn, '__name__', 'unknown')}"
         self.in_axes = in_axes
         self.out_axes = out_axes
         self.axis_size = axis_size
