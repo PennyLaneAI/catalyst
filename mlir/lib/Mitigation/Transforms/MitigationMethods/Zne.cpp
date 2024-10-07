@@ -37,6 +37,8 @@ namespace mitigation {
 
 LogicalResult ZneLowering::match(mitigation::ZneOp op) const { return success(); }
 
+// TODO: Optimize the traversal of call graphs (currently used twice)
+// Also all functions exploree in the call graph get their ZNE version.
 void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
     auto point = rewriter.saveInsertionPoint();
