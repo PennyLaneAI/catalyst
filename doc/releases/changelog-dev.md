@@ -218,12 +218,10 @@
   This is unlikely to affect users since only under certain conditions did
   nesting qnodes worked successfully.
 
-* Changes in the `debug.compile_from_mlir`'s API.
+* Removes `debug.compile_from_mlir`.
   [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
 
-  Now instead of automatically inferring the entry function's name
-  and return types from the IR, the user must add them as inputs.
-  This function is only useful for debugging, so it is unlikely to affect users.
+  Please use `debug.replace_ir`.
 
 <h3>Bug fixes</h3>
 
