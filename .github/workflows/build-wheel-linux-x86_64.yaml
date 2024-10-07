@@ -173,6 +173,7 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
+        # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
 
@@ -208,6 +209,7 @@ jobs:
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       # building with LLD is a strong requirement for mhlo
       run: |
+        # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
@@ -367,6 +369,7 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
+        # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch; fi
         if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi

@@ -58,6 +58,7 @@ all: llvm mhlo enzyme dialects
 
 .PHONY: llvm
 llvm:
+	# TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
 	@echo "build LLVM and MLIR enabling Python bindings"
 	@if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_FUNCOP_PATCH_FILE) > /dev/null 2>&1; then \
         patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_FUNCOP_PATCH_FILE); \
@@ -96,6 +97,7 @@ mhlo:
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
 	fi
+	# TODO: Remove this patch after upgrading Jax (potentailly for 0.4.34 or higher).
 	@if patch --dry-run -p1 -N --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE) > /dev/null 2>&1; then \
         patch -p1 --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE); \
 	fi
