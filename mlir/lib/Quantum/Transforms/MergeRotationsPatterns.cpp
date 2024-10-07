@@ -25,7 +25,7 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::quantum;
 
-static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
+static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ", "CRX", "CRY", "CRZ"};
 
 namespace {
 
@@ -51,7 +51,10 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                 return failure();
         }
 
-        if (OpGateName == "RX" || OpGateName == "RY" || OpGateName == "RZ") {
+
+        static const mlir::StringSet<> rotationsSetCase1 = {"RX", "RY", "RZ", "CRX", "CRY", "CRZ"};
+
+        if (rotationsSetCase1.find(OpGateName) != rotationsSetCase1.end()) {
             TypeRange OutQubitsTypes = op.getOutQubits().getTypes();
             TypeRange OutQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
             auto parentParams = parentOp.getParams().front();
