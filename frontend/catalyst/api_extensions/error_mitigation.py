@@ -38,7 +38,7 @@ def _is_odd_positive(numbers_list):
 
 ## API ##
 def mitigate_with_zne(
-    fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="global"
+    fn=None, *, scale_factors, extrapolate=None, extrapolate_kwargs=None, folding="global"
 ):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
