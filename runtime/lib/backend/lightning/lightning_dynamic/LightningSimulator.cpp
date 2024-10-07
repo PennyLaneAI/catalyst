@@ -314,6 +314,9 @@ std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
     // the number of qubits.
     //
     // Return Value Optimization (RVO)
+    if (this->gen) {
+        return m.generate_samples(shots, (*(this->gen))());
+    }
     return m.generate_samples(shots);
 }
 

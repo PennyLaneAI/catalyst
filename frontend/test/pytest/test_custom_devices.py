@@ -133,7 +133,7 @@ RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
-    class DummyDevice(qml.QubitDevice):
+    class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
         name = "Dummy Device"
@@ -184,7 +184,7 @@ def test_custom_device_load():
 def test_custom_device_bad_directory():
     """Test that custom device error."""
 
-    class DummyDevice(qml.QubitDevice):
+    class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
         name = "Dummy Device"
@@ -224,7 +224,7 @@ def test_custom_device_bad_directory():
 def test_custom_device_no_c_interface():
     """Test that custom device error."""
 
-    class DummyDevice(qml.QubitDevice):
+    class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
         name = "Dummy Device"
