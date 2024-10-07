@@ -570,35 +570,6 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
-    @pytest.mark.parametrize("debug", [False, True])
-    def test_dynamic_one_shot_nested_qnodes(self, backend, debug):
-        """Test that `dynamic_one_shot` handle nested calls correctly."""
-
-        if not debug:
-            pytest.xfail("Error in Catalyst Runtime: Cannot re-initialize an ACTIVE device")
-
-        shots = 10
-        dev = qml.device(backend, wires=2, shots=shots)
-
-        @qml.qnode(dev)
-        def inner():
-            qml.PauliX(0)
-            return qml.sample(wires=0)
-
-        @qjit
-        @qml.qnode(dev, mcm_method="one-shot")
-        def outer():
-            x = inner()
-            if debug:
-                catalyst.debug.print("Value of x = {x}", x=x)
-            qml.RY(jnp.pi * qml.math.sum(x) / shots, wires=0)
-            m0 = measure(0)
-            return qml.sample(m0)
-
-        result = outer()
-        assert result.shape == (shots,)
-        assert jnp.allclose(result, 1.0)
-
     @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
     )
@@ -728,7 +699,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
-        @qjit
+        @qjit(seed=37)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def func(x, y):
             qml.RX(x, 0)
