@@ -359,7 +359,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 {
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnFoldedName = op.getCallee().getLeafReference().str() + ".folded";
+    std::string fnFoldedName = op.getName().str() + ".folded";
 
     MLIRContext *ctx = rewriter.getContext();
 
@@ -445,7 +445,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
     Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    std::string fnAllocName = op.getCallee().getLeafReference().str() + ".quantumAlloc";
+    std::string fnAllocName = op.getName().str() + ".quantumAlloc";
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnAllocName)) {
         return SymbolRefAttr::get(ctx, fnAllocName);
@@ -471,8 +471,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnWithoutMeasurementsName =
-        op.getCallee().getLeafReference().str() + ".withoutMeasurements";
+    std::string fnWithoutMeasurementsName = op.getName().str() + ".withoutMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
     }
@@ -524,8 +523,7 @@ ZneLowering::getOrInsertFnWithMeasurements(Location loc, PatternRewriter &rewrit
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
-    std::string fnWithMeasurementsName =
-        op.getCallee().getLeafReference().str() + ".withMeasurements";
+    std::string fnWithMeasurementsName = op.getName().str() + ".withMeasurements";
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
