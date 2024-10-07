@@ -41,20 +41,20 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         StringRef OpGateName = op.getGateName();
-        if (!HermitianOps.contains(OpGateName)){
+        if (!HermitianOps.contains(OpGateName)) {
             return failure();
         }
 
         ValueRange InQubits = op.getInQubits();
         auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (!ParentOp || ParentOp.getGateName() != OpGateName){
+        if (!ParentOp || ParentOp.getGateName() != OpGateName) {
             return failure();
         }
 
         ValueRange ParentOutQubits = ParentOp.getOutQubits();
         // Check if the input qubits to the current operation match the output qubits of the parent.
         for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx]){
+            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx]) {
                 return failure();
             }
         }
@@ -68,20 +68,21 @@ template <typename OpType>
 struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
 
-    bool verifyParentGateType(OpType op, OpType parentOp) const {
+    bool verifyParentGateType(OpType op, OpType parentOp) const
+    {
         // Verify that the parent gate is of the same type,
         // and parent's results and current gate's inputs are in the same order
         // If OpType is quantum.custom, also verify that parent gate has the
         // same gate name.
 
-        if (!parentOp || !isa<OpType>(parentOp)){
+        if (!parentOp || !isa<OpType>(parentOp)) {
             return false;
         }
 
-        if (isa<CustomOp>(op)){
+        if (isa<CustomOp>(op)) {
             StringRef opGateName = cast<CustomOp>(op).getGateName();
             StringRef parentGateName = cast<CustomOp>(parentOp).getGateName();
-            if (opGateName != parentGateName){
+            if (opGateName != parentGateName) {
                 return false;
             }
         }
@@ -89,7 +90,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         ValueRange InQubits = op.getInQubits();
         ValueRange ParentOutQubits = parentOp.getOutQubits();
         for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<OpType>() != parentOp || Qubit != ParentOutQubits[Idx]){
+            if (Qubit.getDefiningOp<OpType>() != parentOp || Qubit != ParentOutQubits[Idx]) {
                 return false;
             }
         }
@@ -97,19 +98,19 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         return true;
     }
 
-
-    bool verifyParentGateParams(OpType op, OpType parentOp) const {
+    bool verifyParentGateParams(OpType op, OpType parentOp) const
+    {
         // Verify that the parent gate has the same parameters
 
         ValueRange opParams = op.getAllParams();
         ValueRange parentOpParams = parentOp.getAllParams();
 
-        if (opParams.size() != parentOpParams.size()){
+        if (opParams.size() != parentOpParams.size()) {
             return false;
         }
 
-        for (auto [opParam, parentOpParam] : llvm::zip(opParams, parentOpParams)){
-            if (opParam != parentOpParam){
+        for (auto [opParam, parentOpParam] : llvm::zip(opParams, parentOpParams)) {
+            if (opParam != parentOpParam) {
                 return false;
             }
         }
@@ -117,7 +118,8 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         return true;
     }
 
-    bool verifyOneAdjoint(OpType op, OpType parentOp) const {
+    bool verifyOneAdjoint(OpType op, OpType parentOp) const
+    {
         // Verify that exactly one of the neighbouring pair is an adjoint
         bool opIsAdj = op->hasAttr("adjoint");
         bool parentIsAdj = parentOp->hasAttr("adjoint");
@@ -139,26 +141,24 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        //llvm::errs() << "visiting " << op << "\n";
+        // llvm::errs() << "visiting " << op << "\n";
 
         ValueRange InQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<OpType>(InQubits[0].getDefiningOp());
 
-        if (!verifyParentGateType(op, parentOp)){
+        if (!verifyParentGateType(op, parentOp)) {
             return failure();
         }
 
-
-        if (!verifyParentGateParams(op, parentOp)){
+        if (!verifyParentGateParams(op, parentOp)) {
             return failure();
         }
 
-
-        if (!verifyOneAdjoint(op, parentOp)){
+        if (!verifyOneAdjoint(op, parentOp)) {
             return failure();
         }
 
-        //llvm::errs() << "matched!\n";
+        // llvm::errs() << "matched!\n";
         ValueRange simplifiedVal = parentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();

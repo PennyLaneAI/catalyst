@@ -25,8 +25,8 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -58,7 +58,7 @@ struct RemoveChainedSelfInversePass
         MLIRContext *ctx = &getContext();
         auto earlyCSEpm = PassManager::on<ModuleOp>(ctx);
         earlyCSEpm.addPass(mlir::createCSEPass());
-        if (failed(runPipeline(earlyCSEpm, getOperation()))){
+        if (failed(runPipeline(earlyCSEpm, getOperation()))) {
             return signalPassFailure();
         }
 
