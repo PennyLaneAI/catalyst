@@ -192,6 +192,7 @@
 
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+  [(#1182)](https://github.com/PennyLaneAI/catalyst/pull/1182)
 
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
@@ -221,6 +222,11 @@
 
   This is unlikely to affect users since only under certain conditions did
   nesting qnodes worked successfully.
+
+* Removes `debug.compile_from_mlir`.
+  [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
+
+  Please use `debug.replace_ir`.
 
 <h3>Bug fixes</h3>
 

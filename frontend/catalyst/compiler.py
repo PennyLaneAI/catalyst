@@ -560,9 +560,6 @@ class Compiler:
                                    shard object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
-            A list of:
-               func_name (str) Inferred name of the main function
-               ret_type_name (str) Inferred main function result type name
         """
         assert isinstance(
             workspace, Directory
@@ -597,8 +594,6 @@ class Compiler:
 
         filename = compiler_output.get_object_filename()
         out_IR = compiler_output.get_output_ir()
-        func_name = compiler_output.get_function_attributes().get_function_name()
-        ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
         if lower_to_llvm:
             output = LinkerDriver.run(filename, options=self.options)
@@ -607,7 +602,7 @@ class Compiler:
             output_filename = filename
 
         self.last_compiler_output = compiler_output
-        return output_filename, out_IR, [func_name, ret_type_name]
+        return output_filename, out_IR
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
