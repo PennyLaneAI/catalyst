@@ -26,13 +26,11 @@ import sysconfig
 from itertools import product
 
 import catalyst
-from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler, LinkerDriver
+from catalyst.compiler import LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.filesystem import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
