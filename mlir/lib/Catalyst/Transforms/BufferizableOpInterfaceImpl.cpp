@@ -76,6 +76,8 @@ struct PrintOpInterface
 struct CustomCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CustomCallOpInterface,
                                                                    CustomCallOp> {
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
@@ -166,7 +168,8 @@ struct CallbackOpInterface
 
     bufferization::AliasingOpOperandList
     getAliasingOpOperands(Operation *op, Value value,
-                        const bufferization::AnalysisState &state) const {
+                          const bufferization::AnalysisState &state) const
+    {
         return {};
     }
 
@@ -199,6 +202,8 @@ struct CallbackOpInterface
 struct CallbackCallOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CallbackCallOpInterface,
                                                                    CallbackCallOp> {
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
