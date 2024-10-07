@@ -41,24 +41,100 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         StringRef OpGateName = op.getGateName();
-        if (!HermitianOps.contains(OpGateName))
+        if (!HermitianOps.contains(OpGateName)){
             return failure();
+        }
 
         ValueRange InQubits = op.getInQubits();
         auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (!ParentOp || ParentOp.getGateName() != OpGateName)
+        if (!ParentOp || ParentOp.getGateName() != OpGateName){
             return failure();
+        }
 
         ValueRange ParentOutQubits = ParentOp.getOutQubits();
         // Check if the input qubits to the current operation match the output qubits of the parent.
         for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx])
+            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx]){
                 return failure();
+            }
         }
         ValueRange simplifiedVal = ParentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();
     }
+};
+
+template <typename OpType>
+struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
+    using mlir::OpRewritePattern<OpType>::OpRewritePattern;
+
+    bool verifyParentGateType(OpType op, OpType parentOp) const {
+        // Verify that the parent gate is of the same type,
+        // and parent's results and current gate's inputs are in the same order
+        // If OpType is quantum.custom, also verify that parent gate has the
+        // same gate name.
+
+        if (!parentOp || !isa<OpType>(parentOp)){
+            return false;
+        }
+
+        if (isa<CustomOp>(op)){
+            StringRef OpGateName = cast<CustomOp>(op).getGateName();
+            StringRef ParentGateName = cast<CustomOp>(parentOp).getGateName();
+            if (OpGateName != ParentGateName){
+                return false;
+            }
+        }
+
+        ValueRange InQubits = op.getInQubits();
+        ValueRange ParentOutQubits = parentOp.getOutQubits();
+        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
+            if (Qubit.getDefiningOp<OpType>() != parentOp || Qubit != ParentOutQubits[Idx]){
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    bool verifyParentGateParams(OpType op, OpType parentOp) const {
+        // Verify that the parent gate has the same parameters
+        return true;
+    }
+
+    /// Remove generic neighbouring gate pairs of the form
+    /// --- gate --- gate{adjoint} ---
+    /// Conditions:
+    ///  1. Both gates must be of the same type, i.e. a quantum.custom can
+    ///     only be cancelled with a quantum.custom, not a quantum.unitary
+    ///  2. The results of the parent gate must map one-to-one, in order,
+    ///     to the operands of the second gate
+    ///  3. If there are parameters, both gate must have the same parameters.
+    ///  4. If the gates are controlled, both gates' control wires and values
+    ///     must be the same. The control wires must be in the same order
+    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
+    {
+        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
+
+        llvm::errs() << "visiting " << op << "\n";
+
+        ValueRange InQubits = op.getInQubits();
+        auto parentOp = dyn_cast_or_null<OpType>(InQubits[0].getDefiningOp());
+
+        if (!verifyParentGateType(op, parentOp)){
+            return failure();
+        }
+
+
+
+        llvm::errs() << "matched!\n";
+        ValueRange simplifiedVal = parentOp.getInQubits();
+        rewriter.replaceOp(op, simplifiedVal);
+        return success();
+    }
+
+
 };
 
 } // namespace
@@ -69,6 +145,8 @@ namespace quantum {
 void populateSelfInversePatterns(RewritePatternSet &patterns)
 {
     patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<CustomOp>>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
