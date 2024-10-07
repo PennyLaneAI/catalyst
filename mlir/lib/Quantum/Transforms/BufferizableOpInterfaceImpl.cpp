@@ -11,16 +11,17 @@ using namespace catalyst::quantum;
 
 namespace {
 /**
- * The new bufferization interface requires `bufferizesToMemoryRead`, `bufferizesToMemoryWrite`, 
+ * The new bufferization interface requires `bufferizesToMemoryRead`, `bufferizesToMemoryWrite`,
  * and `getAliasingValues`.
- * 
+ *
  * `bufferizesToMemoryRead`: Return `true` if the buffer of the given tensor OpOperand is read.
  *
- * `bufferizesToMemoryWrite`: Return `true` if the buffer of the given tensor OpOperand is written 
+ * `bufferizesToMemoryWrite`: Return `true` if the buffer of the given tensor OpOperand is written
  * (if bufferizing in-place).
  *
- * `getAliasingOpOperands`: Return the OpResults that may share the same buffer as the given OpOperand. 
- * Note that MLIR documentation does not mention `getAliasingValues` but it seems to serve the same purpose. 
+ * `getAliasingOpOperands`: Return the OpResults that may share the same buffer as the given
+ * OpOperand. Note that MLIR documentation does not mention `getAliasingValues` but it seems to
+ * serve the same purpose.
  *
  * Link: https://mlir.llvm.org/docs/Bufferization/#extending-one-shot-bufferize
  */
