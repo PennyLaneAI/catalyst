@@ -699,7 +699,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
-        @qjit
+        @qjit(seed=37)
         @qml.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def func(x, y):
             qml.RX(x, 0)
