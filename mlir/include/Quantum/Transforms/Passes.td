@@ -88,6 +88,12 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
+def GateBuilderTesterPass : Pass<"test-gate-builder"> {
+    let summary = "Test convenience gate builders for quantum.custom operations.";
+
+    let constructor = "catalyst::createGateBuilderTesterPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
