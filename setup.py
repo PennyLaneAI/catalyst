@@ -18,6 +18,7 @@
 
 import glob
 import platform
+import shutil
 import subprocess
 from os import environ, path
 from typing import Optional
@@ -126,6 +127,8 @@ description = {
 
 
 class CMakeExtension(Extension):
+    """Custom setuptools Extension for CMake extensions"""
+
     def __init__(self, name, sourcedir=""):
         Extension.__init__(self, name, sources=[])
         self.sourcedir = path.abspath(sourcedir)
@@ -154,8 +157,9 @@ class CustomBuildExt(build_ext):
         return filename.replace(suffix, "") + extension
 
     def run(self):
+        make_path = shutil.which("make")
         subprocess.check_call(
-            ["make", "-C", "frontend", "all"],
+            [make_path, "-C", "frontend", "all"],
             env=environ,
         )
         super().run()
@@ -167,8 +171,6 @@ class CustomBuildExtLinux(CustomBuildExt):
     Currently no extra work needs to be performed with respect to the base class
     CustomBuildExt.
     """
-
-    pass
 
 
 class CustomBuildExtMacos(CustomBuildExt):
