@@ -20,7 +20,7 @@ import platform
 from typing import Optional
 
 import pennylane as qml
-from pennylane.devices import Device
+from pennylane.devices import Device, NullQubit
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 

@@ -13,19 +13,11 @@
 # limitations under the License.
 """Test for the device API.
 """
-import pathlib
-import platform
-from typing import Optional
-
 import pennylane as qml
 import pytest
-from pennylane.devices import Device, NullQubit
-from pennylane.devices.execution_config import ExecutionConfig
-from pennylane.transforms import split_non_commuting
-from pennylane.transforms.core import TransformProgram
+from pennylane.devices import NullQubit
 
 from catalyst import qjit
-from catalyst.compiler import get_lib_path
 from catalyst.device import (
     QJITDevice,
     get_device_capabilities,
