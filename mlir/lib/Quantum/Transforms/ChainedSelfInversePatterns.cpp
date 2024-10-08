@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "chained-self-inverse"
 
+#include "VerifyParentGateAnalysis.hpp"
+
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
@@ -70,68 +72,9 @@ template <typename OpType>
 struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
 
-    bool verifyParentGateType(OpType op, OpType parentOp) const
-    {
-        // Verify that the parent gate is of the same type.
-        // If OpType is quantum.custom, also verify that parent gate has the
-        // same gate name.
-
-        if (!parentOp || !isa<OpType>(parentOp)) {
-            return false;
-        }
-
-        if (isa<CustomOp>(op)) {
-            StringRef opGateName = cast<CustomOp>(op).getGateName();
-            StringRef parentGateName = cast<CustomOp>(parentOp).getGateName();
-            if (opGateName != parentGateName) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool verifyAllInQubits(OpType op, OpType parentOp) const
-    {
-        // Verify that parent's results and current gate's inputs are in the same order
-        // If the gates are controlled, both gates' control wires and values
-        // must be the same. The control wires must be in the same order.
-
-        ValueRange inNonCtrlQubits = op.getNonCtrlQubitOperands();
-        ValueRange inCtrlQubits = op.getCtrlQubitOperands();
-        ValueRange parentOutNonCtrlQubits = parentOp.getNonCtrlQubitResults();
-        ValueRange parentOutCtrlQubits = parentOp.getCtrlQubitResults();
-
-        if ((inNonCtrlQubits.size() != parentOutNonCtrlQubits.size()) ||
-            (inCtrlQubits.size() != parentOutCtrlQubits.size())) {
-            return false;
-        }
-
-        for (const auto &[idx, qubit] : llvm::enumerate(inNonCtrlQubits)) {
-            if (qubit.getDefiningOp() != parentOp || qubit != parentOutNonCtrlQubits[idx]) {
-                return false;
-            }
-        }
-
-        ValueRange opCtrlValues = op.getCtrlValueOperands();
-        ValueRange parentCtrlValues = parentOp.getCtrlValueOperands();
-        if (opCtrlValues.size() != parentCtrlValues.size()) {
-            return false;
-        }
-
-        for (const auto &[idx, v] : llvm::enumerate(opCtrlValues)) {
-            if (v != parentCtrlValues[idx]) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     bool verifyParentGateParams(OpType op, OpType parentOp) const
     {
         // Verify that the parent gate has the same parameters
-
         ValueRange opParams = op.getAllParams();
         ValueRange parentOpParams = parentOp.getAllParams();
 
@@ -159,28 +102,20 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     /// Remove generic neighbouring gate pairs of the form
     /// --- gate --- gate{adjoint} ---
     /// Conditions:
-    ///  1. Both gates must be of the same type, i.e. a quantum.custom can
-    ///     only be cancelled with a quantum.custom, not a quantum.unitary
-    ///  2. The results of the parent gate must map one-to-one, in order,
-    ///     to the operands of the second gate
-    ///  3. If there are parameters, both gate must have the same parameters.
+    ///  1. Parent gate verification must pass. See VerifyParentGateAnalysis.hpp.
+    ///  2. If there are parameters, both gate must have the same parameters.
     ///     [This pattern assumes the IR is already processed by CSE]
-    ///  4. If the gates are controlled, both gates' control wires and values
-    ///     must be the same. The control wires must be in the same order
     mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
+        VerifyParentGateAnalysis<OpType> vpga(op);
+        if (!vpga.getVerifierResult()) {
+            return failure();
+        }
+
         ValueRange InQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<OpType>(InQubits[0].getDefiningOp());
-
-        if (!verifyParentGateType(op, parentOp)) {
-            return failure();
-        }
-
-        if (!verifyAllInQubits(op, parentOp)) {
-            return failure();
-        }
 
         if (!verifyParentGateParams(op, parentOp)) {
             return failure();
