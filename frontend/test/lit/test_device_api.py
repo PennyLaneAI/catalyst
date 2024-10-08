@@ -28,8 +28,8 @@ from catalyst import qjit
 from catalyst.compiler import get_lib_path
 
 
-class NullQubit(Device):
-    """A Null Qubit, from the device API, that does nothing."""
+class CustomDevice(Device):
+    """A custom device that does nothing."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 

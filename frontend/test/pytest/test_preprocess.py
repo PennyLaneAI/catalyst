@@ -25,11 +25,8 @@ from typing import Optional
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig
+from pennylane.devices import NullQubit
 from pennylane.tape import QuantumScript
-from pennylane.transforms import split_non_commuting
-from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
@@ -41,8 +38,6 @@ from catalyst.api_extensions.control_flow import (
     while_loop,
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
-from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
@@ -75,44 +70,6 @@ def get_test_device_capabilities(
     config = get_test_config(config_text)
     device_capabilities = load_device_capabilities(config, program_features)
     return device_capabilities
-
-
-class NullQubit(Device):
-    """A Null Qubit from the device API."""
-
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
-
-    def __init__(self, wires, shots=1024):
-        print(pathlib.Path(__file__).parent.parent.parent.parent)
-        super().__init__(wires=wires, shots=shots)
-        dummy_capabilities = get_device_capabilities(self)
-        dummy_capabilities.native_ops.pop("BlockEncode")
-        dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.qjit_capabilities = dummy_capabilities
-
-    @staticmethod
-    def get_c_interface():
-        """Returns a tuple consisting of the device name, and
-        the location to the shared object with the C/C++ device implementation.
-        """
-        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
-        )
-        return "NullQubit", lib_path
-
-    def execute(self, circuits, execution_config):
-        """Execution."""
-        return circuits, execution_config
-
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
-        """Preprocessing."""
-        if execution_config is None:
-            execution_config = ExecutionConfig()
-
-        transform_program = TransformProgram()
-        transform_program.add_transform(split_non_commuting)
-        return transform_program, execution_config
 
 
 class OtherHadamard(qml.Hadamard):
