@@ -23,6 +23,7 @@ build:
   apt_packages:
     - graphviz
     - cmake
+    - ninja-build
 
 # Optionally set the version of Python and requirements required to build your docs
 python:
