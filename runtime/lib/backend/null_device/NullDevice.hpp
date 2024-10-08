@@ -1,7 +1,8 @@
 #include <QuantumDevice.hpp>
 
+namespace Catalyst::Runtime::Devices {
 struct NullDevice final : public Catalyst::Runtime::QuantumDevice {
-    NullDevice([[maybe_unused]] const std::string &kwargs) {}
+    NullDevice(const std::string &kwargs = "{}") {}
     ~NullDevice() = default; // LCOV_EXCL_LINE
 
     NullDevice &operator=(const QuantumDevice &) = delete;
@@ -73,5 +74,4 @@ struct NullDevice final : public Catalyst::Runtime::QuantumDevice {
 
     void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
 };
-
-GENERATE_DEVICE_FACTORY(NullDevice, NullDevice);
+} // namespace Catalyst::Runtime::Devices
