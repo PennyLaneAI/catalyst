@@ -64,27 +64,32 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
 {
     function.walk([&](MeasurementProcess op) {
         auto types = op->getResults().getTypes();
-
+        auto loc = op.getLoc();
+        std::vector<Value> results;
         for (auto type : types) {
             if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
                 auto shape = tensorType.getShape();
                 auto elemType = tensorType.getElementType();
-                rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, shape, elemType);
+                auto res = rewriter.create<tensor::EmptyOp>(loc, shape, elemType);
+                results.push_back(res);
             }
             else {
                 if (type.isInteger()) {
-                    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-                        op, type, rewriter.getIntegerAttr(type, 0));
+                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
+                                                                  rewriter.getIntegerAttr(type, 0));
+                    results.push_back(res);
                 }
                 else if (type.isIntOrFloat()) {
-                    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-                        op, type, rewriter.getFloatAttr(type, 0.0));
+                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
+                                                                  rewriter.getFloatAttr(type, 0.0));
+                    results.push_back(res);
                 }
                 else {
                     op.emitError() << "Unexpected measurement type " << *op;
                 }
             }
         }
+        rewriter.replaceOp(op, results);
     });
 }
 
