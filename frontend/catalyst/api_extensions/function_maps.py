@@ -30,6 +30,7 @@ from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_u
 
 from catalyst.api_extensions.control_flow import for_loop
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.type_signatures import get_stripped_signature
 from catalyst.utils.callables import CatalystCallable
 
 
@@ -164,8 +165,10 @@ class VmapCallable(CatalystCallable):
         out_axes: Union[int, Sequence[Any]],
         axis_size: Optional[int],
     ):
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"vmap.{getattr(fn, '__name__', 'unknown')}"
+        self.__signature__ = get_stripped_signature(fn)  # wipe type annotations to prevent AOT
         self.in_axes = in_axes
         self.out_axes = out_axes
         self.axis_size = axis_size

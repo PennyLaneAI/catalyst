@@ -168,6 +168,7 @@ class ZNECallable(CatalystCallable):
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.num_folds = num_folds

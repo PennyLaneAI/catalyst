@@ -632,6 +632,7 @@ class GradCallable(CatalystCallable):
     """
 
     def __init__(self, fn: Differentiable, grad_params: GradParams):
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
