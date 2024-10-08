@@ -230,6 +230,10 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices 
+  supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
+  [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
+
 * Resolve a bug in the `vmap` function when passing shapeless values to the target.
   [(#1150)](https://github.com/PennyLaneAI/catalyst/pull/1150)
 
