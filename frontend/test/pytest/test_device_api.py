@@ -19,7 +19,7 @@ from typing import Optional
 
 import pennylane as qml
 import pytest
-from pennylane.devices import Device
+from pennylane.devices import Device, NullQubit
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
@@ -35,65 +35,6 @@ from catalyst.device import (
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 # pylint:disable = protected-access,attribute-defined-outside-init
-
-
-class NullQubit(Device):
-    """A Null Qubit from the device API."""
-
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
-
-    def __init__(self, wires, shots=1024):
-        print(pathlib.Path(__file__).parent.parent.parent.parent)
-        super().__init__(wires=wires, shots=shots)
-
-    @staticmethod
-    def get_c_interface():
-        """Returns a tuple consisting of the device name, and
-        the location to the shared object with the C/C++ device implementation.
-        """
-        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
-        )
-        return "NullQubit", lib_path
-
-    def execute(self, circuits, execution_config):
-        """Execution."""
-        return circuits, execution_config
-
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
-        """Preprocessing."""
-        if execution_config is None:
-            execution_config = ExecutionConfig()
-
-        transform_program = TransformProgram()
-        transform_program.add_transform(split_non_commuting)
-        return transform_program, execution_config
-
-
-class NullQubitNoWires(Device):
-    """A Null Qubit from the device API without wires."""
-
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
-
-    def __init__(self, shots=1024):
-        super().__init__(shots=shots)
-
-    @staticmethod
-    def get_c_interface():
-        """Returns a tuple consisting of the device name, and
-        the location to the shared object with the C/C++ device implementation.
-        """
-
-        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
-        )
-        return "NullQubit", lib_path
-
-    def execute(self, circuits, execution_config):
-        """Execution."""
-        return circuits, execution_config
 
 
 def test_qjit_device():
@@ -129,7 +70,7 @@ def test_qjit_device():
 
 def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
-    device = NullQubitNoWires(shots=2032)
+    device = NullQubit(shots=2032)
 
     with pytest.raises(
         AttributeError, match="Catalyst does not support device instances without set wires."
@@ -148,7 +89,7 @@ def test_qjit_device_no_wires():
 )
 def test_qjit_device_invalid_wires(wires):
     """Test the qjit device from a device using the new api without wires set."""
-    device = NullQubitNoWires(shots=2032)
+    device = NullQubit(shots=2032)
     device._wires = wires
 
     with pytest.raises(
