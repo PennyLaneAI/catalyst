@@ -293,6 +293,9 @@
   this nested module into other IRs/binary formats and lowering `call_function_in_module`
   to something that can dispatch calls to another runtime / VM.
 
+* Measurement primitives now support dynamic shape at the frontend, although at the PennyLane
+  side, the corresponding operations still lack such support.
+  [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
 
 <h3>Contributors</h3>
 
