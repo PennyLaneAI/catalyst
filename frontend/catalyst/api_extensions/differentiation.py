@@ -183,9 +183,7 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
     if fn is None:
         return functools.partial(grad, **kwargs)
 
-    scalar_out = True
-
-    return GradCallable(fn, GradParams(method, scalar_out, h, argnums))
+    return GradCallable(fn, GradParams(method=method, scalar_out=True, h=h, argnums=argnums))
 
 
 def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
@@ -297,9 +295,9 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
     if fn is None:
         return functools.partial(value_and_grad, **kwargs)
 
-    scalar_out = True
-
-    return GradCallable(fn, GradParams(method, scalar_out, h, argnums, with_value=True))
+    return GradCallable(
+        fn, GradParams(method=method, scalar_out=True, h=h, argnums=argnums, with_value=True)
+    )
 
 
 def jacobian(fn=None, *, method=None, h=None, argnums=None):
@@ -367,11 +365,9 @@ def jacobian(fn=None, *, method=None, h=None, argnums=None):
     kwargs.pop("fn")
 
     if fn is None:
-        return functools.partial(grad, **kwargs)
+        return functools.partial(jacobian, **kwargs)
 
-    scalar_out = False
-
-    return GradCallable(fn, GradParams(method, scalar_out, h, argnums))
+    return GradCallable(fn, GradParams(method=method, scalar_out=False, h=h, argnums=argnums))
 
 
 # pylint: disable=too-many-arguments
@@ -755,8 +751,15 @@ def _check_grad_params(
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
     argnum_expanded, _ = tree_flatten(argnum_selected)
     scalar_argnums = isinstance(argnums, int) or argnums is None
+
     return GradParams(
-        method, scalar_out, h, argnum_list, scalar_argnums, argnum_expanded, with_value
+        method=method,
+        scalar_out=scalar_out,
+        h=h,
+        argnums=argnum_list,
+        scalar_argnums=scalar_argnums,
+        expanded_argnums=argnum_expanded,
+        with_value=with_value,
     )
 
 
