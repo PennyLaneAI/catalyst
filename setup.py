@@ -19,7 +19,7 @@
 import glob
 import platform
 import subprocess
-from os import path
+from os import path, environ
 from typing import Optional
 
 from setuptools import Extension, find_namespace_packages, setup
@@ -125,9 +125,27 @@ description = {
 }
 
 
-class CustomBuildExtLinux(build_ext):
-    """Override build ext from setuptools in order to remove the architecture/python
-    version suffix of the library name."""
+class CMakeExtension(Extension):
+    def __init__(self, name, sourcedir=""):
+        Extension.__init__(self, name, sources=[])
+        self.sourcedir = path.abspath(sourcedir)
+
+
+class CustomBuildExt(build_ext):
+    """Custom build extension class for the Catalyst Frontend
+
+    This class overrides two methods of setuptools.command.build_ext.build_ext:
+
+        1. `get_ext_filename`, in order to remove the architecture/python
+           version suffix of the library name.
+        2. `run`, in order to call the Makefile build system in the Frontend as
+           well as the utils.libcustom_calls module, defined as a setuptools
+           Extension.
+
+    TODO: Eventually it would be better to build the utils.libcustom_calls
+    module using the Makefile system as well, rather than as a setuptools
+    Extension.
+    """
 
     def get_ext_filename(self, fullname):
         filename = super().get_ext_filename(fullname)
@@ -135,11 +153,31 @@ class CustomBuildExtLinux(build_ext):
         extension = path.splitext(filename)[1]
         return filename.replace(suffix, "") + extension
 
+    def run(self):
+        subprocess.check_call(
+            ["make", "-C", "frontend", "all"],
+            env=environ,
+        )
+        super().run()
 
-class CustomBuildExtMacos(build_ext):
-    """Override build ext from setuptools in order to change to remove the architecture/python
-    version suffix of the library name and to change the LC_ID_DYLIB that otherwise is constant
-    and equal to where the shared library was created."""
+
+class CustomBuildExtLinux(CustomBuildExt):
+    """Custom build extension class for Linux platforms
+
+    Currently no extra work needs to be performed with respect to the base class
+    CustomBuildExt.
+    """
+
+    pass
+
+
+class CustomBuildExtMacos(CustomBuildExt):
+    """Custom build extension class for macOS platforms
+
+    In addition to the work performed by the base class CustomBuildExt, this
+    class also changes the LC_ID_DYLIB that is otherwise constant and equal to
+    where the shared library was created.
+    """
 
     def get_ext_filename(self, fullname):
         filename = super().get_ext_filename(fullname)
@@ -149,7 +187,7 @@ class CustomBuildExtMacos(build_ext):
 
     def run(self):
         # Run the original build_ext command
-        build_ext.run(self)
+        super().run(self)
 
         # Construct library name based on ext suffix (contains python version, architecture and .so)
         library_name = "libcustom_calls.so"
