@@ -16,7 +16,7 @@
 
 import pennylane as qml
 
-from catalyst import qjit, mitigate_with_zne
+from catalyst import mitigate_with_zne, qjit
 
 
 @qjit(target="mlir")

@@ -47,7 +47,7 @@ from catalyst.jax_extras import (
     unzip2,
 )
 from catalyst.jax_primitives import quantum_kernel_p
-from catalyst.jax_tracer import trace_quantum_function, Function
+from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.passes import pipeline
 from catalyst.tracing.contexts import EvaluationContext

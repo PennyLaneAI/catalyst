@@ -93,7 +93,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
                 // Replace calls with calls.zne
                 if (containQnodes) {
-
                     currentFnFoldedOp.walk([&](func::CallOp callOp) {
                         PatternRewriter::InsertionGuard insertGuard(rewriter);
                         func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
@@ -313,7 +312,6 @@ FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFo
 FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
                                   func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
-
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
