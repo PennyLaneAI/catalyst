@@ -29,7 +29,7 @@ from catalyst import CompileError, qjit
 # comments (COM:).
 
 try:
-    # COM: CHECK-LABEL: private @sample1(
+    # COM: CHECK-LABEL: public @sample1(
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
     def sample1(x: float, y: float):
@@ -44,7 +44,7 @@ try:
 
     print(sample1.mlir)
 
-    # COM: CHECK-LABEL: private @sample2(
+    # COM: CHECK-LABEL: public @sample2(
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
     def sample2(x: float, y: float):
@@ -65,7 +65,7 @@ except CompileError:
     ...
 
 
-# CHECK-LABEL: private @sample3(
+# CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
 def sample3(x: float, y: float):
@@ -92,7 +92,7 @@ print(sample3.mlir)
 #
 try:
 
-    # COM: CHECK-LABEL: private @counts1(
+    # COM: CHECK-LABEL: public @counts1(
     @qjit(target="mlir")
     @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
     def counts1(x: float, y: float):
@@ -127,7 +127,7 @@ except:
     ...
 
 
-# CHECK-LABEL: private @counts3(
+# CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
 def counts3(x: float, y: float):
@@ -145,7 +145,7 @@ def counts3(x: float, y: float):
 print(counts3.mlir)
 
 
-# CHECK-LABEL: private @expval1(
+# CHECK-LABEL: public @expval1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval1(x: float, y: float):
@@ -162,7 +162,7 @@ def expval1(x: float, y: float):
 print(expval1.mlir)
 
 
-# CHECK-LABEL: private @expval2(
+# CHECK-LABEL: public @expval2(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval2(x: float, y: float):
@@ -184,7 +184,7 @@ def expval2(x: float, y: float):
 print(expval2.mlir)
 
 
-# CHECK-LABEL: private @expval3(
+# CHECK-LABEL: public @expval3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval3():
@@ -198,7 +198,7 @@ def expval3():
 print(expval3.mlir)
 
 
-# CHECK-LABEL: private @expval4(
+# CHECK-LABEL: public @expval4(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval4():
@@ -219,7 +219,7 @@ def expval4():
 print(expval4.mlir)
 
 
-# CHECK-LABEL: private @expval5(
+# CHECK-LABEL: public @expval5(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval5(x: float, y: float):
@@ -249,7 +249,7 @@ def expval5(x: float, y: float):
 print(expval5.mlir)
 
 
-# CHECK-LABEL: private @expval5(
+# CHECK-LABEL: public @expval5(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval5(x: float, y: float):
@@ -277,7 +277,7 @@ def expval5(x: float, y: float):
 print(expval5.mlir)
 
 
-# CHECK-LABEL: private @expval6(
+# CHECK-LABEL: public @expval6(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval6(x: float):
@@ -306,7 +306,7 @@ def expval6(x: float):
 print(expval6.mlir)
 
 
-# CHECK-LABEL: private @expval7(
+# CHECK-LABEL: public @expval7(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval7():
@@ -320,7 +320,7 @@ def expval7():
 print(expval7.mlir)
 
 
-# CHECK-LABEL: private @expval8(
+# CHECK-LABEL: public @expval8(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval8():
@@ -341,7 +341,7 @@ def expval8():
 print(expval8.mlir)
 
 
-# CHECK-LABEL: private @expval9(
+# CHECK-LABEL: public @expval9(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval9(x: float, y: float):
@@ -363,7 +363,7 @@ def expval9(x: float, y: float):
 print(expval9.mlir)
 
 
-# CHECK-LABEL: private @expval10(
+# CHECK-LABEL: public @expval10(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def expval10(x: float, y: float):
@@ -393,7 +393,7 @@ def expval10(x: float, y: float):
 print(expval10.mlir)
 
 
-# CHECK-LABEL: private @var1(
+# CHECK-LABEL: public @var1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def var1(x: float, y: float):
@@ -410,7 +410,7 @@ def var1(x: float, y: float):
 print(var1.mlir)
 
 
-# CHECK-LABEL: private @var2(
+# CHECK-LABEL: public @var2(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def var2(x: float, y: float):
@@ -435,7 +435,7 @@ def var2(x: float, y: float):
 print(var2.mlir)
 
 
-# CHECK-LABEL: private @probs1(
+# CHECK-LABEL: public @probs1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def probs1(x: float, y: float):
@@ -456,7 +456,7 @@ def probs1(x: float, y: float):
 print(probs1.mlir)
 
 
-# CHECK-LABEL: private @state1(
+# CHECK-LABEL: public @state1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state1(x: float, y: float):

@@ -27,6 +27,7 @@ import jax
 import jax.numpy as jnp
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
+from jax.core import call_p
 from pennylane import QNode
 
 import catalyst
@@ -34,10 +35,10 @@ from catalyst.jax_extras import Jaxpr, make_jaxpr2
 from catalyst.jax_primitives import (
     GradParams,
     expval_p,
-    func_p,
     grad_p,
     jvp_p,
     probs_p,
+    quantum_kernel_p,
     value_and_grad_p,
     vjp_p,
 )
@@ -832,7 +833,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
-            if primitive is func_p:
+            if primitive in {call_p, quantum_kernel_p}:
                 child_jaxpr = eqn.params.get("call_jaxpr")
             elif primitive is grad_p:
                 child_jaxpr = eqn.params.get("jaxpr")
@@ -841,7 +842,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
             _check_primitive_is_differentiable(primitive, method)
 
-            py_callable = eqn.params.get("fn")
+            py_callable = eqn.params.get("qnode")
             if py_callable not in visited:
                 if isinstance(py_callable, QNode):
                     _check_qnode_against_grad_method(py_callable, method, child_jaxpr)

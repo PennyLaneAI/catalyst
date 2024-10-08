@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+// Step 3 is inlining
+// RUN: quantum-opt --inline-nested-module=stop-after-step=3 --split-input-file --verify-diagnostics %s | FileCheck %s
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
+// CHECK-LABEL: module @outer
+// CHECK-NOT: module @inner
+// CHECK: func.func @f_0
+// CHECK-NOT module @inner
+module @outer {
+  module @inner {
+    func.func @f() {
+      return
+    }
+  }
+}
 
-namespace catalyst {
-namespace quantum {
-
-void removeQuantumMeasurements(mlir::func::FuncOp &function, mlir::PatternRewriter &rewriter);
-void replaceQuantumMeasurements(mlir::func::FuncOp &function, mlir::PatternRewriter &rewriter);
-mlir::LogicalResult verifyQuantumFree(mlir::func::FuncOp function);
-
-} // namespace quantum
-} // namespace catalyst

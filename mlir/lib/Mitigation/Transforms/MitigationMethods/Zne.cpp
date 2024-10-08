@@ -259,7 +259,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 {
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnFoldedName = op.getCallee().str() + ".folded";
+    std::string fnFoldedName = op.getCallee().getLeafReference().str() + ".folded";
     MLIRContext *ctx = rewriter.getContext();
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnFoldedName)) {
@@ -319,7 +319,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                              fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
-
     rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
 
     Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
@@ -345,7 +344,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
     Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    std::string fnAllocName = op.getCallee().str() + ".quantumAlloc";
+    std::string fnAllocName = op.getCallee().getLeafReference().str() + ".quantumAlloc";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnAllocName)) {
         return SymbolRefAttr::get(ctx, fnAllocName);
     }
@@ -370,7 +369,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnWithoutMeasurementsName = op.getCallee().str() + ".withoutMeasurements";
+    std::string fnWithoutMeasurementsName =
+        op.getCallee().getLeafReference().str() + ".withoutMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
     }
@@ -412,7 +412,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
-    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
+    quantum::replaceQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
     return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
@@ -423,7 +423,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
-    std::string fnWithMeasurementsName = op.getCallee().str() + ".withMeasurements";
+    std::string fnWithMeasurementsName =
+        op.getCallee().getLeafReference().str() + ".withMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
     }
