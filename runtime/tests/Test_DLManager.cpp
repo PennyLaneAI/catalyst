@@ -21,18 +21,6 @@
 
 using namespace Catalyst::Runtime;
 
-QuantumDevice *loadDevice(std::string device_name, std::string filename)
-{
-    std::unique_ptr<SharedLibraryManager> init_rtd_dylib =
-        std::make_unique<SharedLibraryManager>(filename);
-    std::string factory_name{device_name + "Factory"};
-    void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
-
-    // LCOV_EXCL_START
-    return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("") : nullptr;
-    // LCOV_EXCL_STOP
-}
-
 TEST_CASE("Test dummy", "[Third Party]")
 {
     std::string file("this-file-does-not-exist" + get_dylib_ext());
@@ -56,12 +44,6 @@ TEST_CASE("Test error message if init device fails", "[Third Party]")
     REQUIRE_THROWS_WITH(loadDevice("", file), Catch::Contains("undefined symbol: Factory"));
 }
 #endif
-
-TEST_CASE("Test success of loading a device", "[Third Party]")
-{
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    CHECK(loadDevice("NullDevice", "librtd_null_device" + get_dylib_ext()));
-}
 
 TEST_CASE("Test __catalyst__rt__device_init registering a custom device with shots=500 and "
           "device=lightning.qubit",

@@ -24,17 +24,34 @@
 
 #include "catch2/catch.hpp"
 
-#include "LightningSimulator.hpp"
+#include "ExecutionContext.hpp"
+#include "QuantumDevice.hpp"
+
+#include <iostream>
+
+/// @cond DEV
+namespace {
+using namespace Catalyst::Runtime;
+} // namespace
+/// @endcond
 
 /**
  * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
  */
+#if __has_include("LightningSimulator.hpp")
+#include "LightningSimulator.hpp"
 #if __has_include("LightningKokkosSimulator.hpp")
 #include "LightningKokkosSimulator.hpp"
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
                             Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
 #else
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
+#endif
+#else
+#if __has_include("LightningKokkosSimulator.hpp")
+#include "LightningKokkosSimulator.hpp"
+using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
+#endif
 #endif
 
 /**
@@ -73,3 +90,15 @@ static inline MemRefT_CplxT_double_1d getState(size_t buffer_len)
 }
 
 static inline void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
+
+static inline QuantumDevice *loadDevice(std::string device_name, std::string filename)
+{
+    std::unique_ptr<SharedLibraryManager> init_rtd_dylib =
+        std::make_unique<SharedLibraryManager>(filename);
+    std::string factory_name{device_name + "Factory"};
+    void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
+
+    // LCOV_EXCL_START
+    return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("") : nullptr;
+    // LCOV_EXCL_STOP
+}

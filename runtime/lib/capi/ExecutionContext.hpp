@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include <dlfcn.h>
 
 #include <cstdio>
@@ -182,7 +184,11 @@ class RTDevice {
         // Besides, this provides support for runtime device (RTD) libraries added to the system
         // path. This maintains backward compatibility for specifying a device using its name.
         // TODO: This support may need to be removed after updating the C++ unit tests.
-        if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
+        if (rtd_lib == "null.qubit") {
+            rtd_name = "NullDevice";
+            _complete_dylib_os_extension(rtd_lib, "null_device");
+        }
+        else if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
             rtd_name =
                 (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
             _complete_dylib_os_extension(rtd_lib, "lightning");
