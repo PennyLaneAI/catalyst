@@ -198,9 +198,10 @@ class ZNE:
 
         # Certain callables, like QNodes, may introduce additional wrappers during tracing.
         # Make sure to grab the top-level callable object in the traced function.
-        print(jaxpr.eqns[0].params)
-        # fn = jaxpr.eqns[0].params.get("fn")
-        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=self.fn)
+        fn = jaxpr.eqns[0].params.get("fn", self.fn)
+        # breakpoint()
+
+        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=fn)
         float_num_folds = jnp.array(self.num_folds, dtype=float)
         results = self.extrapolate(float_num_folds, results[0])
         # Single measurement

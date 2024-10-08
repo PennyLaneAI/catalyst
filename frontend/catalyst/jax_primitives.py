@@ -1051,6 +1051,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         fn: the function to be mitigated
     """
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
+
     lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_ref = get_symbolref(ctx, func_op)
