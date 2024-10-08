@@ -18,7 +18,7 @@ LIGHTNING_GIT_TAG_VALUE?=6f3e0d5d371ff9823a3177dd2c66052668883d42
 ENABLE_LAPACK?=OFF
 
 BUILD_TARGETS := rt_capi rtd_null_device
-TEST_TARGETS := ""
+TEST_TARGETS := runner_tests_qir_runtime
 
 ifeq ($(ENABLE_LIGHTNING), ON)
 	BUILD_TARGETS += rtd_lightning
@@ -119,19 +119,18 @@ runtime: configure
 $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
-.PHONY: null_device
-null_device:
-	cmake --build $(RT_BUILD_DIR) --target rtd_null_device -j$(NPROC)
-
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
-	@echo "test the Catalyst runtime test suite"
+	@echo "Catalyst runtime test suite - NullDevice"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+ifeq ($(ENABLE_LIGHTNING), ON)
 	# Test the Lightning suite C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
+endif
 
 .PHONY: coverage
 coverage: lq_target
