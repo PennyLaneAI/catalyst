@@ -44,7 +44,7 @@ from catalyst.utils.toml import OperationProperties
 # pylint: disable=attribute-defined-outside-init
 
 
-class NullDevice(Device):
+class NullQubit(Device):
     """A null device from the device API."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
@@ -66,7 +66,7 @@ class NullDevice(Device):
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
         )
-        return "NullDevice", lib_path
+        return "NullQubit", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -82,7 +82,7 @@ class NullDevice(Device):
         return transform_program, execution_config
 
 
-class NullDeviceLimitedMPs(Device):
+class NullQubitLimitedMPs(Device):
     """A null device from the device API without wires."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
@@ -103,7 +103,7 @@ class NullDeviceLimitedMPs(Device):
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
         )
-        return "NullDevice", lib_path
+        return "NullQubit", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -313,7 +313,7 @@ class TestMeasurementTransforms:
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements
 
-        with NullDeviceLimitedMPs(
+        with NullQubitLimitedMPs(
             wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
@@ -742,7 +742,7 @@ class TestMeasurementTransforms:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        dev = NullDevice(wires=4, shots=1000)
+        dev = NullQubit(wires=4, shots=1000)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)

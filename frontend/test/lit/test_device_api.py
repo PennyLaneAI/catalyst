@@ -28,7 +28,7 @@ from catalyst import qjit
 from catalyst.compiler import get_lib_path
 
 
-class NullDevice(Device):
+class NullQubit(Device):
     """A null device, from the device API, that does nothing."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
@@ -46,7 +46,7 @@ class NullDevice(Device):
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
         )
 
-        return "NullDevice", lightning_lib_path
+        return "NullQubit", lightning_lib_path
 
     def execute(self, circuits, execution_config):
         """Execute"""
@@ -65,8 +65,8 @@ class NullDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullDevice", "{'shots': 2048}"]
-    dev = NullDevice(wires=2, shots=2048)
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
+    dev = NullQubit(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)
@@ -90,8 +90,8 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullDevice", "{'shots': 2048}"]
-    dev = NullDevice(wires=2, shots=2048)
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
+    dev = NullQubit(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)

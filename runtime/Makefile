@@ -121,7 +121,7 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
-	@echo "Catalyst runtime test suite - NullDevice"
+	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests

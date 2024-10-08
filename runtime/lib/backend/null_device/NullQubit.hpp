@@ -1,14 +1,14 @@
 #include <QuantumDevice.hpp>
 
 namespace Catalyst::Runtime::Devices {
-struct NullDevice final : public Catalyst::Runtime::QuantumDevice {
-    NullDevice(const std::string &kwargs = "{}") {}
-    ~NullDevice() = default; // LCOV_EXCL_LINE
+struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
+    NullQubit(const std::string &kwargs = "{}") {}
+    ~NullQubit() = default; // LCOV_EXCL_LINE
 
-    NullDevice &operator=(const QuantumDevice &) = delete;
-    NullDevice(const NullDevice &) = delete;
-    NullDevice(NullDevice &&) = delete;
-    NullDevice &operator=(QuantumDevice &&) = delete;
+    NullQubit &operator=(const QuantumDevice &) = delete;
+    NullQubit(const NullQubit &) = delete;
+    NullQubit(NullQubit &&) = delete;
+    NullQubit &operator=(QuantumDevice &&) = delete;
 
     auto AllocateQubit() -> QubitIdType override { return 0; }
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override

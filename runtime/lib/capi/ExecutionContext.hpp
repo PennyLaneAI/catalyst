@@ -185,7 +185,7 @@ class RTDevice {
         // path. This maintains backward compatibility for specifying a device using its name.
         // TODO: This support may need to be removed after updating the C++ unit tests.
         if (rtd_lib == "null.qubit") {
-            rtd_name = "NullDevice";
+            rtd_name = "NullQubit";
             _complete_dylib_os_extension(rtd_lib, "null_device");
         }
         else if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {

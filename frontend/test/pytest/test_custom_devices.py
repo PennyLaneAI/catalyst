@@ -133,7 +133,7 @@ RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
-    class NullDevice(qml.devices.QubitDevice):
+    class NullQubit(qml.devices.QubitDevice):
         """Null Device"""
 
         name = "Null Device"
@@ -164,9 +164,9 @@ def test_custom_device_load():
                 + "/librtd_null_device"
                 + system_extension
             )
-            return "NullDevice", lib_path
+            return "NullQubit", lib_path
 
-    device = NullDevice(wires=1)
+    device = NullQubit(wires=1)
     capabilities = get_device_capabilities(device)
     backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
@@ -176,7 +176,7 @@ def test_custom_device_load():
     @qml.qnode(device)
     def f():
         """This function would normally return False.
-        However, NullDevice as defined in librtd_null_device.so
+        However, NullQubit as defined in librtd_null_device.so
         has been implemented to always return True."""
         return measure(0)
 

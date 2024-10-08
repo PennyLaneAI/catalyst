@@ -14,7 +14,7 @@
 // limitations under the License.
 
 #include "ExecutionContext.hpp"
-#include "NullDevice.hpp"
+#include "NullQubit.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
@@ -26,7 +26,7 @@ using namespace Catalyst::Runtime::Devices;
 TEST_CASE("Test success of loading a device", "[Null Device]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    CHECK(loadDevice("NullDevice", "librtd_null_device" + get_dylib_ext()));
+    CHECK(loadDevice("NullQubit", "librtd_null_device" + get_dylib_ext()));
 }
 
 TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Null Device]")
@@ -41,8 +41,8 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test NullDevice loading is successful.", "[Null Device]")
+TEST_CASE("Test NullQubit loading is successful.", "[Null Device]")
 {
-    std::unique_ptr<NullDevice> sim = std::make_unique<NullDevice>();
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
     sim->AllocateQubit();
 }

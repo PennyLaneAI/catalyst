@@ -35,7 +35,7 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     )
 
 target_sources(runner_tests_qir_runtime PRIVATE
-    Test_NullDevice.cpp
+    Test_NullQubit.cpp
     )
 
 catch_discover_tests(runner_tests_qir_runtime)

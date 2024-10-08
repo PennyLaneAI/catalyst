@@ -37,7 +37,7 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
-class NullDevice(Device):
+class NullQubit(Device):
     """A null device from the device API."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
@@ -55,7 +55,7 @@ class NullDevice(Device):
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
         )
-        return "NullDevice", lib_path
+        return "NullQubit", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -71,7 +71,7 @@ class NullDevice(Device):
         return transform_program, execution_config
 
 
-class NullDeviceNoWires(Device):
+class NullQubitNoWires(Device):
     """A null device from the device API without wires."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
@@ -89,7 +89,7 @@ class NullDeviceNoWires(Device):
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
         )
-        return "NullDevice", lib_path
+        return "NullQubit", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -98,7 +98,7 @@ class NullDeviceNoWires(Device):
 
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
-    device = NullDevice(wires=10, shots=2032)
+    device = NullQubit(wires=10, shots=2032)
 
     # Create qjit device
     device_qjit = QJITDevice(device)
@@ -129,7 +129,7 @@ def test_qjit_device():
 
 def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
-    device = NullDeviceNoWires(shots=2032)
+    device = NullQubitNoWires(shots=2032)
 
     with pytest.raises(
         AttributeError, match="Catalyst does not support device instances without set wires."
@@ -148,7 +148,7 @@ def test_qjit_device_no_wires():
 )
 def test_qjit_device_invalid_wires(wires):
     """Test the qjit device from a device using the new api without wires set."""
-    device = NullDeviceNoWires(shots=2032)
+    device = NullQubitNoWires(shots=2032)
     device._wires = wires
 
     with pytest.raises(
@@ -202,7 +202,7 @@ def test_qjit_device_measurements(shots, mocker):
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = NullDevice(wires=2, shots=2048)
+    dev = NullQubit(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)

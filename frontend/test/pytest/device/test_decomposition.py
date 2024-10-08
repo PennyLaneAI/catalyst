@@ -176,7 +176,7 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
                 + "/librtd_null_device"
                 + system_extension
             )
-            return "NullDevice", lib_path
+            return "NullQubit", lib_path
 
         def execute(self, circuits, execution_config):
             """Execution."""
