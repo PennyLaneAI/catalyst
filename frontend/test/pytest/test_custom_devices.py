@@ -184,11 +184,11 @@ def test_custom_device_load():
 def test_custom_device_bad_directory():
     """Test that custom device error."""
 
-    class DummyDevice(qml.devices.QubitDevice):
-        """Dummy Device"""
+    class CustomDevice(qml.devices.QubitDevice):
+        """Custom Device"""
 
-        name = "Null Qubit"
-        short_name = "null.qubit"
+        name = "Custom Qubit"
+        short_name = "custom.qubit"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -209,14 +209,14 @@ def test_custom_device_bad_directory():
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "DummyDevice", "this-file-does-not-exist.so"
+            return "CustomDevice", "this-file-does-not-exist.so"
 
     with pytest.raises(
         CompileError, match="Device at this-file-does-not-exist.so cannot be found!"
     ):
 
         @qjit
-        @qml.qnode(DummyDevice(wires=1))
+        @qml.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
 
@@ -224,11 +224,11 @@ def test_custom_device_bad_directory():
 def test_custom_device_no_c_interface():
     """Test that custom device error."""
 
-    class DummyDevice(qml.devices.QubitDevice):
-        """Dummy Device"""
+    class CustomDevice(qml.devices.QubitDevice):
+        """Custom Device"""
 
-        name = "Null Qubit"
-        short_name = "null.qubit"
+        name = "Custom Qubit"
+        short_name = "custom.qubit"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -248,6 +248,6 @@ def test_custom_device_no_c_interface():
     ):
 
         @qjit
-        @qml.qnode(DummyDevice(wires=1))
+        @qml.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
