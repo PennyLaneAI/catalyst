@@ -119,7 +119,7 @@ def test_var():
 
 
 def test_probs():
-    """Test that the var primitive can be captured by jaxpr."""
+    """Test that the probs primitive can be captured by jaxpr."""
 
     def f():
         obs = compbasis_p.bind()
@@ -132,7 +132,7 @@ def test_probs():
 
 
 def test_probs_dynamic():
-    """Test that the var primitive can be captured by jaxpr
+    """Test that the probs primitive can be captured by jaxpr
     when using tracers."""
 
     def f(dim_0):
