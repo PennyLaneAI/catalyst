@@ -213,6 +213,9 @@ struct CallbackCallOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
+        // The method returns `true` if the given OpOperand bufferizes to a memory write.
+        // Since CallbackCallOp is related to print, which does not write to its operand,
+        // Maybe we can set this to `false`.
         return false;
     }
 
