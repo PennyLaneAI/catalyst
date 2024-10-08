@@ -177,10 +177,9 @@ class ZNECallable(CatalystCallable):
         super().__init__("fn")
 
     def __call__(self, *args, **kwargs):
-        """Specifies the actual call to the folded circuit."""
-        if isinstance(self.fn, Callable) and not isinstance(self.fn, (Function, qml.QNode)):
-            self.fn = Function(self.fn)
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
+        """Specifies the an actual call to the folded circuit."""
+        callable_fn = _make_function(self.fn)
+        jaxpr = jax.make_jaxpr(callable_fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
         set_dtypes = set(dtypes)
@@ -199,8 +198,12 @@ class ZNECallable(CatalystCallable):
 
         # Certain callables, like QNodes, may introduce additional wrappers during tracing.
         # Make sure to grab the top-level callable object in the traced function.
-        fn = jaxpr.eqns[0].params.get("fn")
-        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=fn)
+        callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
+        assert callable(callable_fn)
+
+        results = zne_p.bind(
+            *args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=callable_fn
+        )
         float_num_folds = jnp.array(self.num_folds, dtype=float)
         results = self.extrapolate(float_num_folds, results[0])
         # Single measurement
@@ -213,3 +216,11 @@ class ZNECallable(CatalystCallable):
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
     return functools.partial(qml.transforms.poly_extrapolate, order=degree)
+
+
+## PRIVATE ##
+def _make_function(fn):
+    if isinstance(fn, (Function, qml.QNode)):
+        return fn
+    elif isinstance(fn, Callable):  # Keep at the bottom
+        return Function(fn)

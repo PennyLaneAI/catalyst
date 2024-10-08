@@ -35,13 +35,48 @@
 namespace catalyst {
 namespace mitigation {
 
+bool containsQnodes(func::FuncOp funcOp)
+{
+    bool containsQnodes = false;
+    funcOp.walk([&](func::CallOp op) {
+        auto insideFuncOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+        if (insideFuncOp->hasAttr("qnode")) {
+            containsQnodes = true;
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+    return containsQnodes;
+}
+
+func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
+{
+    auto loc = funcOp.getLoc();
+    TypeRange originalTypes = funcOp.getArgumentTypes();
+    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
+    Type indexType = rewriter.getIndexType();
+    typesFolded.push_back(indexType);
+    FunctionType fnFoldedType = FunctionType::get(funcOp.getContext(),
+                                                  /*inputs=*/typesFolded,
+                                                  /*outputs=*/funcOp.getResultTypes());
+    std::string fnFoldedName = funcOp.getName().str() + ".zne";
+    auto fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
+
+    rewriter.cloneRegionBefore(funcOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+
+    Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
+    rewriter.setInsertionPointToStart(fnFoldedOpBlock);
+    fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
+    return fnFoldedOp;
+}
+
 LogicalResult ZneLowering::match(mitigation::ZneOp op) const { return success(); }
 
 // TODO: Optimize the traversal of call graphs (currently used twice)
 // Also all functions exploree in the call graph get their ZNE version.
 void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
-    auto point = rewriter.saveInsertionPoint();
     Location loc = op.getLoc();
     auto moduleOp = op->getParentOfType<ModuleOp>();
     // Number of folds
@@ -55,45 +90,18 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
     func::FuncOp fnFoldedOp;
 
-    // Traverse the callgraph and replace qnodes with folded qnodes.
     if (!calleeOp->hasAttr("qnode")) {
+        // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
         traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
             if (!funcOp->hasAttr("qnode")) {
-
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPointToStart(moduleOp.getBody());
-                TypeRange originalTypes = funcOp.getArgumentTypes();
-                SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
-                Type indexType = rewriter.getIndexType();
-                typesFolded.push_back(indexType);
-                FunctionType fnFoldedType = FunctionType::get(op.getContext(),
-                                                              /*inputs=*/typesFolded,
-                                                              /*outputs=*/funcOp.getResultTypes());
-                std::string fnFoldedName = funcOp.getName().str() + ".zne";
-                auto currentFnFoldedOp =
-                    rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
 
-                rewriter.cloneRegionBefore(funcOp.getBody(), currentFnFoldedOp.getBody(),
-                                           currentFnFoldedOp.end());
-
-                Block *currentFnFoldedOpBlock = &currentFnFoldedOp.getBody().front();
-                rewriter.setInsertionPointToStart(currentFnFoldedOpBlock);
-                currentFnFoldedOpBlock->addArgument(currentFnFoldedOp.getArgumentTypes().back(),
-                                                    loc);
-
-                bool containQnodes = false;
-                funcOp.walk([&](func::CallOp op) {
-                    auto insideFuncOp =
-                        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-                    if (insideFuncOp->hasAttr("qnode")) {
-                        containQnodes = true;
-                        return WalkResult::interrupt();
-                    }
-                    return WalkResult::advance();
-                });
-
-                // Replace calls with calls.zne
-                if (containQnodes) {
-
+                // Copy the function and create a .zne counter part and add the scale factor as last
+                // argument
+                auto currentFnFoldedOp = createZneFunc(funcOp, rewriter);
+                // Folding of the qnodes and replace their calls with the folded version
+                if (containsQnodes(currentFnFoldedOp)) {
                     currentFnFoldedOp.walk([&](func::CallOp callOp) {
                         PatternRewriter::InsertionGuard insertGuard(rewriter);
                         func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
@@ -122,22 +130,23 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                             rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
                         }
                     });
-                    rewriter.restoreInsertionPoint(point);
                 }
             }
         });
+
         std::string fnName = calleeOp.getName().str() + ".zne";
         FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
         fnFoldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
-
+        // Traverse the call graph a second time, in orderd to replace the function calls to their
+        // .zne counterparts.
         traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
             funcOp.walk([&](func::CallOp callOp) {
+                PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 std::string fnName = callOp.getCallee().str() + ".zne";
                 FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
                 auto currentFnFoldedOp =
                     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
                 if (currentFnFoldedOp) {
-                    PatternRewriter::InsertionGuard insertionGuard(rewriter);
                     rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());
 
                     callOp.setCallee(currentFnFoldedOp.getName());
@@ -226,6 +235,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
 }
+
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
                                 StringAttr lib, StringAttr name, StringAttr kwargs,
@@ -313,7 +323,6 @@ FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFo
 FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
                                   func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
-
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
@@ -359,7 +368,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 {
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnFoldedName = op.getCallee().getLeafReference().str() + ".folded";
+    std::string fnFoldedName = op.getName().str() + ".folded";
 
     MLIRContext *ctx = rewriter.getContext();
 
@@ -445,7 +454,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
     Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    std::string fnAllocName = op.getCallee().getLeafReference().str() + ".quantumAlloc";
+    std::string fnAllocName = op.getName().str() + ".quantumAlloc";
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnAllocName)) {
         return SymbolRefAttr::get(ctx, fnAllocName);
@@ -471,8 +480,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnWithoutMeasurementsName =
-        op.getCallee().getLeafReference().str() + ".withoutMeasurements";
+    std::string fnWithoutMeasurementsName = op.getName().str() + ".withoutMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
     }
@@ -524,8 +532,7 @@ ZneLowering::getOrInsertFnWithMeasurements(Location loc, PatternRewriter &rewrit
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
-    std::string fnWithMeasurementsName =
-        op.getCallee().getLeafReference().str() + ".withMeasurements";
+    std::string fnWithMeasurementsName = op.getName().str() + ".withMeasurements";
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
