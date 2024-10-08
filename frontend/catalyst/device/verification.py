@@ -330,10 +330,10 @@ def validate_measurements(
                 f"Sample-based measurements like {m} cannot work with shots=None. "
                 "Please specify a finite number of shots."
             )
-        mp_name = m.return_type.value if m.return_type else type(m).__name__
-        if not mp_name.title() in capabilities.measurement_processes:
+        mp_name = type(m).__name__
+        if not mp_name in capabilities.measurement_processes:
             raise CompileError(
-                f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"
+                f"{mp_name} is not a supported measurement process on '{name}' with Catalyst"
             )
 
     return (tape,), lambda x: x[0]
