@@ -23,13 +23,13 @@
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Devices;
 
-TEST_CASE("Test success of loading a device", "[Null Device]")
+TEST_CASE("Test success of loading a device", "[Null Qubit]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     CHECK(loadDevice("NullQubit", "librtd_null_device" + get_dylib_ext()));
 }
 
-TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Null Device]")
+TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Null Qubit]")
 {
     __catalyst__rt__initialize(nullptr);
 
@@ -41,7 +41,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test NullQubit loading is successful.", "[Null Device]")
+TEST_CASE("Test NullQubit loading is successful.", "[Null Qubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
     sim->AllocateQubit();

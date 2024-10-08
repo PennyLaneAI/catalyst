@@ -78,7 +78,7 @@ def get_test_device_capabilities(
 
 
 class NullQubit(Device):
-    """A null device from the device API."""
+    """A Null Qubit from the device API."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 

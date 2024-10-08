@@ -134,10 +134,10 @@ def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
     class NullQubit(qml.devices.QubitDevice):
-        """Null Device"""
+        """Null Qubit"""
 
-        name = "Null Device"
-        short_name = "null.device"
+        name = "Null Qubit"
+        short_name = "null.qubit"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -189,8 +189,8 @@ def test_custom_device_bad_directory():
     class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
-        name = "Null Device"
-        short_name = "null.device"
+        name = "Null Qubit"
+        short_name = "null.qubit"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -229,8 +229,8 @@ def test_custom_device_no_c_interface():
     class DummyDevice(qml.devices.QubitDevice):
         """Dummy Device"""
 
-        name = "Null Device"
-        short_name = "null.device"
+        name = "Null Qubit"
+        short_name = "null.qubit"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
@@ -246,7 +246,7 @@ def test_custom_device_no_c_interface():
             raise RuntimeError("Dummy device")
 
     with pytest.raises(
-        CompileError, match="The null.device device does not provide C interface for compilation."
+        CompileError, match="The null.qubit device does not provide C interface for compilation."
     ):
 
         @qjit

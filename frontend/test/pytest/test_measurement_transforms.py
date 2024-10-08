@@ -45,7 +45,7 @@ from catalyst.utils.toml import OperationProperties
 
 
 class NullQubit(Device):
-    """A null device from the device API."""
+    """A Null Qubit from the device API."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 
@@ -83,7 +83,7 @@ class NullQubit(Device):
 
 
 class NullQubitLimitedMPs(Device):
-    """A null device from the device API without wires."""
+    """A Null Qubit from the device API without wires."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 

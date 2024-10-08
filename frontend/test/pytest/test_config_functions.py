@@ -35,8 +35,8 @@ from catalyst.utils.toml import (
 class DeviceToBeTested(qml.devices.QubitDevice):
     """Test device"""
 
-    name = "Null Device"
-    short_name = "null.device"
+    name = "Null Qubit"
+    short_name = "null.qubit"
     pennylane_requires = "0.33.0"
     version = "0.0.1"
     author = "Dummy"

@@ -29,7 +29,7 @@ from catalyst.compiler import get_lib_path
 
 
 class NullQubit(Device):
-    """A null device, from the device API, that does nothing."""
+    """A Null Qubit, from the device API, that does nothing."""
 
     config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
 
