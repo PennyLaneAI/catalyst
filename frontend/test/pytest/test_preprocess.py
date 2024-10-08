@@ -13,14 +13,10 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
-
-import pathlib
-import platform
 from dataclasses import replace
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from typing import Optional
 
 import numpy as np
 import pennylane as qml
