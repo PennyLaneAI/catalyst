@@ -176,10 +176,10 @@ class ZNE:
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
         if isinstance(self.fn, (Function, qml.QNode)):
-            self.fn = self.fn
+            callable_fn = self.fn
         elif isinstance(self.fn, Callable):  # Keep at the bottom
-            self.fn = Function(self.fn)
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
+            callable_fn = Function(self.fn)
+        jaxpr = jax.make_jaxpr(callable_fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
         set_dtypes = set(dtypes)
@@ -198,10 +198,12 @@ class ZNE:
 
         # Certain callables, like QNodes, may introduce additional wrappers during tracing.
         # Make sure to grab the top-level callable object in the traced function.
-        fn = jaxpr.eqns[0].params.get("fn", self.fn)
-        # breakpoint()
+        callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
+        assert callable(callable_fn)
 
-        results = zne_p.bind(*args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=fn)
+        results = zne_p.bind(
+            *args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=callable_fn
+        )
         float_num_folds = jnp.array(self.num_folds, dtype=float)
         results = self.extrapolate(float_num_folds, results[0])
         # Single measurement
