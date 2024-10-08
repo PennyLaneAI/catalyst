@@ -24,6 +24,7 @@ build:
     - graphviz
     - cmake
     - ninja-build
+    - clang
 
 # Optionally set the version of Python and requirements required to build your docs
 python:
