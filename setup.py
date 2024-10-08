@@ -19,7 +19,7 @@
 import glob
 import platform
 import subprocess
-from os import path, environ
+from os import environ, path
 from typing import Optional
 
 from setuptools import Extension, find_namespace_packages, setup
