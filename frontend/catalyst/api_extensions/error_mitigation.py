@@ -148,6 +148,15 @@ def mitigate_with_zne(
 
 
 ## IMPL ##
+
+
+def _make_function(fn):
+    if isinstance(fn, (Function, qml.QNode)):
+        return fn
+    elif isinstance(fn, Callable):  # Keep at the bottom
+        return Function(fn)
+
+
 class ZNE:
     """An object that specifies how a circuit is mitigated with ZNE.
 
@@ -175,10 +184,7 @@ class ZNE:
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
-        if isinstance(self.fn, (Function, qml.QNode)):
-            callable_fn = self.fn
-        elif isinstance(self.fn, Callable):  # Keep at the bottom
-            callable_fn = Function(self.fn)
+        callable_fn = _make_function(self.fn)
         jaxpr = jax.make_jaxpr(callable_fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
