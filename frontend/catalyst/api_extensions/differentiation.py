@@ -793,7 +793,7 @@ def wrap_callable(f: Callable) -> Differentiable:
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
 
-    raise DifferentiableCompileError(f"Differentiation target must be callable, got: {type(f)}")
+    raise TypeError(f"Differentiation target must be callable, got: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(

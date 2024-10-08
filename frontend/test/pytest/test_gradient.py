@@ -1006,7 +1006,7 @@ def test_assert_non_differentiable():
         h = grad("string!", method="fd")
         return h(x)
 
-    with pytest.raises(DifferentiableCompileError, match="Differentiation target must be callable"):
+    with pytest.raises(TypeError, match="Differentiation target must be callable"):
         qjit(workflow)
 
 
