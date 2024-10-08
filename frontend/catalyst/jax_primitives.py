@@ -813,7 +813,7 @@ def _get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
-        if primitive in { func_p, quantum_kernel_p}:
+        if primitive in {func_p, quantum_kernel_p}:
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
