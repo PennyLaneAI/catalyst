@@ -83,7 +83,7 @@ add_subdirectory(tools)
 # The following subsection of code                                           #
 # was taken from the CIRCT project: https://github.com/llvm/circt            #
 # Small alteration were made for Catalyst                                    #
-# The CIRCT project has a the following license:                             #
+# The CIRCT project has the following license:                               #
 #                                                                            #
 #   The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:  #
 #   As an incubator project with ambition to become part of the LLVM Project,#
