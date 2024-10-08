@@ -68,6 +68,7 @@ from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
     expval_p,
+    func_p,
     gphase_p,
     hamiltonian_p,
     hermitian_p,

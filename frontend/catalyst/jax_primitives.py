@@ -274,6 +274,8 @@ for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
+func_p = core.CallPrimitive("func")
+func_p.multiple_results = True
 jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
@@ -749,6 +751,28 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
 
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
     func_op = get_or_create_qnode_funcop(ctx, qnode, call_jaxpr)
+    call_op = create_call_op(ctx, func_op, *args)
+    return call_op.results
+
+
+@func_p.def_impl
+def _func_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _func_lowering(ctx, *args, call_jaxpr, fn):
+    """Lower a quantum function into MLIR in a two step process.
+    The first step is the compilation of the definition of the function fn.
+    The second step is compiling a call to function fn.
+
+    Args:
+      ctx: the MLIR context
+      args: list of arguments or abstract arguments to the function
+      name: name of the function
+      call_jaxpr: the jaxpr representation of the fn
+      fn: the function being compiled
+    """
+    func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
@@ -2354,6 +2378,7 @@ CUSTOM_LOWERING_RULES = (
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
+    (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
     (adjoint_p, _adjoint_lowering),
