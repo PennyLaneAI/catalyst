@@ -14,11 +14,13 @@
 
 #define DEBUG_TYPE "chained-self-inverse"
 
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
+
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+
 using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst;
@@ -70,8 +72,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
 
     bool verifyParentGateType(OpType op, OpType parentOp) const
     {
-        // Verify that the parent gate is of the same type,
-        // and parent's results and current gate's inputs are in the same order
+        // Verify that the parent gate is of the same type.
         // If OpType is quantum.custom, also verify that parent gate has the
         // same gate name.
 
@@ -87,10 +88,39 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
             }
         }
 
-        ValueRange InQubits = op.getInQubits();
-        ValueRange ParentOutQubits = parentOp.getOutQubits();
-        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<OpType>() != parentOp || Qubit != ParentOutQubits[Idx]) {
+        return true;
+    }
+
+    bool verifyAllInQubits(OpType op, OpType parentOp) const
+    {
+        // Verify that parent's results and current gate's inputs are in the same order
+        // If the gates are controlled, both gates' control wires and values
+        // must be the same. The control wires must be in the same order.
+
+        ValueRange inNonCtrlQubits = op.getNonCtrlQubitOperands();
+        ValueRange inCtrlQubits = op.getCtrlQubitOperands();
+        ValueRange parentOutNonCtrlQubits = parentOp.getNonCtrlQubitResults();
+        ValueRange parentOutCtrlQubits = parentOp.getCtrlQubitResults();
+
+        if ((inNonCtrlQubits.size() != parentOutNonCtrlQubits.size()) ||
+            (inCtrlQubits.size() != parentOutCtrlQubits.size())) {
+            return false;
+        }
+
+        for (const auto &[idx, qubit] : llvm::enumerate(inNonCtrlQubits)) {
+            if (qubit.getDefiningOp<OpType>() != parentOp || qubit != parentOutNonCtrlQubits[idx]) {
+                return false;
+            }
+        }
+
+        ValueRange opCtrlValues = op.getCtrlValueOperands();
+        ValueRange parentCtrlValues = parentOp.getCtrlValueOperands();
+        if (opCtrlValues.size() != parentCtrlValues.size()) {
+            return false;
+        }
+
+        for (const auto &[idx, v] : llvm::enumerate(opCtrlValues)) {
+            if (v != parentCtrlValues[idx]) {
                 return false;
             }
         }
@@ -141,12 +171,14 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        // llvm::errs() << "visiting " << op << "\n";
-
         ValueRange InQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<OpType>(InQubits[0].getDefiningOp());
 
         if (!verifyParentGateType(op, parentOp)) {
+            return failure();
+        }
+
+        if (!verifyAllInQubits(op, parentOp)) {
             return failure();
         }
 
@@ -158,9 +190,15 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
             return failure();
         }
 
-        // llvm::errs() << "matched!\n";
-        ValueRange simplifiedVal = parentOp.getInQubits();
-        rewriter.replaceOp(op, simplifiedVal);
+        // Replace uses
+        ValueRange originalNonCtrlQubits = parentOp.getNonCtrlQubitOperands();
+        ValueRange originalCtrlQubits = parentOp.getCtrlQubitOperands();
+        for (const auto &[idx, nonCtrlQubitResult] : llvm::enumerate(op.getNonCtrlQubitResults())) {
+            nonCtrlQubitResult.replaceAllUsesWith(originalNonCtrlQubits[idx]);
+        }
+        for (const auto &[idx, ctrlQubitResult] : llvm::enumerate(op.getCtrlQubitResults())) {
+            ctrlQubitResult.replaceAllUsesWith(originalCtrlQubits[idx]);
+        }
         return success();
     }
 };
