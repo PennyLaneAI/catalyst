@@ -31,7 +31,7 @@ from catalyst.compiler import get_lib_path
 class CustomDevice(Device):
     """A custom device that does nothing."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
@@ -43,7 +43,7 @@ class CustomDevice(Device):
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
         lightning_lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
 
         return "NullQubit", lightning_lib_path
@@ -65,7 +65,7 @@ class CustomDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
     dev = NullQubit(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -90,7 +90,7 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_device.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
     dev = NullQubit(wires=2, shots=2048)
 
     @qjit(target="mlir")

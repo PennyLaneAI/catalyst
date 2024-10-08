@@ -186,7 +186,7 @@ class RTDevice {
         // TODO: This support may need to be removed after updating the C++ unit tests.
         if (rtd_lib == "null.qubit") {
             rtd_name = "NullQubit";
-            _complete_dylib_os_extension(rtd_lib, "null_device");
+            _complete_dylib_os_extension(rtd_lib, "null_qubit");
         }
         else if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
             rtd_name =

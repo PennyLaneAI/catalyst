@@ -47,7 +47,7 @@ from catalyst.utils.toml import OperationProperties
 class NullQubit(Device):
     """A Null Qubit from the device API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -64,7 +64,7 @@ class NullQubit(Device):
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
         lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
         return "NullQubit", lib_path
 
@@ -85,7 +85,7 @@ class NullQubit(Device):
 class NullQubitLimitedMPs(Device):
     """A Null Qubit from the device API without wires."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
@@ -101,7 +101,7 @@ class NullQubitLimitedMPs(Device):
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
         lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_device" + system_extension
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
         return "NullQubit", lib_path
 

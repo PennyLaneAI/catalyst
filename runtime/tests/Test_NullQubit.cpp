@@ -26,7 +26,7 @@ using namespace Catalyst::Runtime::Devices;
 TEST_CASE("Test success of loading a device", "[Null Qubit]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    CHECK(loadDevice("NullQubit", "librtd_null_device" + get_dylib_ext()));
+    CHECK(loadDevice("NullQubit", "librtd_null_qubit" + get_dylib_ext()));
 }
 
 TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Null Qubit]")

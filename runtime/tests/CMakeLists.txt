@@ -31,7 +31,7 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     Catch2::Catch2
     pybind11::embed
     catalyst_qir_runtime
-    rtd_null_device
+    rtd_null_qubit
     )
 
 target_sources(runner_tests_qir_runtime PRIVATE

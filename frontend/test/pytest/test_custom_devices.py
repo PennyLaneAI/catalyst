@@ -161,7 +161,7 @@ def test_custom_device_load():
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             lib_path = (
                 get_lib_path("runtime", "RUNTIME_LIB_DIR")
-                + "/librtd_null_device"
+                + "/librtd_null_qubit"
                 + system_extension
             )
             return "NullQubit", lib_path
@@ -176,7 +176,7 @@ def test_custom_device_load():
     @qml.qnode(device)
     def f():
         """This function would normally return False.
-        However, NullQubit as defined in librtd_null_device.so
+        However, NullQubit as defined in librtd_null_qubit.so
         has been implemented to always return True."""
         return measure(0)
 

@@ -81,8 +81,8 @@ message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
-list(APPEND devices_list rtd_null_device)
-list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_device")
+list(APPEND devices_list rtd_null_qubit)
+list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_qubit")
 
 if(ENABLE_LIGHTNING)
     list(APPEND devices_list pennylane_lightning rtd_lightning)

@@ -17,7 +17,7 @@ ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?=6f3e0d5d371ff9823a3177dd2c66052668883d42
 ENABLE_LAPACK?=OFF
 
-BUILD_TARGETS := rt_capi rtd_null_device
+BUILD_TARGETS := rt_capi rtd_null_qubit
 TEST_TARGETS := runner_tests_qir_runtime
 
 ifeq ($(ENABLE_LIGHTNING), ON)
