@@ -108,7 +108,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         }
 
         for (const auto &[idx, qubit] : llvm::enumerate(inNonCtrlQubits)) {
-            if (qubit.getDefiningOp<OpType>() != parentOp || qubit != parentOutNonCtrlQubits[idx]) {
+            if (qubit.getDefiningOp() != parentOp || qubit != parentOutNonCtrlQubits[idx]) {
                 return false;
             }
         }
