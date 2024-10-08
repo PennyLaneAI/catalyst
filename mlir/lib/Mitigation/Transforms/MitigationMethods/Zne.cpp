@@ -41,7 +41,6 @@ LogicalResult ZneLowering::match(mitigation::ZneOp op) const { return success();
 // Also all functions exploree in the call graph get their ZNE version.
 void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
-    auto point = rewriter.saveInsertionPoint();
     Location loc = op.getLoc();
     auto moduleOp = op->getParentOfType<ModuleOp>();
     // Number of folds
@@ -59,7 +58,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     if (!calleeOp->hasAttr("qnode")) {
         traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
             if (!funcOp->hasAttr("qnode")) {
-
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPointToStart(moduleOp.getBody());
                 TypeRange originalTypes = funcOp.getArgumentTypes();
                 SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
@@ -121,7 +120,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                             rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
                         }
                     });
-                    rewriter.restoreInsertionPoint(point);
                 }
             }
         });
@@ -131,12 +129,12 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
         traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
             funcOp.walk([&](func::CallOp callOp) {
+                PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 std::string fnName = callOp.getCallee().str() + ".zne";
                 FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
                 auto currentFnFoldedOp =
                     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
                 if (currentFnFoldedOp) {
-                    PatternRewriter::InsertionGuard insertionGuard(rewriter);
                     rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());
 
                     callOp.setCallee(currentFnFoldedOp.getName());
