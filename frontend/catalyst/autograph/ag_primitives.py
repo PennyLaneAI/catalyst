@@ -565,9 +565,10 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # through an additional wrapper, while the class is invoked.
         if isinstance(fn, CatalystCallable):
 
-            ag_wrapper = lambda inner_fn: lambda *inner_args, **inner_kwargs: converted_call(
-                inner_fn, inner_args, inner_kwargs, caller_fn_scope, options
-            )
+            def ag_wrapper(inner_fn):
+                return lambda *inner_args, **inner_kwargs: converted_call(
+                    inner_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                )
 
             return fn.call_with_wrapper(ag_wrapper, args, kwargs if kwargs is not None else {})
 

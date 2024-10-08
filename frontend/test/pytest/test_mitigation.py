@@ -14,12 +14,13 @@
 
 """Test integration for catalyst.mitigate_with_zne."""
 
+from functools import partial
+
 import jax
 import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.transforms import exponential_extrapolate
-from functools import partial
 
 import catalyst
 from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
