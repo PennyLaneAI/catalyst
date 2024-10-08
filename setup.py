@@ -126,14 +126,6 @@ description = {
 }
 
 
-class CMakeExtension(Extension):
-    """Custom setuptools Extension for CMake extensions"""
-
-    def __init__(self, name, sourcedir=""):
-        Extension.__init__(self, name, sources=[])
-        self.sourcedir = path.abspath(sourcedir)
-
-
 class CustomBuildExt(build_ext):
     """Custom build extension class for the Catalyst Frontend
 
