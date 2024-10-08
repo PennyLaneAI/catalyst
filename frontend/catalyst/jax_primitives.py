@@ -1760,8 +1760,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, 
 def _probs_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is not compbasis_p:
-        raise TypeError("probs only supports computational basis")
+    assert obs.primitive is compbasis_p, "probs only supports computational basis"
 
     if Signature.is_dynamic_shape(shape):
         return core.DShapedArray(shape, np.dtype("float64"))
@@ -1790,8 +1789,7 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is not compbasis_p:
-        raise TypeError("state only supports computational basis")
+    assert obs.primitive is compbasis_p, "state only supports computational basis"
 
     if Signature.is_dynamic_shape(shape):
         return core.DShapedArray(shape, np.dtype("complex128"))
