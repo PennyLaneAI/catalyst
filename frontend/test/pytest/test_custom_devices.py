@@ -25,7 +25,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
 
-frontend_path = os.path.join(os.getcwd(), "frontend")
+frontend_path = os.path.join(os.path.dirname(__file__), "..")
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
