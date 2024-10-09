@@ -221,25 +221,67 @@ QUANTUM_COMPILATION_PASS = (
     ],
 )
 
+# From: https://mlir.llvm.org/docs/Bufferization/#overview
+#
+# Preprocessing
+#     |               rewrite_in_destination_passing_style
+#     |               -eliminate-empty-tensors
+# Bufferization
+#     |               -one-shot-bufferize
+# Buffer-Level
+# Optimizations
+#     |               -buffer-hoisting
+#     |               -buffer-loop-hoisting
+#     |               -buffer-results-to-out-params
+#     |               -drop-equivalent-buffer-results
+#     |               -promote-buffers-to-stack
+# Deallocation
+#     |               -buffer-deallocation-pipeline
+
 BUFFERIZATION_PASS = (
     "BufferizationPass",
     [
         "inline",
         "gradient-preprocess",
+# Preprocessing:
+# rewrite_in_destination_passing_style
+#
+# We are not rewriting everything in DPS before -one-shot-bufferize
+# This was discussed with the main author of the -one-shot-bufferize
+# pass and he stated the following:
+#
+#     One-Shot Bufferize was designed for ops that are in DPS (destination-passing style).
+#     Ops that are not in DPS can still be bufferized,
+#     but a new buffer will be allocated for every tensor result.
+#     That’s functionally correct but inefficient.
+#
+#     I’m not sure whether it’s better to first migrate to the new bufferization,
+#     then turn the ops into DPS ops, or do it the other way around.
+#     One benefit of implementing the bufferization first is that
+#     it’s a smaller step that you can already run end-to-end.
+#     And you can think of the DPS of a performance improvement on top of it.
+#
+# https://discourse.llvm.org/t/steps-of-migrating-to-one-shot-bufferization/81062/2
+#
+# Here, please note that gradient-preprocessing is different than rewriting in DPS.
+# So, overall, we are skipping this section while we first focus on migrating to the
+# new -one-shot-bufferize
         "eliminate-empty-tensors",
         "convert-elementwise-to-linalg",
         "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops "
         "function-boundary-type-conversion=identity-layout-map}",
-        "canonicalize",  # Remove dead memrefToTensorOp's
-        "gradient-postprocess",
+        "canonicalize",
+        # Remove dead memrefToTensorOp's
         # introduced during gradient-bufferize of callbacks
+        "gradient-postprocess",
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
-        "canonicalize",  # Must be after convert-bufferization-to-memref
+        # Must be after convert-bufferization-to-memref
         # otherwise there are issues in lowering of dynamic tensors.
+        "canonicalize",
         # "cse",
         "cp-global-memref",
     ],
