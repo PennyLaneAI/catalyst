@@ -113,6 +113,12 @@ template <typename OpType> class VerifyParentGateAnalysis {
             }
         }
 
+        for (const auto &[idx, qubit] : llvm::enumerate(inCtrlQubits)) {
+            if (qubit.getDefiningOp() != parentOp || qubit != parentOutCtrlQubits[idx]) {
+                return false;
+            }
+        }
+
         ValueRange opCtrlValues = op.getCtrlValueOperands();
         ValueRange parentCtrlValues = parentOp.getCtrlValueOperands();
         if (opCtrlValues.size() != parentCtrlValues.size()) {
