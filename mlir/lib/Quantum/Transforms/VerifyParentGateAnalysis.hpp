@@ -55,20 +55,20 @@ template <typename OpType> class VerifyParentGateAnalysis {
         auto parentGate = dyn_cast_or_null<OpType>(inQubits[0].getDefiningOp());
 
         if (!verifyParentGateType(gate, parentGate)) {
-            verified = false;
+            succeeded = false;
             return;
         }
 
         if (!verifyAllInQubits(gate, parentGate)) {
-            verified = false;
+            succeeded = false;
             return;
         }
     }
 
-    bool getVerifierResult() { return verified; }
+    bool getVerifierResult() { return succeeded; }
 
   private:
-    bool verified = true;
+    bool succeeded = true;
 
     bool verifyParentGateType(OpType op, OpType parentOp) const
     {
