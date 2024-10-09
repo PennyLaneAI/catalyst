@@ -243,6 +243,7 @@ BUFFERIZATION_PASS = (
     [
         "inline",
         "gradient-preprocess",
+        "convert-elementwise-to-linalg",
 # Preprocessing:
 # rewrite_in_destination_passing_style
 #
@@ -267,7 +268,6 @@ BUFFERIZATION_PASS = (
 # So, overall, we are skipping this section while we first focus on migrating to the
 # new -one-shot-bufferize
         "eliminate-empty-tensors",
-        "convert-elementwise-to-linalg",
         "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops "
         "function-boundary-type-conversion=identity-layout-map}",
         "canonicalize",
