@@ -30,7 +30,8 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ct
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
     mlir::LLVM::TBAATagAttr tag;
-    if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
+    if ((isa<IndexType>(baseType) && !isa<LLVM::StoreOp>(newOp) && !isa<LLVM::LoadOp>(newOp)) ||
+        isa<IntegerType>(baseType)) {
         tag = tree->getTag("int");
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
     }
