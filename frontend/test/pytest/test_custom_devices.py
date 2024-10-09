@@ -188,7 +188,7 @@ def test_custom_device_bad_directory():
         """Custom Device"""
 
         name = "Custom Qubit"
-        short_name = "null.qubit"
+        short_name = "null.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
