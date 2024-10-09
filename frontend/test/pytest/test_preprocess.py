@@ -13,16 +13,23 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
+import pathlib
+import platform
 from dataclasses import replace
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
+from typing import Optional
 
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.devices import Device
+from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.devices import NullQubit
 from pennylane.tape import QuantumScript
+from pennylane.transforms import split_non_commuting
+from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
@@ -34,6 +41,8 @@ from catalyst.api_extensions.control_flow import (
     while_loop,
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
+from catalyst.compiler import get_lib_path
+from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
@@ -136,6 +145,7 @@ class CustomDevice(Device):
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
+
 
 class TestDecomposition:
     """Test the preprocessing transforms implemented in Catalyst."""
