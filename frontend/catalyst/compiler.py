@@ -27,16 +27,14 @@ import tempfile
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from io import TextIOWrapper
+from operator import is_not
 from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import (
-    DEFAULT_ASYNC_PIPELINES,
-    DEFAULT_PIPELINES,
-    QUANTUM_COMPILATION_PASS,
-)
+from catalyst.pipelines import get_stages
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_bin_path, get_lib_path
@@ -150,15 +148,7 @@ class CompileOptions:
         """Get effective pipelines"""
         if self.pipelines:
             return self.pipelines
-        elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-        if self.disable_assertions:
-            if "disable-assertion" not in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].append("disable-assertion")
-        else:
-            if "disable-assertion" in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].remove("disable-assertion")
-        return DEFAULT_PIPELINES
+        return get_stages(self)
 
 
 @debug_logger

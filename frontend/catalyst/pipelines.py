@@ -27,9 +27,8 @@ This module contains the pipelines that are used to compile a quantum function t
 
 from copy import deepcopy
 
-ENFORCE_RUNTIME_INVARIANTS_PASS = (
-    "EnforeRuntimeInvariantsPass",
-    [
+def get_enforce_runtime_invariants_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+    enforce_runtime_invariants = [
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
@@ -45,12 +44,12 @@ ENFORCE_RUNTIME_INVARIANTS_PASS = (
         # But qnodes targetting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
-    ],
-)
+    ]
+    return enforce_runtime_invariants
 
-HLO_LOWERING_PASS = (
-    "HLOLoweringPass",
-    [
+
+def get_hlo_lowering_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+    hlo_lowering = [
         "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
@@ -66,23 +65,26 @@ HLO_LOWERING_PASS = (
         "func.func(linalg-detensorize{aggressive-mode})",
         "detensorize-scf",
         "canonicalize",
-    ],
-)
+    ]
+    return hlo_lowering
 
-QUANTUM_COMPILATION_PASS = (
-    "QuantumCompilationPass",
-    [
+
+def get_quantum_compilation_stage(options: Optional[CompileOptions] = None) -> List[str]:
+    if options is None:
+        options = CompileOptions()
+
+    quantum_compilation = [
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
-        "disable-assertion",
-    ],
-)
+        "disable-assertion" if options.disable_assertions else None,
+    ]
+    return list(filter(partial(is_not, None), quantum_compilation))
 
-BUFFERIZATION_PASS = (
-    "BufferizationPass",
-    [
+
+def get_bufferization_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+    bufferization = [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
         "gradient-preprocess",
@@ -112,13 +114,19 @@ BUFFERIZATION_PASS = (
         # otherwise there are issues in lowering of dynamic tensors.
         # "cse",
         "cp-global-memref",
-    ],
-)
+    ]
+    return bufferization
 
 
-MLIR_TO_LLVM_PASS = (
-    "MLIRToLLVMDialect",
-    [
+def get_convert_to_llvm_stage(options: Optional[CompileOptions] = None) -> List[str]:
+    if options is None:
+        options = CompileOptions()
+
+    convert_to_llvm = [
+        "qnode-to-async-lowering" if options.async_qnodes else None,
+        "async-func-to-async-runtime" if options.async_qnodes else None,
+        "async-to-async-runtime" if options.async_qnodes else None,
+        "convert-async-to-llvm" if options.async_qnodes else None,
         "expand-realloc",
         "convert-gradient-to-llvm",
         "memrefcpy-to-linalgcpy",
@@ -160,30 +168,16 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "register-inactive-callback",
-    ],
-)
+    ]
+    return list(filter(partial(is_not, None), convert_to_llvm))
 
 
-DEFAULT_PIPELINES = [
-    ENFORCE_RUNTIME_INVARIANTS_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_PASS,
-]
-
-MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
-MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
-    "qnode-to-async-lowering",
-    "async-func-to-async-runtime",
-    "async-to-async-runtime",
-    "convert-async-to-llvm",
-]
-
-DEFAULT_ASYNC_PIPELINES = [
-    ENFORCE_RUNTIME_INVARIANTS_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_ASYNC_PASS,
-]
+def get_stages(options):
+    # Dictionaries in python are ordered
+    stages = {}
+    stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
+    stages["HLOLoweringPass"] = get_hlo_lowering_stage(options)
+    stages["QuantumCompilationPass"] = get_quantum_compilation_stage(options)
+    stages["BufferizationPass"] = get_bufferization_stage(options)
+    stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(options)
+    return list(stages.items())
