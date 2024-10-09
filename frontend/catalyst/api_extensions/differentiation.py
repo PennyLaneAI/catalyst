@@ -44,10 +44,10 @@ from catalyst.jax_primitives import (
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 Differentiable = Union[Function, QNode]
-DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 ## API ##
@@ -183,9 +183,7 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
     if fn is None:
         return functools.partial(grad, **kwargs)
 
-    scalar_out = True
-
-    return Grad(fn, GradParams(method, scalar_out, h, argnums))
+    return GradCallable(fn, GradParams(method=method, scalar_out=True, h=h, argnums=argnums))
 
 
 def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
@@ -297,9 +295,9 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
     if fn is None:
         return functools.partial(value_and_grad, **kwargs)
 
-    scalar_out = True
-
-    return Grad(fn, GradParams(method, scalar_out, h, argnums, with_value=True))
+    return GradCallable(
+        fn, GradParams(method=method, scalar_out=True, h=h, argnums=argnums, with_value=True)
+    )
 
 
 def jacobian(fn=None, *, method=None, h=None, argnums=None):
@@ -367,15 +365,13 @@ def jacobian(fn=None, *, method=None, h=None, argnums=None):
     kwargs.pop("fn")
 
     if fn is None:
-        return functools.partial(grad, **kwargs)
+        return functools.partial(jacobian, **kwargs)
 
-    scalar_out = False
-
-    return Grad(fn, GradParams(method, scalar_out, h, argnums))
+    return GradCallable(fn, GradParams(method=method, scalar_out=False, h=h, argnums=argnums))
 
 
 # pylint: disable=too-many-arguments
-def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnums=None):
+def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
@@ -453,7 +449,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnums
 
     if EvaluationContext.is_tracing():
         scalar_out = False
-        fn = _ensure_differentiable(f)
+        fn = wrap_callable(f)
         args_flatten, in_tree = tree_flatten(params)
         tangents_flatten, _ = tree_flatten(tangents)
         grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
@@ -505,7 +501,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnums
 
 
 # pylint: disable=too-many-arguments
-def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnums=None):
+def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
@@ -559,7 +555,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     if EvaluationContext.is_tracing():
         scalar_out = False
-        fn = _ensure_differentiable(f)
+        fn = wrap_callable(f)
 
         args_flatten, in_tree = tree_flatten(params)
         cotangents_flatten, _ = tree_flatten(cotangents)
@@ -620,7 +616,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
 
 ## IMPL ##
-class Grad:
+class GradCallable(CatalystCallable):
     """An object that specifies that a function will be differentiated.
 
     Args:
@@ -636,9 +632,12 @@ class Grad:
     """
 
     def __init__(self, fn: Differentiable, grad_params: GradParams):
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
+
+        super().__init__("fn")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -648,7 +647,7 @@ class Grad:
 
         with GradContext():
             if EvaluationContext.is_tracing():
-                fn = _ensure_differentiable(self.fn)
+                fn = wrap_callable(self.fn)
 
                 args_data, in_arg_tree = tree_flatten(args)
                 grad_params = _check_grad_params(
@@ -753,8 +752,15 @@ def _check_grad_params(
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
     argnum_expanded, _ = tree_flatten(argnum_selected)
     scalar_argnums = isinstance(argnums, int) or argnums is None
+
     return GradParams(
-        method, scalar_out, h, argnum_list, scalar_argnums, argnum_expanded, with_value
+        method=method,
+        scalar_out=scalar_out,
+        h=h,
+        argnums=argnum_list,
+        scalar_argnums=scalar_argnums,
+        expanded_argnums=argnum_expanded,
+        with_value=with_value,
     )
 
 
@@ -778,8 +784,9 @@ def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results)
     return results_final
 
 
-def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
-    """Narrows down the set of the supported differentiable objects."""
+def wrap_callable(f: Callable) -> Differentiable:
+    """The differentiation target needs to either a QNode or wrapped in a Function object. The
+    reason is that we need to lower the target as a real function in MLIR with its own symbol."""
 
     # Unwrap the function from an existing QJIT object.
     if isinstance(f, catalyst.QJIT):
@@ -790,7 +797,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
 
-    raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
+    raise TypeError(f"Differentiation target must be callable, got: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(

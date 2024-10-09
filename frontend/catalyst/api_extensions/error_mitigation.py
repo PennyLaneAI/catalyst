@@ -29,6 +29,7 @@ from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
 from catalyst.jax_tracer import Function
+from catalyst.utils.callables import CatalystCallable
 
 
 def _is_odd_positive(numbers_list):
@@ -37,7 +38,7 @@ def _is_odd_positive(numbers_list):
 
 ## API ##
 def mitigate_with_zne(
-    fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="global"
+    fn=None, *, scale_factors, extrapolate=None, extrapolate_kwargs=None, folding="global"
 ):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
@@ -144,21 +145,11 @@ def mitigate_with_zne(
 
     num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
 
-    return ZNE(fn, num_folds, extrapolate, folding)
+    return ZNECallable(fn, num_folds, extrapolate, folding)
 
 
 ## IMPL ##
-
-
-def _wrap_callable(fn):
-    if isinstance(fn, (Function, qml.QNode)):
-        return fn
-    elif isinstance(fn, Callable):  # Keep at the bottom
-        return Function(fn)
-    raise TypeError(f"Target must be callable, got: {type(fn)}")
-
-
-class ZNE:
+class ZNECallable(CatalystCallable):
     """An object that specifies how a circuit is mitigated with ZNE.
 
     Args:
@@ -177,11 +168,14 @@ class ZNE:
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.num_folds = num_folds
         self.extrapolate = extrapolate
         self.folding = folding
+
+        super().__init__("fn")
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
@@ -205,7 +199,6 @@ class ZNE:
 
         # Certain callables, like QNodes, may introduce additional wrappers during tracing.
         # Make sure to grab the top-level callable object in the traced function.
-
         assert jaxpr.eqns, "expected non-empty jaxpr for zne target"
         assert jaxpr.eqns[0].primitive in {
             func_p,
@@ -231,3 +224,12 @@ class ZNE:
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
     return functools.partial(qml.transforms.poly_extrapolate, order=degree)
+
+
+## PRIVATE ##
+def _wrap_callable(fn):
+    if isinstance(fn, (Function, qml.QNode)):
+        return fn
+    elif isinstance(fn, Callable):  # Keep at the bottom
+        return Function(fn)
+    raise TypeError(f"Target must be callable, got: {type(fn)}")
