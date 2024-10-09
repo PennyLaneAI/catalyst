@@ -52,6 +52,7 @@ bool containsQnodes(func::FuncOp funcOp)
 
 func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
 {
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
     auto loc = funcOp.getLoc();
     TypeRange originalTypes = funcOp.getArgumentTypes();
     SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
@@ -61,12 +62,12 @@ func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
                                                   /*inputs=*/typesFolded,
                                                   /*outputs=*/funcOp.getResultTypes());
     std::string fnFoldedName = funcOp.getName().str() + ".zne";
+    rewriter.setInsertionPointToStart(funcOp->getParentOfType<ModuleOp>().getBody());
     auto fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
 
     rewriter.cloneRegionBefore(funcOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
 
     Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
-    rewriter.setInsertionPointToStart(fnFoldedOpBlock);
     fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
     return fnFoldedOp;
 }
@@ -94,9 +95,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
         // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
         traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
             if (!funcOp->hasAttr("qnode")) {
-                PatternRewriter::InsertionGuard insertGuard(rewriter);
-                rewriter.setInsertionPointToStart(moduleOp.getBody());
-
                 // Copy the function and create a .zne counter part and add the scale factor as last
                 // argument
                 auto currentFnFoldedOp = createZneFunc(funcOp, rewriter);
@@ -113,20 +111,14 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                             // Create the folded circuit function
                             auto foldedCircuitAttr =
                                 getOrInsertFoldedCircuit(loc, rewriter, funcOp, foldingAlgorithm);
-                            func::FuncOp foldedOp =
-                                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                                    moduleOp, foldedCircuitAttr);
-                            std::vector<Value> args = {callOp.getArgOperands().begin(),
-                                                       callOp.getArgOperands().end()};
-                            args.push_back(currentFnFoldedOp.getArguments().back());
-                            rewriter.setInsertionPoint(callOp);
-                            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
+                            foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                                moduleOp, foldedCircuitAttr);
                         }
-                        else if (funcOp->hasAttr("qnode") and foldedOp) {
-                            rewriter.setInsertionPoint(callOp);
+                        if (foldedOp) {
                             std::vector<Value> args = {callOp.getArgOperands().begin(),
                                                        callOp.getArgOperands().end()};
                             args.push_back(currentFnFoldedOp.getArguments().back());
+                            rewriter.setInsertionPoint(callOp);
                             rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
                         }
                     });
@@ -147,11 +139,11 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                 auto currentFnFoldedOp =
                     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
                 if (currentFnFoldedOp) {
-                    rewriter.setInsertionPointToStart(&currentFnFoldedOp.getFunctionBody().front());
-
-                    callOp.setCallee(currentFnFoldedOp.getName());
-                    auto parentFunc = callOp->getParentOfType<func::FuncOp>();
-                    callOp.getOperandsMutable().append(parentFunc.getArguments().back());
+                    rewriter.modifyOpInPlace(callOp, [&] {
+                        callOp.setCallee(currentFnFoldedOp.getName());
+                        auto parentFunc = callOp->getParentOfType<func::FuncOp>();
+                        callOp.getOperandsMutable().append(parentFunc.getArguments().back());
+                    });
                 }
             });
         });

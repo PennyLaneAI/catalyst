@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, zne_p
+from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
 
@@ -179,7 +179,7 @@ class ZNECallable(CatalystCallable):
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
-        callable_fn = _make_function(self.fn)
+        callable_fn = _wrap_callable(self.fn)
         jaxpr = jax.make_jaxpr(callable_fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
@@ -199,8 +199,15 @@ class ZNECallable(CatalystCallable):
 
         # Certain callables, like QNodes, may introduce additional wrappers during tracing.
         # Make sure to grab the top-level callable object in the traced function.
+        assert jaxpr.eqns, "expected non-empty jaxpr for zne target"
+        assert jaxpr.eqns[0].primitive in {
+            func_p,
+            quantum_kernel_p,
+        }, "expected func_p or quantum_kernel_p as first operation in zne target"
         callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
-        assert callable(callable_fn)
+        assert callable(
+            callable_fn
+        ), "expected callable set as param on the first operation in zne target"
 
         results = zne_p.bind(
             *args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=callable_fn
@@ -220,8 +227,9 @@ def polynomial_extrapolation(degree):
 
 
 ## PRIVATE ##
-def _make_function(fn):
+def _wrap_callable(fn):
     if isinstance(fn, (Function, qml.QNode)):
         return fn
     elif isinstance(fn, Callable):  # Keep at the bottom
         return Function(fn)
+    raise TypeError(f"Target must be callable, got: {type(fn)}")
