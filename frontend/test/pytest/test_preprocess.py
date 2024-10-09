@@ -24,9 +24,8 @@ from typing import Optional
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.devices import Device
+from pennylane.devices import Device, NullQubit
 from pennylane.devices.execution_config import ExecutionConfig
-from pennylane.devices import NullQubit
 from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
@@ -130,7 +129,9 @@ class CustomDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        )
         return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
