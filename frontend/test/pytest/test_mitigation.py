@@ -420,7 +420,8 @@ def test_mcm_method_with_zne(backend):
 @pytest.mark.parametrize("scale_factors", [[1, 3, 5, 7]])
 @pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_on_classical_function_with_qnodes(params, extrapolation, folding, scale_factors):
-    """Test that without noise the same results are returned for qnode calls inside a classical function."""
+    """Test that without noise the same results are returned for qnode calls inside a classical
+    function."""
 
     dev = qml.device("lightning.qubit", wires=2)
 

@@ -677,7 +677,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ctx: the MLIR context
         args: the points in the function in which we are to calculate the derivative
         jaxpr: the jaxpr representation of the grad op
-        fn(Grad): the function to be differentiated
+        fn (GradCallable): the function to be differentiated
         method: the method used for differentiation
         h: the difference for finite difference. May be None when fn is not finite difference.
         argnums: argument indices which define over which arguments to
