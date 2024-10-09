@@ -14,14 +14,14 @@
 
 #define DEBUG_TYPE "chained-self-inverse"
 
-#include "VerifyParentGateAnalysis.hpp"
-
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+
+#include "VerifyParentGateAnalysis.hpp"
 
 using llvm::dbgs;
 using namespace mlir;
