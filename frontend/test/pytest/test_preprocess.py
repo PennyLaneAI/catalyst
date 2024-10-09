@@ -114,7 +114,7 @@ class OtherRX(qml.RX):
 class CustomDevice(Device):
     """A dummy device from the device API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -130,7 +130,7 @@ class CustomDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
