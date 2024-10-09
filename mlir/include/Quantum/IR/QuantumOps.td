@@ -757,13 +757,13 @@ def SampleOp : Measurement_Op<"sample"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        I64:$shots,
         Optional<
            AnyTypeOf<[
             MemRefRankOf<[F64], [1]>,
             MemRefRankOf<[F64], [2]>
            ]>
-        >:$in_data,
-        I64Attr:$shots
+        >:$in_data
     );
 
     let results = (outs
@@ -776,7 +776,7 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+        $obs $shots ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
     }];
 
     let extraClassDeclaration = [{

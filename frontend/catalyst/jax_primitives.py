@@ -1644,16 +1644,17 @@ def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _sample_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
     result_type = ir.RankedTensorType.get(shape, f64_type)
 
-    return SampleOp(result_type, obs, shots_attr).results
+    return SampleOp(result_type, obs, shots).results
 
 
 #

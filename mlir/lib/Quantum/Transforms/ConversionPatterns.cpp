@@ -733,7 +733,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
         ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
 
-        Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShotsAttr());
+        Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShots());
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
         SmallVector<Value> args = {structPtr, numShots, numQubits};
