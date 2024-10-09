@@ -244,6 +244,7 @@ BUFFERIZATION_PASS = (
         "inline",
         "gradient-preprocess",
         "convert-elementwise-to-linalg",
+        "canonicalize",
 # Preprocessing:
 # rewrite_in_destination_passing_style
 #
@@ -299,7 +300,6 @@ BUFFERIZATION_PASS = (
                        #  https://discord.com/channels/636084430946959380/642426447167881246/1212338527824515102
            "}"
         ),
-        "canonicalize",
         # Remove dead memrefToTensorOp's
         # introduced during gradient-bufferize of callbacks
         "gradient-postprocess",
