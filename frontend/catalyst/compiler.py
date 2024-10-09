@@ -302,10 +302,26 @@ BUFFERIZATION_PASS = (
         ),
         # Remove dead memrefToTensorOp's
         # introduced during gradient-bufferize of callbacks
+        # TODO: Figure out how to remove this.
         "gradient-postprocess",
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
+
+        # TODO: Figure out how to include the other buffer-level optimizations.
+        # -buffer-results-to-out-params,
+        # -drop-equivalent-buffer-results,
+        # -promote-buffers-to-stack
+
+        # Deallocation
+        # The buffer deallocation pass has been deprecated in favor of the
+        # ownership-based buffer deallocation pipeline.
+        # The deprecated pass has some limitations that may cause memory leaks in the resulting IR.
+        # TODO: Switch to one-shot-bufferization once it is merged.
         "func.func(buffer-deallocation)",
+        # catalyst.list_* operations are not bufferized through
+        # the bufferization interface
+        # This is because they store a memref inside of a memref
+        # which is incompatible with the bufferization pipeline.
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         # Must be after convert-bufferization-to-memref
@@ -319,6 +335,9 @@ BUFFERIZATION_PASS = (
 BUFFERIZATION_ASYNC_PASS = (
     "BufferizationPass",
     [
+        # TODO: Can we remove copy-before-write?
+        # copy-before-write:
+        # Skip the analysis. Make a buffer copy on every write.
         s.replace("}", " copy-before-write}") if s.startswith("one-shot-bufferize") else s
         for s in BUFFERIZATION_PASS[1]
     ],
