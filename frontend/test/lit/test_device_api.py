@@ -46,7 +46,7 @@ class CustomDevice(Device):
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
 
-        return "NullQubit", null_qubit_lib_path
+        return "Custom", null_qubit_lib_path
 
     def execute(self, circuits, execution_config):
         """Execute"""
@@ -65,7 +65,7 @@ class CustomDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -90,7 +90,7 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
