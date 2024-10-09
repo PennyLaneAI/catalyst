@@ -44,6 +44,11 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
+        VerifyParentGateAnalysis<CustomOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
+            return failure();
+        }
+
         StringRef OpGateName = op.getGateName();
         if (!HermitianOps.contains(OpGateName)) {
             return failure();
@@ -51,17 +56,11 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
 
         ValueRange InQubits = op.getInQubits();
         auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (!ParentOp || ParentOp.getGateName() != OpGateName) {
+        if (ParentOp.getGateName() != OpGateName) {
             return failure();
         }
 
-        ValueRange ParentOutQubits = ParentOp.getOutQubits();
-        // Check if the input qubits to the current operation match the output qubits of the parent.
-        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx]) {
-                return failure();
-            }
-        }
+        // Replace uses
         ValueRange simplifiedVal = ParentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();
