@@ -23,7 +23,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import accelerate, debug, grad, jacobian, pure_callback
+from catalyst import accelerate, debug, grad, jacobian, pure_callback, qjit
 from catalyst.api_extensions.callbacks import base_callback
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.patching import Patcher
@@ -1493,13 +1493,12 @@ def test_error_incomplete_grad_only_forward():
     def fwd(x):
         return identity(x), None
 
-    @qml.qjit
     @grad
     def wrapper(x: float):
         return identity(x)
 
     with pytest.raises(DifferentiableCompileError, match="missing reverse pass"):
-        wrapper(1.0)
+        qjit(wrapper)
 
 
 def test_error_incomplete_grad_only_reverse():
@@ -1513,13 +1512,12 @@ def test_error_incomplete_grad_only_reverse():
     def bwd(_res, cot):
         return cot
 
-    @qml.qjit
     @grad
     def wrapper(x: float):
         return identity(x)
 
     with pytest.raises(DifferentiableCompileError, match="missing forward pass"):
-        wrapper(1.0)
+        qjit(wrapper)
 
 
 def test_nested_accelerate_grad():
