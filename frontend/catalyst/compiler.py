@@ -268,8 +268,37 @@ BUFFERIZATION_PASS = (
 # So, overall, we are skipping this section while we first focus on migrating to the
 # new -one-shot-bufferize
         "eliminate-empty-tensors",
-        "one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops "
-        "function-boundary-type-conversion=identity-layout-map}",
+        (
+           "one-shot-bufferize"
+           "{"
+               "bufferize-function-boundaries "
+                       # - Bufferize function boundaries (experimental).
+                       #
+                       #     By default, function boundaries are not bufferized.
+                       #     This is because there are currently limitations around function graph bufferization:
+                       #     recursive calls are not supported.
+                       #     As long as there are no recursive calls, function boundary bufferization can be enabled with bufferize-function-boundaries.
+                       #     Each tensor function argument and tensor function result is then turned into a memref.
+                       #     The layout map of the memref type can be controlled with function-boundary-type-conversion.
+                       #
+                       # https://mlir.llvm.org/docs/Bufferization/#using-one-shot-bufferize
+               "allow-return-allocs-from-loops "
+                       # - Allows returning/yielding new allocations from a loop.
+                       # https://github.com/llvm/llvm-project/pull/83964
+                       # https://github.com/llvm/llvm-project/pull/87594
+               "function-boundary-type-conversion=identity-layout-map"
+                       # - Controls layout maps when bufferizing function signatures.
+                       #     You can control the memref types at the function boundary with
+                       #     function-boundary-type-conversion. E.g., if you set it to identity-layout-map,
+                       #     you should get the same type as with --func-bufferize.
+                       #     By default, we put a fully dynamic layout map strided<[?, ?], offset: ?>
+                       #     because that works best if you don't know what layout map the buffers at
+                       #     the call site have -- you can always cast a buffer to a type with
+                       #     fully dynamic layout map. (But not the other way around. That may require a reallocation.)
+                       #
+                       #  https://discord.com/channels/636084430946959380/642426447167881246/1212338527824515102
+           "}"
+        ),
         "canonicalize",
         # Remove dead memrefToTensorOp's
         # introduced during gradient-bufferize of callbacks
