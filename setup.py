@@ -128,13 +128,15 @@ description = {
 
 
 class CMakeExtension(Extension):
+    """A setuptools Extension class for modules with a CMake configuration."""
+
     def __init__(self, name, sourcedir=""):
         super().__init__(name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
 class UnifiedBuildExt(build_ext):
-    """Custom build extension class for the Catalyst Frontend
+    """Custom build extension class for the Catalyst Frontend.
 
     This class overrides a number of methods from its parent class
     setuptools.command.build_ext.build_ext, the most important of which are:
@@ -160,9 +162,11 @@ class UnifiedBuildExt(build_ext):
     def finalize_options(self):
         # Parse the custom CMake options and store them in a new attribute
         defines = [] if self.define is None else self.define.split(";")
-        self.cmake_defines = [f"-D{define}" for define in defines]
+        self.cmake_defines = [  # pylint: disable=attribute-defined-outside-init
+            f"-D{define}" for define in defines
+        ]
         if self.verbosity != "":
-            self.verbosity = "--verbose"
+            self.verbosity = "--verbose"  # pylint: disable=attribute-defined-outside-init
 
         super().finalize_options()
 
@@ -180,7 +184,8 @@ class UnifiedBuildExt(build_ext):
             else:
                 self.build_generic_extension(ext)
 
-    def build_cmake_extension(self, ext):
+    def build_cmake_extension(self, ext: CMakeExtension):
+        """Configure and build CMake extension."""
         cmake_path = shutil.which("cmake")
         clang_path = shutil.which("clang++")
         ninja_path = shutil.which("ninja")
@@ -220,7 +225,8 @@ class UnifiedBuildExt(build_ext):
         )
         subprocess.check_call([cmake_path, "--build", "."] + build_args, cwd=build_temp)
 
-    def build_generic_extension(self, ext):
+    def build_generic_extension(self, ext: Extension):
+        """Configure and build generic extension."""
         super().build_extension(ext)
 
 
