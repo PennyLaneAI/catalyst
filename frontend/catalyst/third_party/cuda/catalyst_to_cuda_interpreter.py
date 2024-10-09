@@ -37,7 +37,6 @@ from typing import Hashable
 import cudaq
 import jax
 import pennylane as qml
-from jax.core import call_p
 from jax.tree_util import tree_unflatten
 
 from catalyst.device import BackendInfo
@@ -49,6 +48,7 @@ from catalyst.jax_primitives import (
     counts_p,
     expval_p,
     for_p,
+    func_p,
     grad_p,
     hamiltonian_p,
     hermitian_p,
@@ -137,7 +137,7 @@ def remove_host_context(jaxpr):
     """
     is_one_equation = len(jaxpr.jaxpr.eqns) == 1
     prim = jaxpr.jaxpr.eqns[0].primitive
-    is_single_equation_call = prim in {call_p, quantum_kernel_p}
+    is_single_equation_call = prim in {func_p, quantum_kernel_p}
     is_valid = is_one_equation and is_single_equation_call
     if is_valid:
         return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
@@ -755,6 +755,7 @@ INST_IMPL = {
     while_p: unimplemented_impl,
     for_p: unimplemented_impl,
     grad_p: unimplemented_impl,
+    func_p: unimplemented_impl,
     jvp_p: unimplemented_impl,
     vjp_p: unimplemented_impl,
     print_p: unimplemented_impl,
