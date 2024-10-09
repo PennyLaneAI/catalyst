@@ -28,6 +28,7 @@ This module contains the pipelines that are used to compile a quantum function t
 from copy import deepcopy
 
 def get_enforce_runtime_invariants_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+    """Returns the list of passes in the enforce runtime invariant stage."""
     enforce_runtime_invariants = [
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
@@ -49,6 +50,7 @@ def get_enforce_runtime_invariants_stage(_options: Optional[CompileOptions] = No
 
 
 def get_hlo_lowering_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+    """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
     hlo_lowering = [
         "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
@@ -70,6 +72,7 @@ def get_hlo_lowering_stage(_options: Optional[CompileOptions] = None) -> List[st
 
 
 def get_quantum_compilation_stage(options: Optional[CompileOptions] = None) -> List[str]:
+    """Returns the list of passes that performs quantum transformations"""
     if options is None:
         options = CompileOptions()
 
@@ -84,6 +87,7 @@ def get_quantum_compilation_stage(options: Optional[CompileOptions] = None) -> L
 
 
 def get_bufferization_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+    """Returns the list of passes that performs bufferization"""
     bufferization = [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
@@ -119,6 +123,7 @@ def get_bufferization_stage(_options: Optional[CompileOptions] = None) -> List[s
 
 
 def get_convert_to_llvm_stage(options: Optional[CompileOptions] = None) -> List[str]:
+    """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
     if options is None:
         options = CompileOptions()
 
@@ -173,6 +178,7 @@ def get_convert_to_llvm_stage(options: Optional[CompileOptions] = None) -> List[
 
 
 def get_stages(options):
+    """Returns all stages in order for compilation"""
     # Dictionaries in python are ordered
     stages = {}
     stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(options)
