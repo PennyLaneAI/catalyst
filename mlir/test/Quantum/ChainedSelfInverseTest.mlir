@@ -523,3 +523,36 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
     return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+
+// -----
+
+
+// test with params in the wrong order
+
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+    %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
+    %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
+    %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
+
+    // CHECK: quantum.alloc
+    // CHECK: [[IN0:%.+]] = quantum.extract {{.+}}[ 0]
+    // CHECK: [[IN1:%.+]] = quantum.extract {{.+}}[ 1]
+    // CHECK: [[IN2:%.+]] = quantum.extract {{.+}}[ 2]
+    // CHECK: [[IN3:%.+]] = quantum.extract {{.+}}[ 3]
+    %reg = quantum.alloc( 4) : !quantum.reg
+    %0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %reg[ 2] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %reg[ 3] : !quantum.reg -> !quantum.bit
+
+    // CHECK: quantum.custom
+    %out_qubits:2, %out_ctrl_qubits:2 = quantum.custom "Rot"(%cst, %cst_0, %cst_1) %0, %1 ctrls(%2, %3) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1:2, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%cst_0, %cst, %cst_1) %out_qubits#0, %out_qubits#1 {adjoint} ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+
+
+    return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
