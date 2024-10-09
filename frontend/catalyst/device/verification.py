@@ -133,6 +133,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         DifferentiableCompileError: gradient-related error
         CompileError: compilation error
     """
+    op_support = qjit_device.capabilities.native_ops
 
     def _paramshift_op_checker(op):
         if not isinstance(op, HybridOp):
@@ -150,9 +151,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             op_name = op.base.name
         else:
             op_name = op.name
-        if not qjit_device.qjit_capabilities.native_ops.get(
-            op_name, EMPTY_PROPERTIES
-        ).differentiable:
+        if not op_support.get(op_name, EMPTY_PROPERTIES).differentiable:
             raise DifferentiableCompileError(
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
@@ -175,7 +174,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_control:
             return isinstance(op, HybridCtrl)
 
-        if not qjit_device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).controllable:
+        if not op_support.get(op.name, EMPTY_PROPERTIES).controllable:
             raise CompileError(
                 f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
             )
@@ -200,7 +199,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_inverse:
             return isinstance(op, HybridAdjoint)
 
-        if not qjit_device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).invertible:
+        if not op_support.get(op.name, EMPTY_PROPERTIES).invertible:
             raise CompileError(
                 f"{op.name} is not invertible on '{qjit_device.original_device.name}' device"
             )
@@ -222,7 +221,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             and qjit_device.qjit_capabilities.initial_state_prep_flag
         ):
             pass
-        elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
+        elif not op.name in op_support:
             raise CompileError(
                 f"{op.name} is not supported on '{qjit_device.original_device.name}' device"
             )
@@ -275,9 +274,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     """Validate that the observables on the tape support adjoint differentiation"""
 
     def _obs_checker(obs):
-        if not qjit_device.qjit_capabilities.native_obs.get(
-            obs.name, EMPTY_PROPERTIES
-        ).differentiable:
+        if not qjit_device.capabilities.native_obs.get(obs.name, EMPTY_PROPERTIES).differentiable:
             raise DifferentiableCompileError(
                 f"{obs.name} is non-differentiable on "
                 f"'{qjit_device.original_device.name}' device"
@@ -292,14 +289,14 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 @transform
 def validate_measurements(
-    tape: QuantumTape, qjit_capabilities: dict, name: str, shots: Union[int, Shots]
+    tape: QuantumTape, capabilities: dict, name: str, shots: Union[int, Shots]
 ) -> (Sequence[QuantumTape], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
     from the TOML file.
 
     Args:
         tape (QuantumTape or QNode or Callable): a quantum circuit.
-        qjit_capabilities (dict): specifies the capabilities of the qjitted device
+        capabilities (dict): specifies the capabilities of the qjitted device
         name: the name of the device to use in error messages
         shots: the shots on the device to use in error messages
 
@@ -313,7 +310,7 @@ def validate_measurements(
     """
 
     def _obs_checker(obs):
-        if not qjit_capabilities.native_obs.get(obs.name):
+        if not obs.name in capabilities.native_obs:
             raise CompileError(
                 f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
             )
@@ -339,7 +336,7 @@ def validate_measurements(
                 "Please specify a finite number of shots."
             )
         mp_name = m.return_type.value if m.return_type else type(m).__name__
-        if not mp_name.title() in qjit_capabilities.measurement_processes:
+        if not mp_name.title() in capabilities.measurement_processes:
             raise CompileError(
                 f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"
             )

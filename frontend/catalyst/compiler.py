@@ -74,6 +74,13 @@ class CompileOptions:
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is None.
+        experimental_capture (bool): If set to ``True``,
+            use PennyLane's experimental program capture capabilities
+            to capture the function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline.
+            Default is None.
     """
 
     verbose: Optional[bool] = False
@@ -90,6 +97,8 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
+    experimental_capture: Optional[bool] = False
+    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded
@@ -159,16 +168,24 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
-TAPE_SPLITTING_PASS = (
-    # We clump multiple tapes into a single function and split them
-    # in mlir with a pass (frontend/jax_tracer.py).
-    # Therefore before the splitting the quantum mlir is "illegal",
-    # as each function will have multiple devices.
-    # Thus, the split must be the very first pass before anything else
-    # happens.
-    "QuantumTapeSplittingPass",
+ENFORCE_RUNTIME_INVARIANTS_PASS = (
+    "EnforeRuntimeInvariantsPass",
     [
-        "func.func(split-multiple-tapes)",
+        # We want the invariant that transforms that generate multiple
+        # tapes will generate multiple qnodes. One for each tape.
+        # Split multiple tapes enforces that invariant.
+        "split-multiple-tapes",
+        # Run the transform sequence defined in the MLIR module
+        "apply-transform-sequence",
+        # Nested modules are something that will be used in the future
+        # for making device specific transformations.
+        # Since at the moment, nothing in the runtime is using them
+        # and there is no lowering for them,
+        # we inline them to preserve the semantics. We may choose to
+        # keep inlining modules targetting the Catalyst runtime.
+        # But qnodes targetting other backends may choose to lower
+        # this into something else.
+        "inline-nested-module",
     ],
 )
 
@@ -188,13 +205,14 @@ HLO_LOWERING_PASS = (
         "hlo-custom-call-lowering",
         "cse",
         "func.func(linalg-detensorize{aggressive-mode})",
+        "detensorize-scf",
+        "canonicalize",
     ],
 )
 
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
@@ -208,6 +226,7 @@ BUFFERIZATION_PASS = (
     [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
+        "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
@@ -223,6 +242,7 @@ BUFFERIZATION_PASS = (
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
@@ -260,6 +280,7 @@ MLIR_TO_LLVM_PASS = (
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "convert-math-to-libm",
         "convert-arith-to-llvm",
+        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
@@ -285,7 +306,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
-    TAPE_SPLITTING_PASS,
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -301,7 +322,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
-    TAPE_SPLITTING_PASS,
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -539,9 +560,6 @@ class Compiler:
                                    shard object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
-            A list of:
-               func_name (str) Inferred name of the main function
-               ret_type_name (str) Inferred main function result type name
         """
         assert isinstance(
             workspace, Directory
@@ -576,8 +594,6 @@ class Compiler:
 
         filename = compiler_output.get_object_filename()
         out_IR = compiler_output.get_output_ir()
-        func_name = compiler_output.get_function_attributes().get_function_name()
-        ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
         if lower_to_llvm:
             output = LinkerDriver.run(filename, options=self.options)
@@ -586,7 +602,7 @@ class Compiler:
             output_filename = filename
 
         self.last_compiler_output = compiler_output
-        return output_filename, out_IR, [func_name, ret_type_name]
+        return output_filename, out_IR
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):

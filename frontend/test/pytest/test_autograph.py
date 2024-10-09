@@ -277,31 +277,6 @@ class TestIntegration:
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
-    def test_nested_qnode(self):
-        """Test autograph on a QNode called from within another QNode."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner1(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner2(x):
-            y = inner1(x) * np.pi
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit(autograph=True)
-        def fn(x: int):
-            return inner2(x)
-
-        assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(fn.original_function)
-        assert check_cache(inner1.func)
-        assert check_cache(inner2.func)
-        # Unsupported by the runtime:
-        # assert fn(np.pi) == -2
-
     def test_nested_qjit(self):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
@@ -534,28 +509,6 @@ class TestCodePrinting:
         @qjit(autograph=True)
         def fn(x: float):
             return inner1(x) + inner2(x)
-
-        assert autograph_source(fn)
-        assert autograph_source(inner1)
-        assert autograph_source(inner2)
-
-    def test_nested_qnode(self):
-        """Test printing on a QNode called from within another QNode."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner1(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner2(x):
-            y = inner1(x) * np.pi
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit(autograph=True)
-        def fn(x: int):
-            return inner2(x)
 
         assert autograph_source(fn)
         assert autograph_source(inner1)
@@ -2056,6 +2009,309 @@ class TestDecorators:
             return i + 1
 
         assert qjit(loop, autograph=True)(0) == n
+
+
+class TestJaxIndexOperatorUpdate:
+    """Test Jax index operator update"""
+
+    def test_single_static_index_operator_update_one_item(self):
+        """Test single index operator update for Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Double the first element of x using single index assignment"""
+
+                x[0] *= 2
+                return x
+
+            def g(x):
+                """Double the first element of x using at and multiply"""
+
+                x = x.at[0].multiply(2)
+                return x
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([10, 3, 4]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_operator_update_one_item(self):
+        """Test single index operator update for Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Double the last element of x using single index assignment"""
+
+                last_element = x.shape[0] - 1
+                x[last_element] *= 2
+                return x
+
+            def g(x):
+                """Double the last element of x using at and multiply"""
+
+                last_element = x.shape[0] - 1
+                x = x.at[last_element].multiply(2)
+                return x
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([5, 3, 8]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_mult_update_all_items(self):
+        """Test single index mult update for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to 2 * x using single index mult update"""
+
+                first_dim = x.shape[0]
+
+                for i in range(first_dim):
+                    x[i] *= 2
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to 2 * x using at and multiply"""
+
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
+
+                for i in range(first_dim):
+                    result = result.at[i].multiply(2)
+
+                return result
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([10, 6, 8]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_add_update_all_items(self):
+        """Test single index add update for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x + 1 using single index add update"""
+
+                first_dim = x.shape[0]
+
+                for i in range(first_dim):
+                    x[i] += 1
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to x + 1 using at and multiply"""
+
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
+
+                for i in range(first_dim):
+                    result = result.at[i].add(1)
+
+                return result
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([6, 4, 5]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_sub_update_all_items(self):
+        """Test single index sub update for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x - 1 using single index sub update"""
+
+                first_dim = x.shape[0]
+
+                for i in range(first_dim):
+                    x[i] -= 1
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to x - 1 using at and add"""
+
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
+
+                for i in range(first_dim):
+                    result = result.at[i].add(-1)
+
+                return result
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([4, 2, 3]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_div_update_all_items(self):
+        """Test single index div update for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x / 2 using single index div update"""
+
+                first_dim = x.shape[0]
+
+                for i in range(first_dim):
+                    x[i] /= 2
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to x / 2 using at and divide"""
+
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
+
+                for i in range(first_dim):
+                    result = result.at[i].divide(2)
+
+                return result
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([2.5, 1.5, 2]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_pow_update_all_items(self):
+        """Test single index pow update for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+            def f(x):
+                """Create a new array that is equal to x ** 2 using single index sub update"""
+
+                first_dim = x.shape[0]
+
+                for i in range(first_dim):
+                    x[i] **= 2
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to x ** 2 using at and pow"""
+
+                first_dim = x.shape[0]
+                result = jnp.copy(x)
+
+                for i in range(first_dim):
+                    result = result.at[i].power(2)
+
+                return result
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(np.array([5, 3, 4]))
+        assert jnp.allclose(result, jnp.array([25, 9, 16]))
+        assert jnp.allclose(result, expected)
+
+    def test_single_index_operator_update_python_array(self):
+        """Test single index operator update for Non-Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def double_last_element_python_array(x):
+            """Double the last element of a python array"""
+
+            last_element = len(x) - 1
+            x[last_element] *= 2
+            return x
+
+        assert jnp.allclose(
+            jnp.array(double_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 8])
+        )
+
+    def test_single_index_mult_update_slice(self):
+        """Test slice (start, None, None)x mult update for Jax arrays."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+
+            def f(x):
+                """Create a new array that is equal to 2 * x for even indecies"""
+
+                first_dim = x.shape[0]
+                x[0:first_dim:2] *= 2
+
+                return x
+
+            def g(x):
+                """Create a new array that is equal to 2 * x using at and multiply"""
+
+                first_dim = x.shape[0]
+                x = x.at[0:first_dim:2].multiply(2)
+
+                return x
+
+            result = f(x)
+            expected = g(x)
+            return result, expected
+
+        result, expected = workflow(jnp.array([5, 4, 3, 2, 1]))
+        assert jnp.allclose(result, jnp.array([10, 4, 6, 2, 2]))
+        assert jnp.allclose(result, expected)
+
+    def test_unsopported_cases(self):
+        """Test that TypeError is raised in unsopported cases."""
+
+        @qjit(autograph=True)
+        def workflow(x):
+
+            def test_multi_dimensional_index(x):
+                """Test that TypeError is raised when using multi-dim indexing."""
+                x[0, 1] += 5
+                return x
+
+            x = jnp.array([[1, 2], [3, 4]])
+            with pytest.raises(TypeError, match="JAX arrays are immutable"):
+                test_multi_dimensional_index(x)
+
+            def test_unsupported_operator(x):
+                """Test that TypeError is raised when using an unsupported operator."""
+                x[1] %= 2
+                return x
+
+            x = jnp.array([4, 2, 3])
+            with pytest.raises(TypeError, match="JAX arrays are immutable"):
+                test_unsupported_operator(x)
+
+            def test_array_index(x):
+                """Test that TypeError is raised when using an array as index."""
+                x[np.array([1, 2])] += 3
+                return x
+
+            with pytest.raises(TypeError, match="JAX arrays are immutable"):
+                test_array_index(x)
 
 
 if __name__ == "__main__":

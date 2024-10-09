@@ -25,7 +25,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from jax.core import call_p
+from pennylane import QubitUnitary, QueuingManager
+from pennylane.devices import QubitDevice
 from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
@@ -62,16 +64,13 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
-    CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
     counts_p,
     expval_p,
-    func_p,
     gphase_p,
     hamiltonian_p,
     hermitian_p,
-    mlir_fn_cache,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -129,13 +128,10 @@ def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
+    execution_config = qml.devices.ExecutionConfig()
     if qnode:
-        _gradient_method = _in_gradient_tracing(qnode)
-    else:
-        _gradient_method = None
+        execution_config.gradient_method = _in_gradient_tracing(qnode)
 
-    execution_config = qml.devices.DefaultExecutionConfig
-    execution_config.gradient_method = _gradient_method
     return execution_config
 
 
@@ -162,6 +158,15 @@ class Function:
         AssertionError: Invalid function type.
     """
 
+    CACHE = {}
+
+    def __new__(cls, fn):
+        if cached_instance := cls.CACHE.get(fn):
+            return cached_instance
+        new_instance = super().__new__(cls)
+        cls.CACHE[fn] = new_instance
+        return new_instance
+
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
@@ -178,7 +183,7 @@ class Function:
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, **kwargs)
 
         args, _ = jax.tree_util.tree_flatten((args, kwargs))
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
+        retval = call_p.bind(wrap_init(_eval_jaxpr), *args)
         return tree_unflatten(out_tree, retval)
 
 
@@ -528,11 +533,11 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "static_argnums": static_argnums,
-                "abstracted_axes": abstracted_axes,
-            }
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef
@@ -551,13 +556,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
         ir.Context: the MLIR context
     """
 
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
     MemrefCallable.clearcache()
-    CALLBACK_OP_CACHE.clear()
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)

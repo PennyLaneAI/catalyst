@@ -68,7 +68,8 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
         target.addDynamicallyLegalOp<BackpropOp>(
             [&](BackpropOp op) { return typeConverter.isLegal(op); });
 
-        target.addLegalOp<catalyst::gradient::ReturnOp>();
+        target.addDynamicallyLegalOp<catalyst::gradient::ReturnOp>(
+            [&](catalyst::gradient::ReturnOp op) { return typeConverter.isLegal(op); });
 
         target.addLegalDialect<func::FuncDialect, memref::MemRefDialect>();
 

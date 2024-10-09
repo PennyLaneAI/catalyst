@@ -40,10 +40,10 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
 
-    // Scalar factors
-    auto scaleFactors = op.getScaleFactors();
-    RankedTensorType scaleFactorType = cast<RankedTensorType>(scaleFactors.getType());
-    const auto sizeInt = scaleFactorType.getDimSize(0);
+    // Number of folds
+    auto numFolds = op.getNumFolds();
+    RankedTensorType numFoldType = cast<RankedTensorType>(numFolds.getType());
+    const auto sizeInt = numFoldType.getDimSize(0);
 
     // Folding type
     auto foldingAlgorithm = op.getFolding();
@@ -56,7 +56,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
     RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
 
-    // Loop over the scalars to create a folded circuit per factor
+    // Loop over the num fold to create a folded circuit per factor
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
     Value size = rewriter.create<index::ConstantOp>(loc, sizeInt);
@@ -70,11 +70,10 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                     std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
                     SmallVector<Value> index = {i};
-                    Value scalarFactor =
-                        builder.create<tensor::ExtractOp>(loc, scaleFactors, index);
-                    Value scalarFactorCasted =
-                        builder.create<index::CastSOp>(loc, builder.getIndexType(), scalarFactor);
-                    newArgs.push_back(scalarFactorCasted);
+                    Value numFold = builder.create<tensor::ExtractOp>(loc, numFolds, index);
+                    Value numFoldCasted =
+                        builder.create<index::CastSOp>(loc, builder.getIndexType(), numFold);
+                    newArgs.push_back(numFoldCasted);
 
                     func::CallOp callOp = builder.create<func::CallOp>(loc, foldedCircuit, newArgs);
                     int64_t numResults = callOp.getNumResults();
@@ -135,7 +134,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
                                 func::FuncOp fnWithMeasurementsOp)
 {
     // Function folded: Create the folded circuit (withoutMeasurement *
-    // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
+    // Adjoint(withoutMeasurement))**num_fold * withMeasurements
     Type qregType = quantum::QuregType::get(rewriter.getContext());
 
     rewriter.setInsertionPointToStart(fnFoldedOp.addEntryBlock());
@@ -260,7 +259,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 {
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnFoldedName = op.getCallee().str() + ".folded";
+    std::string fnFoldedName = op.getCallee().getLeafReference().str() + ".folded";
     MLIRContext *ctx = rewriter.getContext();
 
     if (moduleOp.lookupSymbol<func::FuncOp>(fnFoldedName)) {
@@ -320,7 +319,6 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                              fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
-
     rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
 
     Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
@@ -346,7 +344,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
     Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    std::string fnAllocName = op.getCallee().str() + ".quantumAlloc";
+    std::string fnAllocName = op.getCallee().getLeafReference().str() + ".quantumAlloc";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnAllocName)) {
         return SymbolRefAttr::get(ctx, fnAllocName);
     }
@@ -371,7 +369,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    std::string fnWithoutMeasurementsName = op.getCallee().str() + ".withoutMeasurements";
+    std::string fnWithoutMeasurementsName =
+        op.getCallee().getLeafReference().str() + ".withoutMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
     }
@@ -413,7 +412,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
-    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
+    quantum::replaceQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
     return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
@@ -424,7 +423,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
-    std::string fnWithMeasurementsName = op.getCallee().str() + ".withMeasurements";
+    std::string fnWithMeasurementsName =
+        op.getCallee().getLeafReference().str() + ".withMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
     }

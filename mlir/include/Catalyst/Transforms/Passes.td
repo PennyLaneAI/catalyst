@@ -17,6 +17,16 @@
 
 include "mlir/Pass/PassBase.td"
 
+def DetensorizeSCFPass : Pass<"detensorize-scf"> {
+    let summary = "Detensorize for, if, while operations from the SCF dialect.";
+
+    let dependentDialects = [
+        "tensor::TensorDialect"
+    ];
+
+    let constructor = "catalyst::createDetensorizeSCFPass()";
+}
+
 def CatalystBufferizationPass : Pass<"catalyst-bufferize"> {
     let summary = "Bufferize tensors in catalyst utility ops.";
 
@@ -139,7 +149,7 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
 
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
-    
+
     let dependentDialects = [
         "memref::MemRefDialect",
         "linalg::LinalgDialect"
@@ -159,16 +169,43 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
 
 }
 
+def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
+  let summary = "Lower the memref load and store operation to LLVM and add the TBAA tags.";
+
+  let dependentDialects = [
+        "mlir::LLVM::LLVMDialect"
+  ];
+
+  let constructor = "::catalyst::createMemrefToLLVMWithTBAAPass()";
+}
+
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 
     let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
-def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
-    let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
+def InlineNestedModulePass : Pass<"inline-nested-module"> {
+    let summary = "Inline nested modules with qnode attribute.";
 
-    let constructor = "catalyst::createSplitMultipleTapesPass()";
+    let dependentDialects = [
+        "mlir::func::FuncDialect"
+    ];
+
+    let constructor = "catalyst::createInlineNestedModulePass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"stopAfterStep",
+            /*CLI arg name=*/"stop-after-step",
+            /*type=*/"int",
+            /*default=*/"0",
+            /*description=*/
+            "Useful for tests. This will stop the pass after the given step has been executed "
+            "(steps run from 1 to 5). Defaults to 0 which is equivalent to running "
+            "all steps to completion."
+        >
+    ];
 }
 
 #endif // CATALYST_PASSES
