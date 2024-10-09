@@ -30,10 +30,14 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ct
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
     mlir::LLVM::TBAATagAttr tag;
-    // Index can be used as a pointer.
-    if ((isa<IndexType>(baseType) && !isa<LLVM::StoreOp>(newOp) && !isa<LLVM::LoadOp>(newOp)) ||
-        isa<IntegerType>(baseType)) {
-        tag = tree->getTag("int");
+    if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
+        // Index can be used as a pointer.
+        if (isa<IndexType>(baseType) && (isa<LLVM::StoreOp>(newOp) || isa<LLVM::LoadOp>(newOp))) {
+            tag = tree->getTag("any pointer");
+        }
+        else {
+            tag = tree->getTag("int");
+        }
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
     }
     else if (isa<FloatType>(baseType)) {
