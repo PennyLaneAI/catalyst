@@ -218,7 +218,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # It is only valid when the TOML file has the initial_state_prep_flag.
         elif (
             isinstance(op, (StatePrep, BasisState))
-            and qjit_device.qjit_capabilities.initial_state_prep_flag
+            and qjit_device.capabilities.initial_state_prep_flag
         ):
             pass
         elif not op.name in op_support:
