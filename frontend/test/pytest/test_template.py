@@ -706,6 +706,7 @@ def test_cosine_window(backend):
 
     assert np.allclose(interpreted_result, jitted_result)
 
+
 # Hilbert Schmidt templates take a quantum tape as a parameter.
 # Therefore unsuitable for JIT compilation
 
