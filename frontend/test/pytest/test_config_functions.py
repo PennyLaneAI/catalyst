@@ -32,23 +32,6 @@ from catalyst.utils.toml import (
 )
 
 
-class DeviceToBeTested(qml.devices.QubitDevice):
-    """Test device"""
-
-    name = "Null Qubit"
-    short_name = "null.qubit"
-    pennylane_requires = "0.33.0"
-    version = "0.0.1"
-    author = "Dummy"
-
-    operations = []
-    observables = []
-
-    def apply(self, operations, **kwargs):
-        """Unused"""
-        raise RuntimeError("Only C/C++ interface is defined")
-
-
 def get_test_config(config_text: str) -> TOMLDocument:
     """Parse test config into the TOMLDocument structure"""
     with TemporaryDirectory() as d:

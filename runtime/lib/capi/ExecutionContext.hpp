@@ -188,9 +188,8 @@ class RTDevice {
             rtd_name = "NullQubit";
             _complete_dylib_os_extension(rtd_lib, "null_qubit");
         }
-        else if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
-            rtd_name =
-                (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
+        else if (rtd_lib == "lightning.qubit") {
+            rtd_name = "LightningSimulator";
             _complete_dylib_os_extension(rtd_lib, "lightning");
         }
         else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {

@@ -13,6 +13,8 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
+import os
+import pathlib
 import platform
 
 import pennylane as qml
@@ -22,6 +24,8 @@ from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
+
+frontend_path = os.path.join(os.getcwd(), "frontend")
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -134,7 +138,7 @@ def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
     class NullQubit(qml.devices.QubitDevice):
-        """Null Qubit"""
+        """Using Null Qubit structure for test"""
 
         name = "Null Qubit"
         short_name = "null.qubit"
@@ -188,13 +192,14 @@ def test_custom_device_bad_directory():
         """Custom Device"""
 
         name = "Custom Qubit"
-        short_name = "null.device"
+        short_name = "custom.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
         operations = OPERATIONS
         observables = OBSERVABLES
+        config = pathlib.Path(f"{frontend_path}/test/pytest/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -228,23 +233,24 @@ def test_custom_device_no_c_interface():
         """Custom Device"""
 
         name = "Custom Qubit"
-        short_name = "null.device"
+        short_name = "custom.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
         operations = OPERATIONS
         observables = OBSERVABLES
+        config = pathlib.Path(f"{frontend_path}/test/pytest/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
             """Unused."""
-            raise RuntimeError("Dummy device")
+            raise RuntimeError("Custom device")
 
     with pytest.raises(
-        CompileError, match="The null.qubit device does not provide C interface for compilation."
+        CompileError, match="The custom.device device does not provide C interface for compilation."
     ):
 
         @qjit
