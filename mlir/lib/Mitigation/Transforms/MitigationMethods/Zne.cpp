@@ -52,6 +52,7 @@ bool containsQnodes(func::FuncOp funcOp)
 
 func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
 {
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
     auto loc = funcOp.getLoc();
     TypeRange originalTypes = funcOp.getArgumentTypes();
     SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
@@ -94,7 +95,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
         // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
         traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
             if (!funcOp->hasAttr("qnode")) {
-                PatternRewriter::InsertionGuard insertGuard(rewriter);
                 // Copy the function and create a .zne counter part and add the scale factor as last
                 // argument
                 auto currentFnFoldedOp = createZneFunc(funcOp, rewriter);

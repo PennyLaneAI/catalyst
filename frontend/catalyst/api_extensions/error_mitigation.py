@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, zne_p
+from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
 from catalyst.jax_tracer import Function
 
 
@@ -207,9 +207,10 @@ class ZNE:
         # Make sure to grab the top-level callable object in the traced function.
 
         assert jaxpr.eqns, "expected non-empty jaxpr for zne target"
-        assert isinstance(
-            jaxpr.eqns[0].primitive, jax._src.core.CallPrimitive
-        ), "expected CallPrimitive as first operation in zne target"
+        assert jaxpr.eqns[0].primitive in {
+            func_p,
+            quantum_kernel_p,
+        }, "expected func_p or quantum_kernel_p as first operation in zne target"
         callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
         assert callable(
             callable_fn
