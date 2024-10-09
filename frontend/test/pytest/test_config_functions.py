@@ -18,7 +18,6 @@ from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-import pennylane as qml
 import pytest
 
 from catalyst.utils.exceptions import CompileError
