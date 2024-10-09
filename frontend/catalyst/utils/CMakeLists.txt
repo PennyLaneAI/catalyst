@@ -40,8 +40,3 @@ nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
 
 # Add the NumPy include directory to the library's include paths
 target_include_directories(wrapper PRIVATE ${NUMPY_INCLUDE_DIR})
-
-# Install `wrapper` library to catalyst/utils/ so that we can import it
-install(TARGETS wrapper
-    LIBRARY DESTINATION ${CMAKE_SOURCE_DIR}/catalyst/utils
-)
