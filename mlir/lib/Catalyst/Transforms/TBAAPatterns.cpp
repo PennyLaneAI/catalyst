@@ -32,7 +32,7 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ct
     mlir::LLVM::TBAATagAttr tag;
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
         // Index can be used as a pointer.
-        if(isa<IndexType>(baseType) && (isa<LLVM::StoreOp>(newOp) || isa<LLVM::LoadOp>(newOp))) {
+        if (isa<IndexType>(baseType) && (isa<LLVM::StoreOp>(newOp) || isa<LLVM::LoadOp>(newOp))) {
             tag = tree->getTag("any pointer");
         }
         else {
