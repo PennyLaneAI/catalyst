@@ -103,9 +103,9 @@ module @my_model {
 
 // CHECK: [[root:#.+]] = #llvm.tbaa_root<id = "Catalyst TBAA">
 // CHECK: [[typedescdouble:#.+]] = #llvm.tbaa_type_desc<id = "double", members = {<[[root]], 0>}>
-// CHECK: [[typedescptr:#.+]] = #llvm.tbaa_type_desc<id = "any pointer", members = {<[[root]], 0>}>
+// CHECK: [[typedescint:#.+]] = #llvm.tbaa_type_desc<id = "int", members = {<[[root]], 0>}>
 // CHECK: [[tagdouble:#.+]] = #llvm.tbaa_tag<base_type = [[typedescdouble]], access_type = [[typedescdouble]], offset = 0>
-// CHECK: [[tagptr:#.+]] = #llvm.tbaa_tag<base_type = [[typedescptr]], access_type = [[typedescptr]], offset = 0>
+// CHECK: [[tagint:#.+]] = #llvm.tbaa_tag<base_type = [[typedescint]], access_type = [[typedescint]], offset = 0>
 module @my_model {
     llvm.func @__enzyme_autodiff2(...)
     func.func @func_mix_f64_index(%arg0: memref<f64>, %arg1: memref<4xf64>, %arg2: memref<index>, %arg3: memref<3xindex>) -> (memref<4xf64>, memref<3xindex>) {
@@ -121,12 +121,12 @@ module @my_model {
         // CHECK: [[getPtr:%.+]] = llvm.getelementptr [[extract1]][[[idxCast]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
         // CHECK: llvm.store [[load0]], [[getPtr]] {tbaa = [[[tagdouble]]]} : f64, !llvm.ptr
         // CHECK: [[extract2:%.+]] = llvm.extractvalue [[castArg2]][1] : !llvm.struct<(ptr, ptr, i64)>
-        // CHECK: [[load1:%.+]] = llvm.load [[extract2]] {tbaa = [[[tagptr]]]} : !llvm.ptr -> i64
+        // CHECK: [[load1:%.+]] = llvm.load [[extract2]] {tbaa = [[[tagint]]]} : !llvm.ptr -> i64
         // CHECK: [[idx1:%.+]] = index.constant 1
         // CHECK: [[idxCast1:%.+]] = builtin.unrealized_conversion_cast [[idx1]] : index to i64
         // CHECK: [[extract2:%.+]] = llvm.extractvalue [[castArg3]][1] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
         // CHECK: [[getPtr1:%.+]] = llvm.getelementptr [[extract2]][[[idxCast1]]] : (!llvm.ptr, i64) -> !llvm.ptr, i64
-        // CHECK: llvm.store [[load1]], [[getPtr1]] {tbaa = [[[tagptr]]]} : i64, !llvm.ptr
+        // CHECK: llvm.store [[load1]], [[getPtr1]] {tbaa = [[[tagint]]]} : i64, !llvm.ptr
         %0 = memref.load %arg0[] : memref<f64>
         %idx0 = index.constant 0
         memref.store %0, %arg1[%idx0] : memref<4xf64>
