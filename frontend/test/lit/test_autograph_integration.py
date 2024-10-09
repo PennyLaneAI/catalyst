@@ -23,6 +23,8 @@ from jax.core import ShapedArray
 
 from catalyst import jacobian, mitigate_with_zne, qjit, vmap
 
+# pylint: disable=missing-function-docstring
+
 # -----
 # Test autograph on nested QJIT object.
 
@@ -54,7 +56,7 @@ def test_vmap(c, data):
 
 
 # hack in the annotations for vmap
-ptype = inspect._ParameterKind.POSITIONAL_OR_KEYWORD
+ptype = inspect.Parameter.POSITIONAL_OR_KEYWORD
 annotated_params = [
     inspect.Parameter("c", ptype, annotation=bool),
     inspect.Parameter("data", ptype, annotation=ShapedArray((5,), dtype=float)),

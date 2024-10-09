@@ -38,7 +38,6 @@ from catalyst import (
     jacobian,
     jvp,
     measure,
-    mitigate_with_zne,
     qjit,
     run_autograph,
     vjp,

@@ -26,6 +26,9 @@ class CatalystCallable(abc.ABC):
     def __init__(self, *members):
         self._wrappable_members = members
 
+    @abc.abstractmethod
+    def __call__(self, *args, **kwargs): ...
+
     def call_with_wrapper(self, wrapper, call_args, call_kwargs):
         """Adds an additional wrapper to the wrapped function before invoking the __call__ method
         of this class. The wrapper is expected to act like a decorator."""
@@ -33,7 +36,4 @@ class CatalystCallable(abc.ABC):
             (self, member, wrapper(getattr(self, member))) for member in self._wrappable_members
         )
         with Patcher(*patch_items):
-            return self.__call__(*call_args, **call_kwargs)
-
-    def register_wrappable_members(self, *members):
-        self._wrappable_members.extend(members)
+            return self(*call_args, **call_kwargs)
