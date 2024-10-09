@@ -199,7 +199,7 @@ def test_custom_device_bad_directory():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{frontend_path}/test/pytest/custom_device/custom_device.toml")
+        config = pathlib.Path(f"{frontend_path}/test/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -240,7 +240,7 @@ def test_custom_device_no_c_interface():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{frontend_path}/test/pytest/custom_device/custom_device.toml")
+        config = pathlib.Path(f"{frontend_path}/test/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)

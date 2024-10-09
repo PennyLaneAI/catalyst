@@ -20,7 +20,7 @@ import platform
 from typing import Optional
 
 import pennylane as qml
-from pennylane.devices import Device, NullQubit
+from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
@@ -42,11 +42,11 @@ class CustomDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lightning_lib_path = (
+        null_qubit_lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
 
-        return "NullQubit", lightning_lib_path
+        return "NullQubit", null_qubit_lib_path
 
     def execute(self, circuits, execution_config):
         """Execute"""
@@ -66,7 +66,7 @@ def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
     # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
-    dev = NullQubit(wires=2, shots=2048)
+    dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)
@@ -91,7 +91,7 @@ def test_preprocess():
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
     # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "NullQubit", "{'shots': 2048}"]
-    dev = NullQubit(wires=2, shots=2048)
+    dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)
