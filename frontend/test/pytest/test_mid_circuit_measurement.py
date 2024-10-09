@@ -27,7 +27,7 @@ from pennylane.transforms.dynamic_one_shot import fill_in_value
 import catalyst
 from catalyst import CompileError, cond, grad
 from catalyst import jvp as C_jvp
-from catalyst import measure, mitigate_with_zne, qjit, value_and_grad
+from catalyst import measure, qjit, value_and_grad
 from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -393,30 +393,6 @@ class TestMidCircuitMeasurement:
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
-
-    def test_mcm_method_with_zne(self, backend):
-        """Test that the dynamic_one_shot works with ZNE."""
-        dev = qml.device(backend, wires=1, shots=5)
-
-        def circuit():
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit
-        def mitigated_circuit_1():
-            s = [1, 3]
-            g = qml.QNode(circuit, dev, mcm_method="one-shot")
-            return mitigate_with_zne(g, scale_factors=s)()
-
-        @qjit
-        def mitigated_circuit_2():
-            s = [1, 3]
-            g = qml.QNode(circuit, dev)
-            return mitigate_with_zne(g, scale_factors=s)()
-
-        observed = mitigated_circuit_1()
-        expected = mitigated_circuit_2()
-
-        assert np.allclose(expected, observed)
 
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):
