@@ -248,7 +248,7 @@ class CustomBuildExtMacos(UnifiedBuildExt):
 
     def run(self):
         # Run the original build_ext command
-        super().run(self)
+        super().run()
 
         # Construct library name based on ext suffix (contains python version, architecture and .so)
         library_name = "libcustom_calls.so"
