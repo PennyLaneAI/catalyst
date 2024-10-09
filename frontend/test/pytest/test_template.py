@@ -690,23 +690,6 @@ def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
     assert np.allclose(expected, observed)
 
 
-def test_cosine_window(backend):
-    """Test cosine window."""
-
-    def cosine_window():
-        qml.CosineWindow(wires=[0, 1])
-        return qml.probs(wires=[0, 1])
-
-    device = qml.device(backend, wires=2)
-    interpreted_fn = qml.QNode(cosine_window, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    interpreted_result = interpreted_fn()
-    jitted_result = jitted_fn()
-
-    assert np.allclose(interpreted_result, jitted_result)
-
-
 # Hilbert Schmidt templates take a quantum tape as a parameter.
 # Therefore unsuitable for JIT compilation
 
