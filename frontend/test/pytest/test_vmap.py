@@ -782,3 +782,35 @@ class TestVectorizeMap:
         expected = jnp.array([0.93005586, 0.00498127, -0.88789978])
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
+
+    @pytest.mark.parametrize("arg", [10, "no", object()])
+    def test_vmap_with_shapeless_args(self, arg):
+        """Confirm that vmap works when used with shape-less values."""
+
+        @vmap(in_axes=(None, 0))
+        def f(n, arr):
+            return n * arr
+
+        batch_size = f._get_batch_size((arg, jnp.zeros((2, 5))), (None, 0), None)
+        assert batch_size == 2
+
+    def test_vmap_axis_out_of_bounds(self):
+        """Confirm that vmap works when used with shapeless values."""
+
+        @vmap(in_axes=(0, 2))
+        def f(a, b):
+            return a * b
+
+        with pytest.raises(ValueError, match="2 is out of bounds for argument 1"):
+            f._get_batch_size((jnp.zeros(5), jnp.zeros((2, 5))), (0, 2), None)
+
+    def test_vmap_no_aot(self):
+        """Test that vmap does not allow AOT compilation since type signatures are most likely to
+        be wrong."""
+
+        @qjit(target="mlir")
+        @vmap
+        def f(x: float):
+            return x**2
+
+        assert f.mlir is None
