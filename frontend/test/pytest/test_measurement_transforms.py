@@ -21,7 +21,6 @@ import pathlib
 import platform
 import tempfile
 from functools import partial
-from typing import Optional
 from unittest.mock import Mock, patch
 
 import numpy as np
