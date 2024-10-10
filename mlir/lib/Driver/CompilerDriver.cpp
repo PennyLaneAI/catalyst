@@ -279,6 +279,14 @@ bool containsGradients(mlir::ModuleOp moduleOp)
         return WalkResult::interrupt();
     });
 
+    moduleOp.walk([&](mlir::LLVM::LLVMFuncOp op) {
+        auto str = op->getName().getStringRef();
+        if (str.contains("Enzyme")) {
+            contain = true;
+            return WalkResult::interrupt();
+        };
+    });
+
     return contain;
 }
 
