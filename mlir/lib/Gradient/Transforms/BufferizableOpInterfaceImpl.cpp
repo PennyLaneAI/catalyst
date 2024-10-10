@@ -1,10 +1,14 @@
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/IR/UnstructuredControlFlow.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -13,6 +17,7 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace mlir;
@@ -31,6 +36,11 @@ namespace {
  * `getAliasingOpOperands`: Return the OpResults that may share the same buffer as the given
  * OpOperand. Note that MLIR documentation does not mention `getAliasingValues` but it seems to
  * serve the same purpose.
+ *
+ * Bufferizing FunctionOpInterface is also not documented by MLIR. It requires
+ * `OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel`, which requires the
+ * implementation of `supportsUnstructuredControlFlow`, `hasTensorSemantics`, and
+ * `getAliasingOpOperands`.
  *
  * Link: https://mlir.llvm.org/docs/Bufferization/#extending-one-shot-bufferize
  */
@@ -282,7 +292,8 @@ struct BackpropOpInterface
 };
 
 struct ForwardOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<ForwardOpInterface, ForwardOp> {
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+          ForwardOpInterface, ForwardOp> {
     static bool supportsUnstructuredControlFlow() { return true; }
 
     bool hasTensorSemantics(Operation *op) const
@@ -305,7 +316,22 @@ struct ForwardOpInterface
     getAliasingOpOperands(Operation *op, Value value,
                           const bufferization::AnalysisState &state) const
     {
-        return {};
+        return getAliasingBranchOpOperands(op, cast<BlockArgument>(value), state);
+    }
+
+    FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
+                                            const bufferization::BufferizationOptions &options,
+                                            SmallVector<Value> &invocationStack) const
+    {
+        auto forwardOp = cast<ForwardOp>(op);
+        auto bbArg = cast<BlockArgument>(value);
+
+        // Function arguments are special.
+        if (bbArg.getOwner() == &forwardOp.getBody().front())
+            return getBufferizedFunctionArgType(forwardOp, bbArg.getArgNumber(), options);
+
+        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
+            op, value, options, invocationStack);
     }
 
     LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
@@ -387,7 +413,8 @@ struct ForwardOpInterface
 };
 
 struct ReverseOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<ReverseOpInterface, ReverseOp> {
+    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
+          ReverseOpInterface, ReverseOp> {
     static bool supportsUnstructuredControlFlow() { return true; }
 
     bool hasTensorSemantics(Operation *op) const
@@ -410,7 +437,22 @@ struct ReverseOpInterface
     getAliasingOpOperands(Operation *op, Value value,
                           const bufferization::AnalysisState &state) const
     {
-        return {};
+        return getAliasingBranchOpOperands(op, cast<BlockArgument>(value), state);
+    }
+
+    FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
+                                            const bufferization::BufferizationOptions &options,
+                                            SmallVector<Value> &invocationStack) const
+    {
+        auto reverseOp = cast<ReverseOp>(op);
+        auto bbArg = cast<BlockArgument>(value);
+
+        // Function arguments are special.
+        if (bbArg.getOwner() == &reverseOp.getBody().front())
+            return getBufferizedFunctionArgType(reverseOp, bbArg.getArgNumber(), options);
+
+        return OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel::getBufferType(
+            op, value, options, invocationStack);
     }
 
     LogicalResult verifyAnalysis(Operation *op, const bufferization::AnalysisState &state) const
