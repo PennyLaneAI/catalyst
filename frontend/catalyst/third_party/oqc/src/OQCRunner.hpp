@@ -26,7 +26,6 @@
 #include <iostream>
 
 #include "Exception.hpp"
-#include "Python.hpp"
 
 #include <pybind11/embed.h>
 
@@ -119,11 +118,13 @@ struct OQCRunner : public OQCRunnerBase {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+        py::gil_scoped_acquire lock;
 
         auto locals = py::dict("circuit"_a = circuit, "device"_a = device, "kwargs"_a = kwargs,
                                "shots"_a = shots, "msg"_a = "");

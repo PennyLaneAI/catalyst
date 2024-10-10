@@ -22,9 +22,16 @@ add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 target_include_directories(rtd_openqasm PRIVATE .
     ${runtime_includes}
     ${backend_includes}
-    ${util_includes}
     )
 
-target_link_libraries(rtd_openqasm pybind11::module catalyst_python_interpreter)
+pybind11_add_module(openqasm_python_module SHARED openqasm_python_module.cpp)
 
+add_dependencies(rtd_openqasm openqasm_python_module)
+target_compile_definitions(rtd_openqasm PUBLIC -DOPENQASM_PY=\"$<TARGET_FILE_NAME:openqasm_python_module>\")
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:openqasm_python_module>")
+if(NOT APPLE)
+    set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
+else()
+    set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
+endif()

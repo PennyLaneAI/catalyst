@@ -10,7 +10,7 @@ FetchContent_MakeAvailable(MLIRCRunnerUtils)
 FetchContent_MakeAvailable(MLIRFloat16Bits)
 
 # link to rt_backend
-target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS} catalyst_python_interpreter)
+target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS})
 
 if(ENABLE_OPENQASM)
     fetch_pybind11()
@@ -26,7 +26,6 @@ message(STATUS "PROJECT_SOURCE_DIR  " ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver)
 target_include_directories(catalyst_qir_qis_obj PUBLIC .
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${runtime_includes}
-    ${util_includes}
     ${mlirrunnerutils_SOURCE_DIR}/../..  # includes are relative to mlir/ExecutionEngine
     ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver
     )

@@ -14,10 +14,7 @@
 
 #include "OQCDevice.cpp"
 #include "OQCRunner.hpp"
-#include "Python.hpp"
 #include "RuntimeCAPI.h"
-
-PythonInterpreterGuard guard{};
 
 #include <catch2/catch.hpp>
 

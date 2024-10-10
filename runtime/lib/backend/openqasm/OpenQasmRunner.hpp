@@ -23,9 +23,12 @@
 #include <vector>
 
 #include "Exception.hpp"
-#include "Python.hpp"
 
+#ifdef INITIALIZE_PYTHON
 #include <pybind11/embed.h>
+#endif
+
+#include <dlfcn.h>
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
@@ -106,121 +109,60 @@ struct BraketRunner : public OpenQasmRunner {
                                   size_t shots, const std::string &kwargs = "") const
         -> std::string override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
+        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-        namespace py = pybind11;
-        using namespace py::literals;
+        char *(*runCircuitImpl)(const char *, const char *, size_t, const char *);
+        typedef char *(*func_ptr_t)(const char *, const char *, size_t, const char *);
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        runCircuitImpl = (func_ptr_t)dlsym(handle, "runCircuit");
+        if (!runCircuitImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
-
-        py::exec(
-            R"(
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
-
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                result = str(result)
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        return locals["result"].cast<std::string>();
+        char *message = runCircuitImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
+        std::string messageStr(message);
+        free(message);
+        return messageStr;
     }
 
     [[nodiscard]] auto Probs(const std::string &circuit, const std::string &device, size_t shots,
                              size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<double> override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
-        namespace py = pybind11;
-        using namespace py::literals;
-
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
-
-        auto locals =
-            py::dict("circuit"_a = circuit, "braket_device"_a = device, "kwargs"_a = kwargs,
-                     "shots"_a = shots, "num_qubits"_a = num_qubits, "msg"_a = "");
-
-        py::exec(
-            R"(
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
-
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                probs_dict = {int(s, 2): p for s, p in result.measurement_probabilities.items()}
-                probs_list = []
-                for i in range(2 ** int(num_qubits)):
-                    probs_list.append(probs_dict[i] if i in probs_dict else 0)
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        py::list results = locals["probs_list"];
-
-        std::vector<double> probs;
-        probs.reserve(std::pow(2, num_qubits));
-        for (py::handle item : results) {
-            probs.push_back(item.cast<double>());
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
         }
+#endif
+        std::vector<double> probs;
+
+        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
+
+        void *(*probsImpl)(const char *, const char *, size_t, size_t, const char *, void *);
+        typedef void *(*probsImpl_t)(const char *, const char *, size_t, size_t, const char *,
+                                     void *);
+
+        probsImpl = (probsImpl_t)dlsym(handle, "probs");
+        if (!probsImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
+
+        probsImpl(circuit.c_str(), device.c_str(), shots, num_qubits, kwargs.c_str(), &probs);
 
         return probs;
     }
@@ -229,62 +171,31 @@ struct BraketRunner : public OpenQasmRunner {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t> override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
-        namespace py = pybind11;
-        using namespace py::literals;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
-
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
-
-        py::exec(
-            R"(
-            import numpy as np
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
-
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                samples = np.array(result.measurements).flatten()
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        py::list results = locals["samples"];
-
-        std::vector<size_t> samples;
-        samples.reserve(shots * num_qubits);
-        for (py::handle item : results) {
-            samples.push_back(item.cast<size_t>());
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
         }
+#endif
+        std::vector<size_t> samples;
+
+        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
+
+        void *(*samplesImpl)(const char *, const char *, size_t, size_t, const char *, void *);
+        typedef void *(*samplesImpl_t)(const char *, const char *, size_t, size_t, const char *,
+                                       void *);
+
+        samplesImpl = (samplesImpl_t)dlsym(handle, "samples");
+        if (!samplesImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
+
+        samplesImpl(circuit.c_str(), device.c_str(), shots, num_qubits, kwargs.c_str(), &samples);
 
         return samples;
     }
@@ -292,113 +203,55 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Expval(const std::string &circuit, const std::string &device, size_t shots,
                               const std::string &kwargs = "") const -> double override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
-        namespace py = pybind11;
-        using namespace py::literals;
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+        double (*expvalImpl)(const char *, const char *, size_t, const char *);
+        typedef double (*expvalImpl_t)(const char *, const char *, size_t, const char *);
 
-        py::exec(
-            R"(
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
+        expvalImpl = (expvalImpl_t)dlsym(handle, "expval");
+        if (!expvalImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                expval = result.values
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        py::list results = locals["expval"];
-
-        return results[0].cast<double>();
+        return expvalImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
     }
 
     [[nodiscard]] auto Var(const std::string &circuit, const std::string &device, size_t shots,
                            const std::string &kwargs = "") const -> double override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
-        namespace py = pybind11;
-        using namespace py::literals;
+#ifdef INITIALIZE_PYTHON
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+        }
+#endif
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+        double (*varImpl)(const char *, const char *, size_t, const char *);
+        typedef double (*varImpl_t)(const char *, const char *, size_t, const char *);
 
-        py::exec(
-            R"(
-            from braket.aws import AwsDevice
-            from braket.devices import LocalSimulator
-            from braket.ir.openqasm import Program as OpenQasmProgram
+        varImpl = (varImpl_t)dlsym(handle, "expval");
+        if (!varImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
 
-            try:
-                if braket_device in ["default", "braket_sv", "braket_dm"]:
-                    device = LocalSimulator(braket_device)
-                elif "arn:aws:braket" in braket_device:
-                    device = AwsDevice(braket_device)
-                else:
-                    raise ValueError(
-                        "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
-                    )
-                if kwargs != "":
-                    kwargs = kwargs.replace("'", "")
-                    kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
-                    if len(kwargs) != 2:
-                        raise ValueError(
-                            "s3_destination_folder must be of size 2 with a 'bucket' and 'key' respectively."
-                        )
-                    result = device.run(
-                        OpenQasmProgram(source=circuit),
-                        shots=int(shots),
-                        s3_destination_folder=tuple(kwargs),
-                    ).result()
-                else:
-                    result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                var = result.values
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-              )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        py::list results = locals["var"];
-
-        return results[0].cast<double>();
+        return varImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
     }
 };
 

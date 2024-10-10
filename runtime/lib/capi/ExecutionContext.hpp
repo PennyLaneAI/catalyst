@@ -26,7 +26,6 @@
 #include <unordered_set>
 
 #include "Exception.hpp"
-#include "Python.hpp"
 #include "QuantumDevice.hpp"
 #include "Types.h"
 
@@ -261,7 +260,6 @@ class ExecutionContext final {
 
     // ExecutionContext pointers
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
-    std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
     // PRNG
     uint32_t *seed;
@@ -320,12 +318,6 @@ class ExecutionContext final {
             device->getQuantumDevicePtr()->SetDevicePRNG(nullptr);
         }
         device_pool.push_back(device);
-
-#ifdef __build_with_pybind11
-        if (!py_guard && device->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
-            py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
-        }
-#endif
 
         return device_pool[key];
     }
