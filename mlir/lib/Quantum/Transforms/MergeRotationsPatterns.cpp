@@ -16,6 +16,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "VerifyParentGateAnalysis.hpp"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -47,11 +48,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         if (!parentOp || parentOp.getGateName() != opGateName)
             return failure();
 
-        ValueRange parentOutQubits = parentOp.getOutQubits();
-        // Check if the input qubits to the current operation match the output qubits of the parent.
-        for (const auto &[Idx, Qubit] : llvm::enumerate(inQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != parentOutQubits[Idx])
-                return failure();
+        VerifyParentGateAnalysis<CustomOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
+            return failure();
         }
 
         TypeRange outQubitsTypes = op.getOutQubits().getTypes();
@@ -62,9 +61,9 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
 
         auto parentParams = parentOp.getParams();
         auto params = op.getParams();
-        std::vector<Value> sumParams;
+        SmallVector<mlir::Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
+            mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         };
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
@@ -86,44 +85,13 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
                                         mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
-        auto loc = op.getLoc();
-        ValueRange InQubits = op.getInQubits();
+        // auto loc = op.getLoc();
+        // ValueRange InQubits = op.getInQubits();
 
-        // Check parent op
-        auto parentOp = dyn_cast_or_null<MultiRZOp>(InQubits[0].getDefiningOp());
-
-        if (!parentOp)
+        VerifyParentGateAnalysis<MultiRZOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
             return failure();
-
-        // Check the target qubit
-        ValueRange parentOutQubits = parentOp.getOutQubits();
-        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != parentOutQubits[Idx])
-                return failure();
         }
-
-        // Check the control qubits
-        ValueRange inCtrlQubits = op.getInCtrlQubits();
-        ValueRange parentOutCtrlQubits = parentOp.getOutCtrlQubits();
-        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != parentOp || Qubit != parentOutCtrlQubits[Idx])
-                return failure();
-        }
-        // Check the control values
-
-        // ...
-
-        // Sum the angles control values
-
-        // Replace operation
-        TypeRange outQubitsTypes = op.getOutQubits().getTypes();
-        TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
-        ValueRange parentInQubits = parentOp.getInQubits();
-        ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
-        ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
-        // op.replaceAllUsesWith(mergeOp);
-        // op.erase();
-        // parentOp.erase();
 
         return success();
     }
