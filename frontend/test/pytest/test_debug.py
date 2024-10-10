@@ -418,7 +418,7 @@ class TestCProgramGeneration:
         assert len(res) == 0
 
     def test_get_compilation_stage_without_keep_intermediate(self):
-        """Test if error is raised when using get_pipeline_output without keep_intermediate."""
+        """Test if error is raised when using get_compilation_stage without keep_intermediate."""
 
         @qjit
         def f(x: float):

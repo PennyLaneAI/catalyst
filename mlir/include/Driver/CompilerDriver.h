@@ -106,6 +106,12 @@ mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &o
                                       catalyst::driver::CompilerOutput &output);
 
 int QuantumDriverMainFromCL(int argc, char **argv);
+int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
+                              const std::string &moduleName, bool keepIntermediate,
+                              bool asyncQNodes, bool verbose, bool lowerToLLVM,
+                              const std::vector<catalyst::driver::Pipeline> &passPipelines,
+                              const std::string &checkpointStage,
+                              catalyst::driver::CompilerOutput &output);
 
 namespace llvm {
 
