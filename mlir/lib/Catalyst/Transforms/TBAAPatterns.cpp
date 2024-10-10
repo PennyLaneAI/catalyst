@@ -42,8 +42,8 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation* currentOp,
                     llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getName() << "\n";
                     if (currentOp->getPrevNode()->getPrevNode()->getPrevNode()) {
                         llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getPrevNode()->getName() << "\n";
-                        if (currentOp->getPrevNode()->getPrevNode()->getPrevNode()) {
-                            llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getPrevNode()->getName() << "\n";
+                        if (currentOp->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()) {
+                            llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getName() << "\n";
                         }
                     }
                 }
