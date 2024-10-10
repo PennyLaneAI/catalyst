@@ -226,7 +226,11 @@ class VmapCallable(CatalystCallable):
         fn_args = tree_unflatten(args_tree, fn_args_flat)
 
         # Run 'fn' one time to get output-shape
-        init_result = self.fn(*fn_args, **kwargs)
+        _, shape = jax.make_jaxpr(self.fn, return_shape=True)(*fn_args, **kwargs)
+        shapes, init_result_tree = tree_flatten(shape)
+        init_result_flat = [jnp.zeros(shape=shape.shape, dtype=shape.dtype) for shape in shapes]
+        init_result = tree_unflatten(init_result_tree, init_result_flat)
+        
 
         # Check the validity of the output w.r.t. out_axes
         out_axes_deep_struct = tree_structure(self.out_axes, is_leaf=lambda x: x is None)
@@ -237,8 +241,6 @@ class VmapCallable(CatalystCallable):
                 "the number of function results, but got "
                 f"{out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
             )
-
-        init_result_flat, init_result_tree = tree_flatten(init_result)
 
         num_axes_out = len(init_result_flat)
 
