@@ -956,11 +956,11 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     for const in jaxpr.consts:
         const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
         nparray = np.asarray(const)
-        # TODO: Fix bool case
-        if not const.dtype == bool:
-            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-            constantVals = StableHLOConstantOp(attr).results
-            constants.append(constantVals)
+        if const.dtype == bool:
+            nparray = np.packbits(nparray, bitorder="little")
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
 
     args_and_consts = constants + list(args[0:-1])
 
