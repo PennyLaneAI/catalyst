@@ -28,9 +28,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting, split_to_single_terms
-from pennylane.transforms.core import TransformProgram
 
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, get_device_capabilities, get_device_toml_config
@@ -41,7 +39,7 @@ from catalyst.device.decomposition import (
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import OperationProperties
 
-from ..conftest import TEST_PATH
+from catalyst.test.conftest import TEST_PATH
 
 # pylint: disable=attribute-defined-outside-init
 

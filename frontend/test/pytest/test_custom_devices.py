@@ -13,7 +13,6 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
-import os
 import pathlib
 import platform
 
@@ -25,7 +24,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
 
-from ..conftest import TEST_PATH
+from catalyst.tests.conftest import TEST_PATH
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
