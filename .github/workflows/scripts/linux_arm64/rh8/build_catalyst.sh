@@ -89,6 +89,7 @@ export DIALECTS_BUILD_DIR=/catalyst/quantum-build
 export RT_BUILD_DIR=/catalyst/runtime-build
 export OQC_BUILD_DIR=/catalyst/oqc-build
 export ENZYME_BUILD_DIR=/catalyst/enzyme-build
+which cmake
 make wheel
 
 # Exclude libopenblas as we rely on the openblas/lapack library shipped by scipy

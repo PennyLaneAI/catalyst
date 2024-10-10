@@ -193,8 +193,8 @@ class UnifiedBuildExt(build_ext):
 
         try:
             subprocess.check_output([cmake_path, "--version"])
-        except subprocess.CalledProcessError:
-            raise RuntimeError("'cmake --version' failed: check CMake installation")
+        except subprocess.CalledProcessError as err:
+            raise RuntimeError("'cmake --version' failed: check CMake installation") from err
 
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         debug = int(os.environ.get("DEBUG", 0)) if self.debug is None else self.debug
