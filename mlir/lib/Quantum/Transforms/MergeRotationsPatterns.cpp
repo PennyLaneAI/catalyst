@@ -63,7 +63,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         auto params = op.getParams();
         SmallVector<mlir::Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
+            mlir::Value sumParam =
+                rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         };
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
@@ -85,13 +86,35 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
                                         mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
-        // auto loc = op.getLoc();
-        // ValueRange InQubits = op.getInQubits();
+        auto loc = op.getLoc();
 
         VerifyParentGateAnalysis<MultiRZOp> vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
+
+        ValueRange inQubits = op.getInQubits();
+        auto parentOp = dyn_cast_or_null<MultiRZOp>(inQubits[0].getDefiningOp());
+        if (!parentOp)
+            return failure();
+
+        TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+        TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
+        ValueRange parentInQubits = parentOp.getInQubits();
+        ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
+        ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
+
+        auto parentTheta = parentOp.getTheta();
+        auto theta = op.getTheta();
+
+        mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
+
+        auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes,
+                                                  sumParam, parentInQubits, nullptr,
+                                                  parentInCtrlQubits, parentInCtrlValues);
+        op.replaceAllUsesWith(mergeOp);
+        op.erase();
+        parentOp.erase();
 
         return success();
     }
