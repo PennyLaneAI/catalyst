@@ -605,7 +605,6 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
         )
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
-    ctx.cached_primitive_lowerings[fn] = func_op
     return func_op
 
 
