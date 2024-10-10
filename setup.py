@@ -19,8 +19,8 @@
 import glob
 import os
 import platform
-import shutil
 import subprocess
+import sys
 from typing import Optional
 
 from setuptools import Extension, find_namespace_packages, setup
@@ -183,18 +183,22 @@ class UnifiedBuildExt(build_ext):
 
     def build_cmake_extension(self, ext: CMakeExtension):
         """Configure and build CMake extension."""
-        cmake_path = "cmake"  # shutil.which("cmake")
-        # clang_path = shutil.which("clang++")
-        ninja_path = shutil.which("ninja")
-
-        assert cmake_path is not None, "cmake executable not found in PATH."
-        # assert clang_path is not None, "clang++ executable not found in PATH."
-        assert ninja_path is not None, "Ninja executable not found in PATH."
+        cmake_path = "cmake"
+        ninja_path = "ninja"
 
         try:
             subprocess.check_output([cmake_path, "--version"])
         except subprocess.CalledProcessError as err:
-            raise RuntimeError("'cmake --version' failed: check CMake installation") from err
+            raise RuntimeError(
+                f"'{cmake_path} --version' failed: check CMake installation"
+            ) from err
+
+        try:
+            subprocess.check_output([ninja_path, "--version"])
+        except subprocess.CalledProcessError as err:
+            raise RuntimeError(
+                f"'{ninja_path} --version' failed: check Ninja installation"
+            ) from err
 
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         debug = int(os.environ.get("DEBUG", 0)) if self.debug is None else self.debug
@@ -202,9 +206,13 @@ class UnifiedBuildExt(build_ext):
         configure_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DCMAKE_BUILD_TYPE={build_type}",
-            # f"-DCMAKE_CXX_COMPILER={clang_path}",
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
+        configure_args += (
+            [f"-DPYTHON_EXECUTABLE={sys.executable}"]
+            if platform.system() != "Darwin"
+            else [f"-DPython_EXECUTABLE={sys.executable}"]
+        )
 
         configure_args += self.cmake_defines
 
