@@ -27,7 +27,7 @@ jobs:
   check-config:
     name: Build Configuration
     needs: [constants]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout Catalyst repo
