@@ -44,13 +44,13 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        VerifyParentGateAnalysis<CustomOp> vpga(op);
-        if (!vpga.getVerifierResult()) {
+        StringRef OpGateName = op.getGateName();
+        if (!HermitianOps.contains(OpGateName)) {
             return failure();
         }
 
-        StringRef OpGateName = op.getGateName();
-        if (!HermitianOps.contains(OpGateName)) {
+        VerifyParentGateAnalysis<CustomOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
             return failure();
         }
 
