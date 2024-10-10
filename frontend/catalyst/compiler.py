@@ -148,7 +148,18 @@ class CompileOptions:
         """Get effective pipelines"""
         if self.pipelines:
             return self.pipelines
-        return get_stages(self)
+        return self.get_stages()
+
+    def get_stages(self):
+        """Returns all stages in order for compilation"""
+        # Dictionaries in python are ordered
+        stages = {}
+        stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
+        stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
+        stages["BufferizationPass"] = get_bufferization_stage(self)
+        stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
+        return list(stages.items())
 
 
 @debug_logger

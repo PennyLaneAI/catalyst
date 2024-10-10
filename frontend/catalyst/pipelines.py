@@ -27,7 +27,7 @@ This module contains the pipelines that are used to compile a quantum function t
 
 from copy import deepcopy
 
-def get_enforce_runtime_invariants_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes in the enforce runtime invariant stage."""
     enforce_runtime_invariants = [
         # We want the invariant that transforms that generate multiple
@@ -49,7 +49,7 @@ def get_enforce_runtime_invariants_stage(_options: Optional[CompileOptions] = No
     return enforce_runtime_invariants
 
 
-def get_hlo_lowering_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
     hlo_lowering = [
         "canonicalize",
@@ -71,10 +71,8 @@ def get_hlo_lowering_stage(_options: Optional[CompileOptions] = None) -> List[st
     return hlo_lowering
 
 
-def get_quantum_compilation_stage(options: Optional[CompileOptions] = None) -> List[str]:
+def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs quantum transformations"""
-    if options is None:
-        options = CompileOptions()
 
     quantum_compilation = [
         "annotate-function",
@@ -86,7 +84,7 @@ def get_quantum_compilation_stage(options: Optional[CompileOptions] = None) -> L
     return list(filter(partial(is_not, None), quantum_compilation))
 
 
-def get_bufferization_stage(_options: Optional[CompileOptions] = None) -> List[str]:
+def get_bufferization_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs bufferization"""
     bufferization = [
         "one-shot-bufferize{dialect-filter=memref}",
@@ -122,10 +120,8 @@ def get_bufferization_stage(_options: Optional[CompileOptions] = None) -> List[s
     return bufferization
 
 
-def get_convert_to_llvm_stage(options: Optional[CompileOptions] = None) -> List[str]:
+def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
     """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
-    if options is None:
-        options = CompileOptions()
 
     convert_to_llvm = [
         "qnode-to-async-lowering" if options.async_qnodes else None,
