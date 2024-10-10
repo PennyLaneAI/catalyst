@@ -37,7 +37,6 @@ from catalyst.device.decomposition import (
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import OperationProperties
-
 from frontend.test.conftest import TEST_PATH
 
 # pylint: disable=attribute-defined-outside-init
