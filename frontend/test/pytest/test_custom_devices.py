@@ -25,7 +25,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
 
-frontend_path = os.path.join(os.path.dirname(__file__), "..")
+from ..conftest import TEST_PATH
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -199,7 +199,7 @@ def test_custom_device_bad_directory():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{frontend_path}/test/custom_device/custom_device.toml")
+        config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -240,7 +240,7 @@ def test_custom_device_no_c_interface():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{frontend_path}/test/custom_device/custom_device.toml")
+        config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
