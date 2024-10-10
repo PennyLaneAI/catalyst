@@ -706,6 +706,29 @@ class TestProbs:
         observed = probs(np.pi / 2)
         assert np.allclose(observed, expected)
 
+class TestAllCounts:
+    """Test allcounts."""
+
+class TestMidMeasure:
+    """Test measure."""
+
+class TestVnEntropy:
+    """Test vnentropy."""
+
+class TestVnEntanglementEntropy:
+    """Test vnentanglemententropy."""
+
+class TestMutualInfo:
+    """Test mutualinfo."""
+
+class TestShadow:
+    """Test shadow."""
+
+class TestShadowExpval:
+    """Test shadowexpval."""
+
+class TestPurity:
+    """Test purity."""
 
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
