@@ -143,11 +143,11 @@ class UnifiedBuildExt(build_ext):
 
         1. `get_ext_filename`, in order to remove the architecture/python
            version suffix of the library name.
-        2. `run`, in order to handle the compilation of extensions with CMake
-           configurations, namely the catalyst.utils.wrapper module, and of
-           generic C/C++ extensions without a CMake configuration, namely the
-           catalyst.utils.libcustom_calls module, which is currently built as a
-           plain setuptools Extension.
+        2. `build_extension`, in order to handle the compilation of extensions
+           with CMake configurations, namely the catalyst.utils.wrapper module,
+           and of generic C/C++ extensions without a CMake configuration, namely
+           the catalyst.utils.libcustom_calls module, which is currently built
+           as a plain setuptools Extension.
 
     TODO: Eventually it would be better to build the utils.libcustom_calls
     module using a CMake configuration as well, rather than as a setuptools
@@ -176,13 +176,11 @@ class UnifiedBuildExt(build_ext):
         extension = os.path.splitext(filename)[1]
         return filename.replace(suffix, "") + extension
 
-    def run(self):
-        super().run()
-        for ext in self.extensions:
-            if isinstance(ext, CMakeExtension):
-                self.build_cmake_extension(ext)
-            else:
-                self.build_generic_extension(ext)
+    def build_extension(self, ext):
+        if isinstance(ext, CMakeExtension):
+            self.build_cmake_extension(ext)
+        else:
+            super().build_extension(ext)
 
     def build_cmake_extension(self, ext: CMakeExtension):
         """Configure and build CMake extension."""
@@ -203,11 +201,6 @@ class UnifiedBuildExt(build_ext):
             f"-DCMAKE_CXX_COMPILER={clang_path}",
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
-        configure_args += (
-            [f"-DPYTHON_EXECUTABLE={sys.executable}"]
-            if platform.system() != "Darwin"
-            else [f"-DPython_EXECUTABLE={sys.executable}"]
-        )
 
         configure_args += self.cmake_defines
 
@@ -224,10 +217,6 @@ class UnifiedBuildExt(build_ext):
             [cmake_path, "-G", "Ninja", ext.sourcedir] + configure_args, cwd=build_temp
         )
         subprocess.check_call([cmake_path, "--build", "."] + build_args, cwd=build_temp)
-
-    def build_generic_extension(self, ext: Extension):
-        """Configure and build generic extension."""
-        super().build_extension(ext)
 
 
 class CustomBuildExtLinux(UnifiedBuildExt):

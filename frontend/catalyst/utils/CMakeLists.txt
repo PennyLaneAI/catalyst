@@ -40,3 +40,7 @@ nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
 
 # Add the NumPy include directory to the library's include paths
 target_include_directories(wrapper PRIVATE ${NUMPY_INCLUDE_DIR})
+
+# Use suffix ".so" rather than ".abi3.so" for library file using Stable ABI
+# This is necessary for compatibility with setuptools build extensions
+set_target_properties(wrapper PROPERTIES SUFFIX ".so")
