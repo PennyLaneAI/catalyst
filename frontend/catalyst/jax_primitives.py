@@ -29,7 +29,7 @@ from jax._src import api_util, core, source_info_util, util
 from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
-from jax.core import AbstractValue, call_p
+from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
@@ -274,6 +274,8 @@ for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
+func_p = core.CallPrimitive("func")
+func_p.multiple_results = True
 jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
@@ -753,6 +755,28 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
     return call_op.results
 
 
+@func_p.def_impl
+def _func_def_impl(*args, call_jaxpr, fn):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _func_lowering(ctx, *args, call_jaxpr, fn):
+    """Lower a quantum function into MLIR in a two step process.
+    The first step is the compilation of the definition of the function fn.
+    The second step is compiling a call to function fn.
+
+    Args:
+      ctx: the MLIR context
+      args: list of arguments or abstract arguments to the function
+      name: name of the function
+      call_jaxpr: the jaxpr representation of the fn
+      fn: the function being compiled
+    """
+    func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
+    call_op = create_call_op(ctx, func_op, *args)
+    return call_op.results
+
+
 #
 # grad
 #
@@ -789,7 +813,7 @@ def _get_call_jaxpr(jaxpr):
     """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
-        if primitive is call_p or primitive is quantum_kernel_p:
+        if primitive in {func_p, quantum_kernel_p}:
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
@@ -800,7 +824,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ctx: the MLIR context
         args: the points in the function in which we are to calculate the derivative
         jaxpr: the jaxpr representation of the grad op
-        fn(Grad): the function to be differentiated
+        fn (GradCallable): the function to be differentiated
         method: the method used for differentiation
         h: the difference for finite difference. May be None when fn is not finite difference.
         argnums: argument indices which define over which arguments to
@@ -1051,6 +1075,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         fn: the function to be mitigated
     """
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
+
     lower_callable(ctx, fn, func_call_jaxpr)
     func_op = ctx.module_context.cached_primitive_lowerings[fn]
     symbol_ref = get_symbolref(ctx, func_op)
@@ -1062,11 +1087,11 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     for const in jaxpr.consts:
         const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
         nparray = np.asarray(const)
-        # TODO: Fix bool case
-        if not const.dtype == bool:
-            attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-            constantVals = StableHLOConstantOp(attr).results
-            constants.append(constantVals)
+        if const.dtype == bool:
+            nparray = np.packbits(nparray, bitorder="little")
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
 
     args_and_consts = constants + list(args[0:-1])
 
@@ -2352,6 +2377,7 @@ CUSTOM_LOWERING_RULES = (
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
+    (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
     (adjoint_p, _adjoint_lowering),
