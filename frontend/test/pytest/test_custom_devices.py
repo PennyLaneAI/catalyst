@@ -24,7 +24,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
 
-from catalyst.tests.conftest import TEST_PATH
+from frontend.test.conftest import TEST_PATH
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
