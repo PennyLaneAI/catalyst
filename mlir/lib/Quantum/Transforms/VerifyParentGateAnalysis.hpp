@@ -158,6 +158,7 @@ class AggressiveVerifyParentGateAnalysis : public VerifyParentGateAnalysis<OpTyp
         }
     }
 
+  private:
     bool verifyParentGateName(OpType op, OpType parentOp) const
     {
         // If OpType is quantum.custom, also verify that parent gate has the

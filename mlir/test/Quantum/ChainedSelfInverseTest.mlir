@@ -556,3 +556,51 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
     return %out_qubits_1#0, %out_qubits_1#1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+
+// -----
+
+
+// test quantum.multirz labeled with adjoint attribute
+
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: quantum.alloc
+    // CHECK: [[IN0:%.+]] = quantum.extract
+    // CHECK: [[IN1:%.+]] = quantum.extract
+    // CHECK: [[IN2:%.+]] = quantum.extract
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
+    %mrz:3 = quantum.multirz(%arg0) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mrz_out:3 = quantum.multirz(%arg0) %mrz#0, %mrz#1, %mrz#2 {adjoint} : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK-NOT: quantum.multirz
+    // CHECK: return [[IN0]], [[IN1]], [[IN2]]
+    return %mrz_out#0, %mrz_out#1, %mrz_out#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+
+// test quantum.multirz but wrong wire order
+
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: quantum.alloc
+    // CHECK: [[IN0:%.+]] = quantum.extract
+    // CHECK: [[IN1:%.+]] = quantum.extract
+    // CHECK: [[IN2:%.+]] = quantum.extract
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
+    %mrz:3 = quantum.multirz(%arg0) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mrz_out:3 = quantum.multirz(%arg0) %mrz#1, %mrz#2, %mrz#0 {adjoint} : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: quantum.multirz
+    return %mrz_out#0, %mrz_out#1, %mrz_out#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
