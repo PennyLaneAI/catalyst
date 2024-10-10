@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -22,10 +23,37 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 #include "Catalyst/Transforms/TBAAUtils.h"
+#include "llvm/Support/Casting.h"
 
 using namespace mlir;
 
 namespace catalyst {
+
+bool isExtractAlignedPointerAsIndexOpSource(Operation *op)
+{
+    if (isa<memref::ExtractAlignedPointerAsIndexOp>(op)) {
+        return true;
+    }
+    auto prevOp = op->getPrevNode();
+    if (prevOp) {
+        return isExtractAlignedPointerAsIndexOpSource(prevOp);
+    }
+    return false;
+}
+
+bool isDeallocHelper(Operation *op)
+{
+    auto parentOp = dyn_cast<func::FuncOp>(op->getParentOp());
+    if (parentOp) {
+        auto str = parentOp.getName();
+        llvm::StringRef dellocRef = "dealloc_helper";
+        return str.compare(dellocRef) == 0;
+    }
+
+    llvm::outs() << parentOp.getName() << "\n";
+    return false;
+}
+
 void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation *currentOp,
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
@@ -33,11 +61,12 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation *currentOp,
     mlir::LLVM::TBAATagAttr tag;
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
         // Index can be used as a pointer.
-        if (isa<IndexType>(baseType) && isa<memref::StoreOp>(currentOp) &&
-            isa<LLVM::PtrToIntOp>(currentOp->getPrevNode())) {
+        if (isa<IndexType>(baseType) &&
+            (isExtractAlignedPointerAsIndexOpSource(currentOp) || isDeallocHelper(currentOp))) {
             tag = tree->getTag("any pointer");
         }
         else {
+            isDeallocHelper(currentOp);
             tag = tree->getTag("int");
         }
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
