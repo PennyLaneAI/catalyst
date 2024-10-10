@@ -294,7 +294,7 @@ struct BackpropOpInterface
 struct ForwardOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ForwardOpInterface, ForwardOp> {
-    static bool supportsUnstructuredControlFlow() { return true; }
+    static bool supportsUnstructuredControlFlow() { return false; }
 
     bool hasTensorSemantics(Operation *op) const
     {
@@ -316,7 +316,7 @@ struct ForwardOpInterface
     getAliasingOpOperands(Operation *op, Value value,
                           const bufferization::AnalysisState &state) const
     {
-        return getAliasingBranchOpOperands(op, cast<BlockArgument>(value), state);
+        return {};
     }
 
     FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
@@ -415,7 +415,7 @@ struct ForwardOpInterface
 struct ReverseOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ReverseOpInterface, ReverseOp> {
-    static bool supportsUnstructuredControlFlow() { return true; }
+    static bool supportsUnstructuredControlFlow() { return false; }
 
     bool hasTensorSemantics(Operation *op) const
     {
@@ -437,7 +437,7 @@ struct ReverseOpInterface
     getAliasingOpOperands(Operation *op, Value value,
                           const bufferization::AnalysisState &state) const
     {
-        return getAliasingBranchOpOperands(op, cast<BlockArgument>(value), state);
+        return {};
     }
 
     FailureOr<BaseMemRefType> getBufferType(Operation *op, Value value,
