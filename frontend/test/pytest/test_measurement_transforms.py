@@ -41,13 +41,15 @@ from catalyst.device.decomposition import (
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import OperationProperties
 
+from ..conftest import TEST_PATH
+
 # pylint: disable=attribute-defined-outside-init
 
 
-class NullQubit(Device):
-    """A Null Qubit from the device API."""
+class CustomDevice(Device):
+    """A Custom Device following the new API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
+    config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -63,29 +65,21 @@ class NullQubit(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        # Borrowing the NullQubit library:
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
-        return "NullQubit", lib_path
+        return "CustomQubit", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
 
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
-        """Preprocessing."""
-        if execution_config is None:
-            execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
-        transform_program.add_transform(split_non_commuting)
-        return transform_program, execution_config
+class CustomDeviceLimitedMPs(Device):
+    """A Custom Device from the device API without wires."""
 
-
-class NullQubitLimitedMPs(Device):
-    """A Null Qubit from the device API without wires."""
-
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
+    config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
@@ -100,10 +94,11 @@ class NullQubitLimitedMPs(Device):
         """
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        # Borrowing the NullQubit library:
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
-        return "NullQubit", lib_path
+        return "CustomDevice", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -313,7 +308,7 @@ class TestMeasurementTransforms:
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements
 
-        with NullQubitLimitedMPs(
+        with CustomDeviceLimitedMPs(
             wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
@@ -742,7 +737,7 @@ class TestMeasurementTransforms:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        dev = NullQubit(wires=4, shots=1000)
+        dev = CustomDevice(wires=4, shots=1000)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)
