@@ -184,11 +184,11 @@ class UnifiedBuildExt(build_ext):
     def build_cmake_extension(self, ext: CMakeExtension):
         """Configure and build CMake extension."""
         cmake_path = shutil.which("cmake")
-        clang_path = shutil.which("clang++")
+        # clang_path = shutil.which("clang++")
         ninja_path = shutil.which("ninja")
 
         assert cmake_path is not None, "cmake executable not found in PATH."
-        assert clang_path is not None, "clang++ executable not found in PATH."
+        # assert clang_path is not None, "clang++ executable not found in PATH."
         assert ninja_path is not None, "Ninja executable not found in PATH."
 
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
@@ -197,7 +197,7 @@ class UnifiedBuildExt(build_ext):
         configure_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DCMAKE_BUILD_TYPE={build_type}",
-            f"-DCMAKE_CXX_COMPILER={clang_path}",
+            # f"-DCMAKE_CXX_COMPILER={clang_path}",
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
 
