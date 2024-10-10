@@ -268,8 +268,57 @@ BUFFERIZATION_PASS = (
         # Here, please note that gradient-preprocessing is different than rewriting in DPS.
         # So, overall, we are skipping this section while we first focus on migrating to the
         # new -one-shot-bufferize
+
         "eliminate-empty-tensors",
+
         (
+            # Before we enter one-shot-bufferize, here is what we expect:
+            # * Given
+            #
+            #     One-Shot Bufferize was designed for ops that are in DPS (destination-passing style).
+            #     Ops that are not in DPS can still be bufferized,
+            #     but a new buffer will be allocated for every tensor result.
+            #     That’s functionally correct but inefficient.
+            #
+            #   from: https://discourse.llvm.org/t/steps-of-migrating-to-one-shot-bufferization/81062/2
+            #   we expect that results will be (automatically?) converted into new buffers. And it is
+            #   up to us to just define the bufferization for the operands.
+            #
+            # So what is the state of the catalyst, gradient, quantum dialects at this point?
+            #
+            # Let's start with quantum:
+            #
+            # |-------------------------|--------------------|
+            # |      operation          |  has result tensor |
+            # |-------------------------|--------------------|
+            # | quantum.set_state       |                    |
+            # | quantum.set_basis_state |                    |
+            # | quantum.unitary         |                    |
+            # | quantum.hermitian       |                    |
+            # | quantum.hamiltonian     |                    |
+            # | quantum.sample_op       |     YES            |
+            # | quantum.counts_op       |     YES            |
+            # | quantum.probs_op        |     YES            |
+            # | quantum.state_op        |     YES            |
+            # |-------------------------|--------------------|
+            # | catalyst.print_op       |                    |
+            # | catalyst.custom_call    |     YES            |
+            # | catalyst.callback       |                    |
+            # | catalyst.callback_call  |     YES            |
+            # | catalyst.launch_kernel  |     YES            |
+            # |-------------------------|--------------------|
+            # | gradient.grad           |     YES            |
+            # | gradient.value_and_grad |     YES            |
+            # | gradient.adjoint        |     YES            |
+            # | gradient.backprop       |     YES            |
+            # | gradient.jvp            |     YES            |
+            # | gradient.vjp            |     YES            |
+            # | gradient.forward        |     YES            |
+            # | gradient.reverse        |     YES            |
+            # |-------------------------|--------------------|
+            #
+            # So what this means is that for the operands, all the ones that have the YES
+            # means that no operands are written to. They are only read.
             "one-shot-bufferize"
             "{"
             "bufferize-function-boundaries "
