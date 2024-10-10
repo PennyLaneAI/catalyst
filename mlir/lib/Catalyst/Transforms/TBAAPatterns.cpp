@@ -26,13 +26,28 @@
 using namespace mlir;
 
 namespace catalyst {
-void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ctx,
+void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation* currentOp,
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
+    mlir::MLIRContext *ctx = currentOp->getContext();
     mlir::LLVM::TBAATagAttr tag;
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
         // Index can be used as a pointer.
         if (isa<IndexType>(baseType) && (isa<LLVM::StoreOp>(newOp) || isa<LLVM::LoadOp>(newOp))) {
+            llvm::outs() << "=======================================\n";            
+            llvm::outs() << currentOp->getName() << "\n";
+            if (currentOp->getPrevNode()) {
+                llvm::outs() << currentOp->getPrevNode()->getName() << "\n";
+                if (currentOp->getPrevNode()->getPrevNode()) {
+                    llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getName() << "\n";
+                    if (currentOp->getPrevNode()->getPrevNode()->getPrevNode()) {
+                        llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getPrevNode()->getName() << "\n";
+                        if (currentOp->getPrevNode()->getPrevNode()->getPrevNode()) {
+                            llvm::outs() << currentOp->getPrevNode()->getPrevNode()->getPrevNode()->getName() << "\n";
+                        }
+                    }
+                }
+            }
             tag = tree->getTag("any pointer");
         }
         else {
@@ -78,7 +93,7 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
             loadOp.getNontemporal());
 
         if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
-            setTag(baseType, tree, loadOp.getContext(), op);
+            setTag(baseType, tree, loadOp, op);
         }
         else {
             return failure();
@@ -109,7 +124,7 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
                                                              0, false, storeOp.getNontemporal());
 
         if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
-            setTag(baseType, tree, storeOp.getContext(), op);
+            setTag(baseType, tree, storeOp, op);
         }
         else {
             return failure();
