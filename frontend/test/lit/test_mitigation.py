@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""IR tests for ZNE feature."""
+
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
 
 from catalyst import mitigate_with_zne, qjit
+
+# pylint: disable=line-too-long
 
 
 @qjit(target="mlir")
