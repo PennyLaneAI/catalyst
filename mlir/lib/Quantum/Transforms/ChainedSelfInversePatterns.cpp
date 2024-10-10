@@ -49,18 +49,15 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
             return failure();
         }
 
+        // Aggressive verifier checks the parent gate has the same name.
         AggressiveVerifyParentGateAnalysis<CustomOp> avpga(op);
         if (!avpga.getVerifierResult()) {
             return failure();
         }
 
+        // Replace uses
         ValueRange InQubits = op.getInQubits();
         auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (ParentOp.getGateName() != OpGateName) {
-            return failure();
-        }
-
-        // Replace uses
         ValueRange simplifiedVal = ParentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();
