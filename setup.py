@@ -21,7 +21,6 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 from typing import Optional
 
 from setuptools import Extension, find_namespace_packages, setup
