@@ -727,20 +727,24 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Value structPtr = rewriter.create<LLVM::AllocaOp>(
             loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
 
+        // Allocate shots
+        Value shotsPtr = rewriter.create<LLVM::AllocaOp>(
+            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64), c1);
+
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
         ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
 
-        Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShots());
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-        SmallVector<Value> args = {structPtr, numShots, numQubits};
+        SmallVector<Value> args = {structPtr, shotsPtr, numQubits};
         args.insert(args.end(), qubits.begin(), qubits.end());
 
         if constexpr (std::is_same_v<T, SampleOp>) {
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
+            rewriter.create<LLVM::StoreOp>(loc, adaptor.getShots(), shotsPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
             auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);

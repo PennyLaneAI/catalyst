@@ -776,7 +776,7 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let assemblyFormat = [{
-        $obs $shots ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? $shots attr-dict ( `:` type($samples)^ )?
     }];
 
     let extraClassDeclaration = [{
