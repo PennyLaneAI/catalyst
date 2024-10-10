@@ -49,7 +49,7 @@ size_t *to_sizes(char *base, size_t rank)
     size_t aligned = sizeof(void *);
     size_t offset = sizeof(size_t);
     size_t bytes_offset = allocated + aligned + offset;
-    return (size_t *)(base + bytes_offset);
+    return reinterpret_cast<size_t *>(base + bytes_offset);
 }
 
 size_t *to_strides(char *base, size_t rank)
@@ -63,7 +63,7 @@ size_t *to_strides(char *base, size_t rank)
     size_t offset = sizeof(size_t);
     size_t sizes = rank * sizeof(size_t);
     size_t bytes_offset = allocated + aligned + offset + sizes;
-    return (size_t *)(base + bytes_offset);
+    return reinterpret_cast<size_t *>(base + bytes_offset);
 }
 
 void free_wrap(PyObject *capsule)
@@ -75,7 +75,7 @@ void free_wrap(PyObject *capsule)
 const npy_intp *npy_get_dimensions(char *memref, size_t rank)
 {
     size_t *sizes = to_sizes(memref, rank);
-    const npy_intp *dims = (npy_intp *)sizes;
+    const npy_intp *dims = reinterpret_cast<npy_intp *>(sizes);
     return dims;
 }
 
@@ -86,10 +86,10 @@ const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank)
         // memref strides are in terms of elements.
         // numpy strides are in terms of bytes.
         // Therefore multiply by element size.
-        strides[idx] *= (size_t)element_size;
+        strides[idx] *= element_size;
     }
 
-    npy_intp *npy_strides = (npy_intp *)strides;
+    npy_intp *npy_strides = reinterpret_cast<npy_intp *>(strides);
     return npy_strides;
 }
 
@@ -113,14 +113,15 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
     size_t memref_len = nb::cast<size_t>(ranks.attr("__len__")());
     size_t offset = 0;
 
-    char *memref_array_bytes = (char *)(memref_array_ptr);
+    char *memref_array_bytes = reinterpret_cast<char *>(memref_array_ptr);
 
     for (size_t idx = 0; idx < memref_len; idx++) {
         unsigned int rank_i = nb::cast<unsigned int>(ranks.attr("__getitem__")(idx));
         char *memref_i_beginning = memref_array_bytes + offset;
         offset += memref_size_based_on_rank(rank_i);
 
-        struct memref_beginning_t *memref = (struct memref_beginning_t *)memref_i_beginning;
+        struct memref_beginning_t *memref =
+            reinterpret_cast<struct memref_beginning_t *>(memref_i_beginning);
         bool is_in_rt_heap = f_transfer_ptr(memref->allocated);
 
         if (!is_in_rt_heap) {
@@ -133,7 +134,8 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
             //
             // Use the numpy_arrays dictionary which sets up the following map:
             // integer (memory address) -> nb::object (numpy array)
-            auto array_object = numpy_arrays.attr("__getitem__")((size_t)memref->allocated);
+            auto array_object =
+                numpy_arrays.attr("__getitem__")(reinterpret_cast<size_t>(memref->allocated));
             returns.append(array_object);
             continue;
         }
@@ -156,13 +158,13 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
             throw std::runtime_error("PyArray_NewFromDescr failed.");
         }
 
-        PyObject *capsule =
-            PyCapsule_New(memref->allocated, NULL, (PyCapsule_Destructor)&free_wrap);
+        PyObject *capsule = PyCapsule_New(memref->allocated, NULL,
+                                          reinterpret_cast<PyCapsule_Destructor>(&free_wrap));
         if (!capsule) {
             throw std::runtime_error("PyCapsule_New failed.");
         }
 
-        int retval = PyArray_SetBaseObject((PyArrayObject *)new_array, capsule);
+        int retval = PyArray_SetBaseObject(reinterpret_cast<PyArrayObject *>(new_array), capsule);
         bool success = 0 == retval;
         if (!success) {
             throw std::runtime_error("PyArray_SetBaseObject failed.");
@@ -178,7 +180,7 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
         // sent as an input to the generated function.
         // Upon following entries it is extended with the numpy.arrays
         // which are the output of the generated function.
-        PyObject *pyLong = PyLong_FromLong((size_t)memref->allocated);
+        PyObject *pyLong = PyLong_FromLong(reinterpret_cast<size_t>(memref->allocated));
         if (!pyLong) {
             throw std::runtime_error("PyLong_FromLong failed.");
         }
