@@ -228,6 +228,10 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
 
+    - name: Install Dependencies (System)
+      run: |
+        brew install cmake
+
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate

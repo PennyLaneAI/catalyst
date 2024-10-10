@@ -229,7 +229,7 @@ jobs:
 
     - name: Install Dependencies (System)
       run: |
-        brew install libomp
+        brew install libomp cmake
 
     - name: Setup Python version
       # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
