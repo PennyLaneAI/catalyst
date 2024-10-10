@@ -14,11 +14,15 @@
 
 #define DEBUG_TYPE "chained-self-inverse"
 
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
+
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+
+#include "VerifyParentGateAnalysis.hpp"
+
 using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst;
@@ -29,7 +33,7 @@ static const mlir::StringSet<> HermitianOps = {"Hadamard", "PauliX", "PauliY", "
 
 namespace {
 
-struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
+struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
     /// We simplify consecutive Hermitian quantum gates by removing them.
@@ -40,23 +44,95 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        StringRef OpGateName = op.getGateName();
-        if (!HermitianOps.contains(OpGateName))
+        VerifyParentGateAnalysis<CustomOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
             return failure();
+        }
+
+        StringRef OpGateName = op.getGateName();
+        if (!HermitianOps.contains(OpGateName)) {
+            return failure();
+        }
 
         ValueRange InQubits = op.getInQubits();
         auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (!ParentOp || ParentOp.getGateName() != OpGateName)
+        if (ParentOp.getGateName() != OpGateName) {
             return failure();
-
-        ValueRange ParentOutQubits = ParentOp.getOutQubits();
-        // Check if the input qubits to the current operation match the output qubits of the parent.
-        for (const auto &[Idx, Qubit] : llvm::enumerate(InQubits)) {
-            if (Qubit.getDefiningOp<CustomOp>() != ParentOp || Qubit != ParentOutQubits[Idx])
-                return failure();
         }
+
+        // Replace uses
         ValueRange simplifiedVal = ParentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
+        return success();
+    }
+};
+
+template <typename OpType>
+struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
+    using mlir::OpRewritePattern<OpType>::OpRewritePattern;
+
+    bool verifyParentGateParams(OpType op, OpType parentOp) const
+    {
+        // Verify that the parent gate has the same parameters
+        ValueRange opParams = op.getAllParams();
+        ValueRange parentOpParams = parentOp.getAllParams();
+
+        if (opParams.size() != parentOpParams.size()) {
+            return false;
+        }
+
+        for (auto [opParam, parentOpParam] : llvm::zip(opParams, parentOpParams)) {
+            if (opParam != parentOpParam) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool verifyOneAdjoint(OpType op, OpType parentOp) const
+    {
+        // Verify that exactly one of the neighbouring pair is an adjoint
+        bool opIsAdj = op->hasAttr("adjoint");
+        bool parentIsAdj = parentOp->hasAttr("adjoint");
+        return opIsAdj != parentIsAdj; // "XOR" to check just one true
+    }
+
+    /// Remove generic neighbouring gate pairs of the form
+    /// --- gate --- gate{adjoint} ---
+    /// Conditions:
+    ///  1. Parent gate verification must pass. See VerifyParentGateAnalysis.hpp.
+    ///  2. If there are parameters, both gate must have the same parameters.
+    ///     [This pattern assumes the IR is already processed by CSE]
+    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
+    {
+        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
+
+        VerifyParentGateAnalysis<OpType> vpga(op);
+        if (!vpga.getVerifierResult()) {
+            return failure();
+        }
+
+        ValueRange InQubits = op.getInQubits();
+        auto parentOp = dyn_cast_or_null<OpType>(InQubits[0].getDefiningOp());
+
+        if (!verifyParentGateParams(op, parentOp)) {
+            return failure();
+        }
+
+        if (!verifyOneAdjoint(op, parentOp)) {
+            return failure();
+        }
+
+        // Replace uses
+        ValueRange originalNonCtrlQubits = parentOp.getNonCtrlQubitOperands();
+        ValueRange originalCtrlQubits = parentOp.getCtrlQubitOperands();
+        for (const auto &[idx, nonCtrlQubitResult] : llvm::enumerate(op.getNonCtrlQubitResults())) {
+            nonCtrlQubitResult.replaceAllUsesWith(originalNonCtrlQubits[idx]);
+        }
+        for (const auto &[idx, ctrlQubitResult] : llvm::enumerate(op.getCtrlQubitResults())) {
+            ctrlQubitResult.replaceAllUsesWith(originalCtrlQubits[idx]);
+        }
         return success();
     }
 };
@@ -68,7 +144,9 @@ namespace quantum {
 
 void populateSelfInversePatterns(RewritePatternSet &patterns)
 {
-    patterns.add<ChainedHadamardOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<CustomOp>>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
