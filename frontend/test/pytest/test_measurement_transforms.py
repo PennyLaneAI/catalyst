@@ -489,7 +489,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=shots)
 
-        @qml.qjit
+        @qml.qjit(seed=37)
         @partial(measurements_from_samples, device_wires=dev.wires)
         @qml.qnode(dev)
         def circuit(theta: float):
