@@ -680,3 +680,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
     return success();
 }
+
+int QuantumDriverMainFromCL(int argc, char **argv) {
+    
+    return 0;
+}

@@ -105,6 +105,8 @@ struct CompilerOutput {
 mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options,
                                       catalyst::driver::CompilerOutput &output);
 
+int QuantumDriverMainFromCL(int argc, char **argv);
+
 namespace llvm {
 
 inline raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
