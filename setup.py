@@ -183,13 +183,18 @@ class UnifiedBuildExt(build_ext):
 
     def build_cmake_extension(self, ext: CMakeExtension):
         """Configure and build CMake extension."""
-        cmake_path = shutil.which("cmake")
+        cmake_path = "cmake"  # shutil.which("cmake")
         # clang_path = shutil.which("clang++")
         ninja_path = shutil.which("ninja")
 
         assert cmake_path is not None, "cmake executable not found in PATH."
         # assert clang_path is not None, "clang++ executable not found in PATH."
         assert ninja_path is not None, "Ninja executable not found in PATH."
+
+        try:
+            subprocess.check_output([cmake_path, "--version"])
+        except subprocess.CalledProcessError:
+            raise RuntimeError("'cmake --version' failed: check CMake installation")
 
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         debug = int(os.environ.get("DEBUG", 0)) if self.debug is None else self.debug
