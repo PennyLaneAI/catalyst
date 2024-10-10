@@ -24,9 +24,9 @@ os.environ["OMP_NUM_THREADS"] = "2"
 # pylint: disable=unused-import,wrong-import-position
 import platform
 
-import numpy as np
-import pennylane as qml
 import pytest
+
+TEST_PATH = os.path.dirname(__file__)
 
 
 def is_cuda_available():
