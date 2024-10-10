@@ -24,13 +24,7 @@ namespace {
  * (if bufferizing in-place).
  *
  * `getAliasingOpOperands`: Return the OpResults that may share the same buffer as the given
- * OpOperand. Note that MLIR documentation does not mention `getAliasingValues` but it seems to
- * serve the same purpose.
- *
- * Bufferizing FunctionOpInterface is also not documented by MLIR. It requires
- * `OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel`, which requires the
- * implementation of `supportsUnstructuredControlFlow`, `hasTensorSemantics`, and
- * `getAliasingOpOperands`.
+ * OpOperand.
  *
  * Link: https://mlir.llvm.org/docs/Bufferization/#extending-one-shot-bufferize
  */
@@ -148,10 +142,8 @@ struct CustomCallOpInterface
 };
 
 struct CallbackOpInterface
-    : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
-          CallbackOpInterface, CallbackOp> {
-    static bool supportsUnstructuredControlFlow() { return false; }
-
+    : public bufferization::BufferizableOpInterface::ExternalModel<CallbackOpInterface,
+                                                                   CallbackOp> {
     bool hasTensorSemantics(Operation *op) const
     {
         auto isaTensor = llvm::IsaPred<TensorType>;
