@@ -302,8 +302,6 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
         return success();
     }
 
-    auto &outputs = output.pipelineOutputs;
-
     // Create a pass to lower LLVM coroutines (similar to what happens in O0)
     llvm::ModulePassManager CoroPM;
     CoroPM.addPass(llvm::CoroEarlyPass());
@@ -330,10 +328,11 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     CoroPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
-        llvm::raw_string_ostream rawStringOstream{outputs["CoroOpt"]};
+        std::string tmp;
+        llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
         auto outFile = output.nextPipelineDumpFilename("CoroOpt", ".ll");
-        dumpToFile(options, outFile, outputs["CoroOpt"]);
+        dumpToFile(options, outFile, tmp);
     }
 
     return success();
@@ -350,7 +349,6 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
         return success();
     }
 
-    auto &outputs = output.pipelineOutputs;
     // Create the analysis managers.
     llvm::LoopAnalysisManager LAM;
     llvm::FunctionAnalysisManager FAM;
@@ -383,10 +381,11 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
-        llvm::raw_string_ostream rawStringOstream{outputs["O2Opt"]};
+        std::string tmp;
+        llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
         auto outFile = output.nextPipelineDumpFilename("O2Opt", ".ll");
-        dumpToFile(options, outFile, outputs["O2Opt"]);
+        dumpToFile(options, outFile, tmp);
     }
 
     return success();
@@ -400,7 +399,6 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
         return success();
     }
 
-    auto &outputs = output.pipelineOutputs;
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
@@ -432,10 +430,11 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
-        llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
+        std::string tmp;
+        llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
         auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
-        dumpToFile(options, outFile, outputs["Enzyme"]);
+        dumpToFile(options, outFile, tmp);
     }
 
     return success();
@@ -445,7 +444,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output)
 
 {
-    auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
     // Maps a pass to zero or one pipelines ended by this pass
@@ -463,22 +461,25 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
-        if (existingPasses != pm.size()) {
-            const Pass *pass = nullptr;
-            for (size_t pn = existingPasses; pn < pm.size(); pn++) {
-                pass = &(*(pm.begin() + pn));
-                passPipelineNames[pass] = pipeline.name;
-            }
-            assert(pass != nullptr);
-            pipelineTailMarkers[pass] = pipeline.name;
+        if (existingPasses == pm.size()) {
+            continue;
         }
+
+        const Pass *pass = nullptr;
+        for (size_t pn = existingPasses; pn < pm.size(); pn++) {
+            pass = &(*(pm.begin() + pn));
+            passPipelineNames[pass] = pipeline.name;
+        }
+        assert(pass != nullptr);
+        pipelineTailMarkers[pass] = pipeline.name;
     }
 
     if (options.keepIntermediate && options.checkpointStage == "") {
-        llvm::raw_string_ostream s{outputs["mlir"]};
+        std::string tmp;
+        llvm::raw_string_ostream s{tmp};
         s << moduleOp;
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
-                   outputs["mlir"]);
+                   tmp);
     }
 
     catalyst::utils::Timer timer{};
@@ -499,11 +500,11 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
 
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
-            auto pipelineName = res->second;
-            llvm::raw_string_ostream s{outputs[pipelineName]};
+            std::string tmp;
+            llvm::raw_string_ostream s{tmp};
             s << *op;
-            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
-                       outputs[pipelineName]);
+            auto pipelineName = res->second;
+            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName), tmp);
         }
     };
 
@@ -513,11 +514,11 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         assert(res != passPipelineNames.end() && "Unexpected pass");
         options.diagnosticStream << "While processing '" << pass->getName() << "' pass "
                                  << "of the '" << res->second << "' pipeline\n";
-        llvm::raw_string_ostream s{outputs[res->second]};
+        std::string tmp;
+        llvm::raw_string_ostream s{tmp};
         s << *op;
         if (options.keepIntermediate) {
-            dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"),
-                       outputs[res->second]);
+            dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"), tmp);
         }
     };
 
@@ -533,7 +534,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     return success();
 }
 
-LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
+LogicalResult QuantumDriverMain(const CompilerOptions options, CompilerOutput &output)
 {
     using timer = catalyst::utils::Timer;
 
@@ -567,27 +568,45 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
-    OwningOpRef<ModuleOp> op =
+    OwningOpRef<ModuleOp> mlirModule =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
-    catalyst::utils::LinesCount::ModuleOp(*op);
+    catalyst::utils::LinesCount::ModuleOp(*mlirModule);
     output.isCheckpointFound = options.checkpointStage == "mlir";
 
     // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
     // true so that the enzyme pass can be executed.
     bool enzymeRun = options.checkpointStage == "O2Opt";
-    if (op) {
-        enzymeRun = containsGradients(*op);
-        if (failed(runLowering(options, &ctx, *op, output))) {
+
+    if (!mlirModule) {
+        CO_MSG(options, Verbosity::Urgent,
+               "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
+        llvm::SMDiagnostic err;
+        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", false, llvmContext,
+                                  options.source, options.moduleName, err);
+        output.isCheckpointFound = options.checkpointStage == "llvm_ir";
+
+        if (!llvmModule) {
+            err.print(options.moduleName.data(), options.diagnosticStream);
+            CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM source\n");
+            return failure();
+        }
+
+        catalyst::utils::LinesCount::Module(*llvmModule);
+    }
+    else {
+        enzymeRun = containsGradients(*mlirModule);
+        if (failed(runLowering(options, &ctx, *mlirModule, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
 
         output.outIR.clear();
-        outIRStream << *op;
+        outIRStream << *mlirModule;
 
         if (options.lowerToLLVM) {
-            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
-                                      /* add_endl */ false, *op, llvmContext, "LLVMDialectModule");
+            llvmModule =
+                timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
+                             /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
@@ -596,30 +615,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             catalyst::utils::LinesCount::Module(*llvmModule);
 
             if (options.keepIntermediate) {
-                auto &outputs = output.pipelineOutputs;
-                llvm::raw_string_ostream rawStringOstream{outputs["llvm_ir"]};
+                std::string tmp;
+                llvm::raw_string_ostream rawStringOstream{tmp};
                 llvmModule->print(rawStringOstream, nullptr);
                 auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
-                dumpToFile(options, outFile, outputs["llvm_ir"]);
+                dumpToFile(options, outFile, tmp);
             }
         }
-    }
-    else {
-        CO_MSG(options, Verbosity::Urgent,
-               "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
-        llvm::SMDiagnostic err;
-        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", /* add_endl */ false,
-                                  llvmContext, options.source, options.moduleName, err);
-        output.isCheckpointFound = options.checkpointStage == "llvm_ir";
-
-        if (!llvmModule) {
-            // If both MLIR and LLVM failed to parse, exit.
-            err.print(options.moduleName.data(), options.diagnosticStream);
-            CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM source\n");
-            return failure();
-        }
-
-        catalyst::utils::LinesCount::Module(*llvmModule);
     }
 
     if (llvmModule) {
@@ -645,12 +647,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         catalyst::utils::LinesCount::Module(*llvmModule.get());
 
-        if (options.asyncQnodes) {
-            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
-                                    options, llvmModule, output))) {
-                return failure();
-            }
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+        if (options.asyncQnodes &&
+            failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
+                                options, llvmModule, output))) {
+            return failure();
         }
         if (enzymeRun) {
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
@@ -669,8 +669,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.outIR.clear();
         outIRStream << *llvmModule;
 
-        // Attempt to infer the name and return type of the module from LLVM IR. This information is
-        // required when executing a module given as textual IR.
         auto outfile = options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
                                 std::move(llvmModule), targetMachine, outfile))) {
