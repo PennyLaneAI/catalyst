@@ -29,19 +29,19 @@ using namespace mlir;
 
 namespace catalyst {
 
-bool isExtractAlignedPointerAsIndexOpSource(Operation *op)
+bool isFromExtractAlignedPointerAsIndexOp(Operation *op)
 {
     if (isa<memref::ExtractAlignedPointerAsIndexOp>(op)) {
         return true;
     }
     auto prevOp = op->getPrevNode();
     if (prevOp) {
-        return isExtractAlignedPointerAsIndexOpSource(prevOp);
+        return isFromExtractAlignedPointerAsIndexOp(prevOp);
     }
     return false;
 }
 
-bool isDeallocHelper(Operation *op)
+bool isInsideDeallocHelper(Operation *op)
 {
     auto parentOp = dyn_cast<func::FuncOp>(op->getParentOp());
     if (parentOp) {
@@ -62,11 +62,11 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation *currentOp,
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
         // Index can be used as a pointer.
         if (isa<IndexType>(baseType) &&
-            (isExtractAlignedPointerAsIndexOpSource(currentOp) || isDeallocHelper(currentOp))) {
+            (isFromExtractAlignedPointerAsIndexOp(currentOp) || isInsideDeallocHelper(currentOp))) {
             tag = tree->getTag("any pointer");
         }
         else {
-            isDeallocHelper(currentOp);
+            isInsideDeallocHelper(currentOp);
             tag = tree->getTag("int");
         }
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
