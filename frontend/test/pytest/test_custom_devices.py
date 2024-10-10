@@ -136,17 +136,18 @@ RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
-    class NullQubit(qml.devices.QubitDevice):
-        """Using Null Qubit structure for test"""
+    class CustomDevice(qml.devices.QubitDevice):
+        """Custom device"""
 
-        name = "Null Qubit"
-        short_name = "null.qubit"
+        name = "Custom Device"
+        short_name = "custom.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
         operations = OPERATIONS
         observables = OBSERVABLES
+        config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -167,7 +168,7 @@ def test_custom_device_load():
             )
             return "NullQubit", lib_path
 
-    device = NullQubit(wires=1)
+    device = CustomDevice(wires=1)
     capabilities = get_device_capabilities(device)
     backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
