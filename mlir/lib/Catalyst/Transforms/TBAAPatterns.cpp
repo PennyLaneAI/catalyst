@@ -29,18 +29,20 @@ using namespace mlir;
 
 namespace catalyst {
 
-bool isExtractAlignedPointerAsIndexOpSource(Operation* op) {
+bool isFromExtractAlignedPointerAsIndexOp(Operation *op)
+{
     if (isa<memref::ExtractAlignedPointerAsIndexOp>(op)) {
         return true;
     }
     auto prevOp = op->getPrevNode();
     if (prevOp) {
-        return isExtractAlignedPointerAsIndexOpSource(prevOp);
+        return isFromExtractAlignedPointerAsIndexOp(prevOp);
     }
     return false;
 }
 
-bool isDeallocHelper(Operation* op) {
+bool isInsideDeallocHelper(Operation *op)
+{
     auto parentOp = dyn_cast<func::FuncOp>(op->getParentOp());
     if (parentOp) {
         auto str = parentOp.getName();
@@ -48,22 +50,23 @@ bool isDeallocHelper(Operation* op) {
         return str.compare(dellocRef) == 0;
     }
 
-        llvm::outs() << parentOp.getName() << "\n";
+    llvm::outs() << parentOp.getName() << "\n";
     return false;
 }
 
-void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation* currentOp,
+void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation *currentOp,
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
     mlir::MLIRContext *ctx = currentOp->getContext();
     mlir::LLVM::TBAATagAttr tag;
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
         // Index can be used as a pointer.
-        if (isa<IndexType>(baseType) && (isExtractAlignedPointerAsIndexOpSource(currentOp) || isDeallocHelper(currentOp))) {
+        if (isa<IndexType>(baseType) &&
+            (isFromExtractAlignedPointerAsIndexOp(currentOp) || isInsideDeallocHelper(currentOp))) {
             tag = tree->getTag("any pointer");
         }
         else {
-            isDeallocHelper(currentOp);
+            isInsideDeallocHelper(currentOp);
             tag = tree->getTag("int");
         }
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
