@@ -412,7 +412,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
-    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
+    quantum::replaceQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
     return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
