@@ -120,7 +120,7 @@ Pass Pipelines
 
 The compilation steps which take MLIR as an input and lower it to binary are broken into MLIR pass
 pipelines.  The ``pipelines`` argument of the ``qjit`` function may be used to alter the steps used
-for compilation. The default set of pipelines is defined via the ``catalyst.compiler.get_stages``
+for compilation. The default set of pipelines is defined via the :func:`~catalyst.debug.compiler_functions`
 list.
 
 One could customize what compilation passes are executed. A good use case of this would be if you
