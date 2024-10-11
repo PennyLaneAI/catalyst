@@ -13,23 +13,19 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
-
 import pathlib
 import platform
 from dataclasses import replace
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from typing import Optional
 
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig
+from conftest import CONFIG_CUSTOM_DEVICE
+from pennylane.devices import Device, NullQubit
 from pennylane.tape import QuantumScript
-from pennylane.transforms import split_non_commuting
-from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
@@ -77,42 +73,6 @@ def get_test_device_capabilities(
     return device_capabilities
 
 
-class DummyDevice(Device):
-    """A dummy device from the device API."""
-
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
-
-    def __init__(self, wires, shots=1024):
-        print(pathlib.Path(__file__).parent.parent.parent.parent)
-        super().__init__(wires=wires, shots=shots)
-        dummy_capabilities = get_device_capabilities(self)
-        dummy_capabilities.native_ops.pop("BlockEncode")
-        dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.qjit_capabilities = dummy_capabilities
-
-    @staticmethod
-    def get_c_interface():
-        """Returns a tuple consisting of the device name, and
-        the location to the shared object with the C/C++ device implementation.
-        """
-        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
-
-    def execute(self, circuits, execution_config):
-        """Execution."""
-        return circuits, execution_config
-
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
-        """Preprocessing."""
-        if execution_config is None:
-            execution_config = ExecutionConfig()
-
-        transform_program = TransformProgram()
-        transform_program.add_transform(split_non_commuting)
-        return transform_program, execution_config
-
-
 class OtherHadamard(qml.Hadamard):
     """A version of the Hadamard operator that won't be recognized by the QJit device, and will
     need to be decomposed"""
@@ -147,12 +107,41 @@ class OtherRX(qml.RX):
         return [qml.RX(*self.parameters, self.wires)]
 
 
+class CustomDevice(Device):
+    """A dummy device from the device API."""
+
+    config = CONFIG_CUSTOM_DEVICE
+
+    def __init__(self, wires, shots=1024):
+        print(pathlib.Path(__file__).parent.parent.parent.parent)
+        super().__init__(wires=wires, shots=shots)
+        dummy_capabilities = get_device_capabilities(self)
+        dummy_capabilities.native_ops.pop("BlockEncode")
+        dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
+        self.qjit_capabilities = dummy_capabilities
+
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        )
+        return "dummy.remote", lib_path
+
+    def execute(self, circuits, execution_config):
+        """Execution."""
+        raise NotImplementedError
+
+
 class TestDecomposition:
     """Test the preprocessing transforms implemented in Catalyst."""
 
     def test_decompose_integration(self):
         """Test the decompose transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4, shots=None)
+        dev = NullQubit(wires=4, shots=None)
 
         @qml.qjit
         @qml.qnode(dev)
@@ -179,7 +168,7 @@ class TestDecomposition:
 
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
-        dev = DummyDevice(wires=4, shots=None)
+        dev = CustomDevice(wires=4, shots=None)
 
         @qml.qjit
         @qml.qnode(dev)
@@ -193,7 +182,7 @@ class TestDecomposition:
 
     def test_no_matrix(self):
         """Test that controlling an operation without a matrix method raises an error."""
-        dev = DummyDevice(wires=4)
+        dev = NullQubit(wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
             """Op without matrix."""
