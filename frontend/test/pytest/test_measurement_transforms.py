@@ -26,6 +26,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 
@@ -37,7 +38,6 @@ from catalyst.device.decomposition import (
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import OperationProperties
-from frontend import CONFIG_CUSTOM_DEVICE
 
 # pylint: disable=attribute-defined-outside-init
 
