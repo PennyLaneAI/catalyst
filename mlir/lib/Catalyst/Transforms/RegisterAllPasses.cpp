@@ -30,6 +30,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createDetensorizeSCFPass);
     mlir::registerPass(catalyst::createDisableAssertionPass);
+    mlir::registerPass(catalyst::createDisentangleCNOTPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
@@ -43,6 +44,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
     mlir::registerPass(catalyst::createMergeRotationPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
+    mlir::registerPass(catalyst::createPropagateSimpleStatesTesterPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
