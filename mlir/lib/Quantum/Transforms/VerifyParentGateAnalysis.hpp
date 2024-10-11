@@ -134,18 +134,15 @@ template <typename OpType> class VerifyParentGateAnalysis {
     }
 };
 
-template <typename OpType>
-class VerifyParentGateAndNameAnalysis : public VerifyParentGateAnalysis<OpType> {
+class VerifyParentGateAndNameAnalysis : public VerifyParentGateAnalysis<quantum::CustomOp> {
+    // If OpType is quantum.custom, also verify that parent gate has the
+    // same gate name.
   public:
-    VerifyParentGateAndNameAnalysis(OpType gate) : VerifyParentGateAnalysis<OpType>(gate)
+    VerifyParentGateAndNameAnalysis(quantum::CustomOp gate)
+        : VerifyParentGateAnalysis<quantum::CustomOp>(gate)
     {
-        if (!isa<quantum::CustomOp>(gate)) {
-            // No extra checks for non quantum.custom ops
-            return;
-        }
-
         ValueRange inQubits = gate.getInQubits();
-        auto parentGate = dyn_cast_or_null<OpType>(inQubits[0].getDefiningOp());
+        auto parentGate = dyn_cast_or_null<quantum::CustomOp>(inQubits[0].getDefiningOp());
 
         if (!parentGate) {
             this->setVerifierResult(false);
@@ -159,12 +156,10 @@ class VerifyParentGateAndNameAnalysis : public VerifyParentGateAnalysis<OpType> 
     }
 
   private:
-    bool verifyParentGateName(OpType op, OpType parentOp) const
+    bool verifyParentGateName(quantum::CustomOp op, quantum::CustomOp parentOp) const
     {
-        // If OpType is quantum.custom, also verify that parent gate has the
-        // same gate name.
-        StringRef opGateName = cast<quantum::CustomOp>(op).getGateName();
-        StringRef parentGateName = cast<quantum::CustomOp>(parentOp).getGateName();
+        StringRef opGateName = op.getGateName();
+        StringRef parentGateName = parentOp.getGateName();
         return opGateName == parentGateName;
     }
 };

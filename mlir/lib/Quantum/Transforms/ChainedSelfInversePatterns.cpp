@@ -49,7 +49,7 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
             return failure();
         }
 
-        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
+        VerifyParentGateAndNameAnalysis vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
@@ -104,9 +104,17 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        VerifyParentGateAndNameAnalysis<OpType> vpga(op);
-        if (!vpga.getVerifierResult()) {
-            return failure();
+        if (isa<CustomOp>(op)) {
+            VerifyParentGateAndNameAnalysis vpga(cast<CustomOp>(op));
+            if (!vpga.getVerifierResult()) {
+                return failure();
+            }
+        }
+        else {
+            VerifyParentGateAnalysis<OpType> vpga(op);
+            if (!vpga.getVerifierResult()) {
+                return failure();
+            }
         }
 
         ValueRange InQubits = op.getInQubits();
@@ -115,7 +123,6 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         if (!verifyParentGateParams(op, parentOp)) {
             return failure();
         }
-
         if (!verifyOneAdjoint(op, parentOp)) {
             return failure();
         }
