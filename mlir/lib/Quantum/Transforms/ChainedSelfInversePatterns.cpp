@@ -44,23 +44,20 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        VerifyParentGateAnalysis<CustomOp> vpga(op);
-        if (!vpga.getVerifierResult()) {
-            return failure();
-        }
-
         StringRef OpGateName = op.getGateName();
         if (!HermitianOps.contains(OpGateName)) {
             return failure();
         }
 
-        ValueRange InQubits = op.getInQubits();
-        auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        if (ParentOp.getGateName() != OpGateName) {
+        // Aggressive verifier checks the parent gate has the same name.
+        AggressiveVerifyParentGateAnalysis<CustomOp> avpga(op);
+        if (!avpga.getVerifierResult()) {
             return failure();
         }
 
         // Replace uses
+        ValueRange InQubits = op.getInQubits();
+        auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
         ValueRange simplifiedVal = ParentOp.getInQubits();
         rewriter.replaceOp(op, simplifiedVal);
         return success();
@@ -108,8 +105,8 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        VerifyParentGateAnalysis<OpType> vpga(op);
-        if (!vpga.getVerifierResult()) {
+        AggressiveVerifyParentGateAnalysis<OpType> avpga(op);
+        if (!avpga.getVerifierResult()) {
             return failure();
         }
 
@@ -145,8 +142,15 @@ namespace quantum {
 void populateSelfInversePatterns(RewritePatternSet &patterns)
 {
     patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
+
+    // TODO: better organize the quantum dialect
+    // There is an interface `QuantumGate` for all the unitary gate operations,
+    // but interfaces cannot be accepted by pattern matchers, since pattern
+    // matchers require the target operations to have concrete names in the IR.
     patterns.add<ChainedUUadjOpRewritePattern<CustomOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<MultiRZOp>>(patterns.getContext(), 1);
+    //patterns.add<ChainedUUadjOpRewritePattern<GlobalPhaseOp>>(patterns.getContext(), 1);
 }
 
 } // namespace quantum

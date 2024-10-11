@@ -18,7 +18,7 @@
 // Gates passing this analysis are considered valid candidates for merge
 // rotation and cancel inverses.
 
-// Specifically, we check the following conditions:
+// Specifically, we check the following conditions in VerifyParentGateAnalysis:
 //  1. Both gates must be of the same type, i.e. a quantum.custom can
 //     only be cancelled with a quantum.custom, not a quantum.unitary
 //  2. The results of the parent gate must map one-to-one, in order,
@@ -32,6 +32,10 @@
 //     is not.
 //  3. If the gates are controlled, both gates' control wires and values
 //     must be the same. The control wires must be in the same order
+//
+//  On top of the above, we also provide a AggressiveVerifyParentGateAnalysis,
+//  which also checks:
+//  4. If the gates are quantum.custom, then both gates have the same name.
 
 #pragma once
 
@@ -55,17 +59,19 @@ template <typename OpType> class VerifyParentGateAnalysis {
         auto parentGate = dyn_cast_or_null<OpType>(inQubits[0].getDefiningOp());
 
         if (!verifyParentGateType(gate, parentGate)) {
-            succeeded = false;
+            setVerifierResult(false);
             return;
         }
 
         if (!verifyAllInQubits(gate, parentGate)) {
-            succeeded = false;
+            setVerifierResult(false);
             return;
         }
     }
 
     bool getVerifierResult() { return succeeded; }
+
+    void setVerifierResult(bool b) { succeeded = b; }
 
   private:
     bool succeeded = true;
@@ -78,14 +84,6 @@ template <typename OpType> class VerifyParentGateAnalysis {
 
         if (!parentOp || !isa<OpType>(parentOp)) {
             return false;
-        }
-
-        if (isa<quantum::CustomOp>(op)) {
-            StringRef opGateName = cast<quantum::CustomOp>(op).getGateName();
-            StringRef parentGateName = cast<quantum::CustomOp>(parentOp).getGateName();
-            if (opGateName != parentGateName) {
-                return false;
-            }
         }
 
         return true;
@@ -136,4 +134,38 @@ template <typename OpType> class VerifyParentGateAnalysis {
     }
 };
 
+template <typename OpType>
+class AggressiveVerifyParentGateAnalysis : public VerifyParentGateAnalysis<OpType> {
+  public:
+    AggressiveVerifyParentGateAnalysis(OpType gate) : VerifyParentGateAnalysis<OpType>(gate)
+    {
+        if (!isa<quantum::CustomOp>(gate)) {
+            // No extra checks for non quantum.custom ops
+            return;
+        }
+
+        ValueRange inQubits = gate.getInQubits();
+        auto parentGate = dyn_cast_or_null<OpType>(inQubits[0].getDefiningOp());
+
+        if (!parentGate) {
+            this->setVerifierResult(false);
+            return;
+        }
+
+        if (!verifyParentGateName(gate, parentGate)) {
+            this->setVerifierResult(false);
+            return;
+        }
+    }
+
+  private:
+    bool verifyParentGateName(OpType op, OpType parentOp) const
+    {
+        // If OpType is quantum.custom, also verify that parent gate has the
+        // same gate name.
+        StringRef opGateName = cast<quantum::CustomOp>(op).getGateName();
+        StringRef parentGateName = cast<quantum::CustomOp>(parentOp).getGateName();
+        return opGateName == parentGateName;
+    }
+};
 } // namespace catalyst
