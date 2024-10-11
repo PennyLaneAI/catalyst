@@ -1001,12 +1001,13 @@ def test_assert_invalid_h_type():
 
 def test_assert_non_differentiable():
     """Test non-differentiable parameter detection"""
-    with pytest.raises(DifferentiableCompileError, match="Non-differentiable object passed"):
 
-        @qjit()
-        def workflow(x: float):
-            h = grad("string!", method="fd")
-            return h(x)
+    def workflow(x: float):
+        h = grad("string!", method="fd")
+        return h(x)
+
+    with pytest.raises(TypeError, match="Differentiation target must be callable"):
+        qjit(workflow)
 
 
 def test_finite_diff_arbitrary_functions():
