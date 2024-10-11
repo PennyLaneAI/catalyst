@@ -266,7 +266,7 @@ class VmapCallable(CatalystCallable):
             batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
 
         # Apply mapping batched_args[1:] ---> fn(args)
-        @for_loop(1, batch_size, 1)
+        @for_loop(0, batch_size, 1)
         def loop_fn(i, batched_result_list):
             fn_args_flat = args_flat
             for loc in batch_loc:
