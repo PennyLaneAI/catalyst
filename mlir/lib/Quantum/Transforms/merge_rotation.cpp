@@ -62,6 +62,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         }
 
         RewritePatternSet patterns(&getContext());
+        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patterns, &getContext());
         populateMergeRotationsPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
