@@ -69,6 +69,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                                                  parentInCtrlQubits, parentInCtrlValues);
 
         op.replaceAllUsesWith(mergeOp);
+        op.erase();
         parentOp.erase();
 
         return success();
@@ -109,6 +110,7 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
                                                   sumParam, parentInQubits, nullptr,
                                                   parentInCtrlQubits, parentInCtrlValues);
         op.replaceAllUsesWith(mergeOp);
+        op.erase();
         parentOp.erase();
 
         return success();

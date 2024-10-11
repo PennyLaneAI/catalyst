@@ -253,3 +253,29 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum
     %5 = quantum.multirz (%arg1) %4#0 : !quantum.bit
     return %5, %4#1 : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: [[true:%.+]] = llvm.mlir.constant
+    // CHECK: [[false:%.+]] = llvm.mlir.constant
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+
+    // CHECK: quantum.alloc
+    // CHECK: [[qubit0:%.+]] = quantum.extract {{.+}}[ 0]
+    // CHECK: [[qubit1:%.+]] = quantum.extract {{.+}}[ 1]
+    // CHECK: [[qubit2:%.+]] = quantum.extract {{.+}}[ 2]
+    %reg = quantum.alloc( 4) : !quantum.reg
+    %0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %reg[ 2] : !quantum.reg -> !quantum.bit
+    // CHECK:    [[angle0:%.+]] = arith.addf %arg0, %arg1 : f64
+    // CHECK:    [[angle1:%.+]] = arith.addf %arg1, %arg2 : f64
+    // CHECK:    [[angle2:%.+]] = arith.addf %arg2, %arg0 : f64
+    // CHECK:    [[ret:%.+]], [[ctrlret:%.+]]:2 = quantum.custom "Rot"([[angle0]], [[angle1]], [[angle2]]) [[qubit0]] ctrls([[qubit1]], [[qubit2]]) ctrlvals([[true]], [[false]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits, %out_ctrl_qubits:2 = quantum.custom "Rot"(%arg0, %arg1, %arg2) %0 ctrls(%1, %2) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1, %out_ctrl_qubits_1:2 = quantum.custom "Rot"(%arg1, %arg2, %arg0) %out_qubits ctrls(%out_ctrl_qubits#0, %out_ctrl_qubits#1) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+
+    return %out_qubits_1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}

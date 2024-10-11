@@ -41,7 +41,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createInlineNestedModulePass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
-    mlir::registerPass(catalyst::createMergeRotationsPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
