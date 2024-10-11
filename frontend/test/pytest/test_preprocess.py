@@ -137,7 +137,7 @@ class CustomDevice(Device):
 
     def execute(self, circuits, execution_config):
         """Execution."""
-        return circuits, execution_config
+        raise NotImplementedError
 
     def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
         """Preprocessing."""
