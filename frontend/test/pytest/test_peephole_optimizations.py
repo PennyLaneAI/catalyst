@@ -19,7 +19,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.passes import cancel_inverses, pipeline
+from catalyst.passes import cancel_inverses, merge_rotations, pipeline
 
 # pylint: disable=missing-function-docstring
 
@@ -54,6 +54,42 @@ def test_cancel_inverses_functionality(theta, backend):
 
     @qml.qnode(qml.device("default.qubit", wires=1))
     def reference(x):
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.probs()
+
+    assert np.allclose(workflow()[0], workflow()[1])
+    assert np.allclose(workflow()[1], reference(theta))
+
+
+@pytest.mark.parametrize("theta", [42.42])
+def test_cancel_inverses_functionality(theta, backend):
+
+    @qjit
+    def workflow():
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.probs()
+
+        @merge_rotations
+        @qml.qnode(qml.device(backend, wires=1))
+        def g(x):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.probs()
+
+        return f(theta), g(theta)
+
+    @qml.qnode(qml.device("default.qubit", wires=1))
+    def reference(x):
+        qml.RX(x, wires=0)
         qml.RX(x, wires=0)
         qml.Hadamard(wires=0)
         qml.Hadamard(wires=0)
@@ -99,13 +135,14 @@ def test_pipeline_functionality(capfd, theta, backend):
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {"my-option": "aloha"},
+        "merge_rotations": {},
     }
 
     @qjit
     def workflow():
         @qml.qnode(qml.device(backend, wires=2))
         def f(x):
+            qml.RX(0.1, wires=[0])
             qml.RX(x, wires=[0])
             qml.Hadamard(wires=[1])
             qml.Hadamard(wires=[1])
@@ -118,13 +155,6 @@ def test_pipeline_functionality(capfd, theta, backend):
 
     res = workflow()
     assert np.allclose(res[0], res[1])
-
-    # TODO: the boilerplate merge rotation pass prints out different messages based on
-    # the pass option.
-    # The purpose is to test the integration of pass options with pipeline decorator.
-    # Remove the string check when merge rotation becomes the actual merge rotation pass.
-    output_message = capfd.readouterr().err
-    assert output_message == "merge rotation pass, aloha!\n"
 
 
 ### Test bad usages of pass decorators ###
@@ -148,6 +178,12 @@ def test_cancel_inverses_bad_usages():
             match="A QNode is expected, got the classical function",
         ):
             cancel_inverses(classical_func)
+
+        with pytest.raises(
+            TypeError,
+            match="A QNode is expected, got the classical function",
+        ):
+            merge_rotations(classical_func)
 
     test_cancel_inverses_not_on_qnode()
 
