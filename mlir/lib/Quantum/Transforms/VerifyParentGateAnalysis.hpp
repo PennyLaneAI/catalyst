@@ -33,7 +33,7 @@
 //  3. If the gates are controlled, both gates' control wires and values
 //     must be the same. The control wires must be in the same order
 //
-//  On top of the above, we also provide a AggressiveVerifyParentGateAnalysis,
+//  On top of the above, we also provide a VerifyParentGateAndNameAnalysis,
 //  which also checks:
 //  4. If the gates are quantum.custom, then both gates have the same name.
 
@@ -135,9 +135,9 @@ template <typename OpType> class VerifyParentGateAnalysis {
 };
 
 template <typename OpType>
-class AggressiveVerifyParentGateAnalysis : public VerifyParentGateAnalysis<OpType> {
+class VerifyParentGateAndNameAnalysis : public VerifyParentGateAnalysis<OpType> {
   public:
-    AggressiveVerifyParentGateAnalysis(OpType gate) : VerifyParentGateAnalysis<OpType>(gate)
+    VerifyParentGateAndNameAnalysis(OpType gate) : VerifyParentGateAnalysis<OpType>(gate)
     {
         if (!isa<quantum::CustomOp>(gate)) {
             // No extra checks for non quantum.custom ops

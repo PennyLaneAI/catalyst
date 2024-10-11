@@ -49,9 +49,8 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
             return failure();
         }
 
-        // Aggressive verifier checks the parent gate has the same name.
-        AggressiveVerifyParentGateAnalysis<CustomOp> avpga(op);
-        if (!avpga.getVerifierResult()) {
+        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
             return failure();
         }
 
@@ -105,8 +104,8 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
-        AggressiveVerifyParentGateAnalysis<OpType> avpga(op);
-        if (!avpga.getVerifierResult()) {
+        VerifyParentGateAndNameAnalysis<OpType> vpga(op);
+        if (!vpga.getVerifierResult()) {
             return failure();
         }
 
@@ -150,7 +149,6 @@ void populateSelfInversePatterns(RewritePatternSet &patterns)
     patterns.add<ChainedUUadjOpRewritePattern<CustomOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<MultiRZOp>>(patterns.getContext(), 1);
-    //patterns.add<ChainedUUadjOpRewritePattern<GlobalPhaseOp>>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
