@@ -104,9 +104,9 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
 
         mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
 
-        auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes,
-                                                  sumParam, parentInQubits, nullptr,
-                                                  parentInCtrlQubits, parentInCtrlValues);
+        auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
+                                                  parentInQubits, nullptr, parentInCtrlQubits,
+                                                  parentInCtrlValues);
         op.replaceAllUsesWith(mergeOp);
         return success();
     }
