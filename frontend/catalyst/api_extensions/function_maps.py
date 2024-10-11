@@ -32,6 +32,7 @@ from catalyst.api_extensions.control_flow import for_loop
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import get_stripped_signature
 from catalyst.utils.callables import CatalystCallable
+from catalyst.jax_primitives import tensor_insert_slice_p
 
 
 ## API ##
@@ -263,7 +264,8 @@ class VmapCallable(CatalystCallable):
                 else (batch_size, *init_result_flat[j].shape)
             )
             batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
-            batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
+            batched_result_list[j] = tensor_insert_slice_p.bind(init_result_flat[j], batched_result_list[j], 0)
+            #batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
 
         # Apply mapping batched_args[1:] ---> fn(args)
         @for_loop(0, batch_size, 1)
@@ -279,8 +281,12 @@ class VmapCallable(CatalystCallable):
             res_flat, _ = tree_flatten(res)
 
             # Update the list of results
+            #for j in range(num_axes_out):
+            #    batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
+            #indices = jnp.array([jnp.broadcast_to(i, (len(res_flat),)), jnp.arange(len(res_flat))])
+            #breakpoint()
             for j in range(num_axes_out):
-                batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
+                batched_result_list[j] = tensor_insert_slice_p.bind(res_flat[j], batched_result_list[j], i)
 
             return batched_result_list
 
