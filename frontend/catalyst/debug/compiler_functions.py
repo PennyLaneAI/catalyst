@@ -244,6 +244,21 @@ def replace_ir(fn, stage, new_ir):
     fn.compiler.options.checkpoint_stage = stage
     fn.fn_cache.clear()
 
+@debug_logger
+def replace_ir_from_file(fn, stage, new_ir_path):
+    r"""Replace the IR at any compilation stage that will be used the next time the function runs.
+
+    This helper reads ir from file. Please consult replace_ir for all the available compiler stages.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        stage (str): Recompilation picks up after this stage.
+        new_ir_path (str): the path of the replacement IR to use for recompilation.
+    """
+    with open(new_ir_path, 'r') as file:
+        file_content = file.read()
+    replace_ir(fn, stage, file_content)
+
 
 @debug_logger
 def compile_executable(fn, *args):
