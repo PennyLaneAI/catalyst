@@ -83,6 +83,16 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 {
     auto origMemrefType = cast<MemRefType>(reference.getType());
     // Rebuild MemRefType without memory layout.
+    // TODO: Investigate
+    //
+    //     Something looks odd here.
+    //     The result of a `memref.alloc` should be a memref without identity layout.
+    //     I know that the op supports operands for dims/symbols in the memref type,
+    //     but I never understood why.
+    //     Imo, a `memref.alloc() : memref<f64>` should have been generated.
+    //     The result value can then be casted to `memref<f64, strided<[], offset: ?>>`.
+    //
+    // https://discord.com/channels/636084430946959380/642426447167881246/1281710682160627785
     auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
     // Get dynamic dimension sizes from the provided reference value if necessary.
     SmallVector<Value> dynamicDims;
@@ -112,6 +122,7 @@ void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<V
 }
 
 struct AdjointOpInterface
+    // This operation is not in DPS style and I believe that operands will only be read.
     : public bufferization::BufferizableOpInterface::ExternalModel<AdjointOpInterface, AdjointOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
@@ -169,6 +180,13 @@ struct AdjointOpInterface
 };
 
 struct BackpropOpInterface
+    // This operation is not in DPS style
+    // but it has a lot of parameters, notably:
+    // Variadic<AnyType>: $args
+    // Variadic<...RankedTensorOf<[AnyFloat]>>: $cotangents
+    // I think we don't write to the cotangents. And also not to the arguments
+    // so we can set bufferizesToMemoryWrite as false.
+    // The safe assumption is that it should be true.
     : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface,
                                                                    BackpropOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -180,7 +198,7 @@ struct BackpropOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return true;
+        return false;
     }
 
     bufferization::AliasingValueList
