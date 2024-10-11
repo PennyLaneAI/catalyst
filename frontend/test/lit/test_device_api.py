@@ -28,6 +28,7 @@ from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
 
+
 class CustomDevice(Device):
     """A custom device that does nothing."""
 
