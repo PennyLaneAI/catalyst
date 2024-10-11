@@ -31,6 +31,7 @@ namespace {
 
 /// Bufferization of catalyst.print. Get memref of printOp.val.
 struct PrintOpInterface
+    // PrintOp will never write to the buffers
     : public bufferization::BufferizableOpInterface::ExternalModel<PrintOpInterface, PrintOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
@@ -68,8 +69,16 @@ struct PrintOpInterface
 
 /// Bufferization of catalyst.custom_call. Mainly get buffers for arguments.
 struct CustomCallOpInterface
+    // CustomCallOp will interface with BLAS functions.
+    // This operations is not in DPS form. This means that
+    // if we can guarantee operands are never written to, then we can set
+    // bufferizesToMemoryWrite as false.
+    // Results will be allocated a new buffer.
+    // TODO: Double check BLAS and others. Until then, it should be safe to keep
+    // bufferizesToMemoryWrite as True.
     : public bufferization::BufferizableOpInterface::ExternalModel<CustomCallOpInterface,
                                                                    CustomCallOp> {
+
     bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
 
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -81,7 +90,7 @@ struct CustomCallOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        return false;
+        return true;
     }
 
     bufferization::AliasingValueList
@@ -205,9 +214,12 @@ struct CallbackCallOpInterface
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                  const bufferization::AnalysisState &state) const
     {
-        // The method returns `true` if the given OpOperand bufferizes to a memory write.
-        // Since CallbackCallOp is related to print, which does not write to its operand,
-        // Maybe we can set this to `false`.
+        // We can safely say false because CallbackCallOp's memrefs
+        // will be put in a JAX array and JAX arrays are immutable.
+        //
+        //    Unlike NumPy arrays, JAX arrays are always immutable.
+        //
+        // https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html
         return false;
     }
 
