@@ -45,7 +45,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
 
-        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
+        VerifyParentGateAndNameAnalysis vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
@@ -69,7 +69,6 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                                                  parentInCtrlQubits, parentInCtrlValues);
 
         op.replaceAllUsesWith(mergeOp);
-        op.erase();
         parentOp.erase();
 
         return success();
@@ -110,7 +109,6 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
                                                   sumParam, parentInQubits, nullptr,
                                                   parentInCtrlQubits, parentInCtrlValues);
         op.replaceAllUsesWith(mergeOp);
-        op.erase();
         parentOp.erase();
 
         return success();
