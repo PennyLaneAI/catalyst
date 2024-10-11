@@ -53,6 +53,7 @@ from catalyst.utils.toml import (
     load_device_capabilities,
     read_toml_file,
 )
+from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
 
 # pylint: disable=unused-argument
 
@@ -113,7 +114,7 @@ class OtherRX(qml.RX):
 class CustomDevice(Device):
     """A dummy device from the device API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
