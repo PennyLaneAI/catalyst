@@ -64,7 +64,7 @@ def test_cancel_inverses_functionality(theta, backend):
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_cancel_inverses_functionality(theta, backend):
+def test_merge_rotation_functionality(theta, backend):
 
     @qjit
     def workflow():
@@ -128,7 +128,7 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_pipeline_functionality(capfd, theta, backend):
+def test_pipeline_functionality(theta, backend):
     """
     Test that the @pipeline decorator does not change functionality
     when all the passes in the pipeline does not change functionality.
