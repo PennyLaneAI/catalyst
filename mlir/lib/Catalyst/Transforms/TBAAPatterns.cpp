@@ -66,7 +66,6 @@ void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation *currentOp,
             tag = tree->getTag("any pointer");
         }
         else {
-            isInsideDeallocHelper(currentOp);
             tag = tree->getTag("int");
         }
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
