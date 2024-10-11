@@ -24,6 +24,7 @@ from typing import Optional
 import numpy as np
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.tape import QuantumScript
@@ -53,7 +54,6 @@ from catalyst.utils.toml import (
     load_device_capabilities,
     read_toml_file,
 )
-from conftest import CONFIG_CUSTOM_DEVICE
 
 # pylint: disable=unused-argument
 

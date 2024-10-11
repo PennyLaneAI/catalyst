@@ -20,13 +20,13 @@ import platform
 from typing import Optional
 
 import pennylane as qml
+from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from conftest import CONFIG_CUSTOM_DEVICE
 
 
 class CustomDevice(Device):

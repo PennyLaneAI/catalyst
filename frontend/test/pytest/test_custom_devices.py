@@ -17,12 +17,12 @@ import platform
 
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
-from conftest import CONFIG_CUSTOM_DEVICE
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
