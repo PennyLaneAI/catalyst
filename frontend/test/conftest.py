@@ -23,11 +23,7 @@ os.environ["OMP_NUM_THREADS"] = "2"
 
 # pylint: disable=unused-import,wrong-import-position
 import platform
-import pathlib
 import pytest
-
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
 
 
 def is_cuda_available():

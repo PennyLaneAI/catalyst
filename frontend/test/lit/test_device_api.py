@@ -26,7 +26,7 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
+from conftest import CONFIG_CUSTOM_DEVICE
 
 
 class CustomDevice(Device):

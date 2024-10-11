@@ -53,7 +53,7 @@ from catalyst.utils.toml import (
     load_device_capabilities,
     read_toml_file,
 )
-from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
+from conftest import CONFIG_CUSTOM_DEVICE
 
 # pylint: disable=unused-argument
 
@@ -138,15 +138,6 @@ class CustomDevice(Device):
     def execute(self, circuits, execution_config):
         """Execution."""
         raise NotImplementedError
-
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
-        """Preprocessing."""
-        if execution_config is None:
-            execution_config = ExecutionConfig()
-
-        transform_program = TransformProgram()
-        transform_program.add_transform(split_non_commuting)
-        return transform_program, execution_config
 
 
 class TestDecomposition:
