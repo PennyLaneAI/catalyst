@@ -26,6 +26,7 @@ from catalyst.debug import (
     get_cmain,
     get_compilation_stage,
     replace_ir,
+    replace_ir_from_file,
 )
 from catalyst.utils.exceptions import CompileError
 
@@ -386,6 +387,35 @@ class TestCProgramGeneration:
 
         new_ir = old_ir.replace(target, replacement)
         replace_ir(jit_f, pass_name, new_ir)
+        new_result = jit_f(data)
+
+        shutil.rmtree(old_workspace, ignore_errors=True)
+        shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
+        assert old_result * data == new_result
+
+    def test_replace_ir_from_file(self):
+        """Test replace_ir_from_file helper and enzyme detection."""
+
+        def f(x):
+            """Square function."""
+            return x**2
+
+        f.__name__ = f.__name__ + "llvm_ir"
+
+        jit_f = qjit(f, keep_intermediate=True)
+        data = 2.0
+        old_result = jit_f(data)
+        old_workspace = str(jit_f.workspace)
+
+        # get llvm_ir file
+        file_name = ""
+        for _, _, files in os.walk(old_workspace):
+            for file in files:
+                if "_llvm_ir.ll" in file:
+                    file_name = file
+        old_llvm_ir_path = old_workspace + "/" + file_name
+
+        replace_ir_from_file(jit_f, "llvm_ir", old_llvm_ir_path)
         new_result = jit_f(data)
 
         shutil.rmtree(old_workspace, ignore_errors=True)
