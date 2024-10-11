@@ -13,7 +13,6 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
-import pathlib
 import platform
 
 import pennylane as qml
