@@ -45,10 +45,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
 
-        if (!parentOp || parentOp.getGateName() != opGateName)
-            return failure();
-
-        VerifyParentGateAnalysis<CustomOp> vpga(op);
+        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
