@@ -362,7 +362,7 @@ struct SetBasisStateOpInterface
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                                 const bufferization::AnalysisState &state) const
     {
-        return false;
+        return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
