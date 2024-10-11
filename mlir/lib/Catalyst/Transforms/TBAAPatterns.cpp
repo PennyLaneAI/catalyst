@@ -54,20 +54,12 @@ bool isInsideDeallocHelper(Operation *op)
     return false;
 }
 
-void setTag(mlir::Type baseType, catalyst::TBAATree *tree, Operation *currentOp,
+void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ctx,
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
-    mlir::MLIRContext *ctx = currentOp->getContext();
     mlir::LLVM::TBAATagAttr tag;
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
-        // Index can be used as a pointer.
-        if (isa<IndexType>(baseType) &&
-            (isFromExtractAlignedPointerAsIndexOp(currentOp) || isInsideDeallocHelper(currentOp))) {
-            tag = tree->getTag("any pointer");
-        }
-        else {
-            tag = tree->getTag("int");
-        }
+        tag = tree->getTag("int");
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
     }
     else if (isa<FloatType>(baseType)) {
@@ -107,8 +99,14 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
             loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0, false,
             loadOp.getNontemporal());
 
-        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
-            setTag(baseType, tree, loadOp, op);
+                // Index can be used as a pointer.
+        if (isa<IndexType>(baseType) &&
+            (isFromExtractAlignedPointerAsIndexOp(loadOp) || isInsideDeallocHelper(loadOp))) {
+            mlir::LLVM::TBAATagAttr tag = tree->getTag("any pointer");
+            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
+        }
+        else if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+            setTag(baseType, tree, loadOp->getContext(), op);
         }
         else {
             return failure();
@@ -138,8 +136,13 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
                                                              0, false, storeOp.getNontemporal());
 
-        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
-            setTag(baseType, tree, storeOp, op);
+        if (isa<IndexType>(baseType) &&
+            (isFromExtractAlignedPointerAsIndexOp(storeOp) || isInsideDeallocHelper(storeOp))) {
+            mlir::LLVM::TBAATagAttr tag = tree->getTag("any pointer");
+            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
+        }
+        else if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+            setTag(baseType, tree, storeOp->getContext(), op);
         }
         else {
             return failure();
