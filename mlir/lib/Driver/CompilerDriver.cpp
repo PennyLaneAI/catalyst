@@ -38,6 +38,7 @@
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -265,29 +266,14 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
-/// From the MLIR module it checks if gradients operations are in the program.
-bool containsGradients(mlir::ModuleOp moduleOp)
-{
-    bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
-        contain = true;
-        return WalkResult::interrupt();
-    });
-
-    moduleOp.walk([&](catalyst::gradient::BackpropOp op) {
-        contain = true;
-        return WalkResult::interrupt();
-    });
-
-    moduleOp.walk([&](mlir::LLVM::LLVMFuncOp op) {
-        auto str = op->getName().getStringRef();
-        if (str.contains("Enzyme")) {
-            contain = true;
-            return WalkResult::interrupt();
-        };
-    });
-
-    return contain;
+/// From the LLVM module ir checks if __enzyme_ functions are in the program.
+bool containsEnzyme(std::shared_ptr<llvm::Module> llvmModule) {
+    for (auto &function : llvmModule->functions()) {
+        if (function.getName().starts_with("__enzyme_")) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
@@ -670,11 +656,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     catalyst::utils::LinesCount::ModuleOp(*op);
     output.isCheckpointFound = options.checkpointStage == "mlir";
 
-    // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
-    // true so that the enzyme pass can be executed.
-    bool enzymeRun = options.checkpointStage == "O2Opt";
     if (op) {
-        enzymeRun = containsGradients(*op);
         if (failed(runLowering(options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -750,7 +732,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
             catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
-        if (enzymeRun) {
+
+        // If the llvm module contains any enzyme function, enzyme pass should be applied.
+        if (containsEnzyme(llvmModule)) {
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
