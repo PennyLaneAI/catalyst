@@ -19,17 +19,13 @@ from dataclasses import replace
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from typing import Optional
 
 import numpy as np
 import pennylane as qml
 import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
-from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.tape import QuantumScript
-from pennylane.transforms import split_non_commuting
-from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
