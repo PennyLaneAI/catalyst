@@ -16,17 +16,21 @@
 
 """Test for the device API.
 """
+import os
+import pathlib
 import platform
 from typing import Optional
 
 import pennylane as qml
-from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
+
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 class CustomDevice(Device):
