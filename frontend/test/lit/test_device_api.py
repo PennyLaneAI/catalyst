@@ -26,12 +26,12 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-
+from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
 
 class CustomDevice(Device):
     """A custom device that does nothing."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/null_qubit.toml"
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)

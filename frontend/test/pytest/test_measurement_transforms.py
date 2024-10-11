@@ -37,7 +37,7 @@ from catalyst.device.decomposition import (
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import OperationProperties
-from frontend.test.conftest import TEST_PATH
+from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -45,7 +45,7 @@ from frontend.test.conftest import TEST_PATH
 class CustomDevice(Device):
     """A Custom Device following the new API."""
 
-    config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -75,7 +75,7 @@ class CustomDevice(Device):
 class CustomDeviceLimitedMPs(Device):
     """A Custom Device from the device API without wires."""
 
-    config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples

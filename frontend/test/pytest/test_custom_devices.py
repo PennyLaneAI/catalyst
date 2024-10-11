@@ -23,7 +23,7 @@ from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
-from frontend.test.conftest import TEST_PATH
+from frontend.test.conftest import CONFIG_CUSTOM_DEVICE
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -146,7 +146,7 @@ def test_custom_device_load():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
+        config = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -198,7 +198,7 @@ def test_custom_device_bad_directory():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
+        config = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -239,7 +239,7 @@ def test_custom_device_no_c_interface():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = pathlib.Path(f"{TEST_PATH}/custom_device/custom_device.toml")
+        config = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
