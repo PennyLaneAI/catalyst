@@ -677,7 +677,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ctx: the MLIR context
         args: the points in the function in which we are to calculate the derivative
         jaxpr: the jaxpr representation of the grad op
-        fn(Grad): the function to be differentiated
+        fn (GradCallable): the function to be differentiated
         method: the method used for differentiation
         h: the difference for finite difference. May be None when fn is not finite difference.
         argnums: argument indices which define over which arguments to
@@ -951,10 +951,23 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     num_folds = args[-1]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        nparray = np.asarray(const)
+        if const.dtype == bool:
+            nparray = np.packbits(nparray, bitorder="little")
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
+
+    args_and_consts = constants + list(args[0:-1])
+
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
-        mlir.flatten_lowering_ir_args(args[0:-1]),
+        mlir.flatten_lowering_ir_args(args_and_consts),
         _folding_attribute(ctx, folding),
         num_folds,
     ).results

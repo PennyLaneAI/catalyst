@@ -30,6 +30,8 @@ from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_u
 
 from catalyst.api_extensions.control_flow import for_loop
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.type_signatures import get_stripped_signature
+from catalyst.utils.callables import CatalystCallable
 
 
 ## API ##
@@ -58,6 +60,11 @@ def vmap(
 
     Raises:
         ValueError: Invalid ``in_axes``, ``out_axes``, and ``axis_size`` values.
+
+    .. note::
+
+        Using vmap will prevent AOT compilation from working, since annotated type information
+        will no longer be valid when batching arguments/results.
 
     **Example**
 
@@ -129,7 +136,7 @@ def vmap(
     return VmapCallable(fn, **kwargs)
 
 
-class VmapCallable:
+class VmapCallable(CatalystCallable):
     """Class that creates a function which maps an input function over argument axes.
 
     .. note::
@@ -158,11 +165,16 @@ class VmapCallable:
         out_axes: Union[int, Sequence[Any]],
         axis_size: Optional[int],
     ):
+        functools.update_wrapper(self, fn)
         self.fn = fn
+        self.__name__ = f"vmap.{getattr(fn, '__name__', 'unknown')}"
+        self.__signature__ = get_stripped_signature(fn)  # wipe type annotations to prevent AOT
         self.in_axes = in_axes
         self.out_axes = out_axes
         self.axis_size = axis_size
         self._validate_configuration()
+
+        super().__init__("fn")
 
     def _validate_configuration(self):
         # Check the validity of in_axes and out_axes
@@ -319,10 +331,18 @@ class VmapCallable:
         """
 
         batch_sizes = []
-        for arg, d in zip(args_flat, axes_flat):
-            shape = np.shape(arg) if arg.shape else (1,)
-            if d is not None and len(shape) > d:
+        for i, (arg, d) in enumerate(zip(args_flat, axes_flat)):
+            if d is None:
+                continue
+
+            shape = np.shape(arg)
+            if len(shape) > d:
                 batch_sizes.append(shape[d])
+            else:
+                raise ValueError(
+                    f"Axis specifier {d} is out of bounds for argument {i}. "
+                    f"The argument only has {len(shape)} dimensions."
+                )
 
         if any(size != batch_sizes[0] for size in batch_sizes[1:]):
             raise ValueError(

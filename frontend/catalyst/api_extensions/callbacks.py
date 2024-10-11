@@ -294,9 +294,9 @@ class AnnotatedFunctionImpl(AnnotatedFunction):
     """Callable with result_type field."""
 
     def __init__(self, func, result_type):
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.func = func
         self.result_type = result_type
-        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -407,9 +407,9 @@ class CallbackWithCustomGrad(AnnotatedFunction):
 
     def __init__(self, func, forward, reverse, device):
         assert func and forward and reverse
+        assert isinstance(func, AnnotatedFunction)
         functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.func = func
-        assert isinstance(func, AnnotatedFunction)
         self.restype = func.getResultTypes()
         self._fwd = forward
         self._fwd_jaxpr = None
@@ -528,8 +528,8 @@ class FlatCallable:
     a flat list."""
 
     def __init__(self, func, *params, **kwparams):
-        self.func = func
         functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
+        self.func = func
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
