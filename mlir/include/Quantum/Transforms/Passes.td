@@ -114,14 +114,7 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "merge rotation boilerplate words";
 
     let constructor = "catalyst::createMergeRotationsPass()";
-    let options = !listconcat(
-    QuantumCircuitTransformationPass.options,
-    [
-    Option<"MyOption", "my-option",
-            "std::string", /*default=*/"\"\"",
-           "Boilerplate option. Delete if unnecessary.">,
-    ]
-    );
+    let options = QuantumCircuitTransformationPass.options;
 }
 
 // ----- Quantum circuit transformation passes end ----- //
