@@ -17,6 +17,7 @@ import platform
 
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
@@ -133,17 +134,18 @@ RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
-    class DummyDevice(qml.devices.QubitDevice):
-        """Dummy Device"""
+    class CustomDevice(qml.devices.QubitDevice):
+        """Custom device"""
 
-        name = "Dummy Device"
-        short_name = "dummy.device"
+        name = "Custom Device"
+        short_name = "custom.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
         operations = OPERATIONS
         observables = OBSERVABLES
+        config = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -160,11 +162,11 @@ def test_custom_device_load():
             """
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
             )
-            return "DummyDevice", lib_path
+            return "NullQubit", lib_path
 
-    device = DummyDevice(wires=1)
+    device = CustomDevice(wires=1)
     capabilities = get_device_capabilities(device)
     backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
@@ -174,7 +176,7 @@ def test_custom_device_load():
     @qml.qnode(device)
     def f():
         """This function would normally return False.
-        However, DummyDevice as defined in librtd_dummy.so
+        However, NullQubit as defined in librtd_null_qubit.so
         has been implemented to always return True."""
         return measure(0)
 
@@ -184,17 +186,18 @@ def test_custom_device_load():
 def test_custom_device_bad_directory():
     """Test that custom device error."""
 
-    class DummyDevice(qml.devices.QubitDevice):
-        """Dummy Device"""
+    class CustomDevice(qml.devices.QubitDevice):
+        """Custom Device"""
 
-        name = "Dummy Device"
-        short_name = "dummy.device"
+        name = "Custom Qubit"
+        short_name = "custom.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
         operations = OPERATIONS
         observables = OBSERVABLES
+        config = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -209,14 +212,14 @@ def test_custom_device_bad_directory():
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "DummyDevice", "this-file-does-not-exist.so"
+            return "CustomDevice", "this-file-does-not-exist.so"
 
     with pytest.raises(
         CompileError, match="Device at this-file-does-not-exist.so cannot be found!"
     ):
 
         @qjit
-        @qml.qnode(DummyDevice(wires=1))
+        @qml.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
 
@@ -224,30 +227,31 @@ def test_custom_device_bad_directory():
 def test_custom_device_no_c_interface():
     """Test that custom device error."""
 
-    class DummyDevice(qml.devices.QubitDevice):
-        """Dummy Device"""
+    class CustomDevice(qml.devices.QubitDevice):
+        """Custom Device"""
 
-        name = "Dummy Device"
-        short_name = "dummy.device"
+        name = "Custom Qubit"
+        short_name = "custom.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
         operations = OPERATIONS
         observables = OBSERVABLES
+        config = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
             """Unused."""
-            raise RuntimeError("Dummy device")
+            raise RuntimeError("Custom device")
 
     with pytest.raises(
-        CompileError, match="The dummy.device device does not provide C interface for compilation."
+        CompileError, match="The custom.device device does not provide C interface for compilation."
     ):
 
         @qjit
-        @qml.qnode(DummyDevice(wires=1))
+        @qml.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
