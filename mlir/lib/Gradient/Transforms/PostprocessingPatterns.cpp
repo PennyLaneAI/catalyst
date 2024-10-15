@@ -210,21 +210,26 @@ struct RestoreReverseOp : public OpRewritePattern<ReverseOp> {
      * This pass aims to revert the changed made by One-shot bufferize.
      *
      * For example,
-     * ```
-     * gradient.reverse @bwd.rev(%arg0: memref<f64>) -> memref<f64>, memref<f64> attributes {argc =
-     * 2 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape
-     * = 0 : i64} { %0 = func.call @bwd(%arg0) : (memref<f64>) -> memref<f64> %alloc =
-     * memref.alloc() {alignment = 64 : i64} : memref<f64> memref.copy %0, %alloc : memref<f64> to
-     * memref<f64> gradient.return {empty = true} %alloc : memref<f64>
+     *
+     * ```mlir
+     * gradient.reverse @bwd.rev(%arg0: memref<f64>) -> memref<f64>, memref<f64>
+     * attributes {argc = 2 : i64, implementation = @bwd, resc = 1 : i64, tape = 0 : i64} {
+     *     %0 = func.call @bwd(%arg0) : (memref<f64>) -> memref<f64>
+     *     %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
+     *     memref.copy %0, %alloc : memref<f64> to memref<f64>
+     *     gradient.return {empty = true} %alloc : memref<f64>
      * }
      * ```
+     *
      * will be turned into
-     * * ```
-     * gradient.reverse @bwd.rev(%arg0: memref<f64>) -> memref<f64> attributes {argc = 2 : i64,
-     * implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 0 :
-     * i64} { %0 = func.call @bwd(%arg0) : (memref<f64>) -> memref<f64> %alloc = memref.alloc()
-     * {alignment = 64 : i64} : memref<f64> memref.copy %0, %alloc : memref<f64> to memref<f64>
-     *   gradient.return {empty = true} %alloc : memref<f64>
+     *
+     * ```mlir
+     * gradient.reverse @bwd.rev(%arg0: memref<f64>) -> memref<f64>
+     * attributes {argc = 2 : i64, implementation = @bwd, resc = 1 : i64, tape = 0 : i64} {
+     *     %0 = func.call @bwd(%arg0) : (memref<f64>) -> memref<f64>
+     *     %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
+     *     memref.copy %0, %alloc : memref<f64> to memref<f64>
+     *     gradient.return {empty = true} %alloc : memref<f64>
      * }
      * ```
      *
