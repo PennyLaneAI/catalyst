@@ -8,6 +8,7 @@ extend-exclude = '''
   | mlir/Enzyme
   | build
   | env
+  | demos
 )
 '''
 
@@ -38,7 +39,7 @@ known_third_party = ["diastatic-malt", "jax", "jaxlib", "numpy", "pennylane"]
 skips = ["B607"]
 
 [build-system]
-requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy==2.0"]
+requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy!=2.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
