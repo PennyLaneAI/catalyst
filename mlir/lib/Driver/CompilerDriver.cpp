@@ -476,7 +476,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     if (options.keepIntermediate && options.checkpointStage == "") {
         llvm::raw_string_ostream s{outputs["mlir"]};
-        s << moduleOp;
+        AsmState state(moduleOp, OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+        moduleOp->print(s, state);
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
                    outputs["mlir"]);
     }
@@ -501,7 +502,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
             auto pipelineName = res->second;
             llvm::raw_string_ostream s{outputs[pipelineName]};
-            s << *op;
+            AsmState state(op, OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+            op->print(s, state);
             dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
                        outputs[pipelineName]);
         }
