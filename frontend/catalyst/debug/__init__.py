@@ -20,6 +20,7 @@ from catalyst.debug.compiler_functions import (
     get_cmain,
     get_compilation_stage,
     replace_ir,
+    replace_ir_from_file,
 )
 from catalyst.debug.instruments import instrumentation
 from catalyst.debug.printing import (  # pylint: disable=redefined-builtin
