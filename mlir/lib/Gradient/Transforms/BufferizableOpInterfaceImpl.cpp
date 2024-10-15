@@ -115,14 +115,13 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
     //
     // and that is what we are using, however we still have this rebuilding a memref without the
     // layout. If that were true, then we could uncomment the following line and it should work.
-    auto memrefType = origMemrefType;
+    // auto memrefType = origMemrefType;
     // I can confirm that having
     // function-signature-type-conversion=identity-layout-map makes the line above succed while the
     // line below fail:
     //
     //     Get dynamic dimension sizes from the provided reference value if necessary.
-    //     auto memrefType = MemRefType::get(origMemrefType.getShape(),
-    //     origMemrefType.getElementType());
+    auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
     //
     // Looking at this a little bit deeper, I can say that the variable reference
     // appears to come from a function parameter.
