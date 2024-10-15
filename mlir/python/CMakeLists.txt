@@ -3,10 +3,18 @@ include(AddMLIRPython)
 # TODO: Add an upstream cmake param for this vs having a global here.
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=mlir_quantum.")
 
-
+# nanobind currently requires (as of 2.2.0) that we use the `Python` package, NOT the `Python3` package
+# We still require at least Python version 3
 find_package(Python 3
   REQUIRED COMPONENTS Interpreter Development.Module
   OPTIONAL_COMPONENTS Development.SABIModule)
+
+# Check if we have overridden the Python3_EXECUTABLE variable
+# If so, set Python_EXECUTABLE to the same value for nanobind compatibility
+if(DEFINED Python3_EXECUTABLE)
+  set(Python_EXECUTABLE ${Python3_EXECUTABLE})
+  message(STATUS "Overriding Python_EXECUTABLE to value of Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
+endif()
 
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
