@@ -332,6 +332,9 @@
   this nested module into other IRs/binary formats and lowering `call_function_in_module`
   to something that can dispatch calls to another runtime / VM.
 
+* Improved the way the compilation pipeline is configured from options.
+  [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
+
 
 <h3>Contributors</h3>
 

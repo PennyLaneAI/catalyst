@@ -26,7 +26,9 @@ import sys
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from io import TextIOWrapper
+from operator import is_not
 from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -143,15 +145,18 @@ class CompileOptions:
         """Get effective pipelines"""
         if self.pipelines:
             return self.pipelines
-        elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-        if self.disable_assertions:
-            if "disable-assertion" not in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].append("disable-assertion")
-        else:
-            if "disable-assertion" in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].remove("disable-assertion")
-        return DEFAULT_PIPELINES
+        return self.get_stages()
+
+    def get_stages(self):
+        """Returns all stages in order for compilation"""
+        # Dictionaries in python are ordered
+        stages = {}
+        stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
+        stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
+        stages["BufferizationPass"] = get_bufferization_stage(self)
+        stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
+        return list(stages.items())
 
 
 @debug_logger
@@ -168,9 +173,9 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
-ENFORCE_RUNTIME_INVARIANTS_PASS = (
-    "EnforeRuntimeInvariantsPass",
-    [
+def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes in the enforce runtime invariant stage."""
+    enforce_runtime_invariants = [
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
@@ -186,12 +191,13 @@ ENFORCE_RUNTIME_INVARIANTS_PASS = (
         # But qnodes targetting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
-    ],
-)
+    ]
+    return enforce_runtime_invariants
 
-HLO_LOWERING_PASS = (
-    "HLOLoweringPass",
-    [
+
+def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
+    hlo_lowering = [
         "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
@@ -207,23 +213,26 @@ HLO_LOWERING_PASS = (
         "func.func(linalg-detensorize{aggressive-mode})",
         "detensorize-scf",
         "canonicalize",
-    ],
-)
+    ]
+    return hlo_lowering
 
-QUANTUM_COMPILATION_PASS = (
-    "QuantumCompilationPass",
-    [
+
+def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs quantum transformations"""
+
+    quantum_compilation = [
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
-        "disable-assertion",
-    ],
-)
+        "disable-assertion" if options.disable_assertions else None,
+    ]
+    return list(filter(partial(is_not, None), quantum_compilation))
 
-BUFFERIZATION_PASS = (
-    "BufferizationPass",
-    [
+
+def get_bufferization_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs bufferization"""
+    bufferization = [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
         "gradient-preprocess",
@@ -253,13 +262,18 @@ BUFFERIZATION_PASS = (
         # otherwise there are issues in lowering of dynamic tensors.
         # "cse",
         "cp-global-memref",
-    ],
-)
+    ]
+    return bufferization
 
 
-MLIR_TO_LLVM_PASS = (
-    "MLIRToLLVMDialect",
-    [
+def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
+    """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
+
+    convert_to_llvm = [
+        "qnode-to-async-lowering" if options.async_qnodes else None,
+        "async-func-to-async-runtime" if options.async_qnodes else None,
+        "async-to-async-runtime" if options.async_qnodes else None,
+        "convert-async-to-llvm" if options.async_qnodes else None,
         "expand-realloc",
         "convert-gradient-to-llvm",
         "memrefcpy-to-linalgcpy",
@@ -301,33 +315,8 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "register-inactive-callback",
-    ],
-)
-
-
-DEFAULT_PIPELINES = [
-    ENFORCE_RUNTIME_INVARIANTS_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_PASS,
-]
-
-MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
-MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
-    "qnode-to-async-lowering",
-    "async-func-to-async-runtime",
-    "async-to-async-runtime",
-    "convert-async-to-llvm",
-]
-
-DEFAULT_ASYNC_PIPELINES = [
-    ENFORCE_RUNTIME_INVARIANTS_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_ASYNC_PASS,
-]
+    ]
+    return list(filter(partial(is_not, None), convert_to_llvm))
 
 
 class LinkerDriver:
