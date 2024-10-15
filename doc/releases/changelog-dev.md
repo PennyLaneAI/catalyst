@@ -117,6 +117,44 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
+* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the 
+  Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
+  [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
+  [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
+
+  Using the pipeline, one can run:
+
+  ```python
+  from catalys.passes import pipeline
+
+  my_passes = {
+    "merge_rotations": {}
+  }
+
+  @qjit(circuit_transform_pipeline=my_passes)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def g(x: float):
+      qml.RX(x, wires=0)
+      qml.RX(x, wires=0)
+      qml.Hadamard(wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  Using the python function, one can run:
+
+  ```python
+  from catalys.passes import merge_rotations
+  
+  @qjit
+  @merge_rotations
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def g(x: float):
+      qml.RX(x, wires=0)
+      qml.RX(x, wires=0)
+      qml.Hadamard(wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 * Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's
   array assignment operator syntax.
   [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
@@ -209,6 +247,8 @@
 * Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
   [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
 
+* The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
+  [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
 
 <h3>Breaking changes</h3>
 
