@@ -82,8 +82,22 @@ static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
 Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 {
     auto origMemrefType = cast<MemRefType>(reference.getType());
-    // Rebuild MemRefType without memory layout.
-    // TODO: Investigate
+    // TODO: Investigate how to get rid of identity-layout-map
+    //
+    //     Hi all. For one-shot-bufferization, is there any automatic way to pass all memref symbols
+    //     to AllocOp? we have an example below that triggers  error: 'memref.alloc' op symbol
+    //     operand count does not equal memref symbol count: expected 1, got 0 .  We think we have
+    //     to pass the offset symbol to AllocOp.
+    //
+    //         %0 = "bufferization.to_memref"(%arg0) : (tensor<f64>) -> memref<f64, strided<[],
+    //         offset: ?>> %1 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> : () ->
+    //         memref<f64, strided<[], offset: ?>>
+    //
+    //     We know we can set function-signature-type-conversion=identity-layout-map to get rid of
+    //     it. But according to the document, identity-layout-map could be less efficient, we still
+    //     want to stick with the default setting.
+    //
+    // https://discord.com/channels/636084430946959380/642426447167881246/1281620504859512914
     //
     //     Something looks odd here.
     //     The result of a `memref.alloc` should be a memref without identity layout.
@@ -93,8 +107,42 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
     //     The result value can then be casted to `memref<f64, strided<[], offset: ?>>`.
     //
     // https://discord.com/channels/636084430946959380/642426447167881246/1281710682160627785
-    auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
-    // Get dynamic dimension sizes from the provided reference value if necessary.
+    //
+    // What I find interesting is that the comment says that
+    //
+    //     "we know we can set function-signature-type-conversion=identity-layout-map to get rid of
+    //     it"
+    //
+    // and that is what we are using, however we still have this rebuilding a memref without the
+    // layout. If that were true, then we could uncomment the following line and it should work.
+    auto memrefType = origMemrefType;
+    // I can confirm that having
+    // function-signature-type-conversion=identity-layout-map makes the line above succed while the
+    // line below fail:
+    //
+    //     Get dynamic dimension sizes from the provided reference value if necessary.
+    //     auto memrefType = MemRefType::get(origMemrefType.getShape(),
+    //     origMemrefType.getElementType());
+    //
+    // Looking at this a little bit deeper, I can say that the variable reference
+    // appears to come from a function parameter.
+    // and since it is not the identity layout, then we see the following generic MLIR when not
+    // using identity layout
+    //
+    // "func.func"() <{function_type = (memref<f64, strided<[], offset: ?>>) -> memref<f64,
+    // strided<[], offset: ?>>
+    //
+    // and we see this when using the identity layout:
+    //
+    // func.func public @jit_fn(%arg0: memref<f64>) -> memref<f64>
+    //
+    // When not using identity layout but also not removing the layout in the alloca, there are
+    // errors in some cases but not in others. I believe we have to do some casts in other places as
+    // well, whenever we use allocas and the types come from the arguments.
+    //
+    // My recommendation: at some point it would be good to remove the identity-layout-map from the
+    // frontend but until we have some more resources, let's keep it along with the origMemrefType.
+
     SmallVector<Value> dynamicDims;
     if (!memrefType.hasStaticShape()) {
         for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
@@ -106,6 +154,9 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
     }
 
     return builder.create<memref::AllocOp>(loc, memrefType, dynamicDims);
+    // Uncomment below to follow Matthias suggestion of placing a CastOp after AllocOp
+    // some more tests will pass.
+    // return builder.create<memref::CastOp>(loc, origMemrefType, alloc_uncasted);
 }
 
 /// Helper function to generate a set of memref allocations.
