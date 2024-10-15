@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "remove-chained-self-inverse"
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -51,6 +52,7 @@ struct RemoveChainedSelfInversePass
     {
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
+        auto start = std::chrono::high_resolution_clock::now();
 
         // Run cse pass before running remove-chained-self-inverse,
         // to aid identifying equivalent SSA values when verifying
@@ -88,6 +90,10 @@ struct RemoveChainedSelfInversePass
         if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
             return signalPassFailure();
         }
+
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        llvm::errs() << "cancel inverse pass runtime: " << duration.count() << "\n";
     }
 };
 
