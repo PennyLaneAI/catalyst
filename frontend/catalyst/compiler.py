@@ -273,14 +273,16 @@ BUFFERIZATION_PASS = (
             # Before we enter one-shot-bufferize, here is what we expect:
             # * Given
             #
-            #     One-Shot Bufferize was designed for ops that are in DPS (destination-passing style).
+            #     One-Shot Bufferize was designed for ops that are in DPS
+            #     (destination-passing style).
             #     Ops that are not in DPS can still be bufferized,
             #     but a new buffer will be allocated for every tensor result.
             #     That’s functionally correct but inefficient.
             #
-            #   from: https://discourse.llvm.org/t/steps-of-migrating-to-one-shot-bufferization/81062/2
-            #   we expect that results will be (automatically?) converted into new buffers. And it is
-            #   up to us to just define the bufferization for the operands.
+            #   https://discourse.llvm.org/t/steps-of-migrating-to-one-shot-bufferization/81062/2
+            #
+            #   we expect that results will be (automatically?) converted into new buffers. And it
+            #   is up to us to just define the bufferization for the operands.
             #
             # So what is the state of the catalyst, gradient, quantum dialects at this point?
             #
@@ -323,9 +325,11 @@ BUFFERIZATION_PASS = (
             # - Bufferize function boundaries (experimental).
             #
             #     By default, function boundaries are not bufferized.
-            #     This is because there are currently limitations around function graph bufferization:
+            #     This is because there are currently limitations around function graph
+            #     bufferization:
             #     recursive calls are not supported.
-            #     As long as there are no recursive calls, function boundary bufferization can be enabled with bufferize-function-boundaries.
+            #     As long as there are no recursive calls, function boundary bufferization can be
+            #     enabled with bufferize-function-boundaries.
             #     Each tensor function argument and tensor function result is then turned into a memref.
             #     The layout map of the memref type can be controlled with function-boundary-type-conversion.
             #
@@ -342,7 +346,8 @@ BUFFERIZATION_PASS = (
             #     By default, we put a fully dynamic layout map strided<[?, ?], offset: ?>
             #     because that works best if you don't know what layout map the buffers at
             #     the call site have -- you can always cast a buffer to a type with
-            #     fully dynamic layout map. (But not the other way around. That may require a reallocation.)
+            #     fully dynamic layout map. (But not the other way around. That may require a
+            #     reallocation.)
             #
             #  https://discord.com/channels/636084430946959380/642426447167881246/1212338527824515102
             "}"
