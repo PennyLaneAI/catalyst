@@ -73,7 +73,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
 
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-        llvm::errs() << "cancel inverse pass runtime: " << duration.count() << " microseconds\n";
+        llvm::errs() << "merge rotation pass runtime: " << duration.count() << " microseconds\n";
     }
 };
 
