@@ -123,7 +123,6 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         if (!verifyParentGateParams(op, parentOp)) {
             return failure();
         }
-
         if (!verifyOneAdjoint(op, parentOp)) {
             return failure();
         }
