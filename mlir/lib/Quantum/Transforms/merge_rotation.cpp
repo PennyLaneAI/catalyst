@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
+#include <chrono>
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -40,6 +42,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
     {
         LLVM_DEBUG(dbgs() << "merge rotation pass"
                           << "\n");
+        auto start = std::chrono::high_resolution_clock::now();
 
         Operation *module = getOperation();
         Operation *targetfunc;
@@ -67,6 +70,10 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
             return signalPassFailure();
         }
+
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        llvm::errs() << "cancel inverse pass runtime: " << duration.count() << " microseconds\n";
     }
 };
 
