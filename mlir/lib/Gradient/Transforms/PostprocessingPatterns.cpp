@@ -205,94 +205,6 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
     }
 };
 
-struct RestoreReverseOp : public OpRewritePattern<ReverseOp> {
-    /* One-shot bufferize optimizes away the return values that are not used.
-     * This pass aims to revert the changed made by One-shot bufferize.
-     *
-     * For example,
-     *
-     * ```mlir
-     * gradient.reverse @bwd.rev(%arg0: memref<f64>) -> memref<f64>, memref<f64>
-     * attributes {argc = 2 : i64, implementation = @bwd, resc = 1 : i64, tape = 0 : i64} {
-     *     %0 = func.call @bwd(%arg0) : (memref<f64>) -> memref<f64>
-     *     %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
-     *     memref.copy %0, %alloc : memref<f64> to memref<f64>
-     *     gradient.return {empty = true} %alloc : memref<f64>
-     * }
-     * ```
-     *
-     * will be turned into
-     *
-     * ```mlir
-     * gradient.reverse @bwd.rev(%arg0: memref<f64>) -> memref<f64>
-     * attributes {argc = 2 : i64, implementation = @bwd, resc = 1 : i64, tape = 0 : i64} {
-     *     %0 = func.call @bwd(%arg0) : (memref<f64>) -> memref<f64>
-     *     %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
-     *     memref.copy %0, %alloc : memref<f64> to memref<f64>
-     *     gradient.return {empty = true} %alloc : memref<f64>
-     * }
-     * ```
-     *
-     * However, Enzyme expects to see the removed return. We have to add it back.
-     */
-    using OpRewritePattern<ReverseOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(ReverseOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
-        auto forwardArgc = op.getArgc();
-        auto forwardResc = op.getResc();
-        auto tape = op.getTape();
-
-        // Check if the Op is post-processed.
-        if (op.getFunctionType().getNumInputs() == (forwardResc + forwardArgc) * 2 + tape)
-            return failure();
-
-        // If function signature is modified, this pass cannot be processed.
-        if (op.getFunctionType().getNumResults() >= forwardArgc)
-            return failure();
-
-        // get parenet module
-        auto module = op->getParentOfType<mlir::ModuleOp>();
-
-        // Get GradOp
-        CustomGradOp gradCaller = nullptr;
-        for (auto gradOp : module.getOps<CustomGradOp>()) {
-            if (gradOp.getReverse() == op.getSymName()) {
-                gradCaller = gradOp;
-            }
-        }
-
-        if (!gradCaller)
-            return failure();
-
-        ForwardOp target = nullptr;
-        // get corresponding FowardOp
-        for (auto forwardOp : module.getOps<ForwardOp>()) {
-            if (forwardOp.getSymName() == gradCaller.getForward()) {
-                target = forwardOp;
-            }
-        }
-
-        if (!target)
-            return failure();
-
-        auto forwardArgTys = target.getArgumentTypes();
-        SmallVector<Type> noTapeTys;
-        for (size_t i = 0; i < forwardArgTys.size(); ++i) {
-            if (i < op.getArgc()) {
-                noTapeTys.push_back(forwardArgTys[i]);
-            }
-        }
-
-        auto reverseTy = rewriter.getFunctionType(op.getArgumentTypes(), noTapeTys);
-
-        rewriter.modifyOpInPlace(op, [&] { op.setFunctionType(reverseTy); });
-
-        return failure();
-    }
-};
-
 } // namespace
 
 namespace catalyst {
@@ -300,7 +212,6 @@ namespace gradient {
 
 void populatePostprocessingPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<RestoreReverseOp>(patterns.getContext());
     patterns.add<PostprocessForwardOp>(patterns.getContext());
     patterns.add<PostprocessReverseOp>(patterns.getContext());
 }
