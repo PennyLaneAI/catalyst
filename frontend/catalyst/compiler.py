@@ -268,9 +268,7 @@ BUFFERIZATION_PASS = (
         # Here, please note that gradient-preprocessing is different than rewriting in DPS.
         # So, overall, we are skipping this section while we first focus on migrating to the
         # new -one-shot-bufferize
-
         "eliminate-empty-tensors",
-
         (
             # Before we enter one-shot-bufferize, here is what we expect:
             # * Given
