@@ -1031,25 +1031,6 @@ class TestVnEntropy:
         expected = 0.6931471805599453
         assert circuit_entropy(np.pi/2) == expected
 
-
-class TestVnEntanglementEntropy:
-    """Test vnentanglemententropy."""
-
-    @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_vn_entangelment_entropy(self):
-        """Test that VnEntropyEntanglement can be used with Catalyst."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qjit
-        @qml.qnode(dev)
-        def circuit_entropy(x):
-            qml.IsingXX(x, wires=[0, 1])
-            return qml.vn_entanglement_entropy(0, 1)
-
-        expected = 0.6931471805599453
-        assert circuit_entropy(np.pi/2) == expected
-
 class TestMutualInfo:
     """Test mutualinfo."""
 
