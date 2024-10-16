@@ -7,8 +7,10 @@ add_library(rtd_null_qubit SHARED NullQubit.cpp)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-target_include_directories(rtd_null_qubit PUBLIC   ${CMAKE_CURRENT_SOURCE_DIR}
-                                                    ${runtime_includes}
-                                                    )
+target_include_directories(rtd_null_qubit PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${runtime_includes}
+    ${backend_includes}
+)
 
 set_property(TARGET rtd_null_qubit PROPERTY POSITION_INDEPENDENT_CODE ON)

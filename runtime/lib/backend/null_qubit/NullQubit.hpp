@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <algorithm> // generate_n
 #include <complex>
 #include <memory>
 #include <optional>
@@ -22,6 +23,7 @@
 
 #include "DataView.hpp"
 #include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
 #include "Types.h"
 
 namespace Catalyst::Runtime::Devices {
@@ -51,7 +53,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `QubitIdType`
      */
-    auto AllocateQubit() -> QubitIdType { return 0; }
+    auto AllocateQubit() -> QubitIdType
+    {
+        num_qubits_++; // next_id
+        return this->qubit_manager.Allocate(num_qubits_);
+    }
 
     /**
      * @brief Allocate a vector of qubits.
@@ -62,25 +68,40 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     {
-        return std::vector<QubitIdType>(num_qubits, 0);
+        if (!num_qubits) {
+            return {};
+        }
+        std::vector<QubitIdType> result(num_qubits);
+        std::generate_n(result.begin(), num_qubits, [this]() { return AllocateQubit(); });
+        return result;
     }
 
     /**
      * @brief Doesn't Release a qubit.
      */
-    void ReleaseQubit(QubitIdType) {}
+    void ReleaseQubit(QubitIdType q)
+    {
+        if (!num_qubits_) {
+            num_qubits_--;
+            this->qubit_manager.Release(q);
+        }
+    }
 
     /**
      * @brief Doesn't Release all qubits.
      */
-    void ReleaseAllQubits() {}
+    void ReleaseAllQubits()
+    {
+        num_qubits_ = 0;
+        this->qubit_manager.ReleaseAll();
+    }
 
     /**
      * @brief Doesn't Get the number of allocated qubits.
      *
      * @return `size_t`
      */
-    [[nodiscard]] auto GetNumQubits() const -> size_t { return 0; }
+    [[nodiscard]] auto GetNumQubits() const -> size_t { return num_qubits_; }
 
     /**
      * @brief Doesn't Set the number of device shots.
@@ -295,5 +316,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         return {0, 0, 0, {}, {}};
     }
+
+  private:
+    std::size_t num_qubits_{0};
+    Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
 };
 } // namespace Catalyst::Runtime::Devices
