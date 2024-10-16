@@ -837,7 +837,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
-                            .loweringAction = loweringAction};
+                            .loweringAction = LoweringAction};
 
     if (config.shouldDumpPassPipeline()) {
         printPipelines(options.pipelinesCfg);
