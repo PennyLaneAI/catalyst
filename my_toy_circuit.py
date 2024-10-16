@@ -46,7 +46,7 @@ def circuit(theta, loop_size):
 
 os.remove("my_toy_circuit.yml")
 with instrumentation("my_toy_circuit", filename="my_toy_circuit.yml", detailed=True):
-    res = circuit(12.3, 10000000)
+    res = circuit(12.3, 10)
     print(res)
 
 with open('my_toy_circuit.yml', 'r') as f:
