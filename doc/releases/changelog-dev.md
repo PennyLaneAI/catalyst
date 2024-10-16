@@ -273,8 +273,6 @@
 
 <h3>Bug fixes</h3>
 
-* Resolve a bug where NullQubit was allocating all qubits to zero.
-  [(#1210)](https://github.com/PennyLaneAI/catalyst/pull/1210)
 
 * Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices
   supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
