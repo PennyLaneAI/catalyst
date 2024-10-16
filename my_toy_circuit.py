@@ -7,6 +7,9 @@ from catalyst import qjit
 from catalyst.debug import instrumentation
 
 import os
+import sys
+
+import datetime
 
 dev = qml.device("lightning.qubit", wires=3)
 
@@ -31,7 +34,7 @@ peephole_pipeline = {"cancel_inverses":{}, "merge_rotations":{}}
     keep_intermediate=True)
 """
 @qjit(autograph=True,
-    keep_intermediate=True,
+    keep_intermediate=False,
     #circuit_transform_pipeline = peephole_pipeline,
     )
 @qml.qnode(dev)
@@ -44,11 +47,51 @@ def circuit(theta, loop_size):
     return qml.probs()
 
 
+num_of_iters = int(sys.argv[1:][0])
 os.remove("my_toy_circuit.yml")
 with instrumentation("my_toy_circuit", filename="my_toy_circuit.yml", detailed=True):
-    res = circuit(12.3, 10)
-    print(res)
+    res = circuit(12.3, num_of_iters)
+    #print(res)
 
-with open('my_toy_circuit.yml', 'r') as f:
-    print(f.read())
+#with open('my_toy_circuit.yml', 'r') as f:
+#    print(f.read())
 
+
+
+####################### core PL #######################
+
+@qml.qnode(dev)
+def circuit_corePL(theta, loop_size):
+    for i in range(loop_size):
+        qml.Hadamard(0)
+        qml.Hadamard(0)
+        qml.RX(theta, wires=1)
+        qml.RX(-theta, wires=1)
+    return qml.probs()
+
+(tape, ) , _ = qml.workflow.construct_batch(circuit_corePL, level=0)(12.3, num_of_iters)
+start1 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+_ = qml.transforms.cancel_inverses(tape)
+end1 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+start_time = float(start1[start1.rfind(":")+1:])
+end_time = float(end1[end1.rfind(":")+1:])
+elapsed_seconds = end_time - start_time
+elapsed_ms1 = elapsed_seconds * 1e3
+
+
+tape = _[0][0]  # <QuantumScript>
+start2 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+_ = qml.transforms.merge_rotations(tape)
+end2 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+start_time = float(start2[start2.rfind(":")+1:])
+end_time = float(end2[end2.rfind(":")+1:])
+elapsed_seconds = end_time - start_time
+elapsed_ms2 = elapsed_seconds * 1e3
+
+total_elapsed_ms = elapsed_ms1 + elapsed_ms2
+with open('core_peephole_time.txt', 'w') as f:
+    print(total_elapsed_ms, file=f)
+
+
+#res = circuit_corePL(12.3, num_of_iters)
+#print(res)
