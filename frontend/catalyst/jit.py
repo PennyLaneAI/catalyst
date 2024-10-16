@@ -87,6 +87,7 @@ def qjit(
     seed=None,
     experimental_capture=False,
     circuit_transform_pipeline=None,
+    generate_qir=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -149,7 +150,7 @@ def qjit(
             dictionaries of valid keyword arguments and values for the specific pass.
             The order of keys in this dictionary will determine the pass pipeline.
             If not specified, the default pass pipeline will be applied.
-
+        generate_qir (bool): TBD
     Returns:
         QJIT object.
 

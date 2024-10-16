@@ -81,6 +81,7 @@ class CompileOptions:
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
             Default is None.
+        generate_qir (bool): TBD
     """
 
     verbose: Optional[bool] = False
@@ -99,6 +100,7 @@ class CompileOptions:
     seed: Optional[int] = None
     experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
+    generate_qir: Optional[bool] = False
 
     def __post_init__(self):
         # Check that async runs must not be seeded
@@ -304,6 +306,13 @@ MLIR_TO_LLVM_PASS = (
     ],
 )
 
+NEW_LLVM_PASS = MLIR_TO_LLVM_PASS[1]
+NEW_LLVM_PASS[NEW_LLVM_PASS.index("convert-quantum-to-llvm")] = "convert-quantum-to-qiree"
+
+QIR_PASS = (
+    "QIRPass",
+    NEW_LLVM_PASS,
+)
 
 DEFAULT_PIPELINES = [
     ENFORCE_RUNTIME_INVARIANTS_PASS,
@@ -311,6 +320,7 @@ DEFAULT_PIPELINES = [
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_PASS,
+    QIR_PASS,
 ]
 
 MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
@@ -584,6 +594,7 @@ class Compiler:
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
                 checkpoint_stage=self.options.checkpoint_stage,
+                generate_qir=self.options.generate_qir
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e

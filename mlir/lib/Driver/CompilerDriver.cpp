@@ -459,6 +459,17 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             output.isCheckpointFound = options.checkpointStage == pipeline.name;
             continue;
         }
+
+        if (!options.generateQir && pipeline.name == "QIRPass") {
+            continue;
+        }
+        if (options.generateQir && pipeline.name == "MLIRToLLVMDialect") {
+            continue;
+        }
+        if (options.generateQir && pipeline.name == "QIRPass") {
+            llvm::outs() << "Generate QIR\n";
+        }
+
         size_t existingPasses = pm.size();
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();

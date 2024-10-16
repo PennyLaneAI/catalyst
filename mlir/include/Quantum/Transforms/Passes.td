@@ -36,6 +36,14 @@ def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let constructor = "catalyst::createQuantumConversionPass()";
 }
 
+def QIREEConversionPass : Pass<"convert-quantum-to-qiree"> {
+    let summary = "Perform a dialect conversion from Quantum to QIREE.";
+
+    let dependentDialects = ["LLVM::LLVMDialect"];
+
+    let constructor = "catalyst::createQIREEConversionPass()";
+}
+
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {
     let summary = "Emit catalyst python's default interface.";
 
