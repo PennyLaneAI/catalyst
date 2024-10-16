@@ -249,6 +249,7 @@
 
 * The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
   [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
+  [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
 
 <h3>Breaking changes</h3>
 
