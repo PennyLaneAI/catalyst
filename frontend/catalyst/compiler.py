@@ -189,6 +189,14 @@ ENFORCE_RUNTIME_INVARIANTS_PASS = (
     ],
 )
 
+PEEPHOLE_BENCHMARK_PASS = (
+    "PeepholeBenchmarkPass",
+    [
+    "remove-chained-self-inverse{func-name=circuit}",
+    "merge-rotations{func-name=circuit}",
+    ],
+)
+
 HLO_LOWERING_PASS = (
     "HLOLoweringPass",
     [
@@ -306,6 +314,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
+    PEEPHOLE_BENCHMARK_PASS,
     ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
@@ -323,6 +332,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 
 DEFAULT_ASYNC_PIPELINES = [
     ENFORCE_RUNTIME_INVARIANTS_PASS,
+    PEEPHOLE_BENCHMARK_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
