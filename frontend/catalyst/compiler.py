@@ -647,7 +647,7 @@ class Compiler:
             filename = filename[0]
 
             full_path = os.path.join(dirpath, filename)
-            with open(full_path, "r") as file:
+            with open(full_path, "r", encoding="utf-8") as file:
                 file_content = file.read()
 
         if file_content is None:

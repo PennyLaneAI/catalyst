@@ -723,7 +723,6 @@ void printPipelines(std::vector<Pipeline> pipelines)
 
 std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
 {
-
     std::vector<std::string> defaultPipeline = {
         "enforce-runtime-invariants-pipeline", "hlo_lowering-pipeline",
         "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowring-pipeline"};
@@ -771,7 +770,6 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
 
 int QuantumDriverMainFromCL(int argc, char **argv)
 {
-
     // Command-line options
     cl::opt<std::string> WorkspaceDir("workspace", cl::desc("Workspace directory"), cl::init("."));
     cl::opt<std::string> ModuleName("module-name", cl::desc("Module name"),
@@ -872,7 +870,6 @@ int QuantumDriverMainFromArgs(const std::string &source, const std::string &work
                               const std::string &checkpointStage,
                               catalyst::driver::CompilerOutput &output)
 {
-
     llvm::raw_string_ostream errStream{output.diagnosticMessages};
 
     CompilerOptions options{.source = source,
