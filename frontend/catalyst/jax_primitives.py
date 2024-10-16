@@ -1675,10 +1675,12 @@ def _sample_lowering(
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
+    i64_type = ir.IntegerType.get_signless(64, ctx)
+    shots_val = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
     result_type = ir.RankedTensorType.get(shape, f64_type)
 
-    return SampleOp(result_type, obs, shots).results
+    return SampleOp(result_type, obs, shots_val).results
 
 
 #
@@ -1708,11 +1710,12 @@ def _counts_lowering(
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
+    shots_val = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs, shots).results
+    return CountsOp(eigvals_type, counts_type, obs, shots_val).results
 
 
 #

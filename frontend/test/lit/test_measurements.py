@@ -69,6 +69,7 @@ except CompileError:
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
 def sample3(x: float, y: float):
+    # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
@@ -76,7 +77,7 @@ def sample3(x: float, y: float):
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.sample [[obs]] %shots : tensor<1000x2xf64>
+    # CHECK: quantum.sample [[obs]] [[shots]] : tensor<1000x2xf64>
     return qml.sample()
 
 
@@ -131,6 +132,7 @@ except:
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
 def counts3(x: float, y: float):
+    # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
@@ -138,7 +140,7 @@ def counts3(x: float, y: float):
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.counts [[obs]] {shots = 1000 : i64} : tensor<4xf64>, tensor<4xi64>
+    # CHECK: quantum.counts [[obs]] [[shots]] : tensor<4xf64>, tensor<4xi64>
     return qml.counts()
 
 
