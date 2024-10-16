@@ -56,7 +56,7 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
 
         // Replace uses
         ValueRange InQubits = op.getInQubits();
-        auto parentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
+        auto parentOp = cast<CustomOp>(InQubits[0].getDefiningOp());
         ValueRange originalNonCtrlQubits = parentOp.getNonCtrlQubitOperands();
         ValueRange originalCtrlQubits = parentOp.getCtrlQubitOperands();
         for (const auto &[idx, nonCtrlQubitResult] : llvm::enumerate(op.getNonCtrlQubitResults())) {
