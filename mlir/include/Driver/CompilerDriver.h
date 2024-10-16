@@ -21,6 +21,7 @@
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -31,6 +32,12 @@ namespace driver {
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
 // low-level messages, we might want to hide these.
 enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
+
+enum SaveTemps { None, AfterPipeline, AfterPass };
+
+enum Action { OPT, Translate, LLC, All };
+
+enum InputType { MLIR, LLVMIR, OTHER };
 
 /// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \
@@ -58,8 +65,8 @@ struct CompilerOptions {
     mlir::StringRef moduleName;
     /// The stream to output any error messages from MLIR/LLVM passes and translation.
     llvm::raw_ostream &diagnosticStream;
-    /// If true, the driver will output the module at intermediate points.
-    bool keepIntermediate;
+    /// If specified, the driver will output the module after each pipeline or each pass.
+    SaveTemps keepIntermediate;
     /// If true, the llvm.coroutine will be lowered.
     bool asyncQnodes;
     /// Sets the verbosity level to use when printing messages.
@@ -67,10 +74,10 @@ struct CompilerOptions {
     /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR
     /// passes it includes.
     std::vector<Pipeline> pipelinesCfg;
-    /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
-    bool lowerToLLVM;
     /// Specify that the compiler should start after reaching the given pass.
     std::string checkpointStage;
+    /// Specify the loweting action to perform
+    Action loweringAction;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
@@ -102,8 +109,10 @@ struct CompilerOutput {
 }; // namespace catalyst
 
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions options,
-                                      catalyst::driver::CompilerOutput &output);
+mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options,
+                                      catalyst::driver::CompilerOutput &output,
+                                      mlir::DialectRegistry &registry,
+                                      const mlir::MlirOptMainConfig &config);
 
 int QuantumDriverMainFromCL(int argc, char **argv);
 int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
