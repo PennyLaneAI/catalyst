@@ -727,10 +727,6 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Value structPtr = rewriter.create<LLVM::AllocaOp>(
             loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
 
-        // Allocate shots
-        Value shotsPtr = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64), c1);
-
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
         // accept observables for sample.
@@ -739,14 +735,17 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
 
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-        SmallVector<Value> args = {structPtr, shotsPtr, numQubits};
-        args.insert(args.end(), qubits.begin(), qubits.end());
+
+        Value numShots;
 
         if constexpr (std::is_same_v<T, SampleOp>) {
+            auto sampleAdaptor = cast<SampleOpAdaptor>(adaptor);
+            numShots = sampleAdaptor.getShots();
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
-            rewriter.create<LLVM::StoreOp>(loc, adaptor.getShots(), shotsPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
+            auto countsAdaptor = cast<CountsOpAdaptor>(adaptor);
+            numShots = countsAdaptor.getShots();
             auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
             auto bStruct =
                 rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
@@ -754,6 +753,9 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
                 rewriter.create<LLVM::InsertValueOp>(loc, bStruct, adaptor.getInCounts(), 1);
             rewriter.create<LLVM::StoreOp>(loc, cStruct, structPtr);
         }
+
+        SmallVector<Value> args = {structPtr, numShots, numQubits};
+        args.insert(args.end(), qubits.begin(), qubits.end());
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 

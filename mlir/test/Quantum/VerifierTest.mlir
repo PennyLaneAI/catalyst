@@ -241,67 +241,67 @@ func.func @sample5(%q : !quantum.bit, %shots: i64) {
 
 // -----
 
-func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit, %shots: i64) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
-    %err:2 = quantum.counts %obs { shots=1000 } : tensor<4xf64>, tensor<4xi64>
+    %err:2 = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
 
-    %counts:2 = quantum.counts %obs { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+    %counts:2 = quantum.counts %obs %shots : tensor<2xf64>, tensor<2xi64>
 
     return
 }
 
 // -----
 
-func.func @counts2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @counts2(%q0 : !quantum.bit, %q1 : !quantum.bit, %shots: i64) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
-    %err:2 = quantum.counts %obs { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+    %err:2 = quantum.counts %obs %shots : tensor<2xf64>, tensor<2xi64>
 
-    %counts:2 = quantum.counts %obs { shots=1000 } : tensor<4xf64>, tensor<4xi64>
+    %counts:2 = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
 
     return
 }
 
 // -----
 
-func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit, %shots: i64) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     %in_eigvals_1 = memref.alloc() : memref<4xf64>
     %in_counts_1 = memref.alloc() : memref<4xi64>
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
-    quantum.counts %obs in(%in_eigvals_1 : memref<4xf64>, %in_counts_1 : memref<4xi64>) { shots=1000 }
+    quantum.counts %obs in(%in_eigvals_1 : memref<4xf64>, %in_counts_1 : memref<4xi64>) %shots
 
     %in_eigvals_2 = memref.alloc() : memref<2xf64>
     %in_counts_2 = memref.alloc() : memref<2xi64>
-    quantum.counts %obs in(%in_eigvals_2 : memref<2xf64>, %in_counts_2 : memref<2xi64>) { shots=1000 }
+    quantum.counts %obs in(%in_eigvals_2 : memref<2xf64>, %in_counts_2 : memref<2xi64>) %shots
 
     return
 }
 
 // -----
 
-func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit, %shots: i64) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.counts %obs { shots=1000 }
+    quantum.counts %obs %shots
 
     return
 }
 
 // -----
 
-func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit, %shots: i64) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     %in_eigvals = memref.alloc() : memref<2xf64>
     %in_counts = memref.alloc() : memref<2xi64>
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+    quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) %shots : tensor<2xf64>, tensor<2xi64>
 
     return
 }

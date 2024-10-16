@@ -76,7 +76,7 @@ def sample3(x: float, y: float):
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.sample [[obs]] {shots = 1000 : i64} : tensor<1000x2xf64>
+    # CHECK: quantum.sample [[obs]] %shots : tensor<1000x2xf64>
     return qml.sample()
 
 

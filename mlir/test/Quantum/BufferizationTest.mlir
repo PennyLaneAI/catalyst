@@ -18,9 +18,9 @@
 // Measurements //
 //////////////////
 
-func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) -> (tensor<4xf64>, tensor<4xi64>) {
+func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64) -> (tensor<4xf64>, tensor<4xi64>) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-    %samples:2 = quantum.counts %obs {shots=2} : tensor<4xf64>, tensor<4xi64>
+    %samples:2 = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
     func.return %samples#0, %samples#1 : tensor<4xf64>, tensor<4xi64>
 }
 

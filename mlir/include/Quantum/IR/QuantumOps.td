@@ -742,13 +742,13 @@ def SampleOp : Measurement_Op<"sample"> {
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots : i64)
         {
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %samples = quantum.samples %obs1 {shots=1000} : tensor<1000xf64>
+            %samples = quantum.samples %obs1 %shots : tensor<1000xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 {shots=1000} : tensor<1000x2xf64>
+            %samples2 = quantum.samples %obs2 %shots : tensor<1000x2xf64>
 
             func.return
         }
@@ -809,10 +809,10 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
         {
             %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-            %counts = quantum.counts %obs {shots=1000} : tensor<4xf64>, tensor<4xi64>
+            %counts = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %counts2 = quantum.counts %obs2 {shots=1000} : tensor<2xf64>, tensor<2xi64>
+            %counts2 = quantum.counts %obs2 %shots : tensor<2xf64>, tensor<2xi64>
 
             func.return
         }
@@ -821,9 +821,9 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
 
     let arguments = (ins
         ObservableType:$obs,
+        I64:$shots,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
-        Optional<MemRefRankOf<[I64], [1]>>:$in_counts,
-        I64Attr:$shots
+        Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
 
     let results = (outs
@@ -834,7 +834,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     let assemblyFormat = [{
         $obs
         ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
-        attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
+        $shots attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
 
     let extraClassDeclaration = [{
