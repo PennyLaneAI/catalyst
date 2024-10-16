@@ -273,6 +273,9 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
+  AutoGraph.
+  [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
 
 * Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices
   supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
