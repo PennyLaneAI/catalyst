@@ -117,7 +117,7 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the 
+* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the
   Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
   [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
   [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
@@ -144,7 +144,7 @@
 
   ```python
   from catalys.passes import merge_rotations
-  
+
   @qjit
   @merge_rotations
   @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -186,6 +186,9 @@
   ```
 
 <h3>Improvements</h3>
+
+* Implement a Catalyst runtime plugin that mocks out all functions in the QuantumDevice interface.
+  [(#1179)](https://github.com/PennyLaneAI/catalyst/pull/1179)
 
 * Scalar tensors are eliminated from control flow operations in the program, and are replaced with
   bare scalars instead. This improves compilation time and memory usage at runtime by avoiding heap
@@ -270,7 +273,10 @@
 
 <h3>Bug fixes</h3>
 
-* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices 
+* Resolve a bug where NullQubit was allocating all qubits to zero.
+  [(#1210)](https://github.com/PennyLaneAI/catalyst/pull/1210)
+
+* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices
   supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
   [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
@@ -338,6 +344,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Amintor Dusko,
 Joey Carter,
 Spencer Comin,
 Lillian M.A. Frederiksen,
