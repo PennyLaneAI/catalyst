@@ -256,13 +256,8 @@ class VmapCallable(CatalystCallable):
         # in the flatten format with respect to the 'init_result' shape
         batched_result_list = []
         for j in range(num_axes_out):
-            out_shape = (
-                (batch_size,)
-                if not init_result_flat[j].shape
-                else (batch_size, *init_result_flat[j].shape)
-            )
+            out_shape = (batch_size, *init_result_flat[j].shape)
             batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
-            batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
 
         # Apply mapping batched_args[1:] ---> fn(args)
         @for_loop(0, batch_size, 1)
