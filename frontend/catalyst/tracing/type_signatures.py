@@ -32,6 +32,15 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 
+def get_stripped_signature(fn: Callable):
+    """Return the function's signature without annotations."""
+
+    old_params = inspect.signature(fn).parameters.values()
+    new_params = [param.replace(annotation=inspect.Parameter.empty) for param in old_params]
+
+    return inspect.Signature(new_params)
+
+
 def get_param_annotations(fn: Callable):
     """Return true all parameters typed-annotations."""
     assert isinstance(fn, Callable)

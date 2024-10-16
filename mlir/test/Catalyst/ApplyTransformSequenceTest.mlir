@@ -29,25 +29,25 @@ module @workflow {
     }
   }
 
-  func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
+  func.func private @f(%arg0: tensor<f64>) -> !quantum.bit {
     %c_0 = stablehlo.constant dense<0> : tensor<i64>
     %extracted = tensor.extract %c_0[] : tensor<i64>
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
     %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
     %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-    return %arg0 : tensor<f64>
+    return %out_qubits_1 : !quantum.bit
   }
 
 
-  func.func private @g(%arg0: tensor<f64>) -> tensor<f64> {
+  func.func private @g(%arg0: tensor<f64>) -> !quantum.bit {
     %c_0 = stablehlo.constant dense<0> : tensor<i64>
     %extracted = tensor.extract %c_0[] : tensor<i64>
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
     %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
     %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
-    return %arg0 : tensor<f64>
+    return %out_qubits_1 : !quantum.bit
   }
 
 }

@@ -9,7 +9,7 @@ on:
 
 jobs:
   check_if_required:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Build is triggered from Pull Request
