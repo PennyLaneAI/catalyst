@@ -480,6 +480,7 @@ class TestProbs:
         result = qjit(circuit)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+
 class TestVnEntropy:
     """Test vnentropy."""
 
@@ -496,7 +497,7 @@ class TestVnEntropy:
             return qml.vn_entropy(wires=[0])
 
         expected = 0.6931471805599453
-        assert circuit_entropy(np.pi/2) == expected
+        assert circuit_entropy(np.pi / 2) == expected
 
 
 class TestMutualInfo:
@@ -542,6 +543,7 @@ class TestShadow:
         assert expected_bits == actual_bits
         assert expected_recipes == actual_recipes
 
+
 class TestShadowExpval:
     """Test shadowexpval."""
 
@@ -559,9 +561,10 @@ class TestShadowExpval:
             qml.RX(x, wires=0)
             return qml.shadow_expval(obs)
 
-        H = qml.Hamiltonian([1., 1.], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
+        H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
         expected = 1.917
         assert shadow_expval_circuit(0, H) == expected
+
 
 class TestPurity:
     """Test purity."""

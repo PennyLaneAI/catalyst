@@ -19,6 +19,8 @@ from jax import numpy as jnp
 
 from catalyst import qjit
 
+# pylint: disable=too-many-lines
+
 
 class TestSample:
     """Test sample."""
@@ -138,7 +140,6 @@ class TestCounts:
         observed = counts_2qbit(0, np.pi)
         assert np.array_equal(observed, expected)
 
-
     @pytest.mark.xfail(reason="Not supported by Catalyst")
     def test_counts_all_outcomes(self, backend):
         """Test counts with all_outcomes=True."""
@@ -150,14 +151,13 @@ class TestCounts:
             qml.RY(x, wires=1)
             return qml.counts(all_outcomes=True)
 
-        expected = {'00': 1000, '01': 0, '10': 0, '11': 0}
+        expected = {"00": 1000, "01": 0, "10": 0, "11": 0}
         observed = counts_2qbit(0.0)
         assert np.array_equal(observed, expected)
 
-        expected = {'00': 0, '01': 0, '10': 0, '11': 1000}
+        expected = {"00": 0, "01": 0, "10": 0, "11": 1000}
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
-
 
 
 class TestExpval:
@@ -727,6 +727,7 @@ class TestProbs:
         observed = probs(np.pi / 2)
         assert np.allclose(observed, expected)
 
+
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
 
@@ -1013,6 +1014,7 @@ class TestDensityMatrixMP:
             def circuit():
                 return qml.density_matrix([0])
 
+
 class TestVnEntropy:
     """Test vnentropy."""
 
@@ -1029,7 +1031,8 @@ class TestVnEntropy:
             return qml.vn_entropy(wires=[0])
 
         expected = 0.6931471805599453
-        assert circuit_entropy(np.pi/2) == expected
+        assert circuit_entropy(np.pi / 2) == expected
+
 
 class TestMutualInfo:
     """Test mutualinfo."""
@@ -1074,6 +1077,7 @@ class TestShadow:
         assert expected_bits == actual_bits
         assert expected_recipes == actual_recipes
 
+
 class TestShadowExpval:
     """Test shadowexpval."""
 
@@ -1091,9 +1095,10 @@ class TestShadowExpval:
             qml.RX(x, wires=0)
             return qml.shadow_expval(obs)
 
-        H = qml.Hamiltonian([1., 1.], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
+        H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
         expected = 1.917
         assert shadow_expval_circuit(0, H) == expected
+
 
 class TestPurity:
     """Test purity."""
