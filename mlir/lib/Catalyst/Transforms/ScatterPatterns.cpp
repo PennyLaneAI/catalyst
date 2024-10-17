@@ -84,6 +84,55 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return returnOp.getResults().front() == *block.args_rbegin() ? success() : failure();
     }
 
+    mlir::LogicalResult noBatching(mhlo::ScatterOp op) const
+    {
+        // Ok, now that we know it is an assignment, we need to worry about
+        // where exactly are we assigning and what are we assigning.
+        // First let's worry about the what we are assigning.
+        // It needs to be a proper slice. No preprocessing of anyway.
+        // What kind of preprocessing exists?
+        // * Batching for input
+        // * Batching for indices
+        //
+        // From:
+        // (C13) 0 <= input_batching_dims < rank(inputs[0])).
+        // (C17) size(input_batching_dims) == size(scatter_indices_batching_dims)
+        // Implies:
+        // If there is no input_batching_dims and no scatter_indices_batching
+        // TODO: This will always be success until we update our version of mlir-hlo.
+        // It looks we are using an old version where getInputBatchingDims was not yet available.
+        // See here: https://github.com/tensorflow/mlir-hlo/commit/5ac7c579c52ef02b13c29886a98672c2ade7c9b0
+        return success();
+        // Until then, keep this code commented:
+        //   auto scatterDimNumbers = op.getScatterDimensionNumbers();
+        //   return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
+    }
+
+    mlir::LogicalResult singleFullSlices(mhlo::ScatterOp op) const
+    {
+        // From:
+        //   More formally, for all update_index in index_space(updates[0]):
+        //     * update_scatter_dims = [d for d in axes(updates[0]) and d not in update_window_dims]
+        //     * update_scatter_index = update_index[update_scatter_dims...]
+        // we want update_scatter_index to be empty. This would mean that:
+        // scatter_indices points to a location in the input tensor and the corresponding
+        // update value is a full window that is inserted at that location.
+        // So we have a single update
+        auto update = op.getUpdates().front();
+        // And we need to make sure that all of its axes are in the update_window_dims.
+        // From:
+        // (C7) is_unique(update_window_dims) and is_sorted(update_window_dims)
+        // Implies
+        auto updateTy = cast<RankedTensorType>(update.getType());
+        auto scatterDimNumbers = op.getScatterDimensionNumbers();
+        return updateTy.getRank() == scatterDimNumbers.getUpdateWindowDims().size() ? success() : failure();
+    }
+
+    mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(mhlo::ScatterOp op) const
+    {
+        return cast<RankedTensorType>(op.getScatterIndices().getType()).getRank() == 1 ? success() : failure();
+    }
+
     mlir::LogicalResult lowerToTensorInsertSlice(mhlo::ScatterOp op,
                                                  mlir::PatternRewriter &rewriter) const
     {
@@ -102,13 +151,62 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // These simple semantics are obscured a bit by too many other details.
         //
         // Let's make some simplifying assumptions
+
+        // size(%result) == size(%update) == size(%input) == 1
         if (failed(this->onlyOneInputUpdateAndResult(op))) {
             return failure();
         }
+        auto result = op.getResults().front();
+        auto input = op.getInputs().front();
 
+        // update_function = 
+        // ^bb0(%arg0: T, %arg1: T):
+        //   stablehlo.return %arg1 : T
+        // })
         if (failed(this->isAssignment(op))) {
             return failure();
         }
+
+        // input_batching_dims = []
+        // scatter_indices_batching_dims = []
+        if (failed(this->noBatching(op))) {
+            return failure();
+        }
+
+        // rank(%update) == size(update_window_dims)
+        // => we are inserting the whole %update into a dimension of %input
+        if (failed(this->singleFullSlices(op))) {
+            return failure();
+        }
+
+        // Now, where are we going to insert this full slice?
+        // scatter_indices is typed as tensor of integer type
+        // So, normally I would need a loop around the scatter_indices.
+        // But let's assume that scatter_indices is a tensor of rank 1
+        // If this is not true, we would need to create a loop?
+        // rank(%scatter_indices) == 1
+        if (failed(this->canBeDoneWithSingleTensorInsertSlice(op))) {
+            return failure();
+        }
+
+        auto resultTy = cast<RankedTensorType>(result.getType());
+        auto inputTy = cast<RankedTensorType>(input.getType());
+        auto resultShape = resultTy.getShape();
+        auto inputShape = inputTy.getShape();
+        // shape(%result) == shape(%input)
+        if (resultShape == inputShape) {
+            return failure();
+        }
+
+        // %result = tensor.insert_slice %update into %input[%scatter_indices],[size(%update)...],[1*rank(%update)]
+        // But we still have a couple of more attributes that we need to understand.
+        // * scatter_dims_to_operand_dims
+        // * index_vector_dim
+        // * inserted_window_dim
+        // Out of these three
+        
+        
+
         return failure();
     }
 
