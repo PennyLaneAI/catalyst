@@ -98,9 +98,7 @@ def get_compilation_stage(fn, stage):
     if not isinstance(fn, catalyst.QJIT):
         raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
 
-    if stage == "last":
-        return fn.compiler.last_compiler_output.get_output_ir()
-    return fn.compiler.get_output_of(stage)
+    return fn.compiler.get_output_of(stage, fn.workspace)
 
 
 @debug_logger
