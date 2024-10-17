@@ -71,7 +71,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // value to the result.
         Region &region = op.getUpdateComputation();
         Block &block = region.front();
-        bool oneOperation = block.begin() == block.end();
+        bool oneOperation = block.begin() == --block.end();
         if (!oneOperation) {
             return failure();
         }
@@ -81,7 +81,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             return failure();
         }
 
-        return returnOp.getResults().front() == *block.args_rbegin() ? success() : failure();
+        return returnOp.getResults().front() == block.getArgument(1) ? success() : failure();
     }
 
     mlir::LogicalResult noBatching(mhlo::ScatterOp op) const
@@ -158,6 +158,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         }
         auto result = op.getResults().front();
         auto input = op.getInputs().front();
+        auto update = op.getUpdates().front();
+        auto scatterIndices = op.getScatterIndices();
 
         // update_function = 
         // ^bb0(%arg0: T, %arg1: T):
@@ -191,13 +193,25 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         auto resultTy = cast<RankedTensorType>(result.getType());
         auto inputTy = cast<RankedTensorType>(input.getType());
+        auto updateTy = cast<RankedTensorType>(update.getType());
         auto resultShape = resultTy.getShape();
         auto inputShape = inputTy.getShape();
+        auto updateShape = updateTy.getShape();
+        auto scatterIndicesTy = cast<RankedTensorType>(scatterIndices.getType());
         // shape(%result) == shape(%input)
-        if (resultShape == inputShape) {
+        if (resultShape != inputShape) {
             return failure();
         }
 
+        auto scatterDimNumbers = op.getScatterDimensionNumbers();
+        auto updateWindowDims = scatterDimNumbers.getUpdateWindowDims();
+        auto insertedWindowDims = scatterDimNumbers.getInsertedWindowDims();
+        auto scatterDimsToOperandDims = scatterDimNumbers.getScatterDimsToOperandDims();
+        auto indexVectorDim = scatterDimNumbers.getIndexVectorDim();
+
+        if (indexVectorDim != scatterIndicesTy.getRank() - 1) {
+            return failure();
+        }
         // But we still have a couple of more attributes that we need to understand.
         // Somehow I need to use update_window_dims to correctly set this line:
         // %input[%scatter_indices]
@@ -205,7 +219,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // * index_vector_dim
         // * inserted_window_dim
         // Out of these three
-        auto scatterIndices = op.getScatterIndices();
         // %result = tensor.insert_slice %update into %input[%scatter_indices],[size(%update)...],[1*rank(%update)]
         // Annotated description of scatter semantics: https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
         //
@@ -231,10 +244,31 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // the offset relates to inserted_window_dims
         // 
         // rewriter.create<tensor::InsertSliceOp>(loc, update, input, dyn_off, dyn_siz, dyn_str, static_off, static_siz, static_str);
-        
-        
+        SmallVector<Value> dynOffsets, dynSizes, dynStrides;
+        SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
 
-        return failure();
+        // TODO: Close, but not 100% sure. Verify for correctness...
+        for (int i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
+          if (llvm::is_contained(insertedWindowDims, i)) {
+            int scatterDimIndex = scatterDimsToOperandDims[inputDim];
+            Value scatterDimVal = rewriter.create<index::ConstantOp>(op.getLoc(), scatterDimIndex);
+            auto extractOp = rewriter.create<tensor::ExtractOp>(op.getLoc(), scatterIndices, scatterDimVal).getResult();
+            auto indexCastOp = rewriter.create<arith::IndexCastOp>(op.getLoc(), rewriter.getIndexType(), extractOp).getResult();
+            dynOffsets.push_back(indexCastOp);
+            staticOffsets.push_back(ShapedType::kDynamic);
+            staticSizes.push_back(1);
+          } else {
+            staticOffsets.push_back(0);
+            staticSizes.push_back(updateShape[updateDim]);
+            updateDim++;
+          }
+          inputDim++;
+          staticStrides.push_back(1);
+        }
+
+        rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(op, update, input, dynOffsets, dynSizes, dynStrides, staticOffsets, staticSizes, staticStrides);
+
+        return success();
     }
 
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
