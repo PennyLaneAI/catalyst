@@ -198,12 +198,39 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             return failure();
         }
 
-        // %result = tensor.insert_slice %update into %input[%scatter_indices],[size(%update)...],[1*rank(%update)]
         // But we still have a couple of more attributes that we need to understand.
+        // Somehow I need to use update_window_dims to correctly set this line:
+        // %input[%scatter_indices]
         // * scatter_dims_to_operand_dims
         // * index_vector_dim
         // * inserted_window_dim
         // Out of these three
+        auto scatterIndices = op.getScatterIndices();
+        // %result = tensor.insert_slice %update into %input[%scatter_indices],[size(%update)...],[1*rank(%update)]
+        // Annotated description of scatter semantics: https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
+        //
+        //   More formally, for all update_index in index_space(updates[0]):
+        //   // In our case len(updates) = 1
+        //   // so change this to index_space(update)
+        //   // index_space is defined here: https://github.com/openxla/stablehlo/blob/main/docs/spec.md#shape-computations
+        //
+        //   update_scatter_dims = [d for d in axes(updates[0]) and d not in update_window_dims]
+        //   // rank(%update) == size(update_window_dims)
+        //   // => update_scatter_dims = []
+        //
+        //   update_scatter_index = update_index[update_scatter_dims...]
+        //   // update_scatter_index = update_index
+        //
+        //   update_window_index = update_index[update_window_dims...]
+        //   // rank(%update) == size(update_window_dims)
+        //   // => update_window_index = update_index
+        //
+        //   full_window_index = [wi0, ..., 0, ..., wiN] where wi are individual elements in update_window_index, and 0 is inserted at indices from inserted_window_dims and input_batching_dims
+        //   // rank(inputs[0]) = size(update_window_dims) + size(inserted_window_dims) + size(input_batching_dims)
+        
+        // the offset relates to inserted_window_dims
+        // 
+        // rewriter.create<tensor::InsertSliceOp>(loc, update, input, dyn_off, dyn_siz, dyn_str, static_off, static_siz, static_str);
         
         
 
