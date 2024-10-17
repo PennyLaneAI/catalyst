@@ -192,8 +192,8 @@ ENFORCE_RUNTIME_INVARIANTS_PASS = (
 PEEPHOLE_BENCHMARK_PASS = (
     "PeepholeBenchmarkPass",
     [
-    "remove-chained-self-inverse{func-name=circuit}",
-    "merge-rotations{func-name=circuit}",
+        "remove-chained-self-inverse{func-name=circuit}",
+        "merge-rotations{func-name=circuit}",
     ],
 )
 
