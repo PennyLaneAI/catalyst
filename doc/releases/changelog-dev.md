@@ -273,6 +273,10 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug in the extrapolation part of the `catalyst.mitigate_with_zne` function that would lead
+  to incorrectly extrapolated results.
+  [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)
+
 * Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
   AutoGraph.
   [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
