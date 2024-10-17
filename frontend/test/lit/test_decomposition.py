@@ -70,9 +70,9 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
             """
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
             )
-            return "dummy.remote", lib_path
+            return "NullQubit", lib_path
 
         def execute(self, circuits, execution_config):
             """Execution."""
