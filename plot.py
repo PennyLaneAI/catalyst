@@ -4,8 +4,9 @@ import numpy as np
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage, TextArea
 
 # data = np.load('peephole_benchmark_data_small.npz')
-data = np.load("peephole_benchmark_data_geomspace25.npz")
-# data = np.load('peephole_benchmark_data.npz')
+#data = np.load("peephole_benchmark_data_geomspace25.npz")
+#data = np.load('timeit_peephole_benchmark_data.npz')
+data = np.load('timeit_peephole_benchmark_data_geom25.npz')
 
 loopsizes = data["loopsizes"] * 2  # each loop has 4 gates
 walltimes = data["walltimes"]
@@ -30,20 +31,21 @@ plt.plot(
 # plt.title("Compilation time for running cancel_inverses and merge_rotations optimizations")
 plt.xlabel("Circuit Gate Depth [$N$]", fontsize=14)
 plt.xscale("log")
+plt.yscale("log")
 plt.ylabel("Compilation Time [ms]", fontsize=14)
 # plt.ylim(0.29, 0.35)
-plt.ylim(-100, 1660)
+plt.ylim(-100, 600000)
 plt.legend(loc="upper right", fontsize=14)
 
 
-img = mpimg.imread("auto_peephole_comp.png")
+img = mpimg.imread("auto_peephole_comp_horizontal.png")
 
 # plt.xlim(-1000, 21000)
 # plt.ylim(-100, 1500)
 # plt.imshow(img, extent=(100, 1000, 600, 1000))
 
-imagebox = OffsetImage(img, zoom=0.39)
-ab = AnnotationBbox(imagebox, (900, 1000), zorder=1, frameon=False)
+imagebox = OffsetImage(img, zoom=0.53)
+ab = AnnotationBbox(imagebox, (300, 1270), zorder=1, frameon=False)
 plt.gca().add_artist(ab)
 
 
@@ -58,7 +60,7 @@ Catalyst v0.9.0-dev36
 )
 ab = AnnotationBbox(
     text_box,
-    (45, 1500),
+    (50, 180000),
     frameon=False,
     bboxprops=dict(facecolor="none", edgecolor="none"),
     zorder=1,
@@ -83,5 +85,5 @@ plt.legend()
 """
 
 plt.subplots_adjust(hspace=0.8)
-#plt.show()
-plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit.png")
+plt.show()
+#plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log.png")

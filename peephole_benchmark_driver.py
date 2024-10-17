@@ -97,7 +97,7 @@ programsizes = np.array(programsizes)
 core_PL_times = np.array(core_PL_times)
 
 np.savez(
-    "peephole_benchmark_data",
+    "timeit_peephole_benchmark_data_geom25",
     loopsizes=loopsizes,
     walltimes=walltimes,
     cputimes=cputimes,

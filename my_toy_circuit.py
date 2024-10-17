@@ -1,4 +1,3 @@
-import datetime
 import os
 import sys
 
@@ -9,6 +8,8 @@ import pennylane as qml
 import catalyst
 from catalyst import qjit
 from catalyst.debug import instrumentation
+
+from timeit import default_timer as timer
 
 dev = qml.device("lightning.qubit", wires=2)
 
@@ -88,22 +89,18 @@ if draw:
 
 
 (tape,), _ = qml.workflow.construct_batch(circuit_corePL, level=0)(12.3, num_of_iters)
-start1 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+start1 = timer()
 _ = qml.transforms.cancel_inverses(tape)
-end1 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-start_time = float(start1[start1.rfind(":") + 1 :])
-end_time = float(end1[end1.rfind(":") + 1 :])
-elapsed_seconds = end_time - start_time
+end1 = timer()
+elapsed_seconds = end1 - start1
 elapsed_ms1 = elapsed_seconds * 1e3
 
 
 tape = _[0][0]  # <QuantumScript>
-start2 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+start2 = timer()
 _ = qml.transforms.merge_rotations(tape)
-end2 = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-start_time = float(start2[start2.rfind(":") + 1 :])
-end_time = float(end2[end2.rfind(":") + 1 :])
-elapsed_seconds = end_time - start_time
+end2 = timer()
+elapsed_seconds = end2 - start2
 elapsed_ms2 = elapsed_seconds * 1e3
 
 total_elapsed_ms = elapsed_ms1 + elapsed_ms2
