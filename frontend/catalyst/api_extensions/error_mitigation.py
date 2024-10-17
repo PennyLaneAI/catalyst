@@ -143,9 +143,7 @@ def mitigate_with_zne(
     if not _is_odd_positive(scale_factors):
         raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
 
-    num_folds = jnp.array([jnp.floor((s - 1) / 2) for s in scale_factors], dtype=int)
-
-    return ZNECallable(fn, num_folds, extrapolate, folding)
+    return ZNECallable(fn, scale_factors, extrapolate, folding)
 
 
 ## IMPL ##
@@ -164,14 +162,14 @@ class ZNECallable(CatalystCallable):
     def __init__(
         self,
         fn: Callable,
-        num_folds: jnp.ndarray,
+        scale_factors: Sequence,
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
         functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
-        self.num_folds = num_folds
+        self.scale_factors = scale_factors
         self.extrapolate = extrapolate
         self.folding = folding
 
@@ -209,16 +207,18 @@ class ZNECallable(CatalystCallable):
             callable_fn
         ), "expected callable set as param on the first operation in zne target"
 
-        results = zne_p.bind(
-            *args_data, self.num_folds, folding=folding, jaxpr=jaxpr, fn=callable_fn
+        fold_numbers = (jnp.asarray(self.scale_factors, dtype=int) - 1) // 2
+        fold_results = zne_p.bind(
+            *args_data, fold_numbers, folding=folding, jaxpr=jaxpr, fn=callable_fn
         )
-        float_num_folds = jnp.array(self.num_folds, dtype=float)
-        results = self.extrapolate(float_num_folds, results[0])
-        # Single measurement
-        if results.shape == ():
-            return results
-        # Multiple measurements
-        return tuple(res for res in results)
+
+        scale_factors = jnp.asarray(self.scale_factors, dtype=float)
+        zne_results = self.extrapolate(scale_factors, fold_results)
+
+        # if multiple measurement processes, split array back into tuple
+        if len(zne_results.shape):
+            zne_results = tuple(zne_results)
+        return zne_results
 
 
 def polynomial_extrapolation(degree):
