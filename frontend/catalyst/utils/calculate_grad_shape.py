@@ -17,7 +17,7 @@ Deduce the function signatures after taking their gradients with respect to some
 """
 
 
-from jax.core import ShapedArray
+from jax.core import DShapedArray, ShapedArray, Tracer
 
 
 class Signature:
@@ -76,15 +76,33 @@ class Signature:
 
     @staticmethod
     def is_tensor(x):
-        """Determine whether a type ``x`` is a ``jax.core.ShapedArray``.
+        """Determine whether a type ``x`` is a ``jax.core.DShapedArray``
+        or ``jax.core.ShapedArray``.
 
         Args:
             x: The type to be tested.
 
         Returns:
-            bool: Whether the type ``x`` is a ``jax.core.ShapedArray``
+            bool: Whether the type ``x`` is a ``jax.core.DShapedArray``
+            or ``jax.core.ShapedArray``
         """
-        return isinstance(x, ShapedArray)
+        return isinstance(x, (DShapedArray, ShapedArray))
+
+    @staticmethod
+    def is_dynamic_shape(shape):
+        """Determine whether a shape contains a tracer or not.
+
+        Args:
+            shape: The shape to be tested.
+
+        Returns:
+            bool: Whether the shape contains a tracer or not.
+        """
+        for s in shape:
+            if isinstance(s, Tracer):
+                return True
+
+        return False
 
     def __eq__(self, other):
         return self.xs == other.xs and self.ys == other.ys
@@ -123,8 +141,12 @@ def calculate_grad_shape(signature, indices) -> Signature:
                 grad_res_shape.append(axis)
             element_type = diff_arg_type.dtype
 
-            grad_res_type = (
-                ShapedArray(grad_res_shape, element_type) if grad_res_shape else diff_arg_type
-            )
+            grad_res_type = diff_arg_type
+            if grad_res_shape:
+                XShapedArray = (
+                    DShapedArray if Signature.is_dynamic_shape(grad_res_shape) else ShapedArray
+                )
+                grad_res_type = XShapedArray(grad_res_shape, element_type)
+
             grad_result_types.append(grad_res_type)
     return Signature(signature.get_inputs(), grad_result_types)

@@ -409,25 +409,23 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 // CHECK: llvm.func @__catalyst__qis__Sample(!llvm.ptr, i64, i64, ...)
 
 // CHECK-LABEL: @sample
-func.func @sample(%q : !quantum.bit) {
+func.func @sample(%q : !quantum.bit, %shots1 : i64, %shots2 : i64) {
 
     %o1 = quantum.compbasis %q : !quantum.obs
     %o2 = quantum.compbasis %q, %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
-    // CHECK-DAG: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
     // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c1000]], [[c1]], %arg0)
+    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], %arg1, [[c1]], %arg0)
     %alloc1 = memref.alloc() : memref<1000x1xf64>
-    quantum.sample %o1 in(%alloc1 : memref<1000x1xf64>) {shots = 1000 : i64}
+    quantum.sample %o1 in(%alloc1 : memref<1000x1xf64>) %shots1
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
-    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
+    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], %arg2, [[c2]], %arg0, %arg0)
     %alloc2 = memref.alloc() : memref<2000x2xf64>
-    quantum.sample %o2 in(%alloc2 : memref<2000x2xf64>) {shots = 2000 : i64}
+    quantum.sample %o2 in(%alloc2 : memref<2000x2xf64>) %shots2
 
     return
 }
@@ -437,27 +435,25 @@ func.func @sample(%q : !quantum.bit) {
 // CHECK: llvm.func @__catalyst__qis__Counts(!llvm.ptr, i64, i64, ...)
 
 // CHECK-LABEL: @counts
-func.func @counts(%q : !quantum.bit) {
+func.func @counts(%q : !quantum.bit, %shots1 : i64, %shots2 : i64) {
 
     %o1 = quantum.compbasis %q : !quantum.obs
     %o2 = quantum.compbasis %q, %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK-DAG: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
     // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c1000]], [[c1]], %arg0)
+    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], %arg1, [[c1]], %arg0)
     %in_eigvals1 = memref.alloc() : memref<2xf64>
     %in_counts1 = memref.alloc() : memref<2xi64>
-    quantum.counts %o1 in(%in_eigvals1 : memref<2xf64>, %in_counts1 : memref<2xi64>) {shots = 1000 : i64}
+    quantum.counts %o1 in(%in_eigvals1 : memref<2xf64>, %in_counts1 : memref<2xi64>) %shots1
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
+    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], %arg2, [[c2]], %arg0, %arg0)
     %in_eigvals2 = memref.alloc() : memref<4xf64>
     %in_counts2 = memref.alloc() : memref<4xi64>
-    quantum.counts %o2 in(%in_eigvals2 : memref<4xf64>, %in_counts2 : memref<4xi64>) {shots = 2000 : i64}
+    quantum.counts %o2 in(%in_eigvals2 : memref<4xf64>, %in_counts2 : memref<4xi64>) %shots2
 
     return
 }

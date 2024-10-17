@@ -16,6 +16,7 @@ This file contains a couple of tests for the capture of measurement primitives i
 """
 import jax
 
+from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
@@ -40,6 +41,25 @@ def test_sample():
     assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
 
+def test_sample_dynamic():
+    """Test that the sample primitive can be captured into jaxpr
+    when using tracers."""
+
+    def f(shots):
+        obs = compbasis_p.bind()
+        return sample_p.bind(obs, shots=shots, shape=(shots, 0))
+
+    jaxpr = jax.make_jaxpr(f)(5).jaxpr
+    shots_tracer, shape_value = jaxpr.eqns[1].params.values()
+
+    assert jaxpr.eqns[1].primitive == sample_p
+    assert isinstance(shots_tracer, DynamicJaxprTracer)
+    assert isinstance(shape_value[0], DynamicJaxprTracer)
+    assert shape_value[1] == 0
+    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)
+    assert jaxpr.eqns[1].outvars[0].aval.shape[1] == 0
+
+
 def test_counts():
     """Test that the counts primitive can be captured by jaxpr."""
 
@@ -52,6 +72,24 @@ def test_counts():
     assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
     assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
+
+
+def test_counts_dynamic():
+    """Test that the counts primitive can be captured by jaxpr
+    when using tracers."""
+
+    def f(dim_0):
+        obs = compbasis_p.bind()
+        return counts_p.bind(obs, shots=5, shape=(dim_0,))
+
+    jaxpr = jax.make_jaxpr(f)(1)
+    shots, shape_value = jaxpr.eqns[1].params.values()
+
+    assert jaxpr.eqns[1].primitive == counts_p
+    assert isinstance(shape_value[0], DynamicJaxprTracer)
+    assert shots == 5
+    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)
+    assert isinstance(jaxpr.eqns[1].outvars[1].aval.shape[0], jax.core.Var)
 
 
 def test_expval():
@@ -81,7 +119,7 @@ def test_var():
 
 
 def test_probs():
-    """Test that the var primitive can be captured by jaxpr."""
+    """Test that the probs primitive can be captured by jaxpr."""
 
     def f():
         obs = compbasis_p.bind()
@@ -91,6 +129,23 @@ def test_probs():
     assert jaxpr.eqns[1].primitive == probs_p
     assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
+
+
+def test_probs_dynamic():
+    """Test that the probs primitive can be captured by jaxpr
+    when using tracers."""
+
+    def f(dim_0):
+        obs = compbasis_p.bind()
+        return probs_p.bind(obs, shots=5, shape=(dim_0,))
+
+    jaxpr = jax.make_jaxpr(f)(1)
+    shots, shape_value = jaxpr.eqns[1].params.values()
+
+    assert jaxpr.eqns[1].primitive == probs_p
+    assert isinstance(shape_value[0], DynamicJaxprTracer)
+    assert shots == 5
+    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)
 
 
 def test_state():
@@ -104,3 +159,20 @@ def test_state():
     assert jaxpr.eqns[1].primitive == state_p
     assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
+
+
+def test_state_dynamic():
+    """Test that the state primitive can be captured by jaxpr
+    when using tracers."""
+
+    def f(dim_0):
+        obs = compbasis_p.bind()
+        return state_p.bind(obs, shots=5, shape=(dim_0,))
+
+    jaxpr = jax.make_jaxpr(f)(1)
+    shots, shape_value = jaxpr.eqns[1].params.values()
+
+    assert jaxpr.eqns[1].primitive == state_p
+    assert isinstance(shape_value[0], DynamicJaxprTracer)
+    assert shots == 5
+    assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)

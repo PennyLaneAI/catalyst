@@ -1658,10 +1658,8 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 def _sample_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is compbasis_p:
-        assert shape == (shots, obs.num_qubits)
-    else:
-        assert shape == (shots,)
+    if Signature.is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64"))
 
     return core.ShapedArray(shape, jax.numpy.float64)
 
@@ -1671,16 +1669,18 @@ def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _sample_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
+    shots_val = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
     result_type = ir.RankedTensorType.get(shape, f64_type)
 
-    return SampleOp(result_type, obs, shots_attr).results
+    return SampleOp(result_type, obs, shots_val).results
 
 
 #
@@ -1695,25 +1695,27 @@ def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
 def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
-    else:
-        assert shape == (2,)
+    if Signature.is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64")), core.DShapedArray(
+            shape, np.dtype("int64")
+        )
 
     return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
 
 
-def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _counts_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
+    shots_val = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs, shots_attr).results
+    return CountsOp(eigvals_type, counts_type, obs, shots_val).results
 
 
 #
@@ -1787,10 +1789,10 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, 
 def _probs_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
-    else:
-        raise TypeError("probs only supports computational basis")
+    assert obs.primitive is compbasis_p, "probs only supports computational basis"
+
+    if Signature.is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64"))
 
     return core.ShapedArray(shape, jax.numpy.float64)
 
@@ -1816,10 +1818,10 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
-    if obs.primitive is compbasis_p:
-        assert shape == (2**obs.num_qubits,)
-    else:
-        raise TypeError("state only supports computational basis")
+    assert obs.primitive is compbasis_p, "state only supports computational basis"
+
+    if Signature.is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("complex128"))
 
     return core.ShapedArray(shape, jax.numpy.complex128)
 
