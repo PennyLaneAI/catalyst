@@ -97,6 +97,7 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+from mlir_quantum.dialects.tensor import InsertSliceOp, ScatterOp as TensorScatterOp, insert_slice
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -299,6 +300,7 @@ set_basis_state_p = jax.core.Primitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
+tensor_insert_slice_p = jax.core.Primitive("tensor_insert_slice_p")
 
 
 def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
@@ -413,6 +415,22 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
     return PrintOp(val=val, const_val=None, print_descriptor=memref).results
 
 
+@tensor_insert_slice_p.def_abstract_eval
+def _abs_eval(source_tensor, dest_tensor, indices):
+    return dest_tensor
+
+def _tensor_insert_slice_lowering(ctx, source_tensor, dest_tensor, indices):
+    dyn = ir.ShapedType.get_dynamic_size()
+    off = ir.DenseI64ArrayAttr.get([dyn, 0])
+
+    siz = ir.RankedTensorType(source_tensor.type).shape 
+    siz = ir.DenseI64ArrayAttr.get([1, *siz])
+    stri = ir.DenseI64ArrayAttr.get([1, 1])
+    p = TensorExtractOp(ir.RankedTensorType(indices.type).element_type, indices, []).result  # tensor<i64> -> i64
+    p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
+    x = InsertSliceOp(source_tensor, dest_tensor, [p], [], [], off, siz, stri)
+    #x = TensorScatterOp(dest_tensor.type, source_tensor, dest_tensor, indices, [0, 1], unique=True)
+    return x.results
 #
 # transform dialect lowering
 #
@@ -2393,6 +2411,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
+    (tensor_insert_slice_p, _tensor_insert_slice_lowering),
 )
 
 

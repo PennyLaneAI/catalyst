@@ -32,6 +32,7 @@ from catalyst.api_extensions.control_flow import for_loop
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import get_stripped_signature
 from catalyst.utils.callables import CatalystCallable
+from catalyst.jax_primitives import tensor_insert_slice_p
 
 
 ## API ##
@@ -226,7 +227,11 @@ class VmapCallable(CatalystCallable):
         fn_args = tree_unflatten(args_tree, fn_args_flat)
 
         # Run 'fn' one time to get output-shape
-        init_result = self.fn(*fn_args, **kwargs)
+        _, shape = jax.make_jaxpr(self.fn, return_shape=True)(*fn_args, **kwargs)
+        shapes, init_result_tree = tree_flatten(shape)
+        init_result_flat = [jnp.zeros(shape=shape.shape, dtype=shape.dtype) for shape in shapes]
+        init_result = tree_unflatten(init_result_tree, init_result_flat)
+        
 
         # Check the validity of the output w.r.t. out_axes
         out_axes_deep_struct = tree_structure(self.out_axes, is_leaf=lambda x: x is None)
@@ -237,8 +242,6 @@ class VmapCallable(CatalystCallable):
                 "the number of function results, but got "
                 f"{out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
             )
-
-        init_result_flat, init_result_tree = tree_flatten(init_result)
 
         num_axes_out = len(init_result_flat)
 
@@ -261,10 +264,11 @@ class VmapCallable(CatalystCallable):
                 else (batch_size, *init_result_flat[j].shape)
             )
             batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
-            batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
+            batched_result_list[j] = tensor_insert_slice_p.bind(init_result_flat[j], batched_result_list[j], 0)
+            #batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
 
         # Apply mapping batched_args[1:] ---> fn(args)
-        @for_loop(1, batch_size, 1)
+        @for_loop(0, batch_size, 1)
         def loop_fn(i, batched_result_list):
             fn_args_flat = args_flat
             for loc in batch_loc:
@@ -277,8 +281,12 @@ class VmapCallable(CatalystCallable):
             res_flat, _ = tree_flatten(res)
 
             # Update the list of results
+            #for j in range(num_axes_out):
+            #    batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
+            #indices = jnp.array([jnp.broadcast_to(i, (len(res_flat),)), jnp.arange(len(res_flat))])
+            #breakpoint()
             for j in range(num_axes_out):
-                batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
+                batched_result_list[j] = tensor_insert_slice_p.bind(res_flat[j], batched_result_list[j], i)
 
             return batched_result_list
 
