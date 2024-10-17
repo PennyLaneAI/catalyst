@@ -32,9 +32,94 @@ namespace catalyst {
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
+    mlir::LogicalResult onlyOneInputUpdateAndResult(mhlo::ScatterOp op) const
+    {
+        // Assumption 1: only one input, one update, and one result
+        // * size(inputs) == 1
+        // * size(updates) == 1
+        // * size(results) == 1
+        // All ScatterOp ops with N inputs, N updates, and N results can be split
+        // into N ScatterOp ops with 1 input, 1 update and 1 result.
+        // This simplifies the analysis of the update_computation.
+
+        // From:
+        // C5: 0 < size(inputs) = size(updates) = N
+        // C24: element_type(results[i]) = Ei for all i in [0,N).
+        // It follows that:
+        // 0 < size(inputs) = size(updates) = size(results) = N
+        return op.getResults().size() == 1 ? success() : failure();
+    }
+
+    mlir::LogicalResult isAssignment(mhlo::ScatterOp op) const
+    {
+        // From:
+        // C23: update_computation has type
+        //      (tensor<E0>, ..., tensor<EN-1>, tensor<E0>, ..., tensor<EN-1>) -> (tensor<E0>, ...,
+        //      tensor<EN-1>) , where is_promotable(element_type(inputs[i]), Ei)
+        //
+        // On the description of the schedule:
+        //   updated_values = update_computation(results...[result_index], updates_converted)
+        //
+        // It follows that:
+        // We are guaranteed that the update_computation
+        // function only has two parameters and one result.
+        // One parameter that corresponds to the
+        // result at the result_index
+        // and the single updates_converted_values
+        // This means that if the only operation inside the update_computation
+        // function is returning the second argument, then we are just assigning the update
+        // value to the result.
+        Region &region = op.getUpdateComputation();
+        Block &block = region.front();
+        bool oneOperation = block.begin() == block.end();
+        if (!oneOperation) {
+            return failure();
+        }
+
+        mhlo::ReturnOp returnOp = dyn_cast<mhlo::ReturnOp>(block.getTerminator());
+        if (!returnOp) {
+            return failure();
+        }
+
+        return returnOp.getResults().front() == *block.args_rbegin() ? success() : failure();
+    }
+
+    mlir::LogicalResult lowerToTensorInsertSlice(mhlo::ScatterOp op,
+                                                 mlir::PatternRewriter &rewriter) const
+    {
+        // mhlo::ScatterOp is exactly the same as stablehlo::ScatterOp
+        // See https://www.tensorflow.org/mlir/hlo_ops#mhloscatter_mhloscatterop
+        // and https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
+        //
+        // From https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter:
+        //
+        //    Semantics
+        //
+        //    Produces results tensors which are equal to inputs tensors
+        //    except that several slices specified by scatter_indices
+        //    are updated with the values updates using update_computation.
+        //
+        // These simple semantics are obscured a bit by too many other details.
+        //
+        // Let's make some simplifying assumptions
+        if (failed(this->onlyOneInputUpdateAndResult(op))) {
+            return failure();
+        }
+
+        if (failed(this->isAssignment(op))) {
+            return failure();
+        }
+        return failure();
+    }
+
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
+        // FastPath
+        if (!failed(this->lowerToTensorInsertSlice(op, rewriter))) {
+            return success();
+        }
+
         // Compute operation hash in case they are more than one scatter and they have different
         // update function
         auto opHash = OperationEquivalence::computeHash(op);
