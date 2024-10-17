@@ -48,6 +48,9 @@ from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=unnecessary-lambda-assignment
 
+def test_add_noise(backend):
+    """Test the add noise transform on a simple circuit"""
+
 
 @pytest.mark.skip(reason="Uses part of old API")
 def test_batch_input(backend):
@@ -114,6 +117,37 @@ def test_batch_params(backend):
     compiled = qjit(qnode_backend)
     expected = jax_jit(data, x, weights)
     observed = compiled(data, x, weights)
+    assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
+
+def test_batch_partial(backend):
+    """Test batch partial"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(x, y):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            return qml.expval(qml.Z(0) @ qml.Z(1))
+
+        return qfunc
+
+    batch_size = 4
+    x = np.linspace(0.1, 0.5, batch_size)
+    y = np.array(0.2)
+
+    qnode_control = qml.batch_partial(qnode_builder("default.qubit"), y=y)
+    qnode_backend = qml.batch_partial(qnode_builder(backend), y=y)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+    expected = jax_jit(x)
+    observed = compiled(x)
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
