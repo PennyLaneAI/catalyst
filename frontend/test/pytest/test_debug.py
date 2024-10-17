@@ -376,8 +376,6 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        f.__name__ = f.__name__ + pass_name
-
         jit_f = qjit(f, keep_intermediate=True)
         data = 2.0
         old_result = jit_f(data)
@@ -399,8 +397,6 @@ class TestCProgramGeneration:
         def f(x: float):
             """Square function."""
             return x**2
-
-        f.__name__ = f.__name__ + pass_name
 
         jit_f = qjit(f)
         jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
