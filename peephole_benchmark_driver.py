@@ -105,6 +105,8 @@ np.savez(
     core_PL_times=core_PL_times,
 )
 
+do("rm -rf core_peephole_time.txt my_toy_circuit.yml")
+
 
 #################### plot ########################
 plot = False
