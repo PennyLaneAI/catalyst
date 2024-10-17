@@ -308,7 +308,7 @@ bool shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
     }
     if (!output.isCheckpointFound) {
         output.isCheckpointFound = (options.checkpointStage == stageName);
-        return output.isCheckpointFound;
+        return false;
     }
     return true;
 }
@@ -528,7 +528,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             return failure();
     }
     for (const auto &pipeline : options.pipelinesCfg) {
-        if (!shouldRunStage(options, output, pipeline.name)) {
+        if (!shouldRunStage(options, output, pipeline.name) || pipeline.passes.size() == 0) {
             continue;
         }
 

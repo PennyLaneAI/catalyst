@@ -639,6 +639,8 @@ class Compiler:
         file_content = None
         for dirpath, _, filenames in os.walk(str(workspace)):
             filenames = [f for f in filenames if f.endswith(".mlir") or f.endswith(".ll")]
+            if not filenames:
+                break
             filenames_no_ext = [os.path.splitext(f)[0] for f in filenames]
             if pipeline == "mlir":
                 # Sort files and pick the first one
