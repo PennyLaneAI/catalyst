@@ -525,7 +525,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (pm.size() == 0) {
             createDefaultCatalystPipeline(pm);
         }
-        if (config.shouldDumpPassPipeline()) {
+        if (options.dumpPassPipeline) {
             pm.dump();
             llvm::errs() << "\n";
         }
@@ -558,7 +558,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
-        if (config.shouldDumpPassPipeline()) {
+        if (options.dumpPassPipeline) {
             pm.dump();
             llvm::errs() << "\n";
         }
@@ -820,6 +820,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         cl::values(clEnumValN(Action::All, "all",
                               "run quantum-opt, mlir-translate, and llc on the MLIR input")),
         cl::init(Action::All));
+    cl::opt<bool> DumpPassPipeline(
+        "dump-catalyst-pipeline", cl::desc("Print the pipeline that will be run"), cl::init(false));
 
     // Create dialect registery
     DialectRegistry registry;
@@ -853,7 +855,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
-                            .loweringAction = LoweringAction};
+                            .loweringAction = LoweringAction,
+                            .dumpPassPipeline = DumpPassPipeline};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 
@@ -894,7 +897,8 @@ int QuantumDriverMainFromArgs(const std::string &source, const std::string &work
                             .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = passPipelines,
                             .checkpointStage = checkpointStage,
-                            .loweringAction = lowerToLLVM ? Action::All : Action::OPT};
+                            .loweringAction = lowerToLLVM ? Action::All : Action::OPT,
+                            .dumpPassPipeline = false};
 
     DialectRegistry registry;
     static bool initialized = false;
