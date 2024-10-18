@@ -376,8 +376,6 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        f.__name__ = f.__name__ + pass_name
-
         jit_f = qjit(f, keep_intermediate=True)
         data = 2.0
         old_result = jit_f(data)
@@ -400,8 +398,6 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        f.__name__ = f.__name__ + pass_name
-
         jit_f = qjit(f)
         jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
         jit_grad_f(3.0)
@@ -418,7 +414,7 @@ class TestCProgramGeneration:
         assert len(res) == 0
 
     def test_get_compilation_stage_without_keep_intermediate(self):
-        """Test if error is raised when using get_pipeline_output without keep_intermediate."""
+        """Test if error is raised when using get_compilation_stage without keep_intermediate."""
 
         @qjit
         def f(x: float):
