@@ -6,27 +6,33 @@ from matplotlib.offsetbox import AnnotationBbox, OffsetImage, TextArea
 # data = np.load('peephole_benchmark_data_small.npz')
 #data = np.load("peephole_benchmark_data_geomspace25.npz")
 #data = np.load('timeit_peephole_benchmark_data.npz')
-data = np.load('timeit_peephole_benchmark_data_geom25.npz')
+#data = np.load('timeit_peephole_benchmark_data_geom25.npz')
+data = np.load('timeit_peephole_benchmark_data_geom25_err.npz')
 
 loopsizes = data["loopsizes"] * 2  # each loop has 4 gates
 walltimes = data["walltimes"]
 cputimes = data["cputimes"]
 programsizes = data["programsizes"]
 core_PL_times = data["core_PL_times"]
+walltime_errs = data["walltime_errs"]
+cputime_errs = data["cputime_errs"]
+programsize_errs = data["programsize_errs"]
+core_PL_time_errs = data["core_PL_time_errs"]
 
 
-print(loopsizes, walltimes, cputimes, programsizes, core_PL_times)
+print(loopsizes, walltimes, cputimes, programsizes, core_PL_times,
+    walltime_errs, cputime_errs, programsize_errs, core_PL_time_errs)
 
 
 plt.figure(figsize=(15, 9))
 
 # plt.plot(loopsizes, walltimes, label='wall time', color='green')
 # plt.subplot(2, 1, 1)
-plt.plot(
-    loopsizes, cputimes, marker="o", label="Catalyst", c=plt.cm.tab20(2), ls="--", zorder=2
+plt.errorbar(
+    loopsizes, cputimes, yerr=cputime_errs, marker="o", label="Catalyst", c=plt.cm.tab20(2), ls="--", zorder=2
 )
-plt.plot(
-    loopsizes, core_PL_times, marker="s", label="PennyLane", c=plt.cm.tab20(1), ls="--", zorder=2
+plt.errorbar(
+    loopsizes, core_PL_times, yerr=core_PL_time_errs, marker="s", label="PennyLane", c=plt.cm.tab20(1), ls="--", zorder=2
 )
 # plt.title("Compilation time for running cancel_inverses and merge_rotations optimizations")
 plt.xlabel("Circuit Gate Depth [$N$]", fontsize=14)
@@ -86,4 +92,4 @@ plt.legend()
 
 plt.subplots_adjust(hspace=0.8)
 plt.show()
-#plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log.png")
+#plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log_err.png")

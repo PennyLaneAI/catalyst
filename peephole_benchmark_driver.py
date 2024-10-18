@@ -7,6 +7,8 @@ import numpy as np
 def do(command):
     subprocess.call(command, shell=True)
 
+def stderr(list_of_data):
+    return np.std(list_of_data, ddof=1) / np.sqrt(len(list_of_data))
 
 def run_one_circuit(timings, core_PL_timings, num_of_iters):
     do(f"python3 my_toy_circuit.py {num_of_iters}")
@@ -44,18 +46,20 @@ def collect_mean(raw_data, core_PL_timings):
 
     core_PL_timings is just a list of numbers
     """
-    mean_data = {"walltime": 0, "cputime": 0, "programsize": 0}
+    mean_data = {"walltime": [], "cputime": [], "programsize": []}
     for i, d in enumerate(raw_data):
-        mean_data["walltime"] += d["walltime"]
-        mean_data["cputime"] += d["cputime"]
-        mean_data["programsize"] += d["programsize"]
+        mean_data["walltime"].append(d["walltime"])
+        mean_data["cputime"].append(d["cputime"])
+        mean_data["programsize"].append(d["programsize"])
 
-    N = len(raw_data)
-    mean_data["walltime"] /= N
-    mean_data["cputime"] /= N
-    mean_data["programsize"] //= N
+    _ = mean_data["walltime"]
+    mean_data["walltime"] = (np.mean(_), stderr(_))
+    _ = mean_data["cputime"]
+    mean_data["cputime"] = (np.mean(_), stderr(_))
+    _ = mean_data["programsize"]
+    mean_data["programsize"] = (np.mean(_), stderr(_))
 
-    return mean_data, np.mean(np.array(core_PL_timings))
+    return mean_data, (np.mean(core_PL_timings), stderr(core_PL_timings))
 
 
 def run_one_loopsize(loopsize):
@@ -80,13 +84,25 @@ cputimes = []
 programsizes = []
 core_PL_times = []
 
+walltime_errs = []
+cputime_errs = []
+programsize_errs = []
+core_PL_time_errs = []
+
 for loopsize in loopsizes:
     _ = run_one_loopsize(loopsize)
+    #breakpoint()
+    core_PL_times.append(_[1][0])
+    core_PL_time_errs.append(_[1][1])
+
     catalyst_times = _[0]
-    core_PL_times.append(_[1])
-    walltimes.append(catalyst_times["walltime"])
-    cputimes.append(catalyst_times["cputime"])
-    programsizes.append(catalyst_times["programsize"])
+    walltimes.append(catalyst_times["walltime"][0])
+    cputimes.append(catalyst_times["cputime"][0])
+    programsizes.append(catalyst_times["programsize"][0])
+    walltime_errs.append(catalyst_times["walltime"][0])
+    cputime_errs.append(catalyst_times["cputime"][0])
+    programsize_errs.append(catalyst_times["programsize"][0])
+
 
 print(loopsizes, walltimes, cputimes, programsizes, core_PL_times)
 
@@ -95,49 +111,22 @@ walltimes = np.array(walltimes)
 cputimes = np.array(cputimes)
 programsizes = np.array(programsizes)
 core_PL_times = np.array(core_PL_times)
+walltime_errs = np.array(walltime_errs)
+cputime_errs = np.array(cputime_errs)
+programsize_errs = np.array(programsize_errs)
+core_PL_time_errs = np.array(core_PL_time_errs)
 
 np.savez(
-    "timeit_peephole_benchmark_data_geom25",
+    "timeit_peephole_benchmark_data_geom25_err",
     loopsizes=loopsizes,
     walltimes=walltimes,
     cputimes=cputimes,
     programsizes=programsizes,
     core_PL_times=core_PL_times,
+    walltime_errs=walltime_errs,
+    cputime_errs=cputime_errs,
+    programsize_errs=programsize_errs,
+    core_PL_time_errs=core_PL_time_errs
 )
 
 do("rm -rf core_peephole_time.txt my_toy_circuit.yml")
-
-
-#################### plot ########################
-plot = False
-if plot:
-    plt.figure(figsize=(18, 10))
-
-    # plt.plot(loopsizes, walltimes, label='wall time', color='green')
-    plt.subplot(2, 1, 1)
-    plt.plot(loopsizes, cputimes, label="Catalyst time", color="blue")
-    plt.plot(loopsizes, core_PL_times, label="core PL time", color="green")
-    plt.title("Compilation time for running cancel_inverses and merge_rotations optimizations")
-    plt.xlabel("Circuit gate depth")
-    plt.ylabel("Compile time (ms)")
-    # plt.ylim(0.29, 0.35)
-    plt.legend()
-
-    plt.subplot(2, 1, 2)
-    plt.plot(loopsizes, programsizes, label="program size", color="red")
-    plt.title("Catalyst compiled program size for programs with loops")
-    plt.xlabel("Circuit gate depth")
-    plt.ylabel("Program size (IR lines)")
-    plt.legend()
-
-    """
-	plt.subplot(3,1,3)
-	plt.plot(loopsizes, core_PL_times, label='core PL time', color='green')
-	plt.title('Plain PennyLane compilation time for running cancel_inverses and merge_rotations optimizations')
-	plt.xlabel('Circuit gate depth')
-	plt.ylabel('Compile time (ms)')
-	plt.legend()
-	"""
-
-    plt.subplots_adjust(hspace=0.8)
-    plt.show()
