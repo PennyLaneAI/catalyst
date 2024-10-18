@@ -468,8 +468,7 @@ std::string readInputFile(const std::string &filename)
 }
 
 LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput &output, const MlirOptMainConfig &config,
-                          TimingScope &timing)
+                          CompilerOutput &output, TimingScope &timing)
 
 {
     if (options.keepIntermediate && options.checkpointStage.empty()) {
@@ -513,7 +512,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                        tmp);
         }
     };
-
+    MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
     if (options.pipelinesCfg.empty()) {
         // If pipelines are not cofigured explicitly, use the catalyst default pipeline
         auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
@@ -552,8 +551,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (failed(config.setupPassPipeline(pm)))
             return failure();
         if (pm.size() > 0) {
-            llvm::errs()
-                << "--catalyst-pipline option can't be used with individual pass options.\n";
+            llvm::errs() << "--catalyst-pipline option can't be used with individual pass options "
+                            "or -pass-pipeline.\n";
             return failure();
         }
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
@@ -583,7 +582,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 }
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output,
-                                DialectRegistry &registry, const MlirOptMainConfig &config)
+                                DialectRegistry &registry)
 {
     using timer = catalyst::utils::Timer;
 
@@ -652,7 +651,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (inType == InputType::MLIR && currentAction == Action::OPT) {
         enzymeRun = containsGradients(*mlirModule);
-        if (failed(runLowering(options, &ctx, *mlirModule, output, config, optTiming))) {
+        if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
@@ -856,7 +855,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction};
 
-    mlir::LogicalResult result = QuantumDriverMain(options, *output, registry, config);
+    mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 
     errStream.flush();
 
@@ -914,9 +913,7 @@ int QuantumDriverMainFromArgs(const std::string &source, const std::string &work
     registerDefaultTimingManagerCLOptions();
     registerLLVMTranslations(registry);
 
-    MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
-
-    mlir::LogicalResult result = QuantumDriverMain(options, output, registry, config);
+    mlir::LogicalResult result = QuantumDriverMain(options, output, registry);
 
     errStream.flush();
 

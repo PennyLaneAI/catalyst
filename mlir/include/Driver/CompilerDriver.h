@@ -111,8 +111,7 @@ struct CompilerOutput {
 /// Entry point to the MLIR portion of the compiler.
 mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options,
                                       catalyst::driver::CompilerOutput &output,
-                                      mlir::DialectRegistry &registry,
-                                      const mlir::MlirOptMainConfig &config);
+                                      mlir::DialectRegistry &registry);
 
 int QuantumDriverMainFromCL(int argc, char **argv);
 int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
