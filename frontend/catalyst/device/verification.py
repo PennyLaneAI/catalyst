@@ -30,15 +30,13 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.measurements.shots import Shots
-from pennylane.operation import Operation, Tensor
+from pennylane.operation import Operation, StatePrepBase, Tensor
 from pennylane.ops import (
     Adjoint,
-    BasisState,
     CompositeOp,
     Controlled,
     ControlledOp,
     Hamiltonian,
-    StatePrep,
     SymbolicOp,
 )
 from pennylane.tape import QuantumTape
@@ -216,10 +214,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             pass
         # Don't check StatePrep since StatePrep is not in the list of device capabilities.
         # It is only valid when the TOML file has the initial_state_prep_flag.
-        elif (
-            isinstance(op, (StatePrep, BasisState))
-            and qjit_device.capabilities.initial_state_prep_flag
-        ):
+        elif isinstance(op, StatePrepBase) and qjit_device.capabilities.initial_state_prep_flag:
             pass
         elif not op.name in op_support:
             raise CompileError(
