@@ -53,7 +53,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-
         if (failed(onlyOneInputUpdateAndResult(op))) {
             // Otherwise it will segfault.
             op.emitError() << "Only one input, update, and result";
