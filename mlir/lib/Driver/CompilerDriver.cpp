@@ -468,7 +468,8 @@ std::string readInputFile(const std::string &filename)
 }
 
 LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput &output, const MlirOptMainConfig &config)
+                          CompilerOutput &output, const MlirOptMainConfig &config,
+                          TimingScope &timing)
 
 {
     if (options.keepIntermediate && options.checkpointStage.empty()) {
@@ -517,10 +518,19 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         // If pipelines are not cofigured explicitly, use the catalyst default pipeline
         auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
         pm.enableVerifier(config.shouldVerifyPasses());
-        createDefaultCatalystPipeline(pm);
         if (failed(applyPassManagerCLOptions(pm)))
             return failure();
-
+        if (failed(config.setupPassPipeline(pm)))
+            return failure();
+        // If no pass is added manually, create the default pipeline
+        if (pm.size() == 0) {
+            createDefaultCatalystPipeline(pm);
+        }
+        if (config.shouldDumpPassPipeline()) {
+            pm.dump();
+            llvm::errs() << "\n";
+        }
+        pm.enableTiming(timing);
         // Output pipeline names on failures
         pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
             beforePassCallback, afterPassCallback, afterPassFailedCallback)));
@@ -535,13 +545,26 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
         pm.enableVerifier(config.shouldVerifyPasses());
 
-        if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
-            return failure();
-        }
         if (failed(applyPassManagerCLOptions(pm))) {
             return failure();
         }
 
+        if (failed(config.setupPassPipeline(pm)))
+            return failure();
+        if (pm.size() > 0) {
+            llvm::errs()
+                << "--catalyst-pipline option can't be used with individual pass options.\n";
+            return failure();
+        }
+        if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
+            return failure();
+        }
+        if (config.shouldDumpPassPipeline()) {
+            pm.dump();
+            llvm::errs() << "\n";
+        }
+
+        pm.enableTiming(timing);
         // Output pipeline names on failures
         pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
             beforePassCallback, afterPassCallback, afterPassFailedCallback)));
@@ -584,6 +607,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
+    DefaultTimingManager tm;
+    applyDefaultTimingManagerCLOptions(tm);
+    TimingScope timing = tm.getRootScope();
+
+    TimingScope parserTiming = timing.nest("Parser");
     OwningOpRef<ModuleOp> mlirModule =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
 
@@ -611,6 +639,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent, "Wrong or unsupported input\n");
         return failure();
     }
+    parserTiming.stop();
+
+    TimingScope optTiming = timing.nest("Optimization");
     // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
     // true so that the enzyme pass can be executed.
     bool enzymeRun = options.checkpointStage == "O2Opt";
@@ -621,14 +652,16 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (inType == InputType::MLIR && currentAction == Action::OPT) {
         enzymeRun = containsGradients(*mlirModule);
-        if (failed(runLowering(options, &ctx, *mlirModule, output, config))) {
+        if (failed(runLowering(options, &ctx, *mlirModule, output, config, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
         output.outIR.clear();
         outIRStream << *mlirModule;
     }
+    optTiming.stop();
 
+    TimingScope translateTiming = timing.nest("Translate");
     if (options.loweringAction == Action::All)
         currentAction = Action::Translate;
     if (inType == InputType::MLIR && currentAction == Action::Translate) {
@@ -653,7 +686,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.outIR.clear();
         outIRStream << *llvmModule;
     }
+    translateTiming.stop();
 
+    TimingScope llcTiming = timing.nest("llc");
     if (options.loweringAction == Action::All)
         currentAction = Action::LLC;
     if (inType == InputType::LLVMIR && currentAction == Action::LLC) {
@@ -679,25 +714,33 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         catalyst::utils::LinesCount::Module(*llvmModule.get());
 
+        TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
         if (options.asyncQnodes &&
             failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                 options, llvmModule, output))) {
             return failure();
         }
+        coroLLVMPassesTiming.stop();
+
         if (enzymeRun) {
+            TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
             }
+            o2PassesTiming.stop();
             catalyst::utils::LinesCount::Module(*llvmModule.get());
 
+            TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
             }
+            enzymePassesTiming.stop();
             catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
+        TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
         outIRStream << *llvmModule;
 
@@ -707,63 +750,41 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.objectFilename = outfile;
+        outputTiming.stop();
     }
+    llcTiming.stop();
     return success();
-}
-void printPipelines(std::vector<Pipeline> pipelines)
-{
-    llvm::outs() << "Dumping pipelines: \n";
-    for (const auto &pipeline : pipelines) {
-        llvm::outs() << "Pipeline " << pipeline.name << " has " << pipeline.passes.size()
-                     << " passes:\n\t";
-        llvm::interleaveComma(pipeline.passes, llvm::outs());
-        llvm::outs() << "\n";
-    }
 }
 
 std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
 {
-    std::vector<std::string> defaultPipeline = {
-        "enforce-runtime-invariants-pipeline", "hlo_lowering-pipeline",
-        "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowring-pipeline"};
     std::vector<Pipeline> allPipelines;
-    if (catalystPipeline.empty()) {
-        for (std::string pipelineName : defaultPipeline) {
-            Pipeline pipeline;
-            pipeline.name = pipelineName;
-            pipeline.passes.push_back(
-                pipelineName); // Pipelines are registered as a pass with the same name
-            allPipelines.push_back(pipeline);
+    for (const auto &pipelineStr : catalystPipeline) {
+        llvm::StringRef pipelineRef = llvm::StringRef(pipelineStr).trim();
+
+        size_t openParenPos = pipelineRef.find('(');
+        size_t closeParenPos = pipelineRef.find(')', openParenPos);
+
+        if (openParenPos == llvm::StringRef::npos || closeParenPos == llvm::StringRef::npos) {
+            llvm::errs() << "Error: Invalid pipeline format: " << pipelineStr << "\n";
+            continue;
         }
-    }
-    else {
-        for (const auto &pipelineStr : catalystPipeline) {
-            llvm::StringRef pipelineRef = llvm::StringRef(pipelineStr).trim();
 
-            size_t openParenPos = pipelineRef.find('(');
-            size_t closeParenPos = pipelineRef.find(')', openParenPos);
+        // Extract pipeline name
+        llvm::StringRef pipelineName = pipelineRef.slice(0, openParenPos).trim();
+        llvm::StringRef passesStr = pipelineRef.slice(openParenPos + 1, closeParenPos).trim();
+        llvm::SmallVector<llvm::StringRef, 8> passList;
+        passesStr.split(passList, ';', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
 
-            if (openParenPos == llvm::StringRef::npos || closeParenPos == llvm::StringRef::npos) {
-                llvm::errs() << "Error: Invalid pipeline format: " << pipelineStr << "\n";
-                continue;
-            }
-
-            // Extract pipeline name
-            llvm::StringRef pipelineName = pipelineRef.slice(0, openParenPos).trim();
-            llvm::StringRef passesStr = pipelineRef.slice(openParenPos + 1, closeParenPos).trim();
-            llvm::SmallVector<llvm::StringRef, 8> passList;
-            passesStr.split(passList, ';', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
-
-            Pipeline::PassList passes;
-            for (auto &pass : passList) {
-                passes.push_back(pass.trim().str());
-            }
-
-            Pipeline pipeline;
-            pipeline.name = pipelineName.str();
-            pipeline.passes = std::move(passes);
-            allPipelines.push_back(std::move(pipeline));
+        Pipeline::PassList passes;
+        for (auto &pass : passList) {
+            passes.push_back(pass.trim().str());
         }
+
+        Pipeline pipeline;
+        pipeline.name = pipelineName.str();
+        pipeline.passes = std::move(passes);
+        allPipelines.push_back(std::move(pipeline));
     }
     return allPipelines;
 }
@@ -819,10 +840,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Read the input IR file
     std::string source = readInputFile(inputFilename);
-    if (source.empty()) {
-        llvm::errs() << "Error: Unable to open input file: " << inputFilename << "\n";
-        return 1;
-    }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
     assert(output);
@@ -838,10 +855,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction};
-
-    if (config.shouldDumpPassPipeline()) {
-        printPipelines(options.pipelinesCfg);
-    }
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry, config);
 
