@@ -291,8 +291,12 @@
 * Fixes taking gradient of nested accelerate callbacks.
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
-* Registers the func dialect as a requirement for running the scatter lowering pass.
+* Some small fixes for scatter lowering:
   [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
+  [(#1217)](https://github.com/PennyLaneAI/catalyst/pull/1217)
+
+  - Registers the func dialect as a requirement for running the scatter lowering pass.
+  - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
 <h3>Internal changes</h3>
 
