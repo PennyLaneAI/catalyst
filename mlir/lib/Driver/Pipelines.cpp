@@ -92,7 +92,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::createCopyGlobalMemRefPass());
 }
-void createLLVMDialectLowringPipeline(OpPassManager &pm)
+void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::memref::createExpandReallocPass());
     pm.addPass(catalyst::createGradientConversionPass());
@@ -138,7 +138,7 @@ void createDefaultCatalystPipeline(OpPassManager &pm)
     createHloLoweringPipeline(pm);
     createQuantumCompilationPipeline(pm);
     createBufferizationPipeline(pm);
-    createLLVMDialectLowringPipeline(pm);
+    createLLVMDialectLoweringPipeline(pm);
 }
 
 void registerEnforceRuntimeInvariantsPipeline()
@@ -168,7 +168,7 @@ void registerLLVMDialectLoweringPipeline()
 {
     PassPipelineRegistration<>("llvm-dialect-lowring-pipeline",
                                "Register LLVM dialect lowring pipeline as a pass.",
-                               createLLVMDialectLowringPipeline);
+                               createLLVMDialectLoweringPipeline);
 }
 void registerDefaultCatalystPipeline()
 {
@@ -176,5 +176,29 @@ void registerDefaultCatalystPipeline()
                                "Register full default catalyst pipeline as a pass.",
                                createDefaultCatalystPipeline);
 }
+
+std::vector<Pipeline> getDefaultPipeline()
+{
+    using PipelineFunc = void (*)(mlir::OpPassManager &);
+    std::vector<PipelineFunc> pipelineFuncs = {
+        &createEnforceRuntimeInvariantsPipeline, &createHloLoweringPipeline,
+        &createQuantumCompilationPipeline, &createBufferizationPipeline,
+        &createLLVMDialectLoweringPipeline};
+
+    Pipeline::PassList defaultPipelineNames = {
+        "enforce-runtime-invariants-pipeline", "hlo-lowering-pipeline",
+        "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowering-pipeline"};
+
+    std::vector<Pipeline> defaultPipelines;
+    for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {
+        Pipeline pipeline;
+        pipeline.name = defaultPipelineNames[i];
+        pipeline.passes.push_back(defaultPipelineNames[i]);
+        pipeline.registerFunc = pipelineFuncs[i];
+        defaultPipelines.push_back(std::move(pipeline));
+    }
+    return defaultPipelines;
+}
+
 } // namespace driver
 } // namespace catalyst

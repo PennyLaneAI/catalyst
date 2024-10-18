@@ -513,60 +513,45 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     };
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
-    if (options.pipelinesCfg.empty()) {
-        // If pipelines are not cofigured explicitly, use the catalyst default pipeline
-        auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
-        pm.enableVerifier(config.shouldVerifyPasses());
-        if (failed(applyPassManagerCLOptions(pm)))
-            return failure();
-        if (failed(config.setupPassPipeline(pm)))
-            return failure();
-        // If no pass is added manually, create the default pipeline
-        if (pm.size() == 0) {
-            createDefaultCatalystPipeline(pm);
-        }
-        if (options.dumpPassPipeline) {
-            pm.dump();
-            llvm::errs() << "\n";
-        }
-        pm.enableTiming(timing);
-        // Output pipeline names on failures
-        pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
-            beforePassCallback, afterPassCallback, afterPassFailedCallback)));
-        if (failed(pm.run(moduleOp)))
-            return failure();
+    auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
+    pm.enableVerifier(config.shouldVerifyPasses());
+    if (failed(applyPassManagerCLOptions(pm)))
+        return failure();
+    if (failed(config.setupPassPipeline(pm)))
+        return failure();
+    pm.enableTiming(timing);
+    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
+        beforePassCallback, afterPassCallback, afterPassFailedCallback)));
+    bool clHasIndividulaPass = pm.size() > 0;
+    bool clHasManualPipeline = !options.pipelinesCfg.empty();
+    if (clHasIndividulaPass && clHasManualPipeline) {
+        llvm::errs() << "--catalyst-pipline option can't be used with individual pass options "
+                        "or -pass-pipeline.\n";
+        return failure();
     }
-    for (const auto &pipeline : options.pipelinesCfg) {
-        if (!shouldRunStage(options, output, pipeline.name) || pipeline.passes.size() == 0) {
+    if (clHasIndividulaPass)
+        return pm.run(moduleOp);
+
+    // If pipelines are not cofigured explicitly, use the catalyst default pipeline
+    std::vector<Pipeline> UserPipeline =
+        clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
+    for (auto &pipeline : UserPipeline) {
+        if (!shouldRunStage(options, output, pipeline.name)) {
             continue;
         }
-
-        auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
-        pm.enableVerifier(config.shouldVerifyPasses());
-
-        if (failed(applyPassManagerCLOptions(pm))) {
+        pm.clear();
+        if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
+            llvm::errs() << "Pipeline creation function not found: " << pipeline.name << "\n";
             return failure();
         }
-
-        if (failed(config.setupPassPipeline(pm)))
-            return failure();
-        if (pm.size() > 0) {
-            llvm::errs() << "--catalyst-pipline option can't be used with individual pass options "
-                            "or -pass-pipeline.\n";
-            return failure();
-        }
-        if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
+        if (clHasManualPipeline &&
+            failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
         if (options.dumpPassPipeline) {
             pm.dump();
             llvm::errs() << "\n";
         }
-
-        pm.enableTiming(timing);
-        // Output pipeline names on failures
-        pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
-            beforePassCallback, afterPassCallback, afterPassFailedCallback)));
 
         if (failed(pm.run(moduleOp)))
             return failure();
@@ -827,9 +812,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     DialectRegistry registry;
     registerAllPasses();
     registerAllCatalystPasses();
+    registerAllCatalystPipelines();
     mhlo::registerAllMhloPasses();
     registerAllCatalystDialects(registry);
-    registerAllCatalystPipelines();
     registerLLVMTranslations(registry);
 
     // Register and parse command line options.

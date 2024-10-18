@@ -34,5 +34,28 @@ void registerLLVMDialectLoweringPipeline();
 void registerDefaultCatalystPipeline();
 void registerAllCatalystPipelines();
 
+/// Pipeline descriptor
+struct Pipeline {
+    using Name = std::string;
+    using PassList = llvm::SmallVector<std::string>;
+    using PipelineFunc = void (*)(mlir::OpPassManager &);
+    Name name;
+    PassList passes;
+    PipelineFunc registerFunc = nullptr;
+
+    mlir::LogicalResult addPipeline(mlir::OpPassManager &pm)
+    {
+        if (registerFunc) {
+            registerFunc(pm);
+            return mlir::success();
+        }
+        else {
+            return mlir::failure();
+        }
+    }
+};
+
+std::vector<Pipeline> getDefaultPipeline();
+
 } // namespace driver
 } // namespace catalyst

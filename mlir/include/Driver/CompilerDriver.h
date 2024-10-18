@@ -25,6 +25,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Driver/Pipelines.h"
+
 namespace catalyst {
 namespace driver {
 
@@ -46,14 +48,6 @@ enum InputType { MLIR, LLVMIR, OTHER };
             (opt).diagnosticStream << op;                                                          \
         }                                                                                          \
     } while (0)
-
-/// Pipeline descriptor
-struct Pipeline {
-    using Name = std::string;
-    using PassList = llvm::SmallVector<std::string>;
-    Name name;
-    PassList passes;
-};
 
 /// Optional parameters, for which we provide reasonable default values.
 struct CompilerOptions {
