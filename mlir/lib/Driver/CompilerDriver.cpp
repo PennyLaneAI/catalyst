@@ -53,16 +53,19 @@
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
 
 #include "Enzyme.h"
@@ -71,6 +74,7 @@
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
+using namespace catalyst::quantum;
 
 namespace catalyst::utils {
 
@@ -291,6 +295,11 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<quantum::QuantumDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
+
+    // Extend one-shot bufferization pass.
+    catalyst::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
 }
 } // namespace
 

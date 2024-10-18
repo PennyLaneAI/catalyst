@@ -118,14 +118,14 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-${{matrix.python_version}}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         lookup-only: True
 
     - name: Restore Enzyme Build
@@ -172,6 +172,11 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
+
         cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_BUILD_EXAMPLES=OFF \
@@ -198,17 +203,18 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-${{matrix.python_version}}-wheel-build
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       # building with LLD is a strong requirement for mhlo
       run: |
+        # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
         export TARGET_FILE=mlir/mlir-hlo/mhlo/transforms/CMakeLists.txt
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
         if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
+        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch; fi
 
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -228,7 +234,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path:  mhlo-build
-        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -296,7 +302,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-patch-${{ hashFiles('mlir/patches/**') }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -313,7 +319,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  mhlo-build
-        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
+        key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-patch-${{ hashFiles('mlir/patches/**') }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -363,7 +369,12 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
+        # TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/FunctionOpInterface-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/llvm-project < mlir/patches/callOp-bufferization.patch; fi
+        if patch --dry-run -p1 -N --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch > /dev/null 2>&1; then patch -p1 --directory=mlir/mlir-hlo < mlir/patches/FunctionOpInterface-mhlo.patch; fi
+        
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \

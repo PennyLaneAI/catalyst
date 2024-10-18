@@ -4,6 +4,12 @@ file(GLOB SRC
 
     ApplyTransformSequencePass.cpp
     ArrayListToMemRefPass.cpp
+    scatter_lowering.cpp
+    ScatterPatterns.cpp
+    qnode_to_async_lowering.cpp
+    QnodeToAsyncPatterns.cpp
+    RegisterAllPasses.cpp
+    BufferizableOpInterfaceImpl.cpp
     AsyncUtils.cpp
     BufferizationPatterns.cpp
     catalyst_bufferize.cpp
