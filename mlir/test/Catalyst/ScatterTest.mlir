@@ -247,3 +247,33 @@ func.func public @example_no_update_dim(%arg0: tensor<4xf64>) -> tensor<4xf64> {
 //   CHECK:      scf.yield [[INSERTED]] : tensor<4xf64>
 //   CHECK:    }
 //   CHECK:    return [[FORRES]] : tensor<4xf64>
+
+// -----
+
+// CHECK-LABEL: @test_happy_path
+module @test_happy_path {
+      // CHECK-NOT: mhlo.scatter
+      // CHECK-DAG: [[cst0:%.+]] = index.constant 0
+      // CHECK-DAG: [[inputs:%.+]] = "test.op"() : () -> tensor<[[dim1:.*]]x[[dim0:.*]]xf64>
+      // CHECK-DAG: [[scatter_indices:%.+]] = "test.op"() : () -> tensor<1xi32>
+      // CHECK-DAG: [[updates:%.+]] = "test.op"() : () -> tensor<[[dim0]]xf64>
+      // CHECK: [[index_i32:%.+]] = tensor.extract [[scatter_indices]][[[cst0]]] : tensor<1xi32>
+      // CHECK: [[index:%.+]] = arith.index_cast [[index_i32]] : i32 to index
+      // CHECK: tensor.insert_slice [[updates]] into [[inputs]][[[index]], 0] [1, [[dim0]]] [1, 1] : tensor<[[dim0]]xf64> into tensor<[[dim1]]x[[dim0]]xf64>
+      %inputs = "test.op"() : () -> (tensor<7x131072xf64>)
+      %scatter_indices = "test.op"() : () -> (tensor<1xi32>)
+      %updates = "test.op"() : () -> (tensor<131072xf64>)
+      %results = "mhlo.scatter"(%inputs, %scatter_indices, %updates) <{
+          indices_are_sorted = true,
+          unique_indices = true,
+          scatter_dimension_numbers = #mhlo.scatter<
+              update_window_dims = [0],
+              inserted_window_dims = [0],
+              scatter_dims_to_operand_dims = [0]
+          >
+      }> ({
+      ^bb0(%arg3: tensor<f64>, %arg4: tensor<f64>):
+        mhlo.return %arg4 : tensor<f64>
+      }) : (tensor<7x131072xf64>, tensor<1xi32>, tensor<131072xf64>) -> tensor<7x131072xf64>
+      "test.op"(%results) : (tensor<7x131072xf64>) -> ()
+}
