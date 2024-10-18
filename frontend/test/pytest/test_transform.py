@@ -48,6 +48,8 @@ from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=unnecessary-lambda-assignment
+# pylint: disable=too-many-lines
+# pylint: disable=line-too-long
 
 
 @pytest.mark.xfail(reason="Noise models not supported on Lightning.")
@@ -384,7 +386,7 @@ def test_defer_measurements(backend):
             qml.RY(0.123, wires=0)
             qml.Hadamard(wires=1)
             m_0 = qml.measure(1)
-            qml.cond(m_0, qml.RY)(par, wires=0)
+            qml.cond(m_0, qml.RY)(np.pi / 4, wires=0)
             return qml.expval(qml.Z(0))
 
         return qfunc
@@ -749,11 +751,9 @@ def test_split_to_single_terms(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.skip(reason="Requires pyzx import.")
 @pytest.mark.xfail(reason="Something in pyzx not JAX JIT compatible.")
 def test_to_zx(backend):
     """Test to_zx"""
-    import pyzx
 
     def qnode_builder(device_name):
         """Builder"""
