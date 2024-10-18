@@ -291,6 +291,9 @@
 * Fixes taking gradient of nested accelerate callbacks.
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
+* Registers the func dialect as a requirement for running the scatter lowering pass.
+  [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
+
 <h3>Internal changes</h3>
 
 * Remove deprecated pennylane code across the frontend.
