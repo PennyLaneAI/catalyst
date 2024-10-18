@@ -395,3 +395,39 @@ module @two_dyn_indices {
       "test.op"(%results) : (tensor<9x7x5xf64>) -> ()
 }
 
+// -----
+
+// CHECK-LABEL: @two_dyn_indices_reverted
+module @two_dyn_indices_reverted {
+
+      %inputs = "test.op"() : () -> (tensor<9x7x5xf64>)
+      %scatter_indices = "test.op"() : () -> (tensor<2xi32>)
+      %updates = "test.op"() : () -> (tensor<5xf64>)
+
+      // CHECK-DAG: [[idx_0:%.+]] = index.constant 0
+      // CHECK-DAG: [[idx_1:%.+]] = index.constant 1
+      // CHECK-DAG: [[inputs:%.+]] = "test.op"() : () -> tensor<9x[[dim1:.*]]x[[dim0:.*]]xf64>
+      // CHECK-DAG: [[scatter_indices:%.+]] = "test.op"() : () -> tensor<2xi32>
+      // CHECK-DAG: [[updates:%.+]] = "test.op"() : () -> tensor<[[dim0]]xf64>
+      // CHECK-DAG: [[scatter_idx_0:%.+]] = tensor.extract [[scatter_indices]][[[idx_0]]] : tensor<2xi32>
+      // CHECK-DAG: [[scatter_idx_1:%.+]] = tensor.extract [[scatter_indices]][[[idx_1]]] : tensor<2xi32>
+      // CHECK-DAG: [[idx__0:%.+]] = arith.index_cast [[scatter_idx_0]] : i32 to index
+      // CHECK-DAG: [[idx__1:%.+]] = arith.index_cast [[scatter_idx_1]] : i32 to index
+
+      %results = "mhlo.scatter"(%inputs, %scatter_indices, %updates) <{
+          indices_are_sorted = true,
+          unique_indices = true,
+          scatter_dimension_numbers = #mhlo.scatter<
+              update_window_dims = [0],
+              inserted_window_dims = [0, 1],
+              scatter_dims_to_operand_dims = [1, 0] // This line is changed
+          >
+      }> ({
+      ^bb0(%arg3: tensor<f64>, %arg4: tensor<f64>):
+        mhlo.return %arg4 : tensor<f64>
+      }) : (tensor<9x7x5xf64>, tensor<2xi32>, tensor<5xf64>) -> tensor<9x7x5xf64>
+      "test.op"(%results) : (tensor<9x7x5xf64>) -> ()
+
+      // And changes the order of dimensions here.
+      // CHECK: tensor.insert_slice [[updates]] into [[inputs]][[[idx__1]], [[idx__0]], 0] [1, 1, [[dim0]]] [1, 1, 1] : tensor<[[dim0]]xf64> into tensor<9x7x5xf64>
+}
