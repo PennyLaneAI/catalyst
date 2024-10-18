@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <optional>
 
@@ -34,6 +36,34 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 // Quantum op canonicalizers.
 //===----------------------------------------------------------------------===//
+static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
+                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
+static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",           "Rot",
+                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift", "CRot"};
+LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        auto name = op.getGateName();
+        if (hermitianOps.contains(name)) {
+            op.setAdjoint(false);
+            return success();
+        }
+        else if (rotationsOps.contains(name)) {
+            auto params = op.getParams();
+            SmallVector<Value> paramsMinus;
+            for (auto param : params) {
+                rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+            }
+            auto adjointOp = rewriter.create<CustomOp>(op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+                                                     paramsMinus, op.getInQubits(), name, nullptr,
+                                                     op.getInCtrlQubits(), op.getInCtrlValues());
+            rewriter.replaceOp(op, adjointOp.getResults());
+            return success();
+        }
+        return failure();
+    };
+    return failure();
+}
 
 LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
 {
