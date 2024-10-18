@@ -537,7 +537,9 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # HOTFIX: pass through calls of known Catalyst wrapper functions
         if fn in (
             catalyst.adjoint,
+            qml.adjoint,
             catalyst.ctrl,
+            qml.ctrl,
             catalyst.grad,
             catalyst.value_and_grad,
             catalyst.jacobian,
