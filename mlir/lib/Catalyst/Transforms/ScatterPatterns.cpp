@@ -32,9 +32,33 @@ namespace catalyst {
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
+    mlir::LogicalResult onlyOneInputUpdateAndResult(mhlo::ScatterOp op) const
+    {
+        // Assumption 1: only one input, one update, and one result
+        // * size(inputs) == 1
+        // * size(updates) == 1
+        // * size(results) == 1
+        // All ScatterOp ops with N inputs, N updates, and N results can be split
+        // into N ScatterOp ops with 1 input, 1 update and 1 result.
+        // This simplifies the analysis of the update_computation.
+
+        // From:
+        // C5: 0 < size(inputs) = size(updates) = N
+        // C24: element_type(results[i]) = Ei for all i in [0,N).
+        // It follows that:
+        // 0 < size(inputs) = size(updates) = size(results) = N
+        return op.getResults().size() == 1 ? success() : failure();
+    }
+
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
+
+        if (failed(onlyOneInputUpdateAndResult(op))) {
+            // Otherwise it will segfault.
+            op.emitError() << "Only one input, update, and result";
+            return failure();
+        }
         // Compute operation hash in case they are more than one scatter and they have different
         // update function
         auto opHash = OperationEquivalence::computeHash(op);
