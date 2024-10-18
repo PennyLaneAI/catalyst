@@ -285,7 +285,22 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 staticOffsets.push_back(ShapedType::kDynamic);
                 staticSizes.push_back(1);
             }
-            else {
+            else if (updateDim == inputDim) {
+                int scatterDimIndex = scatterDimsToOperandDims[inputDim];
+                Value scatterDimVal =
+                    rewriter.create<index::ConstantOp>(op.getLoc(), scatterDimIndex);
+                auto extractOp =
+                    rewriter.create<tensor::ExtractOp>(op.getLoc(), scatterIndices, scatterDimVal)
+                        .getResult();
+                auto indexCastOp =
+                    rewriter
+                        .create<arith::IndexCastOp>(op.getLoc(), rewriter.getIndexType(), extractOp)
+                        .getResult();
+                dynOffsets.push_back(indexCastOp);
+                staticOffsets.push_back(ShapedType::kDynamic);
+                staticSizes.push_back(updateShape[updateDim]);
+                updateDim++;
+            } else {
                 staticOffsets.push_back(0);
                 staticSizes.push_back(updateShape[updateDim]);
                 updateDim++;

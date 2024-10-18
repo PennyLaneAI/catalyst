@@ -431,3 +431,15 @@ module @two_dyn_indices_reverted {
       // And changes the order of dimensions here.
       // CHECK: tensor.insert_slice [[updates]] into [[inputs]][[[idx__1]], [[idx__0]], 0] [1, 1, [[dim0]]] [1, 1, 1] : tensor<[[dim0]]xf64> into tensor<9x7x5xf64>
 }
+
+// -----
+
+  func.func public @jit_expand_by_two(%arg0: tensor<3xi64>) -> tensor<6xi64> attributes {llvm.emit_c_interface} {
+    %cst = arith.constant dense<0> : tensor<6xi64>
+    %cst_0 = arith.constant dense<3> : tensor<1xi32>
+    %0 = "mhlo.scatter"(%cst, %cst_0, %arg0) <{indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0]>, unique_indices = true}> ({
+    ^bb0(%arg1: tensor<i64>, %arg2: tensor<i64>):
+      mhlo.return %arg2 : tensor<i64>
+    }) : (tensor<6xi64>, tensor<1xi32>, tensor<3xi64>) -> tensor<6xi64>
+    return %0 : tensor<6xi64>
+  }
