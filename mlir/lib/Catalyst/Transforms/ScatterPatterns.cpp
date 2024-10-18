@@ -198,10 +198,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         auto inputShape = inputTy.getShape();
         auto updateShape = updateTy.getShape();
         auto scatterIndicesTy = cast<RankedTensorType>(scatterIndices.getType());
-        // shape(%result) == shape(%input)
-        if (resultShape != inputShape) {
-            return failure();
-        }
+        // (C24) shape(%result) == shape(%input)
 
         auto scatterDimNumbers = op.getScatterDimensionNumbers();
         auto updateWindowDims = scatterDimNumbers.getUpdateWindowDims();
