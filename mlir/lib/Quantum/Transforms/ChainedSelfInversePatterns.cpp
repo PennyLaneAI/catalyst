@@ -56,30 +56,8 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
 
         // Replace uses
         ValueRange InQubits = op.getInQubits();
-
-        /*
-        llvm::errs() << "self: " << op << "\n";
         auto parentOp = cast<CustomOp>(InQubits[0].getDefiningOp());
-        llvm::errs() << "parent: " << parentOp << "\n";
-        ValueRange qubitOperands = parentOp.getQubitOperands();
-        //llvm::errs() << "first parent operand: " << qubitOperands[0] << "\n";
-        for (const auto &[idx, qubitResult] : llvm::enumerate(op.getQubitResults())) {
-            llvm::errs() << qubitResult << "\n";
-            llvm::errs() << qubitOperands[idx] << "\n";
-            qubitResult.replaceAllUsesWith(qubitOperands[idx]);
-        }
-        return success();
-        */
-
-        auto parentOp = cast<CustomOp>(InQubits[0].getDefiningOp());
-        ValueRange originalNonCtrlQubits = parentOp.getNonCtrlQubitOperands();
-        ValueRange originalCtrlQubits = parentOp.getCtrlQubitOperands();
-        for (const auto &[idx, nonCtrlQubitResult] : llvm::enumerate(op.getNonCtrlQubitResults())) {
-            nonCtrlQubitResult.replaceAllUsesWith(originalNonCtrlQubits[idx]);
-        }
-        for (const auto &[idx, ctrlQubitResult] : llvm::enumerate(op.getCtrlQubitResults())) {
-            ctrlQubitResult.replaceAllUsesWith(originalCtrlQubits[idx]);
-        }
+        rewriter.replaceOp(op, parentOp.getQubitOperands());
         return success();
     }
 };
