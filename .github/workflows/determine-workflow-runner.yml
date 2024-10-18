@@ -22,7 +22,7 @@ jobs:
         (
           github.event_name == 'pull_request'
           && contains(github.event.pull_request.labels.*.name, 'urgent')
-        ) && 'pl-4-core-large-runner' || 'ubuntu-latest'
+        ) && 'pl-4-core-large-runner' || 'ubuntu-22.04'
       }}
 
     outputs:
