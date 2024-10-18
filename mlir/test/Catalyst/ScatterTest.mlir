@@ -276,4 +276,27 @@ module @test_happy_path {
         mhlo.return %arg4 : tensor<f64>
       }) : (tensor<7x131072xf64>, tensor<1xi32>, tensor<131072xf64>) -> tensor<7x131072xf64>
       "test.op"(%results) : (tensor<7x131072xf64>) -> ()
+
+}
+
+// -----
+
+module @test_multiple_inputs {
+      %inputs = "test.op"() : () -> (tensor<7x131072xf64>)
+      %scatter_indices = "test.op"() : () -> (tensor<1xi32>)
+      %updates = "test.op"() : () -> (tensor<131072xf64>)
+      // expected-error@+1 {{Only one input, update, and result}}
+      %results:2 = "mhlo.scatter"(%inputs, %inputs, %scatter_indices, %updates, %updates) <{
+          indices_are_sorted = true,
+          unique_indices = true,
+          scatter_dimension_numbers = #mhlo.scatter<
+              update_window_dims = [0],
+              inserted_window_dims = [0],
+              scatter_dims_to_operand_dims = [0]
+          >
+      }> ({
+      ^bb0(%arg3: tensor<f64>, %arg4: tensor<f64>, %arg5: tensor<f64>, %arg6: tensor<f64>):
+        mhlo.return %arg4, %arg6 : tensor<f64>, tensor<f64>
+      }) : (tensor<7x131072xf64>, tensor<7x131072xf64>, tensor<1xi32>, tensor<131072xf64>, tensor<131072xf64>) -> (tensor<7x131072xf64>, tensor<7x131072xf64>)
+      "test.op"(%results#0, %results#1) : (tensor<7x131072xf64>, tensor<7x131072xf64>) -> ()
 }
