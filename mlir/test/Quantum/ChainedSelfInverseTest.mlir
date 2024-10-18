@@ -631,3 +631,29 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
     // CHECK: return [[IN0]], [[IN1]], [[IN2]]
     return %out_qubits_1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+// -----
+
+
+// test with unmatched control wires on named Hermitian gate
+
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+
+    // CHECK: quantum.alloc
+    // CHECK: [[IN0:%.+]] = quantum.extract {{.+}}[ 0]
+    // CHECK: [[IN1:%.+]] = quantum.extract {{.+}}[ 1]
+    // CHECK: [[IN2:%.+]] = quantum.extract {{.+}}[ 2]
+    %reg = quantum.alloc( 3) : !quantum.reg
+    %0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %reg[ 2] : !quantum.reg -> !quantum.bit
+
+    %out_qubits, %out_ctrl_qubits:2 = quantum.custom "Hadamard"() %0 ctrls(%1, %2) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_1, %out_ctrl_qubits_1:2 = quantum.custom "Hadamard"() %out_qubits ctrls(%out_ctrl_qubits#1, %out_ctrl_qubits#0) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+
+    // CHECK: quantum.custom "Hadamard"
+    return %out_qubits_1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}
