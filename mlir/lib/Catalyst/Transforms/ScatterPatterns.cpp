@@ -101,7 +101,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // If there is no input_batching_dims and no scatter_indices_batching
         // TODO: This will always be success until we update our version of mlir-hlo.
         // It looks we are using an old version where getInputBatchingDims was not yet available.
-        // See here: https://github.com/tensorflow/mlir-hlo/commit/5ac7c579c52ef02b13c29886a98672c2ade7c9b0
+        // See here:
+        // https://github.com/tensorflow/mlir-hlo/commit/5ac7c579c52ef02b13c29886a98672c2ade7c9b0
         return success();
         // Until then, keep this code commented:
         //   auto scatterDimNumbers = op.getScatterDimensionNumbers();
@@ -125,12 +126,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Implies
         auto updateTy = cast<RankedTensorType>(update.getType());
         auto scatterDimNumbers = op.getScatterDimensionNumbers();
-        return updateTy.getRank() == scatterDimNumbers.getUpdateWindowDims().size() ? success() : failure();
+        return updateTy.getRank() == scatterDimNumbers.getUpdateWindowDims().size() ? success()
+                                                                                    : failure();
     }
 
     mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(mhlo::ScatterOp op) const
     {
-        return cast<RankedTensorType>(op.getScatterIndices().getType()).getRank() == 1 ? success() : failure();
+        return cast<RankedTensorType>(op.getScatterIndices().getType()).getRank() == 1 ? success()
+                                                                                       : failure();
     }
 
     mlir::LogicalResult lowerToTensorInsertSlice(mhlo::ScatterOp op,
@@ -152,6 +155,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         //
         // Let's make some simplifying assumptions
 
+        // Add checks for supported cases (assumptions: no update windows dim, unique indices and
+        // sorted indices)
+        if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
+            op.emitError() << "Indices are not unique and/or not sorted, unique boolean: "
+                           << op.getUniqueIndices()
+                           << ", sorted boolean :" << op.getIndicesAreSorted();
+            return failure();
+        }
+
         // size(%result) == size(%update) == size(%input) == 1
         if (failed(this->onlyOneInputUpdateAndResult(op))) {
             return failure();
@@ -161,7 +173,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         auto update = op.getUpdates().front();
         auto scatterIndices = op.getScatterIndices();
 
-        // update_function = 
+        // update_function =
         // ^bb0(%arg0: T, %arg1: T):
         //   stablehlo.return %arg1 : T
         // })
@@ -207,8 +219,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         auto indexVectorDim = scatterDimNumbers.getIndexVectorDim();
 
         if (indexVectorDim != scatterIndicesTy.getRank() - 1) {
+            // TODO: I think if indexVectorDim > 0
+            // implies a loop of insert_slices.
             return failure();
         }
+        // Because we said before
+        // rank(%scatter_indices) == 1
+        // => indexVectorDim = 0
+
         // But we still have a couple of more attributes that we need to understand.
         // Somehow I need to use update_window_dims to correctly set this line:
         // %input[%scatter_indices]
@@ -216,13 +234,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // * index_vector_dim
         // * inserted_window_dim
         // Out of these three
-        // %result = tensor.insert_slice %update into %input[%scatter_indices],[size(%update)...],[1*rank(%update)]
-        // Annotated description of scatter semantics: https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
+        // %result = tensor.insert_slice %update into
+        // %input[%scatter_indices],[size(%update)...],[1*rank(%update)] Annotated description of
+        // scatter semantics: https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
         //
         //   More formally, for all update_index in index_space(updates[0]):
         //   // In our case len(updates) = 1
         //   // so change this to index_space(update)
-        //   // index_space is defined here: https://github.com/openxla/stablehlo/blob/main/docs/spec.md#shape-computations
+        //   // index_space is defined here:
+        //   https://github.com/openxla/stablehlo/blob/main/docs/spec.md#shape-computations
         //
         //   update_scatter_dims = [d for d in axes(updates[0]) and d not in update_window_dims]
         //   // rank(%update) == size(update_window_dims)
@@ -235,35 +255,48 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         //   // rank(%update) == size(update_window_dims)
         //   // => update_window_index = update_index
         //
-        //   full_window_index = [wi0, ..., 0, ..., wiN] where wi are individual elements in update_window_index, and 0 is inserted at indices from inserted_window_dims and input_batching_dims
-        //   // rank(inputs[0]) = size(update_window_dims) + size(inserted_window_dims) + size(input_batching_dims)
-        
+        //   full_window_index = [wi0, ..., 0, ..., wiN] where wi are individual elements in
+        //   update_window_index, and 0 is inserted at indices from inserted_window_dims and
+        //   input_batching_dims
+        //   // rank(inputs[0]) = size(update_window_dims) + size(inserted_window_dims) +
+        //   size(input_batching_dims)
+
         // the offset relates to inserted_window_dims
-        // 
-        // rewriter.create<tensor::InsertSliceOp>(loc, update, input, dyn_off, dyn_siz, dyn_str, static_off, static_siz, static_str);
+        //
+        // rewriter.create<tensor::InsertSliceOp>(loc, update, input, dyn_off, dyn_siz, dyn_str,
+        // static_off, static_siz, static_str);
         SmallVector<Value> dynOffsets, dynSizes, dynStrides;
         SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
 
         // TODO: Close, but not 100% sure. Verify for correctness...
         for (int i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
-          if (llvm::is_contained(insertedWindowDims, i)) {
-            int scatterDimIndex = scatterDimsToOperandDims[inputDim];
-            Value scatterDimVal = rewriter.create<index::ConstantOp>(op.getLoc(), scatterDimIndex);
-            auto extractOp = rewriter.create<tensor::ExtractOp>(op.getLoc(), scatterIndices, scatterDimVal).getResult();
-            auto indexCastOp = rewriter.create<arith::IndexCastOp>(op.getLoc(), rewriter.getIndexType(), extractOp).getResult();
-            dynOffsets.push_back(indexCastOp);
-            staticOffsets.push_back(ShapedType::kDynamic);
-            staticSizes.push_back(1);
-          } else {
-            staticOffsets.push_back(0);
-            staticSizes.push_back(updateShape[updateDim]);
-            updateDim++;
-          }
-          inputDim++;
-          staticStrides.push_back(1);
+            if (llvm::is_contained(insertedWindowDims, i)) {
+                int scatterDimIndex = scatterDimsToOperandDims[inputDim];
+                Value scatterDimVal =
+                    rewriter.create<index::ConstantOp>(op.getLoc(), scatterDimIndex);
+                auto extractOp =
+                    rewriter.create<tensor::ExtractOp>(op.getLoc(), scatterIndices, scatterDimVal)
+                        .getResult();
+                auto indexCastOp =
+                    rewriter
+                        .create<arith::IndexCastOp>(op.getLoc(), rewriter.getIndexType(), extractOp)
+                        .getResult();
+                dynOffsets.push_back(indexCastOp);
+                staticOffsets.push_back(ShapedType::kDynamic);
+                staticSizes.push_back(1);
+            }
+            else {
+                staticOffsets.push_back(0);
+                staticSizes.push_back(updateShape[updateDim]);
+                updateDim++;
+            }
+            inputDim++;
+            staticStrides.push_back(1);
         }
 
-        rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(op, update, input, dynOffsets, dynSizes, dynStrides, staticOffsets, staticSizes, staticStrides);
+        rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(op, update, input, dynOffsets, dynSizes,
+                                                           dynStrides, staticOffsets, staticSizes,
+                                                           staticStrides);
 
         return success();
     }
@@ -275,7 +308,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         if (!failed(this->lowerToTensorInsertSlice(op, rewriter))) {
             return success();
         }
-
 
         if (failed(onlyOneInputUpdateAndResult(op))) {
             // Otherwise it will segfault.
