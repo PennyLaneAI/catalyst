@@ -536,7 +536,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     std::vector<Pipeline> UserPipeline =
         clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
     for (auto &pipeline : UserPipeline) {
-        if (!shouldRunStage(options, output, pipeline.name)) {
+        if (!shouldRunStage(options, output, pipeline.name) || pipeline.passes.size() == 0) {
             continue;
         }
         pm.clear();
