@@ -844,6 +844,8 @@ def trace_quantum_measurements(
     """
     shots = get_device_shots(device)
     out_classical_tracers = []
+    # NOTE: Number of qml.counts() we hit
+    num_counts = 0
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
@@ -914,16 +916,8 @@ def trace_quantum_measurements(
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
                 counts_tree = tree_structure(("keys", "counts"))
-                meas_return_trees_children = out_tree.children()
-                if len(meas_return_trees_children):
-                    meas_return_trees_children[i] = counts_tree
-                    out_tree = out_tree.make_from_node_data_and_children(
-                        PyTreeRegistry(),
-                        out_tree.node_data(),
-                        meas_return_trees_children,
-                    )
-                else:
-                    out_tree = counts_tree
+                out_tree = replace_child_tree(out_tree, i + 1 + num_counts, counts_tree)
+                num_counts += 1
             elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
                 assert using_compbasis
                 shape = (2**nqubits,)
@@ -939,6 +933,36 @@ def trace_quantum_measurements(
             out_classical_tracers.append(o)
 
     return out_classical_tracers, out_tree
+
+def replace_child_tree(tree: PyTreeDef, index: int, subtree: PyTreeDef) -> PyTreeDef:
+    """
+    Replace the index-th leaf node in a PyTreeDef with a given subtree.
+    
+    Args:
+        tree (PyTreeDef): The original PyTree.
+        index (int): The index of the leaf node to replace.
+        subtree (PyTreeDef): The new subtree to replace the original leaf node with.
+    
+    Returns:
+        PyTreeDef: The modified PyTree with the replaced leaf node. 
+    """
+    
+    def replace_node(node, idx):
+        if not node.children():
+            # Leaf node => update leaf node counter
+            idx[0] += 1
+            if idx[0] == index:
+                return subtree
+            return node
+
+        
+        return node.make_from_node_data_and_children(
+            PyTreeRegistry(),
+            node.node_data(),
+            [replace_node(child, idx) for child in node.children()]
+        )
+
+    return replace_node(tree, [0])
 
 
 @debug_logger
