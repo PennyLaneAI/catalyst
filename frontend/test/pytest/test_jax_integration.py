@@ -490,6 +490,7 @@ class TestJAXRecompilation:
         jax.grad(circuit, argnums=0)(params, 3)
 
     def test_pytree_qml_counts_simple(self):
+        """Test if a single qml.counts() can be used and output correctly."""
         dev = qml.device("lightning.qubit", wires=1, shots=20)
 
         @qjit
@@ -503,6 +504,7 @@ class TestJAXRecompilation:
         assert "PyTreeDef({'1': (*, *)})" == str(result_tree)
 
     def test_pytree_qml_counts_nested(self):
+        """Test if nested qml.counts() can be used and output correctly."""
         dev = qml.device("lightning.qubit", wires=1, shots=20)
 
         @qjit
@@ -517,16 +519,17 @@ class TestJAXRecompilation:
 
         @qjit
         @qml.qnode(dev)
-        def circuit(x):
+        def circuit2(x):
             qml.RX(x, wires=0)
             return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], {"3": qml.expval(qml.Z(0))}
 
-        result = circuit(0.5)
+        result = circuit2(0.5)
         _, result_tree = jax.tree.flatten(result)
 
         assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], {'3': *}))" == str(result_tree)
 
     def test_pytree_qml_counts_2_nested(self):
+        """Test if multiple nested qml.counts() can be used and output correctly."""
         dev = qml.device("lightning.qubit", wires=1, shots=20)
 
         @qjit
@@ -546,14 +549,14 @@ class TestJAXRecompilation:
 
         @qjit
         @qml.qnode(dev)
-        def circuit(x):
+        def circuit2(x):
             qml.RX(x, wires=0)
             return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
                 {"3": qml.counts()},
                 {"4": qml.expval(qml.Z(0))},
             ]
 
-        result = circuit(0.5)
+        result = circuit2(0.5)
         _, result_tree = jax.tree.flatten(result)
 
         assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': (*, *)}, {'4': *}]))" == str(
@@ -561,6 +564,7 @@ class TestJAXRecompilation:
         )
 
     def test_pytree_qml_counts_longer(self):
+        """Test if 3 differently nested qml.counts() can be used and output correctly."""
         dev = qml.device("lightning.qubit", wires=1, shots=20)
 
         @qjit
@@ -577,7 +581,8 @@ class TestJAXRecompilation:
         result = circuit(0.5)
         _, result_tree = jax.tree.flatten(result)
         assert (
-            "PyTreeDef([[{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}], {'5': *}, {'6': (*, *)}])"
+            "PyTreeDef([[{'1': *}, {'2': (*, *)}], "
+            + "[{'3': *}, {'4': (*, *)}], {'5': *}, {'6': (*, *)}])"
             == str(result_tree)
         )
 
