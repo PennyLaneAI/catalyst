@@ -491,11 +491,12 @@ class TestJAXRecompilation:
 
     def test_pytree_qml_counts_simple(self):
         dev = qml.device("lightning.qubit", wires=1, shots=20)
+
         @qjit
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, wires=0)
-            return {"1":  qml.counts()}
+            return {"1": qml.counts()}
 
         result = circuit(0.5)
         _, result_tree = jax.tree.flatten(result)
@@ -503,6 +504,7 @@ class TestJAXRecompilation:
 
     def test_pytree_qml_counts_nested(self):
         dev = qml.device("lightning.qubit", wires=1, shots=20)
+
         @qjit
         @qml.qnode(dev)
         def circuit(x):
@@ -513,12 +515,12 @@ class TestJAXRecompilation:
         _, result_tree = jax.tree.flatten(result)
         assert "PyTreeDef(({'1': (*, *)}, {'2': *}))" == str(result_tree)
 
-
         @qjit
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, wires=0)
             return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], {"3": qml.expval(qml.Z(0))}
+
         result = circuit(0.5)
         _, result_tree = jax.tree.flatten(result)
 
@@ -526,40 +528,58 @@ class TestJAXRecompilation:
 
     def test_pytree_qml_counts_2_nested(self):
         dev = qml.device("lightning.qubit", wires=1, shots=20)
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x):
-            qml.RX(x, wires=0)
-            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [{"3": qml.expval(qml.Z(0))}, {'4': qml.counts()}]
-
-        result = circuit(0.5)
-        _, result_tree = jax.tree.flatten(result)
-        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}]))" == str(result_tree)
-
 
         @qjit
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, wires=0)
-            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [{"3": qml.counts()}, {'4': qml.expval(qml.Z(0))}]
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
+                {"3": qml.expval(qml.Z(0))},
+                {"4": qml.counts()},
+            ]
+
+        result = circuit(0.5)
+        _, result_tree = jax.tree.flatten(result)
+        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}]))" == str(
+            result_tree
+        )
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
+                {"3": qml.counts()},
+                {"4": qml.expval(qml.Z(0))},
+            ]
+
         result = circuit(0.5)
         _, result_tree = jax.tree.flatten(result)
 
-        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': (*, *)}, {'4': *}]))" == str(result_tree)
-
+        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': (*, *)}, {'4': *}]))" == str(
+            result_tree
+        )
 
     def test_pytree_qml_counts_longer(self):
         dev = qml.device("lightning.qubit", wires=1, shots=20)
+
         @qjit
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, wires=0)
-            return [[{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [{"3": qml.expval(qml.Z(0))}, {'4': qml.counts()}], {"5": qml.expval(qml.Z(0))}, {'6': qml.counts()}]
+            return [
+                [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}],
+                [{"3": qml.expval(qml.Z(0))}, {"4": qml.counts()}],
+                {"5": qml.expval(qml.Z(0))},
+                {"6": qml.counts()},
+            ]
 
         result = circuit(0.5)
         _, result_tree = jax.tree.flatten(result)
-        assert "PyTreeDef([[{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}], {'5': *}, {'6': (*, *)}])" == str(result_tree)
-
+        assert (
+            "PyTreeDef([[{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}], {'5': *}, {'6': (*, *)}])"
+            == str(result_tree)
+        )
 
 
 if __name__ == "__main__":

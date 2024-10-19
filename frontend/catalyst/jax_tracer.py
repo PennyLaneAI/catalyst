@@ -934,19 +934,20 @@ def trace_quantum_measurements(
 
     return out_classical_tracers, out_tree
 
+
 def replace_child_tree(tree: PyTreeDef, index: int, subtree: PyTreeDef) -> PyTreeDef:
     """
     Replace the index-th leaf node in a PyTreeDef with a given subtree.
-    
+
     Args:
         tree (PyTreeDef): The original PyTree.
         index (int): The index of the leaf node to replace.
         subtree (PyTreeDef): The new subtree to replace the original leaf node with.
-    
+
     Returns:
-        PyTreeDef: The modified PyTree with the replaced leaf node. 
+        PyTreeDef: The modified PyTree with the replaced leaf node.
     """
-    
+
     def replace_node(node, idx):
         if not node.children():
             # Leaf node => update leaf node counter
@@ -955,11 +956,10 @@ def replace_child_tree(tree: PyTreeDef, index: int, subtree: PyTreeDef) -> PyTre
                 return subtree
             return node
 
-        
         return node.make_from_node_data_and_children(
             PyTreeRegistry(),
             node.node_data(),
-            [replace_node(child, idx) for child in node.children()]
+            [replace_node(child, idx) for child in node.children()],
         )
 
     return replace_node(tree, [0])
