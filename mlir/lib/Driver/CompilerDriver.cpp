@@ -242,15 +242,6 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     }
 };
 
-// Run the callback with stack printing disabled
-void withoutStackTrace(MLIRContext *ctx, std::function<void()> callback)
-{
-    auto old = ctx->shouldPrintStackTraceOnDiagnostic();
-    ctx->printStackTraceOnDiagnostic(false);
-    callback();
-    ctx->printStackTraceOnDiagnostic(old);
-}
-
 } // namespace
 
 namespace {
@@ -302,80 +293,6 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<mitigation::MitigationDialect>();
 }
 } // namespace
-
-FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
-{
-    Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
-    std::list<StringRef> visited;
-    for (auto &function : llvmModule.functions()) {
-        visited.push_back(function.getName());
-        if (function.getName().starts_with("catalyst.entry_point")) {
-            return &function;
-        }
-    }
-    withoutStackTrace(ctx, [&]() {
-        auto noteStream =
-            emitRemark(loc, "Failed to find entry-point function among the following: ");
-        llvm::interleaveComma(visited, noteStream, [&](StringRef t) { noteStream << t; });
-    });
-
-    return failure();
-}
-
-LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
-                                   Type assumedElementType,
-                                   SmallVectorImpl<RankedTensorType> &inferredTypes)
-{
-    auto inferSingleMemRef = [&](llvm::StructType *descriptorType) {
-        SmallVector<int64_t> resultShape;
-        assert(descriptorType->getNumElements() >= 3 &&
-               "Expected MemRef descriptor struct to have at least 3 entries");
-        // WARNING: Assumption follows
-        //
-        // In this piece of code we are making the assumption that the user will
-        // return something that may have been an MLIR tensor once. This is
-        // likely to be true, however, there are no hard guarantees.
-        //
-        // The assumption gives the following invariants:
-        // * The structure we are "parsing" will be a memref with the following fields
-        // * void* allocated_ptr
-        // * void* aligned_ptr
-        // * int offset
-        // * int[rank] sizes
-        // * int[rank] strides
-        //
-        // Please note that strides might be zero which means that the fields sizes
-        // and stride are optional and not required to be defined.
-        // sizes is defined iff strides is defined.
-        // strides is defined iff sizes is defined.
-        bool hasSizes = 5 == descriptorType->getNumElements();
-        auto *sizes = hasSizes ? cast<llvm::ArrayType>(descriptorType->getTypeAtIndex(3)) : NULL;
-        size_t rank = hasSizes ? sizes->getNumElements() : 0;
-        for (size_t i = 0; i < rank; i++) {
-            resultShape.push_back(ShapedType::kDynamic);
-        }
-        return RankedTensorType::get(resultShape, assumedElementType);
-    };
-    if (returnType->isVoidTy()) {
-        return failure();
-    }
-    if (auto *structType = dyn_cast<llvm::StructType>(returnType)) {
-        // The return type could be a single memref descriptor or a struct of multiple memref
-        // descriptors.
-        if (isa<llvm::StructType>(structType->getElementType(0))) {
-            for (size_t i = 0; i < structType->getNumElements(); i++) {
-                inferredTypes.push_back(
-                    inferSingleMemRef(cast<llvm::StructType>(structType->getTypeAtIndex(i))));
-            }
-        }
-        else {
-            // Assume the function returns a single memref
-            inferredTypes.push_back(inferSingleMemRef(structType));
-        }
-        return success();
-    }
-    return failure();
-}
 
 LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
                                 std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
@@ -754,38 +671,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         // Attempt to infer the name and return type of the module from LLVM IR. This information is
         // required when executing a module given as textual IR.
-        auto function = getJITFunction(&ctx, *llvmModule);
-        if (succeeded(function)) {
-            output.inferredAttributes.functionName = function.value()->getName().str();
-
-            CO_MSG(options, Verbosity::Debug,
-                   "Inferred function name: '" << output.inferredAttributes.functionName << "'\n");
-
-            // When inferring the return type from LLVM, assume a f64
-            // element type. This is because the LLVM pointer type is
-            // opaque and requires looking into its uses to infer its type.
-            SmallVector<RankedTensorType> returnTypes;
-            if (failed(timer::timer(inferMLIRReturnTypes, "inferMLIRReturn", /* add_endl */ true,
-                                    &ctx, function.value()->getReturnType(), Float64Type::get(&ctx),
-                                    returnTypes))) {
-                // Inferred return types are only required when compiling from textual IR. This
-                // inference failing is not a problem when compiling from Python.
-                CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");
-            }
-            else {
-                llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
-                llvm::interleaveComma(returnTypes, returnTypeStream,
-                                      [&](RankedTensorType t) { t.print(returnTypeStream); });
-                CO_MSG(options, Verbosity::Debug,
-                       "Inferred function return type: '" << output.inferredAttributes.returnType
-                                                          << "'\n");
-            }
-        }
-        else {
-            CO_MSG(options, Verbosity::Urgent,
-                   "Unable to infer catalyst.entry_point* function attributes\n");
-        }
-
         auto outfile = options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
                                 std::move(llvmModule), targetMachine, outfile))) {

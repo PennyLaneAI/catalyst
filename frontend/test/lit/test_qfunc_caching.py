@@ -23,8 +23,8 @@ from catalyst import measure, qjit
 @qjit(target="mlir")
 def workflow(n: int):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK-LABEL: private @f
-    # CHECK-NOT: private @f
+    # CHECK-LABEL: public @f
+    # CHECK-NOT: public @f
     def f(x: float):
         qml.RX(x, wires=n)
         return measure(wires=n)

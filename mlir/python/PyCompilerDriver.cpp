@@ -51,13 +51,6 @@ PYBIND11_MODULE(compiler_driver, m)
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
     //===--------------------------------------------------------------------===//
-    py::class_<FunctionAttributes> funcattrs_class(m, "FunctionAttributes");
-    funcattrs_class.def(py::init<>())
-        .def("get_function_name",
-             [](const FunctionAttributes &fa) -> std::string { return fa.functionName; })
-        .def("get_return_type",
-             [](const FunctionAttributes &fa) -> std::string { return fa.returnType; });
-
     py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
     compout_class.def(py::init<>())
         .def("get_pipeline_output",
@@ -69,8 +62,6 @@ PYBIND11_MODULE(compiler_driver, m)
         .def("get_output_ir", [](const CompilerOutput &co) -> std::string { return co.outIR; })
         .def("get_object_filename",
              [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
-        .def("get_function_attributes",
-             [](const CompilerOutput &co) -> FunctionAttributes { return co.inferredAttributes; })
         .def("get_diagnostic_messages",
              [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; })
         .def("get_is_checkpoint_found",

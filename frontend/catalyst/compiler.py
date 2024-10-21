@@ -168,16 +168,24 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
-TAPE_SPLITTING_PASS = (
-    # We clump multiple tapes into a single function and split them
-    # in mlir with a pass (frontend/jax_tracer.py).
-    # Therefore before the splitting the quantum mlir is "illegal",
-    # as each function will have multiple devices.
-    # Thus, the split must be the very first pass before anything else
-    # happens.
-    "QuantumTapeSplittingPass",
+ENFORCE_RUNTIME_INVARIANTS_PASS = (
+    "EnforeRuntimeInvariantsPass",
     [
+        # We want the invariant that transforms that generate multiple
+        # tapes will generate multiple qnodes. One for each tape.
+        # Split multiple tapes enforces that invariant.
         "split-multiple-tapes",
+        # Run the transform sequence defined in the MLIR module
+        "apply-transform-sequence",
+        # Nested modules are something that will be used in the future
+        # for making device specific transformations.
+        # Since at the moment, nothing in the runtime is using them
+        # and there is no lowering for them,
+        # we inline them to preserve the semantics. We may choose to
+        # keep inlining modules targetting the Catalyst runtime.
+        # But qnodes targetting other backends may choose to lower
+        # this into something else.
+        "inline-nested-module",
     ],
 )
 
@@ -205,7 +213,6 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
@@ -299,7 +306,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
-    TAPE_SPLITTING_PASS,
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -315,7 +322,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
-    TAPE_SPLITTING_PASS,
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -553,9 +560,6 @@ class Compiler:
                                    shard object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
-            A list of:
-               func_name (str) Inferred name of the main function
-               ret_type_name (str) Inferred main function result type name
         """
         assert isinstance(
             workspace, Directory
@@ -590,8 +594,6 @@ class Compiler:
 
         filename = compiler_output.get_object_filename()
         out_IR = compiler_output.get_output_ir()
-        func_name = compiler_output.get_function_attributes().get_function_name()
-        ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
         if lower_to_llvm:
             output = LinkerDriver.run(filename, options=self.options)
@@ -600,7 +602,7 @@ class Compiler:
             output_filename = filename
 
         self.last_compiler_output = compiler_output
-        return output_filename, out_IR, [func_name, ret_type_name]
+        return output_filename, out_IR
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):

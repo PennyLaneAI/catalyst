@@ -158,7 +158,10 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     )
                     output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
-                    return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
+                    return (
+                        filename,
+                        "<FAKE_IR>",
+                    )
 
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=1))

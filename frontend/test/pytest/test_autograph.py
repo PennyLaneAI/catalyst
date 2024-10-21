@@ -25,25 +25,7 @@ import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
-from catalyst import (
-    AutoGraphError,
-    adjoint,
-    autograph_source,
-    cond,
-    ctrl,
-    debug,
-    disable_autograph,
-    for_loop,
-    grad,
-    jacobian,
-    jvp,
-    measure,
-    qjit,
-    run_autograph,
-    vjp,
-    vmap,
-    while_loop,
-)
+from catalyst import *
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -277,31 +259,6 @@ class TestIntegration:
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
-    def test_nested_qnode(self):
-        """Test autograph on a QNode called from within another QNode."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner1(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner2(x):
-            y = inner1(x) * np.pi
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit(autograph=True)
-        def fn(x: int):
-            return inner2(x)
-
-        assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(fn.original_function)
-        assert check_cache(inner1.func)
-        assert check_cache(inner2.func)
-        # Unsupported by the runtime:
-        # assert fn(np.pi) == -2
-
     def test_nested_qjit(self):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
@@ -320,7 +277,8 @@ class TestIntegration:
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 
-    def test_adjoint_wrapper(self):
+    @pytest.mark.parametrize("adjoint_fn", [adjoint, qml.adjoint])
+    def test_adjoint_wrapper(self, adjoint_fn):
         """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
 
         def inner(x):
@@ -329,14 +287,15 @@ class TestIntegration:
         @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def fn(x: float):
-            adjoint(inner)(x)
+            adjoint_fn(inner)(x)
             return qml.probs()
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
         assert np.allclose(fn(np.pi), [0.0, 1.0])
 
-    def test_ctrl_wrapper(self):
+    @pytest.mark.parametrize("ctrl_fn", [ctrl, qml.ctrl])
+    def test_ctrl_wrapper(self, ctrl_fn):
         """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
 
         def inner(x):
@@ -345,7 +304,7 @@ class TestIntegration:
         @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def fn(x: float):
-            ctrl(inner, control=1)(x)
+            ctrl_fn(inner, control=1)(x)
             return qml.probs()
 
         assert hasattr(fn.user_function, "ag_unconverted")
@@ -534,28 +493,6 @@ class TestCodePrinting:
         @qjit(autograph=True)
         def fn(x: float):
             return inner1(x) + inner2(x)
-
-        assert autograph_source(fn)
-        assert autograph_source(inner1)
-        assert autograph_source(inner2)
-
-    def test_nested_qnode(self):
-        """Test printing on a QNode called from within another QNode."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner1(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def inner2(x):
-            y = inner1(x) * np.pi
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        @qjit(autograph=True)
-        def fn(x: int):
-            return inner2(x)
 
         assert autograph_source(fn)
         assert autograph_source(inner1)
