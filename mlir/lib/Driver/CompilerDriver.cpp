@@ -772,17 +772,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
     llcTiming.stop();
 
-    // If not creating object file, output the IR to the specified file.
-    if (currentAction < LLC) {
-        std::string errorMessage;
-        auto outfile = openOutputFile(output.outputFilename, &errorMessage);
-        if (!outfile) {
-            llvm::errs() << errorMessage << "\n";
-            return failure();
-        }
-        outfile->os() << output.outIR;
-        outfile->keep();
-    }
     return success();
 }
 
@@ -872,6 +861,10 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Read the input IR file
     std::string source = readInputFile(inputFilename);
+    if (source.empty()) {
+        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
+        return 1;
+    }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
     assert(output);
@@ -898,6 +891,19 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         llvm::errs() << "Compilation failed:\n" << output->diagnosticMessages << "\n";
         return 1;
     }
+
+    // If not creating object file, output the IR to the specified file.
+    if (LoweringAction < Action::LLC) {
+        std::string errorMessage;
+        auto outfile = openOutputFile(outputFilename, &errorMessage);
+        if (!outfile) {
+            llvm::errs() << errorMessage << "\n";
+            return 1;
+        }
+        outfile->os() << output->outIR;
+        outfile->keep();
+    }
+
     return 0;
 }
 
