@@ -471,7 +471,7 @@ class QJIT(CatalystCallable):
                 if (compile_options.static_argnums is None)
                 else list(compile_options.static_argnums)
             )
-            fn_argnames = inspect.getfullargspec(fn).args
+            fn_argnames = list(inspect.signature(fn).parameters.keys())
 
             # static_argnames can be a single str, or a list/tuple of strs
             # convert all of them to list
