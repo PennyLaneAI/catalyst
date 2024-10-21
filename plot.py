@@ -24,6 +24,7 @@ print(loopsizes, walltimes, cputimes, programsizes, core_PL_times,
     walltime_errs, cputime_errs, programsize_errs, core_PL_time_errs)
 
 
+
 plt.figure(figsize=(15, 9))
 
 # plt.plot(loopsizes, walltimes, label='wall time', color='green')
@@ -40,8 +41,8 @@ plt.xscale("log")
 plt.yscale("log")
 plt.ylabel("Compilation Time [ms]", fontsize=14)
 # plt.ylim(0.29, 0.35)
-plt.ylim(-100, 600000)
-plt.legend(loc="upper right", fontsize=14)
+plt.ylim(-0.00001, 600000)
+plt.legend(loc="upper right", fontsize=14, frameon=False)
 
 
 img = mpimg.imread("auto_peephole_comp_horizontal.png")
@@ -57,16 +58,17 @@ plt.gca().add_artist(ab)
 
 text_box = TextArea(
     """
-Compilation Time Benchmarks,
-Quantum Circuit Optimizations
+$\mathbf{Compilation~Time~Benchmarks}$
+$\mathbf{Quantum~Circuit~Optimizations}$
 
+11th Gen Intel(R) Core(TM) i7-1185G7
 Catalyst v0.9.0-dev36
 """,
     textprops=dict(color="black", fontsize=14),
 )
 ab = AnnotationBbox(
     text_box,
-    (50, 180000),
+    (65, 120000),
     frameon=False,
     bboxprops=dict(facecolor="none", edgecolor="none"),
     zorder=1,
@@ -91,5 +93,5 @@ plt.legend()
 """
 
 plt.subplots_adjust(hspace=0.8)
-plt.show()
-#plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log_err.png")
+#plt.show()
+plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log_err.png")
