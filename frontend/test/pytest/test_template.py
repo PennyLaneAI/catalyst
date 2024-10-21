@@ -1473,5 +1473,6 @@ def test_cosine_window(backend):
 
     assert np.allclose(interpreted_result, jitted_result)
 
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
