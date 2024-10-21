@@ -467,20 +467,10 @@ std::string readInputFile(const std::string &filename)
     return buffer.str();
 }
 
-LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput &output, TimingScope &timing)
-
+LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options,
+                                 CompilerOutput &output, catalyst::utils::Timer &timer,
+                                 TimingScope &timing)
 {
-    if (options.keepIntermediate && options.checkpointStage.empty()) {
-        std::string tmp;
-        llvm::raw_string_ostream s{tmp};
-        s << moduleOp;
-        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
-                   tmp);
-    }
-
-    catalyst::utils::Timer timer{};
-
     auto beforePassCallback = [&](Pass *pass, Operation *op) {
         if (!timer.is_active()) {
             timer.start();
@@ -512,8 +502,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                        tmp);
         }
     };
+
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
-    auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
     pm.enableVerifier(config.shouldVerifyPasses());
     if (failed(applyPassManagerCLOptions(pm)))
         return failure();
@@ -522,6 +512,48 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     pm.enableTiming(timing);
     pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
         beforePassCallback, afterPassCallback, afterPassFailedCallback)));
+    return success();
+}
+
+LogicalResult configurePipeline(PassManager &pm, const CompilerOptions &options, Pipeline &pipeline,
+                                bool clHasManualPipeline)
+{
+    pm.clear();
+    if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
+        llvm::errs() << "Pipeline creation function not found: " << pipeline.name << "\n";
+        return failure();
+    }
+    if (clHasManualPipeline &&
+        failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
+        return failure();
+    }
+    if (options.dumpPassPipeline) {
+        pm.dump();
+        llvm::errs() << "\n";
+    }
+    return success();
+}
+
+LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
+                          CompilerOutput &output, TimingScope &timing)
+
+{
+    if (options.keepIntermediate && options.checkpointStage.empty()) {
+        std::string tmp;
+        llvm::raw_string_ostream s{tmp};
+        s << moduleOp;
+        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
+                   tmp);
+    }
+
+    catalyst::utils::Timer timer{};
+
+    auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
+    if (failed(preparePassManager(pm, options, output, timer, timing))) {
+        llvm::errs() << "Failed to setup pass manager\n";
+        return failure();
+    }
+
     bool clHasIndividulaPass = pm.size() > 0;
     bool clHasManualPipeline = !options.pipelinesCfg.empty();
     if (clHasIndividulaPass && clHasManualPipeline) {
@@ -529,8 +561,15 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                         "or -pass-pipeline.\n";
         return failure();
     }
-    if (clHasIndividulaPass)
+
+    // If individual passes are configured, run them
+    if (clHasIndividulaPass) {
+        if (options.dumpPassPipeline) {
+            pm.dump();
+            llvm::errs() << "\n";
+        }
         return pm.run(moduleOp);
+    }
 
     // If pipelines are not cofigured explicitly, use the catalyst default pipeline
     std::vector<Pipeline> UserPipeline =
@@ -539,18 +578,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (!shouldRunStage(options, output, pipeline.name) || pipeline.passes.size() == 0) {
             continue;
         }
-        pm.clear();
-        if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
-            llvm::errs() << "Pipeline creation function not found: " << pipeline.name << "\n";
+        if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
+            llvm::errs() << "Failed to run pipeline: " << pipeline.name << "\n";
             return failure();
-        }
-        if (clHasManualPipeline &&
-            failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
-            return failure();
-        }
-        if (options.dumpPassPipeline) {
-            pm.dump();
-            llvm::errs() << "\n";
         }
 
         if (failed(pm.run(moduleOp)))
