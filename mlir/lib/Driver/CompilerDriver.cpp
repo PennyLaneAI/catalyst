@@ -596,6 +596,23 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     return success();
 }
 
+LogicalResult verifyInputType(const CompilerOptions &options, InputType inType)
+{
+    if (inType == InputType::OTHER) {
+        CO_MSG(options, Verbosity::Urgent, "Wrong or unsupported input\n");
+        return failure();
+    }
+    if (options.loweringAction == Action::LLC && inType != InputType::LLVMIR) {
+        CO_MSG(options, Verbosity::Urgent, "Expected LLVM IR input but received MLIR input.\n");
+        return failure();
+    }
+    if (options.loweringAction < Action::LLC && inType != InputType::MLIR) {
+        CO_MSG(options, Verbosity::Urgent, "Expected MLIR input but received LLVM IR input.\n");
+        return failure();
+    }
+    return success();
+}
+
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output,
                                 DialectRegistry &registry)
 {
@@ -612,7 +629,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
-    enum InputType inType = InputType::OTHER;
 
     llvm::raw_string_ostream outIRStream(output.outIR);
 
@@ -629,6 +645,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> mlirModule =
         timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
 
+    enum InputType inType = InputType::OTHER;
     if (mlirModule) {
         inType = InputType::MLIR;
         catalyst::utils::LinesCount::ModuleOp(*mlirModule);
@@ -648,27 +665,22 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.isCheckpointFound = options.checkpointStage == "llvm_ir";
         catalyst::utils::LinesCount::Module(*llvmModule);
     }
-
-    if (inType == InputType::OTHER) {
-        CO_MSG(options, Verbosity::Urgent, "Wrong or unsupported input\n");
+    if (failed(verifyInputType(options, inType))) {
         return failure();
     }
     parserTiming.stop();
 
-    TimingScope optTiming = timing.nest("Optimization");
     // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
     // true so that the enzyme pass can be executed.
     bool enzymeRun = options.checkpointStage == "O2Opt";
 
-    enum Action currentAction = options.loweringAction;
-    if (options.loweringAction == Action::All)
-        currentAction = Action::OPT;
+    bool runAll = options.loweringAction == Action::All;
+    bool runOpt = options.loweringAction == Action::OPT || runAll;
+    bool runTranslate = options.loweringAction == Action::Translate || runAll;
+    bool runLLC = options.loweringAction == Action::LLC || runAll;
 
-    if (currentAction == Action::OPT) {
-        if (inType != InputType::MLIR) {
-            CO_MSG(options, Verbosity::Urgent, "Expected MLIR input but received LLVM IR\n");
-            return failure();
-        }
+    if (runOpt && inType == InputType::MLIR) {
+        TimingScope optTiming = timing.nest("Optimization");
         // TODO: The enzymeRun flag will not travel correctly in the case where different
         // stages of compilation are executed independantly via the qcc executable.
         // Ideally, It should be added to the IR via an attribute.
@@ -679,17 +691,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outIR.clear();
         outIRStream << *mlirModule;
+        optTiming.stop();
     }
-    optTiming.stop();
 
-    TimingScope translateTiming = timing.nest("Translate");
-    if (options.loweringAction == Action::All)
-        currentAction = Action::Translate;
-    if (currentAction == Action::Translate) {
-        if (inType != InputType::MLIR) {
-            CO_MSG(options, Verbosity::Urgent, "Expected MLIR input but received LLVM IR\n");
-            return failure();
-        }
+    if (runTranslate && inType == InputType::MLIR) {
+        TimingScope translateTiming = timing.nest("Translate");
         llvmModule =
             timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
                          /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule");
@@ -710,17 +716,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outIR.clear();
         outIRStream << *llvmModule;
+        translateTiming.stop();
     }
-    translateTiming.stop();
 
-    TimingScope llcTiming = timing.nest("llc");
-    if (options.loweringAction == Action::All)
-        currentAction = Action::LLC;
-    if (currentAction == Action::LLC) {
-        if (inType != InputType::LLVMIR) {
-            CO_MSG(options, Verbosity::Urgent, "Expected LLVM IR input but received MLIR\n");
-            return failure();
-        }
+    if (runLLC && inType == InputType::LLVMIR) {
+        TimingScope llcTiming = timing.nest("llc");
         // Set data layout before LLVM passes or the default one is used.
         std::string targetTriple = llvm::sys::getDefaultTargetTriple();
 
@@ -781,8 +781,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outputFilename = outfile;
         outputTiming.stop();
+        llcTiming.stop();
     }
-    llcTiming.stop();
 
     return success();
 }
