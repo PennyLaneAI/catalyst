@@ -85,7 +85,7 @@ struct CompilerOptions {
 
 struct CompilerOutput {
     typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
-    std::string outputFilename;
+    std::string outputFilename = "-";
     std::string outIR;
     std::string diagnosticMessages;
     PipelineOutputs pipelineOutputs;
