@@ -267,7 +267,7 @@ class TestStaticArguments:
 
         assert set(f.compile_options.static_argnums) == {1}
 
-    def test_static_argnames(self):
+    def test_static_argnames_with_decorator(self):
         # pylint: disable=unused-argument, function-redefined
         """Test static arguments specified by names
         on functions with decorators"""
