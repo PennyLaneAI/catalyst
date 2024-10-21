@@ -185,6 +185,30 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
+* Catalyst now has a standalone compiler tool called qcc (Quantum Computing compiler) which quantum
+  compiles MLIR input files into an object file without any dependancy to the python frontend.
+  [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
+
+  This compiler tool combines three stages of compilation which are:
+
+  - qunatum-opt: Performs the mlir level optimizations and lowers the input dialect to LLVM dialect.
+  - mlir-translate: Translates the input in LLVM dialect into LLVM IR.
+  - llc: Performs lower level optimizations and creates the object file.
+  
+  qcc runs all of the above stages under the hood, but it has the ability to isolate them on demand.
+  An example of usage whould look like below:
+
+  ```
+  // Creates both the optimized IR and an object file
+  qcc input.mlir -o output.o 
+  // Only performs MLIR optimizations
+  qcc --tool=opt input.mlir -o llvm-dialect.mlir
+  // Only lowers LLVM dialect MLIR input to LLVM IR
+  qcc --tool=translate llvm-dialect.mlir -o llvm-ir.ll
+  // Only performs lower-level optimizations and create object file
+  qcc --tool=llc llvm-ir.ll -o output.o
+  ```
+
 <h3>Improvements</h3>
 
 * Implement a Catalyst runtime plugin that mocks out all functions in the QuantumDevice interface.
@@ -271,6 +295,11 @@
   [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
 
   Please use `debug.replace_ir`.
+
+* Removes `compiler.last_compiler_output`.
+  [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
+
+  Please use `compiler.get_output_of("last", workspace)`
 
 <h3>Bug fixes</h3>
 
