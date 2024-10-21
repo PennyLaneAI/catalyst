@@ -664,7 +664,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (options.loweringAction == Action::All)
         currentAction = Action::OPT;
 
-    if (inType == InputType::MLIR && currentAction == Action::OPT) {
+    if (currentAction == Action::OPT) {
+        if (inType != InputType::MLIR) {
+            CO_MSG(options, Verbosity::Urgent, "Expected MLIR input but received LLVM IR\n");
+            return failure();
+        }
         // TODO: The enzymeRun flag will not travel correctly in the case where different
         // stages of compilation are executed independantly via the qcc executable.
         // Ideally, It should be added to the IR via an attribute.
@@ -681,7 +685,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     TimingScope translateTiming = timing.nest("Translate");
     if (options.loweringAction == Action::All)
         currentAction = Action::Translate;
-    if (inType == InputType::MLIR && currentAction == Action::Translate) {
+    if (currentAction == Action::Translate) {
+        if (inType != InputType::MLIR) {
+            CO_MSG(options, Verbosity::Urgent, "Expected MLIR input but received LLVM IR\n");
+            return failure();
+        }
         llvmModule =
             timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
                          /* add_endl */ false, *mlirModule, llvmContext, "LLVMDialectModule");
@@ -708,7 +716,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     TimingScope llcTiming = timing.nest("llc");
     if (options.loweringAction == Action::All)
         currentAction = Action::LLC;
-    if (inType == InputType::LLVMIR && currentAction == Action::LLC) {
+    if (currentAction == Action::LLC) {
+        if (inType != InputType::LLVMIR) {
+            CO_MSG(options, Verbosity::Urgent, "Expected LLVM IR input but received MLIR\n");
+            return failure();
+        }
         // Set data layout before LLVM passes or the default one is used.
         std::string targetTriple = llvm::sys::getDefaultTargetTriple();
 
