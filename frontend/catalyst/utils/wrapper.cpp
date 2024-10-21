@@ -170,7 +170,7 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
             throw std::runtime_error("PyArray_SetBaseObject failed.");
         }
 
-        returns.append(nb::borrow(new_array));
+        returns.append(nb::borrow(new_array)); // nb::borrow increments ref count by 1
 
         // Now we insert the array into the dictionary.
         // This dictionary is a map of the type:
@@ -185,8 +185,11 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
             throw std::runtime_error("PyLong_FromLong failed.");
         }
 
-        numpy_arrays[pyLong] = nb::borrow(new_array);
+        numpy_arrays[pyLong] = nb::borrow(new_array); // nb::borrow increments ref count by 1
 
+        // Decrement reference counts.
+        // The final ref count of `new_array` should be 2: one for the `returns` list and one for
+        // the `numpy_arrays` dict.
         Py_DECREF(pyLong);
         Py_DECREF(new_array);
     }
