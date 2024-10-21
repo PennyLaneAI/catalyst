@@ -431,33 +431,6 @@ def qjit(
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
-    # Map static_argnames to static_argnums
-    # no need to propagate static_argnames further
-    if static_argnames is not None:
-        static_argnums = [] if (static_argnums is None) else list(kwargs["static_argnums"])
-        fn_argnames = inspect.getfullargspec(fn).args
-
-        # static_argnames can be a single str, or a list/tuple of strs
-        # convert all of them to list
-        if isinstance(static_argnames, str):
-            static_argnames = [static_argnames]
-
-        for static_argname in static_argnames:
-            if static_argname not in fn_argnames:
-                raise ValueError(
-                    f"""
-    qjitted function has invalid argname {{{static_argname}}} in static_argnames.
-    Function does not take these args.
-                    """
-                )
-            static_argnums.append(fn_argnames.index(static_argname))
-
-        # Remove potential duplicates from static_argnums and static_argnames
-        static_argnums = list(dict.fromkeys(static_argnums))
-        static_argnums.sort()
-        kwargs["static_argnums"] = static_argnums
-    kwargs.pop("static_argnames")
-
     return QJIT(fn, CompileOptions(**kwargs))
 
 
@@ -489,6 +462,39 @@ class QJIT(CatalystCallable):
     def __init__(self, fn, compile_options):
         functools.update_wrapper(self, fn)
         self.original_function = fn
+
+        # Map static_argnames to static_argnums
+        # no need to propagate static_argnames further
+        if compile_options.static_argnames is not None:
+            static_argnums = (
+                []
+                if (compile_options.static_argnums is None)
+                else list(compile_options.static_argnums)
+            )
+            fn_argnames = inspect.getfullargspec(fn).args
+
+            # static_argnames can be a single str, or a list/tuple of strs
+            # convert all of them to list
+            if isinstance(compile_options.static_argnames, str):
+                static_argnames = [compile_options.static_argnames]
+            else:
+                static_argnames = compile_options.static_argnames
+
+            for static_argname in static_argnames:
+                if static_argname not in fn_argnames:
+                    raise ValueError(
+                        f"""
+        qjitted function has invalid argname {{{static_argname}}} in static_argnames.
+        Function does not take these args.
+                        """
+                    )
+                static_argnums.append(fn_argnames.index(static_argname))
+
+            # Remove potential duplicates from static_argnums and static_argnames
+            static_argnums = list(dict.fromkeys(static_argnums))
+            static_argnums.sort()
+            compile_options.static_argnums = tuple(static_argnums)
+
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
         self.fn_cache = CompilationCache(
