@@ -55,7 +55,7 @@ PYBIND11_MODULE(compiler_driver, m)
     compout_class.def(py::init<>())
         .def("get_output_ir", [](const CompilerOutput &co) -> std::string { return co.outIR; })
         .def("get_object_filename",
-             [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
+             [](const CompilerOutput &co) -> std::string { return co.outputFilename; })
         .def("get_diagnostic_messages",
              [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; });
 

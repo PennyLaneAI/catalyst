@@ -665,6 +665,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         currentAction = Action::OPT;
 
     if (inType == InputType::MLIR && currentAction == Action::OPT) {
+        // TODO: The enzymeRun flag will not travel correctly in the case where different
+        // stages of compilation are executed independantly via the qcc executable.
+        // Ideally, It should be added to the IR via an attribute.
         enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
@@ -758,15 +761,28 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.outIR.clear();
         outIRStream << *llvmModule;
 
-        auto outfile = options.getObjectFile();
+        bool outputFileSpecified = !output.outputFilename.empty() && output.outputFilename != "-";
+        auto outfile = outputFileSpecified ? output.outputFilename : options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
                                 std::move(llvmModule), targetMachine, outfile))) {
             return failure();
         }
-        output.objectFilename = outfile;
+        output.outputFilename = outfile;
         outputTiming.stop();
     }
     llcTiming.stop();
+
+    // If not creating object file, output the IR to the specified file.
+    if (currentAction < LLC) {
+        std::string errorMessage;
+        auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+        if (!outfile) {
+            llvm::errs() << errorMessage << "\n";
+            return failure();
+        }
+        outfile->os() << output.outIR;
+        outfile->keep();
+    }
     return success();
 }
 
@@ -859,6 +875,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
     assert(output);
+    output->outputFilename = outputFilename;
     llvm::raw_string_ostream errStream{output->diagnosticMessages};
 
     CompilerOptions options{.source = source,
@@ -881,15 +898,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         llvm::errs() << "Compilation failed:\n" << output->diagnosticMessages << "\n";
         return 1;
     }
-
-    std::string errorMessage;
-    auto outfile = openOutputFile(outputFilename, &errorMessage);
-    if (!outfile) {
-        llvm::errs() << errorMessage << "\n";
-        return 1;
-    }
-    outfile->os() << output->outIR;
-    outfile->keep();
     return 0;
 }
 
