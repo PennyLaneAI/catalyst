@@ -1795,7 +1795,7 @@ def _probs_abstract_eval(obs, shape, shots=None):
     return core.ShapedArray(shape, jax.numpy.float64)
 
 
-@var_p.def_impl
+@probs_p.def_impl
 def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
