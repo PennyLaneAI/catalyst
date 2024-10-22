@@ -185,7 +185,7 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
-* Static arguments of a jit-ted function can now be indicated by a `static_argnames`
+* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
   argument to `qjit`.
   [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
 
@@ -206,7 +206,7 @@
   ```
 
   ```pycon
-  >>> 3 7
+  3 7
   ```
 
 <h3>Improvements</h3>
