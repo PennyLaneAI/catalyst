@@ -231,15 +231,21 @@ class TestStaticArguments:
 
         assert set(f.compile_options.static_argnums) == {1}
 
-        with pytest.raises(ValueError, match="qjitted function has invalid argname {yy}"):
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {'yy'}"):
 
             @qjit(static_argnames="yy")
             def f_badname(x, y):
                 return
 
-        with pytest.raises(ValueError, match="qjitted function has invalid argname {yy}"):
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {'yy'}"):
 
             @qjit(static_argnames=["y", "yy"])
+            def f_badname_list(x, y):
+                return
+
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {'xx', 'yy'}"):
+
+            @qjit(static_argnames=["xx", "yy"])
             def f_badname_list(x, y):
                 return
 

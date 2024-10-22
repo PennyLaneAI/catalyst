@@ -167,15 +167,20 @@ def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnu
     if isinstance(static_argnames, str):
         static_argnames = [static_argnames]
 
+    non_existent_args = []
     for static_argname in static_argnames:
-        if static_argname not in fn_argnames:
-            raise ValueError(
-                f"""
-qjitted function has invalid argname {{{static_argname}}} in static_argnames.
+        if static_argname in fn_argnames:
+            new_static_argnums.append(fn_argnames.index(static_argname))
+            continue
+        non_existent_args.append(static_argname)
+
+    if non_existent_args:
+        raise ValueError(
+            f"""
+qjitted function has invalid argname {set(non_existent_args)} in static_argnames.
 Function does not take these args.
-                """
-            )
-        new_static_argnums.append(fn_argnames.index(static_argname))
+            """
+        )
 
     # Remove potential duplicates from static_argnums and static_argnames
     new_static_argnums = tuple(sorted(set(new_static_argnums)))
