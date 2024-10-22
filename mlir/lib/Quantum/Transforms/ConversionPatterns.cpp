@@ -736,16 +736,14 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
 
-        Value numShots;
+        SmallVector<Value> args = {structPtr};
 
         if constexpr (std::is_same_v<T, SampleOp>) {
-            auto sampleAdaptor = cast<SampleOpAdaptor>(adaptor);
-            numShots = sampleAdaptor.getShots();
+            args.push_back(cast<SampleOpAdaptor>(adaptor).getShots());
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
-            auto countsAdaptor = cast<CountsOpAdaptor>(adaptor);
-            numShots = countsAdaptor.getShots();
+            args.push_back(cast<CountsOpAdaptor>(adaptor).getShots());
             auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
             auto bStruct =
                 rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
@@ -754,7 +752,8 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
             rewriter.create<LLVM::StoreOp>(loc, cStruct, structPtr);
         }
 
-        SmallVector<Value> args = {structPtr, numShots, numQubits};
+        args.push_back(numQubits);
+
         args.insert(args.end(), qubits.begin(), qubits.end());
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
