@@ -178,10 +178,9 @@ Function does not take these args.
         new_static_argnums.append(fn_argnames.index(static_argname))
 
     # Remove potential duplicates from static_argnums and static_argnames
-    new_static_argnums = list(dict.fromkeys(new_static_argnums))
-    new_static_argnums.sort()
+    new_static_argnums = tuple(sorted(set(new_static_argnums)))
 
-    return tuple(new_static_argnums)
+    return new_static_argnums
 
 
 def merge_static_args(signature, args, static_argnums):
