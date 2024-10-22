@@ -291,6 +291,7 @@ def test_basic_entangler_layers(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore::pennylane.PennyLaneDeprecationWarning")
 def test_basis_state_preparation(backend):
     """Test basis state preparation."""
 
@@ -922,6 +923,7 @@ def test_qsvt(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_single(backend):
     """Test broadcast single."""
 
@@ -940,6 +942,7 @@ def test_broadcast_single(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_double(backend):
     """Test broadcast double."""
 
@@ -958,6 +961,7 @@ def test_broadcast_double(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_chain(backend):
     """Test broadcast chain."""
 
@@ -976,6 +980,7 @@ def test_broadcast_chain(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_ring(backend):
     """Test broadcast ring."""
 
@@ -994,6 +999,7 @@ def test_broadcast_ring(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_pyramid(backend):
     """Test broadcast pyramid."""
 
@@ -1012,6 +1018,7 @@ def test_broadcast_pyramid(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
 def test_broadcast_all_to_all(backend):
     """Test broadcast all to all."""
 

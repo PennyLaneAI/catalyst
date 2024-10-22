@@ -27,7 +27,7 @@ jobs:
   check-config:
     name: Build Configuration
     needs: [constants]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout Catalyst repo
@@ -39,7 +39,7 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        git checkout v0.8.1-rc
+        git checkout v0.8.2-rc
 
     - name: Install deps
       run: |

@@ -25,7 +25,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane import QubitUnitary, QueuingManager
+from pennylane.devices import QubitDevice
 from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
@@ -156,6 +157,15 @@ class Function:
     Raises:
         AssertionError: Invalid function type.
     """
+
+    CACHE = {}
+
+    def __new__(cls, fn):
+        if cached_instance := cls.CACHE.get(fn):
+            return cached_instance
+        new_instance = super().__new__(cls)
+        cls.CACHE[fn] = new_instance
+        return new_instance
 
     @debug_logger_init
     def __init__(self, fn):
