@@ -83,7 +83,7 @@ ab = AnnotationBbox(
 )
 ax1.add_artist(ab)
 #plt.gca().add_artist(ab)
-
+ax1.set_xticklabels([''] * len(ax1.get_xticks()))  # Remove the labels
 
 #plt.subplot(2, 1, 2)
 ax2.plot(loopsizes, core_PL_times/cputimes, c=yellow, marker="o")
@@ -106,6 +106,6 @@ plt.legend()
 """
 
 plt.tight_layout()
-plt.subplots_adjust(hspace=0.15)
+plt.subplots_adjust(hspace=0.05)
 #plt.show()
 plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log_err.png", dpi=300)
