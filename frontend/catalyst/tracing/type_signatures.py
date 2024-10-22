@@ -175,9 +175,14 @@ def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnu
         non_existent_args.append(static_argname)
 
     if non_existent_args:
+        non_existent_args_str = "{"
+        for arg in non_existent_args:
+            non_existent_args_str += "'" + arg + "', "
+        non_existent_args_str = non_existent_args_str[:-2] + "}"
+
         raise ValueError(
             f"""
-qjitted function has invalid argname {set(non_existent_args)} in static_argnames.
+qjitted function has invalid argname {non_existent_args_str} in static_argnames.
 Function does not take these args.
             """
         )
