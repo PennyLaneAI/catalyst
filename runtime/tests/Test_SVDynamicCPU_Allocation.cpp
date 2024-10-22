@@ -24,7 +24,7 @@
 #include "LinearAlgebra.hpp"
 #include "StateVectorLQubitDynamic.hpp"
 #include "Util.hpp"
-#include "cpu_kernels/GateImplementationsPI.hpp"
+#include "cpu_kernels/GateImplementationsLM.hpp"
 #include <StateVectorLQubit.hpp>
 
 #include "TestHelpers.hpp"
