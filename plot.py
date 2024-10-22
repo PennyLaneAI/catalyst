@@ -2,6 +2,10 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage, TextArea
+import matplotlib.gridspec as gridspec
+
+yellow = plt.cm.tab20(2)
+blue = plt.cm.tab20(1)
 
 # data = np.load('peephole_benchmark_data_small.npz')
 #data = np.load("peephole_benchmark_data_geomspace25.npz")
@@ -25,24 +29,27 @@ print(loopsizes, walltimes, cputimes, programsizes, core_PL_times,
 
 
 
-plt.figure(figsize=(15, 9))
+fig = plt.figure(figsize=(15, 9))
+gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])  # 2:1 ratio
+ax1 = fig.add_subplot(gs[0])  # First subplot (taller)
+ax2 = fig.add_subplot(gs[1])  # Second subplot (shorter)
 
 # plt.plot(loopsizes, walltimes, label='wall time', color='green')
-# plt.subplot(2, 1, 1)
-plt.errorbar(
-    loopsizes, cputimes, yerr=cputime_errs, marker="o", label="Catalyst", c=plt.cm.tab20(2), ls="--", zorder=2
+#plt.subplot(2, 1, 1)
+ax1.errorbar(
+    loopsizes, cputimes, yerr=cputime_errs, marker="o", label="Catalyst", c=yellow, zorder=2
 )
-plt.errorbar(
-    loopsizes, core_PL_times, yerr=core_PL_time_errs, marker="s", label="PennyLane", c=plt.cm.tab20(1), ls="--", zorder=2
+ax1.errorbar(
+    loopsizes, core_PL_times, yerr=core_PL_time_errs, marker="s", label="PennyLane", c=blue, ls="--", zorder=2
 )
 # plt.title("Compilation time for running cancel_inverses and merge_rotations optimizations")
-plt.xlabel("Circuit Gate Depth [$N$]", fontsize=14)
-plt.xscale("log")
-plt.yscale("log")
-plt.ylabel("Compilation Time [ms]", fontsize=14)
+#plt.xlabel("Circuit Gate Depth [$N$]", fontsize=14)
+ax1.set_xscale("log")
+ax1.set_yscale("log")
+ax1.set_ylabel("Compilation Time [ms]", fontsize=14)
 # plt.ylim(0.29, 0.35)
-plt.ylim(-0.00001, 600000)
-plt.legend(loc="upper right", fontsize=14, frameon=False)
+ax1.set_ylim(-0.00001, 700000)
+ax1.legend(loc="upper right", fontsize=14, frameon=False)
 
 
 img = mpimg.imread("auto_peephole_comp_horizontal.png")
@@ -51,9 +58,10 @@ img = mpimg.imread("auto_peephole_comp_horizontal.png")
 # plt.ylim(-100, 1500)
 # plt.imshow(img, extent=(100, 1000, 600, 1000))
 
-imagebox = OffsetImage(img, zoom=0.53)
-ab = AnnotationBbox(imagebox, (300, 1270), zorder=1, frameon=False)
-plt.gca().add_artist(ab)
+imagebox = OffsetImage(img, zoom=0.48)
+ab = AnnotationBbox(imagebox, (1600, 9000), zorder=1, frameon=False)
+ax1.add_artist(ab)
+#plt.gca().add_artist(ab)
 
 
 text_box = TextArea(
@@ -68,22 +76,27 @@ Catalyst v0.9.0-dev36
 )
 ab = AnnotationBbox(
     text_box,
-    (65, 120000),
+    (50, 80000),
     frameon=False,
     bboxprops=dict(facecolor="none", edgecolor="none"),
     zorder=1,
 )
-plt.gca().add_artist(ab)
+ax1.add_artist(ab)
+#plt.gca().add_artist(ab)
+
+
+#plt.subplot(2, 1, 2)
+ax2.plot(loopsizes, core_PL_times/cputimes, c=yellow, marker="o")
+#plt.title("Catalyst compiled program size for programs with loops")
+ax2.set_xlabel("Circuit gate depth [N]")
+ax2.set_ylabel("Compilation Speedup", fontsize=14)
+ax2.set_xlabel("Circuit Gate Depth [$N$]", fontsize=14)
+ax2.set_xscale("log")
+ax2.set_yscale("log")
+ax2.grid(axis="y", zorder=0)
+#plt.legend()
 
 """
-plt.subplot(2, 1, 2)
-plt.plot(loopsizes, programsizes, label="program size", color="red")
-plt.title("Catalyst compiled program size for programs with loops")
-plt.xlabel("Circuit gate depth")
-plt.ylabel("Program size (IR lines)")
-plt.legend()
-
-
 plt.subplot(3,1,3)
 plt.plot(loopsizes, core_PL_times, label='core PL time', color='green')
 plt.title('Plain PennyLane compilation time for running cancel_inverses and merge_rotations optimizations')
@@ -92,6 +105,7 @@ plt.ylabel('Compile time (ms)')
 plt.legend()
 """
 
-plt.subplots_adjust(hspace=0.8)
+plt.tight_layout()
+plt.subplots_adjust(hspace=0.15)
 #plt.show()
-plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log_err.png")
+plt.savefig("catalyst_quant_advantage_peephole_compile_time_artificial_circuit_log_err.png", dpi=300)
