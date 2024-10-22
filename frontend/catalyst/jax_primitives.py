@@ -1700,6 +1700,12 @@ def _counts_abstract_eval(obs, shots, shape):
             shape, np.dtype("int64")
         )
 
+    # Return a static shaped array
+    if obs.primitive is compbasis_p:
+        assert shape == (2**obs.num_qubits,)
+    else:
+        assert shape == (2,)
+
     return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
 
 
@@ -1794,6 +1800,8 @@ def _probs_abstract_eval(obs, shape, shots=None):
     if Signature.is_dynamic_shape(shape):
         return core.DShapedArray(shape, np.dtype("float64"))
 
+    # Return a static shaped array
+    assert shape == (2**obs.num_qubits,)
     return core.ShapedArray(shape, jax.numpy.float64)
 
 
@@ -1823,6 +1831,8 @@ def _state_abstract_eval(obs, shape, shots=None):
     if Signature.is_dynamic_shape(shape):
         return core.DShapedArray(shape, np.dtype("complex128"))
 
+    # Return a static shaped array
+    assert shape == (2**obs.num_qubits,)
     return core.ShapedArray(shape, jax.numpy.complex128)
 
 
