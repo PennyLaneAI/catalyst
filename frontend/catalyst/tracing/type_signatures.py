@@ -159,32 +159,29 @@ def split_static_args(args, static_argnums):
 def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnums):
     """Map static_argnames of the callable to the corresponding argument indices,
     and add them to static_argnums"""
-    if static_argnames is not None:
-        new_static_argnums = [] if (static_argnums is None) else list(static_argnums)
-        fn_argnames = list(inspect.signature(fn).parameters.keys())
+    new_static_argnums = [] if (static_argnums is None) else list(static_argnums)
+    fn_argnames = list(inspect.signature(fn).parameters.keys())
 
-        # static_argnames can be a single str, or a list/tuple of strs
-        # convert all of them to list
-        if isinstance(static_argnames, str):
-            static_argnames = [static_argnames]
+    # static_argnames can be a single str, or a list/tuple of strs
+    # convert all of them to list
+    if isinstance(static_argnames, str):
+        static_argnames = [static_argnames]
 
-        for static_argname in static_argnames:
-            if static_argname not in fn_argnames:
-                raise ValueError(
-                    f"""
-    qjitted function has invalid argname {{{static_argname}}} in static_argnames.
-    Function does not take these args.
-                    """
-                )
-            new_static_argnums.append(fn_argnames.index(static_argname))
+    for static_argname in static_argnames:
+        if static_argname not in fn_argnames:
+            raise ValueError(
+                f"""
+qjitted function has invalid argname {{{static_argname}}} in static_argnames.
+Function does not take these args.
+                """
+            )
+        new_static_argnums.append(fn_argnames.index(static_argname))
 
-        # Remove potential duplicates from static_argnums and static_argnames
-        new_static_argnums = list(dict.fromkeys(new_static_argnums))
-        new_static_argnums.sort()
+    # Remove potential duplicates from static_argnums and static_argnames
+    new_static_argnums = list(dict.fromkeys(new_static_argnums))
+    new_static_argnums.sort()
 
-        return tuple(new_static_argnums)
-    else:
-        return tuple(static_argnums)
+    return tuple(new_static_argnums)
 
 
 def merge_static_args(signature, args, static_argnums):

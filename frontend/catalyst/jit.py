@@ -463,9 +463,6 @@ class QJIT(CatalystCallable):
     def __init__(self, fn, compile_options):
         functools.update_wrapper(self, fn)
         self.original_function = fn
-        compile_options.static_argnums = merge_static_argname_into_argnum(
-            fn, compile_options.static_argnames, compile_options.static_argnums
-        )
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
         self.fn_cache = CompilationCache(
@@ -488,6 +485,12 @@ class QJIT(CatalystCallable):
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
+
+        # If static_argnames are present, convert them to static_argnums
+        if compile_options.static_argnames is not None:
+            compile_options.static_argnums = merge_static_argname_into_argnum(
+                fn, compile_options.static_argnames, compile_options.static_argnums
+            )
 
         # Patch the conversion rules by adding the included modules before the block list
         include_convertlist = tuple(
