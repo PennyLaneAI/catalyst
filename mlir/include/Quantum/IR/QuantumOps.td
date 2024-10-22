@@ -871,8 +871,7 @@ def ExpvalOp : Measurement_Op<"expval"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs,
-        OptionalAttr<I64Attr>:$shots
+        ObservableType:$obs
     );
 
     let results = (outs
@@ -908,9 +907,7 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs,
-        OptionalAttr<I64Attr>:$shots
-    );
+        ObservableType:$obs);
 
     let results = (outs
         F64:$variance

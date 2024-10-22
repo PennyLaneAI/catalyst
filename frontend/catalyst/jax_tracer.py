@@ -895,9 +895,9 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(reshaped_result)
 
             elif o.return_type.value == "expval":
-                out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
+                out_classical_tracers.append(expval_p.bind(obs_tracers))
             elif o.return_type.value == "var":
-                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
+                out_classical_tracers.append(var_p.bind(obs_tracers))
             elif o.return_type.value == "probs":
                 assert using_compbasis
                 shape = (2**nqubits,)
