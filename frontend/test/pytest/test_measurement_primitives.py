@@ -47,13 +47,11 @@ def test_sample_dynamic():
 
     def f(shots):
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots=shots, shape=(shots, 0))
+        return sample_p.bind(obs, shots, shape=(shots, 0))
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
-    shots_tracer, shape_value = jaxpr.eqns[1].params.values()
-
+    (shape_value,) = jaxpr.eqns[1].params.values()
     assert jaxpr.eqns[1].primitive == sample_p
-    assert isinstance(shots_tracer, DynamicJaxprTracer)
     assert isinstance(shape_value[0], DynamicJaxprTracer)
     assert shape_value[1] == 0
     assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)
@@ -78,16 +76,15 @@ def test_counts_dynamic():
     """Test that the counts primitive can be captured by jaxpr
     when using tracers."""
 
-    def f(dim_0):
+    def f(shots, dim_0):
         obs = compbasis_p.bind()
-        return counts_p.bind(obs, shots=5, shape=(dim_0,))
+        return counts_p.bind(obs, shots, shape=(dim_0,))
 
-    jaxpr = jax.make_jaxpr(f)(1)
-    shots, shape_value = jaxpr.eqns[1].params.values()
+    jaxpr = jax.make_jaxpr(f)(5, 1)
+    (shape_value,) = jaxpr.eqns[1].params.values()
 
     assert jaxpr.eqns[1].primitive == counts_p
     assert isinstance(shape_value[0], DynamicJaxprTracer)
-    assert shots == 5
     assert isinstance(jaxpr.eqns[1].outvars[0].aval.shape[0], jax.core.Var)
     assert isinstance(jaxpr.eqns[1].outvars[1].aval.shape[0], jax.core.Var)
 
