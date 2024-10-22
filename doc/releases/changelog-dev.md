@@ -185,7 +185,7 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
-* Catalyst now has a standalone compiler tool called qcc (Quantum Computing compiler) which quantum
+* Catalyst now has a standalone compiler tool called catalyst-cli which quantum
   compiles MLIR input files into an object file without any dependancy to the python frontend.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
 
@@ -195,18 +195,18 @@
   - mlir-translate: Translates the input in LLVM dialect into LLVM IR.
   - llc: Performs lower level optimizations and creates the object file.
   
-  qcc runs all of the above stages under the hood, but it has the ability to isolate them on demand.
+  catalyst-cli runs all of the above stages under the hood, but it has the ability to isolate them on demand.
   An example of usage whould look like below:
 
   ```
   // Creates both the optimized IR and an object file
-  qcc input.mlir -o output.o 
+  catalyst-cli input.mlir -o output.o 
   // Only performs MLIR optimizations
-  qcc --tool=opt input.mlir -o llvm-dialect.mlir
+  catalyst-cli --tool=opt input.mlir -o llvm-dialect.mlir
   // Only lowers LLVM dialect MLIR input to LLVM IR
-  qcc --tool=translate llvm-dialect.mlir -o llvm-ir.ll
+  catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
   // Only performs lower-level optimizations and create object file
-  qcc --tool=llc llvm-ir.ll -o output.o
+  catalyst-cli --tool=llc llvm-ir.ll -o output.o
   ```
 
 <h3>Improvements</h3>

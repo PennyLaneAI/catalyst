@@ -682,7 +682,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (runOpt && inType == InputType::MLIR) {
         TimingScope optTiming = timing.nest("Optimization");
         // TODO: The enzymeRun flag will not travel correctly in the case where different
-        // stages of compilation are executed independantly via the qcc executable.
+        // stages of compilation are executed independantly via the catalyst-cli executable.
         // Ideally, It should be added to the IR via an attribute.
         enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {

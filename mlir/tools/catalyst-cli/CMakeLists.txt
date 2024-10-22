@@ -40,7 +40,7 @@ set(LIBS
     CatalystCompilerDriver
 )
 
-add_llvm_executable(qcc qcc.cpp)
-target_link_libraries(qcc PRIVATE ${LIBS})
-llvm_update_compile_flags(qcc)
-mlir_check_all_link_libraries(qcc)
+add_llvm_executable(catalyst-cli catalyst-cli.cpp)
+target_link_libraries(catalyst-cli PRIVATE ${LIBS})
+llvm_update_compile_flags(catalyst-cli)
+mlir_check_all_link_libraries(catalyst-cli)

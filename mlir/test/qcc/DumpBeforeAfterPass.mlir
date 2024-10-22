@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: qcc --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-before-all --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-BEFORE
-// RUN: qcc --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-after-all --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-AFTER
-// RUN: qcc --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-before=inline-nested-module --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-BEFORE-ONE
-// RUN: qcc --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-after=inline-nested-module --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-AFTER-ONE
-// RUN: qcc --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-op-generic --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-GENERIC
+// RUN: catalyst-cli --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-before-all --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-BEFORE
+// RUN: catalyst-cli --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-after-all --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-AFTER
+// RUN: catalyst-cli --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-before=inline-nested-module --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-BEFORE-ONE
+// RUN: catalyst-cli --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-ir-after=inline-nested-module --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-AFTER-ONE
+// RUN: catalyst-cli --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --mlir-print-op-generic --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-GENERIC
 
 func.func @foo() {
     return

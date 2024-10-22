@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: not qcc %s --tool=llc --verify-diagnostics 2>&1 | FileCheck %s -check-prefix=CHECK-LLC
-// RUN: not qcc %s --tool=translate --verify-diagnostics 2>&1 | FileCheck %s -check-prefix=CHECK-TRANSLATE
+// RUN: not catalyst-cli %s --tool=llc --verify-diagnostics 2>&1 | FileCheck %s -check-prefix=CHECK-LLC
+// RUN: not catalyst-cli %s --tool=translate --verify-diagnostics 2>&1 | FileCheck %s -check-prefix=CHECK-TRANSLATE
 
 
 func.func @foo() {

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: qcc %s --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s
-// RUN: qcc --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-CUSTOM
-// RUN: qcc --tool=opt %s -cse --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-ONE-PASS
-// RUN: not qcc --tool=opt %s -cse --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-FAIL
+// RUN: catalyst-cli %s --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s
+// RUN: catalyst-cli --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-CUSTOM
+// RUN: catalyst-cli --tool=opt %s -cse --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-ONE-PASS
+// RUN: not catalyst-cli --tool=opt %s -cse --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-FAIL
 
 func.func @foo() {
     return

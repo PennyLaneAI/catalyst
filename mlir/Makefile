@@ -146,7 +146,7 @@ dialects:
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver qcc
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver catalyst-cli
 
 .PHONY: test
 test:
