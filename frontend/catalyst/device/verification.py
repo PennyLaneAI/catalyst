@@ -142,7 +142,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     def _mcm_op_checker(op):
         if isinstance(op, MidCircuitMeasure):
-            raise DifferentiableCompileError(f"{op.name} is not allowed in gradinets")
+            raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
     def _adj_diff_op_checker(op):
         if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
