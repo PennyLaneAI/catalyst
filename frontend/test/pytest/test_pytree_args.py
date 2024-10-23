@@ -607,9 +607,8 @@ class TestPyTreesQmlCounts:
             return {"1": qml.counts()}
 
         observed = circuit(0.5)
-        expected = {"1": (jnp.array((0, 1), dtype=jnp.int64),
-                          jnp.array((0, 3), dtype=jnp.int64))}
-        
+        expected = {"1": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))}
+
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
@@ -626,11 +625,10 @@ class TestPyTreesQmlCounts:
 
         observed = circuit(0.5)
         expected = (
-            {"1": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))},
+            {"1": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
             {"2": jnp.array(-1, dtype=jnp.float64)},
         )
-        
+
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
@@ -643,9 +641,10 @@ class TestPyTreesQmlCounts:
 
         observed = circuit2(0.5)
         expected = (
-            [{"1": jnp.array(-1, dtype=jnp.float64)},
-            {"2": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))}],
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
             {"3": jnp.array(-1, dtype=jnp.float64)},
         )
         _, expected_shape = tree_flatten(expected)
@@ -667,12 +666,14 @@ class TestPyTreesQmlCounts:
 
         observed = circuit(0.5)
         expected = (
-            [{"1": jnp.array(-1, dtype=jnp.float64)},
-            {"2": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))}],
-            [{"3": jnp.array(-1, dtype=jnp.float64)},
-            {"4": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))}],
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            [
+                {"3": jnp.array(-1, dtype=jnp.float64)},
+                {"4": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
         )
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
@@ -689,12 +690,14 @@ class TestPyTreesQmlCounts:
 
         observed = circuit2(0.5)
         expected = (
-            [{"1": jnp.array(-1, dtype=jnp.float64)},
-            {"2": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))}],
-            [{"3": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))},
-            {"4": jnp.array(-1, dtype=jnp.float64)}],
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            [
+                {"3": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+                {"4": jnp.array(-1, dtype=jnp.float64)},
+            ],
         )
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
@@ -717,15 +720,16 @@ class TestPyTreesQmlCounts:
 
         observed = circuit(0.5)
         expected = [
-            [{"1": jnp.array(-1, dtype=jnp.float64)},
-            {"2": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))}],
-            [{"3": jnp.array(-1, dtype=jnp.float64)},
-            {"4": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))}],
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            [
+                {"3": jnp.array(-1, dtype=jnp.float64)},
+                {"4": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
             {"5": jnp.array(-1, dtype=jnp.float64)},
-            {"6": (jnp.array((0, 1), dtype=jnp.int64),
-                      jnp.array((0, 3), dtype=jnp.int64))},
+            {"6": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
         ]
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
@@ -751,6 +755,7 @@ class TestPyTreesQmlCounts:
         _, expected_shape = tree_flatten(expected)
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
