@@ -262,7 +262,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 staticOffsets.push_back(ShapedType::kDynamic);
                 staticSizes.push_back(updateShape[updateDim]);
                 updateDim++;
-            } else {
+            }
+            else {
                 staticOffsets.push_back(0);
                 staticSizes.push_back(updateShape[updateDim]);
                 updateDim++;
