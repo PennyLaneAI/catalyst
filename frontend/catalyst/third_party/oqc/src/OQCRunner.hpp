@@ -16,18 +16,16 @@
 #pragma once
 
 #include <complex>
-#include <mutex>
-#include <optional>
 #include <string>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 
-#include <iostream>
+#include <dlfcn.h>
 
 #include "Exception.hpp"
 
+#ifdef INITIALIZE_PYTHON
 #include <pybind11/embed.h>
+#endif
 
 namespace Catalyst::Runtime::Device {
 
@@ -118,56 +116,30 @@ struct OQCRunner : public OQCRunnerBase {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-        namespace py = pybind11;
-        using namespace py::literals;
 
+#ifdef INITIALIZE_PYTHON
         if (!Py_IsInitialized()) {
             pybind11::initialize_interpreter();
         }
-        py::gil_scoped_acquire lock;
+#endif
 
-        auto locals = py::dict("circuit"_a = circuit, "device"_a = device, "kwargs"_a = kwargs,
-                               "shots"_a = shots, "msg"_a = "");
-
-        py::exec(
-            R"(
-            import os
-            from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-            from qcaas_client.config import QuantumResultsFormat, Tket, TketOptimizations
-            optimisations = Tket()
-            optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
-
-            RES_FORMAT = QuantumResultsFormat().binary_count()
-
-            try:
-                email = os.environ.get("OQC_EMAIL")
-                password = os.environ.get("OQC_PASSWORD")
-                url = os.environ.get("OQC_URL")
-                client = OQCClient(url=url, email=email, password=password)
-                client.authenticate()
-                oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
-                oqc_task = QPUTask(circuit, oqc_config)
-                res = client.execute_tasks(oqc_task)
-                counts = res[0].result["cbits"]
-
-            except Exception as e:
-                print(f"circuit: {circuit}")
-                msg = str(e)
-            )",
-            py::globals(), locals);
-
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
-
-        py::dict results = locals["counts"];
-
-        std::vector<size_t> counts_value;
-        for (auto item : results) {
-            auto key = item.first;
-            auto value = item.second;
-            counts_value.push_back(value.cast<size_t>());
+        void *handle = dlopen(OQC_PY, RTLD_LAZY);
+        if (!handle) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
         }
-        return counts_value;
+
+        std::vector<size_t> (*countsImpl)(const char *, const char *, size_t, const char *);
+        using countsImpl_t = std::vector<size_t>(*)(const char *, const char *, size_t, const char *);
+
+        countsImpl = reinterpret_cast<countsImpl_t>(dlsym(handle, "counts"));
+        if (!countsImpl) {
+            char *err_msg = dlerror();
+            RT_FAIL(err_msg);
+        }
+
+        return countsImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
+
     }
 };
 
