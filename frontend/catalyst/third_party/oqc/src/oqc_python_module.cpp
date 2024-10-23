@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <pybind11/pybind11.h>
 #include <pybind11/eval.h>
+#include <pybind11/pybind11.h>
 #include <string>
 
 #include "Exception.hpp"
@@ -44,7 +44,7 @@ except Exception as e:
 )";
 
 [[gnu::visibility("default")]] void counts(const char *_circuit, const char *_device, size_t shots,
-                                          size_t num_qubits, const char *_kwargs, void *_vector)
+                                           size_t num_qubits, const char *_kwargs, void *_vector)
 {
     namespace py = pybind11;
     using namespace py::literals;
@@ -52,7 +52,7 @@ except Exception as e:
     py::gil_scoped_acquire lock;
 
     auto locals = py::dict("circuit"_a = _circuit, "device"_a = _device, "kwargs"_a = _kwargs,
-                            "shots"_a = shots, "msg"_a = "");
+                           "shots"_a = shots, "msg"_a = "");
 
     py::exec(program, py::globals(), locals);
 

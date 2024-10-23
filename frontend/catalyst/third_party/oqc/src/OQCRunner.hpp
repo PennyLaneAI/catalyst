@@ -130,7 +130,8 @@ struct OQCRunner : public OQCRunnerBase {
         }
 
         std::vector<size_t> (*countsImpl)(const char *, const char *, size_t, const char *);
-        using countsImpl_t = std::vector<size_t>(*)(const char *, const char *, size_t, const char *);
+        using countsImpl_t =
+            std::vector<size_t> (*)(const char *, const char *, size_t, const char *);
 
         countsImpl = reinterpret_cast<countsImpl_t>(dlsym(handle, "counts"));
         if (!countsImpl) {
@@ -139,7 +140,6 @@ struct OQCRunner : public OQCRunnerBase {
         }
 
         return countsImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
-
     }
 };
 
