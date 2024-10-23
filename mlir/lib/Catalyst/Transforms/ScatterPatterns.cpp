@@ -287,7 +287,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             op.emitError() << "Only one input, update, and result";
             return failure();
         }
-
         // Compute operation hash in case they are more than one scatter and they have different
         // update function
         auto opHash = OperationEquivalence::computeHash(op);

@@ -185,6 +185,30 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
+* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
+  argument to `qjit`.
+  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+
+  ```python
+  @qjit(static_argnames="y")
+  def f(x, y):
+    if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+        return x + y
+
+  @qjit(static_argnames=["x","y"])
+  def g(x, y):
+    if x < 10 and y < 10:
+        return x + y
+
+  res_f = f(1, 2)
+  res_g = g(3, 4)
+  print(res_f, res_g)
+  ```
+
+  ```pycon
+  3 7
+  ```
+
 <h3>Improvements</h3>
 
 * Implement a Catalyst runtime plugin that mocks out all functions in the QuantumDevice interface.
@@ -274,6 +298,10 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug in `catalyst.mitigate_with_zne` that would lead
+  to incorrectly extrapolated results.
+  [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)
+
 * Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
   AutoGraph.
   [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
@@ -291,8 +319,12 @@
 * Fixes taking gradient of nested accelerate callbacks.
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
-* Registers the func dialect as a requirement for running the scatter lowering pass.
+* Some small fixes for scatter lowering:
   [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
+  [(#1217)](https://github.com/PennyLaneAI/catalyst/pull/1217)
+
+  - Registers the func dialect as a requirement for running the scatter lowering pass.
+  - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
 * Fixes #1153 : a performance issue with vmap with its root cause in the
   lowering of the scatter operation.
