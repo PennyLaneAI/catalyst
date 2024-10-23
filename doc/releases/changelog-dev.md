@@ -326,7 +326,7 @@
   - Registers the func dialect as a requirement for running the scatter lowering pass.
   - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
-* Resolves a bug where calling `qml.counts()` within complex and/or nested return expressions did not return the correct `PyTreeDef`. [(#1219)](https://github.com/PennyLaneAI/catalyst/pull/1219)
+* Resolves a bug where calling `qml.counts()` within complicated and/or nested return expressions did not return the correct `PyTreeDef`. [(#1219)](https://github.com/PennyLaneAI/catalyst/pull/1219)
 
 <h3>Internal changes</h3>
 
