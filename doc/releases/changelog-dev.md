@@ -117,9 +117,10 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the 
+* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the
   Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
   [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
+  [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
 
   Using the pipeline, one can run:
 
@@ -143,7 +144,7 @@
 
   ```python
   from catalys.passes import merge_rotations
-  
+
   @qjit
   @merge_rotations
   @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -184,7 +185,34 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
+* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
+  argument to `qjit`.
+  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+
+  ```python
+  @qjit(static_argnames="y")
+  def f(x, y):
+    if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+        return x + y
+
+  @qjit(static_argnames=["x","y"])
+  def g(x, y):
+    if x < 10 and y < 10:
+        return x + y
+
+  res_f = f(1, 2)
+  res_g = g(3, 4)
+  print(res_f, res_g)
+  ```
+
+  ```pycon
+  3 7
+  ```
+
 <h3>Improvements</h3>
+
+* Implement a Catalyst runtime plugin that mocks out all functions in the QuantumDevice interface.
+  [(#1179)](https://github.com/PennyLaneAI/catalyst/pull/1179)
 
 * Scalar tensors are eliminated from control flow operations in the program, and are replaced with
   bare scalars instead. This improves compilation time and memory usage at runtime by avoiding heap
@@ -248,6 +276,7 @@
 
 * The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
   [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
+  [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
 
 <h3>Breaking changes</h3>
 
@@ -269,7 +298,11 @@
 
 <h3>Bug fixes</h3>
 
-* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices 
+* Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
+  AutoGraph.
+  [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
+
+* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices
   supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
   [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
@@ -281,6 +314,13 @@
 
 * Fixes taking gradient of nested accelerate callbacks.
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
+
+* Some small fixes for scatter lowering:
+  [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
+  [(#1217)](https://github.com/PennyLaneAI/catalyst/pull/1217)
+
+  - Registers the func dialect as a requirement for running the scatter lowering pass.
+  - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
 <h3>Internal changes</h3>
 
@@ -337,6 +377,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Amintor Dusko,
 Joey Carter,
 Spencer Comin,
 Lillian M.A. Frederiksen,

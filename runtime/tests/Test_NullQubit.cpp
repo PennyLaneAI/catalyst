@@ -16,6 +16,7 @@
 #include "ExecutionContext.hpp"
 #include "NullQubit.hpp"
 #include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
 #include "RuntimeCAPI.h"
 
 #include "TestUtils.hpp"
@@ -194,7 +195,7 @@ TEST_CASE("NullQubit (no) Basis vector", "[NullQubit]")
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
-    CHECK(view.size() == 1);
+    CHECK(view.size() == 8);
     CHECK(view(0).real() == Approx(0.0).epsilon(1e-5));
     CHECK(view(0).imag() == Approx(0.0).epsilon(1e-5));
 }
@@ -213,9 +214,27 @@ TEST_CASE("test AllocateQubits", "[NullQubit]")
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
-    CHECK(state.size() == 1);
+    CHECK(state.size() == 4);
     CHECK(state[0].real() == Approx(0.0).epsilon(1e-5));
     CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
+}
+
+TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[NullQubit]")
+{
+    std::size_t num_qubits = 4;
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+
+    CHECK(sim->AllocateQubits(0).size() == 0);
+
+    auto q_vec = sim->AllocateQubits(num_qubits);
+
+    QubitManager qm = QubitManager();
+    std::vector<QubitIdType> result(num_qubits);
+    std::generate_n(result.begin(), num_qubits, [&, n = 0]() mutable { return qm.Allocate(n++); });
+
+    for (std::size_t nn = 0; nn < num_qubits; nn++) {
+        CHECK(q_vec[nn] == result[nn]);
+    }
 }
 
 TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
@@ -234,7 +253,7 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
-    CHECK(view.size() == 1);
+    CHECK(view.size() == 16);
     CHECK(view(0).real() == Approx(0.0).epsilon(1e-5));
     CHECK(view(0).imag() == Approx(0.0).epsilon(1e-5));
 }

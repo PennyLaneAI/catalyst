@@ -45,6 +45,7 @@ from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
     get_type_annotations,
+    merge_static_argname_into_argnum,
     merge_static_args,
     promote_arguments,
     verify_static_argnums,
@@ -82,6 +83,7 @@ def qjit(
     logfile=None,
     pipelines=None,
     static_argnums=None,
+    static_argnames=None,
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
@@ -124,6 +126,8 @@ def qjit(
             considered to be used by advanced users for low-level debugging purposes.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
+        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+            names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -481,6 +485,12 @@ class QJIT(CatalystCallable):
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
+
+        # If static_argnames are present, convert them to static_argnums
+        if compile_options.static_argnames is not None:
+            compile_options.static_argnums = merge_static_argname_into_argnum(
+                fn, compile_options.static_argnames, compile_options.static_argnums
+            )
 
         # Patch the conversion rules by adding the included modules before the block list
         include_convertlist = tuple(

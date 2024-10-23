@@ -156,6 +156,38 @@ def split_static_args(args, static_argnums):
     return tuple(dynamic_args), tuple(static_args)
 
 
+def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnums):
+    """Map static_argnames of the callable to the corresponding argument indices,
+    and add them to static_argnums"""
+    new_static_argnums = [] if (static_argnums is None) else list(static_argnums)
+    fn_argnames = list(inspect.signature(fn).parameters.keys())
+
+    # static_argnames can be a single str, or a list/tuple of strs
+    # convert all of them to list
+    if isinstance(static_argnames, str):
+        static_argnames = [static_argnames]
+
+    non_existent_args = []
+    for static_argname in static_argnames:
+        if static_argname in fn_argnames:
+            new_static_argnums.append(fn_argnames.index(static_argname))
+            continue
+        non_existent_args.append(static_argname)
+
+    if non_existent_args:
+        non_existent_args_str = "{" + ", ".join(repr(item) for item in non_existent_args) + "}"
+
+        raise ValueError(
+            f"qjitted function has invalid argname {non_existent_args_str} in static_argnames. "
+            "Function does not take these args."
+        )
+
+    # Remove potential duplicates from static_argnums and static_argnames
+    new_static_argnums = tuple(sorted(set(new_static_argnums)))
+
+    return new_static_argnums
+
+
 def merge_static_args(signature, args, static_argnums):
     """Merge static arguments back into an abstract signature, retaining the original ordering.
 
