@@ -593,5 +593,120 @@ class TestAuxiliaryData:
         assert result.a == 4
 
 
+class TestPyTreesQmlCounts:
+    """Test QJIT workflows when using qml.counts in a return expression."""
+
+    def test_pytree_qml_counts_simple(self):
+        """Test if a single qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return {"1": qml.counts()}
+
+        result = circuit(0.5)
+        _, result_tree = jax.tree.flatten(result)
+        assert "PyTreeDef({'1': (*, *)})" == str(result_tree)
+
+    def test_pytree_qml_counts_nested(self):
+        """Test if nested qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return {"1": qml.counts()}, {"2": qml.expval(qml.Z(0))}
+
+        result = circuit(0.5)
+        _, result_tree = jax.tree.flatten(result)
+        assert "PyTreeDef(({'1': (*, *)}, {'2': *}))" == str(result_tree)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit2(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], {"3": qml.expval(qml.Z(0))}
+
+        result = circuit2(0.5)
+        _, result_tree = jax.tree.flatten(result)
+
+        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], {'3': *}))" == str(result_tree)
+
+    def test_pytree_qml_counts_2_nested(self):
+        """Test if multiple nested qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
+                {"3": qml.expval(qml.Z(0))},
+                {"4": qml.counts()},
+            ]
+
+        result = circuit(0.5)
+        _, result_tree = jax.tree.flatten(result)
+        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}]))" == str(
+            result_tree
+        )
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit2(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
+                {"3": qml.counts()},
+                {"4": qml.expval(qml.Z(0))},
+            ]
+
+        result = circuit2(0.5)
+        _, result_tree = jax.tree.flatten(result)
+
+        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': (*, *)}, {'4': *}]))" == str(
+            result_tree
+        )
+
+    def test_pytree_qml_counts_longer(self):
+        """Test if 3 differently nested qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return [
+                [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}],
+                [{"3": qml.expval(qml.Z(0))}, {"4": qml.counts()}],
+                {"5": qml.expval(qml.Z(0))},
+                {"6": qml.counts()},
+            ]
+
+        result = circuit(0.5)
+        _, result_tree = jax.tree.flatten(result)
+        assert (
+            "PyTreeDef([[{'1': *}, {'2': (*, *)}], "
+            + "[{'3': *}, {'4': (*, *)}], {'5': *}, {'6': (*, *)}])"
+            == str(result_tree)
+        )
+
+    def test_pytree_qml_counts_mcm(self):
+        """Test qml.counts() with mid circuit measurement."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qml.qjit
+        @qml.qnode(dev, mcm_method="one-shot", postselect_mode=None)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            measure(0, postselect=1)
+            return {"hi": qml.counts()}, {"bye": qml.expval(qml.Z(0))}, {"hi": qml.counts()}
+
+        result = circuit(0.9)
+        _, result_tree = jax.tree.flatten(result)
+        assert ("PyTreeDef(({'hi': (*, *)}, {'bye': *}, {'hi': (*, *)}))" == str(result_tree))
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

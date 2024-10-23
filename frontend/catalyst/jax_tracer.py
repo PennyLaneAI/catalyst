@@ -916,8 +916,8 @@ def trace_quantum_measurements(
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
                 counts_tree = tree_structure(("keys", "counts"))
-                out_tree = replace_child_tree(out_tree, i + 1 + num_counts, counts_tree)
                 num_counts += 1
+                out_tree = replace_child_tree(out_tree, i + num_counts, counts_tree)
             elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
                 assert using_compbasis
                 shape = (2**nqubits,)
@@ -937,7 +937,7 @@ def trace_quantum_measurements(
 
 def replace_child_tree(tree: PyTreeDef, index: int, subtree: PyTreeDef) -> PyTreeDef:
     """
-    Replace the index-th leaf node in a PyTreeDef with a given subtree.
+    Replace the index-th leaf node in a left-to-right depth-first tree traversal of a PyTreeDef with a given subtree.
 
     Args:
         tree (PyTreeDef): The original PyTree.

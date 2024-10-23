@@ -294,6 +294,8 @@
 * Registers the func dialect as a requirement for running the scatter lowering pass.
   [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
 
+* Resolves a bug where calling `qml.counts()` within complex and/or nested return expressions did not return the correct `PyTreeDef`. [(#1219)](https://github.com/PennyLaneAI/catalyst/pull/1219)
+
 <h3>Internal changes</h3>
 
 * Remove deprecated pennylane code across the frontend.
@@ -350,6 +352,7 @@
 This release contains contributions from (in alphabetical order):
 
 Amintor Dusko,
+Arjun Bhamra,
 Joey Carter,
 Spencer Comin,
 Lillian M.A. Frederiksen,
