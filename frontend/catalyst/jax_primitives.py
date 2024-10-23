@@ -1655,22 +1655,22 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # sample measurement
 #
 @sample_p.def_abstract_eval
-def _sample_abstract_eval(obs, shots, shape):
+def _sample_abstract_eval(obs, shots, numqubits):
     assert isinstance(obs, AbstractObs)
 
-    if Signature.is_dynamic_shape(shape):
-        return core.DShapedArray(shape, np.dtype("float64"))
+    if isinstance(shots, core.ShapedArray) or isinstance(numqubits, core.ShapedArray):
+        return core.DShapedArray((shots, numqubits), np.dtype("float64"))
 
-    return core.ShapedArray(shape, jax.numpy.float64)
+    return core.ShapedArray((shots, numqubits), jax.numpy.float64)
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
+def _sample_def_impl(ctx, obs, shots, numqubits):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, numqubits: ir.Value
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -1678,7 +1678,9 @@ def _sample_lowering(
     i64_type = ir.IntegerType.get_signless(64, ctx)
     shots_val = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
-    result_type = ir.RankedTensorType.get(shape, f64_type)
+    result_type = ir.RankedTensorType.get(
+        (ir.ShapedType.get_dynamic_size(), ir.ShapedType.get_dynamic_size()), f64_type
+    )
 
     return SampleOp(result_type, obs, shots_val).results
 

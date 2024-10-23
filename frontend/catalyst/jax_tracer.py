@@ -875,8 +875,9 @@ def trace_quantum_measurements(
                 if o.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(o.mv)
                 else:
-                    shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = sample_p.bind(obs_tracers, shots, shape=shape)
+                    numqubits = nqubits if using_compbasis else None
+                    result = sample_p.bind(obs_tracers, shots, numqubits)
+                    print(result)
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 

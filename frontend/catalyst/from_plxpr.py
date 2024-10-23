@@ -352,7 +352,7 @@ class QFuncPlxprInterpreter:
 
         primitive = measurement_map[eqn.primitive.name]
         if eqn.primitive.name in ["sample_wires"]:
-            mval = primitive.bind(obs, self._device.shots.total_shots, shape=shaped_array.shape)
+            mval = primitive.bind(obs, self._device.shots.total_shots, len(self._device.wires))
         elif eqn.primitive.name in ["expval_obs", "var_obs"]:
             mval = primitive.bind(obs, shape=shaped_array.shape)
         else:

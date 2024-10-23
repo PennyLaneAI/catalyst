@@ -33,7 +33,7 @@ def test_sample():
 
     def f():
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots=5, shape=(5, 0))
+        return sample_p.bind(obs, shots=5, numqubits=0)
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
     assert jaxpr.eqns[1].primitive == sample_p
@@ -47,7 +47,7 @@ def test_sample_dynamic():
 
     def f(shots):
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots, shape=(shots, 0))
+        return sample_p.bind(obs, shots, numqubits=0)
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
     (shape_value,) = jaxpr.eqns[1].params.values()
