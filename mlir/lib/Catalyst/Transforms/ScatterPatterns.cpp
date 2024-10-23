@@ -126,8 +126,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Implies
         auto updateTy = cast<RankedTensorType>(update.getType());
         auto scatterDimNumbers = op.getScatterDimensionNumbers();
-        return updateTy.getRank() == scatterDimNumbers.getUpdateWindowDims().size() ? success()
-                                                                                    : failure();
+        size_t rank = updateTy.getRank();
+        return rank == scatterDimNumbers.getUpdateWindowDims().size() ? success() : failure();
     }
 
     mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(mhlo::ScatterOp op) const
@@ -168,7 +168,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         if (failed(this->onlyOneInputUpdateAndResult(op))) {
             return failure();
         }
-        auto result = op.getResults().front();
         auto input = op.getInputs().front();
         auto update = op.getUpdates().front();
         auto scatterIndices = op.getScatterIndices();
@@ -203,17 +202,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             return failure();
         }
 
-        auto resultTy = cast<RankedTensorType>(result.getType());
         auto inputTy = cast<RankedTensorType>(input.getType());
         auto updateTy = cast<RankedTensorType>(update.getType());
-        auto resultShape = resultTy.getShape();
         auto inputShape = inputTy.getShape();
         auto updateShape = updateTy.getShape();
         auto scatterIndicesTy = cast<RankedTensorType>(scatterIndices.getType());
         // (C24) shape(%result) == shape(%input)
 
         auto scatterDimNumbers = op.getScatterDimensionNumbers();
-        auto updateWindowDims = scatterDimNumbers.getUpdateWindowDims();
         auto insertedWindowDims = scatterDimNumbers.getInsertedWindowDims();
         auto scatterDimsToOperandDims = scatterDimNumbers.getScatterDimsToOperandDims();
         auto indexVectorDim = scatterDimNumbers.getIndexVectorDim();
@@ -231,7 +227,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
 
         // TODO: upstream to mlir-hlo and stablehlo
-        for (int i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
+        for (size_t i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
             if (llvm::is_contained(insertedWindowDims, i)) {
                 int scatterDimIndex = scatterDimsToOperandDims[inputDim];
                 Value scatterDimVal =
