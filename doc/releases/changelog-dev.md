@@ -207,6 +207,29 @@
   catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
   // Only performs lower-level optimizations and create object file
   catalyst-cli --tool=llc llvm-ir.ll -o output.o
+
+* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
+  argument to `qjit`.
+  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+
+  ```python
+  @qjit(static_argnames="y")
+  def f(x, y):
+    if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+        return x + y
+
+  @qjit(static_argnames=["x","y"])
+  def g(x, y):
+    if x < 10 and y < 10:
+        return x + y
+
+  res_f = f(1, 2)
+  res_g = g(3, 4)
+  print(res_f, res_g)
+  ```
+
+  ```pycon
+  3 7
   ```
 
 <h3>Improvements</h3>
@@ -302,6 +325,10 @@
   Please use `compiler.get_output_of("last", workspace)`
 
 <h3>Bug fixes</h3>
+
+* Fix a bug in `catalyst.mitigate_with_zne` that would lead
+  to incorrectly extrapolated results.
+  [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)
 
 * Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
   AutoGraph.

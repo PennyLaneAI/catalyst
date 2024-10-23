@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import grad, qjit
 from catalyst.utils.exceptions import CompileError
 
 
@@ -220,6 +220,81 @@ class TestStaticArguments:
         wrapper(0.5, 0.5)
         captured = capsys.readouterr()
         assert captured.out.strip() == "Inside QNode: 0.5"
+
+    def test_static_argnames(self):
+        # pylint: disable=unused-argument, function-redefined
+        """Test static arguments specified by names"""
+
+        @qjit(static_argnames="y")
+        def f(x, y):
+            return
+
+        assert set(f.compile_options.static_argnums) == {1}
+
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {'yy'}"):
+
+            @qjit(static_argnames="yy")
+            def f_badname(x, y):
+                return
+
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {'yy'}"):
+
+            @qjit(static_argnames=["y", "yy"])
+            def f_badname_list(x, y):
+                return
+
+        with pytest.raises(ValueError, match="qjitted function has invalid argname {'xx', 'yy'}"):
+
+            @qjit(static_argnames=["xx", "yy"])
+            def f_badname_list(x, y):
+                return
+
+        @qjit(static_argnames=("x", "y"))
+        def f(x, y):
+            return
+
+        assert set(f.compile_options.static_argnums) == {0, 1}
+
+        @qjit(static_argnames=("x"), static_argnums=[1])
+        def f(x, y):
+            return
+
+        assert set(f.compile_options.static_argnums) == {0, 1}
+
+        @qjit(static_argnames=("y"), static_argnums=[0])
+        def f(x, y):
+            return
+
+        assert set(f.compile_options.static_argnums) == {0, 1}
+
+        @qjit(static_argnames=("y"), static_argnums=[1])
+        def f(x, y):
+            return
+
+        assert set(f.compile_options.static_argnums) == {1}
+
+    def test_static_argnames_with_decorator(self):
+        # pylint: disable=unused-argument, function-redefined
+        """Test static arguments specified by names
+        on functions with decorators"""
+
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @qjit(static_argnames="theta")
+        @qml.qnode(dev)
+        def f(theta, phi):
+            qml.RX(theta, wires=0)
+            qml.RY(phi, wires=1)
+            return qml.probs()
+
+        assert set(f.compile_options.static_argnums) == {0}
+
+        @qjit(static_argnames=("x", "y"))
+        @grad
+        def f(x, y):
+            return x * y
+
+        assert set(f.compile_options.static_argnums) == {0, 1}
 
 
 if __name__ == "__main__":
