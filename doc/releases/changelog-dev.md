@@ -298,6 +298,10 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug in `catalyst.mitigate_with_zne` that would lead
+  to incorrectly extrapolated results.
+  [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)
+
 * Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
   AutoGraph.
   [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
@@ -321,6 +325,10 @@
 
   - Registers the func dialect as a requirement for running the scatter lowering pass.
   - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
+
+* Fixes a performance issue with vmap with its root cause in the
+  lowering of the scatter operation.
+  [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
 
 <h3>Internal changes</h3>
 
