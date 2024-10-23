@@ -1320,7 +1320,6 @@ def test_mod_exp(backend):
     work_wires = [5, 6, 7, 8, 9]
 
     def mod_exp():
-        qml.Identity(0)
         qml.BasisEmbedding(x, wires=x_wires)
         qml.BasisEmbedding(b, wires=output_wires)
         qml.ModExp(x_wires, output_wires, base, mod, work_wires)
@@ -1360,6 +1359,7 @@ def test_multiplier(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.xfail(reason="Multiple state preparations at beginning of circuit")
 def test_out_adder(backend):
     """Test OutAdder."""
     x = 5
@@ -1372,7 +1372,6 @@ def test_out_adder(backend):
     work_wires = [6, 10]
 
     def out_adder():
-        qml.Identity(0)
         qml.BasisEmbedding(x, wires=x_wires)
         qml.BasisEmbedding(y, wires=y_wires)
         qml.OutAdder(x_wires, y_wires, output_wires, mod, work_wires)
@@ -1388,6 +1387,7 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
+@pytest.mark.xfail(reason="Multiple state preparations at beginning of circuit")
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     x = 2
@@ -1400,7 +1400,6 @@ def test_out_multiplier(backend):
     work_wires = [5, 10]
 
     def out_multiplier():
-        qml.Identity(0)
         qml.BasisEmbedding(x, wires=x_wires)
         qml.BasisEmbedding(y, wires=y_wires)
         qml.OutMultiplier(x_wires, y_wires, output_wires, mod, work_wires)
