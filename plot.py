@@ -68,6 +68,7 @@ text_box = TextArea(
     """
 $\mathbf{Compilation~Time~Benchmarks}$
 $\mathbf{Quantum~Circuit~Optimizations}$
+$\mathbf{Simple~Circuit}$
 
 11th Gen Intel(R) Core(TM) i7-1185G7
 Catalyst v0.9.0-dev36
@@ -76,7 +77,7 @@ Catalyst v0.9.0-dev36
 )
 ab = AnnotationBbox(
     text_box,
-    (50, 80000),
+    (50, 70000),
     frameon=False,
     bboxprops=dict(facecolor="none", edgecolor="none"),
     zorder=1,
