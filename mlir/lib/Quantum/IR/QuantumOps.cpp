@@ -50,17 +50,33 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
         }
         else if (rotationsOps.contains(name)) {
             auto params = op.getParams();
-            SmallVector<Value> paramsMinus;
+            SmallVector<Value> paramsNeg;
             for (auto param : params) {
-                rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+                auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+                paramsNeg.push_back(paramNeg);
             }
-            auto adjointOp = rewriter.create<CustomOp>(op.getLoc(), op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
-                                                     paramsMinus, op.getInQubits(), name, nullptr,
-                                                     op.getInCtrlQubits(), op.getInCtrlValues());
-            rewriter.replaceOp(op, adjointOp.getResults());
+
+            rewriter.replaceOpWithNewOp<CustomOp>(
+                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
+                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
             return success();
         }
         return failure();
+    };
+    return failure();
+}
+
+LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+
+        rewriter.replaceOpWithNewOp<MultiRZOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
     };
     return failure();
 }

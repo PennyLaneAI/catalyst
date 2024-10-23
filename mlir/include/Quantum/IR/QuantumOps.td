@@ -455,6 +455,8 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
     }];
+    
+    let hasCanonicalizeMethod = 1;
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,

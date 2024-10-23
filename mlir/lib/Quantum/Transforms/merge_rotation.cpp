@@ -60,9 +60,16 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
             // Do nothing and exit!
             return;
         }
+        RewritePatternSet patternsCanonicalization(&getContext());
+        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                 &getContext());
+        catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                  &getContext());
+        if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patternsCanonicalization)))) {
+            return signalPassFailure();
+        }
 
         RewritePatternSet patterns(&getContext());
-        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patterns, &getContext());
         populateMergeRotationsPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
