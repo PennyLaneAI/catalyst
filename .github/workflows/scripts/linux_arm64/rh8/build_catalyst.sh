@@ -56,7 +56,6 @@ cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dumm
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
 export RT_BUILD_DIR="/catalyst/runtime-build"
-export USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER=ON
 make oqc
 
 # Build Catalyst dialects
