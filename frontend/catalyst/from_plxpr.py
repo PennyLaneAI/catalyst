@@ -351,7 +351,14 @@ class QFuncPlxprInterpreter:
         )[0]
 
         primitive = measurement_map[eqn.primitive.name]
-        mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+        if eqn.primitive.name in ["sample_wires"]:
+            mval = primitive.bind(obs, self._device.shots.total_shots, len(self._device.wires))
+        elif eqn.primitive.name in ["expval_obs", "var_obs"]:
+            mval = primitive.bind(obs, shape=shaped_array.shape)
+        else:
+            mval = primitive.bind(
+                obs, shape=shaped_array.shape, shots=self._device.shots.total_shots
+            )
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if shaped_array.dtype != mval.dtype:

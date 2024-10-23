@@ -18,18 +18,18 @@
 // Measurements //
 //////////////////
 
-func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) -> (tensor<4xf64>, tensor<4xi64>) {
+func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64) -> (tensor<4xf64>, tensor<4xi64>) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-    %samples:2 = quantum.counts %obs {shots=2} : tensor<4xf64>, tensor<4xi64>
+    %samples:2 = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
     func.return %samples#0, %samples#1 : tensor<4xf64>, tensor<4xi64>
 }
 
 // -----
 
-func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit) {
+func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
     // CHECK: quantum.sample {{.*}} : memref<1000x2xf64>
-    %samples = quantum.sample %obs {shots=1000} : tensor<1000x2xf64>
+    %samples = quantum.sample %obs %shots : tensor<1000x2xf64>
     func.return
 }
 
