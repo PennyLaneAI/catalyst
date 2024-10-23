@@ -24,6 +24,22 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
 include(CTest)
 include(Catch)
 
+add_executable(runner_tests_qir_runtime runner_main.cpp)
+
+# To avoid link to libpython, we use pybind11::module interface library.
+target_link_libraries(runner_tests_qir_runtime PRIVATE
+    Catch2::Catch2
+    pybind11::embed
+    catalyst_qir_runtime
+    rtd_null_qubit
+    )
+
+target_sources(runner_tests_qir_runtime PRIVATE
+    Test_NullQubit.cpp
+    )
+
+catch_discover_tests(runner_tests_qir_runtime)
+
 if(ENABLE_LIGHTNING)
     add_executable(runner_tests_lightning runner_main.cpp)
 
@@ -41,7 +57,7 @@ if(ENABLE_LIGHTNING)
         # runtime (see https://github.com/google/sanitizers/issues/611 for
         # details). If you want to run this-file-does-not-exist.so library under
         # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
-        set(dl_manager_tests 
+        set(dl_manager_tests
             Test_DLManager.cpp
             )
     endif()

@@ -117,6 +117,44 @@
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
+* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the
+  Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
+  [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
+  [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
+
+  Using the pipeline, one can run:
+
+  ```python
+  from catalys.passes import pipeline
+
+  my_passes = {
+    "merge_rotations": {}
+  }
+
+  @qjit(circuit_transform_pipeline=my_passes)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def g(x: float):
+      qml.RX(x, wires=0)
+      qml.RX(x, wires=0)
+      qml.Hadamard(wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  Using the python function, one can run:
+
+  ```python
+  from catalys.passes import merge_rotations
+
+  @qjit
+  @merge_rotations
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def g(x: float):
+      qml.RX(x, wires=0)
+      qml.RX(x, wires=0)
+      qml.Hadamard(wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 * Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's
   array assignment operator syntax.
   [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
@@ -147,7 +185,34 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
+* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
+  argument to `qjit`.
+  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+
+  ```python
+  @qjit(static_argnames="y")
+  def f(x, y):
+    if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+        return x + y
+
+  @qjit(static_argnames=["x","y"])
+  def g(x, y):
+    if x < 10 and y < 10:
+        return x + y
+
+  res_f = f(1, 2)
+  res_g = g(3, 4)
+  print(res_f, res_g)
+  ```
+
+  ```pycon
+  3 7
+  ```
+
 <h3>Improvements</h3>
+
+* Implement a Catalyst runtime plugin that mocks out all functions in the QuantumDevice interface.
+  [(#1179)](https://github.com/PennyLaneAI/catalyst/pull/1179)
 
 * Scalar tensors are eliminated from control flow operations in the program, and are replaced with
   bare scalars instead. This improves compilation time and memory usage at runtime by avoiding heap
@@ -192,9 +257,26 @@
 
 * Catalyst now supports numpy 2.0
   [(#1119)](https://github.com/PennyLaneAI/catalyst/pull/1119)
+  [(#1182)](https://github.com/PennyLaneAI/catalyst/pull/1182)
 
 * Importing Catalyst will now pollute less of JAX's global variables by using `LoweringParameters`.
   [(#1152)](https://github.com/PennyLaneAI/catalyst/pull/1152)
+
+* Compiling `qnode`s to asynchronous functions will no longer print to stderr in case of an error.
+  [(#645)](https://github.com/PennyLaneAI/catalyst/pull/645)
+
+* Cached primitive lowerings is used instead of a custom cache structure.
+  [(#1159)](https://github.com/PennyLaneAI/catalyst/pull/1159)
+
+* Calling gradients twice (with same GradParams) will now only lower to a single MLIR function.
+  [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
+
+* Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
+  [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+
+* The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
+  [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
+  [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
 
 <h3>Breaking changes</h3>
 
@@ -203,7 +285,30 @@
 
   This reverts a previous breaking change.
 
+* Nesting qnodes now raises an error.
+  [(#1176)](https://github.com/PennyLaneAI/catalyst/pull/1176)
+
+  This is unlikely to affect users since only under certain conditions did
+  nesting qnodes worked successfully.
+
+* Removes `debug.compile_from_mlir`.
+  [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
+
+  Please use `debug.replace_ir`.
+
 <h3>Bug fixes</h3>
+
+* Fix a bug in `catalyst.mitigate_with_zne` that would lead
+  to incorrectly extrapolated results.
+  [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)
+
+* Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
+  AutoGraph.
+  [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
+
+* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices
+  supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
+  [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
 * Resolve a bug in the `vmap` function when passing shapeless values to the target.
   [(#1150)](https://github.com/PennyLaneAI/catalyst/pull/1150)
@@ -214,7 +319,21 @@
 * Fixes taking gradient of nested accelerate callbacks.
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
+* Some small fixes for scatter lowering:
+  [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
+  [(#1217)](https://github.com/PennyLaneAI/catalyst/pull/1217)
+
+  - Registers the func dialect as a requirement for running the scatter lowering pass.
+  - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
+
+* Fixes a performance issue with vmap with its root cause in the
+  lowering of the scatter operation.
+  [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
+
 <h3>Internal changes</h3>
+
+* Remove deprecated pennylane code across the frontend.
+  [(#1168)](https://github.com/PennyLaneAI/catalyst/pull/1168)
 
 * Update Enzyme to version `v0.0.149`.
   [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
@@ -247,10 +366,26 @@
  `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
   function has been removed entirely.
 
+* Catalyst now generates nested modules denoting quantum programs.
+  [(#1144)](https://github.com/PennyLaneAI/catalyst/pull/1144)
+
+  Similar to MLIR's `gpu.launch_kernel` function, Catalyst, now supports
+  a `call_function_in_module`. This allows Catalyst to call functions in modules
+  and have modules denote a quantum kernel. This will allow for device specific
+  optimizations and compilation pipelines.
+
+  At the moment, no one is using this. This is just the necessary scaffolding to
+  supporting device specific transformations. As such, the module will be inlined
+  to preserve current semantics. However, in the future, we will explore lowering
+  this nested module into other IRs/binary formats and lowering `call_function_in_module`
+  to something that can dispatch calls to another runtime / VM.
+
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Amintor Dusko,
 Joey Carter,
 Spencer Comin,
 Lillian M.A. Frederiksen,

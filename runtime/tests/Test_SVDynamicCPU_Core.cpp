@@ -24,7 +24,7 @@
 #include "LinearAlgebra.hpp"
 #include "StateVectorLQubitDynamic.hpp"
 #include "Util.hpp"
-#include "cpu_kernels/GateImplementationsPI.hpp"
+#include "cpu_kernels/GateImplementationsLM.hpp"
 #include <StateVectorLQubit.hpp>
 
 #include "TestHelpers.hpp"
@@ -129,7 +129,7 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with a pointer",
 
             const auto m = Pennylane::Util::randomUnitary<PrecisionT>(re, num_wires);
             sv1.applyMatrix(m, wires);
-            Gates::GateImplementationsPI::applyMultiQubitOp<PrecisionT>(sv2.getData(), num_qubits,
+            Gates::GateImplementationsLM::applyMultiQubitOp<PrecisionT>(sv2.getData(), num_qubits,
                                                                         m.data(), wires, false);
             CHECK(sv1.getDataVector() == approx(sv2.getDataVector()).margin(PrecisionT{1e-5}));
         }

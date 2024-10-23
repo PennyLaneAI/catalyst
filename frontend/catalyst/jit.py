@@ -45,11 +45,13 @@ from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
     get_type_annotations,
+    merge_static_argname_into_argnum,
     merge_static_args,
     promote_arguments,
     verify_static_argnums,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
@@ -81,6 +83,7 @@ def qjit(
     logfile=None,
     pipelines=None,
     static_argnums=None,
+    static_argnames=None,
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
@@ -123,6 +126,8 @@ def qjit(
             considered to be used by advanced users for low-level debugging purposes.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
+        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+            names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -136,9 +141,6 @@ def qjit(
             on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
-            Note that seeding samples on simulator devices is not yet supported. As such,
-            shot-noise stochasticity in terminal measurement statistics such as ``sample`` or
-            ``expval`` will remain.
         experimental_capture (bool): If set to ``True``, the qjit decorator
             will use PennyLane's experimental program capture capabilities
             to capture the decorated function for compilation.
@@ -437,7 +439,7 @@ def qjit(
 
 
 # pylint: disable=too-many-instance-attributes
-class QJIT:
+class QJIT(CatalystCallable):
     """Class representing a just-in-time compiled hybrid quantum-classical function.
 
     .. note::
@@ -459,6 +461,7 @@ class QJIT:
 
     @debug_logger_init
     def __init__(self, fn, compile_options):
+        functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
@@ -480,9 +483,14 @@ class QJIT:
         self.out_type = None
         self.overwrite_ir = None
 
-        functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
+
+        # If static_argnames are present, convert them to static_argnums
+        if compile_options.static_argnames is not None:
+            compile_options.static_argnums = merge_static_argname_into_argnum(
+                fn, compile_options.static_argnames, compile_options.static_argnums
+            )
 
         # Patch the conversion rules by adding the included modules before the block list
         include_convertlist = tuple(
@@ -499,6 +507,8 @@ class QJIT:
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
+
+        super().__init__("user_function")
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -703,7 +713,7 @@ class QJIT:
         canonicalizer = Compiler(options)
 
         # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
+        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
 
         return mlir_module, mlir_string
 
@@ -732,13 +742,13 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir, _ = self.compiler.run_from_ir(
+            shared_object, llvm_ir = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
