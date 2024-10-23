@@ -121,9 +121,9 @@ struct BraketRunner : public OpenQasmRunner {
         }
 
         char *(*runCircuitImpl)(const char *, const char *, size_t, const char *);
-        typedef char *(*func_ptr_t)(const char *, const char *, size_t, const char *);
+        using func_ptr_t = char *(*)(const char *, const char *, size_t, const char *);
 
-        runCircuitImpl = (func_ptr_t)dlsym(handle, "runCircuit");
+        runCircuitImpl = reinterpret_cast<func_ptr_t>(dlsym(handle, "runCircuit"));
         if (!runCircuitImpl) {
             char *err_msg = dlerror();
             RT_FAIL(err_msg);
@@ -153,10 +153,10 @@ struct BraketRunner : public OpenQasmRunner {
         }
 
         void *(*probsImpl)(const char *, const char *, size_t, size_t, const char *, void *);
-        typedef void *(*probsImpl_t)(const char *, const char *, size_t, size_t, const char *,
-                                     void *);
+        using probsImpl_t =
+            void *(*)(const char *, const char *, size_t, size_t, const char *, void *);
 
-        probsImpl = (probsImpl_t)dlsym(handle, "probs");
+        probsImpl = reinterpret_cast<probsImpl_t>(dlsym(handle, "probs"));
         if (!probsImpl) {
             char *err_msg = dlerror();
             RT_FAIL(err_msg);
@@ -186,10 +186,10 @@ struct BraketRunner : public OpenQasmRunner {
         }
 
         void *(*samplesImpl)(const char *, const char *, size_t, size_t, const char *, void *);
-        typedef void *(*samplesImpl_t)(const char *, const char *, size_t, size_t, const char *,
-                                       void *);
+        using samplesImpl_t =
+            void *(*)(const char *, const char *, size_t, size_t, const char *, void *);
 
-        samplesImpl = (samplesImpl_t)dlsym(handle, "samples");
+        samplesImpl = reinterpret_cast<samplesImpl_t>(dlsym(handle, "samples"));
         if (!samplesImpl) {
             char *err_msg = dlerror();
             RT_FAIL(err_msg);
@@ -216,9 +216,9 @@ struct BraketRunner : public OpenQasmRunner {
         }
 
         double (*expvalImpl)(const char *, const char *, size_t, const char *);
-        typedef double (*expvalImpl_t)(const char *, const char *, size_t, const char *);
+        using expvalImpl_t = double (*)(const char *, const char *, size_t, const char *);
 
-        expvalImpl = (expvalImpl_t)dlsym(handle, "expval");
+        expvalImpl = reinterpret_cast<expvalImpl_t>(dlsym(handle, "expval"));
         if (!expvalImpl) {
             char *err_msg = dlerror();
             RT_FAIL(err_msg);
@@ -243,9 +243,9 @@ struct BraketRunner : public OpenQasmRunner {
         }
 
         double (*varImpl)(const char *, const char *, size_t, const char *);
-        typedef double (*varImpl_t)(const char *, const char *, size_t, const char *);
+        using varImpl_t = double (*)(const char *, const char *, size_t, const char *);
 
-        varImpl = (varImpl_t)dlsym(handle, "expval");
+        varImpl = reinterpret_cast<varImpl_t>(dlsym(handle, "expval"));
         if (!varImpl) {
             char *err_msg = dlerror();
             RT_FAIL(err_msg);
