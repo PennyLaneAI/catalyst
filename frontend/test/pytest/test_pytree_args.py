@@ -606,9 +606,13 @@ class TestPyTreesQmlCounts:
             qml.RX(x, wires=0)
             return {"1": qml.counts()}
 
-        result = circuit(0.5)
-        _, result_tree = jax.tree.flatten(result)
-        assert "PyTreeDef({'1': (*, *)})" == str(result_tree)
+        observed = circuit(0.5)
+        expected = {"1": (jnp.array((0, 1), dtype=jnp.int64),
+                          jnp.array((0, 3), dtype=jnp.int64))}
+        
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
     def test_pytree_qml_counts_nested(self):
         """Test if nested qml.counts() can be used and output correctly."""
@@ -620,9 +624,16 @@ class TestPyTreesQmlCounts:
             qml.RX(x, wires=0)
             return {"1": qml.counts()}, {"2": qml.expval(qml.Z(0))}
 
-        result = circuit(0.5)
-        _, result_tree = jax.tree.flatten(result)
-        assert "PyTreeDef(({'1': (*, *)}, {'2': *}))" == str(result_tree)
+        observed = circuit(0.5)
+        expected = (
+            {"1": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))},
+            {"2": jnp.array(-1, dtype=jnp.float64)},
+        )
+        
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
         @qjit
         @qml.qnode(dev)
@@ -630,10 +641,16 @@ class TestPyTreesQmlCounts:
             qml.RX(x, wires=0)
             return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], {"3": qml.expval(qml.Z(0))}
 
-        result = circuit2(0.5)
-        _, result_tree = jax.tree.flatten(result)
-
-        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], {'3': *}))" == str(result_tree)
+        observed = circuit2(0.5)
+        expected = (
+            [{"1": jnp.array(-1, dtype=jnp.float64)},
+            {"2": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))}],
+            {"3": jnp.array(-1, dtype=jnp.float64)},
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
     def test_pytree_qml_counts_2_nested(self):
         """Test if multiple nested qml.counts() can be used and output correctly."""
@@ -648,11 +665,18 @@ class TestPyTreesQmlCounts:
                 {"4": qml.counts()},
             ]
 
-        result = circuit(0.5)
-        _, result_tree = jax.tree.flatten(result)
-        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': *}, {'4': (*, *)}]))" == str(
-            result_tree
+        observed = circuit(0.5)
+        expected = (
+            [{"1": jnp.array(-1, dtype=jnp.float64)},
+            {"2": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))}],
+            [{"3": jnp.array(-1, dtype=jnp.float64)},
+            {"4": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))}],
         )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
         @qjit
         @qml.qnode(dev)
@@ -663,12 +687,18 @@ class TestPyTreesQmlCounts:
                 {"4": qml.expval(qml.Z(0))},
             ]
 
-        result = circuit2(0.5)
-        _, result_tree = jax.tree.flatten(result)
-
-        assert "PyTreeDef(([{'1': *}, {'2': (*, *)}], [{'3': (*, *)}, {'4': *}]))" == str(
-            result_tree
+        observed = circuit2(0.5)
+        expected = (
+            [{"1": jnp.array(-1, dtype=jnp.float64)},
+            {"2": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))}],
+            [{"3": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))},
+            {"4": jnp.array(-1, dtype=jnp.float64)}],
         )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
     def test_pytree_qml_counts_longer(self):
         """Test if 3 differently nested qml.counts() can be used and output correctly."""
@@ -685,13 +715,21 @@ class TestPyTreesQmlCounts:
                 {"6": qml.counts()},
             ]
 
-        result = circuit(0.5)
-        _, result_tree = jax.tree.flatten(result)
-        assert (
-            "PyTreeDef([[{'1': *}, {'2': (*, *)}], "
-            + "[{'3': *}, {'4': (*, *)}], {'5': *}, {'6': (*, *)}])"
-            == str(result_tree)
-        )
+        observed = circuit(0.5)
+        expected = [
+            [{"1": jnp.array(-1, dtype=jnp.float64)},
+            {"2": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))}],
+            [{"3": jnp.array(-1, dtype=jnp.float64)},
+            {"4": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))}],
+            {"5": jnp.array(-1, dtype=jnp.float64)},
+            {"6": (jnp.array((0, 1), dtype=jnp.int64),
+                      jnp.array((0, 3), dtype=jnp.int64))},
+        ]
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
     def test_pytree_qml_counts_mcm(self):
         """Test qml.counts() with mid circuit measurement."""
@@ -704,10 +742,15 @@ class TestPyTreesQmlCounts:
             measure(0, postselect=1)
             return {"hi": qml.counts()}, {"bye": qml.expval(qml.Z(0))}, {"hi": qml.counts()}
 
-        result = circuit(0.9)
-        _, result_tree = jax.tree.flatten(result)
-        assert "PyTreeDef(({'hi': (*, *)}, {'bye': *}, {'hi': (*, *)}))" == str(result_tree)
-
+        observed = circuit(0.5)
+        expected = (
+            {"hi": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            {"bye": jnp.array(-1, dtype=jnp.float64)},
+            {"hi": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
