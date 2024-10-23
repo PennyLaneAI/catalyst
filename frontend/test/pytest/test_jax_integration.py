@@ -489,5 +489,6 @@ class TestJAXRecompilation:
         params = jnp.array([0.54, 0.3154, 0.654, 0.123, 0.1, 0.2])
         jax.grad(circuit, argnums=0)(params, 3)
 
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
