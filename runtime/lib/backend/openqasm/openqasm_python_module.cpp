@@ -85,7 +85,9 @@ extern "C" {
     std::string kwargs(_kwargs);
 
     py::exec(program, py::globals(), py::globals());
-    return py::globals()["py_var"](circuit, device, kwargs, shots).attr("__getitem__")(0).cast<double>();
+    return py::globals()["py_var"](circuit, device, kwargs, shots)
+        .attr("__getitem__")(0)
+        .cast<double>();
 }
 [[gnu::visibility("default")]] double expval(const char *_circuit, const char *_device,
                                              size_t shots, const char *_kwargs)
@@ -98,7 +100,9 @@ extern "C" {
     std::string kwargs(_kwargs);
 
     py::exec(program, py::globals(), py::globals());
-    return py::globals()["py_expval"](circuit, device, kwargs, shots).attr("__getitem__")(0).cast<double>();
+    return py::globals()["py_expval"](circuit, device, kwargs, shots)
+        .attr("__getitem__")(0)
+        .cast<double>();
 }
 [[gnu::visibility("default")]] void samples(const char *_circuit, const char *_device, size_t shots,
                                             size_t num_qubits, const char *_kwargs, void *_vector)
