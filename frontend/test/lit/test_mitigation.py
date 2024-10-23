@@ -40,7 +40,6 @@ def mcm_method_with_zne():
 # CHECK: mitigation.zne @one_shot_wrapper(%c) folding( global) numFolds(%2 : tensor<2xi64>) : (tensor<5xi1>) -> tensor<2xf64>
 
 # CHECK: func.func private @one_shot_wrapper(%arg0: tensor<5xi1>) -> tensor<f64>
-# CHECK: catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<f64>
 # CHECK: scf.for
 # CHECK: catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<f64>
 print(mcm_method_with_zne.mlir)

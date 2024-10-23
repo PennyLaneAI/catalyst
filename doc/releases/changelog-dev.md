@@ -326,6 +326,10 @@
   - Registers the func dialect as a requirement for running the scatter lowering pass.
   - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
+* Fixes a performance issue with vmap with its root cause in the
+  lowering of the scatter operation.
+  [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
+
 <h3>Internal changes</h3>
 
 * Remove deprecated pennylane code across the frontend.
