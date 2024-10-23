@@ -706,7 +706,10 @@ class TestPyTreesQmlCounts:
 
         result = circuit(0.9)
         _, result_tree = jax.tree.flatten(result)
-        assert ("PyTreeDef(({'hi': (*, *)}, {'bye': *}, {'hi': (*, *)}))" == str(result_tree))
+        assert (
+            "PyTreeDef(({'hi': (*, *)}, {'bye': *}, {'hi': (*, *)}))"
+            == str(result_tree)
+        )
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
