@@ -877,7 +877,6 @@ def trace_quantum_measurements(
                 else:
                     numqubits = nqubits if using_compbasis else None
                     result = sample_p.bind(obs_tracers, shots, numqubits)
-                    print(result)
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 

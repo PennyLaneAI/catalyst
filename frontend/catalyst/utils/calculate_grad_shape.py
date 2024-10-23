@@ -99,7 +99,7 @@ class Signature:
             bool: Whether the shape contains a tracer or not.
         """
         for s in shape:
-            if isinstance(s, Tracer):
+            if isinstance(s, Tracer) or isinstance(s, ShapedArray):
                 return True
 
         return False

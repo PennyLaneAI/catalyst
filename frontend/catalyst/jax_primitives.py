@@ -1658,10 +1658,17 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 def _sample_abstract_eval(obs, shots, numqubits):
     assert isinstance(obs, AbstractObs)
 
-    if isinstance(shots, core.ShapedArray) or isinstance(numqubits, core.ShapedArray):
-        return core.DShapedArray((shots, numqubits), np.dtype("float64"))
+    shape = (shots, numqubits)
 
-    return core.ShapedArray((shots, numqubits), jax.numpy.float64)
+    if Signature.is_dynamic_shape(shape):
+        return core.DShapedArray(shape, np.dtype("float64"))
+
+    if obs.primitive is compbasis_p:
+        assert shape == (shots, obs.num_qubits)
+    else:
+        assert shape == (shots,)
+
+    return core.ShapedArray(shape, jax.numpy.float64)
 
 
 @sample_p.def_impl
