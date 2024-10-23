@@ -34,6 +34,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
     mlir::LogicalResult onlyOneInputUpdateAndResult(mhlo::ScatterOp op) const
     {
+        // Semantics of scatter:
+        // https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
         // Assumption 1: only one input, one update, and one result
         // * size(inputs) == 1
         // * size(updates) == 1
@@ -225,19 +227,18 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         SmallVector<Value> dynOffsets, dynSizes, dynStrides;
         SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+        Location loc = op.getLoc();
 
         // TODO: upstream to mlir-hlo and stablehlo
         for (size_t i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
             if (llvm::is_contained(insertedWindowDims, i)) {
                 int scatterDimIndex = scatterDimsToOperandDims[inputDim];
-                Value scatterDimVal =
-                    rewriter.create<index::ConstantOp>(op.getLoc(), scatterDimIndex);
+                Value scatterDimVal = rewriter.create<index::ConstantOp>(loc, scatterDimIndex);
                 auto extractOp =
-                    rewriter.create<tensor::ExtractOp>(op.getLoc(), scatterIndices, scatterDimVal)
+                    rewriter.create<tensor::ExtractOp>(loc, scatterIndices, scatterDimVal)
                         .getResult();
                 auto indexCastOp =
-                    rewriter
-                        .create<arith::IndexCastOp>(op.getLoc(), rewriter.getIndexType(), extractOp)
+                    rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), extractOp)
                         .getResult();
                 dynOffsets.push_back(indexCastOp);
                 staticOffsets.push_back(ShapedType::kDynamic);
@@ -245,14 +246,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             }
             else if (updateDim == inputDim) {
                 int scatterDimIndex = scatterDimsToOperandDims[inputDim];
-                Value scatterDimVal =
-                    rewriter.create<index::ConstantOp>(op.getLoc(), scatterDimIndex);
+                Value scatterDimVal = rewriter.create<index::ConstantOp>(loc, scatterDimIndex);
                 auto extractOp =
-                    rewriter.create<tensor::ExtractOp>(op.getLoc(), scatterIndices, scatterDimVal)
+                    rewriter.create<tensor::ExtractOp>(loc, scatterIndices, scatterDimVal)
                         .getResult();
                 auto indexCastOp =
-                    rewriter
-                        .create<arith::IndexCastOp>(op.getLoc(), rewriter.getIndexType(), extractOp)
+                    rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), extractOp)
                         .getResult();
                 dynOffsets.push_back(indexCastOp);
                 staticOffsets.push_back(ShapedType::kDynamic);
