@@ -162,7 +162,7 @@ class ZNECallable(CatalystCallable):
     def __init__(
         self,
         fn: Callable,
-        scale_factors: Sequence,
+        scale_factors: Sequence[int],
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
