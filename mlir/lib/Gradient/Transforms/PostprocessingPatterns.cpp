@@ -14,12 +14,14 @@
 
 #include "iostream"
 #include "llvm/Support/raw_ostream.h"
+#include <cstddef>
 
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -41,10 +43,11 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
         // Check if the numbers of args and returns match Enzyme's format.
         auto argc = op.getArgc();
         auto resc = op.getResc();
-        auto tapeCount = op.getTape();
+        auto tape = op.getTape();
 
-        if (op.getFunctionType().getNumInputs() == (argc + resc) * 2 &&
-            op.getFunctionType().getNumResults() == tapeCount)
+        // If function signature is modified, this pass cannot be processed.
+        if (op.getFunctionType().getNumInputs() != argc ||
+            op.getFunctionType().getNumResults() != (resc + tape))
             return failure();
 
         auto argTys = op.getArgumentTypes();
@@ -127,7 +130,9 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto forwardResc = op.getResc();
         auto tape = op.getTape();
 
-        if (op.getFunctionType().getNumInputs() == (forwardArgc + forwardResc) * 2 + tape)
+        // If function signature is modified, this pass cannot be processed.
+        if (op.getFunctionType().getNumInputs() != (forwardResc + tape) ||
+            op.getFunctionType().getNumResults() != forwardArgc)
             return failure();
 
         auto argTys = op.getArgumentTypes();

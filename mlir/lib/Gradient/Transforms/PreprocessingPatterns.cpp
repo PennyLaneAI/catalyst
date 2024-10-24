@@ -70,7 +70,6 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
     {
         if (!op.getBody().empty())
             return failure();
-
         Block *block;
         rewriter.modifyOpInPlace(op, [&] { block = op.addEntryBlock(); });
 

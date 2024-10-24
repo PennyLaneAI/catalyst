@@ -274,9 +274,12 @@
 * Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
   [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
 
+* [(#1027)](https://github.com/PennyLaneAI/catalyst/pull/1027) Catalyst now supports `one-shot bufferize` from MLIR, which is required for JAX v0.4.29 or higher.
+
 * The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
   [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
   [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
+
 
 <h3>Breaking changes</h3>
 
@@ -391,6 +394,7 @@ Spencer Comin,
 Lillian M.A. Frederiksen,
 Sengthai Heng,
 David Ittah,
+Tzung-Han Juang,
 Mehrdad Malekmohammadi,
 Vincent Michaud-Rioux,
 Romain Moyard,
