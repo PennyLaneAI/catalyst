@@ -214,6 +214,7 @@
 
 * Adjoint canonicalization is now available in MLIR for `CustomOp` and `MultiRZOp`. It can be used
   with the `--canonicalize` pass in `quantum-opt`.
+  [(#1205)](https://github.com/PennyLaneAI/catalyst/pull/1205)
 
 * Implement a Catalyst runtime plugin that mocks out all functions in the QuantumDevice interface.
   [(#1179)](https://github.com/PennyLaneAI/catalyst/pull/1179)
