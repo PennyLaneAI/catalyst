@@ -22,13 +22,12 @@
 #include <utility>
 #include <vector>
 
+#include "DynamicLibraryLoader.hpp"
 #include "Exception.hpp"
 
 #ifdef INITIALIZE_PYTHON
 #include <pybind11/embed.h>
 #endif
-
-#include <dlfcn.h>
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
@@ -114,20 +113,11 @@ struct BraketRunner : public OpenQasmRunner {
             pybind11::initialize_interpreter();
         }
 #endif
-        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
-        if (!handle) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
 
-        char *(*runCircuitImpl)(const char *, const char *, size_t, const char *);
+        DynamicLibraryLoader libLoader(OPENQASM_PY);
+
         using func_ptr_t = char *(*)(const char *, const char *, size_t, const char *);
-
-        runCircuitImpl = reinterpret_cast<func_ptr_t>(dlsym(handle, "runCircuit"));
-        if (!runCircuitImpl) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        auto runCircuitImpl = libLoader.getSymbol<func_ptr_t>("runCircuit");
 
         char *message = runCircuitImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
         std::string messageStr(message);
@@ -144,24 +134,14 @@ struct BraketRunner : public OpenQasmRunner {
             pybind11::initialize_interpreter();
         }
 #endif
-        std::vector<double> probs;
 
-        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
-        if (!handle) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        DynamicLibraryLoader libLoader(OPENQASM_PY);
 
-        void *(*probsImpl)(const char *, const char *, size_t, size_t, const char *, void *);
         using probsImpl_t =
             void *(*)(const char *, const char *, size_t, size_t, const char *, void *);
+        auto probsImpl = libLoader.getSymbol<probsImpl_t>("probs");
 
-        probsImpl = reinterpret_cast<probsImpl_t>(dlsym(handle, "probs"));
-        if (!probsImpl) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
-
+        std::vector<double> probs;
         probsImpl(circuit.c_str(), device.c_str(), shots, num_qubits, kwargs.c_str(), &probs);
 
         return probs;
@@ -176,24 +156,14 @@ struct BraketRunner : public OpenQasmRunner {
             pybind11::initialize_interpreter();
         }
 #endif
-        std::vector<size_t> samples;
 
-        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
-        if (!handle) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        DynamicLibraryLoader libLoader(OPENQASM_PY);
 
-        void *(*samplesImpl)(const char *, const char *, size_t, size_t, const char *, void *);
         using samplesImpl_t =
             void *(*)(const char *, const char *, size_t, size_t, const char *, void *);
+        auto samplesImpl = libLoader.getSymbol<samplesImpl_t>("samples");
 
-        samplesImpl = reinterpret_cast<samplesImpl_t>(dlsym(handle, "samples"));
-        if (!samplesImpl) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
-
+        std::vector<size_t> samples;
         samplesImpl(circuit.c_str(), device.c_str(), shots, num_qubits, kwargs.c_str(), &samples);
 
         return samples;
@@ -208,20 +178,10 @@ struct BraketRunner : public OpenQasmRunner {
         }
 #endif
 
-        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
-        if (!handle) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        DynamicLibraryLoader libLoader(OPENQASM_PY);
 
-        double (*expvalImpl)(const char *, const char *, size_t, const char *);
         using expvalImpl_t = double (*)(const char *, const char *, size_t, const char *);
-
-        expvalImpl = reinterpret_cast<expvalImpl_t>(dlsym(handle, "expval"));
-        if (!expvalImpl) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        auto expvalImpl = libLoader.getSymbol<expvalImpl_t>("expval");
 
         return expvalImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
     }
@@ -235,20 +195,10 @@ struct BraketRunner : public OpenQasmRunner {
         }
 #endif
 
-        void *handle = dlopen(OPENQASM_PY, RTLD_LAZY);
-        if (!handle) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        DynamicLibraryLoader libLoader(OPENQASM_PY);
 
-        double (*varImpl)(const char *, const char *, size_t, const char *);
         using varImpl_t = double (*)(const char *, const char *, size_t, const char *);
-
-        varImpl = reinterpret_cast<varImpl_t>(dlsym(handle, "expval"));
-        if (!varImpl) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        auto varImpl = libLoader.getSymbol<varImpl_t>("var");
 
         return varImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
     }

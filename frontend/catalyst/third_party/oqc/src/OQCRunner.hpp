@@ -19,8 +19,7 @@
 #include <string>
 #include <vector>
 
-#include <dlfcn.h>
-
+#include "DynamicLibraryLoader.hpp"
 #include "Exception.hpp"
 
 #ifdef INITIALIZE_PYTHON
@@ -122,21 +121,11 @@ struct OQCRunner : public OQCRunnerBase {
         }
 #endif
 
-        void *handle = dlopen(OQC_PY, RTLD_LAZY);
-        if (!handle) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        DynamicLibraryLoader libLoader(OQC_PY);
 
-        std::vector<size_t> (*countsImpl)(const char *, const char *, size_t, const char *);
         using countsImpl_t =
             std::vector<size_t> (*)(const char *, const char *, size_t, const char *);
-
-        countsImpl = reinterpret_cast<countsImpl_t>(dlsym(handle, "counts"));
-        if (!countsImpl) {
-            char *err_msg = dlerror();
-            RT_FAIL(err_msg);
-        }
+        auto countsImpl = libLoader.getSymbol<countsImpl_t>("counts");
 
         return countsImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
     }
