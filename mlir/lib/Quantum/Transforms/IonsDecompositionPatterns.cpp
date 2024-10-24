@@ -30,6 +30,39 @@ constexpr double PI = 3.14159265358979323846;
 
 // Define map, name to function creating decomp
 
+void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+    TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
+    ValueRange inQubits = op.getInQubits();
+
+    auto parentOp = dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
+    ValueRange parentInQubits = parentOp.getInQubits();
+    ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
+    ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
+
+    TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
+    mlir::Value minusPiOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), minusPiOver2Attr);
+    TypedAttr piOver2Attr = rewriter.getF64FloatAttr(PI / 2);
+    mlir::Value piOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver2Attr);
+    TypedAttr piOver4Attr = rewriter.getF64FloatAttr(PI / 2);
+    mlir::Value piOver4 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver4Attr);
+
+    auto rxMinusPiOver2 = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
+                                                    minusPiOver2, parentInQubits, "RX", nullptr,
+                                                    parentInCtrlQubits, parentInCtrlValues);
+    auto rzPiOver4 = rewriter.create<CustomOp>(
+        op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, piOver4, rxMinusPiOver2.getOutQubits(),
+        "RZ", nullptr, rxMinusPiOver2.getInCtrlQubits(), rxMinusPiOver2.getInCtrlValues());
+    auto rxPiOver2 = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
+                                               piOver2, rzPiOver4.getOutQubits(), "RX", nullptr,
+                                               parentInCtrlQubits, parentInCtrlValues);
+    op.replaceAllUsesWith(rxPiOver2);
+}
+
+std::map<StringRef, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
+    funcMap = {{"T", &tDecomp}};
+
 namespace {
 
 struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp> {
@@ -37,7 +70,15 @@ struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp>
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        return success();
+        auto it = funcMap.find(op.getGateName());
+        if (it != funcMap.end()) {
+            auto decompFunc = it->second;
+            decompFunc(op, rewriter);
+            return success();
+        }
+        else {
+            return failure();
+        }
     }
 };
 } // namespace
