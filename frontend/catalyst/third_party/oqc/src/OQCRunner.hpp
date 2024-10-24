@@ -116,7 +116,6 @@ struct OQCRunner : public OQCRunnerBase {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-
 #ifdef INITIALIZE_PYTHON
         if (!Py_IsInitialized()) {
             pybind11::initialize_interpreter();

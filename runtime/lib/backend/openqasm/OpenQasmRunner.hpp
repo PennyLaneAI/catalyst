@@ -171,7 +171,6 @@ struct BraketRunner : public OpenQasmRunner {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t> override
     {
-
 #ifdef INITIALIZE_PYTHON
         if (!Py_IsInitialized()) {
             pybind11::initialize_interpreter();
