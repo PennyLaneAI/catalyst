@@ -50,11 +50,11 @@ class Pipeline {
         return mlir::failure();
     }
 
-    const std::string &getName() { return name; }
+    const std::string &getName() const { return name; }
 
-    const llvm::SmallVector<std::string> &getPasses() { return passes; }
+    const llvm::SmallVector<std::string> &getPasses() const { return passes; }
 
-    PipelineFunc getRegisterFunc() { return registerFunc; }
+    PipelineFunc getRegisterFunc() const { return registerFunc; }
 
     void setRegisterFunc(PipelineFunc func) { registerFunc = func; }
 
