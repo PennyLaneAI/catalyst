@@ -63,7 +63,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
             return success();
         }
         return failure();
-    };
+    }
     return failure();
 }
 
