@@ -38,8 +38,8 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
                                                "CY",       "CZ",     "SWAP",   "Toffoli"};
-static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",           "Rot",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift", "CRot"};
+static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
+                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
 {
     if (op.getAdjoint()) {
