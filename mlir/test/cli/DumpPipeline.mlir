@@ -25,9 +25,12 @@ func.func @foo() {
 // CHECK: builtin.module
 
 // CHECK-CUSTOM: Pass Manager with 2 passes
+// CHECK-CUSTOM: builtin.module(split-multiple-tapes,apply-transform-sequence)
 // CHECK-CUSTOM: Pass Manager with 1 passes
+// CHECK-CUSTOM: builtin.module(inline-nested-module{stop-after-step=0})
 
 // CHECK-ONE-PASS: Pass Manager with 1 passes
+// CHECK-ONE-PASS: builtin.module(cse)
 
 // CHECK-FAIL: --catalyst-pipline option can't be used with individual pass options or -pass-pipeline.
 // CHECK-FAIL: Compilation failed
