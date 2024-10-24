@@ -17,6 +17,8 @@
 from copy import deepcopy
 from unittest.mock import patch
 
+import platform
+
 import pennylane as qml
 import pytest
 from pennylane.measurements import ExpectationMP, VarianceMP
@@ -33,6 +35,7 @@ from catalyst import (
     while_loop,
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
@@ -79,6 +82,19 @@ def get_custom_device(
             for obs in non_differentiable_obs:
                 custom_capabilities.native_obs[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
+
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "CustomDevice", lib_path
 
         def execute(self, _circuits, _execution_config):
             """

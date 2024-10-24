@@ -16,7 +16,6 @@ option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
-option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -77,17 +76,11 @@ if(RUNTIME_ENABLE_WARNINGS)
     add_compile_options(-Werror -Wall)
 endif()
 
-message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
 list(APPEND devices_list rtd_null_qubit)
 list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_qubit")
-
-if(ENABLE_LIGHTNING)
-    list(APPEND devices_list pennylane_lightning rtd_lightning)
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_dynamic")
-endif()
 
 if(ENABLE_OPENQASM)
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
