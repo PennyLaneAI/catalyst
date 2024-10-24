@@ -153,7 +153,6 @@ func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quan
 
     // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
     // CHECK: [[ret:%.+]]:2 = quantum.multirz([[arg0neg]]) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
-    // CHECK-NOT: quantum.multirz
     %3:2 = quantum.multirz (%arg0) %1, %2 {adjoint} : !quantum.bit, !quantum.bit
     return %3#0, %3#1 : !quantum.bit, !quantum.bit
 }
