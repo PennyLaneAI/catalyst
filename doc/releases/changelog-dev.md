@@ -363,6 +363,9 @@
   lowering of the scatter operation.
   [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
 
+* Resolves a bug where calling `qml.counts()` within complicated and/or nested return expressions did not return the correct `PyTreeDef`.
+  [(#1219)](https://github.com/PennyLaneAI/catalyst/pull/1219)
+
 <h3>Internal changes</h3>
 
 * Remove deprecated pennylane code across the frontend.
@@ -419,6 +422,7 @@
 This release contains contributions from (in alphabetical order):
 
 Amintor Dusko,
+Arjun Bhamra,
 Joey Carter,
 Spencer Comin,
 Lillian M.A. Frederiksen,

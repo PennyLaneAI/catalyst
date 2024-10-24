@@ -593,5 +593,169 @@ class TestAuxiliaryData:
         assert result.a == 4
 
 
+class TestPyTreesQmlCounts:
+    """Test QJIT workflows when using qml.counts in a return expression."""
+
+    def test_pytree_qml_counts_simple(self):
+        """Test if a single qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return {"1": qml.counts()}
+
+        observed = circuit(0.5)
+        expected = {"1": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))}
+
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+    def test_pytree_qml_counts_nested(self):
+        """Test if nested qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return {"1": qml.counts()}, {"2": qml.expval(qml.Z(0))}
+
+        observed = circuit(0.5)
+        expected = (
+            {"1": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            {"2": jnp.array(-1, dtype=jnp.float64)},
+        )
+
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit2(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], {"3": qml.expval(qml.Z(0))}
+
+        observed = circuit2(0.5)
+        expected = (
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            {"3": jnp.array(-1, dtype=jnp.float64)},
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+    def test_pytree_qml_counts_2_nested(self):
+        """Test if multiple nested qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
+                {"3": qml.expval(qml.Z(0))},
+                {"4": qml.counts()},
+            ]
+
+        observed = circuit(0.5)
+        expected = (
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            [
+                {"3": jnp.array(-1, dtype=jnp.float64)},
+                {"4": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit2(x):
+            qml.RX(x, wires=0)
+            return [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}], [
+                {"3": qml.counts()},
+                {"4": qml.expval(qml.Z(0))},
+            ]
+
+        observed = circuit2(0.5)
+        expected = (
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            [
+                {"3": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+                {"4": jnp.array(-1, dtype=jnp.float64)},
+            ],
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+    def test_pytree_qml_counts_longer(self):
+        """Test if 3 differently nested qml.counts() can be used and output correctly."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            return [
+                [{"1": qml.expval(qml.Z(0))}, {"2": qml.counts()}],
+                [{"3": qml.expval(qml.Z(0))}, {"4": qml.counts()}],
+                {"5": qml.expval(qml.Z(0))},
+                {"6": qml.counts()},
+            ]
+
+        observed = circuit(0.5)
+        expected = [
+            [
+                {"1": jnp.array(-1, dtype=jnp.float64)},
+                {"2": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            [
+                {"3": jnp.array(-1, dtype=jnp.float64)},
+                {"4": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            ],
+            {"5": jnp.array(-1, dtype=jnp.float64)},
+            {"6": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+        ]
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+    def test_pytree_qml_counts_mcm(self):
+        """Test qml.counts() with mid-circuit measurement."""
+        dev = qml.device("lightning.qubit", wires=1, shots=20)
+
+        @qml.qjit
+        @qml.qnode(dev, mcm_method="one-shot", postselect_mode=None)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            measure(0, postselect=1)
+            return {"hi": qml.counts()}, {"bye": qml.expval(qml.Z(0))}, {"hi": qml.counts()}
+
+        observed = circuit(0.5)
+        expected = (
+            {"hi": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+            {"bye": jnp.array(-1, dtype=jnp.float64)},
+            {"hi": (jnp.array((0, 1), dtype=jnp.int64), jnp.array((0, 3), dtype=jnp.int64))},
+        )
+        _, expected_shape = tree_flatten(expected)
+        _, observed_shape = tree_flatten(observed)
+        assert expected_shape == observed_shape
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
