@@ -35,7 +35,7 @@ export PYTHON=/usr/bin/python3
 export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
 
 # Install python dependencies
-/usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
+/usr/bin/python3 -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
 
 # Build Catalyst runtime
 cmake -S runtime -B runtime-build -G Ninja \
