@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -22,15 +23,43 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 #include "Catalyst/Transforms/TBAAUtils.h"
+#include "llvm/Support/Casting.h"
 
 using namespace mlir;
 
 namespace catalyst {
+
+bool isFromExtractAlignedPointerAsIndexOp(Operation *op)
+{
+    if (isa<memref::ExtractAlignedPointerAsIndexOp>(op)) {
+        return true;
+    }
+    auto prevOp = op->getPrevNode();
+    if (prevOp) {
+        return isFromExtractAlignedPointerAsIndexOp(prevOp);
+    }
+    return false;
+}
+
+bool isInsideDeallocHelper(Operation *op)
+{
+    auto parentOp = dyn_cast<func::FuncOp>(op->getParentOp());
+    if (parentOp) {
+        auto str = parentOp.getName();
+        llvm::StringRef dellocRef = "dealloc_helper";
+        return str.compare(dellocRef) == 0;
+    }
+
+    llvm::outs() << parentOp.getName() << "\n";
+    return false;
+}
+
 void setTag(mlir::Type baseType, catalyst::TBAATree *tree, mlir::MLIRContext *ctx,
             mlir::LLVM::AliasAnalysisOpInterface newOp)
 {
     mlir::LLVM::TBAATagAttr tag;
     if (isa<IndexType>(baseType) || isa<IntegerType>(baseType)) {
+        // Index can be used as a pointer.
         tag = tree->getTag("int");
         newOp.setTBAATags(ArrayAttr::get(ctx, tag));
     }
@@ -71,7 +100,13 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
             loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0, false,
             loadOp.getNontemporal());
 
-        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+        // Index can be used as a pointer.
+        if (isa<IndexType>(baseType) &&
+            (isFromExtractAlignedPointerAsIndexOp(loadOp) || isInsideDeallocHelper(loadOp))) {
+            mlir::LLVM::TBAATagAttr tag = tree->getTag("any pointer");
+            op.setTBAATags(ArrayAttr::get(loadOp.getContext(), tag));
+        }
+        else if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
             setTag(baseType, tree, loadOp.getContext(), op);
         }
         else {
@@ -102,7 +137,13 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
                                                              0, false, storeOp.getNontemporal());
 
-        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+        // Index can be used as a pointer.
+        if (isa<IndexType>(baseType) &&
+            (isFromExtractAlignedPointerAsIndexOp(storeOp) || isInsideDeallocHelper(storeOp))) {
+            mlir::LLVM::TBAATagAttr tag = tree->getTag("any pointer");
+            op.setTBAATags(ArrayAttr::get(storeOp.getContext(), tag));
+        }
+        else if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
             setTag(baseType, tree, storeOp.getContext(), op);
         }
         else {
