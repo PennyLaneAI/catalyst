@@ -38,10 +38,13 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
         auto py_passes = i++;
         assert(i == t.end());
         std::string name = py_name->attr("__str__")().cast<std::string>();
-        Pipeline::PassList passes;
+        llvm::SmallVector<std::string> passes;
         std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
                        [](py::handle p) { return p.attr("__str__")().cast<std::string>(); });
-        out.push_back(Pipeline({name, passes}));
+        Pipeline pipeline;
+        pipeline.setName(name);
+        pipeline.setPasses(passes);
+        out.push_back(pipeline);
     }
     return out;
 }

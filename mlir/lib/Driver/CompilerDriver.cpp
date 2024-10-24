@@ -193,7 +193,7 @@ class LinesCount {
 
 namespace {
 
-std::string joinPasses(const Pipeline::PassList &passes)
+std::string joinPasses(const llvm::SmallVector<std::string> &passes)
 {
     std::string joined;
     llvm::raw_string_ostream stream{joined};
@@ -520,11 +520,11 @@ LogicalResult configurePipeline(PassManager &pm, const CompilerOptions &options,
 {
     pm.clear();
     if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
-        llvm::errs() << "Pipeline creation function not found: " << pipeline.name << "\n";
+        llvm::errs() << "Pipeline creation function not found: " << pipeline.getName() << "\n";
         return failure();
     }
     if (clHasManualPipeline &&
-        failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
+        failed(parsePassPipeline(joinPasses(pipeline.getPasses()), pm, options.diagnosticStream))) {
         return failure();
     }
     if (options.dumpPassPipeline) {
@@ -575,11 +575,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     std::vector<Pipeline> UserPipeline =
         clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
     for (auto &pipeline : UserPipeline) {
-        if (!shouldRunStage(options, output, pipeline.name) || pipeline.passes.size() == 0) {
+        if (!shouldRunStage(options, output, pipeline.getName()) ||
+            pipeline.getPasses().size() == 0) {
             continue;
         }
         if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
-            llvm::errs() << "Failed to run pipeline: " << pipeline.name << "\n";
+            llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
             return failure();
         }
 
@@ -590,7 +591,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
             s << moduleOp;
-            dumpToFile(options, output.nextPipelineDumpFilename(pipeline.name, ".mlir"), tmp);
+            dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
         }
     }
     return success();
@@ -674,12 +675,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // true so that the enzyme pass can be executed.
     bool enzymeRun = options.checkpointStage == "O2Opt";
 
-    bool runAll = options.loweringAction == Action::All;
-    bool runOpt = options.loweringAction == Action::OPT || runAll;
-    bool runTranslate = options.loweringAction == Action::Translate || runAll;
-    bool runLLC = options.loweringAction == Action::LLC || runAll;
+    bool runAll = (options.loweringAction == Action::All);
+    bool runOpt = (options.loweringAction == Action::OPT) || runAll;
+    bool runTranslate = (options.loweringAction == Action::Translate) || runAll;
+    bool runLLC = (options.loweringAction == Action::LLC) || runAll;
 
-    if (runOpt && inType == InputType::MLIR) {
+    if (runOpt && (inType == InputType::MLIR)) {
         TimingScope optTiming = timing.nest("Optimization");
         // TODO: The enzymeRun flag will not travel correctly in the case where different
         // stages of compilation are executed independantly via the catalyst-cli executable.
@@ -694,7 +695,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         optTiming.stop();
     }
 
-    if (runTranslate && inType == InputType::MLIR) {
+    if (runTranslate && (inType == InputType::MLIR)) {
         TimingScope translateTiming = timing.nest("Translate");
         llvmModule =
             timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
@@ -719,7 +720,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         translateTiming.stop();
     }
 
-    if (runLLC && inType == InputType::LLVMIR) {
+    if (runLLC && (inType == InputType::LLVMIR)) {
         TimingScope llcTiming = timing.nest("llc");
         // Set data layout before LLVM passes or the default one is used.
         std::string targetTriple = llvm::sys::getDefaultTargetTriple();
@@ -807,14 +808,14 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
         llvm::SmallVector<llvm::StringRef, 8> passList;
         passesStr.split(passList, ';', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
 
-        Pipeline::PassList passes;
+        llvm::SmallVector<std::string> passes;
         for (auto &pass : passList) {
             passes.push_back(pass.trim().str());
         }
 
         Pipeline pipeline;
-        pipeline.name = pipelineName.str();
-        pipeline.passes = std::move(passes);
+        pipeline.setName(pipelineName.str());
+        pipeline.setPasses(passes);
         allPipelines.push_back(std::move(pipeline));
     }
     return allPipelines;

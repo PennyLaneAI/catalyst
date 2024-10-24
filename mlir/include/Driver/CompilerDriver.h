@@ -84,7 +84,7 @@ struct CompilerOptions {
 };
 
 struct CompilerOutput {
-    typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
+    typedef std::unordered_map<std::string, std::string> PipelineOutputs;
     std::string outputFilename;
     std::string outIR;
     std::string diagnosticMessages;
@@ -94,7 +94,7 @@ struct CompilerOutput {
     bool isCheckpointFound;
 
     // Gets the next pipeline dump file name, prefixed with number.
-    std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir")
+    std::string nextPipelineDumpFilename(std::string pipelineName, std::string ext = ".mlir")
     {
         return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
             .replace_extension(ext);
@@ -121,9 +121,9 @@ namespace llvm {
 
 inline raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
 {
-    oss << "Pipeline('" << p.name << "', [";
+    oss << "Pipeline('" << p.getName() << "', [";
     bool first = true;
-    for (const auto &i : p.passes) {
+    for (const auto &i : p.getPasses()) {
         oss << (first ? "" : ", ") << i;
         first = false;
     }

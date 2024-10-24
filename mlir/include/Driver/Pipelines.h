@@ -33,15 +33,13 @@ void registerBufferizationPipeline();
 void registerLLVMDialectLoweringPipeline();
 void registerDefaultCatalystPipeline();
 void registerAllCatalystPipelines();
-
-/// Pipeline descriptor
-struct Pipeline {
-    using Name = std::string;
-    using PassList = llvm::SmallVector<std::string>;
+class Pipeline {
+  public:
     using PipelineFunc = void (*)(mlir::OpPassManager &);
-    Name name;
-    PassList passes;
-    PipelineFunc registerFunc = nullptr;
+
+    Pipeline() {}
+
+    void addPass(std::string &pass) { passes.push_back(pass); }
 
     mlir::LogicalResult addPipeline(mlir::OpPassManager &pm)
     {
@@ -49,10 +47,25 @@ struct Pipeline {
             registerFunc(pm);
             return mlir::success();
         }
-        else {
-            return mlir::failure();
-        }
+        return mlir::failure();
     }
+
+    const std::string &getName() { return name; }
+
+    const llvm::SmallVector<std::string> &getPasses() { return passes; }
+
+    PipelineFunc getRegisterFunc() { return registerFunc; }
+
+    void setRegisterFunc(PipelineFunc func) { registerFunc = func; }
+
+    void setName(const std::string &pipelineName) { name = pipelineName; }
+
+    void setPasses(const llvm::SmallVector<std::string> &newPasses) { passes = newPasses; }
+
+  private:
+    std::string name;
+    llvm::SmallVector<std::string> passes;
+    PipelineFunc registerFunc;
 };
 
 std::vector<Pipeline> getDefaultPipeline();

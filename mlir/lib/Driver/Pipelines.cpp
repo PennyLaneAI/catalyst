@@ -122,16 +122,6 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createRegisterInactiveCallbackPass());
 }
 
-void registerAllCatalystPipelines()
-{
-    registerEnforceRuntimeInvariantsPipeline();
-    registerHloLoweringPipeline();
-    registerQuantumCompilationPipeline();
-    registerBufferizationPipeline();
-    registerLLVMDialectLoweringPipeline();
-    registerDefaultCatalystPipeline();
-}
-
 void createDefaultCatalystPipeline(OpPassManager &pm)
 {
     createEnforceRuntimeInvariantsPipeline(pm);
@@ -170,11 +160,22 @@ void registerLLVMDialectLoweringPipeline()
                                "Register LLVM dialect lowring pipeline as a pass.",
                                createLLVMDialectLoweringPipeline);
 }
+
 void registerDefaultCatalystPipeline()
 {
     PassPipelineRegistration<>("default-catalyst-pipeline",
                                "Register full default catalyst pipeline as a pass.",
                                createDefaultCatalystPipeline);
+}
+
+void registerAllCatalystPipelines()
+{
+    registerEnforceRuntimeInvariantsPipeline();
+    registerHloLoweringPipeline();
+    registerQuantumCompilationPipeline();
+    registerBufferizationPipeline();
+    registerLLVMDialectLoweringPipeline();
+    registerDefaultCatalystPipeline();
 }
 
 std::vector<Pipeline> getDefaultPipeline()
@@ -185,17 +186,16 @@ std::vector<Pipeline> getDefaultPipeline()
         &createQuantumCompilationPipeline, &createBufferizationPipeline,
         &createLLVMDialectLoweringPipeline};
 
-    Pipeline::PassList defaultPipelineNames = {
+    llvm::SmallVector<std::string> defaultPipelineNames = {
         "enforce-runtime-invariants-pipeline", "hlo-lowering-pipeline",
         "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowering-pipeline"};
 
     std::vector<Pipeline> defaultPipelines;
+    defaultPipelines.reserve(defaultPipelineNames.size());
     for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {
-        Pipeline pipeline;
-        pipeline.name = defaultPipelineNames[i];
-        pipeline.passes.push_back(defaultPipelineNames[i]);
-        pipeline.registerFunc = pipelineFuncs[i];
-        defaultPipelines.push_back(std::move(pipeline));
+        defaultPipelines[i].setRegisterFunc(pipelineFuncs[i]);
+        defaultPipelines[i].setName(defaultPipelineNames[i]);
+        defaultPipelines[i].addPass(defaultPipelineNames[i]);
     }
     return defaultPipelines;
 }
