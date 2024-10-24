@@ -185,7 +185,7 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
-* Catalyst now has a standalone compiler tool called catalyst-cli which quantum
+* Catalyst now has a standalone compiler tool called `catalyst-cli` which quantum
   compiles MLIR input files into an object file without any dependancy to the python frontend.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
 
