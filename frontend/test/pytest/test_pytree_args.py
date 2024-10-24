@@ -736,7 +736,7 @@ class TestPyTreesQmlCounts:
         assert expected_shape == observed_shape
 
     def test_pytree_qml_counts_mcm(self):
-        """Test qml.counts() with mid circuit measurement."""
+        """Test qml.counts() with mid-circuit measurement."""
         dev = qml.device("lightning.qubit", wires=1, shots=20)
 
         @qml.qjit

@@ -937,7 +937,8 @@ def trace_quantum_measurements(
 
 def replace_child_tree(tree: PyTreeDef, index: int, subtree: PyTreeDef) -> PyTreeDef:
     """
-    Replace the index-th leaf node in a left-to-right depth-first tree traversal of a PyTreeDef with a given subtree.
+    Replace the index-th leaf node in a left-to-right depth-first tree traversal of a PyTreeDef
+    with a given subtree.
 
     Args:
         tree (PyTreeDef): The original PyTree.
