@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "remove-chained-self-inverse"
 
 #include <memory>
+#include <numbers>
 #include <vector>
 
 #include "llvm/Support/Debug.h"
@@ -51,6 +52,8 @@ struct RemoveChainedSelfInversePass
     {
         LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
+
+        llvm::errs() << std::numbers::pi << "\n";
 
         // Run cse pass before running remove-chained-self-inverse,
         // to aid identifying equivalent SSA values when verifying
