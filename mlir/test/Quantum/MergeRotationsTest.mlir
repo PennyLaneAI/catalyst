@@ -273,3 +273,42 @@ func.func @test_merge_rotations(%arg0: f64) -> (!quantum.bit, !quantum.bit, !qua
     // CHECK:  return [[ret]], [[ctrlret]]#0, [[ctrlret]]#1
     return %out_qubits_1, %out_ctrl_qubits_1#0, %out_ctrl_qubits_1#1 : !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+// -----
+
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK: [[arg1neg:%.+]] = arith.negf %arg1 : f64
+    // CHECK: [[add:%.+]] = arith.addf [[arg0neg]], [[arg1neg]] : f64
+    // CHECK: [[ret:%.+]] = quantum.custom "RX"([[add]]) [[qubit]] : !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 {adjoint}: !quantum.bit
+    %3 = quantum.custom "RX"(%arg1) %2 {adjoint}: !quantum.bit
+
+    // CHECK:  return [[ret]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK: [[arg1neg:%.+]] = arith.negf %arg1 : f64
+    // CHECK: [[add:%.+]] = arith.addf [[arg0neg]], [[arg1neg]] : f64
+    // CHECK: [[ret:%.+]]:2 = quantum.multirz([[add]]) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
+    %3:2 = quantum.multirz (%arg0) %1, %2 {adjoint}: !quantum.bit, !quantum.bit
+    %4:2 = quantum.multirz (%arg1) %3#0, %3#1 {adjoint}: !quantum.bit, !quantum.bit
+    // CHECK: return [[ret]]#0, [[ret]]#1
+    return %4#0, %4#1 : !quantum.bit, !quantum.bit
+}

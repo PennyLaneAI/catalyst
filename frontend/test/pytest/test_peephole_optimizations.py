@@ -72,6 +72,8 @@ def test_merge_rotation_functionality(theta, backend):
         def f(x):
             qml.RX(x, wires=0)
             qml.RX(x, wires=0)
+            qml.RZ(x, wires=0)
+            qml.adjoint(qml.RZ)(x, wires=0)
             qml.Rot(x, x, x, wires=0)
             qml.Rot(x, x, x, wires=0)
             qml.PhaseShift(x, wires=0)
@@ -85,6 +87,8 @@ def test_merge_rotation_functionality(theta, backend):
         def g(x):
             qml.RX(x, wires=0)
             qml.RX(x, wires=0)
+            qml.RZ(x, wires=0)
+            qml.adjoint(qml.RZ)(x, wires=0)
             qml.Rot(x, x, x, wires=0)
             qml.Rot(x, x, x, wires=0)
             qml.PhaseShift(x, wires=0)
@@ -99,6 +103,8 @@ def test_merge_rotation_functionality(theta, backend):
     def reference(x):
         qml.RX(x, wires=0)
         qml.RX(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.adjoint(qml.RZ)(x, wires=0)
         qml.Rot(x, x, x, wires=0)
         qml.Rot(x, x, x, wires=0)
         qml.PhaseShift(x, wires=0)
