@@ -117,6 +117,13 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let options = QuantumCircuitTransformationPass.options;
 }
 
+def IonsDecompositionPass : Pass<"ions-decompositions"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
+
+    let constructor = "catalyst::createIonsDecompositionPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
