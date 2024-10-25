@@ -676,6 +676,20 @@ class TestCondOperatorAccess:
         assert func(True) == 1
         assert func(False) == 0
 
+    def test_cond_single_gate(self, backend):
+        """Test standard pennylane qml.cond usage on single quantum gates."""
+        """Fixes https://github.com/PennyLaneAI/catalyst/issues/449"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def func(x, y):
+            qml.cond(x == 42, qml.Hadamard)(wires=0)
+            qml.cond(y == 37, qml.Hadamard)(wires=0)
+            return qml.probs()
+
+        assert np.allclose(func(42, 37), [1, 0])
+        assert np.allclose(func(0, 37), [0.5, 0.5])
+
 
 class TestCondPredicateConversion:
     """Test suite for checking predicate conversion to bool."""

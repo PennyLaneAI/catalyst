@@ -24,6 +24,7 @@ from typing import Any, Callable, List
 
 import jax
 import jax.numpy as jnp
+import pennylane as qml
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
 from pennylane import QueuingManager
@@ -65,7 +66,12 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 
-import pennylane as qml
+
+def is_pennylane_gate(callable):
+    # TODO
+    return True
+
+
 ## API ##
 def cond(pred: DynamicJaxprTracer):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
@@ -237,22 +243,12 @@ def cond(pred: DynamicJaxprTracer):
     """
 
     def _decorator(true_fn: Callable):
-        #breakpoint()
 
-        if len(inspect.signature(true_fn).parameters):
-            #breakpoint()
-            current_frame = inspect.currentframe()
-            call_frame = current_frame.f_back
-            args_info = inspect.getargvalues(call_frame)
-            #breakpoint()
+        # if len(inspect.signature(true_fn).parameters):
+        #    raise TypeError("Conditional 'True' function is not allowed to have any arguments")
 
-            #def _true_fn():
-            #  true_fn(wires=0)
-            #return CondCallable(pred, _true_fn)
-
-            #raise TypeError("Conditional 'True' function is not allowed to have any arguments")
-
-        #return CondCallable(pred, true_fn)
+        # return CondCallable(pred, true_fn)
+        # if true_fn is a plain gate:
         return CondCallableSingleGateHandler(pred, true_fn)
 
     return _decorator
@@ -512,19 +508,6 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
 
 ## IMPL ##
-class CondCallableSingleGateHandler:
-    def __init__(self, pred, true_fn):
-        self.pred = pred
-        self.true_fn = true_fn
-
-
-    def __call__(self, *my_args, **my_kwargs):
-        def new_true_fn():
-            self.true_fn(*my_args, **my_kwargs)
-        #breakpoint()
-        return CondCallable(self.pred, new_true_fn)
-
-
 class CondCallable:
     """User-facing wrapper provoding "else_if" and "otherwise" public methods.
     Some code in this class has been adapted from the cond implementation in the JAX project at
@@ -641,7 +624,7 @@ class CondCallable:
 
         if isinstance(pred, jax.Array) and pred.shape not in ((), (1,)):
             raise TypeError("Array with multiple elements is not a valid predicate")
-        #breakpoint()
+        # breakpoint()
         if not self._is_any_boolean(pred):
             try:
                 pred = jnp.astype(pred, bool, copy=False)
@@ -650,7 +633,7 @@ class CondCallable:
                     "Conditional predicates are required to be of bool, integer or float type"
                 ) from e
 
-        #breakpoint()
+        # breakpoint()
         return pred
 
     def _is_any_boolean(self, pred):
@@ -768,6 +751,20 @@ class CondCallable:
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
+
+
+class CondCallableSingleGateHandler(CondCallable):
+
+    def __init__(self, pred, true_fn):
+        self.pred = pred
+        self.true_fn = true_fn
+
+    def __call__(self, *my_args, **my_kwargs):
+        def new_true_fn():
+            self.true_fn(*my_args, **my_kwargs)
+
+        super().__init__(self.pred, new_true_fn)
+        return super().__call__()
 
 
 class ForLoopCallable:
