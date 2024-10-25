@@ -34,33 +34,30 @@ void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 {
     TypeRange outQubitsTypes = op.getOutQubits().getTypes();
     TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
-    ValueRange inQubits = op.getInQubits();
 
-    auto parentOp = dyn_cast_or_null<CustomOp>(inQubits[0].getDefiningOp());
-    ValueRange parentInQubits = parentOp.getInQubits();
-    ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
-    ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
+    ValueRange inQubits = op.getInQubits();
+    ValueRange inCtrlQubits = op.getInCtrlQubits();
+    ValueRange inCtrlValues = op.getInCtrlValues();
 
     TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
     mlir::Value minusPiOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), minusPiOver2Attr);
     TypedAttr piOver2Attr = rewriter.getF64FloatAttr(PI / 2);
     mlir::Value piOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver2Attr);
-    TypedAttr piOver4Attr = rewriter.getF64FloatAttr(PI / 2);
+    TypedAttr piOver4Attr = rewriter.getF64FloatAttr(PI / 4);
     mlir::Value piOver4 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver4Attr);
-
     auto rxMinusPiOver2 = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
-                                                    minusPiOver2, parentInQubits, "RX", nullptr,
-                                                    parentInCtrlQubits, parentInCtrlValues);
+                                                    minusPiOver2, inQubits, "RX", nullptr,
+                                                    inCtrlQubits, inCtrlValues);
     auto rzPiOver4 = rewriter.create<CustomOp>(
         op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, piOver4, rxMinusPiOver2.getOutQubits(),
-        "RZ", nullptr, rxMinusPiOver2.getInCtrlQubits(), rxMinusPiOver2.getInCtrlValues());
+        "RY", nullptr, rxMinusPiOver2.getInCtrlQubits(), rxMinusPiOver2.getInCtrlValues());
     auto rxPiOver2 = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
                                                piOver2, rzPiOver4.getOutQubits(), "RX", nullptr,
-                                               parentInCtrlQubits, parentInCtrlValues);
+                                               inCtrlQubits, inCtrlValues);
     op.replaceAllUsesWith(rxPiOver2);
 }
 
-std::map<StringRef, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
+std::map<std::string, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
     funcMap = {{"T", &tDecomp}};
 
 namespace {
@@ -69,8 +66,8 @@ struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp>
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
-    {
-        auto it = funcMap.find(op.getGateName());
+    {   
+        auto it = funcMap.find(op.getGateName().str());
         if (it != funcMap.end()) {
             auto decompFunc = it->second;
             decompFunc(op, rewriter);
