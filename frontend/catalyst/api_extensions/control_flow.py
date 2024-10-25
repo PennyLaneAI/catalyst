@@ -241,6 +241,10 @@ def cond(pred: DynamicJaxprTracer):
 
         if len(inspect.signature(true_fn).parameters):
             if isinstance(true_fn, type) and issubclass(true_fn, qml.operation.Operation):
+                # Special treatment if conditional function body is a single pennylane gate
+                # The qml.operation.Operation base class represents things that
+                # can reasonably be considered as a gate,
+                # e.g. qml.Hadamard, qml.RX, etc.
                 return CondCallableSingleGateHandler(pred, true_fn)
             else:
                 raise TypeError("Conditional 'True' function is not allowed to have any arguments")
@@ -749,6 +753,19 @@ class CondCallable:
 
 
 class CondCallableSingleGateHandler(CondCallable):
+    """
+    Special CondCallable when the conditional body function is a single pennylane gate.
+
+    A usual pennylane conditional call for a gate looks like
+    `qml.cond(x == 42, qml.RX)(theta, wires=0)`
+
+    Since gates are guaranteed to take in arguments (at the very least the wire argument),
+    the usual CondCallable class, which expects the conditional body function to have no arguments,
+    cannot be used.
+    This class inherits from base CondCallable, but wraps the gate in a function with no arguments,
+    and send that function to CondCallable.
+    This allows us to perform the conditional branch gate function with arguments.
+    """
 
     def __init__(self, pred, true_fn):
         self.pred = pred
