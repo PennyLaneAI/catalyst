@@ -676,8 +676,10 @@ class TestCondOperatorAccess:
         assert func(False) == 0
 
     def test_cond_single_gate(self, backend):
-        """Test standard pennylane qml.cond usage on single quantum gates."""
-        """Fixes https://github.com/PennyLaneAI/catalyst/issues/449"""
+        """
+        Test standard pennylane qml.cond usage on single quantum gates.
+        Fixes https://github.com/PennyLaneAI/catalyst/issues/449
+        """
 
         @qml.qnode(qml.device(backend, wires=2))
         def func(x, y):
