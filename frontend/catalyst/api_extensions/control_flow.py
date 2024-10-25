@@ -67,11 +67,6 @@ from catalyst.tracing.contexts import (
 )
 
 
-def is_pennylane_gate(callable):
-    # TODO
-    return True
-
-
 ## API ##
 def cond(pred: DynamicJaxprTracer):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
@@ -244,12 +239,13 @@ def cond(pred: DynamicJaxprTracer):
 
     def _decorator(true_fn: Callable):
 
-        # if len(inspect.signature(true_fn).parameters):
-        #    raise TypeError("Conditional 'True' function is not allowed to have any arguments")
+        if len(inspect.signature(true_fn).parameters):
+            if isinstance(true_fn, type) and issubclass(true_fn, qml.operation.Operation):
+                return CondCallableSingleGateHandler(pred, true_fn)
+            else:
+                raise TypeError("Conditional 'True' function is not allowed to have any arguments")
 
-        # return CondCallable(pred, true_fn)
-        # if true_fn is a plain gate:
-        return CondCallableSingleGateHandler(pred, true_fn)
+        return CondCallable(pred, true_fn)
 
     return _decorator
 

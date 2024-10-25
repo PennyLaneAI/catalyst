@@ -418,12 +418,11 @@ class TestCond:
     def test_argument_error_with_callables(self):
         """Test for the error when arguments are supplied and the target is not a function."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x: int):
 
-            qml.cond(x < 5, qml.Hadamard)(0)
+            res = qml.cond(x < 5, lambda z: z + 1)(0)
 
-            return qml.probs()
+            return res
 
         with pytest.raises(TypeError, match="not allowed to have any arguments"):
             qjit(f)
