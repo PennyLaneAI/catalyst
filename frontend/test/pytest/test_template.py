@@ -1479,6 +1479,34 @@ def test_cosine_window(backend):
 
     assert np.allclose(interpreted_result, jitted_result)
 
+def test_basis_rotation(backend):
+    """Test BasisRotation"""
+
+    unitary_matrix = jnp.array(
+        [
+            [0.51378719 + 0.0j, 0.0546265 + 0.79145487j, -0.2051466 + 0.2540723j],
+            [0.62651582 + 0.0j, -0.00828925 - 0.60570321j, -0.36704948 + 0.32528067j],
+            [-0.58608928 + 0.0j, 0.03902657 + 0.04633548j, -0.57220635 + 0.57044649j],
+        ]
+    )
+
+    def basis_rotation(unitary_matrix, check):
+        qml.BasisState(qml.math.array([1, 1, 0]), wires=[0, 1, 2])
+        qml.BasisRotation(
+            wires=range(3),
+            unitary_matrix=unitary_matrix,
+            check=check,
+        )
+        return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+    device = qml.device(backend, wires=3)
+    interpreted_fn = qml.QNode(basis_rotation, device)
+    jitted_fn = qjit(interpreted_fn, static_argnums=1)
+
+    interpreted_result = interpreted_fn(unitary_matrix, False)
+    jitted_result = jitted_fn(unitary_matrix, False)
+
+    assert np.allclose(interpreted_result, jitted_result)
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
