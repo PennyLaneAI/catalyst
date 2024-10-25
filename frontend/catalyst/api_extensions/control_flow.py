@@ -767,7 +767,7 @@ class CondCallableSingleGateHandler(CondCallable):
     This allows us to perform the conditional branch gate function with arguments.
     """
 
-    def __init__(self, pred, true_fn):
+    def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
         self.pred = pred
         self.true_fn = true_fn
 
