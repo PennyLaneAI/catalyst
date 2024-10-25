@@ -365,7 +365,7 @@
 
 * Fixes a bug where conditional-ed single gates cannot be used in qjit,
   i.e. `qml.cond(x > 1, qml.Hadamard)(wires=0)`.
-  [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1232)
+  [(#1232)](https://github.com/PennyLaneAI/catalyst/pull/1232)
 
 <h3>Internal changes</h3>
 
