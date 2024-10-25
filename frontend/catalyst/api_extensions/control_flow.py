@@ -620,7 +620,7 @@ class CondCallable:
 
         if isinstance(pred, jax.Array) and pred.shape not in ((), (1,)):
             raise TypeError("Array with multiple elements is not a valid predicate")
-        # breakpoint()
+
         if not self._is_any_boolean(pred):
             try:
                 pred = jnp.astype(pred, bool, copy=False)
@@ -629,7 +629,6 @@ class CondCallable:
                     "Conditional predicates are required to be of bool, integer or float type"
                 ) from e
 
-        # breakpoint()
         return pred
 
     def _is_any_boolean(self, pred):
