@@ -186,6 +186,29 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
+* Catalyst now has a standalone compiler tool called `catalyst-cli` which quantum
+  compiles MLIR input files into an object file without any dependancy to the python frontend.
+  [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
+
+  This compiler tool combines three stages of compilation which are:
+
+  - qunatum-opt: Performs the mlir level optimizations and lowers the input dialect to LLVM dialect.
+  - mlir-translate: Translates the input in LLVM dialect into LLVM IR.
+  - llc: Performs lower level optimizations and creates the object file.
+  
+  catalyst-cli runs all of the above stages under the hood, but it has the ability to isolate them on demand.
+  An example of usage whould look like below:
+
+  ```
+  // Creates both the optimized IR and an object file
+  catalyst-cli input.mlir -o output.o 
+  // Only performs MLIR optimizations
+  catalyst-cli --tool=opt input.mlir -o llvm-dialect.mlir
+  // Only lowers LLVM dialect MLIR input to LLVM IR
+  catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
+  // Only performs lower-level optimizations and create object file
+  catalyst-cli --tool=llc llvm-ir.ll -o output.o
+
 * Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
   argument to `qjit`.
   [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
@@ -300,6 +323,11 @@
   [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
 
   Please use `debug.replace_ir`.
+
+* Removes `compiler.last_compiler_output`.
+  [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
+
+  Please use `compiler.get_output_of("last", workspace)`
 
 <h3>Bug fixes</h3>
 
