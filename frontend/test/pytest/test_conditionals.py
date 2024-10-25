@@ -679,15 +679,30 @@ class TestCondOperatorAccess:
         """Test standard pennylane qml.cond usage on single quantum gates."""
         """Fixes https://github.com/PennyLaneAI/catalyst/issues/449"""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qml.qnode(qml.device(backend, wires=2))
         def func(x, y):
             qml.cond(x == 42, qml.Hadamard)(wires=0)
-            qml.cond(y == 37, qml.Hadamard)(wires=0)
+            qml.cond(x == 42, qml.RY)(1.5, wires=0)
+            qml.cond(x == 42, qml.CNOT)(wires=[1, 0])
+            qml.cond(y == 37, qml.PauliX)(wires=1)
+            qml.cond(y == 37, qml.RZ)(5.1, wires=0)
+            qml.cond(y == 37, qml.Rot)(1.2, 3.4, 5.6, wires=1)
+
             return qml.probs()
 
-        assert np.allclose(func(42, 37), [1, 0])
-        assert np.allclose(func(0, 37), [0.5, 0.5])
+        expected_0 = func(42, 37)
+        expected_1 = func(0, 37)
+        expected_2 = func(42, 0)
+
+        jitted_func = qjit(func)
+
+        observed_0 = jitted_func(42, 37)
+        observed_1 = jitted_func(0, 37)
+        observed_2 = jitted_func(42, 0)
+
+        assert np.allclose(expected_0, observed_0)
+        assert np.allclose(expected_1, observed_1)
+        assert np.allclose(expected_2, observed_2)
 
 
 class TestCondPredicateConversion:
