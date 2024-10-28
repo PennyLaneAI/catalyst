@@ -6,8 +6,8 @@
   quantum gates, without control flow.
   [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
 
-  To trigger the PennyLane pipeline for capturing the program as a JaxPR, one needs to simply
-  set `experimental_capture=True` in the qjit decorator.
+  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
+  `experimental_capture=True` in the qjit decorator.
 
   ```python
   import pennylane as qml
@@ -42,8 +42,8 @@
   @qjit
   @qml.qnode(dev)
   def circuit():
-    qml.Hadamard(0)
-    return qml.sample()
+      qml.Hadamard(0)
+      return qml.sample()
   ```
 
   ```pycon
@@ -53,72 +53,68 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
-* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline
+* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation-pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
 
   ```python
-    my_passes = {
-        "cancel_inverses": {},
-        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
-    }
-    dev = qml.device("lightning.qubit", wires=2)
+  my_passes = {
+      "cancel_inverses": {},
+      "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+  }
+  dev = qml.device("lightning.qubit", wires=2)
 
-    @pipeline(my_passes)
-    @qnode(dev)
-    def circuit(x):
-        qml.RX(x, wires=0)
-        return qml.expval(qml.PauliZ(0))
+  @pipeline(my_passes)
+  @qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      return qml.expval(qml.PauliZ(0))
 
-    @qjit
-    def fn(x):
-        return jnp.sin(circuit(x ** 2))
+  @qjit
+  def fn(x):
+      return jnp.sin(circuit(x ** 2))
   ```
 
   `pipeline` can also be used to specify different pass pipelines for different parts of the
   same qjit-compiled workflow:
 
   ```python
-    my_pipeline = {
-        "cancel_inverses": {},
-        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
-    }
+  my_pipeline = {
+      "cancel_inverses": {},
+      "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+  }
 
-    my_other_pipeline = {"cancel_inverses": {}}
+  my_other_pipeline = {"cancel_inverses": {}}
 
-    @qjit
-    def fn(x):
-        circuit_pipeline = pipeline(my_pipeline)(circuit)
-        circuit_other = pipeline(my_other_pipeline)(circuit)
-        return jnp.abs(circuit_pipeline(x) - circuit_other(x))
+  @qjit
+  def fn(x):
+      circuit_pipeline = pipeline(my_pipeline)(circuit)
+      circuit_other = pipeline(my_other_pipeline)(circuit)
+      return jnp.abs(circuit_pipeline(x) - circuit_other(x))
   ```
 
-  For a list of available passes, please see the
-  [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
-
-  The pass pipeline order and options can be configured *globally* for a qjit-compiled
-  function, by using the `circuit_transform_pipeline` argument of the :func:`~.qjit`
-  decorator.
+  The pass pipeline order and options can be configured *globally* for a qjit-compiled function, by
+  using the `circuit_transform_pipeline` argument of the :func:`~.qjit` decorator.
 
   ```python
-    my_passes = {
-        "cancel_inverses": {},
-        "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
-    }
+  my_passes = {
+      "cancel_inverses": {},
+      "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
+  }
 
-    @qjit(circuit_transform_pipeline=my_passes)
-    def fn(x):
-        return jnp.sin(circuit(x ** 2))
+  @qjit(circuit_transform_pipeline=my_passes)
+  def fn(x):
+      return jnp.sin(circuit(x ** 2))
   ```
 
-  Global and local (via `@pipeline`) configurations can coexist, however local pass pipelines
-  will always take precedence over global pass pipelines.
+  Global and local (via `@pipeline`) configurations can coexist, however local pass pipelines will
+  always take precedence over global pass pipelines.
 
-  Available MLIR passes are now documented and available within the
-  [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+  The available MLIR passes are listed and documented in the
+  [`catalyst.passes` module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the
-  Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
+* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`,
+  or the Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
   [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
   [(#1205)](https://github.com/PennyLaneAI/catalyst/pull/1205)
   [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
@@ -129,7 +125,7 @@
   from catalys.passes import pipeline
 
   my_passes = {
-    "merge_rotations": {}
+      "merge_rotations": {}
   }
 
   @qjit(circuit_transform_pipeline=my_passes)
@@ -141,7 +137,7 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
-  Using the python function, one can run:
+  Using the Python function, one can run:
 
   ```python
   from catalys.passes import merge_rotations
@@ -163,22 +159,23 @@
 
   Using operator assignment syntax in favor of `at...op` expressions is now possible for the
   following operations:
-  * `x[i] += y` in favor of `x.at[i].add(y)`
-  * `x[i] -= y` in favor of `x.at[i].add(-y)`
-  * `x[i] *= y` in favor of `x.at[i].multiply(y)`
-  * `x[i] /= y` in favor of `x.at[i].divide(y)`
-  * `x[i] **= y` in favor of `x.at[i].power(y)`
+
+  - `x[i] += y` in favor of `x.at[i].add(y)`
+  - `x[i] -= y` in favor of `x.at[i].add(-y)`
+  - `x[i] *= y` in favor of `x.at[i].multiply(y)`
+  - `x[i] /= y` in favor of `x.at[i].divide(y)`
+  - `x[i] **= y` in favor of `x.at[i].power(y)`
 
   ```python
   @qjit(autograph=True)
   def f(x):
-    first_dim = x.shape[0]
-    result = jnp.copy(x)
+      first_dim = x.shape[0]
+      result = jnp.copy(x)
 
-    for i in range(first_dim):
-      result[i] *= 2  # This is now supported
+      for i in range(first_dim):
+        result[i] *= 2  # This is now supported
 
-    return result
+      return result
   ```
 
   ```pycon
@@ -186,43 +183,47 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
-* Catalyst now has a standalone compiler tool called `catalyst-cli` which quantum
-  compiles MLIR input files into an object file without any dependancy to the python frontend.
+* Catalyst now has a standalone compiler tool called `catalyst-cli` that quantum compiles MLIR
+  input files into an object file independent of the Python frontend.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
 
-  This compiler tool combines three stages of compilation which are:
+  This compiler tool combines three stages of compilation:
 
-  - qunatum-opt: Performs the mlir level optimizations and lowers the input dialect to LLVM dialect.
-  - mlir-translate: Translates the input in LLVM dialect into LLVM IR.
-  - llc: Performs lower level optimizations and creates the object file.
+  1. `quantum-opt`: Performs the MLIR-level optimizations and lowers the input dialect to the LLVM dialect.
+  2. `mlir-translate`: Translates the input in the LLVM dialect into LLVM IR.
+  3. `llc`: Performs lower-level optimizations and creates the object file.
   
-  catalyst-cli runs all of the above stages under the hood, but it has the ability to isolate them on demand.
-  An example of usage whould look like below:
+  `catalyst-cli` runs all three stages under the hood by default, but it also has the ability to run
+  each stage individually. For example:
 
-  ```
-  // Creates both the optimized IR and an object file
-  catalyst-cli input.mlir -o output.o 
-  // Only performs MLIR optimizations
+  ```console
+  # Creates both the optimized IR and an object file
+  catalyst-cli input.mlir -o output.o
+
+  # Only performs MLIR optimizations
   catalyst-cli --tool=opt input.mlir -o llvm-dialect.mlir
-  // Only lowers LLVM dialect MLIR input to LLVM IR
-  catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
-  // Only performs lower-level optimizations and create object file
-  catalyst-cli --tool=llc llvm-ir.ll -o output.o
 
-* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames`
-  argument to `qjit`.
+  # Only lowers LLVM dialect MLIR input to LLVM IR
+  catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
+
+  # Only performs lower-level optimizations and creates object file
+  catalyst-cli --tool=llc llvm-ir.ll -o output.o
+  ```
+
+* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames` argument
+  to `qjit`.
   [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
 
   ```python
   @qjit(static_argnames="y")
   def f(x, y):
-    if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
-        return x + y
+      if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
+          return x + y
 
   @qjit(static_argnames=["x","y"])
   def g(x, y):
-    if x < 10 and y < 10:
-        return x + y
+      if x < 10 and y < 10:
+          return x + y
 
   res_f = f(1, 2)
   res_g = g(3, 4)
