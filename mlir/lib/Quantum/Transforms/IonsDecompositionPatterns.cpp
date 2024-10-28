@@ -30,7 +30,8 @@ constexpr double PI = 3.14159265358979323846;
 
 // Define map, name to function creating decomp
 
-void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter, double phi, double theta, double lambda)
+void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter, double phi,
+                    std::variant<mlir::Value, double> theta, double lambda)
 {
     TypeRange outQubitsTypes = op.getOutQubits().getTypes();
     TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
@@ -40,21 +41,28 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
     ValueRange inCtrlValues = op.getInCtrlValues();
 
     TypedAttr phiAttr = rewriter.getF64FloatAttr(phi);
-    mlir::Value phiValue= rewriter.create<arith::ConstantOp>(op.getLoc(), phiAttr);
-    TypedAttr thetaAttr = rewriter.getF64FloatAttr(theta);
-    mlir::Value thetaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), thetaAttr);
+    mlir::Value phiValue = rewriter.create<arith::ConstantOp>(op.getLoc(), phiAttr);
+
+    mlir::Value thetaValue;
+    if (std::holds_alternative<mlir::Value>(theta)) {
+        thetaValue = std::get<mlir::Value>(theta);
+    }
+    else if (std::holds_alternative<double>(theta)) {
+        TypedAttr thetaAttr = rewriter.getF64FloatAttr(std::get<double>(theta));
+        thetaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), thetaAttr);
+    }
     TypedAttr lambdaAttr = rewriter.getF64FloatAttr(lambda);
     mlir::Value lambdaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), lambdaAttr);
 
-    auto rxPhi = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
-                                                    phiValue, inQubits, "RX", nullptr,
-                                                    inCtrlQubits, inCtrlValues);
-    auto ryTheta= rewriter.create<CustomOp>(
-        op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, thetaValue, rxPhi.getOutQubits(),
-        "RY", nullptr, rxPhi.getInCtrlQubits(), rxPhi.getInCtrlValues());
+    auto rxPhi =
+        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, phiValue,
+                                  inQubits, "RX", nullptr, inCtrlQubits, inCtrlValues);
+    auto ryTheta = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
+                                             thetaValue, rxPhi.getOutQubits(), "RY", nullptr,
+                                             rxPhi.getInCtrlQubits(), rxPhi.getInCtrlValues());
     auto rxLambda = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
-                                               lambdaValue, ryTheta.getOutQubits(), "RX", nullptr,
-                                               inCtrlQubits, inCtrlValues);
+                                              lambdaValue, ryTheta.getOutQubits(), "RX", nullptr,
+                                              inCtrlQubits, inCtrlValues);
     op.replaceAllUsesWith(rxLambda);
 }
 
@@ -63,8 +71,34 @@ void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
     oneQubitDecomp(op, rewriter, -PI / 2, PI / 4, PI / 2);
 }
 
+void sDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, PI / 2, PI / 2);
+}
+
+void zDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, PI, PI / 2);
+}
+
+void hDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, PI / 2, PI, PI / 2);
+}
+
+void psDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
+}
+
+void rzDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
+}
+
 std::map<std::string, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
-    funcMap = {{"T", &tDecomp}};
+    funcMap = {{"T", &tDecomp},        {"S", &sDecomp},  {"Z", &zDecomp},
+               {"Hadamard", &hDecomp}, {"RZ", &rzDecomp}, {"PhaseShift", &psDecomp}};
 
 namespace {
 
@@ -72,7 +106,7 @@ struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp>
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
-    {   
+    {
         auto it = funcMap.find(op.getGateName().str());
         if (it != funcMap.end()) {
             auto decompFunc = it->second;
