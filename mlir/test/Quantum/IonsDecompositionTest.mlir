@@ -15,8 +15,8 @@
 // RUN: quantum-opt --ions-decomposition --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
-    // CHECK: [[PIO4:%.+]] = arith.constant 0.78539816339744828 : f64
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
+    // CHECK: [[PIO4:%.+]] = arith.constant 0.78539816339744828 : f64
     // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit

@@ -30,7 +30,7 @@ constexpr double PI = 3.14159265358979323846;
 
 // Define map, name to function creating decomp
 
-void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter, double phi, double theta, double lambda)
 {
     TypeRange outQubitsTypes = op.getOutQubits().getTypes();
     TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
@@ -39,22 +39,28 @@ void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
     ValueRange inCtrlQubits = op.getInCtrlQubits();
     ValueRange inCtrlValues = op.getInCtrlValues();
 
-    TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
-    mlir::Value minusPiOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), minusPiOver2Attr);
-    TypedAttr piOver2Attr = rewriter.getF64FloatAttr(PI / 2);
-    mlir::Value piOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver2Attr);
-    TypedAttr piOver4Attr = rewriter.getF64FloatAttr(PI / 4);
-    mlir::Value piOver4 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver4Attr);
-    auto rxMinusPiOver2 = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
-                                                    minusPiOver2, inQubits, "RX", nullptr,
+    TypedAttr phiAttr = rewriter.getF64FloatAttr(phi);
+    mlir::Value phiValue= rewriter.create<arith::ConstantOp>(op.getLoc(), phiAttr);
+    TypedAttr thetaAttr = rewriter.getF64FloatAttr(theta);
+    mlir::Value thetaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), thetaAttr);
+    TypedAttr lambdaAttr = rewriter.getF64FloatAttr(lambda);
+    mlir::Value lambdaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), lambdaAttr);
+
+    auto rxPhi = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
+                                                    phiValue, inQubits, "RX", nullptr,
                                                     inCtrlQubits, inCtrlValues);
-    auto rzPiOver4 = rewriter.create<CustomOp>(
-        op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, piOver4, rxMinusPiOver2.getOutQubits(),
-        "RY", nullptr, rxMinusPiOver2.getInCtrlQubits(), rxMinusPiOver2.getInCtrlValues());
-    auto rxPiOver2 = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
-                                               piOver2, rzPiOver4.getOutQubits(), "RX", nullptr,
+    auto ryTheta= rewriter.create<CustomOp>(
+        op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, thetaValue, rxPhi.getOutQubits(),
+        "RY", nullptr, rxPhi.getInCtrlQubits(), rxPhi.getInCtrlValues());
+    auto rxLambda = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
+                                               lambdaValue, ryTheta.getOutQubits(), "RX", nullptr,
                                                inCtrlQubits, inCtrlValues);
-    op.replaceAllUsesWith(rxPiOver2);
+    op.replaceAllUsesWith(rxLambda);
+}
+
+void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, PI / 4, PI / 2);
 }
 
 std::map<std::string, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
