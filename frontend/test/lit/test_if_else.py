@@ -58,6 +58,43 @@ print(circuit.mlir)
 # -----
 
 
+# CHECK-LABEL: public @jit_circuit_single_gate
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=1))
+def circuit_single_gate(n: int):
+    # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
+    # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = quantum.alloc
+    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]]
+
+    # CHECK:       [[qreg_out:%.+]] = scf.if [[b]]
+    # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = quantum.extract
+    # CHECK-DAG:   [[q1:%[a-zA-Z0-9_]+]] = quantum.custom "PauliX"() [[q0]]
+    # pylint: disable=line-too-long
+    # CHECK-DAG:   [[qreg_1:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q1]]
+    # CHECK:       scf.yield [[qreg_1]]
+
+    # CHECK:       else
+    # CHECK-DAG:   [[q2:%[a-zA-Z0-9_]+]] = quantum.extract
+    # CHECK-DAG:   [[q3:%[a-zA-Z0-9_]+]] = quantum.custom "Hadamard"() [[q2]]
+    # pylint: disable=line-too-long
+    # CHECK-DAG:   [[qreg_2:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q3]]
+    # CHECK:       scf.yield [[qreg_2]]
+    qml.cond(n <= 5, qml.PauliX, qml.Hadamard)(wires=0)
+
+    # CHECK:       [[qreg_3:%.+]] = quantum.extract [[qreg_out]][ 0]
+    # CHECK:       [[qobs:%.+]] = quantum.compbasis [[qreg_3]] : !quantum.obs
+    # CHECK:       [[ret:%.+]] = quantum.probs [[qobs]]
+    # CHECK:       return [[ret]]
+    return qml.probs()
+
+
+print(circuit_single_gate.mlir)
+
+
+# -----
+
+
 # CHECK-LABEL: test_convert_element_type
 @qjit
 def test_convert_element_type(i: int, f: float):
