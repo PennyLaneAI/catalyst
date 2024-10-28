@@ -365,19 +365,19 @@
 
 <h3>Internal changes</h3>
 
-* Remove deprecated pennylane code across the frontend.
+* Removes deprecated PennyLane code across the frontend.
   [(#1168)](https://github.com/PennyLaneAI/catalyst/pull/1168)
 
-* Update Enzyme to version `v0.0.149`.
+* Updates Enzyme to version `v0.0.149`.
   [(#1142)](https://github.com/PennyLaneAI/catalyst/pull/1142)
 
-* Remove the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), this reduces bugs when
-  running gradient like functions.
+* Removes the `MemMemCpyOptPass` in llvm O2 (applied for Enzyme), which reduces bugs when running
+  gradient-like functions.
   [(#1063)](https://github.com/PennyLaneAI/catalyst/pull/1063)
 
 * Functions with multiple tapes are now split with a new mlir pass `--split-multiple-tapes`, with
-  one tape per function. The reset routine that makes a maeasurement between tapes and inserts a
-  X gate if measured one is no longer used.
+  one tape per function. The reset routine that makes a measurement between tapes and inserts an X
+  gate if measured one is no longer used.
   [(#1017)](https://github.com/PennyLaneAI/catalyst/pull/1017)
   [(#1130)](https://github.com/PennyLaneAI/catalyst/pull/1130)
 
@@ -389,7 +389,7 @@
 * Remove the old `QJITDevice` API.
   [(#1138)](https://github.com/PennyLaneAI/catalyst/pull/1138)
 
-* The device capability loading mechanism has been moved into the `QJITDevice` constructor.
+* The device-capability loading mechanism has been moved into the `QJITDevice` constructor.
   [(#1141)](https://github.com/PennyLaneAI/catalyst/pull/1141)
 
 * Several functions related to device capabilities have been refactored.
@@ -402,16 +402,14 @@
 * Catalyst now generates nested modules denoting quantum programs.
   [(#1144)](https://github.com/PennyLaneAI/catalyst/pull/1144)
 
-  Similar to MLIR's `gpu.launch_kernel` function, Catalyst, now supports
-  a `call_function_in_module`. This allows Catalyst to call functions in modules
-  and have modules denote a quantum kernel. This will allow for device specific
-  optimizations and compilation pipelines.
+  Similar to MLIR's `gpu.launch_kernel` function, Catalyst, now supports a `call_function_in_module`.
+  This allows Catalyst to call functions in modules and have modules denote a quantum kernel. This
+  will allow for device-specific optimizations and compilation pipelines.
 
-  At the moment, no one is using this. This is just the necessary scaffolding to
-  supporting device specific transformations. As such, the module will be inlined
-  to preserve current semantics. However, in the future, we will explore lowering
-  this nested module into other IRs/binary formats and lowering `call_function_in_module`
-  to something that can dispatch calls to another runtime / VM.
+  At the moment, no one is using this. This is just the necessary scaffolding to support device-
+  specific transformations. As such, the module will be inlined to preserve current semantics.
+  However, in the future, we will explore lowering this nested module into other IRs/binary formats
+  and lowering `call_function_in_module` to something that can dispatch calls to another runtime/VM.
 
 
 <h3>Contributors</h3>
