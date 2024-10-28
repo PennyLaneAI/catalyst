@@ -683,8 +683,8 @@ class TestCondOperatorAccess:
 
         @qml.qnode(qml.device(backend, wires=2))
         def func(x, y):
-            qml.cond(x == 42, qml.Hadamard)(wires=0)
-            qml.cond(x == 42, qml.RY)(1.5, wires=0)
+            qml.cond(x == 42, qml.Hadamard, qml.PauliX)(wires=0)
+            qml.cond(x == 42, qml.RY, qml.RZ)(1.5, wires=0)
             qml.cond(x == 42, qml.CNOT)(wires=[1, 0])
             qml.cond(y == 37, qml.PauliX)(wires=1)
             qml.cond(y == 37, qml.RZ)(5.1, wires=0)
