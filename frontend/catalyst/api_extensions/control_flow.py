@@ -775,16 +775,16 @@ class CondCallableSingleGateHandler(CondCallable):
         self._true_fn = true_fn
         self._otherwise_fn = None
 
-    def __call__(self, *my_args, **my_kwargs):
+    def __call__(self, *args, **kwargs):
         def new_true_fn():
-            self._true_fn(*my_args, **my_kwargs)
+            self._true_fn(*args, **kwargs)
 
         super().__init__(self._pred, new_true_fn)
 
         if self._otherwise_fn is not None:
 
             def new_otherwise_fn():
-                self._otherwise_fn(*my_args, **my_kwargs)
+                self._otherwise_fn(*args, **kwargs)
 
             super().set_otherwise_fn(new_otherwise_fn)
 
