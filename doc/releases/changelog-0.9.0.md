@@ -333,36 +333,34 @@
 
 <h3>Bug fixes</h3>
 
-* Fix a bug in `catalyst.mitigate_with_zne` that would lead
-  to incorrectly extrapolated results.
+* Fixes a bug in `catalyst.mitigate_with_zne` that would lead to incorrectly extrapolated results.
   [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)
 
-* Fix a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
+* Fixes a bug preventing the target of `qml.adjoint` and `qml.ctrl` calls from being transformed by
   AutoGraph.
   [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
 
-* Resolve a bug where `mitigate_with_zne` does not work properly with shots and devices
-  supporting only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
+* Resolves a bug where `mitigate_with_zne` does not work properly with shots and devices supporting
+  only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
   [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
-* Resolve a bug in the `vmap` function when passing shapeless values to the target.
+* Resolves a bug in the `vmap` function when passing shapeless values to the target.
   [(#1150)](https://github.com/PennyLaneAI/catalyst/pull/1150)
 
-* Fix error message displayed when using `qml.cond` on callables with arguments.
+* Fixes a bug that resulted in an error message when using `qml.cond` on callables with arguments.
   [(#1151)](https://github.com/PennyLaneAI/catalyst/pull/1151)
 
-* Fixes taking gradient of nested accelerate callbacks.
+* Fixes a bug that prevented taking the gradient of nested accelerate callbacks.
   [(#1156)](https://github.com/PennyLaneAI/catalyst/pull/1156)
 
-* Some small fixes for scatter lowering:
+* Fixes some small issues with scatter lowering:
   [(#1216)](https://github.com/PennyLaneAI/catalyst/pull/1216)
   [(#1217)](https://github.com/PennyLaneAI/catalyst/pull/1217)
 
   - Registers the func dialect as a requirement for running the scatter lowering pass.
   - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
-* Fixes a performance issue with vmap with its root cause in the
-  lowering of the scatter operation.
+* Fixes a performance issue with vmap with its root cause in the lowering of the scatter operation.
   [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
 
 <h3>Internal changes</h3>
