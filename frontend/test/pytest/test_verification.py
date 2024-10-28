@@ -14,10 +14,9 @@
 
 """ Test program verification routines """
 
+import platform
 from copy import deepcopy
 from unittest.mock import patch
-
-import platform
 
 import pennylane as qml
 import pytest

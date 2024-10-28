@@ -15,9 +15,8 @@
 # RUN: %PYTHON %s | FileCheck %s
 """ Test the lowering cases involving quantum control """
 
-from copy import deepcopy
-
 import platform
+from copy import deepcopy
 
 import jax.numpy as jnp
 import pennylane as qml
