@@ -435,7 +435,7 @@ class TestCond:
 
         with pytest.raises(
             TypeError,
-            match="Conditional 'False' function is allowed to have arguments only if it is a PennyLane gate.",
+            match="Conditional 'False' function can have arguments only if it is a PennyLane gate.",
         ):
             qjit(f)
 

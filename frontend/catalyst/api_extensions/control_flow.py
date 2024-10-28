@@ -567,7 +567,7 @@ class CondCallable:
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
 
-    def set_otherwise_fn(self, otherwise_fn):
+    def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
         self.otherwise_fn = otherwise_fn
 
     @property
@@ -796,7 +796,7 @@ class CondCallableSingleGateHandler(CondCallable):
             self.sgh_otherwise_fn = otherwise_fn
         else:
             raise TypeError(
-                "Conditional 'False' function is allowed to have arguments only if it is a PennyLane gate."
+                "Conditional 'False' function can have arguments only if it is a PennyLane gate."
             )
 
 
