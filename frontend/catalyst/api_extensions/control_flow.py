@@ -792,7 +792,12 @@ class CondCallableSingleGateHandler(CondCallable):
 
     def otherwise(self, otherwise_fn):
         # Override the "can't have arguments" check in the original CondCallable's `otherwise`
-        self.sgh_otherwise_fn = otherwise_fn
+        if isinstance(otherwise_fn, type) and issubclass(otherwise_fn, qml.operation.Operation):
+            self.sgh_otherwise_fn = otherwise_fn
+        else:
+            raise TypeError(
+                "Conditional 'False' function is allowed to have arguments only if it is a PennyLane gate."
+            )
 
 
 class ForLoopCallable:

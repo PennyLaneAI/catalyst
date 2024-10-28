@@ -427,6 +427,18 @@ class TestCond:
         with pytest.raises(TypeError, match="not allowed to have any arguments"):
             qjit(f)
 
+        def f(x: int):
+
+            res = qml.cond(x < 5, qml.Hadamard, lambda z: z + 1)(0)
+
+            return res
+
+        with pytest.raises(
+            TypeError,
+            match="Conditional 'False' function is allowed to have arguments only if it is a PennyLane gate.",
+        ):
+            qjit(f)
+
 
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent
