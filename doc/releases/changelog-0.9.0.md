@@ -192,7 +192,7 @@
   1. `quantum-opt`: Performs the MLIR-level optimizations and lowers the input dialect to the LLVM dialect.
   2. `mlir-translate`: Translates the input in the LLVM dialect into LLVM IR.
   3. `llc`: Performs lower-level optimizations and creates the object file.
-  
+
   `catalyst-cli` runs all three stages under the hood by default, but it also has the ability to run
   each stage individually. For example:
 
