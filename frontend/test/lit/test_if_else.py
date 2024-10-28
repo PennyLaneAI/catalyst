@@ -63,26 +63,40 @@ print(circuit.mlir)
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit_single_gate(n: int):
     # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
-    # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK-DAG:   [[c6:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<6> : tensor<i64>
+    # CHECK-DAG:       [[b_t5:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK-DAG:       [[b_t6:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c6]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
     # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = quantum.alloc
-    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]]
+    # CHECK:       [[b5:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t5]]
 
-    # CHECK:       [[qreg_out:%.+]] = scf.if [[b]]
-    # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = quantum.extract
+    # CHECK:       [[qreg_out:%.+]] = scf.if [[b5]]
+    # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = quantum.extract [[qreg_0]]
     # CHECK-DAG:   [[q1:%[a-zA-Z0-9_]+]] = quantum.custom "PauliX"() [[q0]]
     # pylint: disable=line-too-long
     # CHECK-DAG:   [[qreg_1:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q1]]
     # CHECK:       scf.yield [[qreg_1]]
 
     # CHECK:       else
-    # CHECK-DAG:   [[q2:%[a-zA-Z0-9_]+]] = quantum.extract
+    # CHECK-DAG:   [[q2:%[a-zA-Z0-9_]+]] = quantum.extract [[qreg_0]]
     # CHECK-DAG:   [[q3:%[a-zA-Z0-9_]+]] = quantum.custom "Hadamard"() [[q2]]
     # pylint: disable=line-too-long
     # CHECK-DAG:   [[qreg_2:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q3]]
     # CHECK:       scf.yield [[qreg_2]]
     qml.cond(n <= 5, qml.PauliX, qml.Hadamard)(wires=0)
 
-    # CHECK:       [[qreg_3:%.+]] = quantum.extract [[qreg_out]][ 0]
+    # CHECK:       [[b6:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t6]]
+    # CHECK:       [[qreg_out1:%.+]] = scf.if [[b6]]
+    # CHECK-DAG:   [[q4:%[a-zA-Z0-9_]+]] = quantum.extract [[qreg_out]]
+    # CHECK-DAG:   [[q5:%[a-zA-Z0-9_]+]] = quantum.custom "RX"({{%.+}}) [[q4]]
+    # pylint: disable=line-too-long
+    # CHECK-DAG:   [[qreg_3:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_out]][ {{[%a-zA-Z0-9_]+}}], [[q1]]
+    # CHECK:       scf.yield [[qreg_3]]
+    # CHECK:       else
+    # CHECK:       scf.yield [[qreg_out]]
+
+    qml.cond(n <= 6, qml.RX)(3.14, wires=0)
+
+    # CHECK:       [[qreg_3:%.+]] = quantum.extract [[qreg_out1]][ 0]
     # CHECK:       [[qobs:%.+]] = quantum.compbasis [[qreg_3]] : !quantum.obs
     # CHECK:       [[ret:%.+]] = quantum.probs [[qobs]]
     # CHECK:       return [[ret]]
