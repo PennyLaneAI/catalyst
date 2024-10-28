@@ -416,9 +416,9 @@
 
 This release contains contributions from (in alphabetical order):
 
-Amintor Dusko,
 Joey Carter,
 Spencer Comin,
+Amintor Dusko,
 Lillian M.A. Frederiksen,
 Sengthai Heng,
 David Ittah,
