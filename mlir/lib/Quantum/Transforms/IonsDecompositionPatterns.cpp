@@ -26,7 +26,7 @@ using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst::quantum;
 
-constexpr double PI = 3.14159265358979323846;
+constexpr double PI = llvm::numbers::pi;
 
 // Define map, name to function creating decomp
 
