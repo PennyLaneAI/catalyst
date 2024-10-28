@@ -53,7 +53,7 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
-* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation-pass pipeline
+* A new function `catalyst.passes.pipeline` allows the quantum-circuit-transformation pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
 
