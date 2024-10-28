@@ -45,7 +45,7 @@ struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecomposition
 
         RewritePatternSet patterns(&getContext());
         populateIonsDecompositionPatterns(patterns);
-
+        // TODO: add adjoint canonicalization
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }

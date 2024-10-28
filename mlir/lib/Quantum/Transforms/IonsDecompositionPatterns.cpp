@@ -96,9 +96,50 @@ void rzDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
     oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
 }
 
+void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+
+    mlir::Value inQubit0 = op.getInQubits().front();
+    mlir::Value inQubit1 = op.getInQubits().back();
+
+    TypedAttr piOver2Attr = rewriter.getF64FloatAttr(PI / 2);
+    mlir::Value piOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver2Attr);
+    auto ryPiOver2 =
+        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), ValueRange{}, piOver2,
+                                  inQubit0, "RY", nullptr, ValueRange{}, ValueRange{});
+    SmallVector<mlir::Value> qubitsAfterRy;
+    qubitsAfterRy.push_back(ryPiOver2.getOutQubits().front());
+    qubitsAfterRy.push_back(inQubit1);
+    auto ms = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, ValueRange{}, piOver2,
+                                        qubitsAfterRy, "MS", nullptr, ValueRange{}, ValueRange{});
+    mlir::Value qubit0AfterMs = ms.getOutQubits().front();
+    mlir::Value qubit1AfterMs = ms.getOutQubits().back();
+
+    TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(PI / 2);
+    mlir::Value minusPiOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), minusPiOver2Attr);
+    auto rxMinusPiOver2 =
+        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), ValueRange{}, minusPiOver2,
+                                  qubit0AfterMs, "RX", nullptr, ValueRange{}, ValueRange{});
+    auto firstRyMinusPiOver2 =
+        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), ValueRange{}, minusPiOver2,
+                                  qubit1AfterMs, "RY", nullptr, ValueRange{}, ValueRange{});
+
+    mlir::Value qubit0AfterRY = rxMinusPiOver2.getOutQubits().front();
+    auto secondRyMinusPiOver2 =
+        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), ValueRange{}, minusPiOver2,
+                                  qubit0AfterRY, "RY", nullptr, ValueRange{}, ValueRange{});
+
+    SmallVector<mlir::Value> qubitsEnd;
+    qubitsEnd.push_back(firstRyMinusPiOver2.getOutQubits().front());
+    qubitsEnd.push_back(secondRyMinusPiOver2.getOutQubits().front());
+    op.replaceAllUsesWith(qubitsEnd);
+}
+
 std::map<std::string, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
-    funcMap = {{"T", &tDecomp},        {"S", &sDecomp},  {"Z", &zDecomp},
-               {"Hadamard", &hDecomp}, {"RZ", &rzDecomp}, {"PhaseShift", &psDecomp}};
+    funcMap = {{"T", &tDecomp},        {"S", &sDecomp},   {"Z", &zDecomp},
+               {"Hadamard", &hDecomp}, {"RZ", &rzDecomp}, {"PhaseShift", &psDecomp},
+               {"CNOT", &cnotDecomp}};
 
 namespace {
 

@@ -58,3 +58,13 @@ func.func @test_param_1q(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
     %4 = quantum.custom "RZ"(%arg2) %3 : !quantum.bit
     return %4 : !quantum.bit
 }
+
+// -----
+
+func.func @test_CNOT(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
