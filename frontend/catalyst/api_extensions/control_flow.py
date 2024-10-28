@@ -771,20 +771,20 @@ class CondCallableSingleGateHandler(CondCallable):
     """
 
     def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
-        self._pred = pred
-        self._true_fn = true_fn
-        self._otherwise_fn = None
+        self.sgh_pred = pred
+        self.sgh_true_fn = true_fn
+        self.sgh_otherwise_fn = None
 
     def __call__(self, *args, **kwargs):
         def new_true_fn():
-            self._true_fn(*args, **kwargs)
+            self.sgh_true_fn(*args, **kwargs)
 
-        super().__init__(self._pred, new_true_fn)
+        super().__init__(self.sgh_pred, new_true_fn)
 
-        if self._otherwise_fn is not None:
+        if self.sgh_otherwise_fn is not None:
 
             def new_otherwise_fn():
-                self._otherwise_fn(*args, **kwargs)
+                self.sgh_otherwise_fn(*args, **kwargs)
 
             super().set_otherwise_fn(new_otherwise_fn)
 
@@ -792,7 +792,7 @@ class CondCallableSingleGateHandler(CondCallable):
 
     def otherwise(self, otherwise_fn):
         # Override the "can't have arguments" check in the original CondCallable's `otherwise`
-        self._otherwise_fn = otherwise_fn
+        self.sgh_otherwise_fn = otherwise_fn
 
 
 class ForLoopCallable:
