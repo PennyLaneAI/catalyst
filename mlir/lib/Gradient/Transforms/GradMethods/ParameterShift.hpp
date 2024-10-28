@@ -21,7 +21,7 @@
 
 #include "Gradient/IR/GradientOps.h"
 
-constexpr double PI = 3.14159265358979323846;
+constexpr double PI = llvm::numbers::pi;
 
 using namespace mlir;
 
