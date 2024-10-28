@@ -129,7 +129,7 @@ class CustomDevice(Device):
         lib_path = (
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
-        return "NullQubit", lib_path
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
