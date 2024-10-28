@@ -570,6 +570,12 @@ class CondCallable:
     def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
         self.otherwise_fn = otherwise_fn
 
+    def add_pred(self, _pred):
+        self.preds.append(self._convert_predicate_to_bool(_pred))
+
+    def add_branch_fn(self, _branch_fn):
+        self.branch_fns.append(_branch_fn)
+
     @property
     def operation(self):
         """
@@ -771,15 +777,15 @@ class CondCallableSingleGateHandler(CondCallable):
     """
 
     def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
-        self.sgh_pred = pred
-        self.sgh_true_fn = true_fn
+        self.sgh_preds = [pred]
+        self.sgh_branch_fns = [true_fn]
         self.sgh_otherwise_fn = None
 
     def __call__(self, *args, **kwargs):
         def argless_true_fn():
-            self.sgh_true_fn(*args, **kwargs)
+            self.sgh_branch_fns[0](*args, **kwargs)
 
-        super().__init__(self.sgh_pred, argless_true_fn)
+        super().__init__(self.sgh_preds[0], argless_true_fn)
 
         if self.sgh_otherwise_fn is not None:
 
@@ -788,10 +794,37 @@ class CondCallableSingleGateHandler(CondCallable):
 
             super().set_otherwise_fn(argless_otherwise_fn)
 
+        for i in range(1, len(self.sgh_branch_fns)):
+
+            def argless_elseif_fn(i=i):  # i=i to work around late binding
+                self.sgh_branch_fns[i](*args, **kwargs)
+
+            super().add_pred(self.sgh_preds[i])
+            super().add_branch_fn(argless_elseif_fn)
+
         return super().__call__()
 
+    def else_if(self, _pred):
+        """
+        Override the "can't have arguments" check in the original CondCallable's `else_if`
+        """
+
+        def decorator(branch_fn):
+            if isinstance(branch_fn, type) and issubclass(branch_fn, qml.operation.Operation):
+                self.sgh_preds.append(_pred)
+                self.sgh_branch_fns.append(branch_fn)
+                return self
+            else:
+                raise TypeError(
+                    "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
+                )
+
+        return decorator
+
     def otherwise(self, otherwise_fn):
-        # Override the "can't have arguments" check in the original CondCallable's `otherwise`
+        """
+        Override the "can't have arguments" check in the original CondCallable's `otherwise`
+        """
         if isinstance(otherwise_fn, type) and issubclass(otherwise_fn, qml.operation.Operation):
             self.sgh_otherwise_fn = otherwise_fn
         else:
