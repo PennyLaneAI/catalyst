@@ -844,7 +844,8 @@ def trace_quantum_measurements(
     """
     shots = get_device_shots(device)
     out_classical_tracers = []
-    # NOTE: Number of qml.counts() we hit
+    # NOTE: Number of qml.counts() we hit, used to update our iteration variable to account
+    # for additional leaf PyTreeDef nodes.
     num_counts = 0
 
     for i, o in enumerate(outputs):
