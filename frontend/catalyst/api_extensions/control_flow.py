@@ -763,7 +763,7 @@ class CondCallableSingleGateHandler(CondCallable):
     the usual CondCallable class, which expects the conditional body function to have no arguments,
     cannot be used.
     This class inherits from base CondCallable, but wraps the gate in a function with no arguments,
-    and send that function to CondCallable.
+    and sends that function to CondCallable.
     This allows us to perform the conditional branch gate function with arguments.
     """
 
