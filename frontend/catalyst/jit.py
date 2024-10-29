@@ -137,7 +137,7 @@ def qjit(
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
         seed (Optional[Int]):
-            The seed for mid-circuit measurement results when the qjit-compiled function is executed
+            The seed for mid-circuit measurement and sample results when the qjit-compiled function is executed
             on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
