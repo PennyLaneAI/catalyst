@@ -42,13 +42,17 @@
   [(#1240)](https://github.com/PennyLaneAI/catalyst/pull/1240)
 
   ```python
+  import pennylane as qml
+  from catalyst import pipeline, qjit
+
   my_passes = {
       "cancel_inverses": {},
       "my_circuit_transformation_pass": {"my-option" : "my-option-value"},
   }
+
   dev = qml.device("lightning.qubit", wires=2)
 
-  @pipeline(pass_pipeline=my_passes)
+  @pipeline(my_passes)
   @qml.qnode(dev)
   def circuit(x):
       qml.RX(x, wires=0)
@@ -72,8 +76,8 @@
 
   @qjit
   def fn(x):
-      circuit_pipeline = pipeline(pass_pipeline=my_pipeline)(circuit)
-      circuit_other = pipeline(pass_pipeline=my_other_pipeline)(circuit)
+      circuit_pipeline = pipeline(my_pipeline)(circuit)
+      circuit_other = pipeline(my_other_pipeline)(circuit)
       return jnp.abs(circuit_pipeline(x) - circuit_other(x))
   ```
 
@@ -104,10 +108,10 @@
   [(#1205)](https://github.com/PennyLaneAI/catalyst/pull/1205)
   [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
 
-  The `merge_rotations` pass can be provided to the `catalyst.passes.pipeline` decorator:
+  The `merge_rotations` pass can be provided to the `catalyst.pipeline` decorator:
 
   ```python
-  from catalyst.passes import pipeline
+  from catalyst import pipeline, qjit
 
   my_passes = {
       "merge_rotations": {}
@@ -115,7 +119,8 @@
 
   dev = qml.device("lightning.qubit", wires=1)
 
-  @qjit(circuit_transform_pipeline=my_passes)
+  @qjit
+  @pipeline(my_passes)
   @qml.qnode(dev)
   def g(x: float):
       qml.RX(x, wires=0)
@@ -128,7 +133,7 @@
   Python decorator:
 
   ```python
-  from catalys.passes import merge_rotations
+  from catalyst.passes import merge_rotations
 
   @qjit
   @merge_rotations
