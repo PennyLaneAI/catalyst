@@ -116,7 +116,7 @@ void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
     mlir::Value qubit0AfterMs = ms.getOutQubits().front();
     mlir::Value qubit1AfterMs = ms.getOutQubits().back();
 
-    TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(PI / 2);
+    TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
     mlir::Value minusPiOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), minusPiOver2Attr);
     auto rxMinusPiOver2 =
         rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), ValueRange{}, minusPiOver2,

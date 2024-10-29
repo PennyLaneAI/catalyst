@@ -62,6 +62,17 @@ func.func @test_param_1q(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
 // -----
 
 func.func @test_CNOT(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
+    // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.custom "RY"([[PIO2]]) [[qubit0]] : !quantum.bit
+    // CHECK: [[qubits3:%.+]]:2 = quantum.custom "MS"([[PIO2]]) [[qubit2]], [[qubit1]] : !quantum.bit, !quantum.bit
+    // CHECK: [[qubit4:%.+]] = quantum.custom "RX"([[MPIO2]]) [[qubits3]]#0 : !quantum.bit
+    // CHECK: [[qubit5:%.+]] = quantum.custom "RY"([[MPIO2]]) [[qubits3]]#1 : !quantum.bit
+    // CHECK: [[qubit6:%.+]] = quantum.custom "RY"([[MPIO2]]) [[qubit4]] : !quantum.bit
+    // CHECK: return [[qubit5]], [[qubit6]] : !quantum.bit, !quantum.bit
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
