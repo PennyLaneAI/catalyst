@@ -302,7 +302,7 @@
 * Calling gradients twice (with same GradParams) will now only lower to a single MLIR function.
   [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
 
-* Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
+* `qml.sample()` and `qml.counts()` on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
   [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
 
 * The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
