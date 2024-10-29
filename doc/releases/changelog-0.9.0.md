@@ -36,9 +36,10 @@
   Note that other measurement types, such as `expval` and `probs`, currently do not support
   shot-vectors.
 
-* A new function `catalyst.passes.pipeline` allows the quantum-circuit-transformation pass pipeline
+* A new function `catalyst.pipeline` allows the quantum-circuit-transformation pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
+  [(#1240)](https://github.com/PennyLaneAI/catalyst/pull/1240)
 
   ```python
   my_passes = {
