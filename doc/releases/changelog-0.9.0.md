@@ -349,21 +349,16 @@
 
   This reverts a previous breaking change.
 
-* Nesting qnodes now raises an error.
+* Nesting QNodes within one another now raises an error.
   [(#1176)](https://github.com/PennyLaneAI/catalyst/pull/1176)
 
-  This is unlikely to affect users since only under certain conditions did
-  nesting qnodes worked successfully.
-
-* Removes `debug.compile_from_mlir`.
+* The `debug.compile_from_mlir` function has been removed;
+  please use `debug.replace_ir` instead.
   [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
 
-  Please use `debug.replace_ir`.
-
-* Removes `compiler.last_compiler_output`.
+* The `compiler.last_compiler_output` function has been removed;
+  please use `compiler.get_output_of("last", workspace)` instead.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
-
-  Please use `compiler.get_output_of("last", workspace)`
 
 <h3>Bug fixes</h3>
 
@@ -375,7 +370,7 @@
   [(#1212)](https://github.com/PennyLaneAI/catalyst/pull/1212)
 
 * Resolves a bug where `mitigate_with_zne` does not work properly with shots and devices supporting
-  only Counts and Samples (e.g. Qrack). (transform: `measurements_from_sample`).
+  only counts and samples (e.g., Qrack).
   [(#1165)](https://github.com/PennyLaneAI/catalyst/pull/1165)
 
 * Resolves a bug in the `vmap` function when passing shapeless values to the target.
@@ -394,7 +389,8 @@
   - Registers the func dialect as a requirement for running the scatter lowering pass.
   - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
-* Fixes a performance issue with vmap with its root cause in the lowering of the scatter operation.
+* Fixes a performance issue with `catalyst.vmap` with its root cause in
+  the lowering of the scatter operation.
   [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
 
 <h3>Internal changes</h3>
