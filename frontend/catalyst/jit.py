@@ -137,7 +137,7 @@ def qjit(
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
         seed (Optional[Int]):
-            The seed for mid-circuit measurement and sample results when the qjit-compiled function is executed
+            The seed for mid-circuit measurement results when the qjit-compiled function is executed
             on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
@@ -285,12 +285,10 @@ def qjit(
     .. details::
         :title: Static arguments
 
-        - ``static_argnums`` defines which positional arguments should be treated as static. If it takes an
+        ``static_argnums`` defines which elements should be treated as static. If it takes an
         integer, it means the argument whose index is equal to the integer is static. If it takes
         an iterable of integers, arguments whose index is contained in the iterable are static.
         Changing static arguments will introduce re-compilation.
-
-        - ``static_argnames`` defines which named function arguments should be treated as static.
 
         A valid static argument must be hashable and its ``__hash__`` method must be able to
         reflect any changes of its attributes.
