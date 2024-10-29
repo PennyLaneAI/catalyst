@@ -2,41 +2,21 @@
 
 <h3>New features</h3>
 
-* Experimental integration of the PennyLane capture module is available. It currently only supports
-  quantum gates, without control flow.
-  [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
-
-  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
-  `experimental_capture=True` in the qjit decorator.
-
-  ```python
-  import pennylane as qml
-  from catalyst import qjit
-
-  dev = qml.device("lightning.qubit", wires=1)
-
-  @qjit(experimental_capture=True)
-  @qml.qnode(dev)
-  def circuit():
-      qml.Hadamard(0)
-      qml.CNOT([0, 1])
-      return qml.expval(qml.Z(0))
-  ```
-
-* Shot-vector support for Catalyst: Introduces support for shot-vectors in Catalyst, currently
-  available for `qml.sample` measurements in the `lightning.qubit` device. Shot-vectors now allow
-  elements of the form `((20, 5),)`, which is equivalent to `(20,)*5` or `(20, 20, 20, 20, 20)`.
-  Furthermore, multiple `qml.sample` calls can now be returned from the same program, and can be
-  structured using Python containers. For example, a program can return a dictionary like
-  `return {"first": qml.sample(), "second": qml.sample()}`.
+* Catalyst now supports the specification of shot-vectors when used with
+  `qml.sample` measurements on the `lightning.qubit` device.
   [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
+
+  Shot-vectors allow shots to be specified as a list of shots, `[20, 1, 100]`,
+  or as a tuple of the form `((num_shots, repetitions), ...)` such that
+  `((20, 3), (1, 100))` is equivalent to `shots=[20, 20, 20, 1, 1, ..., 1]`.
+
+  This can result in more efficient quantum execution, as a single job representing
+  the total number of shots is executed on the quantum device, with the measurement
+  post-processing then course-grained with respect to the shot-vector.
 
   For example,
 
   ```python
-  import pennylane as qml
-  from catalyst import qjit
-
   dev = qml.device("lightning.qubit", wires=1, shots=((5, 2), 7))
 
   @qjit
@@ -50,8 +30,11 @@
   >>> circuit()
   (Array([[0], [1], [0], [1], [1]], dtype=int64),
   Array([[0], [1], [1], [0], [1]], dtype=int64),
-  Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
+  Array([[1], [0], [1], [1], [0], [1], [0]], dtype=int64))
   ```
+
+  Note that other measurement types, such as `expval` and `probs`, currently
+  do not support shot-vectors.
 
 * A new function `catalyst.passes.pipeline` allows the quantum-circuit-transformation pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
@@ -64,8 +47,8 @@
   }
   dev = qml.device("lightning.qubit", wires=2)
 
-  @pipeline(my_passes)
-  @qnode(dev)
+  @pipeline(pass_pipeline=my_passes)
+  @qml.qnode(dev)
   def circuit(x):
       qml.RX(x, wires=0)
       return qml.expval(qml.PauliZ(0))
@@ -88,8 +71,8 @@
 
   @qjit
   def fn(x):
-      circuit_pipeline = pipeline(my_pipeline)(circuit)
-      circuit_other = pipeline(my_other_pipeline)(circuit)
+      circuit_pipeline = pipeline(pass_pipeline=my_pipeline)(circuit)
+      circuit_other = pipeline(pass_pipeline=my_other_pipeline)(circuit)
       return jnp.abs(circuit_pipeline(x) - circuit_other(x))
   ```
 
@@ -111,18 +94,19 @@
   always take precedence over global pass pipelines.
 
   The available MLIR passes are listed and documented in the
-  [`catalyst.passes` module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+  [passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`,
-  or the Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
+* A peephole merge rotations pass, which acts similarly to the Python-based [PennyLane merge rotations transform](https://docs.pennylane.ai/en/stable/code/api/pennylane.transforms.merge_rotations.html),
+  is now available in MLIR and can be applied to QNodes within a qjit-compiled function.
   [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
   [(#1205)](https://github.com/PennyLaneAI/catalyst/pull/1205)
   [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
 
-  Using the pipeline, one can run:
+  The `merge_rotations` pass can be provided to the `catalyst.passes.pipeline`
+  decorator:
 
   ```python
-  from catalys.passes import pipeline
+  from catalyst.passes import pipeline
 
   my_passes = {
       "merge_rotations": {}
@@ -134,10 +118,11 @@
       qml.RX(x, wires=0)
       qml.RX(x, wires=0)
       qml.Hadamard(wires=0)
-      return qml.expval(qml.PauliZ(0))
+      return qml.expval(qml.PauliX(0))
   ```
 
-  Using the Python function, one can run:
+  It can also be applied directly to qjit-compiled QNodes via
+  the `catalyst.passes.merge_rotations` Python decorator:
 
   ```python
   from catalys.passes import merge_rotations
@@ -149,7 +134,36 @@
       qml.RX(x, wires=0)
       qml.RX(x, wires=0)
       qml.Hadamard(wires=0)
-      return qml.expval(qml.PauliZ(0))
+      return qml.expval(qml.PauliX(0))
+  ```
+
+* Static arguments of a qjit-compiled function can now be indicated by name via a `static_argnames` argument
+  to the `qjit` decorator.
+  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+
+  Specified static argument names will be treated as compile-time static
+  values, allowing any hashable Python object to be passed to this
+  function argument during compilation.
+
+  ```pycon
+  >>> @qjit(static_argnames="y")
+  ... def f(x, y):
+  ...     print(f"Compiling with y={y}")
+  ...     return x + y
+  >>> f(0.5, 0.3)
+  Compiling with y=0.3
+  ```
+
+  The function will only be re-compiled if the hash value of the static arguments change. Otherwise,
+  re-using previous static argument values will result in no re-compilation:
+
+  ```pycon
+  Array(0.8, dtype=float64)
+  >>> f(0.1, 0.3)  # no re-compilation occurs
+  Array(0.4, dtype=float64)
+  >>> f(0.1, 0.4)  # y changes, re-compilation
+  Compiling with y=0.4
+  Array(0.5, dtype=float64)
   ```
 
 * Catalyst Autograph now supports updating a single index or a slice of JAX arrays using Python's
@@ -210,31 +224,37 @@
   catalyst-cli --tool=llc llvm-ir.ll -o output.o
   ```
 
-* Static arguments of a qjit-compiled function can now be indicated by a `static_argnames` argument
-  to `qjit`.
-  [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
+  Note that `catalyst-cli` is only available when Catalyst is built from
+  source, and is not included when installing Catalyst via pip or from
+  wheels.
+
+* Experimental integration of the PennyLane capture module is available. It currently only supports
+  quantum gates, without control flow.
+  [(#1109)](https://github.com/PennyLaneAI/catalyst/pull/1109)
+
+  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
+  `experimental_capture=True` in the qjit decorator.
 
   ```python
-  @qjit(static_argnames="y")
-  def f(x, y):
-      if y < 10:  # y needs to be marked as static since its concrete boolean value is needed
-          return x + y
+  import pennylane as qml
+  from catalyst import qjit
 
-  @qjit(static_argnames=["x","y"])
-  def g(x, y):
-      if x < 10 and y < 10:
-          return x + y
+  dev = qml.device("lightning.qubit", wires=1)
 
-  res_f = f(1, 2)
-  res_g = g(3, 4)
-  print(res_f, res_g)
-  ```
-
-  ```pycon
-  3 7
+  @qjit(experimental_capture=True)
+  @qml.qnode(dev)
+  def circuit():
+      qml.Hadamard(0)
+      qml.CNOT([0, 1])
+      return qml.expval(qml.Z(0))
   ```
 
 <h3>Improvements</h3>
+
+* Multiple `qml.sample` calls can now be returned from the same program, and can be
+  structured using Python containers. For example, a program can return a dictionary of the form
+  `return {"first": qml.sample(), "second": qml.sample()}`.
+  [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
 * Adjoint canonicalization is now available in MLIR for `CustomOp` and `MultiRZOp`. It can be used
   with the `--canonicalize` pass in `quantum-opt`.
