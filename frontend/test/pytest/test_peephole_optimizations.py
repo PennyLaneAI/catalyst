@@ -18,8 +18,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
-from catalyst.passes import cancel_inverses, merge_rotations, pipeline
+from catalyst import qjit, pipeline
+from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
