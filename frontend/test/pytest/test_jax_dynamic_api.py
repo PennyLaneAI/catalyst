@@ -1161,8 +1161,25 @@ def test_abstracted_axis_no_recompilation():
     x2 = 0.1967
 
     res_0 = circuit(x1, x2)
+    _id0 = id(circuit.compiled_function)
+
     res_1 = circuit(x1, x2)
+    _id1 = id(circuit.compiled_function)
+
+    assert _id0 == _id1
     assert np.allclose(res_0, res_1)
+
+    x1 = jnp.array([0.1, 0.2, 0.3, 0.4])
+
+    res_2 = circuit(x1, x2)
+    _id2 = id(circuit.compiled_function)
+    assert _id0 == _id2
+
+    res_3 = circuit(x1, x2)
+    assert np.allclose(res_2, res_3)
+
+    _id3 = id(circuit.compiled_function)
+    assert _id0 == _id3
 
 
 if __name__ == "__main__":
