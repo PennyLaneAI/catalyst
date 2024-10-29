@@ -347,6 +347,16 @@
   gradient parameters) will now only lower to a single MLIR function.
   [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
 
+* `qml.sample()` and `qml.counts()` on `lightning.qubit`/`kokkos` can now be seeded with
+  `qjit(seed=...)`.
+  [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+  [(#1248)](https://github.com/PennyLaneAI/catalyst/pull/1248)
+
+* The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary
+  operations (in addition to the named Hermitian gates).
+  [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
+  [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
+
 <h3>Breaking changes</h3>
 
 * The `static_size` field in the `AbstractQreg` class has been removed.
