@@ -75,7 +75,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
     -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
-cmake --build quantum-build --target check-dialects compiler_driver
+cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
