@@ -156,7 +156,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
-        ref: v0.38.0_rc
+        ref: v0.39.0_rc
         path: lightning_build
         fetch-depth: 0
 
