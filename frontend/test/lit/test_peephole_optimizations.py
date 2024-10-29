@@ -90,7 +90,7 @@ def test_pipeline_lowering():
     }
 
     @qjit(keep_intermediate=True)
-    @pipeline(pass_pipeline=my_pipeline)
+    @pipeline(my_pipeline)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_pipeline_lowering_workflow(x):
         qml.RX(x, wires=[0])
