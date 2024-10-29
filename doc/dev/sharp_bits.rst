@@ -326,7 +326,7 @@ Specifying compile-time constants
 
 The ``@qjit`` decorator argument ``static_argnums`` allows positional arguments
 to be specified which should be treated as compile-time static arguments (similarly,
-``static_argnames`` can be used to specify compile-time arguments via name).
+``static_argnames`` can be used to specify compile-time static arguments by name).
 
 This allows any hashable Python object to be passed to the function during compilation;
 the function will only be re-compiled if the hash value of the static arguments change.

@@ -2,17 +2,17 @@
 
 <h3>New features</h3>
 
-* Catalyst now supports the specification of shot-vectors when used with
-  `qml.sample` measurements on the `lightning.qubit` device.
+* Catalyst now supports the specification of shot-vectors when used with `qml.sample` measurements
+  on the `lightning.qubit` device.
   [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
-  Shot-vectors allow shots to be specified as a list of shots, `[20, 1, 100]`,
-  or as a tuple of the form `((num_shots, repetitions), ...)` such that
-  `((20, 3), (1, 100))` is equivalent to `shots=[20, 20, 20, 1, 1, ..., 1]`.
+  Shot-vectors allow shots to be specified as a list of shots, `[20, 1, 100]`, or as a tuple of the
+  form `((num_shots, repetitions), ...)` such that `((20, 3), (1, 100))` is equivalent to
+  `shots=[20, 20, 20, 1, 1, ..., 1]`.
 
-  This can result in more efficient quantum execution, as a single job representing
-  the total number of shots is executed on the quantum device, with the measurement
-  post-processing then course-grained with respect to the shot-vector.
+  This can result in more efficient quantum execution, as a single job representing the total number
+  of shots is executed on the quantum device, with the measurement post-processing then
+  coarse-grained with respect to the shot-vector.
 
   For example,
 
@@ -33,8 +33,8 @@
   Array([[1], [0], [1], [1], [0], [1], [0]], dtype=int64))
   ```
 
-  Note that other measurement types, such as `expval` and `probs`, currently
-  do not support shot-vectors.
+  Note that other measurement types, such as `expval` and `probs`, currently do not support
+  shot-vectors.
 
 * A new function `catalyst.passes.pipeline` allows the quantum-circuit-transformation pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
@@ -58,8 +58,8 @@
       return jnp.sin(circuit(x ** 2))
   ```
 
-  `pipeline` can also be used to specify different pass pipelines for different parts of the
-  same qjit-compiled workflow:
+  `pipeline` can also be used to specify different pass pipelines for different parts of the same
+  qjit-compiled workflow:
 
   ```python
   my_pipeline = {
@@ -96,14 +96,14 @@
   The available MLIR passes are listed and documented in the
   [passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
 
-* A peephole merge rotations pass, which acts similarly to the Python-based [PennyLane merge rotations transform](https://docs.pennylane.ai/en/stable/code/api/pennylane.transforms.merge_rotations.html),
+* A peephole merge rotations pass, which acts similarly to the Python-based
+  [PennyLane merge rotations transform](https://docs.pennylane.ai/en/stable/code/api/pennylane.transforms.merge_rotations.html),
   is now available in MLIR and can be applied to QNodes within a qjit-compiled function.
   [(#1162)](https://github.com/PennyLaneAI/catalyst/pull/1162)
   [(#1205)](https://github.com/PennyLaneAI/catalyst/pull/1205)
   [(#1206)](https://github.com/PennyLaneAI/catalyst/pull/1206)
 
-  The `merge_rotations` pass can be provided to the `catalyst.passes.pipeline`
-  decorator:
+  The `merge_rotations` pass can be provided to the `catalyst.passes.pipeline` decorator:
 
   ```python
   from catalyst.passes import pipeline
@@ -123,8 +123,8 @@
       return qml.expval(qml.PauliX(0))
   ```
 
-  It can also be applied directly to qjit-compiled QNodes via
-  the `catalyst.passes.merge_rotations` Python decorator:
+  It can also be applied directly to qjit-compiled QNodes via the `catalyst.passes.merge_rotations`
+  Python decorator:
 
   ```python
   from catalys.passes import merge_rotations
@@ -139,13 +139,12 @@
       return qml.expval(qml.PauliX(0))
   ```
 
-* Static arguments of a qjit-compiled function can now be indicated by name via a `static_argnames` argument
-  to the `qjit` decorator.
+* Static arguments of a qjit-compiled function can now be indicated by name via a `static_argnames`
+  argument to the `qjit` decorator.
   [(#1158)](https://github.com/PennyLaneAI/catalyst/pull/1158)
 
-  Specified static argument names will be treated as compile-time static
-  values, allowing any hashable Python object to be passed to this
-  function argument during compilation.
+  Specified static argument names will be treated as compile-time static values, allowing any
+  hashable Python object to be passed to this function argument during compilation.
 
   ```pycon
   >>> @qjit(static_argnames="y")
@@ -156,8 +155,8 @@
   Compiling with y=0.3
   ```
 
-  The function will only be re-compiled if the hash value of the static arguments change. Otherwise,
-  re-using previous static argument values will result in no re-compilation:
+  The function will only be re-compiled if the hash values of the static arguments change.
+  Otherwise, re-using previous static argument values will result in no re-compilation:
 
   ```pycon
   Array(0.8, dtype=float64)
@@ -199,13 +198,14 @@
   Array([2, 4, 6], dtype=int64)
   ```
 
-* Catalyst now has a standalone compiler tool called `catalyst-cli` that quantum compiles MLIR
-  input files into an object file independent of the Python frontend.
+* Catalyst now has a standalone compiler tool called `catalyst-cli` that quantum compiles MLIR input
+  files into an object file independent of the Python frontend.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
 
   This compiler tool combines three stages of compilation:
 
-  1. `quantum-opt`: Performs the MLIR-level optimizations and lowers the input dialect to the LLVM dialect.
+  1. `quantum-opt`: Performs the MLIR-level optimizations and lowers the input dialect to the LLVM
+     dialect.
   2. `mlir-translate`: Translates the input in the LLVM dialect into LLVM IR.
   3. `llc`: Performs lower-level optimizations and creates the object file.
 
@@ -226,9 +226,8 @@
   catalyst-cli --tool=llc llvm-ir.ll -o output.o
   ```
 
-  Note that `catalyst-cli` is only available when Catalyst is built from
-  source, and is not included when installing Catalyst via pip or from
-  wheels.
+  Note that `catalyst-cli` is only available when Catalyst is built from source, and is not included
+  when installing Catalyst via pip or from wheels.
 
 * Experimental integration of the PennyLane capture module is available. It currently only supports
   quantum gates, without control flow.
@@ -253,14 +252,14 @@
 
 <h3>Improvements</h3>
 
-* Multiple `qml.sample` calls can now be returned from the same program, and can be
-  structured using Python containers. For example, a program can return a dictionary of the form
+* Multiple `qml.sample` calls can now be returned from the same program, and can be structured using
+  Python containers. For example, a program can return a dictionary of the form
   `return {"first": qml.sample(), "second": qml.sample()}`.
   [(#1051)](https://github.com/PennyLaneAI/catalyst/pull/1051)
 
-* Catalyst now ships with `null.qubit`, a Catalyst runtime plugin that mocks out all
-  functions in the QuantumDevice interface. This device is provided as a convenience for testing
-  and benchmarking purposes.
+* Catalyst now ships with `null.qubit`, a Catalyst runtime plugin that mocks out all functions in
+  the QuantumDevice interface. This device is provided as a convenience for testing and benchmarking
+  purposes.
   [(#1179)](https://github.com/PennyLaneAI/catalyst/pull/1179)
 
   ```python
@@ -273,8 +272,8 @@
       return qml.probs(wires=[0])
   ```
 
-* Setting the `seed` argument in the `qjit` decorator will now seed sampled results, in addition
-  to mid-circuit measurement results.
+* Setting the `seed` argument in the `qjit` decorator will now seed sampled results, in addition to
+  mid-circuit measurement results.
   [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
 
   ```python
@@ -294,12 +293,13 @@
   def workflow(x):
       return jnp.squeeze(jnp.stack([circuit(x) for i in range(4)]))
   ```
+
   ```pycon
   >>> workflow(1.8)
   Array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-       [1, 1, 0, 0, 1, 1, 0, 0, 1, 0],
-       [0, 0, 1, 0, 1, 1, 0, 0, 1, 1],
-       [1, 1, 1, 0, 0, 1, 1, 0, 1, 1]], dtype=int64)
+         [1, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+         [0, 0, 1, 0, 1, 1, 0, 0, 1, 1],
+         [1, 1, 1, 0, 0, 1, 1, 0, 1, 1]], dtype=int64)
   >>> workflow(1.8)
   Array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
          [1, 1, 0, 0, 1, 1, 0, 0, 1, 0],
@@ -307,18 +307,17 @@
          [1, 1, 1, 0, 0, 1, 1, 0, 1, 1]], dtype=int64)
   ```
 
-  Note that statistical measurement processes such as `expval`, `var`, and `probs`
-  are currently not affected by seeding when shot noise is present.
+  Note that statistical measurement processes such as `expval`, `var`, and `probs` are currently not
+  affected by seeding when shot noise is present.
 
 * The `cancel_inverses` MLIR compilation pass (`-remove-chained-self-inverse`) now supports
-  cancelling all Hermitian gates, as well as adjoints of arbitrary unitary
-  operations.
+  cancelling all Hermitian gates, as well as adjoints of arbitrary unitary operations.
   [(#1136)](https://github.com/PennyLaneAI/catalyst/pull/1136)
   [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
   [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
 
-  For the full list of supported Hermitian gates please see the `cancel_inverses` documentation
-  in `catalyst.passes`.
+  For the full list of supported Hermitian gates please see the `cancel_inverses` documentation in
+  `catalyst.passes`.
 
 * Support is expanded for backend devices that exclusively return samples in the measurement basis.
   Pre- and post-processing now allows `qjit` to be used on these devices with `qml.expval`,
@@ -338,13 +337,13 @@
 * Compiling QNodes to asynchronous functions will no longer print to `stderr` in case of an error.
   [(#645)](https://github.com/PennyLaneAI/catalyst/pull/645)
 
-* Gradient computations have been made more efficient, as calling gradients twice
-  (with the same gradient parameters) will now only lower to a single MLIR function.
+* Gradient computations have been made more efficient, as calling gradients twice (with the same
+  gradient parameters) will now only lower to a single MLIR function.
   [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
 
 <h3>Breaking changes</h3>
 
-* Remove `static_size` field from `AbstractQreg` class.
+* The `static_size` field in the `AbstractQreg` class has been removed.
   [(#1113)](https://github.com/PennyLaneAI/catalyst/pull/1113)
 
   This reverts a previous breaking change.
@@ -352,12 +351,11 @@
 * Nesting QNodes within one another now raises an error.
   [(#1176)](https://github.com/PennyLaneAI/catalyst/pull/1176)
 
-* The `debug.compile_from_mlir` function has been removed;
-  please use `debug.replace_ir` instead.
+* The `debug.compile_from_mlir` function has been removed; please use `debug.replace_ir` instead.
   [(#1181)](https://github.com/PennyLaneAI/catalyst/pull/1181)
 
-* The `compiler.last_compiler_output` function has been removed;
-  please use `compiler.get_output_of("last", workspace)` instead.
+* The `compiler.last_compiler_output` function has been removed; please use
+  `compiler.get_output_of("last", workspace)` instead.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
 
 <h3>Bug fixes</h3>
@@ -389,8 +387,8 @@
   - Registers the func dialect as a requirement for running the scatter lowering pass.
   - Emits error if `%input`, `%update` and `%result` are not of length 1 instead of segfaulting.
 
-* Fixes a performance issue with `catalyst.vmap` with its root cause in
-  the lowering of the scatter operation.
+* Fixes a performance issue with `catalyst.vmap`, where the root cause was in the lowering of the
+  scatter operation.
   [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
 
 <h3>Internal changes</h3>
@@ -447,7 +445,7 @@
   [(#1149)](https://github.com/PennyLaneAI/catalyst/pull/1149)
 
   In particular, the signatures of `get_device_capability`, `catalyst_decompose`,
- `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
+  `catalyst_acceptance`, and `QJITDevice.__init__` have changed, and the `pennylane_operation_set`
   function has been removed entirely.
 
 * Catalyst now generates nested modules denoting quantum programs.
@@ -457,10 +455,11 @@
   This allows Catalyst to call functions in modules and have modules denote a quantum kernel. This
   will allow for device-specific optimizations and compilation pipelines.
 
-  At the moment, no one is using this. This is just the necessary scaffolding to support device-
-  specific transformations. As such, the module will be inlined to preserve current semantics.
-  However, in the future, we will explore lowering this nested module into other IRs/binary formats
-  and lowering `call_function_in_module` to something that can dispatch calls to another runtime/VM.
+  At the moment, no one is using this. This is just the necessary scaffolding to support
+  device-specific transformations. As such, the module will be inlined to preserve current
+  semantics. However, in the future, we will explore lowering this nested module into other
+  IRs/binary formats and lowering `call_function_in_module` to something that can dispatch calls to
+  another runtime/VM.
 
 
 <h3>Contributors</h3>
