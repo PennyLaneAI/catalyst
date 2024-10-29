@@ -16,7 +16,6 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "VerifyParentGateAnalysis.hpp"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
