@@ -29,7 +29,7 @@ import shutil
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
-from catalyst import qjit, pipeline
+from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
 from catalyst.passes import cancel_inverses, merge_rotations
 
