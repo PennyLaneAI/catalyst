@@ -29,9 +29,9 @@ import shutil
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
-from catalyst import qjit
+from catalyst import qjit, pipeline
 from catalyst.debug import get_compilation_stage
-from catalyst.passes import cancel_inverses, merge_rotations, pipeline
+from catalyst.passes import cancel_inverses, merge_rotations
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
@@ -90,7 +90,7 @@ def test_pipeline_lowering():
     }
 
     @qjit(keep_intermediate=True)
-    @pipeline(pass_pipeline=my_pipeline)
+    @pipeline(my_pipeline)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_pipeline_lowering_workflow(x):
         qml.RX(x, wires=[0])
