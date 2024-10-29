@@ -53,9 +53,10 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
-* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline
+* A new function `catalyst.pipeline` allows the quantum circuit transformation pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
+  [(#1240)](https://github.com/PennyLaneAI/catalyst/pull/1240)
 
   ```python
     my_passes = {
@@ -116,6 +117,8 @@
 
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+
+  The `pipeline` function is available as `catalyst.pipeline` and `catalyst.passes.pipeline`.
 
 * A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the
   Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
