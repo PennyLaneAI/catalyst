@@ -142,7 +142,7 @@ def qjit(
             The default value is None, which means no seeding is performed, and all processes
             are random. A seed is expected to be an unsigned 32-bit integer.
             Currently, the following measurement processes are seeded: :func:`~.measure`,
-            :func:`qml.sample <pennylane.sample>`, :func:`qml.counts <pennylane.counts>`.
+            :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`.
         experimental_capture (bool): If set to ``True``, the qjit decorator
             will use PennyLane's experimental program capture capabilities
             to capture the decorated function for compilation.
