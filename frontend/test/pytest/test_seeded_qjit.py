@@ -110,7 +110,8 @@ def test_seeded_measurement(seed, backend):
     ],
 )
 @pytest.mark.parametrize("shots", [10])
-def test_seeded_sample(seed, shots, backend):
+@pytest.mark.parametrize("readout", [qml.sample, qml.counts])
+def test_seeded_sample(seed, shots, readout, backend):
     """Test that different calls to qjits with the same seed produce the same sample results"""
 
     if backend not in ["lightning.qubit", "lightning.kokkos"]:
@@ -124,7 +125,7 @@ def test_seeded_sample(seed, shots, backend):
         def circuit():
             qml.Hadamard(wires=[0])
             qml.RX(12.34, wires=[1])
-            return qml.sample()
+            return readout()
 
         return circuit(), circuit(), circuit(), circuit()
 
@@ -134,7 +135,7 @@ def test_seeded_sample(seed, shots, backend):
         def circuit():
             qml.Hadamard(wires=[0])
             qml.RX(12.34, wires=[1])
-            return qml.sample()
+            return readout()
 
         return circuit(), circuit(), circuit(), circuit()
 
