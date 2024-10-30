@@ -207,6 +207,7 @@
 * Catalyst now has a standalone compiler tool called `catalyst-cli` that quantum-compiles MLIR input
   files into an object file independent of the Python frontend.
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
+  [(#1255)](https://github.com/PennyLaneAI/catalyst/pull/1255)
 
   This compiler tool combines three stages of compilation:
 
@@ -375,6 +376,9 @@
   [(#1208)](https://github.com/PennyLaneAI/catalyst/pull/1208)
 
 <h3>Bug fixes</h3>
+
+* Fix a bug where the second execution of a function with abstracted axes is failing.
+  [(#1247)](https://github.com/PennyLaneAI/catalyst/pull/1247)
 
 * Fixes a bug in `catalyst.mitigate_with_zne` that would lead to incorrectly extrapolated results.
   [(#1213)](https://github.com/PennyLaneAI/catalyst/pull/1213)

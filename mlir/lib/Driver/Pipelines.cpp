@@ -190,8 +190,7 @@ std::vector<Pipeline> getDefaultPipeline()
         "enforce-runtime-invariants-pipeline", "hlo-lowering-pipeline",
         "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowering-pipeline"};
 
-    std::vector<Pipeline> defaultPipelines;
-    defaultPipelines.reserve(defaultPipelineNames.size());
+    std::vector<Pipeline> defaultPipelines(defaultPipelineNames.size());
     for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {
         defaultPipelines[i].setRegisterFunc(pipelineFuncs[i]);
         defaultPipelines[i].setName(defaultPipelineNames[i]);

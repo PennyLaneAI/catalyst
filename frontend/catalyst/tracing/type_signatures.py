@@ -276,8 +276,8 @@ def typecheck_signatures(compiled_signature, runtime_signature, abstracted_axes=
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
     ):
         # TODO: do away with private jax functions
-        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
-        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
+        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature)
+        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature)
         in_type_compiled = infer_lambda_input_type(axes_specs_compile, flat_compiled_sig)
         in_type_runtime = infer_lambda_input_type(axes_specs_runtime, flat_runtime_sig)
 
