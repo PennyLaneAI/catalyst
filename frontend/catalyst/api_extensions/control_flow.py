@@ -570,10 +570,10 @@ class CondCallable:
     def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
         self.otherwise_fn = otherwise_fn
 
-    def add_pred(self, _pred):
+    def add_pred(self, _pred):  # pylint:disable=missing-function-docstring
         self.preds.append(self._convert_predicate_to_bool(_pred))
 
-    def add_branch_fn(self, _branch_fn):
+    def add_branch_fn(self, _branch_fn):  # pylint:disable=missing-function-docstring
         self.branch_fns.append(_branch_fn)
 
     @property
@@ -814,7 +814,7 @@ class CondCallableSingleGateHandler(CondCallable):
                 self.sgh_preds.append(_pred)
                 self.sgh_branch_fns.append(branch_fn)
                 return self
-            else:
+            else:   # pylint:disable=line-too-long
                 raise TypeError(
                     "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
                 )

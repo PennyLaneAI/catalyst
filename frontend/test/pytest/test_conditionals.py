@@ -427,7 +427,7 @@ class TestCond:
         with pytest.raises(TypeError, match="not allowed to have any arguments"):
             qjit(f)
 
-        def f(x: int):
+        def g(x: int):
 
             res = qml.cond(x < 5, qml.Hadamard, lambda z: z + 1)(0)
 
@@ -437,9 +437,9 @@ class TestCond:
             TypeError,
             match="Conditional 'False' function can have arguments only if it is a PennyLane gate.",
         ):
-            qjit(f)
+            qjit(g)
 
-        def f(x: int):
+        def h(x: int):
 
             res = qml.cond(x < 5, qml.Hadamard, qml.Hadamard, ((x < 6, lambda z: z + 1),))(0)
 
@@ -447,9 +447,9 @@ class TestCond:
 
         with pytest.raises(
             TypeError,
-            match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",
+            match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",   # pylint:disable=line-too-long
         ):
-            qjit(f)
+            qjit(h)
 
 
 class TestInterpretationConditional:
