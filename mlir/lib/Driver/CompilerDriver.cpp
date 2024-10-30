@@ -557,7 +557,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     bool clHasIndividulaPass = pm.size() > 0;
     bool clHasManualPipeline = !options.pipelinesCfg.empty();
     if (clHasIndividulaPass && clHasManualPipeline) {
-        llvm::errs() << "--catalyst-pipline option can't be used with individual pass options "
+        llvm::errs() << "--catalyst-pipeline option can't be used with individual pass options "
                         "or -pass-pipeline.\n";
         return failure();
     }

@@ -215,6 +215,10 @@ def cancel_inverses(fn=None):
         As a result, circuit inspection tools such as :func:`~.draw` will continue
         to display the circuit as written in Python.
 
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationPass"`` stage via the
+        :func:`~.get_compilation_stage` function.
+
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
 
@@ -338,6 +342,10 @@ def merge_rotations(fn=None):
 
         As a result, circuit inspection tools such as :func:`~.draw` will continue
         to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationPass"`` stage via the
+        :func:`~.get_compilation_stage` function.
 
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
