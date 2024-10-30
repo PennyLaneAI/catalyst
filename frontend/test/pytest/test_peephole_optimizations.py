@@ -18,8 +18,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
-from catalyst.passes import cancel_inverses, merge_rotations, pipeline
+from catalyst import pipeline, qjit
+from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
@@ -167,7 +167,7 @@ def test_pipeline_functionality(theta, backend):
             return qml.expval(qml.PauliY(wires=0))
 
         no_pipeline_result = f(theta)
-        pipeline_result = pipeline(pass_pipeline=my_pipeline)(f)(theta)
+        pipeline_result = pipeline(my_pipeline)(f)(theta)
 
         return no_pipeline_result, pipeline_result
 
@@ -189,7 +189,7 @@ def test_cancel_inverses_bad_usages():
             TypeError,
             match="A QNode is expected, got the classical function",
         ):
-            pipeline(classical_func)
+            pipeline()(classical_func)
 
         with pytest.raises(
             TypeError,
