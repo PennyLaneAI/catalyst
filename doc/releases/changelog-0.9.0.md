@@ -53,9 +53,10 @@
   Array([[1], [0], [1], [1], [0], [1],[0]], dtype=int64))
   ```
 
-* A new function `catalyst.passes.pipeline` allows the quantum circuit transformation pass pipeline
+* A new function `catalyst.pipeline` allows the quantum circuit transformation pass pipeline
   for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
+  [(#1240)](https://github.com/PennyLaneAI/catalyst/pull/1240)
 
   ```python
     my_passes = {
@@ -116,6 +117,8 @@
 
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+
+  The `pipeline` function is available as `catalyst.pipeline` and `catalyst.passes.pipeline`.
 
 * A peephole merge rotations pass is now available in MLIR. It can be added to `catalyst.passes.pipeline`, or the
   Python function `catalyst.passes.merge_rotations` can be directly called on a `QNode`.
@@ -299,8 +302,9 @@
 * Calling gradients twice (with same GradParams) will now only lower to a single MLIR function.
   [(#1172)](https://github.com/PennyLaneAI/catalyst/pull/1172)
 
-* Samples on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
+* `qml.sample()` and `qml.counts()` on lightning.qubit/kokkos can now be seeded with `qjit(seed=...)`.
   [(#1164)](https://github.com/PennyLaneAI/catalyst/pull/1164)
+  [(#1248)](https://github.com/PennyLaneAI/catalyst/pull/1248)
 
 * The compiler pass `-remove-chained-self-inverse` can now also cancel adjoints of arbitrary unitary operations (in addition to the named Hermitian gates).
   [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
@@ -362,6 +366,10 @@
 * Fixes a performance issue with vmap with its root cause in the
   lowering of the scatter operation.
   [(#1214)](https://github.com/PennyLaneAI/catalyst/pull/1214)
+
+* Fixes a bug where conditional-ed single gates cannot be used in qjit,
+  e.g. `qml.cond(x > 1, qml.Hadamard)(wires=0)`.
+  [(#1232)](https://github.com/PennyLaneAI/catalyst/pull/1232)
 
 <h3>Internal changes</h3>
 
