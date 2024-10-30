@@ -342,7 +342,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=2a40629d3dc6500549cc5beef7241a43d1a62e01 \
+              -DLIGHTNING_GIT_TAG=0d59583eb03bafebf2d9f437bf66f2fdbbf8d237 \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
