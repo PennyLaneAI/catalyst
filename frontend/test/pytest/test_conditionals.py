@@ -447,7 +447,7 @@ class TestCond:
 
         with pytest.raises(
             TypeError,
-            match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",   # pylint:disable=line-too-long
+            match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
         ):
             qjit(h)
 

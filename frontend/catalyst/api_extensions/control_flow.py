@@ -814,7 +814,7 @@ class CondCallableSingleGateHandler(CondCallable):
                 self.sgh_preds.append(_pred)
                 self.sgh_branch_fns.append(branch_fn)
                 return self
-            else:   # pylint:disable=line-too-long
+            else:  # pylint:disable=line-too-long
                 raise TypeError(
                     "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
                 )
