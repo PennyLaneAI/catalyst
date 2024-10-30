@@ -1148,10 +1148,7 @@ def test_abstracted_axis_no_recompilation():
 
         @qml.for_loop(0, jnp.shape(x1)[0], 1)
         def loop_block(i):
-            qml.Hadamard(0)
             qml.RX(x1[i], 0)
-            qml.CNOT(wires=[0, 1])
-            qml.Hadamard(1)
 
         loop_block()
         qml.RY(x2, 1)
