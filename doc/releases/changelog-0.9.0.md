@@ -377,7 +377,7 @@
 
 <h3>Bug fixes</h3>
 
-* Fix a bug where the second execution of a function with abstracted axes is failing.
+* Fixes a bug where the second execution of a function with abstracted axes is failing.
   [(#1247)](https://github.com/PennyLaneAI/catalyst/pull/1247)
 
 * Fixes a bug in `catalyst.mitigate_with_zne` that would lead to incorrectly extrapolated results.
