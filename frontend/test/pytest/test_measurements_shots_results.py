@@ -81,7 +81,7 @@ class TestExpval:
             return qml.expval(qml.PauliX(wires=0)), qml.expval(qml.PauliX(wires=1))
 
         expected = circuit()
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliy(self, backend, tol_stochastic):
