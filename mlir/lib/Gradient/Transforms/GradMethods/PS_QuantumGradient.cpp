@@ -56,7 +56,7 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
                                                    Value selectorBuffer, func::FuncOp shiftedFn,
                                                    std::vector<Value> callArgs)
 {
-    constexpr double shift = PI / 2;
+    constexpr double shift = llvm::numbers::pi / 2;
     ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Value selectorVector = rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer);
 
