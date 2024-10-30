@@ -1253,8 +1253,9 @@ Note that ``jax.vmap`` cannot be used within a qjit-compiled function:
 NotImplementedError: Batching rule for 'qinst' not implemented
 
 In addition, shot-vectors are currently only supported in a limited manner;
-shot-vectors work with ``qml.sample``, but not other measurement processes
-such as ``qml.expval`` and ``qml.probs``.
+shot-vectors work with :func:`qml.sample <pennylane.sample>`, but not other
+measurement processes such as :func:`qml.expval <pennylane.expval>` and
+:func:`qml.probs <pennylane.probs>`.
 
 Functionality differences from PennyLane
 ----------------------------------------
