@@ -36,8 +36,8 @@
   Note that other measurement types, such as `expval` and `probs`, currently do not support
   shot-vectors.
 
-* A new function `catalyst.pipeline` allows the quantum-circuit-transformation pass pipeline for
-  QNodes within a qjit-compiled workflow to be configured.
+* A new function `catalyst.pipeline` allows the quantum-circuit-transformation pass pipeline
+  for QNodes within a qjit-compiled workflow to be configured.
   [(#1131)](https://github.com/PennyLaneAI/catalyst/pull/1131)
   [(#1240)](https://github.com/PennyLaneAI/catalyst/pull/1240)
 
@@ -97,8 +97,6 @@
 
   Global and local (via `@pipeline`) configurations can coexist, however local pass pipelines will
   always take precedence over global pass pipelines.
-
-  The `pipeline` function is available as `catalyst.pipeline` and `catalyst.passes.pipeline`.
 
   The available MLIR passes are listed and documented in the
   [passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
