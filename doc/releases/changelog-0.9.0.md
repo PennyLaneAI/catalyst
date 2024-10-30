@@ -358,6 +358,9 @@
   [(#1186)](https://github.com/PennyLaneAI/catalyst/pull/1186)
   [(#1211)](https://github.com/PennyLaneAI/catalyst/pull/1211)
 
+* Add Lightning-GPU support to Catalyst docs and update tests.
+  [(#1254)](https://github.com/PennyLaneAI/catalyst/pull/1254)
+
 <h3>Breaking changes</h3>
 
 * The `static_size` field in the `AbstractQreg` class has been removed.

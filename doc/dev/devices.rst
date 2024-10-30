@@ -45,7 +45,7 @@ Supported backend devices include:
       for the GPU-accelerated quantum simulation. See the
       `Lightning-GPU documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_gpu/device.html>`__
       for more details, as well as its
-      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_gpu/lightning_gou.toml>`__
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_gpu/lightning_gpu.toml>`__
       for natively supported instructions.
 
   * - ``braket.aws.qubit``
