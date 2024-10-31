@@ -554,16 +554,16 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         return failure();
     }
 
-    bool clHasIndividulaPass = pm.size() > 0;
+    bool clHasIndividualPass = pm.size() > 0;
     bool clHasManualPipeline = !options.pipelinesCfg.empty();
-    if (clHasIndividulaPass && clHasManualPipeline) {
+    if (clHasIndividualPass && clHasManualPipeline) {
         llvm::errs() << "--catalyst-pipeline option can't be used with individual pass options "
                         "or -pass-pipeline.\n";
         return failure();
     }
 
     // If individual passes are configured, run them
-    if (clHasIndividulaPass) {
+    if (clHasIndividualPass) {
         if (options.dumpPassPipeline) {
             pm.dump();
             llvm::errs() << "\n";
@@ -571,7 +571,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         return pm.run(moduleOp);
     }
 
-    // If pipelines are not cofigured explicitly, use the catalyst default pipeline
+    // If pipelines are not configured explicitly, use the catalyst default pipeline
     std::vector<Pipeline> UserPipeline =
         clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
     for (auto &pipeline : UserPipeline) {
@@ -683,7 +683,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (runOpt && (inType == InputType::MLIR)) {
         TimingScope optTiming = timing.nest("Optimization");
         // TODO: The enzymeRun flag will not travel correctly in the case where different
-        // stages of compilation are executed independantly via the catalyst-cli executable.
+        // stages of compilation are executed independently via the catalyst-cli executable.
         // Ideally, It should be added to the IR via an attribute.
         enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
@@ -856,7 +856,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     cl::opt<bool> DumpPassPipeline(
         "dump-catalyst-pipeline", cl::desc("Print the pipeline that will be run"), cl::init(false));
 
-    // Create dialect registery
+    // Create dialect registry
     DialectRegistry registry;
     registerAllPasses();
     registerAllCatalystPasses();
@@ -868,7 +868,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
     std::tie(inputFilename, outputFilename) =
-        registerAndParseCLIOptions(argc, argv, "qunatum compiler", registry);
+        registerAndParseCLIOptions(argc, argv, "quantum compiler", registry);
     llvm::InitLLVM y(argc, argv);
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
