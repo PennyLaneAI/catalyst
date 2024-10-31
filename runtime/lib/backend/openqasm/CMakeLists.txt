@@ -26,5 +26,11 @@ target_include_directories(rtd_openqasm PRIVATE .
     )
 
 target_link_libraries(rtd_openqasm pybind11::module catalyst_python_interpreter)
+set_property(TARGET rt_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:catalyst_python_interpreter>")
+if(NOT APPLE)
+    set_property(TARGET rt_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
+else()
+    set_property(TARGET rt_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
+endif()
 
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
