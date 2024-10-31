@@ -14,11 +14,13 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
-#include "mlir/Pass/Pass.h"
-#include "llvm/Support/Debug.h"
-
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -27,32 +29,60 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_MERGEROTATIONPASS
-#define GEN_PASS_DECL_MERGEROTATIONPASS
+#define GEN_PASS_DEF_MERGEROTATIONSPASS
+#define GEN_PASS_DECL_MERGEROTATIONSPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct MergeRotationPass : impl::MergeRotationPassBase<MergeRotationPass> {
-    using MergeRotationPassBase::MergeRotationPassBase;
+struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
+    using MergeRotationsPassBase::MergeRotationsPassBase;
 
     void runOnOperation() final
     {
         LLVM_DEBUG(dbgs() << "merge rotation pass"
                           << "\n");
 
-        if (MyOption == "aloha") {
-            llvm::errs() << "merge rotation pass, aloha!\n";
+        Operation *module = getOperation();
+        Operation *targetfunc;
+
+        WalkResult result = module->walk([&](func::FuncOp op) {
+            StringRef funcName = op.getSymName();
+
+            if (funcName != FuncNameOpt) {
+                // not the function to run the pass on, visit the next function
+                return WalkResult::advance();
+            }
+            targetfunc = op;
+            return WalkResult::interrupt();
+        });
+
+        if (!result.wasInterrupted()) {
+            // Never met a target function
+            // Do nothing and exit!
+            return;
         }
-        else {
-            llvm::errs() << "merge rotation pass, hi!\n";
+        RewritePatternSet patternsCanonicalization(&getContext());
+        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                 &getContext());
+        catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                  &getContext());
+        if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patternsCanonicalization)))) {
+            return signalPassFailure();
+        }
+
+        RewritePatternSet patterns(&getContext());
+        populateMergeRotationsPatterns(patterns);
+
+        if (failed(applyPatternsAndFoldGreedily(targetfunc, std::move(patterns)))) {
+            return signalPassFailure();
         }
     }
 };
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createMergeRotationPass()
+std::unique_ptr<Pass> createMergeRotationsPass()
 {
-    return std::make_unique<quantum::MergeRotationPass>();
+    return std::make_unique<quantum::MergeRotationsPass>();
 }
 
 } // namespace catalyst

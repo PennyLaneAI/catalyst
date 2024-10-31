@@ -292,14 +292,14 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=latest_release \
+              -DLIGHTNING_GIT_TAG=6f3e0d5d371ff9823a3177dd2c66052668883d42 \
               -DENABLE_LAPACK=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -334,7 +334,7 @@ jobs:
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DLLVM_ENABLE_LLD=OFF
 
-        cmake --build quantum-build --target check-dialects compiler_driver
+        cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 
     - name: Build wheel
       run: |

@@ -805,3 +805,14 @@ class TestVectorizeMap:
 
         with pytest.raises(ValueError, match="2 is out of bounds for argument 1"):
             f._get_batch_size((jnp.zeros(5), jnp.zeros((2, 5))), (0, 2), None)
+
+    def test_vmap_no_aot(self):
+        """Test that vmap does not allow AOT compilation since type signatures are most likely to
+        be wrong."""
+
+        @qjit(target="mlir")
+        @vmap
+        def f(x: float):
+            return x**2
+
+        assert f.mlir is None

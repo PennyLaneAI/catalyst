@@ -25,7 +25,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane import QubitUnitary, QueuingManager
+from pennylane.devices import QubitDevice
 from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
@@ -62,7 +63,6 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
-    CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
     counts_p,
@@ -71,7 +71,6 @@ from catalyst.jax_primitives import (
     gphase_p,
     hamiltonian_p,
     hermitian_p,
-    mlir_fn_cache,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -158,6 +157,15 @@ class Function:
     Raises:
         AssertionError: Invalid function type.
     """
+
+    CACHE = {}
+
+    def __new__(cls, fn):
+        if cached_instance := cls.CACHE.get(fn):
+            return cached_instance
+        new_instance = super().__new__(cls)
+        cls.CACHE[fn] = new_instance
+        return new_instance
 
     @debug_logger_init
     def __init__(self, fn):
@@ -548,13 +556,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
         ir.Context: the MLIR context
     """
 
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
     MemrefCallable.clearcache()
-    CALLBACK_OP_CACHE.clear()
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)

@@ -1,5 +1,5 @@
-add_subdirectory(dummy)
-configure_file(dummy/dummy_device.toml dummy_device.toml)
+add_subdirectory(null_qubit)
+configure_file(null_qubit/null_qubit.toml null_qubit.toml)
 if(ENABLE_LIGHTNING)
 add_subdirectory(lightning)
 endif()

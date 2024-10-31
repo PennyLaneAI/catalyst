@@ -8,14 +8,16 @@ configure_lit_site_cfg(
 set(DIALECT_TESTS_DEPEND
     FileCheck
     quantum-opt
+    catalyst-cli
 )
 
 set(TEST_SUITES
-    Catalyst
     Quantum
     Gradient
     Mitigation
-    Catalyst)
+    Catalyst
+    cli
+    )
 
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)

@@ -18,7 +18,6 @@ from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-import pennylane as qml
 import pytest
 
 from catalyst.utils.exceptions import CompileError
@@ -30,23 +29,6 @@ from catalyst.utils.toml import (
     load_device_capabilities,
     read_toml_file,
 )
-
-
-class DeviceToBeTested(qml.QubitDevice):
-    """Test device"""
-
-    name = "Dummy Device"
-    short_name = "dummy.device"
-    pennylane_requires = "0.33.0"
-    version = "0.0.1"
-    author = "Dummy"
-
-    operations = []
-    observables = []
-
-    def apply(self, operations, **kwargs):
-        """Unused"""
-        raise RuntimeError("Only C/C++ interface is defined")
 
 
 def get_test_config(config_text: str) -> TOMLDocument:

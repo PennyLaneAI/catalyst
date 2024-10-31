@@ -32,6 +32,7 @@ from catalyst.tracing.type_signatures import (
     params_are_annotated,
     typecheck_signatures,
 )
+from catalyst.utils.exceptions import CompileError
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
@@ -454,10 +455,10 @@ class TestCaching:
         def g(x: float):
             return f(x) + f(x)
 
-        assert "func.func private @f(" in g.mlir
-        assert g.mlir.count("call @f(") == 2
+        assert "func.func public @f(" in g.mlir
+        assert g.mlir.count("launch_kernel @module_f::@f") == 2
         # Duplicate function generation results in a "_0" suffix
-        assert not "func.func private @f_0(" in g.mlir
+        assert not "func.func public @f_0(" in g.mlir
 
 
 class TestShots:
@@ -993,6 +994,30 @@ class TestParamsAnnotations:
         def foo(hello: "BAD ANNOTATION"): ...
 
         assert not params_are_annotated(foo)
+
+
+class TestErrorNestedQNode:
+    """Test error is raised with nested qnodes"""
+
+    def test_nested_qnode(self):
+        """Test autograph on a QNode raises error."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def inner():
+            return qml.state()
+
+        @qml.qnode(dev)
+        def outer():
+            inner()
+            return qml.state()
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            def fn():
+                return outer()
 
 
 if __name__ == "__main__":
