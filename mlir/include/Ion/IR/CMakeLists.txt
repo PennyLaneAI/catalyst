@@ -1,0 +1,12 @@
+add_mlir_dialect(IonOps ion)
+add_mlir_interface(IonInterfaces)
+# add_mlir_doc(IonDialect -gen-dialect-doc IonDialect Ion/)
+# add_mlir_doc(IonOps -gen-op-doc IonOps Ion/)
+# add_mlir_doc(IonInterfaces -gen-op-interface-docs IonInterfaces Ion/)
+
+set(LLVM_TARGET_DEFINITIONS IonOps.td)
+mlir_tablegen(IonEnums.h.inc -gen-enum-decls)
+mlir_tablegen(IonEnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(IonAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=ion)
+mlir_tablegen(IonAttributes.cpp.inc -gen-attrdef-defs -attrdefs-dialect=ion)
+# add_public_tablegen_target(MLIRIonEnumsIncGen)
