@@ -287,10 +287,10 @@ def qjit(
     .. details::
         :title: Static arguments
 
-        - ``static_argnums`` defines which positional arguments should be treated as static. If it takes an
-        integer, it means the argument whose index is equal to the integer is static. If it takes
-        an iterable of integers, arguments whose index is contained in the iterable are static.
-        Changing static arguments will introduce re-compilation.
+        - ``static_argnums`` defines which positional arguments should be treated as static. If it
+          takes an integer, it means the argument whose index is equal to the integer is static. If
+          it takes an iterable of integers, arguments whose index is contained in the iterable are
+          static. Changing static arguments will introduce re-compilation.
 
         - ``static_argnames`` defines which named function arguments should be treated as static.
 
