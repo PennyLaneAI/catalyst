@@ -118,9 +118,10 @@ applies the pass ``inline-nested-module``, we would specifiy this pipeline confi
 ``--workspace=<path>``
 """"""""""""""""""""""
 
-The workspace directory where intermediate files are saved, and from which they are read when using
-the ``--checkpoint-stage`` option. The default is the current working directory. Note that the
-workspace directory must exist before running ``catalyst-cli`` with this option.
+The workspace directory where intermediate files are saved. The default is the current working
+directory.
+
+Note that the workspace directory must exist before running ``catalyst-cli`` with this option.
 
 ``--module-name=<name>``
 """"""""""""""""""""""""
@@ -147,71 +148,90 @@ Print (to stderr) the pipeline(s) that will be run.
 Examples
 ^^^^^^^^
 
-To illustrate how to use the Catalyst CLI tool, consider the very simple MLIR code, ``foo.mlir``,
-which defines a function ``foo`` that takes in no arguments and returns nothing:
+To illustrate how to use the Catalyst CLI tool, consider the simple MLIR code, ``my_circuit.mlir``,
+which defines a function ``my_circuit`` that implements a single-qubit quantum circuit that applies
+the sequence of gates :math:`R_x(\theta) \to H \to H \to R_x(\theta)` to the input qubit for some
+rotation angle :math:`\theta`:
 
 .. code-block::
 
     module {
-      func.func @foo() {
-        return
+      func.func @my_circuit(%in_qubit: !quantum.bit, %angle: f64) -> !quantum.bit {
+        %0 = quantum.custom "RX"(%angle) %in_qubit : !quantum.bit
+        %1 = quantum.custom "Hadamard"() %0 : !quantum.bit
+        %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
+        %3 = quantum.custom "RX"(%angle) %2 : !quantum.bit
+        return %3 : !quantum.bit
       }
     }
 
 We'll use the Catalyst CLI tool to run the ``quantum-opt`` compiler to perform the MLIR-level
-optimizations and lower the input to the LLVM MLIR dialect. We'll define two pass pipelines:
+optimizations and lower the input to the LLVM MLIR dialect. We'll define a pass pipeline that
+applies two quantum-optimization passes:
 
-#. ``pass1``, which applies the ``split-multiple-tapes`` and ``apply-transform-sequence`` passes, and
-#. ``pass2``, which applies the ``inline-nested-module`` pass.
+#. ``remove-chained-self-inverse``, which removes any operations that are applied next to their
+   (self-)inverses or adjoint, in this case the two adjacent Hadamard gates.
+#. ``merge-rotations``, which combines rotation gates of the same type that act sequentially, in
+   this case the two RX gates the become adjacent after the two Hadamard gates have been removed by
+   the ``remove-chained-self-inverse`` pass.
+
+To define the pass pipeline, we must supply the name of the function to which each pass applies
+using the ``func-name`` argument. To apply these two passes to our ``my_circuit`` function, we can
+do so as follows:
+
+.. code-block::
+
+    pipe(remove-chained-self-inverse{func-name=my_circuit};merge-rotations{func-name=my_circuit})
 
 Finally, we'll use the option ``--mlir-print-ir-after-all`` to print the resulting MLIR after each
 pass that is applied, and the ``-o`` option to set the name of the output file:
 
 .. code-block::
 
-    catalyst-cli foo.mlir \
+    catalyst-cli my_circuit.mlir \
         --tool=opt \
-        --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" \
+        --catalyst-pipeline="pipe(remove-chained-self-inverse{func-name=my_circuit};merge-rotations{func-name=my_circuit})" \
         --mlir-print-ir-after-all \
-        -o foo-llvm.mlir
+        -o my_circuit-llvm.mlir
 
-This will output the following intermediate IR to the console:
+Running this command will output the following intermediate IR to the console:
 
 .. code-block::
 
-    // -----// IR Dump After SplitMultipleTapesPass (split-multiple-tapes) //----- //
+    // -----// IR Dump After RemoveChainedSelfInversePass (remove-chained-self-inverse) //----- //
     module {
-      func.func @foo() {
-        return
+      func.func @my_circuit(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
+        %out_qubits = quantum.custom "RX"(%arg1) %arg0 : !quantum.bit
+        %out_qubits_0 = quantum.custom "RX"(%arg1) %out_qubits : !quantum.bit
+        return %out_qubits_0 : !quantum.bit
       }
     }
 
 
-    // -----// IR Dump After ApplyTransformSequencePass (apply-transform-sequence) //----- //
+    // -----// IR Dump After MergeRotationsPass (merge-rotations) //----- //
     module {
-      func.func @foo() {
-        return
+      func.func @my_circuit(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
+        %0 = arith.addf %arg1, %arg1 : f64
+        %out_qubits = quantum.custom "RX"(%0) %arg0 : !quantum.bit
+        return %out_qubits : !quantum.bit
       }
     }
 
-
-    // -----// IR Dump After InlineNestedModulePass (inline-nested-module) //----- //
-    module {
-      func.func @foo() {
-        return
-      }
-    }
-
-and produce a new file ``foo-llvm.mlir`` containing the resulting LLVM MLIR dialect:
+and produce a new file ``my_circuit-llvm.mlir`` containing the resulting module in the LLVM MLIR
+dialect:
 
 .. code-block::
 
     module {
-      func.func @foo() {
-        return
+      func.func @my_circuit(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
+        %0 = arith.addf %arg1, %arg1 : f64
+        %out_qubits = quantum.custom "RX"(%0) %arg0 : !quantum.bit
+        return %out_qubits : !quantum.bit
       }
     }
 
-In this particular case, the function ``foo`` was already fully optimized according to the
-transformation and optimization pass pipelines we supplied, so the LLVM MLIR dialect output is
-unchanged from the original MLIR input.
+We can see in the intermediate IR after the ``remove-chained-self-inverse`` pass that the two
+adjacent Hadamard gates were removed and that the two RX gates were merged into one after the
+``merge-rotations`` pass, with the input angle to the single RX gate being the sum of the two input
+angles to the original two gates. The result in ``my_circuit-llvm.mlir`` contains the final,
+optimized MLIR.
