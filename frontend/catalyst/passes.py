@@ -131,7 +131,7 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
     will always take precedence over global pass pipelines.
     """
 
-    def _decorator(fn=None):
+    def _decorator(fn=None, **kwargs):
         if fn is None:
             return functools.partial(pipeline, **kwargs)
 
