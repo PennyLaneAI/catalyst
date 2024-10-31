@@ -51,7 +51,7 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DENABLE_OPENQASM=ON \
     -DENABLE_OPENMP=OFF \
     -DLQ_ENABLE_KERNEL_OMP=OFF
-cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
+cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit catalyst_python_interpreter
 
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
@@ -79,7 +79,7 @@ cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
-cp /catalyst/runtime-build/lib/libcatalyst_python_interpreter.* /catalyst/runtime-build/lib
+find . -name libcatalyst_python_interpreter.* -exec cp /catalyst/runtime-build/lib {} \;
 cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/
 
