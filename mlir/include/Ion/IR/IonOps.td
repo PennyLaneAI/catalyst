@@ -28,34 +28,124 @@ include "Ion/IR/IonInterfaces.td"
 // Ion dialect enums.
 //===----------------------------------------------------------------------===//
 
-// def NamedObservable : I32EnumAttr<"NamedObservable",
-//     "Known named observables",
-//     [
-//         I32EnumAttrCase<"Identity", 0>,
-//         I32EnumAttrCase<"PauliX",   1>,
-//         I32EnumAttrCase<"PauliY",   2>,
-//         I32EnumAttrCase<"PauliZ",   3>,
-//         I32EnumAttrCase<"Hadamard", 4>,
-//     ]> {
-//     let cppNamespace = "catalyst::ion";
-//     let genSpecializedAttr = 0;
-// }
-
 
 //===----------------------------------------------------------------------===//
 // Ion dialect traits.
 //===----------------------------------------------------------------------===//
 
-// def Unitary : NativeOpTrait<"UnitaryTrait">;
-// def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-// def IonMemory : Resource<"IonMemory">;
 
 //===----------------------------------------------------------------------===//
 // Ion dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def NamedObservableAttr : EnumAttr<IonDialect, NamedObservable, "named_observable">;
+class Ion_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<Ion_Dialect, name, traits> {
+  let mnemonic = attrMnemonic;
+}
+
+def LevelAttr : Ion_Attr<"Level", "level"> {
+  let summary = "A class to represent an atomic level.";
+
+  let parameters = (ins
+    "mlir::IntegerAttr":$principal,
+    "mlir::FloatAttr":$spin,
+    "mlir::FloatAttr":$orbital,
+    "mlir::FloatAttr":$nuclear,
+    "mlir::FloatAttr":$spin_orbital,
+    "mlir::FloatAttr":$spin_orbital_nuclear,
+    "mlir::FloatAttr":$spin_orbital_nuclear_magnetization,
+    "mlir::FloatAttr":$energy
+  );
+
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins     
+    "mlir::IntegerAttr":$principal,
+    "mlir::FloatAttr":$spin,
+    "mlir::FloatAttr":$orbital,
+    "mlir::FloatAttr":$nuclear,
+    "mlir::FloatAttr":$spin_orbital,
+    "mlir::FloatAttr":$spin_orbital_nuclear,
+    "mlir::FloatAttr":$spin_orbital_nuclear_magnetization,
+    "mlir::FloatAttr":$energy), [{
+      return $_get(principal.getContext(), principal, spin, orbital, nuclear, spin_orbital, spin_orbital_nuclear, spin_orbital_nuclear_magnetization, energy);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+def PhononAttr : Ion_Attr<"Phonon", "phonon"> {
+  let summary = "A class to represent a phonon.";
+
+  let parameters = (ins
+    "mlir::FloatAttr":$energy,
+    "mlir::IntegerAttr":$eigen_vector,
+  );
+
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins     
+    "mlir::FloatAttr":$energy,
+    "mlir::DenseIntElementsAttr":$eigen_vector), [{
+      return $_get(energy.getContext(), energy, eigen_vector);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+def TransitionAttr : Ion_Attr<"Transition", "transition"> {
+  let summary = "A class to represent a atomic transition between two levels.";
+
+  let parameters = (ins
+    "LevelAttr":$level_0,
+    "LevelAttr":$level_1,
+  );
+
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins     
+    "LevelAttr":$level_0,
+    "LevelAttr":$level_1,
+    "mlir::FloatAttr":$einstein_a,), [{
+      return $_get(level_0.getContext(), level_0, level_1, einstein_a);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+
+def LevelArrayAttr : TypedArrayAttrBase<
+    LevelAttr, "Array of atomic levels.">;
+
+def TransitionArrayAttr : TypedArrayAttrBase<
+    TransititionAttr, "Array of transtion between atomic level">;
+
+def IonAttr : Ion_Attr<"Ion", "ion"> {
+  let summary = "A class to represent an ion.";
+
+  let parameters = (ins
+    "mlir::FloatAttr":$mass,
+    "mlir::FloatAttr":$charge,
+    "mlir::DenseIntElementsAttr": $position,
+    LevelArrayAttr: $levels,
+    TransitionArrayAttr: $transitions,
+  );
+
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins     
+    "LevelAttr":$level_0,
+    "LevelAttr":$level_1,
+    "mlir::FloatAttr":$einstein_a,), [{
+      return $_get(mass.getContext(), mass, charge, position, levels, transitions);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
 
 //===----------------------------------------------------------------------===//
 // Ion dialect operations.
@@ -63,20 +153,56 @@ def NamedObservableAttr : EnumAttr<IonDialect, NamedObservable, "named_observabl
 
 class Ion_Op<string mnemonic, list<Trait> traits = []> : Op<IonDialect, mnemonic, traits>;
 
-def InitializeOp : Ion_Op<"init"> {
-    let summary = "Initialize the Ion runtime.";
+def BeamOp : Ion_Op<"beam"> {
+    let summary = "Represent a beam.";
 
+    let arguments = (ins
+        TransitionAttr:$transition,
+        "mlir::FloatAttr":$rabi,
+        "mlir::FloatAttr":$detuning,
+        "mlir::DenseIntElementsAttr": $polarization,
+        "mlir::DenseIntElementsAttr": $wavevector,
+        QubitType: $in_qubit,
+    );
+
+    let results = (outs
+        QubitType:$out_qubit,
+    );
     let assemblyFormat = [{
-        attr-dict
+        attr-dict `transition` `rabi` `detuning` `polarization` `wavevector` 
+        %in_qubit : type -> %out_qubit : type
     }];
 }
 
-def FinalizeOp : Ion_Op<"finalize"> {
-    let summary = "Teardown the Ion runtime.";
+def BeamOp : Ion_Op<"beam"> {
+    let summary = "Represent a beam.";
 
+    let arguments = (ins
+        TransitionAttr:$transition,
+        "mlir::FloatAttr":$rabi,
+        "mlir::FloatAttr":$detuning,
+        "mlir::DenseIntElementsAttr": $polarization,
+        "mlir::DenseIntElementsAttr": $wavevector,
+        QubitType: $in_qubit,
+    );
+
+    let results = (outs
+        QubitType:$out_qubit,
+    );
     let assemblyFormat = [{
-        attr-dict
+        attr-dict `transition` `rabi` `detuning` `polarization` `wavevector` 
+        %in_qubit : type -> %out_qubit : type
     }];
 }
+
+// def SequentialProtocolOp : Ion_Op<"sequential_protocol"> {
+//     let summary = "Represent beams that are run sequentially.";
+
+// }
+
+// def ParallelProtocolOp : Ion_Op<"parallel_protocol"> {
+//     let summary = "Represent beams that are run in parallel";
+
+// }
 
 #endif // ION_OPS
