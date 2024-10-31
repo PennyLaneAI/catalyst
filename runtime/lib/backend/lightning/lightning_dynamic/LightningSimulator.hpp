@@ -87,7 +87,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit LightningSimulator(const std::string &kwargs = "{}")
+    explicit LightningSimulator(const std::string &kwargs = "{}") // NOLINT(hicpp-member-init)
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
@@ -105,6 +105,10 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(LightningSimulator);
 
+    // TODO: properly refactor the common device methods,
+    // instead of using #define macros in
+    // runtime/lib/backend/common/Utils.hpp
+    // When done, remove the NOLINT(hicpp-member-init) on the class constructor
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
 

@@ -29,7 +29,7 @@ auto LightningSimulator::AllocateQubit() -> QubitIdType
 
 auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (!num_qubits) {
+    if (num_qubits == 0U) {
         return {};
     }
 
