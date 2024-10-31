@@ -25,7 +25,6 @@ from typing import Any, Callable, List
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-import pennylane as qml
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
 from pennylane import QueuingManager
