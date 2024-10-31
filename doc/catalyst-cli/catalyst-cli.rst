@@ -152,8 +152,10 @@ which defines a function ``foo`` that takes in no arguments and returns nothing:
 
 .. code-block::
 
-    func.func @foo() {
+    module {
+      func.func @foo() {
         return
+      }
     }
 
 We'll use the Catalyst CLI tool to run the ``quantum-opt`` compiler to perform the MLIR-level
@@ -212,4 +214,4 @@ and produce a new file ``foo-llvm.mlir`` containing the resulting LLVM MLIR dial
 
 In this particular case, the function ``foo`` was already fully optimized according to the
 transformation and optimization pass pipelines we supplied, so the LLVM MLIR dialect output is
-largely unchanged from the original MLIR input.
+unchanged from the original MLIR input.
