@@ -170,6 +170,7 @@ wheel:
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/libcatalyst_python_interpreter.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/catalyst_callback_registry*.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
