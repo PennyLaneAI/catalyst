@@ -55,9 +55,18 @@ set(OQC_LIBRARIES
     catalyst_python_interpreter
 )
 
-set_target_properties(rtd_oqc PROPERTIES BUILD_RPATH "$ORIGIN/../utils")
 target_link_directories(rtd_oqc PRIVATE ${runtime_lib})
 target_link_libraries(rtd_oqc PRIVATE pybind11::module catalyst_python_interpreter)
+set_target_properties(rtd_oqc PROPERTIES BUILD_RPATH "$ORIGIN/../utils")
+
+# TODO: learn more cmake for this
+#add_dependencies(rtd_oqc catalyst_python_interpreter)
+#set_property(TARGET rtd_oqc APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:catalyst_python_interpreter>")
+if(NOT APPLE)
+    set_property(TARGET rtd_oqc APPEND PROPERTY BUILD_RPATH $ORIGIN)
+else()
+    set_property(TARGET rtd_oqc APPEND PROPERTY BUILD_RPATH @loader_path)
+endif()
 
 if(USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER_PATH)
  target_link_directories(rtd_oqc PRIVATE  ${catalyst_python_interpreter_path})
