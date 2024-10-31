@@ -824,6 +824,11 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
 int QuantumDriverMainFromCL(int argc, char **argv)
 {
     // Command-line options
+
+    // ATTENTION
+    // ---------
+    // Any modifications made to the command-line interface should be documented in
+    // doc/catalyst-cli/catalyst-cli.rst
     cl::opt<std::string> WorkspaceDir("workspace", cl::desc("Workspace directory"), cl::init("."));
     cl::opt<std::string> ModuleName("module-name", cl::desc("Module name"),
                                     cl::init("catalyst_module"));

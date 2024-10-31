@@ -2,7 +2,7 @@ Catalyst CLI
 ============
 
 Catalyst includes a standalone command-line-interface compiler tool ``catalyst-cli`` that
-quantum-compiles MLIR input files into an object file, independent of the Python frontend.
+quantum-compiles MLIR input files into an object file, independent of the Catalyst Python frontend.
 
 This compiler tool combines three stages of compilation:
 
@@ -119,8 +119,8 @@ applies the pass ``inline-nested-module``, we would specifiy this pipeline confi
 """"""""""""""""""""""
 
 The workspace directory where intermediate files are saved, and from which they are read when using
-the ``--checkpoint-stage`` option. The default is the current working directory, ``./``. Note that
-the workspace directory must exist before running ``catalyst-cli`` with this option.
+the ``--checkpoint-stage`` option. The default is the current working directory. Note that the
+workspace directory must exist before running ``catalyst-cli`` with this option.
 
 ``--module-name=<name>``
 """"""""""""""""""""""""
@@ -136,16 +136,80 @@ Enable asynchronous QNodes.
 ``--checkpoint-stage=<stage name>``
 """""""""""""""""""""""""""""""""""
 
-The checkpoint stage.
-
-FIXME!! DO NOT COMMIT! I don't understand how this option works.
+Define a *checkpoint stage*, used to indicate that the compiler should start only after reaching the
+given pass.
 
 ``--dump-catalyst-pipeline[=<true|false>]``
 """""""""""""""""""""""""""""""""""""""""""
 
-Print the pipeline that will be run to stderr.
+Print (to stderr) the pipeline(s) that will be run.
 
 Examples
 ^^^^^^^^
 
-TODO
+To illustrate how to use the Catalyst CLI tool, consider the very simple MLIR code, ``foo.mlir``,
+which defines a function ``foo`` that takes in no arguments and returns nothing:
+
+.. code-block::
+
+    func.func @foo() {
+        return
+    }
+
+We'll use the Catalyst CLI tool to run the ``quantum-opt`` compiler to perform the MLIR-level
+optimizations and lower the input to the LLVM MLIR dialect. We'll define two pass pipelines:
+
+#. ``pass1``, which applies the ``split-multiple-tapes`` and ``apply-transform-sequence`` passes, and
+#. ``pass2``, which applies the ``inline-nested-module`` pass.
+
+Finally, we'll use the option ``--mlir-print-ir-after-all`` to print the resulting MLIR after each
+pass that is applied, and the ``-o`` option to set the name of the output file:
+
+.. code-block::
+
+    catalyst-cli foo.mlir \
+        --tool=opt \
+        --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" \
+        --mlir-print-ir-after-all \
+        -o foo-llvm.mlir
+
+This will output the following intermediate IR to the console:
+
+.. code-block::
+
+    // -----// IR Dump After SplitMultipleTapesPass (split-multiple-tapes) //----- //
+    module {
+      func.func @foo() {
+        return
+      }
+    }
+
+
+    // -----// IR Dump After ApplyTransformSequencePass (apply-transform-sequence) //----- //
+    module {
+      func.func @foo() {
+        return
+      }
+    }
+
+
+    // -----// IR Dump After InlineNestedModulePass (inline-nested-module) //----- //
+    module {
+      func.func @foo() {
+        return
+      }
+    }
+
+and produce a new file ``foo-llvm.mlir`` containing the resulting LLVM MLIR dialect:
+
+.. code-block::
+
+    module {
+      func.func @foo() {
+        return
+      }
+    }
+
+In this particular case, the function ``foo`` was already fully optimized according to the
+transformation and optimization pass pipelines we supplied, so the LLVM MLIR dialect output is
+largely unchanged from the original MLIR input.
