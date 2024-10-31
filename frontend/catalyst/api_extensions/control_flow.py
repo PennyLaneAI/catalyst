@@ -25,6 +25,7 @@ from typing import Any, Callable, List
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+import pennylane as qml
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
 from pennylane import QueuingManager
@@ -570,10 +571,10 @@ class CondCallable:
     def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
         self.otherwise_fn = otherwise_fn
 
-    def add_pred(self, _pred):  # pylint:disable=missing-function-docstring
+    def add_pred(self, _pred):
         self.preds.append(self._convert_predicate_to_bool(_pred))
 
-    def add_branch_fn(self, _branch_fn):  # pylint:disable=missing-function-docstring
+    def add_branch_fn(self, _branch_fn):
         self.branch_fns.append(_branch_fn)
 
     @property
