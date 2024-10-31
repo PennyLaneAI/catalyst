@@ -1139,5 +1139,45 @@ def test_trace_to_jaxpr():
     assert r == 3
 
 
+def test_abstracted_axis_no_recompilation():
+    """Test that a function that does not need recompilation can be executed a second time"""
+
+    @qml.qjit(abstracted_axes=(("n",), ()))
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(x1, x2):
+
+        @qml.for_loop(0, jnp.shape(x1)[0], 1)
+        def loop_block(i):
+            qml.RX(x1[i], 0)
+
+        loop_block()
+        qml.RY(x2, 1)
+        return qml.expval(qml.Z(1))
+
+    x1 = jnp.array([0.1, 0.2, 0.3])
+    x2 = 0.1967
+
+    res_0 = circuit(x1, x2)
+    _id0 = id(circuit.compiled_function)
+
+    res_1 = circuit(x1, x2)
+    _id1 = id(circuit.compiled_function)
+
+    assert _id0 == _id1
+    assert np.allclose(res_0, res_1)
+
+    x1 = jnp.array([0.1, 0.2, 0.3, 0.4])
+
+    res_2 = circuit(x1, x2)
+    _id2 = id(circuit.compiled_function)
+    assert _id0 == _id2
+
+    res_3 = circuit(x1, x2)
+    assert np.allclose(res_2, res_3)
+
+    _id3 = id(circuit.compiled_function)
+    assert _id0 == _id3
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
