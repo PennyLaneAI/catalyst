@@ -1,5 +1,5 @@
-Catalyst CLI
-============
+Catalyst Command Line Interface
+===============================
 
 Catalyst includes a standalone command-line-interface compiler tool ``catalyst-cli`` that
 quantum-compiles MLIR input files into an object file, independent of the Catalyst Python frontend.
