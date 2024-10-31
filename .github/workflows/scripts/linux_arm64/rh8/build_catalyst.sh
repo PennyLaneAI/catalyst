@@ -79,7 +79,7 @@ cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
-find . -name 'libcatalyst_python_interpreter.*' -exec cp /catalyst/runtime-build/lib {} \;
+find . -name 'libcatalyst_python_interpreter.*' -exec cp {} /catalyst/runtime-build/lib \;
 cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/
 
