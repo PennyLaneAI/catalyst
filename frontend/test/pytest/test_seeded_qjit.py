@@ -115,7 +115,9 @@ def test_seeded_sample(seed, shots, readout, backend):
     """Test that different calls to qjits with the same seed produce the same sample results"""
 
     if backend not in ["lightning.qubit", "lightning.kokkos", "lightning.gpu"]:
-        pytest.skip("Sample seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu")
+        pytest.skip(
+            "Sample seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
+        )
 
     dev = qml.device(backend, wires=2, shots=shots)
 
