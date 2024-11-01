@@ -7,8 +7,9 @@ quantum-compiles MLIR input files into an object file, independent of the Cataly
 This compiler tool combines three stages of compilation:
 
 #. ``quantum-opt``: Performs the MLIR-level optimizations, including quantum optimizations, and
-   lowers the input dialect to the LLVM MLIR dialect.
-#. ``mlir-translate``: Translates the input LLVM MLIR dialect into LLVM IR.
+   translates the input dialect to the `LLVM dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_.
+#. ``mlir-translate``: Translates the input LLVM dialect into
+   `LLVM IR <https://llvm.org/docs/LangRef.html>`_.
 #. ``llc``: Performs lower-level optimizations on the LLVM IR input and creates the object file.
 
 ``catalyst-cli`` runs all three stages under the hood by default, but it also has the ability to run
@@ -19,10 +20,10 @@ each stage individually. For example:
     # Creates both the optimized IR and an object file
     catalyst-cli input.mlir -o output.o
 
-    # Only performs MLIR optimizations
+    # Only performs MLIR optimizations and translates to LLVM dialect
     catalyst-cli --tool=opt input.mlir -o llvm-dialect.mlir
 
-    # Only lowers LLVM MLIR dialect input to LLVM IR
+    # Only lowers LLVM dialect input to LLVM IR
     catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
 
     # Only performs lower-level optimizations and creates object file
@@ -78,7 +79,7 @@ to produce an object file, the resulting IR is output to stdout.
 Select the tool to run individually. The default is ``all``.
 
 * ``opt``: Run ``quantum-opt`` on the MLIR input.
-* ``translate``: Run ``mlir-translate`` on the LLVM MLIR dialect input.
+* ``translate``: Run ``mlir-translate`` on the LLVM dialect input.
 * ``llc``: Run ``llc`` on the LLVM IR input.
 * ``all``: Run all of ``opt``, ``translate`` and ``llc`` on the MLIR input.
 
@@ -166,8 +167,8 @@ rotation angle :math:`\theta`:
     }
 
 We'll use the Catalyst CLI tool to run the ``quantum-opt`` compiler to perform the MLIR-level
-optimizations and lower the input to the LLVM MLIR dialect. We'll define a pass pipeline that
-applies two quantum-optimization passes:
+optimizations and translate the input to the LLVM dialect. We'll define a pass pipeline that applies
+two quantum-optimization passes:
 
 #. ``remove-chained-self-inverse``, which removes any operations that are applied next to their
    (self-)inverses or adjoint, in this case the two adjacent Hadamard gates.
@@ -217,8 +218,7 @@ Running this command will output the following intermediate IR to the console:
       }
     }
 
-and produce a new file ``my_circuit-llvm.mlir`` containing the resulting module in the LLVM MLIR
-dialect:
+and produce a new file ``my_circuit-llvm.mlir`` containing the resulting module in the LLVM dialect:
 
 .. code-block:: mlir
 
