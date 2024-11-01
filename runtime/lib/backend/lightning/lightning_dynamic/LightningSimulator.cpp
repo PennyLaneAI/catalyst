@@ -104,16 +104,16 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data,
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &state,
                                   std::vector<QubitIdType> &wires)
 {
-    std::vector<std::complex<double>> data_vector(data.begin(), data.end());
+    std::vector<std::complex<double>> data_vector(state.begin(), state.end());
     this->device_sv->setStateVector(data_vector, getDeviceWires(wires));
 }
 
-void LightningSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
+void LightningSimulator::SetBasisState(DataView<int8_t, 1> &n, std::vector<QubitIdType> &wires)
 {
-    std::vector<std::size_t> data_vector(data.begin(), data.end());
+    std::vector<std::size_t> data_vector(n.begin(), n.end());
     this->device_sv->setBasisState(data_vector, getDeviceWires(wires));
 }
 
@@ -453,8 +453,8 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
     // It represents the measured result, true for 1, false for 0
     bool mres = Lightning::simulateDraw(probs, postselect, this->gen);
     auto dev_wires = getDeviceWires(wires);
-    this->device_sv->collapse(dev_wires[0], (mres != 0U) ? true : false);
-    return (mres != 0U) ? this->One() : this->Zero();
+    this->device_sv->collapse(dev_wires[0], static_cast<unsigned int>(mres != 0U));
+    return static_cast<unsigned int>(mres != 0U) ? this->One() : this->Zero();
 }
 
 // Gradient
