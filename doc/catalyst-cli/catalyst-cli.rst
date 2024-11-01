@@ -109,7 +109,7 @@ sequence of pipelines.
 
 For example, if we wanted to specify two pass pipelines, ``pipe1`` and ``pipe2``, where ``pipe1``
 applies the passes ``split-multiple-tapes`` and ``apply-transform-sequence``, and where ``pipe2``
-applies the pass ``inline-nested-module``, we would specifiy this pipeline configuration as:
+applies the pass ``inline-nested-module``, we would specify this pipeline configuration as:
 
 .. code-block::
 
