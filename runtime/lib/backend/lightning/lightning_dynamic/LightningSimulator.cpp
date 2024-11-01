@@ -34,7 +34,7 @@ auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitI
     }
 
     // at the first call when num_qubits == 0
-    if (!this->GetNumQubits()) {
+    if (this->GetNumQubits() == 0U) {
         this->device_sv = std::make_unique<StateVectorT>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
