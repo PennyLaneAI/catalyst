@@ -79,7 +79,6 @@ configure:
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DCLANG_TIDY_BINARY=clang-tidy \
 		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
@@ -106,7 +105,6 @@ lq_configure:
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DCLANG_TIDY_BINARY=clang-tidy \
 		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
