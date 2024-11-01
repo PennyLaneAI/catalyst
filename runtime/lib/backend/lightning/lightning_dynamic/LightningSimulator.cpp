@@ -453,8 +453,8 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
     // It represents the measured result, true for 1, false for 0
     bool mres = Lightning::simulateDraw(probs, postselect, this->gen);
     auto dev_wires = getDeviceWires(wires);
-    this->device_sv->collapse(dev_wires[0], static_cast<unsigned int>(mres != 0U));
-    return static_cast<unsigned int>(mres != 0U) ? this->One() : this->Zero();
+    this->device_sv->collapse(dev_wires[0], mres);
+    return mres ? this->One() : this->Zero();
 }
 
 // Gradient
