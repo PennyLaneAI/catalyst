@@ -230,4 +230,3 @@ CheckOptions:
   - key:             readability-simplify-subscript-expr.Types
     value:           '::std::basic_string;::std::basic_string_view;::std::vector;::std::array'
 ...
-
