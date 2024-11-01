@@ -26,7 +26,7 @@
 struct DynamicLibraryLoader {
     void *handle;
 
-    DynamicLibraryLoader(std::string_view library_name, int mode = RTLD_LAZY)
+    DynamicLibraryLoader(std::string_view library_name, int mode = RTLD_LAZY | RTLD_NODELETE)
     {
         // Load the shared library
         handle = dlopen(library_name.data(), mode);

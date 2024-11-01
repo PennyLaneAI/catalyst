@@ -73,9 +73,8 @@ def py_get_results(circuit, braket_device, kwargs, shots):
     return str(py_run_circuit(circuit, braket_device, kwargs, shots))
 )";
 
-extern "C" {
-[[gnu::visibility("default")]] double var(const char *_circuit, const char *_device, size_t shots,
-                                          const char *_kwargs)
+extern "C" PYBIND11_EXPORT double var(const char *_circuit, const char *_device, size_t shots,
+                                      const char *_kwargs)
 {
     namespace py = pybind11;
     py::gil_scoped_acquire lock;
@@ -89,8 +88,9 @@ extern "C" {
         .attr("__getitem__")(0)
         .cast<double>();
 }
-[[gnu::visibility("default")]] double expval(const char *_circuit, const char *_device,
-                                             size_t shots, const char *_kwargs)
+
+extern "C" PYBIND11_EXPORT double expval(const char *_circuit, const char *_device, size_t shots,
+                                         const char *_kwargs)
 {
     namespace py = pybind11;
     py::gil_scoped_acquire lock;
@@ -104,8 +104,9 @@ extern "C" {
         .attr("__getitem__")(0)
         .cast<double>();
 }
-[[gnu::visibility("default")]] void samples(const char *_circuit, const char *_device, size_t shots,
-                                            size_t num_qubits, const char *_kwargs, void *_vector)
+
+extern "C" PYBIND11_EXPORT void samples(const char *_circuit, const char *_device, size_t shots,
+                                        size_t num_qubits, const char *_kwargs, void *_vector)
 {
     namespace py = pybind11;
     py::gil_scoped_acquire lock;
@@ -126,8 +127,9 @@ extern "C" {
 
     return;
 }
-[[gnu::visibility("default")]] void probs(const char *_circuit, const char *_device, size_t shots,
-                                          size_t num_qubits, const char *_kwargs, void *_vector)
+
+extern "C" PYBIND11_EXPORT void probs(const char *_circuit, const char *_device, size_t shots,
+                                      size_t num_qubits, const char *_kwargs, void *_vector)
 {
     namespace py = pybind11;
     py::gil_scoped_acquire lock;
@@ -148,8 +150,9 @@ extern "C" {
 
     return;
 }
-[[gnu::visibility("default")]] char *runCircuit(const char *_circuit, const char *_device,
-                                                size_t shots, const char *_kwargs)
+
+extern "C" PYBIND11_EXPORT char *runCircuit(const char *_circuit, const char *_device, size_t shots,
+                                            const char *_kwargs)
 {
     namespace py = pybind11;
     py::gil_scoped_acquire lock;
@@ -164,7 +167,6 @@ extern "C" {
     char *retptr = (char *)malloc(sizeof(char *) * retval.size() + 1);
     memcpy(retptr, retval.c_str(), sizeof(char *) * retval.size());
     return retptr;
-}
 }
 
 PYBIND11_MODULE(openqasm_python_module, m) { m.doc() = "openqasm"; }
