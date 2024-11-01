@@ -21,6 +21,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinAttributes.td"
 
 include "Ion/IR/IonDialect.td"
 include "Ion/IR/IonInterfaces.td"
@@ -82,17 +83,9 @@ def PhononAttr : Ion_Attr<"Phonon", "phonon"> {
 
   let parameters = (ins
     "mlir::FloatAttr":$energy,
-    "mlir::IntegerAttr":$eigen_vector
+    "mlir::DenseIntElementsAttr":$eigen_vector
   );
 
-
-  let builders = [
-    AttrBuilderWithInferredContext<(ins     
-    "mlir::FloatAttr":$energy,
-    "mlir::DenseIntElementsAttr":$eigen_vector), [{
-      return $_get(energy.getContext(), energy, eigen_vector);
-    }]>
-  ];
 
   let assemblyFormat = "`<` struct(params) `>`";
 }
@@ -102,50 +95,32 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
 
   let parameters = (ins
     "LevelAttr":$level_0,
-    "LevelAttr":$level_1
+    "LevelAttr":$level_1,
+    "mlir::FloatAttr":$einstein_a
   );
 
-
-  let builders = [
-    AttrBuilderWithInferredContext<(ins     
-    "LevelAttr":$level_0,
-    "LevelAttr":$level_1,
-    "mlir::FloatAttr":$einstein_a), [{
-      return $_get(level_0.getContext(), level_0, level_1, einstein_a);
-    }]>
-  ];
 
   let assemblyFormat = "`<` struct(params) `>`";
 }
 
 
-def LevelArrayAttr : TypedArrayAttrBase<LevelAttr, "Array of atomic levels.">;
+// def LevelArrayAttr : TypedArrayAttrBase<LevelAttr, "Array of atomic levels.">;
 
-def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr, "Array of transtion between atomic level">;
+// def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr, "Array of transtion between atomic level">;
 
-def IonAttr : Ion_Attr<"Ion", "ion"> {
-  let summary = "A class to represent an ion.";
+// def IonAttr : Ion_Attr<"Ion", "ion"> {
+//   let summary = "A class to represent an ion.";
 
-  let parameters = (ins
-    "mlir::FloatAttr":$mass,
-    "mlir::FloatAttr":$charge,
-    "mlir::DenseIntElementsAttr": $position,
-    LevelArrayAttr: $levels,
-    TransitionArrayAttr: $transitions
-  );
+//   let parameters = (ins
+//     "mlir::FloatAttr":$mass,
+//     "mlir::FloatAttr":$charge,
+//     "mlir::DenseIntElementsAttr": $position,
+//     LevelArrayAttr: $levels,
+//     TransitionArrayAttr: $transitions
+//   );
 
-
-  let builders = [
-    AttrBuilderWithInferredContext<(ins     
-    "LevelAttr":$level_0,
-    "LevelAttr":$level_1,
-    "mlir::FloatAttr":$einstein_a), [{
-      return $_get(mass.getContext(), mass, charge, position, levels, transitions);
-    }]>
-  ];
-
-  let assemblyFormat = "`<` struct(params) `>`";
-}
+//   let assemblyFormat = "`<` struct(params) `>`";
+// }
 
 //===----------------------------------------------------------------------===//
 // Ion dialect operations.
@@ -156,20 +131,16 @@ def BeamOp : Ion_Op<"beam"> {
 
     let arguments = (ins
         TransitionAttr:$transition,
-        "mlir::FloatAttr":$rabi,
-        "mlir::FloatAttr":$detuning,
-        "mlir::DenseIntElementsAttr": $polarization,
-        "mlir::DenseIntElementsAttr": $wavevector,
-        QubitType: $in_qubit
+        Builtin_FloatAttr:$rabi,
+        Builtin_FloatAttr:$detuning,
+        AnyIntElementsAttr: $polarization,
+        AnyIntElementsAttr: $wavevector,
+        AnyType: $in_qubit
     );
 
     let results = (outs
-        QubitType:$out_qubit
+        AnyType:$out_qubit
     );
-    let assemblyFormat = [{
-        attr-dict `transition` `rabi` `detuning` `polarization` `wavevector` 
-        %in_qubit : type -> %out_qubit : type
-    }];
 }
 
 #endif // ION_OPS
