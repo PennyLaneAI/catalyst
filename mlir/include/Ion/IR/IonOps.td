@@ -135,11 +135,11 @@ def BeamOp : Ion_Op<"beam"> {
         Builtin_FloatAttr:$detuning,
         AnyIntElementsAttr: $polarization,
         AnyIntElementsAttr: $wavevector,
-        AnyType: $in_qubit
+        QubitType: $in_qubit
     );
 
     let results = (outs
-        AnyType:$out_qubit
+        QubitType:$out_qubit
     );
 }
 

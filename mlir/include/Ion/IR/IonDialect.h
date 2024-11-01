@@ -16,6 +16,7 @@
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Dialect.h"
+#include "Quantum/IR/QuantumDialect.h"
 
 //===----------------------------------------------------------------------===//
 // Ion dialect declarations.
