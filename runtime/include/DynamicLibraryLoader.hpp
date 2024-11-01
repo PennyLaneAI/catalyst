@@ -39,7 +39,17 @@ struct DynamicLibraryLoader {
     ~DynamicLibraryLoader()
     {
         if (handle) {
-            dlclose(handle);
+            // TODO: This is non-sensical.
+            // We are using RTLD_NODELETE, why would calling dlclose have a side-effect?
+            // Worst of all, the side-effect is not in our code.
+            // When we have dlclose, everything works well the first time.
+            // However, when trying to compile a second time, we will find that jaxlib will now
+            // raise a StopIteration exception. This doesn't really make any sense.
+            // My guess is that somehow dlclosing here will unload a the StopIteration symbol (?)
+            // rebind it with another equivalent (but with different id?)
+            // and then the MLIR python bindings are unable to catch it and stop the iteration and
+            // it gets propagated upwards.
+            // dlclose(handle);
         }
     }
 
