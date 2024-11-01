@@ -394,7 +394,7 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[--idx] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = (li_samples[shot * numQubits + wire] != 0U);
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -432,7 +432,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = dev_wires.size();
         for (auto wire : dev_wires) {
-            basisState[--idx] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = (li_samples[shot * numQubits + wire] !=0U);
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
