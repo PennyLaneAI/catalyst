@@ -153,7 +153,7 @@ which defines a function ``my_circuit`` that implements a single-qubit quantum c
 the sequence of gates :math:`R_x(\theta) \to H \to H \to R_x(\theta)` to the input qubit for some
 rotation angle :math:`\theta`:
 
-.. code-block::
+.. code-block:: mlir
 
     module {
       func.func @my_circuit(%in_qubit: !quantum.bit, %angle: f64) -> !quantum.bit {
@@ -220,7 +220,7 @@ Running this command will output the following intermediate IR to the console:
 and produce a new file ``my_circuit-llvm.mlir`` containing the resulting module in the LLVM MLIR
 dialect:
 
-.. code-block::
+.. code-block:: mlir
 
     module {
       func.func @my_circuit(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
