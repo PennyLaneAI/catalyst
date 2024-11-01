@@ -467,7 +467,7 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     const size_t num_train_params = tp_empty ? num_params : trainParams.size();
     const size_t jac_size = num_train_params * this->cache_manager.getNumObservables();
 
-    if (!jac_size) {
+    if (jac_size == 0U) {
         return;
     }
 
