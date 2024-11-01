@@ -228,7 +228,7 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return device_shots ? m.expval(*obs, device_shots, {}) : m.expval(*obs);
+    return (device_shots!=0U) ? m.expval(*obs, device_shots, {}) : m.expval(*obs);
 }
 
 auto LightningSimulator::Var(ObsIdType obsKey) -> double
@@ -244,7 +244,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return device_shots ? m.var(*obs, device_shots) : m.var(*obs);
+    return (device_shots!=0U) ? m.var(*obs, device_shots) : m.var(*obs);
 }
 
 void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
@@ -258,7 +258,7 @@ void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
 void LightningSimulator::Probs(DataView<double, 1> &probs)
 {
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = device_shots ? m.probs(device_shots) : m.probs();
+    auto &&dv_probs = (device_shots!=0U) ? m.probs(device_shots) : m.probs();
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
@@ -276,7 +276,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = device_shots ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
+    auto &&dv_probs = (device_shots!=0U) ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
                "Invalid size for the pre-allocated partial-probabilities");
@@ -314,7 +314,7 @@ std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
     // the number of qubits.
     //
     // Return Value Optimization (RVO)
-    if (this->gen) {
+    if (this->gen != nullptr) {
         return m.generate_samples(shots, (*(this->gen))());
     }
     return m.generate_samples(shots);
