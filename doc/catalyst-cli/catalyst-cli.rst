@@ -177,8 +177,9 @@ two quantum-optimization passes:
    the ``remove-chained-self-inverse`` pass.
 
 To define the pass pipeline, we must supply the name of the function to which each pass applies
-using the ``func-name`` argument. To apply these two passes to our ``my_circuit`` function, we can
-do so as follows:
+using the ``func-name`` argument. The ``func-name`` argument is specific to the two passes we are
+applying and is not a general requirement. To apply these two passes to our ``my_circuit`` function,
+we can do so as follows:
 
 .. code-block::
 
