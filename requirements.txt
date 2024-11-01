@@ -13,7 +13,7 @@ scipy==1.13
 # formatting/linting
 black
 clang-format==14.*
-clang-tidy==14.*
+clang-tidy~=16.0
 pylint
 isort
 
