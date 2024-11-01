@@ -32,5 +32,5 @@ func.func @foo() {
 // CHECK-ONE-PASS: Pass Manager with 1 passes
 // CHECK-ONE-PASS: builtin.module(cse)
 
-// CHECK-FAIL: --catalyst-pipline option can't be used with individual pass options or -pass-pipeline.
+// CHECK-FAIL: --catalyst-pipeline option can't be used with individual pass options or -pass-pipeline.
 // CHECK-FAIL: Compilation failed

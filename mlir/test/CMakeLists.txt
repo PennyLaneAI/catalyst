@@ -16,6 +16,7 @@ set(TEST_SUITES
     Gradient
     Mitigation
     Catalyst
+    cli
     )
 
 
