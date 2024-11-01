@@ -235,3 +235,7 @@ adjacent Hadamard gates were removed and that the two RX gates were merged into 
 ``merge-rotations`` pass, with the input angle to the single RX gate being the sum of the two input
 angles to the original two gates. The result in ``my_circuit-llvm.mlir`` contains the final,
 optimized MLIR.
+
+For a list of transformation passes currently available in Catalyst, see the
+:ref:`catalyst-s-transformation-library` documentation. The available passes are also listed in the
+``catalyst-cli --help`` message.
