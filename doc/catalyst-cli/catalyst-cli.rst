@@ -196,7 +196,7 @@ pass that is applied, and the ``-o`` option to set the name of the output file:
 
 Running this command will output the following intermediate IR to the console:
 
-.. code-block::
+.. code-block:: mlir
 
     // -----// IR Dump After RemoveChainedSelfInversePass (remove-chained-self-inverse) //----- //
     module {
