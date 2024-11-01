@@ -39,7 +39,7 @@ struct DynamicLibraryLoader {
     ~DynamicLibraryLoader()
     {
         if (handle) {
-            // dlclose(handle); TODO: investigate
+            dlclose(handle);
         }
     }
 
