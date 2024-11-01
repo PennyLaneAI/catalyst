@@ -9,5 +9,5 @@ add_mlir_library(MLIRIon
     DEPENDS
     MLIRIonInterfacesIncGen
     MLIRIonOpsIncGen
-    # MLIRIonEnumsIncGen
+    MLIRIonEnumsIncGen
 )

@@ -17,14 +17,14 @@
 
 include "mlir/IR/OpBase.td"
 
-def QuantumRegion : OpInterface<"QuantumRegion"> {
+def IonRegion : OpInterface<"IonRegion"> {
     let description = [{
         This interface provides a generic way to interact with instructions that are
         considered quantum regions. These are characterized by operating on a single
         qubit register, and returning a new register value.
     }];
 
-    let cppNamespace = "::catalyst::quantum";
+    let cppNamespace = "::catalyst::ion";
 
     let methods = [
         InterfaceMethod<

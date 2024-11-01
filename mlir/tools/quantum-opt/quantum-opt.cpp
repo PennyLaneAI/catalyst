@@ -32,6 +32,7 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
+#include "Ion/IR/IonDialect.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
@@ -53,6 +54,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
+    registry.insert<catalyst::ion::IonDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
 
     return mlir::asMainReturnCode(

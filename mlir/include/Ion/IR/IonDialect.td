@@ -15,6 +15,7 @@
 #ifndef ION_DIALECT
 #define ION_DIALECT
 
+include "mlir/IR/OpBase.td"
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/AttrTypeBase.td"
 
@@ -22,7 +23,7 @@ include "mlir/IR/AttrTypeBase.td"
 // Ion dialect.
 //===----------------------------------------------------------------------===//
 
-def IonDialect : Dialect {
+def Ion_Dialect : Dialect {
     let summary = "A trapped ions dialect with value semantics.";
     let description = [{
         The ion dialect extends core MLIR with the necessary types and operations to form
@@ -61,5 +62,12 @@ def IonDialect : Dialect {
 // def ResultType : Quantum_Type<"Result", "res"> {
 //     let summary = "A quantum measurement result.";
 // }
+
+//===----------------------------------------------------------------------===//
+// Ion dialect base operation.
+//===----------------------------------------------------------------------===//
+
+class Ion_Op<string mnemonic, list<Trait> traits = []> :
+        Op<Ion_Dialect, mnemonic, traits>;
 
 #endif // ION_DIALECT

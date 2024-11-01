@@ -32,26 +32,13 @@
 // Ion trait declarations.
 //===----------------------------------------------------------------------===//
 
-namespace mlir {
-namespace OpTrait {
-
-// template <typename ConcreteType> class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {
-// };
-
-// template <typename ConcreteType>
-// class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {
-// };
-
-} // namespace OpTrait
-} // namespace mlir
-
 
 //===----------------------------------------------------------------------===//
 // Ion ops declarations.
 //===----------------------------------------------------------------------===//
 
 #include "Ion/IR/IonDialect.h"
-#include "Ion/IR/IonEnums.h.inc"
+// #include "Ion/IR/IonEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "Ion/IR/IonAttributes.h.inc"
 #define GET_OP_CLASSES

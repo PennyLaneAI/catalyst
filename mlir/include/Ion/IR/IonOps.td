@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef Ion_OPS
-#define Ion_OPS
+#ifndef ION_OPS
+#define ION_OPS
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/IR/AttrTypeBase.td"
 
 include "Ion/IR/IonDialect.td"
 include "Ion/IR/IonInterfaces.td"
+include "Quantum/IR/QuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
 // Ion dialect enums.
@@ -80,7 +82,7 @@ def PhononAttr : Ion_Attr<"Phonon", "phonon"> {
 
   let parameters = (ins
     "mlir::FloatAttr":$energy,
-    "mlir::IntegerAttr":$eigen_vector,
+    "mlir::IntegerAttr":$eigen_vector
   );
 
 
@@ -100,7 +102,7 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
 
   let parameters = (ins
     "LevelAttr":$level_0,
-    "LevelAttr":$level_1,
+    "LevelAttr":$level_1
   );
 
 
@@ -108,7 +110,7 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
     AttrBuilderWithInferredContext<(ins     
     "LevelAttr":$level_0,
     "LevelAttr":$level_1,
-    "mlir::FloatAttr":$einstein_a,), [{
+    "mlir::FloatAttr":$einstein_a), [{
       return $_get(level_0.getContext(), level_0, level_1, einstein_a);
     }]>
   ];
@@ -117,11 +119,9 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
 }
 
 
-def LevelArrayAttr : TypedArrayAttrBase<
-    LevelAttr, "Array of atomic levels.">;
+def LevelArrayAttr : TypedArrayAttrBase<LevelAttr, "Array of atomic levels.">;
 
-def TransitionArrayAttr : TypedArrayAttrBase<
-    TransititionAttr, "Array of transtion between atomic level">;
+def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr, "Array of transtion between atomic level">;
 
 def IonAttr : Ion_Attr<"Ion", "ion"> {
   let summary = "A class to represent an ion.";
@@ -131,7 +131,7 @@ def IonAttr : Ion_Attr<"Ion", "ion"> {
     "mlir::FloatAttr":$charge,
     "mlir::DenseIntElementsAttr": $position,
     LevelArrayAttr: $levels,
-    TransitionArrayAttr: $transitions,
+    TransitionArrayAttr: $transitions
   );
 
 
@@ -139,7 +139,7 @@ def IonAttr : Ion_Attr<"Ion", "ion"> {
     AttrBuilderWithInferredContext<(ins     
     "LevelAttr":$level_0,
     "LevelAttr":$level_1,
-    "mlir::FloatAttr":$einstein_a,), [{
+    "mlir::FloatAttr":$einstein_a), [{
       return $_get(mass.getContext(), mass, charge, position, levels, transitions);
     }]>
   ];
@@ -151,8 +151,6 @@ def IonAttr : Ion_Attr<"Ion", "ion"> {
 // Ion dialect operations.
 //===----------------------------------------------------------------------===//
 
-class Ion_Op<string mnemonic, list<Trait> traits = []> : Op<IonDialect, mnemonic, traits>;
-
 def BeamOp : Ion_Op<"beam"> {
     let summary = "Represent a beam.";
 
@@ -162,47 +160,16 @@ def BeamOp : Ion_Op<"beam"> {
         "mlir::FloatAttr":$detuning,
         "mlir::DenseIntElementsAttr": $polarization,
         "mlir::DenseIntElementsAttr": $wavevector,
-        QubitType: $in_qubit,
+        QubitType: $in_qubit
     );
 
     let results = (outs
-        QubitType:$out_qubit,
+        QubitType:$out_qubit
     );
     let assemblyFormat = [{
         attr-dict `transition` `rabi` `detuning` `polarization` `wavevector` 
         %in_qubit : type -> %out_qubit : type
     }];
 }
-
-def BeamOp : Ion_Op<"beam"> {
-    let summary = "Represent a beam.";
-
-    let arguments = (ins
-        TransitionAttr:$transition,
-        "mlir::FloatAttr":$rabi,
-        "mlir::FloatAttr":$detuning,
-        "mlir::DenseIntElementsAttr": $polarization,
-        "mlir::DenseIntElementsAttr": $wavevector,
-        QubitType: $in_qubit,
-    );
-
-    let results = (outs
-        QubitType:$out_qubit,
-    );
-    let assemblyFormat = [{
-        attr-dict `transition` `rabi` `detuning` `polarization` `wavevector` 
-        %in_qubit : type -> %out_qubit : type
-    }];
-}
-
-// def SequentialProtocolOp : Ion_Op<"sequential_protocol"> {
-//     let summary = "Represent beams that are run sequentially.";
-
-// }
-
-// def ParallelProtocolOp : Ion_Op<"parallel_protocol"> {
-//     let summary = "Represent beams that are run in parallel";
-
-// }
 
 #endif // ION_OPS
