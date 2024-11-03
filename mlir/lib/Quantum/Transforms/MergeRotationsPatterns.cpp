@@ -21,8 +21,8 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
-#include "/home/mohsen/project/llvm-project/mlir/include/mlir/Dialect/Math/IR/Math.h"
-#include "/home/mohsen/project/llvm-project/mlir/include/mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Arith/IR/Arith.h""
 
 using llvm::dbgs;
 using namespace mlir;
