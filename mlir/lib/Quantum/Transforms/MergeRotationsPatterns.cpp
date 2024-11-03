@@ -66,7 +66,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             auto c2 = rewriter.create<math::CosOp>(loc, parentParams[1]);
             auto s2 = rewriter.create<math::SinOp>(loc, parentParams[1]);
 
-                        // Step 2: Calculate cf
+            // Step 2: Calculate cf
             auto c1Squared = rewriter.create<arith::MulFOp>(loc, c1, c1);
             auto c2Squared = rewriter.create<arith::MulFOp>(loc, c2, c2);
             auto s1Squared = rewriter.create<arith::MulFOp>(loc, s1, s1);

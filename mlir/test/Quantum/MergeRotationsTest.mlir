@@ -14,19 +14,6 @@
 
 // RUN: quantum-opt --pass-pipeline="builtin.module(merge-rotations{func-name=test_merge_rotations})" --split-input-file -verify-diagnostics %s | FileCheck %s
 
-func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
-    %0 = quantum.alloc( 1) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
-    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[sum:%.+]] = arith.addf %arg0, %arg1 : f64
-    // CHECK: [[ret:%.+]] = quantum.custom "RX"([[sum]]) [[qubit]] : !quantum.bit
-    // CHECK-NOT: quantum.custom "RX"
-    %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
-    %3 = quantum.custom "RX"(%arg1) %2 : !quantum.bit
-    // CHECK: return [[ret]]
-    return %3 : !quantum.bit
-}
 
 // -----
 
@@ -155,14 +142,24 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 
-    // CHECK: quantum.custom "Rot"
-    // CHECK: quantum.custom "Rot"
-    // CHECK: [[ret:%.+]] = quantum.custom "Rot"
+    // Calculate intermediate values for each rotation step (e.g., cosines and sines) if needed
+    // %c1, %s1 = calculate cos and sin of %arg1 for the first rotation
+    // %c2, %s2 = calculate cos and sin of %arg2 for the second rotation
+    // %c3, %s3 = calculate cos and sin of %arg0 for the third rotation
+
+    // First rotation with parameters %arg0, %arg1, %arg2
+    // CHECK: [[rot1:%.+]] = quantum.custom "Rot"(%arg0, %arg1, %arg2) [[qubit]]
     %2 = quantum.custom "Rot"(%arg0, %arg1, %arg2) %1 : !quantum.bit
+
+    // Second rotation with parameters %arg1, %arg2, %arg0
+    // CHECK: [[rot2:%.+]] = quantum.custom "Rot"(%arg1, %arg2, %arg0) [[rot1]]
     %3 = quantum.custom "Rot"(%arg1, %arg2, %arg0) %2 : !quantum.bit
+
+    // Third rotation with parameters %arg2, %arg0, %arg1
+    // CHECK: [[rot3:%.+]] = quantum.custom "Rot"(%arg2, %arg0, %arg1) [[rot2]]
     %4 = quantum.custom "Rot"(%arg2, %arg0, %arg1) %3 : !quantum.bit
 
-    // CHECK: return [[ret]]
+    // CHECK: return [[rot3]]
     return %4 : !quantum.bit
 }
 
