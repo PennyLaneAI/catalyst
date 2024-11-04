@@ -50,7 +50,7 @@ class MemoryManager final {
     {
         // Lock the mutex to protect _impl free
         std::lock_guard<std::mutex> lock(mu);
-        for (auto allocation : _impl) {
+        for (auto *allocation : _impl) {
             free(allocation);
         }
     }
@@ -81,7 +81,7 @@ class SharedLibraryManager final {
 
   public:
     SharedLibraryManager() = delete;
-    explicit SharedLibraryManager(std::string filename)
+    explicit SharedLibraryManager(const std::string &filename)
     {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
@@ -168,7 +168,7 @@ class RTDevice {
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
-    void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
+    static void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
     {
 #ifdef __linux__
         rtd_lib = "librtd_" + name + ".so";
@@ -232,8 +232,9 @@ class RTDevice {
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
-            f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
-                  : nullptr);
+            (f_ptr != nullptr)
+                ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
+                : nullptr);
         return rtd_qdevice;
     }
 
@@ -262,7 +263,7 @@ class ExecutionContext final {
     std::vector<std::shared_ptr<RTDevice>> device_pool;
     std::mutex pool_mu; // To protect device_pool
 
-    bool initial_tape_recorder_status;
+    bool initial_tape_recorder_status{false};
 
     // ExecutionContext pointers
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
@@ -278,7 +279,7 @@ class ExecutionContext final {
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
-        if (this->seed) {
+        if (this->seed != nullptr) {
             this->gen = std::mt19937(*seed);
         }
     }
@@ -318,7 +319,7 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
-        if (this->seed) {
+        if (this->seed != nullptr) {
             device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
         }
         else {
