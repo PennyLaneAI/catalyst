@@ -63,7 +63,7 @@ struct PythonInterpreterGuard {
 // LCOV_EXCL_STOP
 #else
 struct PythonInterpreterGuard {
-    PythonInterpreterGuard() {}
-    ~PythonInterpreterGuard() {}
+    PythonInterpreterGuard() = default;
+    ~PythonInterpreterGuard() = default;
 };
 #endif
