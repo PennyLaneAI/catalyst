@@ -17,6 +17,7 @@ MLIR/LLVM representations.
 import glob
 import importlib
 import logging
+import multiprocessing as mp
 import os
 import pathlib
 import platform
@@ -29,8 +30,6 @@ from dataclasses import dataclass
 from io import TextIOWrapper
 from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
-
-from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
@@ -541,6 +540,38 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
+def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
+    """Call the compiler driver from a newly spawned python interpreter.
+
+    This spawned python interpreter communicates with the parent python
+    interpreter by sending messages through the `conn`ected Pipe.
+    """
+    try:
+        from mlir_quantum.compiler_driver import run_compiler_driver
+
+        compiler_output = run_compiler_driver(
+            ir,
+            str(workspace),
+            module_name,
+            keep_intermediate=options.keep_intermediate,
+            async_qnodes=options.async_qnodes,
+            verbose=options.verbose,
+            pipelines=options.get_pipelines(),
+            lower_to_llvm=lower_to_llvm,
+            checkpoint_stage=options.checkpoint_stage,
+        )
+
+        filename = compiler_output.get_object_filename()
+        out_IR = compiler_output.get_output_ir()
+        diagnostic_messages = compiler_output.get_diagnostic_messages()
+
+        conn.send((filename, out_IR, diagnostic_messages, None))
+    except Exception as error:
+        conn.send((None, None, None, error))
+    finally:
+        conn.close()
+
+
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
@@ -576,26 +607,23 @@ class Compiler:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         try:
-            compiler_output = run_compiler_driver(
-                ir,
-                str(workspace),
-                module_name,
-                keep_intermediate=self.options.keep_intermediate,
-                async_qnodes=self.options.async_qnodes,
-                verbose=self.options.verbose,
-                pipelines=self.options.get_pipelines(),
-                lower_to_llvm=lower_to_llvm,
-                checkpoint_stage=self.options.checkpoint_stage,
-            )
-        except RuntimeError as e:
+            ctx = mp.get_context("spawn")
+            conn1, conn2 = mp.Pipe(duplex=False)
+            process_args = (conn2, ir, workspace, module_name, self.options, lower_to_llvm)
+            process = mp.Process(target=request_handler, args=process_args)
+            process.start()
+            if not conn1.poll(timeout=5):
+                raise CompileError("Connection timed out")
+            filename, out_IR, diagnostic_messages, exception = conn1.recv()
+            process.join()
+            if exception:
+                raise CompileError(*exception.args) from exception
+        except EOFError as e:
             raise CompileError(*e.args) from e
 
         if self.options.verbose:
-            for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
+            for line in diagnostic_messages.split("\n"):
                 print(f"[LIB] {line}", file=self.options.logfile)
-
-        filename = compiler_output.get_object_filename()
-        out_IR = compiler_output.get_output_ir()
 
         if lower_to_llvm:
             output = LinkerDriver.run(filename, options=self.options)
