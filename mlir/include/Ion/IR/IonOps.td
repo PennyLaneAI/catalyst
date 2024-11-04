@@ -103,6 +103,20 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
   let assemblyFormat = "`<` struct(params) `>`";
 }
 
+def BeamAttr : Ion_Attr<"Beam", "beam"> {
+  let summary = "A class to represent a laser beam.";
+
+  let parameters = (ins
+    "TransitionAttr":$transition,
+    "mlir::FloatAttr":$rabi,
+    "mlir::FloatAttr":$detuning,
+    "mlir::DenseIntElementsAttr": $polarization,
+    "mlir::DenseIntElementsAttr": $wavevector
+  );
+
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
 
 // def LevelArrayAttr : TypedArrayAttrBase<LevelAttr, "Array of atomic levels.">;
 
@@ -126,15 +140,12 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
 // Ion dialect operations.
 //===----------------------------------------------------------------------===//
 
-def BeamOp : Ion_Op<"beam"> {
-    let summary = "Represent a beam.";
+def PulseOp : Ion_Op<"Pulse"> {
+    let summary = "Represent a pulse (a laser beam and some time).";
 
     let arguments = (ins
-        TransitionAttr:$transition,
-        Builtin_FloatAttr:$rabi,
-        Builtin_FloatAttr:$detuning,
-        AnyIntElementsAttr: $polarization,
-        AnyIntElementsAttr: $wavevector,
+        BeamAttr: $beam,
+        AnyFloat: $time,
         QubitType: $in_qubit
     );
 
