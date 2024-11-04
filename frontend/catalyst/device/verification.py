@@ -32,7 +32,14 @@ from pennylane.measurements import (
 )
 from pennylane.measurements.shots import Shots
 from pennylane.operation import Operation, StatePrepBase, Tensor
-from pennylane.ops import Adjoint, CompositeOp, Controlled, ControlledOp, Hamiltonian, SymbolicOp
+from pennylane.ops import (
+    Adjoint,
+    CompositeOp,
+    Controlled,
+    ControlledOp,
+    Hamiltonian,
+    SymbolicOp,
+)
 from pennylane.tape import QuantumTape
 
 import catalyst
