@@ -23,6 +23,7 @@ from functools import partial
 import jax
 import pennylane as qml
 from pennylane import transform
+from pennylane.devices.capabilities import DeviceCapabilities
 from pennylane.devices.preprocess import decompose
 from pennylane.measurements import (
     CountsMP,
@@ -38,18 +39,17 @@ from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def check_alternative_support(op, capabilities):
+def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
     if isinstance(op, qml.ops.Controlled):
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
-        supported = capabilities.native_ops.get(op.base.name)
+        supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
             return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
@@ -60,6 +60,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
     returns the default decomposition, unless the operator should decompose to a QubitUnitary.
     Raises a CompileError for MidMeasureMP"""
+
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
@@ -67,37 +68,30 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if alternative_decomp is not None:
         return alternative_decomp
 
-    if capabilities.native_ops.get("QubitUnitary"):
-        # If the device supports unitary matrices, apply the relevant conversions and fallbacks.
-        if op.name in capabilities.to_matrix_ops or (
-            op.has_matrix and isinstance(op, qml.ops.Controlled)
-        ):
-            return _decompose_to_matrix(op)
-
     return op.decomposition()
 
 
 @transform
 @debug_logger
-def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
+def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities):
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
     in the same manner as in PennyLane (for each operator on the tape, checking if the operator
-    passes the stopping_condition, and using its `decompostion` method if not, called recursively
+    passes the stopping_condition, and using its `decomposition` method if not, called recursively
     until a supported operation is found or an error is hit, then moving on to the next operator
     on the tape.)
 
     Once all operators on the tape are supported operators, the resulting tape is iterated over,
-    and for each HybridOp, the catalyst_decompose function is called on each of it's regions.
+    and for each HybridOp, the catalyst_decompose function is called on each of its regions.
     This continues to call catalyst_decompose recursively until the tapes on all
     the HybridOps have been passed to the decompose function.
     """
 
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
-        skip_initial_state_prep=capabilities.initial_state_prep_flag,
+        stopping_condition=lambda _op: bool(catalyst_acceptance(_op, capabilities)),
+        skip_initial_state_prep=capabilities.initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         name="catalyst on this device",
         error=CompileError,
@@ -113,18 +107,7 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     return (tape,), lambda x: x[0]
 
 
-def _decompose_to_matrix(op):
-    try:
-        mat = op.matrix()
-    except Exception as e:
-        raise CompileError(
-            f"Operation {op} could not be decomposed, it might be unsupported."
-        ) from e
-    op = qml.QubitUnitary(mat, wires=op.wires)
-    return [op]
-
-
-def _decompose_nested_tapes(op, ctx, capabilities):
+def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
@@ -148,59 +131,28 @@ def _decompose_nested_tapes(op, ctx, capabilities):
     return new_op
 
 
-@transform
-@debug_logger
-def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
-    r"""Quantum transform that decomposes operations to unitary given a list of operations name.
+def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> str | None:
+    """Check whether an Operator is supported and returns the name of the operation or None."""
 
-    Args:
-        tape (QNode or QuantumTape or Callable): A quantum circuit.
-        convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
-
-    Returns:
-        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
-    """
-    new_operations = []
-
-    for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, HybridCtrl):
-            try:
-                mat = op.matrix()
-            except Exception as e:
-                raise CompileError(
-                    f"Operation {op} could not be decomposed, it might be unsupported."
-                ) from e
-            op = qml.QubitUnitary(mat, wires=op.wires)
-        new_operations.append(op)
-
-    new_tape = type(tape)(new_operations, tape.measurements, shots=tape.shots)
-
-    def null_postprocessing(results):
-        """A postprocesing function returned by a transform that only converts the batch of results
-        into a result for a single ``QuantumTape``.
-        """
-        return results[0]
-
-    return [new_tape], null_postprocessing
-
-
-def catalyst_acceptance(op: qml.operation.Operation, capabilities: DeviceCapabilities) -> str:
-    """Check whether or not an Operator is supported."""
-    op_support = capabilities.native_ops
+    op_support = capabilities.operations
 
     if isinstance(op, qml.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities)
-        if not match or not op_support[match].invertible:
-            return None
-    elif type(op) is qml.ops.ControlledOp:
-        match = catalyst_acceptance(op.base, capabilities)
-        if not match or not op_support[match].controllable:
-            return None
-    else:
-        match = op.name if op.name in op_support else None
+        if match and op_support[match].invertible:
+            return match
 
-    return match
+    elif type(op) is qml.ops.ControlledOp:
+        # There are cases where a custom controlled gate, e.g., CH, is supported, but its
+        # base, i.e., H, is not labeled controllable. In this case, we don't want to use
+        # this branch to check the support for this operation.
+        match = catalyst_acceptance(op.base, capabilities)
+        if match and op_support[match].controllable:
+            return match
+
+    elif op.name in op_support:
+        return op.name
+
+    return None
 
 
 @transform
@@ -228,7 +180,7 @@ def measurements_from_counts(tape, device_wires):
     new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_counts(results):
-        """A processing function to get expecation values from counts."""
+        """A processing function to get expectation values from counts."""
         states = results[0][0]
         counts_outcomes = results[0][1]
         results_processed = []
@@ -286,7 +238,7 @@ def measurements_from_samples(tape, device_wires):
     new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_samples(results):
-        """A processing function to get expecation values from samples."""
+        """A processing function to get expectation values from samples."""
         samples = results[0]
         results_processed = []
         for m in tape.measurements:
