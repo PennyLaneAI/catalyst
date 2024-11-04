@@ -204,7 +204,7 @@ def YieldOp : Ion_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["Paral
     let summary = "Return results from parallel protocol regions";
 
     let arguments = (ins
-        Variadic<AnyTypeOf<[QubitType]>>:$results
+        Variadic<QubitType>:$results
     );
 
     let assemblyFormat = [{
