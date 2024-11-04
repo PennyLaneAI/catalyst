@@ -22,7 +22,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/Arith/IR/Arith.h""
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 using llvm::dbgs;
 using namespace mlir;
