@@ -140,7 +140,7 @@ def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr,
 // Ion dialect operations.
 //===----------------------------------------------------------------------===//
 
-def IonOp : Ion_Op<"Ion"> {
+def IonOp : Ion_Op<"ion"> {
   let summary = "A class to represent an ion.";
 
   let arguments = (ins
@@ -157,7 +157,7 @@ def IonOp : Ion_Op<"Ion"> {
   );
 }
 
-def PulseOp : Ion_Op<"Pulse"> {
+def PulseOp : Ion_Op<"pulse"> {
     let summary = "Represent a pulse (a laser beam and some time).";
 
     let arguments = (ins
@@ -169,6 +169,10 @@ def PulseOp : Ion_Op<"Pulse"> {
     let results = (outs
         QubitType:$out_qubit
     );
+
+    let assemblyFormat = [{
+        `(` $time `:` type($time) `)` $in_qubit attr-dict `:` type($out_qubit)
+    }];
 }
 
 #endif // ION_OPS
