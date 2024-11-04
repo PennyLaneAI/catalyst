@@ -45,14 +45,14 @@ def Ion_Dialect : Dialect {
 // Ion dialect types.
 //===----------------------------------------------------------------------===//
 
-// class Quantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
-//         : TypeDef<QuantumDialect, name, traits> {
-//     let mnemonic = typeMnemonic;
-// }
+class Ion_Type<string name, string typeMnemonic, list<Trait> traits = []>
+        : TypeDef<Ion_Dialect, name, traits> {
+    let mnemonic = typeMnemonic;
+}
 
-// def QubitType : Quantum_Type<"Qubit", "bit"> {
-//     let summary = "A value-semantic qubit (state).";
-// }
+def IonType : Ion_Type<"Ion", "ion"> {
+    let summary = "A value-semantic ion.";
+}
 // def QuregType : Quantum_Type<"Qureg", "reg"> {
 //     let summary = "An array of value-semantic qubits (i.e. quantum register).";
 // }

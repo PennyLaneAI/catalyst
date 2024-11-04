@@ -99,6 +99,13 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
     "mlir::FloatAttr":$einstein_a
   );
 
+  let builders = [
+    AttrBuilderWithInferredContext<(ins "LevelAttr":$level_0,
+                                        "LevelAttr":$level_1,
+                                        "mlir::FloatAttr":$einstein_a), [{
+      return $_get(einstein_a.getContext(), level_0, level_1, einstein_a);
+    }]>
+  ];
 
   let assemblyFormat = "`<` struct(params) `>`";
 }
@@ -118,27 +125,36 @@ def BeamAttr : Ion_Attr<"Beam", "beam"> {
   let assemblyFormat = "`<` struct(params) `>`";
 }
 
-// def LevelArrayAttr : TypedArrayAttrBase<LevelAttr, "Array of atomic levels.">;
+def LevelArrayAttr : TypedArrayAttrBase<LevelAttr,
+                         LevelAttr.summary # " array"> {
+  let constBuilderCall = ?;
+}
 
-// def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr, "Array of transtion between atomic level">;
 
-// def IonAttr : Ion_Attr<"Ion", "ion"> {
-//   let summary = "A class to represent an ion.";
-
-//   let parameters = (ins
-//     "mlir::FloatAttr":$mass,
-//     "mlir::FloatAttr":$charge,
-//     "mlir::DenseIntElementsAttr": $position,
-//     LevelArrayAttr: $levels,
-//     TransitionArrayAttr: $transitions
-//   );
-
-//   let assemblyFormat = "`<` struct(params) `>`";
-// }
+def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr,
+                         TransitionAttr.summary # " array"> {
+  let constBuilderCall = ?;
+}
 
 //===----------------------------------------------------------------------===//
 // Ion dialect operations.
 //===----------------------------------------------------------------------===//
+
+def IonOp : Ion_Op<"Ion"> {
+  let summary = "A class to represent an ion.";
+
+  let arguments = (ins
+    Builtin_FloatAttr:$mass,
+    Builtin_FloatAttr:$charge,
+    AnyIntElementsAttr: $position,
+    LevelArrayAttr: $levels,
+    TransitionArrayAttr: $transitions
+  );
+
+  let results = (outs
+    IonType:$out_qubit
+  );
+}
 
 def PulseOp : Ion_Op<"Pulse"> {
     let summary = "Represent a pulse (a laser beam and some time).";
