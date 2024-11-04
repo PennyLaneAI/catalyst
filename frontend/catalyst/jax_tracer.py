@@ -17,10 +17,11 @@ This module contains functions tracing and lowering JAX code to MLIR.
 """
 
 import logging
+from abc.collections import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp

@@ -34,7 +34,6 @@ from pennylane.measurements import (
     VarianceMP,
 )
 
-from catalyst.api_extensions import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext

@@ -23,7 +23,6 @@ import platform
 import re
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from lib2to3.pgen2.tokenize import Operator
 from typing import Any, Dict, Optional
 
 import pennylane as qml
