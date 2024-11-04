@@ -17,7 +17,7 @@ This module contains functions tracing and lowering JAX code to MLIR.
 """
 
 import logging
-from abc.collections import Sequence
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
