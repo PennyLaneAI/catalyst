@@ -70,14 +70,14 @@ inline auto get_dylib_ext() -> std::string
 
 static inline MemRefT_CplxT_double_1d getState(size_t buffer_len)
 {
-    CplxT_double *buffer = new CplxT_double[buffer_len];
+    auto *buffer = new CplxT_double[buffer_len];
     MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
     return result;
 }
 
 static inline void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
 
-static inline QuantumDevice *loadDevice(std::string device_name, std::string filename)
+static inline QuantumDevice *loadDevice(const std::string &device_name, const std::string &filename)
 {
     std::unique_ptr<SharedLibraryManager> init_rtd_dylib =
         std::make_unique<SharedLibraryManager>(filename);
