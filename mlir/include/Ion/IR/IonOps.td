@@ -144,6 +144,7 @@ def IonOp : Ion_Op<"Ion"> {
   let summary = "A class to represent an ion.";
 
   let arguments = (ins
+    Builtin_StringAttr:$name,
     Builtin_FloatAttr:$mass,
     Builtin_FloatAttr:$charge,
     AnyIntElementsAttr: $position,
