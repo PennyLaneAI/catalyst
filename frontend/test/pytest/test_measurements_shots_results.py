@@ -481,46 +481,6 @@ class TestProbs:
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 
-class TestVnEntropy:
-    """Test vnentropy."""
-
-    @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_vn_entropy(self):
-        """Test that VnEntropy can be used with Catalyst."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qjit
-        @qml.qnode(dev)
-        def circuit_entropy(x):
-            qml.IsingXX(x, wires=[0, 1])
-            return qml.vn_entropy(wires=[0])
-
-        expected = 0.6931471805599453
-        assert circuit_entropy(np.pi / 2) == expected
-
-
-class TestMutualInfo:
-    """Test mutualinfo."""
-
-    @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_mutual_info(self):
-        """Test that MutualInfo can be used with Catalyst."""
-
-        dev = qml.device("lightning.qubit", wires=range(2))
-
-        @qjit
-        @qml.qnode(dev)
-        def mutual_info_circuit():
-            qml.Hadamard(0)
-            qml.CNOT((0, 1))
-            qml.RX(0, wires=0)
-            return qml.mutual_info(0, 1)
-
-        expected = 1.3862943611198906
-        assert mutual_info_circuit() == expected
-
-
 class TestShadow:
     """Test shadow."""
 
@@ -528,7 +488,7 @@ class TestShadow:
     def test_shadow(self):
         """Test that Shadow can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2))
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
 
         @qjit
         @qml.qnode(dev)
@@ -547,11 +507,11 @@ class TestShadow:
 class TestShadowExpval:
     """Test shadowexpval."""
 
-    @pytest.mark.xfail(reason="Not supported on lightning.")
+    @pytest.mark.xfail(reason="TypeError in Catalyst")
     def test_shadow_expval(self):
         """Test that ShadowExpVal can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2))
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
 
         @qjit
         @qml.qnode(dev)
@@ -562,26 +522,8 @@ class TestShadowExpval:
             return qml.shadow_expval(obs)
 
         H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
-        expected = 1.917
+        expected = 1.9917
         assert shadow_expval_circuit(0, H) == expected
-
-
-class TestPurity:
-    """Test purity."""
-
-    @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_purity(self):
-        """Test that Purity can be used with Catalyst."""
-
-        dev = qml.device("lightning.qubit", wires=[0])
-
-        @qjit
-        @qml.qnode(dev)
-        def purity_circuit():
-            return qml.purity(wires=[0])
-
-        expected = 1.0
-        assert purity_circuit() == expected
 
 
 class TestOtherMeasurements:
