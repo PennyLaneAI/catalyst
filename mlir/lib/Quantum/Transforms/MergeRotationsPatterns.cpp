@@ -53,6 +53,12 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         }
 
         if (opGateName == "qml.Rot" || opGateName == "qml.CRot") {
+
+            if (op.getAdjoint()) {
+                LLVM_DEBUG(dbgs() << "Skipping adjointed operation:\n" << op << "\n");
+                return failure();
+            }
+
             LLVM_DEBUG(dbgs() << "Applying scalar formula for combined rotation operation:\n" << op << "\n");
             auto params = op.getParams();
             auto parentParams = parentOp.getParams();
