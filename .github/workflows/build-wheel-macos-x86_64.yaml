@@ -14,7 +14,7 @@ on:
   workflow_call:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 12
+  MACOSX_DEPLOYMENT_TARGET: 13
 
 concurrency:
   group: Build Catalyst Wheel on macOS (x86_64)-${{ github.ref }}
@@ -40,7 +40,7 @@ jobs:
         python_version: ["3.10"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-12
+    runs-on: macos-13
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -217,7 +217,7 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: macos-12
+    runs-on: macos-13
 
     steps:
     - name: Checkout Catalyst repo
@@ -368,7 +368,7 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Mac x86
-    runs-on: macos-12
+    runs-on: macos-13
 
     steps:
     - name: Checkout Catalyst repo
