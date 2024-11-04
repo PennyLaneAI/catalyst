@@ -166,13 +166,55 @@ def PulseOp : Ion_Op<"pulse"> {
         QubitType: $in_qubit
     );
 
-    let results = (outs
-        QubitType:$out_qubit
+    let assemblyFormat = [{
+        `(` $time `:` type($time) `)` $in_qubit attr-dict
+    }];
+}
+
+
+def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "Represent a parallel protocol of pulses.";
+
+    let arguments = (ins
+        Variadic<QubitType>: $in_qubits
+    );
+
+    let results = (outs Variadic<QubitType>:$out_qubits);
+    let regions = (region SizedRegion<1>:$region);
+
+    let builders = [
+      OpBuilder<(ins
+        CArg<"mlir::ValueRange", "std::nullopt">:$in_qubits,
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>",
+            "nullptr">)>
+    ];
+
+    let extraClassDeclaration = [{
+      using BodyBuilderFn =
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>;
+
+    }];
+
+    let assemblyFormat = [{
+        `(` $in_qubits `)` attr-dict `:` type($out_qubits) $region
+    }];
+}
+
+def YieldOp : Ion_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["ParallelProtocolOp"]>]> {
+    let summary = "Return results from parallel protocol regions";
+
+    let arguments = (ins
+        Variadic<AnyTypeOf<[QubitType]>>:$results
     );
 
     let assemblyFormat = [{
-        `(` $time `:` type($time) `)` $in_qubit attr-dict `:` type($out_qubit)
+        attr-dict ($results^ `:` type($results))?
     }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
 }
+
 
 #endif // ION_OPS
