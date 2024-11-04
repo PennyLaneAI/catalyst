@@ -85,6 +85,7 @@ static inline QuantumDevice *loadDevice(std::string device_name, std::string fil
     void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
 
     // LCOV_EXCL_START
-    return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("") : nullptr;
+    return (f_ptr != nullptr) ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("")
+                              : nullptr;
     // LCOV_EXCL_STOP
 }
