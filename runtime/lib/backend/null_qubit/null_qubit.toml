@@ -1,7 +1,7 @@
 # Based on Lightning's lightning_qubit.toml. It is better if we keep it updated.
-schema = 2
+schema = 3
 
-[operators.gates.native]
+[operators.gates]
 
 CNOT                   = { properties = [ "invertible",                 "differentiable" ] }
 ControlledPhaseShift   = { properties = [ "invertible",                 "differentiable" ] }
@@ -40,30 +40,6 @@ SWAP                   = { properties = [ "invertible", "controllable", "differe
 Toffoli                = { properties = [ "invertible",                 "differentiable" ] }
 T                      = { properties = [ "invertible", "controllable", "differentiable" ] }
 
-[operators.gates.decomp]
-
-# Operators that should be decomposed according to the algorithm used
-# by PennyLane's device API.
-# Optional, since gates not listed in this list will typically be decomposed by
-# default, but can be useful to express a deviation from this device's regular
-# strategy in PennyLane.
-MultiControlledX       = {}
-
-# Gates which should be translated to QubitUnitary
-[operators.gates.matrix]
-
-BlockEncode            = {properties = [ "controllable" ]}
-DiagonalQubitUnitary   = {}
-ECR                    = {}
-ISWAP                  = {}
-OrbitalRotation        = {}
-PSWAP                  = {}
-QubitCarry             = {}
-QubitSum               = {}
-SISWAP                 = {}
-SQISW                  = {}
-SX                     = {}
-
 # Observables supported by the device
 [operators.observables]
 
@@ -84,12 +60,12 @@ LinearCombination      = { properties = [ "differentiable" ] }
 
 [measurement_processes]
 
-Expval                 = {}
-Var                    = {}
-Probs                  = {}
-State                  = { condition = [ "analytic" ] }
-Sample                 = { condition = [ "finiteshots" ] }
-Counts                  = { condition = [ "finiteshots" ] }
+ExpectationMP          = {}
+VarianceMP             = {}
+ProbabilityMP          = {}
+StateMP                = { conditions = [ "analytic" ] }
+SampleMP               = { conditions = [ "finiteshots" ] }
+CountsMP               = { conditions = [ "finiteshots" ] }
 
 [compilation]
 
@@ -97,16 +73,14 @@ Counts                  = { condition = [ "finiteshots" ] }
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
-# If the device supports mid circuit measurements natively
-mid_circuit_measurement = true
-# This field is currently unchecked but it is reserved for the purpose of
+# If the device supports mid-circuit measurements natively
+supported_mcm_methods = [ "device" ]
+# This field is currently unchecked, but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
-
 # whether the device can support non-commuting measurements together
 # in a single execution
 non_commuting_observables = true
-
 # Whether the device supports (arbitrary) initial state preparation.
 initial_state_prep = true
 

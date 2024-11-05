@@ -1,8 +1,8 @@
-schema = 2
+schema = 3
 
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
-[operators.gates.native]
+[operators.gates]
 
 PRx = { }
 ISWAP = { }
@@ -39,32 +39,22 @@ IsingZZ = { }
 Toffoli = { }
 ControlledPhaseShift = { }
 
-# Operators that should be decomposed according to the algorithm used
-# by PennyLane's device API.
-# Optional, since gates not listed in this list will typically be decomposed by
-# default, but can be useful to express a deviation from this device's regular
-# strategy in PennyLane.
-[operators.gates.decomp]
-
-# Gates which should be translated to QubitUnitary
-[operators.gates.matrix]
-
 [operators.observables]
 # Observables supported by the device
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-Hadamard = {}
-Hermitian = {}
-Tensor = {}
+PauliX = { }
+PauliY = { }
+PauliZ = { }
+Hadamard = { }
+Hermitian = { }
+Tensor = { }
 
 [measurement_processes]
-Expval = {}
-Var = {}
-Probs = {}
-State = { condition = [ "analytic" ] }
-Sample = { condition = [ "finiteshots" ] }
-Counts = { condition = [ "finiteshots" ] }
+ExpectationMP = { }
+VarianceMP = { }
+ProbabilityMP = { }
+StateMP = { conditions = ["analytic"] }
+SampleMP = { conditions = ["finiteshots"] }
+CountsMP = { conditions = ["finiteshots"] }
 
 
 [compilation]
@@ -73,8 +63,7 @@ qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = true
 # If the device supports mid circuit measurements natively
-mid_circuit_measurement = false
-
+supported_mcm_methods = [ ]
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false

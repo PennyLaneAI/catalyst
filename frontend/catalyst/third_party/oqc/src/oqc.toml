@@ -1,8 +1,8 @@
-schema = 2
+schema = 3
 
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
-[operators.gates.native]
+[operators.gates]
 
 Identity = { }
 Hadamard = { }
@@ -28,38 +28,23 @@ U1 = { }
 U2 = { }
 U3 = { }
 
-# Operators that should be decomposed according to the algorithm used
-# by PennyLane's device API.
-# Optional, since gates not listed in this list will typically be decomposed by
-# default, but can be useful to express a deviation from this device's regular
-# strategy in PennyLane.
-
-[operators.gates.decomp]
-
-# Gates which should be translated to QubitUnitary
-[operators.gates.matrix]
-
 [operators.observables]
-# Observables supported by the device
 
 [measurement_processes]
 
-Counts = { condition = [ "finiteshots" ] }
-
+CountsMP = { condition = ["finiteshots"] }
 
 [compilation]
+
 # If the device is compatible with qjit
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = true
-
 # If the device supports mid circuit measurements natively
-mid_circuit_measurement = false
-
+supported_mcm_methods = []
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
-
 # whether the device can support non-commuting measurements together 
 # in a single execution
 non_commuting_observables = false

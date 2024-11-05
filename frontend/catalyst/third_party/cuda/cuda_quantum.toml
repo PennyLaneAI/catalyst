@@ -1,59 +1,50 @@
-schema = 2
+schema = 3
 
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
-[operators.gates.native]
+[operators.gates]
 
-CNOT = { properties = [ "invertible" ] }
-CY = { properties = [ "invertible" ] }
-CZ = { properties = [ "invertible" ] }
-CRX = { properties = [ "invertible" ] }
-CRY = { properties = [ "invertible" ] }
-CRZ = { properties = [ "invertible" ] }
-PauliX = { properties = [ "invertible" ] }
-PauliY = { properties = [ "invertible" ] }
-PauliZ = { properties = [ "invertible" ] }
-Hadamard = { properties = [ "invertible" ] }
-S = { properties = [ "invertible" ] }
-T = { properties = [ "invertible" ] }
-RX = { properties = [ "invertible" ] }
-RY = { properties = [ "invertible" ] }
-RZ = { properties = [ "invertible" ] }
-SWAP = { properties = [ "invertible" ] }
-CSWAP = { properties = [ "invertible" ] }
-
-# Operators that should be decomposed according to the algorithm used
-# by PennyLane's device API.
-# Optional, since gates not listed in this list will typically be decomposed by
-# default, but can be useful to express a deviation from this device's regular
-# strategy in PennyLane.
-# Everything else should be decomposed.
-[operators.gates.decomp]
-
-[operators.gates.matrix]
+CNOT        = { properties = ["invertible"] }
+CY          = { properties = ["invertible"] }
+CZ          = { properties = ["invertible"] }
+CRX         = { properties = ["invertible"] }
+CRY         = { properties = ["invertible"] }
+CRZ         = { properties = ["invertible"] }
+PauliX      = { properties = ["invertible"] }
+PauliY      = { properties = ["invertible"] }
+PauliZ      = { properties = ["invertible"] }
+Hadamard    = { properties = ["invertible"] }
+S           = { properties = ["invertible"] }
+T           = { properties = ["invertible"] }
+RX          = { properties = ["invertible"] }
+RY          = { properties = ["invertible"] }
+RZ          = { properties = ["invertible"] }
+SWAP        = { properties = ["invertible"] }
+CSWAP       = { properties = ["invertible"] }
 
 # Observables supported natively by the device
 [operators.observables]
-PauliX = {}
-PauliZ = {}
-Sum = {}
+
+PauliX  = { }
+PauliZ  = { }
+Sum     = { }
 
 [measurement_processes]
 
-Expval                 = {}
-State                  = { condition = [ "analytic" ] }
-Sample                 = { condition = [ "finiteshots" ] }
-Counts                  = { condition = [ "finiteshots" ] }
+ExpectationMP   = { }
+StateMP         = { conditions = ["analytic"] }
+SampleMP        = { conditions = ["finiteshots"] }
+CountsMP        = { conditions = ["finiteshots"] }
 
 [compilation]
+
 # If the device is compatible with qjit
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
 # Technically limited support
-mid_circuit_measurement = true
-
-# This field is currently unchecked but it is reserved for the purpose of
+supported_mcm_methods = [ "device" ]
+# This field is currently unchecked, but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
 
