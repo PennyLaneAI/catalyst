@@ -294,8 +294,6 @@ def qjit(
 
         - ``static_argnames`` defines which named function arguments should be treated as static.
 
-        - ``static_argnames`` defines which named function arguments should be treated as static.
-
         A valid static argument must be hashable and its ``__hash__`` method must be able to
         reflect any changes of its attributes.
 
