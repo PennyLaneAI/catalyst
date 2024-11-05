@@ -88,7 +88,9 @@ frontend:
 	@echo "install Catalyst Frontend"
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
-	$(PYTHON) -m pip uninstall -y pennylane
+	# TODO: --- enable the following line before merging to main ------------- #
+	# $(PYTHON) -m pip uninstall -y pennylane
+	# ------------------------------------------------------------------------ #
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
