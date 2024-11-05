@@ -125,6 +125,11 @@ class SharedLibraryManager final {
         dlclose(_handler);
     }
 
+    SharedLibraryManager(const SharedLibraryManager &other) = delete;
+    SharedLibraryManager &operator=(const SharedLibraryManager &other) = delete;
+    SharedLibraryManager(SharedLibraryManager &&other) = delete;
+    SharedLibraryManager &operator=(SharedLibraryManager &&other) = delete;
+
     void *getSymbol(const std::string &symbol)
     {
         void *sym = dlsym(_handler, symbol.c_str());
@@ -215,6 +220,10 @@ class RTDevice {
     }
 
     ~RTDevice() = default;
+    RTDevice(const RTDevice &other) = delete;
+    RTDevice &operator=(const RTDevice &other) = delete;
+    RTDevice(RTDevice &&other) = delete;
+    RTDevice &operator=(RTDevice &&other) = delete;
 
     auto operator==(const RTDevice &other) const -> bool
     {
@@ -274,8 +283,7 @@ class ExecutionContext final {
     std::mt19937 gen;
 
   public:
-    explicit ExecutionContext(uint32_t *seed = nullptr)
-        : seed(seed)
+    explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
@@ -285,6 +293,10 @@ class ExecutionContext final {
     }
 
     ~ExecutionContext() = default;
+    ExecutionContext(const ExecutionContext &other) = delete;
+    ExecutionContext &operator=(const ExecutionContext &other) = delete;
+    ExecutionContext(ExecutionContext &&other) = delete;
+    ExecutionContext &operator=(ExecutionContext &&other) = delete;
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 

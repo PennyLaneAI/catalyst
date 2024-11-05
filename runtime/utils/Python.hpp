@@ -55,15 +55,19 @@ struct PythonInterpreterGuard {
         }
     }
 
-    PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
-    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
+    PythonInterpreterGuard(const PythonInterpreterGuard &other) = delete;
+    PythonInterpreterGuard(PythonInterpreterGuard &&other) = delete;
+    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &other) = delete;
+    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&other) = delete;
 };
 // LCOV_EXCL_STOP
 #else
 struct PythonInterpreterGuard {
     PythonInterpreterGuard() = default;
     ~PythonInterpreterGuard() = default;
+    PythonInterpreterGuard(const PythonInterpreterGuard &other) = delete;
+    PythonInterpreterGuard(PythonInterpreterGuard &&other) = delete;
+    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &other) = delete;
+    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&other) = delete;
 };
 #endif
