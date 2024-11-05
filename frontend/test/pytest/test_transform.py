@@ -47,9 +47,7 @@ from pennylane.transforms import merge_rotations
 from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=unnecessary-lambda-assignment
-# pylint: disable=too-many-lines
-# pylint: disable=line-too-long
+# pylint: disable=too-many-lines,line-too-long
 
 
 @pytest.mark.xfail(reason="Noise models not supported on Lightning.")
@@ -166,7 +164,6 @@ def test_batch_params(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="JIT and QJIT give different results.")
 def test_batch_partial(backend):
     """Test batch partial"""
 
@@ -185,8 +182,8 @@ def test_batch_partial(backend):
     x = np.linspace(0.1, 0.5, batch_size)
     y = np.array(0.2)
 
-    qnode_control = qml.batch_partial(qnode_builder("default.qubit"), y=y)
-    qnode_backend = qml.batch_partial(qnode_builder(backend), y=y)
+    qnode_control = qml.batch_partial(qnode_builder("default.qubit"), all_operations=True, y=y)
+    qnode_backend = qml.batch_partial(qnode_builder(backend), all_operations=True, y=y)
 
     jax_jit = jax.jit(qnode_control)
     compiled = qjit(qnode_backend)
@@ -238,7 +235,7 @@ def test_cancel_inverses(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="Not JAX JIT compatible")
+@pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
 def test_clifford_t_decomposition(backend):
     """Test clifford_t_decomposition"""
 
@@ -373,7 +370,7 @@ def test_convert_to_numpy_parameters(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="cond does not work with qml.RY")
+@pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
 def test_defer_measurements(backend):
     """Test defer_measurements"""
 
@@ -437,7 +434,7 @@ def test_diagonalize_measurements(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="cond does not work with qml.RY")
+@pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
 def test_dynamic_one_shot(backend):
     """Test dynamic_one_shot"""
 
@@ -460,9 +457,10 @@ def test_dynamic_one_shot(backend):
     jax_jit = jax.jit(qnode_control)
     compiled = qjit(qnode_backend)
 
-    x = [np.pi / 4, np.pi / 4]
-    expected = jax_jit(x)
-    observed = compiled(x)
+    x = np.pi / 4
+    y = np.pi / 4
+    expected = jax_jit(x, y)
+    observed = compiled(x, y)
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
 
@@ -535,7 +533,7 @@ def test_merge_amplitude_embedding(backend):
 
 
 @pytest.mark.xfail(
-    reason="ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
+    reason="QJIT fails with ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
 )
 def test_pattern_matching_optimization(backend):
     """Test pattern_matching_optimization"""
@@ -608,7 +606,9 @@ def test_remove_barrier(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="ValueError on Lightning")
+@pytest.mark.xfail(
+    reason="QJIT error ValueError: Passed tape must end in `qml.expval(H)` or qml.var(H)`, where H is of type `qml.Hamiltonian`"
+)
 def test_sign_expand(backend):
     """Test sign_expand"""
 
@@ -751,7 +751,7 @@ def test_split_to_single_terms(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="Something in pyzx not JAX JIT compatible.")
+@pytest.mark.xfail(reason="Both JAX JIT and QJIT fail due to this transform's dependency on PyZX")
 def test_to_zx(backend):
     """Test to_zx"""
 
@@ -823,7 +823,7 @@ def test_transpile(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="JIT and QJIT return different values.")
+@pytest.mark.xfail(reason="QJIT result differs from PennyLane")
 def test_unitary_to_rot(backend):
     """Test unitary_to_rot"""
 
@@ -845,12 +845,15 @@ def test_unitary_to_rot(backend):
     qnode_control = qnode_builder("default.qubit")
     qnode_backend = qnode_builder(backend)
 
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
     params = [0.2, 0.3]
-    expected = jax_jit(params)
+
+    compiled = qjit(qnode_backend)
     observed = compiled(params)
+    expected = qnode_control(params)
+    assert np.allclose(expected, observed)
+
+    jax_jit = jax.jit(qnode_control)
+    expected = jax_jit(params)
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -894,7 +897,7 @@ def test_undo_swaps(backend):
 class TestMitigate:
     """Test error mitigation transforms"""
 
-    @pytest.mark.xfail(reason="JIT and QJIT return different values.")
+    @pytest.mark.xfail(reason="PennyLane and QJIT give different values")
     def test_fold_global(self, backend):
         """Test fold_global"""
 
@@ -918,20 +921,22 @@ class TestMitigate:
 
         qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
+        x = np.arange(6)
+
+        compiled = qjit(qnode_backend)
+        observed = compiled(x)
+        expected = qnode_control(x)
+        assert np.allclose(expected, observed)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
-
-        x = np.arange(6)
         expected = jax_jit(x)
-        observed = compiled(x)
         assert np.allclose(expected, observed)
 
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    @pytest.mark.xfail(reason="JIT and QJIT return different values.")
+    @pytest.mark.xfail(reason="PennyLane and QJIT give different values")
     def test_mitigate_with_zne(self, backend):
         """Test mitigate_with_zne"""
 
@@ -961,11 +966,13 @@ class TestMitigate:
         qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
 
-        jax_jit = jax.jit(qnode_control)
         compiled = qjit(qnode_backend)
-
-        expected = jax_jit(w1, w2)
         observed = compiled(w1, w2)
+        expected = qnode_control(w1, w2)
+        assert np.allclose(expected, observed)
+
+        jax_jit = jax.jit(qnode_control)
+        expected = jax_jit(w1, w2)
         assert np.allclose(expected, observed)
 
         _, expected_shape = jax.tree_util.tree_flatten(expected)
