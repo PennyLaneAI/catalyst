@@ -153,8 +153,12 @@ def IonOp : Ion_Op<"ion"> {
   );
 
   let results = (outs
-    IonType:$out_qubit
+    IonType:$out_ion
   );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($out_ion)
+  }];
 }
 
 def PulseOp : Ion_Op<"pulse"> {
