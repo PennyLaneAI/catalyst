@@ -16,9 +16,11 @@
 
 from copy import deepcopy
 from unittest.mock import patch
+from webbrowser import Opera
 
 import pennylane as qml
 import pytest
+from pennylane.devices.capabilities import OperatorProperties
 from pennylane.measurements import ExpectationMP, VarianceMP
 from pennylane.ops import Adjoint, Controlled
 
@@ -36,7 +38,6 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
-from catalyst.utils.toml import OperationProperties
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
@@ -69,15 +70,15 @@ def get_custom_device(
             lightning_capabilities = get_device_capabilities(lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
-                custom_capabilities.native_ops[gate] = OperationProperties(True, True, True)
+                custom_capabilities.operations[gate] = OperatorProperties(True, True, True)
             for gate in non_differentiable_gates:
-                custom_capabilities.native_ops[gate].differentiable = False
+                custom_capabilities.operations[gate].differentiable = False
             for gate in non_invertible_gates:
-                custom_capabilities.native_ops[gate].invertible = False
+                custom_capabilities.operations[gate].invertible = False
             for gate in non_controllable_gates:
-                custom_capabilities.native_ops[gate].controllable = False
+                custom_capabilities.operations[gate].controllable = False
             for obs in non_differentiable_obs:
-                custom_capabilities.native_obs[obs].differentiable = False
+                custom_capabilities.observables[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
 
         def execute(self, _circuits, _execution_config):
@@ -284,7 +285,7 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+        runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
             invertible=True, controllable=True, differentiable=True
         )
 
@@ -392,7 +393,7 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+        runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
             invertible=True, controllable=True, differentiable=True
         )
 
@@ -435,7 +436,7 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+        runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
             invertible=True, controllable=True, differentiable=True
         )
 
@@ -594,7 +595,7 @@ class TestObservableValidation:
 
         dev_capabilities.native_obs.update(
             {
-                "PauliX2": OperationProperties(
+                "PauliX2": OperatorProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
