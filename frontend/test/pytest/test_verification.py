@@ -19,7 +19,6 @@ from unittest.mock import patch
 
 import pennylane as qml
 import pytest
-from pennylane.devices.capabilities import OperatorProperties
 from pennylane.measurements import ExpectationMP, VarianceMP
 from pennylane.ops import Adjoint, Controlled
 
@@ -37,6 +36,7 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
+from catalyst.utils.toml import OperationProperties
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
