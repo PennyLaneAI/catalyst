@@ -555,10 +555,10 @@ class QJIT(CatalystCallable):
                 )
 
         if self.compile_options.target in ("mlir", "binary"):
-            self.mlir_module, self.mlir = self.generate_ir()
+            self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
-            self.compiled_function, self.qir = self.compile()
+            self.compiled_function = self.compile()
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
@@ -599,8 +599,8 @@ class QJIT(CatalystCallable):
                     args, **kwargs
                 )
 
-            self.mlir_module, self.mlir = self.generate_ir()
-            self.compiled_function, self.qir = self.compile()
+            self.mlir_module = self.generate_ir()
+            self.compiled_function = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -716,10 +716,7 @@ class QJIT(CatalystCallable):
         options.lower_to_llvm = False
         canonicalizer = Compiler(options)
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
-
-        return mlir_module, mlir_string
+        return mlir_module
 
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
@@ -746,19 +743,19 @@ class QJIT(CatalystCallable):
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir = self.compiler.run_from_ir(
+            shared_object = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+            shared_object = self.compiler.run(self.mlir_module, self.workspace)
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
 
-        return compiled_fn, llvm_ir
+        return compiled_fn
 
     @instrument(has_finegrained=True)
     @debug_logger

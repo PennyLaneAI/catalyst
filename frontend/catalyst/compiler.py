@@ -575,7 +575,7 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        filename, out_IR, diagnostic_messages, exception = request(
+        filename, diagnostic_messages, exception = request(
             ir, workspace, module_name, self.options, lower_to_llvm
         )
         if exception:
@@ -591,7 +591,7 @@ class Compiler:
         else:
             output_filename = filename
 
-        return output_filename, out_IR
+        return output_filename
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):

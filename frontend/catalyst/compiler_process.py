@@ -71,8 +71,18 @@ provide the necessary isolation to prevent
 import multiprocessing as mp
 
 
-
-def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
+def request_handler(
+    conn,
+    ir,
+    workspace,
+    module_name,
+    keep_intermediate,
+    async_qnodes,
+    verbose,
+    pipelines,
+    checkpoint_stage,
+    lower_to_llvm,
+):
     """Call the compiler driver from a newly spawned python interpreter.
 
     This spawned python interpreter communicates with the parent python
@@ -80,7 +90,11 @@ def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
     """
     # We need this here to avoid importing the compiler_driver to
     # the parent process.
+    import sys
+
     from mlir_quantum.compiler_driver import run_compiler_driver
+
+    print(list(sys.modules.keys()))
 
     try:
 
@@ -88,19 +102,19 @@ def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
             ir,
             str(workspace),
             module_name,
-            keep_intermediate=options.keep_intermediate,
-            async_qnodes=options.async_qnodes,
-            verbose=options.verbose,
-            pipelines=options.get_pipelines(),
+            keep_intermediate=keep_intermediate,
+            async_qnodes=async_qnodes,
+            verbose=verbose,
+            pipelines=pipelines,
             lower_to_llvm=lower_to_llvm,
-            checkpoint_stage=options.checkpoint_stage,
+            checkpoint_stage=checkpoint_stage,
         )
 
         filename = compiler_output.get_object_filename()
         out_IR = compiler_output.get_output_ir()
         diagnostic_messages = compiler_output.get_diagnostic_messages()
 
-        conn.send((filename, out_IR, diagnostic_messages, None))
+        conn.send((filename, diagnostic_messages, None))
     except Exception as error:
         conn.send((None, None, None, error))
     finally:
@@ -109,13 +123,27 @@ def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
 
 def request(ir, workspace, module_name, options, lower_to_llvm):
     """Handles the necessary logic for spawning a child interpreter"""
-    ctx = mp.get_context("spawn")
-    conn1, conn2 = mp.Pipe(duplex=False)
-    process_args = (conn2, ir, workspace, module_name, options, lower_to_llvm)
-    process = mp.Process(target=request_handler, args=process_args)
+    ctx = mp.get_context("forkserver")
+    ctx.freeze_support()
+    conn1, conn2 = ctx.Pipe(duplex=False)
+    process_args = (
+        conn2,
+        ir,
+        workspace,
+        module_name,
+        options.keep_intermediate,
+        options.async_qnodes,
+        options.verbose,
+        options.get_pipelines(),
+        options.checkpoint_stage,
+        lower_to_llvm,
+    )
+    process = ctx.Process(target=request_handler, args=process_args)
     process.start()
-    if not conn1.poll(timeout=5):
-        raise CompileError("Connection timed out")
-    filename, out_IR, diagnostic_messages, exception = conn1.recv()
+    filename, diagnostic_messages, exception = conn1.recv()
     process.join()
-    return filename, out_IR, diagnostic_messages, exception
+    return filename, diagnostic_messages, exception
+
+
+if __name__ == "__main__":
+    ...
