@@ -76,7 +76,7 @@ void zDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 
 void hDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    oneQubitDecomp(op, rewriter, PI / 2, PI, PI / 2);
+    oneQubitDecomp(op, rewriter, 0.0, PI/2, PI);
 }
 
 void psDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
