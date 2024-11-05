@@ -646,7 +646,7 @@ class TestDynamicOneShotIntegration:
     ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
-        if backend == "lightning.kokkos":
+        if backend in ("lightning.kokkos", "lightning.gpu"):
             obs = qml.PauliZ(0)
         else:
             obs = qml.PauliY(0)
