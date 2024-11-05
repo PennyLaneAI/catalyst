@@ -31,11 +31,8 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
                     std::variant<mlir::Value, double> theta, double lambda)
 {
     TypeRange outQubitsTypes = op.getOutQubits().getTypes();
-    TypeRange outQubitsCtrlTypes = op.getOutCtrlQubits().getTypes();
 
     ValueRange inQubits = op.getInQubits();
-    ValueRange inCtrlQubits = op.getInCtrlQubits();
-    ValueRange inCtrlValues = op.getInCtrlValues();
 
     TypedAttr phiAttr = rewriter.getF64FloatAttr(phi);
     mlir::Value phiValue = rewriter.create<arith::ConstantOp>(op.getLoc(), phiAttr);
@@ -51,15 +48,14 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
     TypedAttr lambdaAttr = rewriter.getF64FloatAttr(lambda);
     mlir::Value lambdaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), lambdaAttr);
 
-    auto rxPhi =
-        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes, phiValue,
-                                  inQubits, "RX", nullptr, inCtrlQubits, inCtrlValues);
-    auto ryTheta = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
-                                             thetaValue, rxPhi.getOutQubits(), "RY", nullptr,
+    auto rxPhi = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, ValueRange{}, phiValue,
+                                           inQubits, "RX", nullptr, ValueRange{}, ValueRange{});
+    auto ryTheta = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, ValueRange{}, thetaValue,
+                                             rxPhi.getOutQubits(), "RY", nullptr,
                                              rxPhi.getInCtrlQubits(), rxPhi.getInCtrlValues());
-    auto rxLambda = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, outQubitsCtrlTypes,
+    auto rxLambda = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, ValueRange{},
                                               lambdaValue, ryTheta.getOutQubits(), "RX", nullptr,
-                                              inCtrlQubits, inCtrlValues);
+                                              ValueRange{}, ValueRange{});
     op.replaceAllUsesWith(rxLambda);
 }
 
