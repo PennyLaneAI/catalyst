@@ -54,6 +54,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     using ComplexT = std::complex<PrecisionT>;
     using CFP_t = ComplexT;
     using MemoryStorageT = Pennylane::Util::MemoryStorageLocation::Internal;
+    using AlignedAllocComplexT = AlignedAllocator<ComplexT>;
 
   private:
     using BaseType = StateVectorLQubit<PrecisionT, StateVectorLQubitDynamic<PrecisionT>>;
@@ -82,14 +83,13 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
         return second;
     }
 
-    inline void _scalar_mul_data(std::vector<ComplexT, AlignedAllocator<ComplexT>> &data,
-                                 ComplexT scalar)
+    inline void _scalar_mul_data(std::vector<ComplexT, AlignedAllocComplexT> &data, ComplexT scalar)
     {
         std::transform(data.begin(), data.end(), data.begin(),
                        [scalar](const ComplexT &elem) { return elem * scalar; });
     }
 
-    inline void _normalize_data(std::vector<ComplexT, AlignedAllocator<ComplexT>> &data)
+    inline void _normalize_data(std::vector<ComplexT, AlignedAllocComplexT> &data)
     {
         _scalar_mul_data(data,
                          ONE<PrecisionT>() / std::sqrt(squaredNorm(data.data(), data.size())));
@@ -157,7 +157,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param memory_model Memory model the statevector will use
      */
     template <class Alloc>
-    explicit StateVectorLQubitDynamic(const std::vector<std::complex<PrecisionT>, Alloc> &other,
+    explicit StateVectorLQubitDynamic(const std::vector<ComplexT, Alloc> &other,
                                       Threading threading = Threading::SingleThread,
                                       CPUMemoryModel memory_model = bestCPUMemoryModel())
         : StateVectorLQubitDynamic(other.data(), other.size(), threading, memory_model)
@@ -192,7 +192,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     /**
      * @brief Get underlying data vector.
      */
-    [[nodiscard]] auto getDataVector() -> std::vector<ComplexT, AlignedAllocator<ComplexT>> &
+    [[nodiscard]] auto getDataVector() -> std::vector<ComplexT, AlignedAllocComplexT> &
     {
         return data_;
     }
@@ -200,8 +200,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     /**
      * @brief Get underlying data vector.
      */
-    [[nodiscard]] auto getDataVector() const
-        -> const std::vector<ComplexT, AlignedAllocator<ComplexT>> &
+    [[nodiscard]] auto getDataVector() const -> const std::vector<ComplexT, AlignedAllocComplexT> &
     {
         return data_;
     }
@@ -229,7 +228,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
         updateData(new_data.data(), new_data.size());
     }
 
-    AlignedAllocator<ComplexT> allocator() const { return data_.get_allocator(); }
+    [[nodiscard]] AlignedAllocComplexT allocator() const { return data_.get_allocator(); }
 
     [[nodiscard]] auto isValidWire(size_t wire) -> bool { return wire < this->getNumQubits(); }
 

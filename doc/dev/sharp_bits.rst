@@ -325,7 +325,8 @@ Specifying compile-time constants
 ---------------------------------
 
 The ``@qjit`` decorator argument ``static_argnums`` allows positional arguments
-to be specified which should be treated as compile-time static arguments.
+to be specified which should be treated as compile-time static arguments (similarly,
+``static_argnames`` can be used to specify compile-time static arguments by name).
 
 This allows any hashable Python object to be passed to the function during compilation;
 the function will only be re-compiled if the hash value of the static arguments change.
@@ -1250,6 +1251,11 @@ Note that ``jax.vmap`` cannot be used within a qjit-compiled function:
 
 >>> qjit(jax.vmap(circuit))(jnp.array([0.1, 0.2]))
 NotImplementedError: Batching rule for 'qinst' not implemented
+
+In addition, shot-vectors are currently only supported in a limited manner;
+shot-vectors work with :func:`qml.sample <pennylane.sample>`, but not other
+measurement processes such as :func:`qml.expval <pennylane.expval>` and
+:func:`qml.probs <pennylane.probs>`.
 
 Functionality differences from PennyLane
 ----------------------------------------

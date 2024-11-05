@@ -74,6 +74,7 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
         "mlir::func::FuncDialect",
         "index::IndexDialect",
         "mhlo::MhloDialect",
+        "tensor::TensorDialect",
         "scf::SCFDialect"
     ];
 

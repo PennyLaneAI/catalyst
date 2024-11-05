@@ -27,3 +27,6 @@ doc/code/api
 
 # Development
 venv
+
+# Cache files
+.cache
