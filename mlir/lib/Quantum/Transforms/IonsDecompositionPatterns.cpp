@@ -17,17 +17,15 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 
-using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst::quantum;
 
 constexpr double PI = llvm::numbers::pi;
 
-// Define map, name to function creating decomp
+// This function creates the RX(phi) RY(theta) RX(lambda) decomposition
+// Note that for parametric operations theta is a Value, for non parametric
+// operation theta is an attribute, hence the use of std::variant.
 
 void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter, double phi,
                     std::variant<mlir::Value, double> theta, double lambda)
