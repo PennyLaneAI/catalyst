@@ -16,3 +16,4 @@ pennylane=0.39.0.dev30
 # commit hash corresponding to the merged PR that implements the
 # desired feature.
 lightning=0.39.0-dev38
+
