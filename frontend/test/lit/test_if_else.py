@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck --implicit-check-not convert_element_type %s
 
+# pylint: disable=missing-function-docstring
+
 import pennylane as qml
 
 from catalyst import cond, measure, qjit
