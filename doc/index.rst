@@ -1,4 +1,4 @@
-:og:description: Catalyst is an experimental package that enables just-in-time (JIT) compilation of PennyLane programs. Compile the entire quantum-classical workflow.
+:og:description: Catalyst is a package that enables just-in-time (JIT) compilation of PennyLane programs. Compile the entire quantum-classical workflow.
 
 Catalyst
 ########
@@ -25,7 +25,7 @@ Catalyst
 
     <div class="container mt-2 mb-2">
         <p class="lead grey-text">
-            Catalyst is an experimental package that enables just-in-time (JIT)
+            Catalyst is a package that enables just-in-time (JIT)
             compilation of PennyLane programs. Compile the entire quantum-classical workflow.
         </p>
         <img src="_static/catalyst.png" style="max-width: 700px; width: 100%;">
