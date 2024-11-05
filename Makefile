@@ -262,11 +262,11 @@ endif
 .PHONY: format-frontend
 format-frontend:
 ifdef check
-	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend
 	black --check --verbose .
 	isort --check --diff .
 else
-	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend
 	black .
 	isort .
 endif

@@ -44,7 +44,7 @@ from catalyst.tracing.contexts import EvaluationContext
 
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
+def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
 
     Args:
@@ -131,55 +131,55 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
     will always take precedence over global pass pipelines.
     """
 
-    kwargs = copy.copy(locals())
-    kwargs.pop("fn")
+    def _decorator(fn=None, **kwargs):
+        if fn is None:
+            return functools.partial(pipeline, **kwargs)
 
-    if fn is None:
-        return functools.partial(pipeline, **kwargs)
+        if not isinstance(fn, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    if not isinstance(fn, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        if pass_pipeline is None:
+            # TODO: design a default peephole pipeline
+            return fn
 
-    if pass_pipeline is None:
-        # TODO: design a default peephole pipeline
-        return fn
+        fn_original_name = fn.__name__
+        wrapped_qnode_function = fn.func
+        fn_clone = copy.copy(fn)
+        uniquer = str(_rename_to_unique())
+        fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
 
-    fn_original_name = fn.__name__
-    wrapped_qnode_function = fn.func
-    fn_clone = copy.copy(fn)
-    uniquer = str(_rename_to_unique())
-    fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
+        pass_names = _API_name_to_pass_name()
 
-    pass_names = _API_name_to_pass_name()
+        def wrapper(*args, **kwrags):
+            # TODO: we should not match pass targets by function name.
+            # The quantum scope work will likely put each qnode into a module
+            # instead of a `func.func ... attributes {qnode}`.
+            # When that is in place, the qnode's module can have a proper attribute
+            # (as opposed to discardable) that records its transform schedule, i.e.
+            #    module_with_transform @name_of_module {
+            #      // transform schedule
+            #    } {
+            #      // contents of the module
+            #    }
+            # This eliminates the need for matching target functions by name.
 
-    def wrapper(*args, **kwrags):
-        # TODO: we should not match pass targets by function name.
-        # The quantum scope work will likely put each qnode into a module
-        # instead of a `func.func ... attributes {qnode}`.
-        # When that is in place, the qnode's module can have a proper attribute
-        # (as opposed to discardable) that records its transform schedule, i.e.
-        #    module_with_transform @name_of_module {
-        #      // transform schedule
-        #    } {
-        #      // contents of the module
-        #    }
-        # This eliminates the need for matching target functions by name.
+            if EvaluationContext.is_tracing():
+                for API_name, pass_options in pass_pipeline.items():
+                    opt = ""
+                    for option, option_value in pass_options.items():
+                        opt += " " + str(option) + "=" + str(option_value)
+                    apply_registered_pass_p.bind(
+                        pass_name=pass_names[API_name],
+                        options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
+                    )
+            return wrapped_qnode_function(*args, **kwrags)
 
-        if EvaluationContext.is_tracing():
-            for API_name, pass_options in pass_pipeline.items():
-                opt = ""
-                for option, option_value in pass_options.items():
-                    opt += " " + str(option) + "=" + str(option_value)
-                apply_registered_pass_p.bind(
-                    pass_name=pass_names[API_name],
-                    options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
-                )
-        return wrapped_qnode_function(*args, **kwrags)
+        fn_clone.func = wrapper
+        fn_clone._peephole_transformed = True  # pylint: disable=protected-access
 
-    fn_clone.func = wrapper
-    fn_clone._peephole_transformed = True  # pylint: disable=protected-access
+        return fn_clone
 
-    return fn_clone
+    return _decorator
 
 
 def cancel_inverses(fn=None):
@@ -214,6 +214,10 @@ def cancel_inverses(fn=None):
 
         As a result, circuit inspection tools such as :func:`~.draw` will continue
         to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationPass"`` stage via the
+        :func:`~.get_compilation_stage` function.
 
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
@@ -338,6 +342,10 @@ def merge_rotations(fn=None):
 
         As a result, circuit inspection tools such as :func:`~.draw` will continue
         to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationPass"`` stage via the
+        :func:`~.get_compilation_stage` function.
 
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
