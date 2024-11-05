@@ -70,7 +70,6 @@ provide the necessary isolation to prevent
 
 import multiprocessing as mp
 
-from mlir_quantum.compiler_driver import run_compiler_driver
 
 
 def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
@@ -79,6 +78,10 @@ def request_handler(conn, ir, workspace, module_name, options, lower_to_llvm):
     This spawned python interpreter communicates with the parent python
     interpreter by sending messages through the `conn`ected Pipe.
     """
+    # We need this here to avoid importing the compiler_driver to
+    # the parent process.
+    from mlir_quantum.compiler_driver import run_compiler_driver
+
     try:
 
         compiler_output = run_compiler_driver(
