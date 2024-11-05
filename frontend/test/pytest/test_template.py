@@ -101,48 +101,6 @@ def test_basis_embedding(backend):
     assert np.allclose(interpreted_result, jitted_result)
 
 
-@pytest.mark.xfail(reason="Displacement operator not supported on lightning.")
-def test_displacement_embedding(backend):
-    """Test displacement embedding."""
-
-    def displacement_embedding(features):
-        qml.DisplacementEmbedding(features, range(3))
-        qml.Beamsplitter(0.5, 0, wires=[2, 1])
-        qml.Beamsplitter(0.5, 0, wires=[1, 0])
-        return qml.expval(qml.QuadX(0))
-
-    features = jax.numpy.array([1.0, 1.0, 1.0])
-    device = qml.device(backend, wires=3)
-    interpreted_fn = qml.QNode(displacement_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    interpreted_result = interpreted_fn(features)
-    jitted_result = jitted_fn(features)
-
-    assert np.allclose(interpreted_result, jitted_result)
-
-
-@pytest.mark.xfail(reason="Squeezing operator not supported on lightning.")
-def test_squeezing_embedding(backend):
-    """Test squeezing embedding."""
-
-    def displacement_embedding(features):
-        qml.SqueezingEmbedding(features, range(3))
-        qml.Beamsplitter(0.5, 0, wires=[2, 1])
-        qml.Beamsplitter(0.5, 0, wires=[1, 0])
-        return qml.expval(qml.QuadX(0))
-
-    features = jax.numpy.array([1.0, 1.0, 1.0])
-    device = qml.device(backend, wires=3)
-    interpreted_fn = qml.QNode(displacement_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    interpreted_result = interpreted_fn(features)
-    jitted_result = jitted_fn(features)
-
-    assert np.allclose(interpreted_result, jitted_result)
-
-
 def test_iqp_embedding(backend):
     """Test iqp embedding."""
 
@@ -177,39 +135,6 @@ def test_qaoa_embedding(backend):
 
     interpreted_result = interpreted_fn(*params)
     jitted_result = jitted_fn(*params)
-
-    assert np.allclose(interpreted_result, jitted_result)
-
-
-@pytest.mark.xfail(reason="Beamsplitter is not supported by lightning.")
-def test_cv_layers(backend):
-    """Test CVNeuralNetLayers."""
-
-    def cv_layer(*weights):
-        qml.CVNeuralNetLayers(*weights, range(2))
-        return qml.expval(qml.X(0))
-
-    def expected_shapes(n_layers, n_wires):
-        # compute the expected shapes for a given number of wires
-        n_if = n_wires * (n_wires - 1) // 2
-        expected = (
-            [(n_layers, n_if)] * 2
-            + [(n_layers, n_wires)] * 3
-            + [(n_layers, n_if)] * 2
-            + [(n_layers, n_wires)] * 4
-        )
-        return expected
-
-    shapes = expected_shapes(1, 2)
-    weights = [np.random.random(shape) for shape in shapes]
-    weights = [jnp.array(w) for w in weights]
-
-    device = qml.device(backend, wires=2)
-    interpreted_fn = qml.QNode(cv_layer, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    interpreted_result = interpreted_fn(*weights)
-    jitted_result = jitted_fn(*weights)
 
     assert np.allclose(interpreted_result, jitted_result)
 
@@ -1479,6 +1404,7 @@ def test_cosine_window(backend):
 
     assert np.allclose(interpreted_result, jitted_result)
 
+
 def test_basis_rotation(backend):
     """Test BasisRotation"""
 
@@ -1507,6 +1433,7 @@ def test_basis_rotation(backend):
     jitted_result = jitted_fn(unitary_matrix, False)
 
     assert np.allclose(interpreted_result, jitted_result)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
