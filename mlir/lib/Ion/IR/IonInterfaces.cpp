@@ -15,7 +15,7 @@
 #include "Ion/IR/IonInterfaces.h"
 
 using namespace mlir;
-using namespace catalyst::ion;
+// using namespace catalyst::ion;
 
 //===----------------------------------------------------------------------===//
 // Ion interface definitions.

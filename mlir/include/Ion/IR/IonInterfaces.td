@@ -17,29 +17,5 @@
 
 include "mlir/IR/OpBase.td"
 
-def IonRegion : OpInterface<"IonRegion"> {
-    let description = [{
-        This interface provides a generic way to interact with instructions that are
-        considered quantum regions. These are characterized by operating on a single
-        qubit register, and returning a new register value.
-    }];
-
-    let cppNamespace = "::catalyst::ion";
-
-    let methods = [
-        InterfaceMethod<
-            "Return the quantum register operand.",
-            "mlir::Value", "getRegisterOperand", (ins), /*methodBody=*/[{
-                return $_op->getOperand(0);
-            }]
-        >,
-        InterfaceMethod<
-            "Return the quantum register result.",
-            "mlir::Value", "getRegisterResult", (ins), /*methodBody=*/[{
-                return $_op->getResult(0);
-            }]
-        >,
-    ];
-}
 
 #endif // ION_INTERFACES
