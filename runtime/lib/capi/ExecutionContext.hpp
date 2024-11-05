@@ -177,7 +177,7 @@ class RTDevice {
 #endif
     }
 
-    void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
+    static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
     {
         // The following if-elif is required for C++ tests where these backend devices
         // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
@@ -275,7 +275,7 @@ class ExecutionContext final {
 
   public:
     explicit ExecutionContext(uint32_t *seed = nullptr)
-        : initial_tape_recorder_status(false), seed(seed)
+        : seed(seed)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
