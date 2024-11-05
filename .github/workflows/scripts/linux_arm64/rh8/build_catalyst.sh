@@ -45,7 +45,7 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
-    -DLIGHTNING_GIT_TAG=6f3e0d5d371ff9823a3177dd2c66052668883d42 \
+    -DLIGHTNING_GIT_TAG=latest_release \
     -DENABLE_LAPACK=OFF \
     -DENABLE_WARNINGS=OFF \
     -DENABLE_OPENQASM=ON \
