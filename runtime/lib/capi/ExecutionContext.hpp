@@ -40,38 +40,59 @@ extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, i
 
 class MemoryManager final {
   private:
-    std::unordered_set<void *> _impl;
+    std::unordered_set<std::shared_ptr<void>> _impl;
     std::mutex mu; // To guard the memory manager
 
   public:
     explicit MemoryManager() { _impl.reserve(1024); };
 
-    ~MemoryManager()
+    std::shared_ptr<void> create(size_t size)
     {
-        // Lock the mutex to protect _impl free
-        std::lock_guard<std::mutex> lock(mu);
-        for (auto *allocation : _impl) {
-            free(allocation);
-        }
+        std::shared_ptr<void> p(std::malloc(size), [](void *ptr) { free(ptr); });
+        this->insert(p);
+        return p;
     }
 
-    void insert(void *ptr)
+    std::shared_ptr<void> create_aligned(size_t alignment, size_t size)
+    {
+        std::shared_ptr<void> p(std::aligned_alloc(alignment, size), [](void *ptr) { free(ptr); });
+        this->insert(p);
+        return p;
+    }
+
+    void insert(std::shared_ptr<void> ptr)
     {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         _impl.insert(ptr);
     }
+
     void erase(void *ptr)
     {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
-        _impl.erase(ptr);
+
+        std::shared_ptr<void> target;
+        for (std::shared_ptr<void> sharedP : _impl) {
+            if (sharedP.get() == ptr) {
+                target = sharedP;
+            }
+        }
+        _impl.erase(target);
     }
+
     bool contains(void *ptr)
     {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
-        return _impl.contains(ptr);
+
+        bool result = false;
+        for (std::shared_ptr<void> sharedP : _impl) {
+            if (sharedP.get() == ptr) {
+                result = true;
+            }
+        }
+        return result;
     }
 };
 
