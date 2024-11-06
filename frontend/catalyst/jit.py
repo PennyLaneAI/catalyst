@@ -98,7 +98,7 @@ def qjit(
     .. note::
 
         Not all PennyLane devices currently work with Catalyst. Supported backend devices include
-        ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+        ``lightning.qubit``, ``lightning.kokkos``, ``lightning.gpu``, and ``braket.aws.qubit``. For
         a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
@@ -137,10 +137,12 @@ def qjit(
         disable_assertions (bool): If set to ``True``, runtime assertions included in
             ``fn`` via :func:`~.debug_assert` will be disabled during compilation.
         seed (Optional[Int]):
-            The seed for mid-circuit measurement results when the qjit-compiled function is executed
-            on simulator devices including ``lightning.qubit`` and ``lightning.kokkos``.
-            The default value is None, which means no seeding is performed, and all processes
-            are random. A seed is expected to be an unsigned 32-bit integer.
+            The seed for circuit readout results when the qjit-compiled function is executed
+            on simulator devices including ``lightning.qubit``, ``lightning.kokkos``, and
+            ``lightning.gpu``. The default value is None, which means no seeding is performed,
+            and all processes are random. A seed is expected to be an unsigned 32-bit integer.
+            Currently, the following measurement processes are seeded: :func:`~.measure`,
+            :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`.
         experimental_capture (bool): If set to ``True``, the qjit decorator
             will use PennyLane's experimental program capture capabilities
             to capture the decorated function for compilation.
@@ -285,10 +287,12 @@ def qjit(
     .. details::
         :title: Static arguments
 
-        ``static_argnums`` defines which elements should be treated as static. If it takes an
-        integer, it means the argument whose index is equal to the integer is static. If it takes
-        an iterable of integers, arguments whose index is contained in the iterable are static.
-        Changing static arguments will introduce re-compilation.
+        - ``static_argnums`` defines which positional arguments should be treated as static. If it
+          takes an integer, it means the argument whose index is equal to the integer is static. If
+          it takes an iterable of integers, arguments whose index is contained in the iterable are
+          static. Changing static arguments will introduce re-compilation.
+
+        - ``static_argnames`` defines which named function arguments should be treated as static.
 
         A valid static argument must be hashable and its ``__hash__`` method must be able to
         reflect any changes of its attributes.
