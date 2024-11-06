@@ -476,7 +476,7 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        pip install PennyLane-Lightning-Kokkos==0.38.0-dev32 --extra-index-url https://test.pypi.org/simple
+        pip install PennyLane-Lightning-Kokkos==0.39.0 --extra-index-url https://test.pypi.org/simple
 
     - name: Install Deps
       run: |
