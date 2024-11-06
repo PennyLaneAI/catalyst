@@ -56,7 +56,9 @@ struct DynamicLibraryLoader {
             // https://pubs.opengroup.org/onlinepubs/000095399/functions/dlclose.html
             // https://github.com/pybind/pybind11/blob/75e48c5f959b4f0a49d8c664e059b6fb4b497102/include/pybind11/detail/internals.h#L108-L113
             //
-            // dlclose(handle);
+#ifndef __APPLE__
+            dlclose(handle);
+#endif
         }
     }
 
