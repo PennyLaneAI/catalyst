@@ -144,6 +144,7 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
 
     namespace catalyst {
     #define GEN_PASS_DEF_MYHELLOWORLDPASS
+    #define GEN_PASS_DECL_MYHELLOWORLDPASS
     #include "Catalyst/Transforms/Passes.h.inc"
 
     struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {
@@ -191,6 +192,8 @@ And in ``mlir/lib/Catalyst/Transforms/RegisterAllPasses.cpp``, register the pass
         mlir::registerPass(catalyst::createMyHelloWorldPass);
         ...
     }
+
+Note that this addition in ``RegisterAllPasses.cpp`` needs to happen in the ``lib/Catalyst/Transforms`` directory, regardless of which dialect your pass belongs to.
 
 Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and 
 
