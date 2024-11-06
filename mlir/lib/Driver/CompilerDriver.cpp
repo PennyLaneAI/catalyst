@@ -785,6 +785,21 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     return success();
 }
 
+size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos) {
+    int parenCount = 1;
+    for (size_t pos = openParenPos + 1; pos < str.size(); pos++) {
+        if (str[pos] == '(') {
+            parenCount++;
+        } else if (str[pos] == ')') {
+            parenCount--;
+            if (parenCount == 0) {
+                return pos;
+            }
+        }
+    }
+    return llvm::StringRef::npos;
+}
+
 std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
 {
     std::vector<Pipeline> allPipelines;
@@ -792,7 +807,7 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
         llvm::StringRef pipelineRef = llvm::StringRef(pipelineStr).trim();
 
         size_t openParenPos = pipelineRef.find('(');
-        size_t closeParenPos = pipelineRef.find(')', openParenPos);
+        size_t closeParenPos = findMatchingClosingParen(pipelineRef, openParenPos);
 
         if (openParenPos == llvm::StringRef::npos || closeParenPos == llvm::StringRef::npos) {
             llvm::errs() << "Error: Invalid pipeline format: " << pipelineStr << "\n";
