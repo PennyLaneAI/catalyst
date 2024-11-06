@@ -156,16 +156,14 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
-    void *ptr = malloc(size);
-    CTX->getMemoryManager()->insert(ptr);
-    return ptr;
+    std::shared_ptr<void> ptr = CTX->getMemoryManager()->create(size);
+    return ptr.get();
 }
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
-    void *ptr = aligned_alloc(alignment, size);
-    CTX->getMemoryManager()->insert(ptr);
-    return ptr;
+    std::shared_ptr<void> ptr = CTX->getMemoryManager()->create_aligned(alignment, size);
+    return ptr.get();
 }
 
 bool _mlir_memory_transfer(void *ptr)
@@ -177,11 +175,7 @@ bool _mlir_memory_transfer(void *ptr)
     return true;
 }
 
-void _mlir_memref_to_llvm_free(void *ptr)
-{
-    CTX->getMemoryManager()->erase(ptr);
-    free(ptr);
-}
+void _mlir_memref_to_llvm_free(void *ptr) { CTX->getMemoryManager()->erase(ptr); }
 
 void __catalyst__rt__print_string(char *string)
 {

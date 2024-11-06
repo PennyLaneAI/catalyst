@@ -491,7 +491,6 @@ TEST_CASE("Test memory transfer in rt", "[CoreQIS]")
     bool is_in_rt = _mlir_memory_transfer(a);
     CHECK(is_in_rt);
     __catalyst__rt__finalize();
-    free(a);
 }
 
 TEST_CASE("Test memory transfer not in rt", "[CoreQIS]")
@@ -501,7 +500,6 @@ TEST_CASE("Test memory transfer not in rt", "[CoreQIS]")
     bool is_in_rt = _mlir_memory_transfer(a);
     CHECK(!is_in_rt);
     __catalyst__rt__finalize();
-    free(a);
 }
 
 TEST_CASE("Test __catalyst__qis__Measure", "[CoreQIS]")
