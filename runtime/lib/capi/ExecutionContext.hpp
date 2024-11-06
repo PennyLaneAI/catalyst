@@ -38,7 +38,9 @@ namespace Catalyst::Runtime {
 
 extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
 
-class MemoryManager final { // NOLINT(cppcoreguidelines-special-member-functions)
+class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
+                    // hicpp-special-member-functions)
+                        final {
   private:
     std::unordered_set<void *> _impl;
     std::mutex mu; // To guard the memory manager
@@ -51,7 +53,7 @@ class MemoryManager final { // NOLINT(cppcoreguidelines-special-member-functions
         // Lock the mutex to protect _impl free
         std::lock_guard<std::mutex> lock(mu);
         for (auto *allocation : _impl) {
-            free(allocation); // NOLINT(cppcoreguidelines-no-malloc)
+            free(allocation); // NOLINT(cppcoreguidelines-no-malloc, hicpp-no-malloc)
         }
     }
 
