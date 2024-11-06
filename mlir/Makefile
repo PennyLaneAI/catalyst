@@ -17,10 +17,10 @@ PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
-SYMBOL_VISIBILITY := hidden
+SYMBOL_VISIBILITY := default
 else
 DEFAULT_ENABLE_LLD := ON
-SYMBOL_VISIBILITY := protected
+SYMBOL_VISIBILITY := default
 endif
 
 ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
