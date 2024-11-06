@@ -23,14 +23,13 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
 from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
-
-from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
@@ -559,7 +558,7 @@ class Compiler:
 
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
-                                   shard object library path.
+                                   shared object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
         """
@@ -576,34 +575,73 @@ class Compiler:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         try:
-            compiler_output = run_compiler_driver(
-                ir,
-                str(workspace),
-                module_name,
-                keep_intermediate=self.options.keep_intermediate,
-                async_qnodes=self.options.async_qnodes,
-                verbose=self.options.verbose,
-                pipelines=self.options.get_pipelines(),
-                lower_to_llvm=lower_to_llvm,
-                checkpoint_stage=self.options.checkpoint_stage,
-            )
-        except RuntimeError as e:
-            raise CompileError(*e.args) from e
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".mlir", dir=str(workspace), delete=False
+            ) as tmp_infile:
+                tmp_infile_name = tmp_infile.name
+                tmp_infile.write(ir)
 
-        if self.options.verbose:
-            for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
-                print(f"[LIB] {line}", file=self.options.logfile)
+            if lower_to_llvm:
+                output_ir_ext = ".ll"
+            else:
+                output_ir_ext = ".mlir"
 
-        filename = compiler_output.get_object_filename()
-        out_IR = compiler_output.get_output_ir()
+            output_object_name = os.path.join(str(workspace), f"{module_name}.o")
+            output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
 
-        if lower_to_llvm:
-            output = LinkerDriver.run(filename, options=self.options)
-            output_filename = str(pathlib.Path(output).absolute())
-        else:
-            output_filename = filename
+            # Prepare the command-line arguments
+            cmd = ["catalyst-cli"]
 
-        return output_filename, out_IR
+            cmd += ["--module-name", module_name]
+            cmd += ["--workspace", str(workspace)]
+            if self.options.keep_intermediate:
+                cmd += ["--keep-intermediate"]
+            if self.options.async_qnodes:
+                cmd += ["--async-qnodes"]
+            if self.options.verbose:
+                cmd += ["--verbose"]
+            if self.options.checkpoint_stage:
+                cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+
+            pipeline_str = ""
+            for pipeline in self.options.get_pipelines():
+                pipeline_name, passes = pipeline
+                passes_str = ";".join(passes)
+                pipeline_str += f"{pipeline_name}({passes_str}),"
+            cmd += ["--catalyst-pipeline", pipeline_str]
+
+            if not lower_to_llvm:
+                cmd += ["--tool", "opt"]
+
+            cmd += ["-o", output_ir_name]
+            cmd += [tmp_infile_name]
+
+            try:
+                if self.options.verbose:
+                    print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                if self.options.verbose:
+                    print(f"[OUTPUT] {result.stdout}", file=self.options.logfile)
+                    print(f"[ERROR] {result.stderr}", file=self.options.logfile)
+            except subprocess.CalledProcessError as e:
+                raise CompileError(
+                    f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
+                ) from e
+
+            with open(output_ir_name, "r") as f:
+                out_IR = f.read()
+
+            if lower_to_llvm:
+                output = LinkerDriver.run(output_object_name, options=self.options)
+                output_object_name = str(pathlib.Path(output).absolute())
+
+        finally:
+            if os.path.exists(tmp_infile_name):
+                os.remove(tmp_infile_name)
+            if os.path.exists(output_ir_name):
+                os.remove(output_ir_name)
+
+        return output_object_name, out_IR
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):

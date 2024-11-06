@@ -774,13 +774,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.outIR.clear();
         outIRStream << *llvmModule;
 
-        bool outputFileSpecified = !output.outputFilename.empty() && output.outputFilename != "-";
-        auto outfile = outputFileSpecified ? output.outputFilename : options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), targetMachine, outfile))) {
+                                std::move(llvmModule), targetMachine, options.getObjectFile()))) {
             return failure();
         }
-        output.outputFilename = outfile;
         outputTiming.stop();
         llcTiming.stop();
     }
@@ -906,16 +903,14 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     }
 
     // If not creating object file, output the IR to the specified file.
-    if (LoweringAction < Action::LLC) {
-        std::string errorMessage;
-        auto outfile = openOutputFile(outputFilename, &errorMessage);
-        if (!outfile) {
-            llvm::errs() << errorMessage << "\n";
-            return 1;
-        }
-        outfile->os() << output->outIR;
-        outfile->keep();
+    std::string errorMessage;
+    auto outfile = openOutputFile(outputFilename, &errorMessage);
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
+        return 1;
     }
+    outfile->os() << output->outIR;
+    outfile->keep();
 
     return 0;
 }
