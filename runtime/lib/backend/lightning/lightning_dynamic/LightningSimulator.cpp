@@ -29,12 +29,12 @@ auto LightningSimulator::AllocateQubit() -> QubitIdType
 
 auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (!num_qubits) {
+    if (num_qubits == 0U) {
         return {};
     }
 
     // at the first call when num_qubits == 0
-    if (!this->GetNumQubits()) {
+    if (this->GetNumQubits() == 0U) {
         this->device_sv = std::make_unique<StateVectorT>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
@@ -104,19 +104,17 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-void LightningSimulator::SetState(DataView<std::complex<double>, 1> &data,
+void LightningSimulator::SetState(DataView<std::complex<double>, 1> &state,
                                   std::vector<QubitIdType> &wires)
 {
-    std::vector<std::complex<double>> data_vector(data.begin(), data.end());
-    std::vector<std::size_t> wires_size_t(wires.begin(), wires.end());
-    this->device_sv->setStateVector(data_vector, wires_size_t);
+    std::vector<std::complex<double>> data_vector(state.begin(), state.end());
+    this->device_sv->setStateVector(data_vector, getDeviceWires(wires));
 }
 
-void LightningSimulator::SetBasisState(DataView<int8_t, 1> &data, std::vector<QubitIdType> &wires)
+void LightningSimulator::SetBasisState(DataView<int8_t, 1> &n, std::vector<QubitIdType> &wires)
 {
-    std::vector<std::size_t> data_vector(data.begin(), data.end());
-    std::vector<std::size_t> wires_size_t(wires.begin(), wires.end());
-    this->device_sv->setBasisState(data_vector, wires_size_t);
+    std::vector<std::size_t> data_vector(n.begin(), n.end());
+    this->device_sv->setBasisState(data_vector, getDeviceWires(wires));
 }
 
 auto LightningSimulator::Zero() const -> Result
@@ -230,7 +228,7 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return device_shots ? m.expval(*obs, device_shots, {}) : m.expval(*obs);
+    return (device_shots != 0U) ? m.expval(*obs, device_shots, {}) : m.expval(*obs);
 }
 
 auto LightningSimulator::Var(ObsIdType obsKey) -> double
@@ -246,7 +244,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return device_shots ? m.var(*obs, device_shots) : m.var(*obs);
+    return (device_shots != 0U) ? m.var(*obs, device_shots) : m.var(*obs);
 }
 
 void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
@@ -260,7 +258,7 @@ void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
 void LightningSimulator::Probs(DataView<double, 1> &probs)
 {
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = device_shots ? m.probs(device_shots) : m.probs();
+    auto &&dv_probs = (device_shots != 0U) ? m.probs(device_shots) : m.probs();
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
@@ -278,7 +276,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = device_shots ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
+    auto &&dv_probs = (device_shots != 0U) ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
                "Invalid size for the pre-allocated partial-probabilities");
@@ -316,6 +314,9 @@ std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
     // the number of qubits.
     //
     // Return Value Optimization (RVO)
+    if (this->gen != nullptr) {
+        return m.generate_samples(shots, (*(this->gen))());
+    }
     return m.generate_samples(shots);
 }
 
@@ -393,7 +394,7 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[--idx] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = (li_samples[shot * numQubits + wire] != 0U);
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -431,7 +432,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = dev_wires.size();
         for (auto wire : dev_wires) {
-            basisState[--idx] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = (li_samples[shot * numQubits + wire] != 0U);
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -452,7 +453,7 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
     // It represents the measured result, true for 1, false for 0
     bool mres = Lightning::simulateDraw(probs, postselect, this->gen);
     auto dev_wires = getDeviceWires(wires);
-    this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
+    this->device_sv->collapse(dev_wires[0], mres);
     return mres ? this->One() : this->Zero();
 }
 
@@ -466,7 +467,7 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     const size_t num_train_params = tp_empty ? num_params : trainParams.size();
     const size_t jac_size = num_train_params * this->cache_manager.getNumObservables();
 
-    if (!jac_size) {
+    if (jac_size == 0U) {
         return;
     }
 

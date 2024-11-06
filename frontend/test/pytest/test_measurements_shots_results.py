@@ -428,7 +428,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1))
 
-        if isinstance(dev, qml.devices.Device):
+        if isinstance(dev, qml.devices.LegacyDeviceFacade):
+            with pytest.raises(
+                RuntimeError,
+                match=r"Cannot split up terms in sums for MeasurementProcess <class 'pennylane.measurements.var.VarianceMP'>",
+            ):
+                circuit(0.432, 0.123, -0.543)
+        else:
             # TODO: only raises with the new API, Kokkos should also raise an error.
             with pytest.raises(
                 TypeError,
@@ -475,6 +481,51 @@ class TestProbs:
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 
+class TestShadow:
+    """Test shadow."""
+
+    @pytest.mark.xfail(reason="Not supported on lightning.")
+    def test_shadow(self):
+        """Test that Shadow can be used with Catalyst."""
+
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+
+        @qjit
+        @qml.qnode(dev)
+        def classical_shadow_circuit():
+            qml.Hadamard(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.classical_shadow(wires=[0, 1])
+
+        expected_bits = [[1, 1], [0, 1]]
+        expected_recipes = [[0, 1], [0, 2]]
+        actual_bits, actual_recipes = classical_shadow_circuit()
+        assert expected_bits == actual_bits
+        assert expected_recipes == actual_recipes
+
+
+class TestShadowExpval:
+    """Test shadowexpval."""
+
+    @pytest.mark.xfail(reason="TypeError in Catalyst")
+    def test_shadow_expval(self):
+        """Test that ShadowExpVal can be used with Catalyst."""
+
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+
+        @qjit
+        @qml.qnode(dev)
+        def shadow_expval_circuit(x, obs):
+            qml.Hadamard(0)
+            qml.CNOT((0, 1))
+            qml.RX(x, wires=0)
+            return qml.shadow_expval(obs)
+
+        H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
+        expected = 1.9917
+        assert shadow_expval_circuit(0, H) == expected
+
+
 class TestOtherMeasurements:
     """Test other measurement processes."""
 
@@ -488,10 +539,7 @@ class TestOtherMeasurements:
         def circuit():
             return meas_fun(wires=0)
 
-        # ValueError is legacy behaviour with the old device API
-        error_type = ValueError if isinstance(dev, qml.devices.LegacyDevice) else CompileError
-
-        with pytest.raises(error_type, match="cannot work with shots=None"):
+        with pytest.raises(CompileError, match="cannot work with shots=None"):
             qjit(circuit)
 
     def test_multiple_return_values(self, backend, tol_stochastic):

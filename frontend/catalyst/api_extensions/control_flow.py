@@ -19,10 +19,12 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
+import inspect
 from typing import Any, Callable, List
 
 import jax
 import jax.numpy as jnp
+import pennylane as qml
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
 from pennylane import QueuingManager
@@ -236,8 +238,17 @@ def cond(pred: DynamicJaxprTracer):
     """
 
     def _decorator(true_fn: Callable):
-        if true_fn.__code__.co_argcount != 0:
-            raise TypeError("Conditional 'True' function is not allowed to have any arguments")
+
+        if len(inspect.signature(true_fn).parameters):
+            if isinstance(true_fn, type) and issubclass(true_fn, qml.operation.Operation):
+                # Special treatment if conditional function body is a single pennylane gate
+                # The qml.operation.Operation base class represents things that
+                # can reasonably be considered as a gate,
+                # e.g. qml.Hadamard, qml.RX, etc.
+                return CondCallableSingleGateHandler(pred, true_fn)
+            else:
+                raise TypeError("Conditional 'True' function is not allowed to have any arguments")
+
         return CondCallable(pred, true_fn)
 
     return _decorator
@@ -556,6 +567,15 @@ class CondCallable:
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
 
+    def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
+        self.otherwise_fn = otherwise_fn
+
+    def add_pred(self, _pred):  # pylint:disable=missing-function-docstring
+        self.preds.append(self._convert_predicate_to_bool(_pred))
+
+    def add_branch_fn(self, _branch_fn):  # pylint:disable=missing-function-docstring
+        self.branch_fns.append(_branch_fn)
+
     @property
     def operation(self):
         """
@@ -584,7 +604,7 @@ class CondCallable:
         """
 
         def decorator(branch_fn):
-            if branch_fn.__code__.co_argcount != 0:
+            if len(inspect.signature(branch_fn).parameters):
                 raise TypeError(
                     "Conditional 'else if' function is not allowed to have any arguments"
                 )
@@ -603,7 +623,7 @@ class CondCallable:
         Returns:
             self
         """
-        if otherwise_fn.__code__.co_argcount != 0:
+        if len(inspect.signature(otherwise_fn).parameters):
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
@@ -739,6 +759,78 @@ class CondCallable:
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
+
+
+class CondCallableSingleGateHandler(CondCallable):
+    """
+    Special CondCallable when the conditional body function is a single pennylane gate.
+
+    A usual pennylane conditional call for a gate looks like
+    `qml.cond(x == 42, qml.RX)(theta, wires=0)`
+
+    Since gates are guaranteed to take in arguments (at the very least the wire argument),
+    the usual CondCallable class, which expects the conditional body function to have no arguments,
+    cannot be used.
+    This class inherits from base CondCallable, but wraps the gate in a function with no arguments,
+    and sends that function to CondCallable.
+    This allows us to perform the conditional branch gate function with arguments.
+    """
+
+    def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
+        self.sgh_preds = [pred]
+        self.sgh_branch_fns = [true_fn]
+        self.sgh_otherwise_fn = None
+
+    def __call__(self, *args, **kwargs):
+        def argless_true_fn():
+            self.sgh_branch_fns[0](*args, **kwargs)
+
+        super().__init__(self.sgh_preds[0], argless_true_fn)
+
+        if self.sgh_otherwise_fn is not None:
+
+            def argless_otherwise_fn():
+                self.sgh_otherwise_fn(*args, **kwargs)
+
+            super().set_otherwise_fn(argless_otherwise_fn)
+
+        for i in range(1, len(self.sgh_branch_fns)):
+
+            def argless_elseif_fn(i=i):  # i=i to work around late binding
+                self.sgh_branch_fns[i](*args, **kwargs)
+
+            super().add_pred(self.sgh_preds[i])
+            super().add_branch_fn(argless_elseif_fn)
+
+        return super().__call__()
+
+    def else_if(self, _pred):
+        """
+        Override the "can't have arguments" check in the original CondCallable's `else_if`
+        """
+
+        def decorator(branch_fn):
+            if isinstance(branch_fn, type) and issubclass(branch_fn, qml.operation.Operation):
+                self.sgh_preds.append(_pred)
+                self.sgh_branch_fns.append(branch_fn)
+                return self
+            else:  # pylint:disable=line-too-long
+                raise TypeError(
+                    "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
+                )
+
+        return decorator
+
+    def otherwise(self, otherwise_fn):
+        """
+        Override the "can't have arguments" check in the original CondCallable's `otherwise`
+        """
+        if isinstance(otherwise_fn, type) and issubclass(otherwise_fn, qml.operation.Operation):
+            self.sgh_otherwise_fn = otherwise_fn
+        else:
+            raise TypeError(
+                "Conditional 'False' function can have arguments only if it is a PennyLane gate."
+            )
 
 
 class ForLoopCallable:
@@ -1107,8 +1199,7 @@ class Cond(HybridOp):
         op = self
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                reg_len = qrp.base.length
-                new_qreg = AbstractQreg(reg_len)
+                new_qreg = AbstractQreg()
                 qreg_in = _input_type_to_tracers(region.trace.new_arg, [new_qreg])[0]
                 qreg_out = trace_quantum_operations(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
@@ -1167,8 +1258,7 @@ class ForLoop(HybridOp):
         expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
-            reg_len = qrp.base.length
-            new_qreg = AbstractQreg(reg_len)
+            new_qreg = AbstractQreg()
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
@@ -1249,7 +1339,7 @@ class WhileLoop(HybridOp):
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
-            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg(qrp.base.length)])
+            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
             cond_jaxpr, _, cond_consts = trace_to_jaxpr(
                 cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
@@ -1260,7 +1350,7 @@ class WhileLoop(HybridOp):
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             region = self.regions[1]
             res_classical_tracers = region.res_classical_tracers
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg(qrp.base.length)])[0]
+            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(

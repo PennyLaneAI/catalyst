@@ -70,9 +70,18 @@ class CompileOptions:
             the main compilation pipeline is complete. Default is ``True``.
         static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
             Default is ``None``.
+        static_argnames (Optional[Union[str, Iterable[str]]]): names of static arguments.
+            Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
+            Default is None.
+        experimental_capture (bool): If set to ``True``,
+            use PennyLane's experimental program capture capabilities
+            to capture the function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline.
             Default is None.
     """
 
@@ -85,11 +94,14 @@ class CompileOptions:
     autograph_include: Optional[Iterable[str]] = ()
     async_qnodes: Optional[bool] = False
     static_argnums: Optional[Union[int, Iterable[int]]] = None
+    static_argnames: Optional[Union[str, Iterable[str]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
+    experimental_capture: Optional[bool] = False
+    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded
@@ -159,6 +171,27 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
+ENFORCE_RUNTIME_INVARIANTS_PASS = (
+    "EnforeRuntimeInvariantsPass",
+    [
+        # We want the invariant that transforms that generate multiple
+        # tapes will generate multiple qnodes. One for each tape.
+        # Split multiple tapes enforces that invariant.
+        "split-multiple-tapes",
+        # Run the transform sequence defined in the MLIR module
+        "apply-transform-sequence",
+        # Nested modules are something that will be used in the future
+        # for making device specific transformations.
+        # Since at the moment, nothing in the runtime is using them
+        # and there is no lowering for them,
+        # we inline them to preserve the semantics. We may choose to
+        # keep inlining modules targetting the Catalyst runtime.
+        # But qnodes targetting other backends may choose to lower
+        # this into something else.
+        "inline-nested-module",
+    ],
+)
+
 HLO_LOWERING_PASS = (
     "HLOLoweringPass",
     [
@@ -175,13 +208,14 @@ HLO_LOWERING_PASS = (
         "hlo-custom-call-lowering",
         "cse",
         "func.func(linalg-detensorize{aggressive-mode})",
+        "detensorize-scf",
+        "canonicalize",
     ],
 )
 
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
@@ -195,6 +229,7 @@ BUFFERIZATION_PASS = (
     [
         "one-shot-bufferize{dialect-filter=memref}",
         "inline",
+        "gradient-preprocess",
         "gradient-bufferize",
         "scf-bufferize",
         "convert-tensor-to-linalg",  # tensor.pad
@@ -210,6 +245,7 @@ BUFFERIZATION_PASS = (
         "func-bufferize",
         "func.func(finalizing-bufferize)",
         "canonicalize",  # Remove dead memrefToTensorOp's
+        "gradient-postprocess",
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
@@ -247,6 +283,7 @@ MLIR_TO_LLVM_PASS = (
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "convert-math-to-libm",
         "convert-arith-to-llvm",
+        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
@@ -272,6 +309,7 @@ MLIR_TO_LLVM_PASS = (
 
 
 DEFAULT_PIPELINES = [
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -287,6 +325,7 @@ MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
+    ENFORCE_RUNTIME_INVARIANTS_PASS,
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
@@ -387,7 +426,10 @@ class LinkerDriver:
 
         system_flags = []
         if platform.system() == "Linux":
-            system_flags += ["-Wl,-no-as-needed"]
+            # --disable-new-dtags makes the linker use RPATH instead of RUNPATH.
+            # RPATH influences search paths globally while RUNPATH only works for
+            # a single file, but not its dependencies.
+            system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
         elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
 
@@ -505,7 +547,6 @@ class Compiler:
     @debug_logger_init
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
-        self.last_compiler_output = None
 
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
@@ -521,9 +562,6 @@ class Compiler:
                                    shard object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
-            A list of:
-               func_name (str) Inferred name of the main function
-               ret_type_name (str) Inferred main function result type name
         """
         assert isinstance(
             workspace, Directory
@@ -558,8 +596,6 @@ class Compiler:
 
         filename = compiler_output.get_object_filename()
         out_IR = compiler_output.get_output_ir()
-        func_name = compiler_output.get_function_attributes().get_function_name()
-        ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
         if lower_to_llvm:
             output = LinkerDriver.run(filename, options=self.options)
@@ -567,8 +603,7 @@ class Compiler:
         else:
             output_filename = filename
 
-        self.last_compiler_output = compiler_output
-        return output_filename, out_IR, [func_name, ret_type_name]
+        return output_filename, out_IR
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
@@ -596,7 +631,7 @@ class Compiler:
         )
 
     @debug_logger
-    def get_output_of(self, pipeline) -> Optional[str]:
+    def get_output_of(self, pipeline, workspace) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
             pipeline (str): name of pass class
@@ -604,12 +639,41 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
-            pipeline
-        ):
+        file_content = None
+        for dirpath, _, filenames in os.walk(str(workspace)):
+            filenames = [f for f in filenames if f.endswith(".mlir") or f.endswith(".ll")]
+            if not filenames:
+                break
+            filenames_no_ext = [os.path.splitext(f)[0] for f in filenames]
+            if pipeline == "mlir":
+                # Sort files and pick the first one
+                selected_file = [
+                    sorted(filenames)[0],
+                ]
+            elif pipeline == "last":
+                # Sort files and pick the last one
+                selected_file = [
+                    sorted(filenames)[-1],
+                ]
+            else:
+                selected_file = [
+                    f
+                    for f, name_no_ext in zip(filenames, filenames_no_ext)
+                    if pipeline in name_no_ext
+                ]
+            if len(selected_file) != 1:
+                msg = f"Attempting to get output for pipeline: {pipeline},"
+                msg += " but no or more than one file was found.\n"
+                raise CompileError(msg)
+            filename = selected_file[0]
+
+            full_path = os.path.join(dirpath, filename)
+            with open(full_path, "r", encoding="utf-8") as file:
+                file_content = file.read()
+
+        if file_content is None:
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
             raise CompileError(msg)
-
-        return self.last_compiler_output.get_pipeline_output(pipeline)
+        return file_content

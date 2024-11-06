@@ -3,14 +3,17 @@
 pip>=22.3
 
 # Build dependencies for non-Python components
-numpy<2
-pybind11>=2.8.0
+# Do not allow NumPy 2.0.0 due to a bug with their C API that blocks the usage of the Stable ABI;
+# this bug was fixed in 2.0.1 (https://github.com/numpy/numpy/pull/26995)
+numpy!=2.0.0
+pybind11>=2.12.0
 PyYAML
+scipy==1.13
 
 # formatting/linting
 black
 clang-format==14.*
-clang-tidy==14.*
+clang-tidy~=16.0
 pylint
 isort
 
@@ -26,5 +29,3 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
-# TODO: remove pin once we support jax>=0.4.27
-optax<0.2.3

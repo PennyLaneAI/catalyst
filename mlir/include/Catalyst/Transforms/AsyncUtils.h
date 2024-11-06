@@ -44,7 +44,9 @@ std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp);
 // Helper functions for matching function names
 bool isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName);
 bool isAbort(LLVM::LLVMFuncOp funcOp);
+bool isPuts(LLVM::LLVMFuncOp funcOp);
 bool callsAbort(LLVM::CallOp callOp);
+bool callsPuts(LLVM::CallOp callOp);
 bool callsAbort(Operation *possibleCall);
 bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp);
 bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp);
@@ -58,6 +60,7 @@ bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
 bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall);
 bool hasAbortInBlock(Block *block);
+bool hasPutsInBlock(Block *block);
 
 // Helper function for creating function declarations
 LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp);

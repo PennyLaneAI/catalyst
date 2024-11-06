@@ -27,12 +27,18 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, zne_p
+from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
+from catalyst.jax_tracer import Function
+from catalyst.utils.callables import CatalystCallable
+
+
+def _is_odd_positive(numbers_list):
+    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in numbers_list)
 
 
 ## API ##
 def mitigate_with_zne(
-    fn=None, *, scale_factors=None, extrapolate=None, extrapolate_kwargs=None, folding="global"
+    fn=None, *, scale_factors, extrapolate=None, extrapolate_kwargs=None, folding="global"
 ):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
@@ -47,17 +53,19 @@ def mitigate_with_zne(
 
     Args:
         fn (qml.QNode): the circuit to be mitigated.
-        scale_factors (array[int]): the range of noise scale factors used.
+        scale_factors (list[int]): the range of noise scale factors used.
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
-            By default, perfect polynomial fitting will be used.
+            By default, perfect polynomial fitting :func:`~.polynomial_extrapolate` will be used,
+            the :func:`~.exponential_extrapolate` function from PennyLane may also be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
+            - local-all: per-gate folding sequences replace original gates in-place in the circuit
 
     Returns:
-        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
+        Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
         for the given arguments.
 
     **Example:**
@@ -87,9 +95,40 @@ def mitigate_with_zne(
 
         @qjit
         def mitigated_circuit(args, n):
-            s = jax.numpy.array([1, 2, 3])
+            s = [1, 3, 5]
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+
+    Alternatively the `mitigate_with_zne` function can be applied directly on a qjitted
+    function containing :class:`~.QNode`, the mitigation will be applied on each
+    :class:`~.QNode` individually.
+
+    Exponential extrapolation can also be performed via the
+    :func:`~.exponential_extrapolate` function from PennyLane:
+
+    .. code-block:: python
+
+        from pennylane.transforms import exponential_extrapolate
+
+        dev = qml.device("lightning.qubit", wires=2, shots=100000)
+
+        @qml.qnode(dev)
+        def circuit(weights):
+            qml.StronglyEntanglingLayers(weights, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+        @qjit
+        def workflow(weights, s):
+            zne_circuit = mitigate_with_zne(
+                circuit, scale_factors=s, extrapolate=exponential_extrapolate
+            )
+            return zne_circuit(weights)
+
+    >>> weights = jnp.ones([3, 2, 3])
+    >>> scale_factors = [1, 3, 5]
+    >>> workflow(weights, scale_factors)
+    Array(-0.19946598, dtype=float64)
     """
+
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
 
@@ -101,11 +140,14 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    return ZNE(fn, scale_factors, extrapolate, folding)
+    if not _is_odd_positive(scale_factors):
+        raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
+
+    return ZNECallable(fn, scale_factors, extrapolate, folding)
 
 
 ## IMPL ##
-class ZNE:
+class ZNECallable(CatalystCallable):
     """An object that specifies how a circuit is mitigated with ZNE.
 
     Args:
@@ -120,21 +162,23 @@ class ZNE:
     def __init__(
         self,
         fn: Callable,
-        scale_factors: jnp.ndarray,
+        scale_factors: Sequence[int],
         extrapolate: Callable[[Sequence[float], Sequence[float]], float],
         folding: str,
     ):
-        if not isinstance(fn, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.scale_factors = scale_factors
         self.extrapolate = extrapolate
         self.folding = folding
 
+        super().__init__("fn")
+
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
+        callable_fn = _wrap_callable(self.fn)
+        jaxpr = jax.make_jaxpr(callable_fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
         set_dtypes = set(dtypes)
@@ -148,21 +192,44 @@ class ZNE:
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
         # TODO: remove the following check once #755 is completed
-        if folding != Folding.GLOBAL:
+        if folding == Folding.RANDOM:
             raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
-        results = zne_p.bind(
-            *args_data, self.scale_factors, folding=folding, jaxpr=jaxpr, fn=self.fn
+        # Certain callables, like QNodes, may introduce additional wrappers during tracing.
+        # Make sure to grab the top-level callable object in the traced function.
+        assert jaxpr.eqns, "expected non-empty jaxpr for zne target"
+        assert jaxpr.eqns[0].primitive in {
+            func_p,
+            quantum_kernel_p,
+        }, "expected func_p or quantum_kernel_p as first operation in zne target"
+        callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
+        assert callable(
+            callable_fn
+        ), "expected callable set as param on the first operation in zne target"
+
+        fold_numbers = (jnp.asarray(self.scale_factors, dtype=int) - 1) // 2
+        fold_results = zne_p.bind(
+            *args_data, fold_numbers, folding=folding, jaxpr=jaxpr, fn=callable_fn
         )
-        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = self.extrapolate(float_scale_factors, results[0])
-        # Single measurement
-        if results.shape == ():
-            return results
-        # Multiple measurements
-        return tuple(res for res in results)
+
+        scale_factors = jnp.asarray(self.scale_factors, dtype=float)
+        zne_results = self.extrapolate(scale_factors, fold_results)
+
+        # if multiple measurement processes, split array back into tuple
+        if len(zne_results.shape):
+            zne_results = tuple(zne_results)
+        return zne_results
 
 
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
     return functools.partial(qml.transforms.poly_extrapolate, order=degree)
+
+
+## PRIVATE ##
+def _wrap_callable(fn):
+    if isinstance(fn, (Function, qml.QNode)):
+        return fn
+    elif isinstance(fn, Callable):  # Keep at the bottom
+        return Function(fn)
+    raise TypeError(f"Target must be callable, got: {type(fn)}")

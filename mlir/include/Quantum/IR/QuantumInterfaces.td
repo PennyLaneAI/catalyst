@@ -53,27 +53,59 @@ def QuantumRegion : OpInterface<"QuantumRegion"> {
     }];
 }
 
-def QuantumGate : OpInterface<"QuantumGate"> {
+def QuantumOperation : OpInterface<"QuantumOperation"> {
     let description = [{
         This interface provides a generic way to interact with instructions that are
-        considered quantum logic gates. These are characterized operating on at least
-        one qubit value, and returning the same amount of qubit values.
+        considered quantum logic gates. These are characterized by operating on zero
+        or more qubit values, and returning the same amount of qubit values.
     }];
 
     let cppNamespace = "::catalyst::quantum";
 
     let methods = [
         InterfaceMethod<
-            "Return all operands which are considered input qubit values.",
+            "Return all operands which are considered input qubit values (including controls).",
             "std::vector<mlir::Value>", "getQubitOperands"
         >,
         InterfaceMethod<
-            "Return all results which are considered output qubit values.",
-            "std::vector<mlir::Value>", "getQubitResults"
+            "Set all operands which are considered input qubit values (including controls).",
+            "void", "setQubitOperands", (ins "mlir::ValueRange":$replacements)
         >,
+        InterfaceMethod<
+            "Return all results which are considered output qubit values (including controls).",
+            "std::vector<mlir::Value>", "getQubitResults"
+        >
+    ];
+
+    let verify = [{
+        auto gate = mlir::cast<ConcreteOp>($_op);
+
+        if (gate.getQubitOperands().size() != gate.getQubitResults().size())
+            return $_op->emitError() <<
+                "number of qubits in input (" << gate.getQubitOperands().size() << ") " <<
+                "and output (" << gate.getQubitResults().size() << ") must be the same";
+
+        return mlir::success();
+    }];
+}
+
+def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
+    let description = [{
+        This interface provides a generic way to interact with instructions that are
+        considered 'unitary' gates, which in addition to the properties of the
+        "QuantumOperation" can be inverted and controlled.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
         InterfaceMethod<
             "Return operands which are considered non-controlled input qubit values.",
             "mlir::ValueRange", "getNonCtrlQubitOperands"
+        >,
+        InterfaceMethod<
+            "Set all operands which are considered non-controlled input qubit values.",
+            "void", "setNonCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
             "Return results which are considered non-controlled output qubit values.",
@@ -84,8 +116,16 @@ def QuantumGate : OpInterface<"QuantumGate"> {
             "mlir::ValueRange", "getCtrlQubitOperands"
         >,
         InterfaceMethod<
+            "Set all operands which are considered controlling input qubit values.",
+            "void", "setCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
+        >,
+        InterfaceMethod<
             "Return all operands which are considered controlling input boolean values.",
             "mlir::ValueRange", "getCtrlValueOperands"
+        >,
+        InterfaceMethod<
+            "Set all operands which are considered controlling input boolean values.",
+            "void", "setCtrlValueOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
             "Return all operands which are considered controlling output qubit values.",
@@ -120,11 +160,6 @@ def QuantumGate : OpInterface<"QuantumGate"> {
                 gate.getCtrlQubitResults().size() <<
                 ") must be the same";
 
-        if (gate.getQubitOperands().size() != gate.getQubitResults().size())
-            return $_op->emitError() <<
-                "number of qubits in input (" << gate.getQubitOperands().size() << ") " <<
-                "and output (" << gate.getQubitResults().size() << ") must be the same";
-
         return mlir::success();
     }];
 }
@@ -132,8 +167,8 @@ def QuantumGate : OpInterface<"QuantumGate"> {
 def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
     let description = [{
         This interface provides a generic way to interact with parametrized
-        quantum instructions. These are quantum operations with differentiable
-        gate parameters.
+        quantum instructions. These are quantum operations with arbitrary
+        classical gate parameters.
     }];
 
     let cppNamespace = "::catalyst::quantum";
@@ -155,7 +190,7 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
     let description = [{
         This interface provides a generic way to interact with differentiable
         quantum instructions. These are quantum operations with differentiable
-        gate parameters.
+        gate parameters (must be scalar F64 values).
     }];
 
     let cppNamespace = "::catalyst::quantum";

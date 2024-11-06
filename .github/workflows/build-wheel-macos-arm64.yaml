@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.9]
+        python_version: ["3.10"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-latest
@@ -124,7 +124,7 @@ jobs:
         lookup-only: True
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -232,7 +232,7 @@ jobs:
         brew install libomp
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |
@@ -256,7 +256,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -301,14 +301,14 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=c6b86a5 \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_LAPACK=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
 
     - name: Test Catalyst-Runtime
       run: |
@@ -344,7 +344,7 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm
 
-        cmake --build quantum-build --target check-dialects compiler_driver
+        cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 
     - name: Build wheel
       run: |
@@ -391,7 +391,7 @@ jobs:
         path: dist
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.9 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.10 - 3.12 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
       # 3.11 and 3.12. Make sure to consistently use the system versions.
       run: |

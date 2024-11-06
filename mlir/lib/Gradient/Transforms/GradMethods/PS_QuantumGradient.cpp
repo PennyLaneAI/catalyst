@@ -56,7 +56,7 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
                                                    Value selectorBuffer, func::FuncOp shiftedFn,
                                                    std::vector<Value> callArgs)
 {
-    constexpr double shift = PI / 2;
+    constexpr double shift = llvm::numbers::pi / 2;
     ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Value selectorVector = rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer);
 
@@ -296,7 +296,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
-            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 // We are undoing the def-use chains of this gate's return values
                 // so that we can safely delete it (all quantum ops must be eliminated).
                 rewriter.replaceOp(gate, gate.getQubitOperands());

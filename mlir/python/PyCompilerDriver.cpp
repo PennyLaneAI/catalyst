@@ -38,10 +38,13 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
         auto py_passes = i++;
         assert(i == t.end());
         std::string name = py_name->attr("__str__")().cast<std::string>();
-        Pipeline::PassList passes;
+        llvm::SmallVector<std::string> passes;
         std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
                        [](py::handle p) { return p.attr("__str__")().cast<std::string>(); });
-        out.push_back(Pipeline({name, passes}));
+        Pipeline pipeline;
+        pipeline.setName(name);
+        pipeline.setPasses(passes);
+        out.push_back(pipeline);
     }
     return out;
 }
@@ -51,30 +54,13 @@ PYBIND11_MODULE(compiler_driver, m)
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
     //===--------------------------------------------------------------------===//
-    py::class_<FunctionAttributes> funcattrs_class(m, "FunctionAttributes");
-    funcattrs_class.def(py::init<>())
-        .def("get_function_name",
-             [](const FunctionAttributes &fa) -> std::string { return fa.functionName; })
-        .def("get_return_type",
-             [](const FunctionAttributes &fa) -> std::string { return fa.returnType; });
-
     py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
     compout_class.def(py::init<>())
-        .def("get_pipeline_output",
-             [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
-                 auto res = co.pipelineOutputs.find(name);
-                 return res != co.pipelineOutputs.end() ? res->second
-                                                        : std::optional<std::string>();
-             })
         .def("get_output_ir", [](const CompilerOutput &co) -> std::string { return co.outIR; })
         .def("get_object_filename",
-             [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
-        .def("get_function_attributes",
-             [](const CompilerOutput &co) -> FunctionAttributes { return co.inferredAttributes; })
+             [](const CompilerOutput &co) -> std::string { return co.outputFilename; })
         .def("get_diagnostic_messages",
-             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; })
-        .def("get_is_checkpoint_found",
-             [](const CompilerOutput &co) -> bool { return co.isCheckpointFound; });
+             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; });
 
     m.def(
         "run_compiler_driver",
@@ -88,22 +74,9 @@ PYBIND11_MODULE(compiler_driver, m)
             std::unique_ptr<CompilerOutput> output(new CompilerOutput());
             assert(output);
 
-            llvm::raw_string_ostream errStream{output->diagnosticMessages};
-
-            CompilerOptions options{.source = source,
-                                    .workspace = workspace,
-                                    .moduleName = moduleName,
-                                    .diagnosticStream = errStream,
-                                    .keepIntermediate = keepIntermediate,
-                                    .asyncQnodes = asyncQnodes,
-                                    .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
-                                    .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .lowerToLLVM = lower_to_llvm,
-                                    .checkpointStage = checkpointStage};
-
-            errStream.flush();
-
-            if (mlir::failed(QuantumDriverMain(options, *output))) {
+            if (QuantumDriverMainFromArgs(source, workspace, moduleName, keepIntermediate,
+                                          asyncQnodes, verbose, lower_to_llvm,
+                                          parseCompilerSpec(pipelines), checkpointStage, *output)) {
                 throw std::runtime_error("Compilation failed:\n" + output->diagnosticMessages);
             }
             return output;

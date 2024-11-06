@@ -24,11 +24,7 @@ import pennylane as qml
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
+from catalyst.utils.toml import OperationProperties
 
 
 def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
@@ -51,10 +47,7 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(self.shots))
-            lightning_capabilities = get_device_capabilities(
-                self.lightning_device, program_features
-            )
+            lightning_capabilities = get_device_capabilities(self.lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in discards:
                 custom_capabilities.native_ops.pop(gate, None)
@@ -70,20 +63,6 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
             """Unused"""
             raise RuntimeError("Only C/C++ interface is defined")
 
-        @property
-        def operations(self):
-            """Return operations using PennyLane's C(.) syntax"""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Return PennyLane observables"""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
         @staticmethod
         def get_c_interface():
             """Returns a tuple consisting of the device name, and
@@ -91,9 +70,9 @@ def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=froz
             """
             system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
             lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
             )
-            return "dummy.remote", lib_path
+            return "NullQubit", lib_path
 
         def execute(self, circuits, execution_config):
             """Execution."""

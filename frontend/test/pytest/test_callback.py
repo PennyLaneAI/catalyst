@@ -23,7 +23,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import accelerate, debug, grad, jacobian, pure_callback
+from catalyst import accelerate, debug, grad, jacobian, pure_callback, qjit
 from catalyst.api_extensions.callbacks import base_callback
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.patching import Patcher
@@ -1386,13 +1386,9 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
 
 
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
-@pytest.mark.parametrize("order", ["good", "bad"])
+@pytest.mark.parametrize("order", ["truth_hypo", "hypo_truth"])
 def test_vjp_as_residual(arg, order):
     """See https://github.com/PennyLaneAI/catalyst/issues/852"""
-
-    if order == "bad":
-        # See https://github.com/PennyLaneAI/catalyst/issues/894
-        pytest.skip("Bug")
 
     def jax_callback(fn, result_type):
 
@@ -1421,7 +1417,7 @@ def test_vjp_as_residual(arg, order):
     def ground_truth(x):
         return jax.scipy.linalg.expm(x)
 
-    if order == "bad":
+    if order == "hypo_truth":
         obs = hypothesis(arg)
         exp = ground_truth(arg)
     else:
@@ -1431,13 +1427,9 @@ def test_vjp_as_residual(arg, order):
 
 
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
-@pytest.mark.parametrize("order", ["good", "bad"])
+@pytest.mark.parametrize("order", ["truth_hypo", "hypo_truth"])
 def test_vjp_as_residual_automatic(arg, order):
     """Test automatic differentiation of accelerated function"""
-
-    if order == "bad":
-        # See https://github.com/PennyLaneAI/catalyst/issues/894
-        pytest.skip("Bug")
 
     @qml.qjit
     @jacobian
@@ -1448,7 +1440,7 @@ def test_vjp_as_residual_automatic(arg, order):
     def ground_truth(x):
         return jax.scipy.linalg.expm(x)
 
-    if order == "bad":
+    if order == "hypo_truth":
         obs = hypothesis(arg)
         exp = ground_truth(arg)
     else:
@@ -1501,13 +1493,12 @@ def test_error_incomplete_grad_only_forward():
     def fwd(x):
         return identity(x), None
 
-    @qml.qjit
     @grad
     def wrapper(x: float):
         return identity(x)
 
     with pytest.raises(DifferentiableCompileError, match="missing reverse pass"):
-        wrapper(1.0)
+        qjit(wrapper)
 
 
 def test_error_incomplete_grad_only_reverse():
@@ -1521,13 +1512,28 @@ def test_error_incomplete_grad_only_reverse():
     def bwd(_res, cot):
         return cot
 
-    @qml.qjit
     @grad
     def wrapper(x: float):
         return identity(x)
 
     with pytest.raises(DifferentiableCompileError, match="missing forward pass"):
-        wrapper(1.0)
+        qjit(wrapper)
+
+
+def test_nested_accelerate_grad():
+    """https://github.com/PennyLaneAI/catalyst/issues/1086"""
+
+    @qml.qjit
+    @grad
+    def hypothesis(x):
+        return accelerate(accelerate(jnp.sin))(x)
+
+    @jax.jit
+    @jax.grad
+    def ground_truth(x):
+        return jax.jit(jax.jit(jnp.sin))(x)
+
+    assert np.allclose(hypothesis(0.43), ground_truth(0.43))
 
 
 if __name__ == "__main__":

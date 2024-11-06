@@ -66,7 +66,6 @@ help:
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  oqc                to build Catalyst-OQC Runtime"
-	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
@@ -88,7 +87,7 @@ catalyst: runtime dialects frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
-	# versions of a package with the same version tag (e.g. 0.37-dev0).
+	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
@@ -111,9 +110,6 @@ dialects:
 
 runtime:
 	$(MAKE) -C runtime runtime
-
-dummy_device:
-	$(MAKE) -C runtime dummy_device
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
@@ -266,13 +262,13 @@ endif
 .PHONY: format-frontend
 format-frontend:
 ifdef check
-	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend
 	black --check --verbose .
-	isort --check --diff . 
+	isort --check --diff .
 else
-	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend
 	black .
-	isort . 
+	isort .
 endif
 
 .PHONY: docs clean-docs

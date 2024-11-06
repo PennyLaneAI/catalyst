@@ -99,5 +99,56 @@ def test_seeded_measurement(seed, backend):
         assert np.allclose(results0, results2)
 
 
+@pytest.mark.parametrize(
+    "seed",
+    [
+        42,
+        37,
+        1337,
+        2**32 - 1,
+        0,
+    ],
+)
+@pytest.mark.parametrize("shots", [10])
+@pytest.mark.parametrize("readout", [qml.sample, qml.counts])
+def test_seeded_sample(seed, shots, readout, backend):
+    """Test that different calls to qjits with the same seed produce the same sample results"""
+
+    if backend not in ["lightning.qubit", "lightning.kokkos", "lightning.gpu"]:
+        pytest.skip(
+            "Sample seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
+        )
+
+    dev = qml.device(backend, wires=2, shots=shots)
+
+    @qjit(seed=seed)
+    def workflow():
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(wires=[0])
+            qml.RX(12.34, wires=[1])
+            return readout()
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    @qjit(seed=seed)
+    def workflow1():
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(wires=[0])
+            qml.RX(12.34, wires=[1])
+            return readout()
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    # Calls to qjits with the same seed should return the same samples
+    for _ in range(5):
+        results0 = workflow()
+        results1 = workflow()
+        results2 = workflow1()
+        assert np.allclose(results0, results1)
+        assert np.allclose(results0, results2)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

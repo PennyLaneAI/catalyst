@@ -14,7 +14,7 @@ export PYTHON_PACKAGE=$4
 export PYTHON_ALTERNATIVE_VERSION=$5
 
 # Install system dependencies
-dnf update -y 
+dnf update -y
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION}
 if [ "$PYTHON_VERSION" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
@@ -22,13 +22,13 @@ fi
 dnf clean all -y
 
 # Make GCC the default compiler
-source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
-export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc 
+source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y
+export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc
 export CXX_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/g++
 
 # Set the right Python interpreter
 rm -rf /usr/bin/python3
-ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3 
+ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3
 export PYTHON=/usr/bin/python3
 
 # Add LLVM, Python and GCC to the PATH env var
@@ -45,13 +45,13 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
-    -DLIGHTNING_GIT_TAG=c6b86a5 \
+    -DLIGHTNING_GIT_TAG=latest_release \
     -DENABLE_LAPACK=OFF \
     -DENABLE_WARNINGS=OFF \
     -DENABLE_OPENQASM=ON \
     -DENABLE_OPENMP=OFF \
     -DLQ_ENABLE_KERNEL_OMP=OFF
-cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
 
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
@@ -75,7 +75,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_ENABLE_ZSTD=FORCE_ON \
     -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
-cmake --build quantum-build --target check-dialects compiler_driver
+cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib

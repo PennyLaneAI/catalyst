@@ -18,11 +18,8 @@ from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-import pennylane as qml
 import pytest
 
-from catalyst.device import QJITDeviceNewAPI
-from catalyst.device.qjit_device import validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     ALL_SUPPORTED_SCHEMAS,
@@ -30,26 +27,8 @@ from catalyst.utils.toml import (
     ProgramFeatures,
     TOMLDocument,
     load_device_capabilities,
-    pennylane_operation_set,
     read_toml_file,
 )
-
-
-class DeviceToBeTested(qml.QubitDevice):
-    """Test device"""
-
-    name = "Dummy Device"
-    short_name = "dummy.device"
-    pennylane_requires = "0.33.0"
-    version = "0.0.1"
-    author = "Dummy"
-
-    operations = []
-    observables = []
-
-    def apply(self, operations, **kwargs):
-        """Unused"""
-        raise RuntimeError("Only C/C++ interface is defined")
 
 
 def get_test_config(config_text: str) -> TOMLDocument:
@@ -72,28 +51,6 @@ def get_test_device_capabilities(
 
 
 @pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
-def test_config_qjit_incompatible_device(schema):
-    """Test error is raised if checking for qjit compatibility and field is false in toml file."""
-    device_capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            f"""
-                schema = {schema}
-                [compilation]
-                qjit_compatible = false
-            """
-        ),
-    )
-
-    name = DeviceToBeTested.name
-    with pytest.raises(
-        CompileError,
-        match=f"Attempting to compile program for incompatible device '{name}'",
-    ):
-        validate_device_capabilities(DeviceToBeTested(), device_capabilities)
-
-
-@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
 def test_get_observables(schema):
     """Test observables are properly obtained."""
     device_capabilities = get_test_device_capabilities(
@@ -106,7 +63,8 @@ def test_get_observables(schema):
             """
         ),
     )
-    assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_obs)
+    assert len(device_capabilities.native_obs) == 1
+    assert "PauliX" in device_capabilities.native_obs
 
 
 @pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
@@ -124,9 +82,9 @@ def test_get_native_ops(schema):
         ),
     )
 
-    assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(
-        device_capabilities.native_ops
-    )
+    assert len(device_capabilities.native_ops) == 2
+    assert {"PauliX", "PauliY"}.issubset(device_capabilities.native_ops)
+    assert device_capabilities.native_ops["PauliX"].controllable
 
 
 @pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
@@ -284,27 +242,6 @@ def test_config_invalid_condition_duplicate_false(schema):
                 """
             ),
         )
-
-
-@pytest.mark.parametrize("schema", ALL_SUPPORTED_SCHEMAS)
-def test_config_qjit_device_operations(schema):
-    """Check the gate condition handling logic"""
-    capabilities = get_test_device_capabilities(
-        ProgramFeatures(False),
-        dedent(
-            f"""
-                schema = {schema}
-                [operators.gates.native]
-                PauliX = {{}}
-                [operators.observables]
-                PauliY = {{}}
-            """
-        ),
-    )
-    device = qml.device("lightning.qubit", wires=2, shots=1000)
-    qjit_device = QJITDeviceNewAPI(device, capabilities)
-    assert "PauliX" in qjit_device.operations
-    assert "PauliY" in qjit_device.observables
 
 
 @pytest.mark.parametrize("schema", [1, 999])
