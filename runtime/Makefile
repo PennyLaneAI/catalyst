@@ -102,7 +102,7 @@ lq_configure:
 		$(CMAKE_ARGS)
 
 lq_target: lq_configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi rtd_lightning -j$(NPROC)
+	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
 
 .PHONY: runtime
 runtime: configure

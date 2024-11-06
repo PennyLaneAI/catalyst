@@ -51,7 +51,7 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DENABLE_OPENQASM=ON \
     -DENABLE_OPENMP=OFF \
     -DLQ_ENABLE_KERNEL_OMP=OFF
-cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
+cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
