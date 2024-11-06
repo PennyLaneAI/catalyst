@@ -4,6 +4,9 @@
 
 <h3>New features since last release</h3>
 
+* Remove Lightning Qubit Dynamic plugin from Catalyst.
+  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
+
 <h3>Improvements 🛠</h3>
 
 <h3>Breaking changes 💔</h3>
@@ -17,3 +20,5 @@
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Raul Torres, Haochen Paul Wang
