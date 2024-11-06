@@ -40,7 +40,7 @@ extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, i
 
 class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
                     // hicpp-special-member-functions)
-                        final {
+    final {
   private:
     std::unordered_set<void *> _impl;
     std::mutex mu; // To guard the memory manager
