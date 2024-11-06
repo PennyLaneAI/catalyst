@@ -56,7 +56,6 @@ cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
 export RT_BUILD_DIR="/catalyst/runtime-build"
-export USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER=ON
 make oqc
 
 # Build Catalyst dialects
@@ -80,6 +79,7 @@ cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
+cp /catalyst/runtime-build/lib/*/*/*/*/openqasm_python_module.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/
 
 # Build wheels
