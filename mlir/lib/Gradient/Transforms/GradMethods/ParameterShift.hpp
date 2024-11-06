@@ -21,8 +21,6 @@
 
 #include "Gradient/IR/GradientOps.h"
 
-constexpr double PI = 3.14159265358979323846;
-
 using namespace mlir;
 
 namespace catalyst {

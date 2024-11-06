@@ -56,9 +56,13 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
 
         // Replace uses
         ValueRange InQubits = op.getInQubits();
-        auto ParentOp = dyn_cast_or_null<CustomOp>(InQubits[0].getDefiningOp());
-        ValueRange simplifiedVal = ParentOp.getInQubits();
-        rewriter.replaceOp(op, simplifiedVal);
+        auto parentOp = cast<CustomOp>(InQubits[0].getDefiningOp());
+
+        // TODO: it would make more sense for getQubitOperands()
+        // to return ValueRange, like the other getters
+        std::vector<mlir::Value> originalQubits = parentOp.getQubitOperands();
+
+        rewriter.replaceOp(op, originalQubits);
         return success();
     }
 };

@@ -26,8 +26,8 @@ using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst::quantum;
 
-static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift",           "Rot",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift", "CRot"};
+static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift",
+                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 
 namespace {
 
@@ -39,7 +39,6 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
         StringRef opGateName = op.getGateName();
-
         if (!rotationsSet.contains(opGateName))
             return failure();
         ValueRange inQubits = op.getInQubits();
