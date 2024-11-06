@@ -37,7 +37,9 @@ namespace Catalyst::Runtime {
 
 extern "C" void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
 
-class MemoryManager final {
+class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
+                    // hicpp-special-member-functions)
+    final {
   private:
     std::unordered_set<void *> _impl;
     std::mutex mu; // To guard the memory manager
@@ -49,8 +51,8 @@ class MemoryManager final {
     {
         // Lock the mutex to protect _impl free
         std::lock_guard<std::mutex> lock(mu);
-        for (auto allocation : _impl) {
-            free(allocation);
+        for (auto *allocation : _impl) {
+            free(allocation); // NOLINT(cppcoreguidelines-no-malloc, hicpp-no-malloc)
         }
     }
 
@@ -80,7 +82,7 @@ class SharedLibraryManager final {
 
   public:
     SharedLibraryManager() = delete;
-    explicit SharedLibraryManager(std::string filename)
+    explicit SharedLibraryManager(const std::string &filename)
     {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
@@ -123,6 +125,11 @@ class SharedLibraryManager final {
         // Exercise for the reader, how could one trigger the "cannot create scope list" error?
         dlclose(_handler);
     }
+
+    SharedLibraryManager(const SharedLibraryManager &other) = delete;
+    SharedLibraryManager &operator=(const SharedLibraryManager &other) = delete;
+    SharedLibraryManager(SharedLibraryManager &&other) = delete;
+    SharedLibraryManager &operator=(SharedLibraryManager &&other) = delete;
 
     void *getSymbol(const std::string &symbol)
     {
@@ -167,7 +174,7 @@ class RTDevice {
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
-    void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
+    static void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
     {
 #ifdef __linux__
         rtd_lib = "librtd_" + name + ".so";
@@ -176,7 +183,7 @@ class RTDevice {
 #endif
     }
 
-    void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
+    static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
     {
         // The following if-elif is required for C++ tests where these backend devices
         // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
@@ -214,6 +221,10 @@ class RTDevice {
     }
 
     ~RTDevice() = default;
+    RTDevice(const RTDevice &other) = delete;
+    RTDevice &operator=(const RTDevice &other) = delete;
+    RTDevice(RTDevice &&other) = delete;
+    RTDevice &operator=(RTDevice &&other) = delete;
 
     auto operator==(const RTDevice &other) const -> bool
     {
@@ -231,8 +242,9 @@ class RTDevice {
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
-            f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
-                  : nullptr);
+            (f_ptr != nullptr)
+                ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
+                : nullptr);
         return rtd_qdevice;
     }
 
@@ -261,7 +273,7 @@ class ExecutionContext final {
     std::vector<std::shared_ptr<RTDevice>> device_pool;
     std::mutex pool_mu; // To protect device_pool
 
-    bool initial_tape_recorder_status;
+    bool initial_tape_recorder_status{false};
 
     // ExecutionContext pointers
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
@@ -271,17 +283,20 @@ class ExecutionContext final {
     std::mt19937 gen;
 
   public:
-    explicit ExecutionContext(uint32_t *seed = nullptr)
-        : initial_tape_recorder_status(false), seed(seed)
+    explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
-        if (this->seed) {
+        if (this->seed != nullptr) {
             this->gen = std::mt19937(*seed);
         }
     }
 
     ~ExecutionContext() = default;
+    ExecutionContext(const ExecutionContext &other) = delete;
+    ExecutionContext &operator=(const ExecutionContext &other) = delete;
+    ExecutionContext(ExecutionContext &&other) = delete;
+    ExecutionContext &operator=(ExecutionContext &&other) = delete;
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
@@ -316,7 +331,7 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
-        if (this->seed) {
+        if (this->seed != nullptr) {
             device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
         }
         else {
