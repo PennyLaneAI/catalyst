@@ -117,6 +117,20 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let options = QuantumCircuitTransformationPass.options;
 }
 
+def PropagateSimpleStatesTesterPass : Pass<"propagate-simple-states-tester"> {
+    let summary = "Propagate simple states through their corresponding gates down the circuit. The simple states are the six Pauli basis states.";
+
+    let constructor = "catalyst::createPropagateSimpleStatesTesterPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
+def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+    let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleCNOTPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES

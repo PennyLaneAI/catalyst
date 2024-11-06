@@ -29,5 +29,7 @@ std::unique_ptr<mlir::Pass> createRemoveChainedSelfInversePass();
 std::unique_ptr<mlir::Pass> createAnnotateFunctionPass();
 std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
 std::unique_ptr<mlir::Pass> createMergeRotationsPass();
+std::unique_ptr<mlir::Pass> createPropagateSimpleStatesTesterPass();
+std::unique_ptr<mlir::Pass> createDisentangleCNOTPass();
 
 } // namespace catalyst
