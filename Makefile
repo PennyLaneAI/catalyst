@@ -19,6 +19,8 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml')
+MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
+LLVM_EXTERNAL_LIT ?= $(shell pwd)/mlir/llvm-project/build/bin/llvm-lit
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -202,6 +204,7 @@ clean:
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
+	rm -rf standalone
 
 clean-all: clean-frontend clean-mlir clean-runtime clean-oqc
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
@@ -249,6 +252,11 @@ endif
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
+
+.PHONY: standalone-plugin
+standalone-plugin:
+	cmake -B standalone/build -G Ninja standalone -DMLIR_DIR=$(MLIR_DIR) -DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) -DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin
+	cmake --build standalone/build --target check-standalone
 
 .PHONY: format
 format:

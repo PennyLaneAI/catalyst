@@ -73,6 +73,16 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
 cmake --build quantum-build --target check-dialects catalyst-cli
 
+cmake -B standalone/build -G Ninja standalone \
+    -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir \
+    -DLLVM_EXTERNAL_LIT=/catalyst/llvm-build/bin/llvm-lit \
+    -DCATALYST_TOOLS_DIR=/catalyst/quantum-build/bin \
+    -DPython3_EXECUTABLE=/usr/bin/python3 \
+    -DPython3_NumPy_INCLUDE_DIRS=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include
+
+cmake --build standalone/build --target check-standalone
+
+
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.so /catalyst/runtime-build/lib
