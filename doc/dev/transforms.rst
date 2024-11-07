@@ -107,7 +107,7 @@ Let's first set up the various boilerplate items required to register and run a 
 We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout.
 Note that the ``mlir/include`` and ``mlir/lib`` directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect.
 
-The first thing to do is to create the pass object in the tablegen ``mlir/include/Catalyst/Transforms/Passes.td``:
+The first thing to do is to create the pass object in the `tablegen <https://mlir.llvm.org/docs/PassManagement/#tablegen-specification>`_ ``mlir/include/Catalyst/Transforms/Passes.td``:
 
 .. code-block::
 
@@ -187,7 +187,7 @@ And in ``mlir/lib/Catalyst/Transforms/RegisterAllPasses.cpp``, register the pass
 
 Note that this addition in ``RegisterAllPasses.cpp`` needs to happen in the ``lib/Catalyst/Transforms`` directory, regardless of which dialect your pass belongs to.
 
-Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and 
+Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and call the command line instruction
 
 .. code-block::
 
