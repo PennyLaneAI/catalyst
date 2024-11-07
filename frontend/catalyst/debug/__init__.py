@@ -32,6 +32,7 @@ __all__ = (
     "print",
     "print_memref",
     "get_compilation_stage",
+    "get_compilation_stages_groups",
     "get_cmain",
     "instrumentation",
     "replace_ir",
