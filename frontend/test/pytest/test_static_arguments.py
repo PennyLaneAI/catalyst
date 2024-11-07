@@ -123,6 +123,18 @@ class TestStaticArguments:
         assert f(MyClass(5), 2, MyClass(5)) == 12
         assert function == f.compiled_function
 
+    def test_default_static_arguments(self):
+
+        @qjit(static_argnums=[1])
+        def f(y, x=9):
+            if x < 10:
+                return x + y
+            return 42000
+
+        assert f(20) == 29
+        assert f(20, 3) == 23
+        assert f(20, 300000) == 42000
+
     def test_mutable_static_arguments(self):
         """Test QJIT with mutable static arguments."""
 
