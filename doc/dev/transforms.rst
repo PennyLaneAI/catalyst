@@ -398,7 +398,9 @@ In C++ it will look as follows:
         zeromat->moveBefore(parentOp);
         matmul->moveBefore(parentOp);
         mlir::Value res = matmul.getResult(0);
-        parentOp->setOperand(0, res);
+        rewriter.modifyOpInPlace(parentOp, [&] {
+            parentOp->setOperand(0, res);
+        });
 
         // The second unitary is not needed anymore
         // Whoever uses the second unitary, use the first one instead!
@@ -467,8 +469,12 @@ changes (also called the insertion point). Let's have look at some of these elem
 
   .. code-block:: cpp
 
-        parentOp->setOperand(0, res);
+        rewriter.modifyOpInPlace(parentOp, [&] {
+            parentOp->setOperand(0, res);
+        });
 
+  Note that in order to change to results on an operation you will need to create a copy of it
+  and erase the existing operation, they cannot be modified in-place.
 
 Invoking transformation patterns
 ================================
@@ -516,7 +522,7 @@ fixed point is reached.
 
     If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
     section, you can have a look at or cherry-pick this commit which includes all changes described
-    in this section: https://github.com/PennyLaneAI/catalyst/commit/2e7f7cde8cf65091e0f77cb0ccf2c5762501ee11
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/9afcc3500e12e5a51b78dda76cd4d27bdf4c8905
 
 
 Writing more general transformations
