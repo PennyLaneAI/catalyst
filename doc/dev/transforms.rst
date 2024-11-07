@@ -101,12 +101,6 @@ same representation.
 Writing and running your first Catalyst pass
 ============================================
 
-.. note::
-
-    If you are encoutering issues, or would like to quickly try out the hello world pass described in this
-    section, you can have a look at or cherry-pick this commit which includes all changes described
-    in this section: https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3
-
 If this is your first time writing MLIR or LLVM passes, the boilerplate can be quite overwhelming. 
 Let's first set up the various boilerplate items required to register and run a new pass. 
 
@@ -224,15 +218,15 @@ To run the pass, simply do
 
 on any input mlir file ``input.mlir``. And our new pass will print out ``Hello world!``. 
 
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the hello world pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3
+
 
 Writing transformations on Catalyst's IR
 ========================================
-
-.. note::
-
-    If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
-    section, you can have a look at or cherry-pick this commit which includes all changes described
-    in this section: https://github.com/PennyLaneAI/catalyst/commit/2e7f7cde8cf65091e0f77cb0ccf2c5762501ee11
 
 We'll start with DAG-to-DAG transformations, which typically match small pieces of code at a time.
 In our example above, we might to consider merging the two ``quantum.unitary`` applications because
@@ -517,6 +511,12 @@ To apply patterns we need a `pattern applicator <https://mlir.llvm.org/docs/Patt
 There a few in MLIR but typically you can just use the greedy pattern rewrite driver
 (``applyPatternsAndFoldGreedily``), which will iterative over the IR and apply patterns until a
 fixed point is reached.
+
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/2e7f7cde8cf65091e0f77cb0ccf2c5762501ee11
 
 
 Writing more general transformations
