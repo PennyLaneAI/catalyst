@@ -59,6 +59,28 @@ func.func @test_s_dagger(%arg0: f64) -> !quantum.bit {
 
 // -----
 
+func.func @test_t_dagger(%arg0: f64) -> !quantum.bit {
+    // CHECK: [[PIO4:%.+]] = arith.constant 0.78539816339744828 : f64
+    // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
+    // CHECK: [[MPIO4:%.+]] = arith.constant -0.78539816339744828 : f64
+    // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit1:%.+]] = quantum.custom "RX"([[MPIO2]]) [[qubit]] : !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.custom "RY"([[MPIO4]]) [[qubit1]] : !quantum.bit
+    // CHECK: [[qubit3:%.+]] = quantum.custom "RX"([[PIO2]]) [[qubit2]] : !quantum.bit
+    // CHECK: [[qubit4:%.+]] = quantum.custom "RX"([[MPIO2]]) [[qubit3]] : !quantum.bit
+    // CHECK: [[qubit5:%.+]] = quantum.custom "RY"([[PIO4]]) [[qubit4]] : !quantum.bit
+    // CHECK: [[qubit6:%.+]] = quantum.custom "RX"([[PIO2]]) [[qubit5]] : !quantum.bit
+    // CHECK: return [[qubit6]]
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.custom "T"() %1 {adjoint}: !quantum.bit
+    %3 = quantum.custom "T"() %2 : !quantum.bit
+    return %3 : !quantum.bit
+}
+
+// -----
 func.func @test_param_1q(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
