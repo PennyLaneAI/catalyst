@@ -806,6 +806,10 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
     for (const auto &pipelineStr : catalystPipeline) {
         llvm::StringRef pipelineRef = llvm::StringRef(pipelineStr).trim();
 
+        if (pipelineRef.empty()) {
+            continue;
+        }
+        
         size_t openParenPos = pipelineRef.find('(');
         size_t closeParenPos = findMatchingClosingParen(pipelineRef, openParenPos);
 
