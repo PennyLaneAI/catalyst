@@ -33,6 +33,10 @@ export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/o
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja
 
+# TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
+if patch --dry-run -p1 -N --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/FunctionOpInterface-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/FunctionOpInterface-bufferization.patch; fi
+if patch --dry-run -p1 -N --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/callOp-bufferization.patch > /dev/null 2>&1; then patch -p1 --directory=/catalyst/mlir/llvm-project < /catalyst/mlir/patches/callOp-bufferization.patch; fi
+
 # Build LLVM
 cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \

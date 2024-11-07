@@ -425,7 +425,7 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     %r = quantum.alloc(1) : !quantum.reg
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
-    // CHECK:         [[SEL:%.+]] = bufferization.to_tensor [[SELBUFF]] : memref<0xindex>
+    // CHECK:         [[SEL:%.+]] = bufferization.to_tensor [[SELBUFF]] restrict : memref<0xindex>
     // CHECK:         [[EVALPOS:%.+]]:2 = call @multi_res_circuit.shifted(%arg0, [[SHIFTPOS]], [[SEL]]) : {{.+}} -> (f64, tensor<2xf64>)
     // CHECK:         [[EVALNEG:%.+]]:2 = call @multi_res_circuit.shifted(%arg0, [[SHIFTNEG]], [[SEL]]) : {{.+}} -> (f64, tensor<2xf64>)
     // CHECK:         [[DIFF0:%.+]] = arith.subf [[EVALPOS]]#0, [[EVALNEG]]#0

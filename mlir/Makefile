@@ -12,6 +12,12 @@ ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
+# TODO: remove after JAX upgrade
+LLVM_ROOT=$(MK_DIR)/llvm-project
+LLVM_FUNCOP_PATCH_FILE=$(MK_DIR)/patches/FunctionOpInterface-bufferization.patch
+LLVM_FUNC_CALL_PATCH_FILE=$(MK_DIR)/patches/callOp-bufferization.patch
+MHLO_ROOT?=$(MK_DIR)/mlir-hlo
+MHLO_MODULE_PATCH_FILE=$(MK_DIR)/patches/FunctionOpInterface-mhlo.patch
 TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 
@@ -53,7 +59,14 @@ all: llvm mhlo enzyme dialects
 
 .PHONY: llvm
 llvm:
+	# TODO: Remove these patches after upgrading Jax (potentailly for 0.4.34 or higher).
 	@echo "build LLVM and MLIR enabling Python bindings"
+	@if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_FUNCOP_PATCH_FILE) > /dev/null 2>&1; then \
+        patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_FUNCOP_PATCH_FILE); \
+	fi
+	@if patch --dry-run -p1 -N --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE) > /dev/null 2>&1; then \
+        patch -p1 --directory=$(LLVM_ROOT) < $(LLVM_FUNC_CALL_PATCH_FILE); \
+	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
@@ -84,6 +97,10 @@ mhlo:
 	# TODO: remove once https://github.com/openxla/xla/pull/15446 is merged
 	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
 		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
+	# TODO: Remove this patch after upgrading Jax (potentailly for 0.4.34 or higher).
+	@if patch --dry-run -p1 -N --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE) > /dev/null 2>&1; then \
+        patch -p1 --directory=$(MHLO_ROOT) < $(MHLO_MODULE_PATCH_FILE); \
 	fi
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
