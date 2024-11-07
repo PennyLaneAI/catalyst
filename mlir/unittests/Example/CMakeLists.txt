@@ -3,6 +3,7 @@ add_catalyst_unittest(CatalystExampleTests
 )
 
 target_link_libraries(CatalystExampleTests PRIVATE
+  MLIRArithDialect
   MLIRFuncDialect
   MLIRQuantum
   MLIRIR
