@@ -31,11 +31,9 @@
 #include "QubitManager.hpp"
 #include "Utils.hpp"
 
-#include <pybind11/embed.h>
-
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
-#include "OpenQasmRunner.hpp" // <pybind11/embed.h>
+#include "OpenQasmRunner.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
