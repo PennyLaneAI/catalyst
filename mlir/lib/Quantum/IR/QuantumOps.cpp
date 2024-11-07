@@ -36,8 +36,8 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 // Quantum op canonicalizers.
 //===----------------------------------------------------------------------===//
-static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
+static const mlir::StringSet<> hermitianOps = {
+    "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "T", "CNOT", "CY", "CZ", "SWAP", "Toffoli"};
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
