@@ -79,7 +79,7 @@ struct CompilerOptions {
     std::string getObjectFile() const
     {
         using path = std::filesystem::path;
-        return path(workspace.str()) / path(moduleName.str()).replace_extension(".o");
+        return path(workspace.str()) / path(moduleName.str() + ".o");
     }
 };
 
