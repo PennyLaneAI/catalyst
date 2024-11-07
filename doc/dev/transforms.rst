@@ -195,6 +195,11 @@ Now that we have written our shiny new pass, we can build it by going back to th
 
 The tool to run passes is the executable ``quantum-opt`` at the location ``mlir/build/bin/quantum-opt``.
 Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
+Alternatively, you can add ``quantum-opt``'s directory to your ``PATH`` by having the following in your ``.zshrc`` or ``.bashrc``:
+
+.. code-block::
+
+    export PATH=<path_to_catalyst_root_directory>/mlir/build/bin:$PATH
 
 We can inspect by all the available passes by running ``quantum-opt --help``:
 
