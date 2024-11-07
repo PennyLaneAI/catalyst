@@ -101,11 +101,11 @@ same representation.
 Writing and running your first Catalyst pass
 ============================================
 
-If this is your first time writing MLIR or LLVM passes, the boilerplate can be quite overwhelming. 
+If this is your first time writing an MLIR pass, the boilerplate can be quite overwhelming.
 Let's first set up the various boilerplate items required to register and run a new pass. 
 
 We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout.
-Note that the ``mlir/include`` (and ``mlir/lib``) directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect. 
+Note that the ``mlir/include`` and ``mlir/lib`` directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect.
 
 The first thing to do is to create the pass object in the tablegen ``mlir/include/Catalyst/Transforms/Passes.td``:
 
@@ -150,7 +150,7 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
     } // namespace catalyst
 
 We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase`` that tablegen will build in the namespace ``impl``. 
-The function that determines what your pass actually does is the ``void runOnOperation()``. Here all the pass does is print out ``"Hello world!\n"``. 
+The function that determines what your pass actually does is the ``void runOnOperation()``. Currently, all this pass does is print out ``"Hello world!\n"``.
 
 (A sidenote on printing messages in MLIR: there are two major printing options in LLVM. The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``, which only prints when a debug flag is set. 
 The other option is the ``errs()`` used here, which will print no matter what.)
@@ -193,7 +193,7 @@ Now that we have written our shiny new pass, we can build it by going back to th
 
     make dialects
 
-The tool to run passes is built as ``mlir/build/bin/quantum-opt``. 
+The tool to run passes is the executable ``quantum-opt`` at the location ``mlir/build/bin/quantum-opt``.
 Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
 
 We can inspect by all the available passes by running ``quantum-opt --help``:
