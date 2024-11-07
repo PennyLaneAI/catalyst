@@ -620,9 +620,12 @@ class Compiler:
                 if self.options.verbose:
                     print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
                 result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-                if self.options.verbose:
-                    print(f"[OUTPUT] {result.stdout}", file=self.options.logfile)
-                    print(f"[ERROR] {result.stderr}", file=self.options.logfile)
+                if self.options.verbose and result.stdout:
+                    for line in result.stdout.strip().split("\n"):
+                        print(f"{line}", file=self.options.logfile)
+                if self.options.verbose and result.stderr:
+                    for line in result.stderr.strip().split("\n"):
+                        print(f"[LIB] {line}", file=self.options.logfile)
             except subprocess.CalledProcessError as e:
                 raise CompileError(
                     f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
