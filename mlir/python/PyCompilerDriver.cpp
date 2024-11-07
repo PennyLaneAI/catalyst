@@ -32,17 +32,19 @@ using namespace catalyst::driver;
 
 std::vector<Pipeline> parseCompilerSpec(const nb::list &pipelines)
 {
-    // nb::print(pipelines);
     std::vector<Pipeline> out;
     for (nb::handle obj : pipelines) {
         nb::tuple t = nb::cast<nb::tuple>(obj);
         assert(nb::len(t) == 2);
         std::string name = nb::cast<std::string>(t[0]);
         nb::list py_passes = t[1];
-        Pipeline::PassList passes;
+        llvm::SmallVector<std::string> passes;
         std::transform(py_passes.begin(), py_passes.end(), std::back_inserter(passes),
                        [](nb::handle p) { return nb::cast<std::string>(p.attr("__str__")()); });
-        out.push_back(Pipeline({name, passes}));
+        Pipeline pipeline;
+        pipeline.setName(name);
+        pipeline.setPasses(passes);
+        out.push_back(pipeline);
     }
     return out;
 }
@@ -54,19 +56,11 @@ NB_MODULE(compiler_driver, m)
     //===--------------------------------------------------------------------===//
     nb::class_<CompilerOutput> compout_class(m, "CompilerOutput");
     compout_class.def(nb::init<>())
-        .def("get_pipeline_output",
-             [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
-                 auto res = co.pipelineOutputs.find(name);
-                 return res != co.pipelineOutputs.end() ? res->second
-                                                        : std::optional<std::string>();
-             })
         .def("get_output_ir", [](const CompilerOutput &co) -> std::string { return co.outIR; })
         .def("get_object_filename",
-             [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
+             [](const CompilerOutput &co) -> std::string { return co.outputFilename; })
         .def("get_diagnostic_messages",
-             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; })
-        .def("get_is_checkpoint_found",
-             [](const CompilerOutput &co) -> bool { return co.isCheckpointFound; });
+             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; });
 
     m.def(
         "run_compiler_driver",
@@ -80,22 +74,9 @@ NB_MODULE(compiler_driver, m)
             std::unique_ptr<CompilerOutput> output(new CompilerOutput());
             assert(output);
 
-            llvm::raw_string_ostream errStream{output->diagnosticMessages};
-
-            CompilerOptions options{.source = source,
-                                    .workspace = workspace,
-                                    .moduleName = moduleName,
-                                    .diagnosticStream = errStream,
-                                    .keepIntermediate = keepIntermediate,
-                                    .asyncQnodes = asyncQnodes,
-                                    .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
-                                    .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .lowerToLLVM = lower_to_llvm,
-                                    .checkpointStage = checkpointStage};
-
-            errStream.flush();
-
-            if (mlir::failed(QuantumDriverMain(options, *output))) {
+            if (QuantumDriverMainFromArgs(source, workspace, moduleName, keepIntermediate,
+                                          asyncQnodes, verbose, lower_to_llvm,
+                                          parseCompilerSpec(pipelines), checkpointStage, *output)) {
                 throw std::runtime_error("Compilation failed:\n" + output->diagnosticMessages);
             }
             return output;

@@ -44,6 +44,7 @@ namespace Catalyst::Runtime::Simulator {
 template <typename PrecisionT> class LightningObsManager {
   private:
     using VectorStateT = StateVectorLQubitDynamic<PrecisionT>;
+    using ComplexT = typename VectorStateT::ComplexT;
     using ObservablePairType = std::pair<std::shared_ptr<Observable<VectorStateT>>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
@@ -118,7 +119,7 @@ template <typename PrecisionT> class LightningObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
+    [[nodiscard]] auto createHermitianObs(const std::vector<ComplexT> &matrix,
                                           const std::vector<size_t> &wires) -> ObsIdType
     {
         observables_.push_back(std::make_pair(
