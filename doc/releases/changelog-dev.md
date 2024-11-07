@@ -14,6 +14,11 @@
   its ability to target Python's [stable ABI interface](https://docs.python.org/3/c-api/stable.html)
   starting with Python 3.12.
 
+* Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"} to
+  the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to 
+  `quantum-opt --ions-decomposition`.
+  [(#1226)](https://github.com/PennyLaneAI/catalyst/pull/1226)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -26,4 +31,5 @@
 
 This release contains contributions from (in alphabetical order):
 
-Joey Carter
+Joey Carter,
+Romain Moyard.
