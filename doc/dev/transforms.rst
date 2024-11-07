@@ -38,10 +38,10 @@ Let's look at a simple example starting in Python:
     def circuit(x: complex):
         qml.Hadamard(wires=0)
 
-        A = np.array([1, 0], [0, np.exp(x)])
+        A = np.array([[1, 0], [0, np.exp(x)]])
         qml.QubitUnitary(A, wires=0)
 
-        B = np.array([1, 0], [0, np.exp(2*x)])
+        B = np.array([[1, 0], [0, np.exp(2*x)]])
         qml.QubitUnitary(B, wires=0)
 
         return measure(0)
@@ -55,24 +55,22 @@ The corresponding IR might look something like this (simplified):
         %c10 = complex.constant [1.0, 0.0] : complex<f64>
         %c20 = complex.constant [2.0, 0.0] : complex<f64>
 
-        %reg = quantum.alloc(1) : !quantum.reg
-        %q0 = quantum.extract %reg[0] : !quantum.bit
-
-        %q1 = quantum.custom "Hadamard"() %q0 : !quantum.bit
-
         %0 = complex.exp %arg0 : complex<f64>
-        %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
-        %q2 = quantum.unitary %A, %q1 : !quantum.bit
+        %A = tensor.from_elements %c10, %c00, %c00, %0 : tensor<2x2xcomplex<f64>>
 
         %1 = complex.mul %arg0, %c20 : complex<f64>
-        %2 = complex.exp %0 : complex<f64>
+        %2 = complex.exp %1 : complex<f64>
         %B = tensor.from_elements %c10, %c00, %c00, %2 : tensor<2x2xcomplex<f64>>
-        %q3 = quantum.unitary %B, %q2 : !quantum.bit
 
-        %m = quantum.measure %q3 : i1
+        %reg = quantum.alloc(1) : !quantum.reg
+        %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+        %q1 = quantum.custom "Hadamard"() %q0 : !quantum.bit
+        %q2 = quantum.unitary(%A : tensor<2x2xcomplex<f64>>) %q1 : !quantum.bit
+        %q3 = quantum.unitary(%B : tensor<2x2xcomplex<f64>>) %q2 : !quantum.bit
 
-        quantum.dealloc %r : !quantum.reg
-        func.return %m : i1
+        %m, %q4 = quantum.measure %q3 : i1, !quantum.bit
+
+        return %m : i1
     }
 
 A few things you might note in this representation:
@@ -105,8 +103,8 @@ Writing and running your first Catalyst pass
 
 .. note::
 
-    If you are encoutering issues, or would like to quickly try out the pass described in this
-    guide, you can have a look at or cherry-pick this commit which includes all changes described
+    If you are encoutering issues, or would like to quickly try out the hello world pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
     in this section: https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3
 
 If this is your first time writing MLIR or LLVM passes, the boilerplate can be quite overwhelming. 
@@ -230,6 +228,12 @@ on any input mlir file ``input.mlir``. And our new pass will print out ``Hello w
 Writing transformations on Catalyst's IR
 ========================================
 
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/2e7f7cde8cf65091e0f77cb0ccf2c5762501ee11
+
 We'll start with DAG-to-DAG transformations, which typically match small pieces of code at a time.
 In our example above, we might to consider merging the two ``quantum.unitary`` applications because
 they act on the same qubit in immediate succession:
@@ -237,11 +241,11 @@ they act on the same qubit in immediate succession:
 .. code-block:: mlir
 
     %0 = complex.exp %arg0 : complex<f64>
-    %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
+    %A = tensor.from_elements %c10, %c00, %c00, %0 : tensor<2x2xcomplex<f64>>
     %q2 = quantum.unitary %A, %q1 : !quantum.bit                                (A)
 
     %1 = complex.mul %arg0, %c20 : complex<f64>
-    %2 = complex.exp %0 : complex<f64>
+    %2 = complex.exp %1 : complex<f64>
     %B = tensor.from_elements %c10, %c00, %c00, %2 : tensor<2x2xcomplex<f64>>
     %q3 = quantum.unitary %B, %q2 : !quantum.bit                                (B)
 
@@ -287,23 +291,29 @@ Let's implement it in C++:
 
 .. code-block:: cpp
 
-    LogicalResult QubitUnitaryFusion::match(QubitUnitaryOp op)
+    LogicalResult match(QubitUnitaryOp op) const override
     {
         ValueRange qbs = op.getInQubits();
         Operation *parent = qbs[0].getDefiningOp();
 
-        if (!isa<QubitUnitaryOp>(parent))
+        // Parent should be a QubitUnitaryOp
+        if (!isa<QubitUnitaryOp>(parent)) {
             return failure();
+        }
 
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(parent);
         ValueRange parentQbs = parentOp.getOutQubits();
 
-        if (qbs.size() != parentQbs.size())
+        // Parent's output qubits should be the current op's input qubits,
+        // and the qubits need to be in the same order
+        if (qbs.size() != parentQbs.size()) {
             return failure();
+        }
 
         for (auto [qb1, qb2] : llvm::zip(qbs, parentQbs))
-            if (qb1 != qb2)
+            if (qb1 != qb2) {
                 return failure();
+            }
 
         return success();
     }
@@ -353,21 +363,52 @@ In C++ it will look as follows:
 
 .. code-block:: cpp
 
-    void QubitUnitaryFusion::rewrite(QubitUnitaryOp op, PatternRewriter &rewriter)
+    void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
     {
         ValueRange qbs = op.getInQubits();
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(qbs[0].getDefiningOp());
 
-        Value m1 = op.getMatrix();
-        Value m2 = parentOp.getMatrix();
+        // In the tablegen definition of `QubitUnitaryOp`, there is a
+        // field called `$matrix`, storing the matrix for the unitary gate.
+        // Tablegen automatically generates getters for all of the fields.
+        mlir::Value m1 = op.getMatrix();
+        mlir::Value m2 = parentOp.getMatrix();
 
-        linalg::MatmulOp matmul = rewriter.create<linalg::MatmulOp>(op.getLoc(), {m1, m2}, {});
-        Value res = matmul.getResult(0);
+        // Get the type of a 2x2 complex matrix
+        // Note that both m1 and m2 have this type already
+        mlir::Type MatrixType = m1.getType();
 
-        rewriter.updateRootInPlace(op, [&] {
-            op->setOperand(0, res);
-        });
-        rewriter.replaceOp(parentOp, parentOp.getResults());
+        // Create the matrix multiplication operation
+        // The linalg.matmul op's semantics is:
+        //   linalg.matmul({A, B}, {C})
+        // performs C+=A*B
+        // so we need to create a zero matrix of the desired type and shape first
+        tensor::EmptyOp zeromat =
+            rewriter.create<tensor::EmptyOp>(op.getLoc(), MatrixType, ValueRange{});
+
+        // The first argument to the `create` need to be a `Location`
+        // which can usually just be a `getLoc()` from any operation you have handy
+        // The second argument needs to be (a list of) type(s) of the operation's output
+        // The third argument needs to be (a list of) input value(s) to the operation
+        linalg::MatmulOp matmul = rewriter.create<linalg::MatmulOp>(
+            op.getLoc(), TypeRange{MatrixType}, ValueRange{m1, m2}, ValueRange{zeromat});
+
+        // Some peculiarity for the matmul operation; no need to worry about it here
+        matmul->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({2, 1}));
+
+        // Replace the matrix for the parent unitary (which is the first unitary op)
+        // with the product matrix
+        // Note: we need to move the zero matrix
+        // and the matmul before the parent unitary
+        // so all of them are defined before being used by the parent unitary
+        zeromat->moveBefore(parentOp);
+        matmul->moveBefore(parentOp);
+        mlir::Value res = matmul.getResult(0);
+        parentOp->setOperand(0, res);
+
+        // The second unitary is not needed anymore
+        // Whoever uses the second unitary, use the first one instead!
+        op.replaceAllUsesWith(parentOp);
     }
 
 When writing transformations, the rewriter is the most important tool we have. It can create new
@@ -431,13 +472,8 @@ changes (also called the insertion point). Let's have look at some of these elem
   operation:
 
   .. code-block:: cpp
+        parentOp->setOperand(0, res);
 
-      rewriter.updateRootInPlace(op, [&] {
-          op->setOperand(0, res);
-      });
-
-  Note that in order to change to results on an operation you will need to create a copy of it
-  and erase the existing operation, they cannot be modified in-place.
 
 Invoking transformation patterns
 ================================
