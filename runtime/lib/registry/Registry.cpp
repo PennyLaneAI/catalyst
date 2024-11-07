@@ -15,13 +15,13 @@
 #include <cstdint>
 #include <cstdio>
 #include <dlfcn.h>
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
+#include <string>
 #include <unordered_map>
 
-#include <iostream>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 // From PyBind11's documentation:
 //
@@ -31,7 +31,7 @@ namespace py = pybind11;
 //     intentionally leaking at the end of the program.
 //
 // https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
-std::unordered_map<int64_t, py::function> *references;
+std::unordered_map<int64_t, nb::callable> *references;
 
 std::string libmlirpath;
 
@@ -48,7 +48,7 @@ class LibraryManager {
     {
         this->_handle = dlopen(path.c_str(), RTLD_LAZY);
         if (!this->_handle) {
-            throw py::value_error(dlerror());
+            throw nb::value_error(dlerror());
         }
     }
 
@@ -63,7 +63,7 @@ class LibraryManager {
     {
         void *f_ptr = dlsym(this->_handle, "memrefCopy");
         if (!f_ptr) {
-            throw py::value_error(dlerror());
+            throw nb::value_error(dlerror());
         }
         typedef void (*memrefCopy_t)(int64_t, void *, void *);
         void (*memrefCopy)(int64_t, void *, void *);
@@ -85,20 +85,20 @@ inline const char *ext()
 
 std::string library_name(std::string name) { return name + ext(); }
 
-void convertResult(py::handle tuple)
+void convertResult(nb::handle tuple)
 {
-    py::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
+    nb::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
 
-    py::object unranked_memref = unrankedMemrefPtrSizeTuple.attr("__getitem__")(0);
-    py::object element_size = unrankedMemrefPtrSizeTuple.attr("__getitem__")(1);
-    py::object unranked_memref_ptr_int = unranked_memref.attr("value");
+    nb::object unranked_memref = unrankedMemrefPtrSizeTuple.attr("__getitem__")(0);
+    nb::object element_size = unrankedMemrefPtrSizeTuple.attr("__getitem__")(1);
+    nb::object unranked_memref_ptr_int = unranked_memref.attr("value");
 
-    void *unranked_memref_ptr = reinterpret_cast<void *>(py::cast<long>(unranked_memref_ptr_int));
-    long e_size = py::cast<long>(element_size);
+    void *unranked_memref_ptr = reinterpret_cast<void *>(nb::cast<long>(unranked_memref_ptr_int));
+    long e_size = nb::cast<long>(element_size);
 
-    py::object dest = tuple.attr("__getitem__")(1);
+    nb::object dest = tuple.attr("__getitem__")(1);
 
-    long destAsLong = py::cast<long>(dest);
+    long destAsLong = nb::cast<long>(dest);
     void *destAsPtr = (void *)(destAsLong);
 
     UnrankedMemrefType *src = (UnrankedMemrefType *)unranked_memref_ptr;
@@ -109,11 +109,11 @@ void convertResult(py::handle tuple)
     memrefCopy(e_size, src, &destMemref);
 }
 
-void convertResults(py::list results, py::list allocated)
+void convertResults(nb::list results, nb::list allocated)
 {
-    auto builtins = py::module_::import("builtins");
+    auto builtins = nb::module_::import_("builtins");
     auto zip = builtins.attr("zip");
-    for (py::handle obj : zip(results, allocated)) {
+    for (nb::handle obj : zip(results, allocated)) {
         convertResult(obj);
     }
 }
@@ -122,20 +122,20 @@ extern "C" {
 [[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc,
                                                  va_list args)
 {
-    py::gil_scoped_acquire lock;
+    nb::gil_scoped_acquire lock;
     auto it = references->find(identifier);
     if (it == references->end()) {
         throw std::invalid_argument("Callback called with invalid identifier");
     }
     auto lambda = it->second;
 
-    py::list flat_args;
+    nb::list flat_args;
     for (int i = 0; i < count; i++) {
         int64_t ptr = va_arg(args, int64_t);
         flat_args.append(ptr);
     }
 
-    py::list flat_results = lambda(flat_args);
+    nb::list flat_results = nb::list(lambda(flat_args));
 
     // We have a flat list of return values.
     // These returns **may** be array views to
@@ -145,7 +145,7 @@ extern "C" {
     // of aliasing. Let's just copy them to guarantee
     // no aliasing issues. We can revisit this as an optimization
     // and allowing these to alias.
-    py::list flat_returns_allocated_compiler;
+    nb::list flat_returns_allocated_compiler;
     for (int i = 0; i < retc; i++) {
         int64_t ptr = va_arg(args, int64_t);
         flat_returns_allocated_compiler.append(ptr);
@@ -156,22 +156,22 @@ extern "C" {
 
 void setMLIRLibPath(std::string path) { libmlirpath = path; }
 
-auto registerImpl(py::function f)
+auto registerImpl(nb::callable f)
 {
     // Do we need to see if it is already present or can we just override it? Just override is fine.
     // Does python reuse id's? Yes.
     // But only after they have been garbaged collected.
     // So as long as we maintain a reference to it, then they won't be garbage collected.
     // Inserting the function into the unordered map increases the reference by one.
-    int64_t id = (int64_t)f.ptr();
+    int64_t id = reinterpret_cast<int64_t>(f.ptr());
     references->insert({id, f});
     return id;
 }
 
-PYBIND11_MODULE(catalyst_callback_registry, m)
+NB_MODULE(catalyst_callback_registry, m)
 {
     if (references == nullptr) {
-        references = new std::unordered_map<int64_t, py::function>();
+        references = new std::unordered_map<int64_t, nb::callable>();
     }
     m.doc() = "Callbacks";
     m.def("register", &registerImpl, "Call a python function registered in a map.");
