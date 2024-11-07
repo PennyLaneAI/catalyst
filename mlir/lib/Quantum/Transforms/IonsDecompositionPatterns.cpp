@@ -61,12 +61,22 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
 
 void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    oneQubitDecomp(op, rewriter, -PI / 2, PI / 4, PI / 2);
+    if (op.getAdjoint()) {
+        oneQubitDecomp(op, rewriter, -PI / 2, -PI / 4, PI / 2);
+    }
+    else {
+        oneQubitDecomp(op, rewriter, -PI / 2, PI / 4, PI / 2);
+    }
 }
 
 void sDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    oneQubitDecomp(op, rewriter, -PI / 2, PI / 2, PI / 2);
+    if (op.getAdjoint()) {
+        oneQubitDecomp(op, rewriter, -PI / 2, -PI / 2, PI / 2);
+    }
+    else {
+        oneQubitDecomp(op, rewriter, -PI / 2, PI / 2, PI / 2);
+    }
 }
 
 void zDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
