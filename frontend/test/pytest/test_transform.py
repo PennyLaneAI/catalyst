@@ -373,6 +373,10 @@ def test_convert_to_numpy_parameters(backend):
 @pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
 def test_defer_measurements(backend):
     """Test defer_measurements"""
+    # The defer_measurements transform looks for MidMeasureMP.
+    # Catalyst's `measure` is not a MidMeasureMP.
+    # So, this transformation simply does nothing when
+    # the program uses `catalyst.measure`.
 
     def qnode_builder(device_name):
         """Builder"""
@@ -437,6 +441,8 @@ def test_diagonalize_measurements(backend):
 @pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
 def test_dynamic_one_shot(backend):
     """Test dynamic_one_shot"""
+    # Catalyst has its own dynamic_one_shot transform
+    # Applying PennyLane's transform will result in errors.
 
     def qnode_builder(device_name):
         """Builder"""
