@@ -932,7 +932,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     }
     outfile->os() << output->outIR;
     outfile->keep();
-
-    llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
+    if (Verbose)
+        llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     return 0;
 }
