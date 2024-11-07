@@ -42,7 +42,6 @@ catch_discover_tests(runner_tests_qir_runtime)
 
 if(ENABLE_LIGHTNING)
     add_executable(runner_tests_lightning runner_main.cpp)
-    target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
 
     # Skip dynamic device loading test when sanitizers are enabled or when building on mac,
     # due to the fact that our current support is not fully compatible on macOS.
@@ -92,8 +91,18 @@ endif()
 
 if(ENABLE_OPENQASM)
     add_executable(runner_tests_openqasm runner_main.cpp)
+    add_dependencies(runner_tests_openqasm openqasm_python_module)
+    set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:openqasm_python_module>")
+    if(NOT APPLE)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+    else()
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+    endif()
 
     # To avoid link to libpython, we use pybind11::module interface library.
+    target_compile_definitions(runner_tests_openqasm PUBLIC INITIALIZE_PYTHON)
     target_link_libraries(runner_tests_openqasm PRIVATE
         Catch2::Catch2
         pybind11::embed

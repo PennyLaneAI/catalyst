@@ -579,6 +579,8 @@ into:
 
     %deriv:3 = func.call @my_func.finitediff(%x, %y, %z) : (f64, f64, f64) -> (f64, f64, f64)
 
+.. _catalyst-s-transformation-library:
+
 Catalyst's Transformation Library
 =================================
 
