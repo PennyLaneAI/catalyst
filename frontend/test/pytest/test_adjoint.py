@@ -999,11 +999,11 @@ class TestMiscMethods:
 
     def test_repr(self):
         """Test __repr__ method."""
-        assert repr(adjoint(qml.S(0))) == "Adjoint(S(wires=[0]))"
+        assert repr(adjoint(qml.S(0))) == "Adjoint(S(0))"
 
         base = qml.S(0) + qml.T(0)
         op = adjoint(base)
-        assert repr(op) == "Adjoint(S(wires=[0]) + T(wires=[0]))"
+        assert repr(op) == "Adjoint(S(0) + T(0))"
 
     def test_label(self):
         """Test that the label method for the adjoint class adds a † to the end."""
