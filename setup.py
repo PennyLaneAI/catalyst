@@ -55,7 +55,7 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = 0.38
+pl_min_release = 0.39
 lq_min_release = pl_min_release
 
 if pl_version is not None:

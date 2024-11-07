@@ -12,7 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Python.hpp"
+// RUN: not catalyst-cli %s --tool=llc --verify-diagnostics 2>&1 | FileCheck %s -check-prefix=CHECK-LLC
+// RUN: not catalyst-cli %s --tool=translate --verify-diagnostics 2>&1 | FileCheck %s -check-prefix=CHECK-TRANSLATE
 
-std::mutex python_mutex;
-std::mutex &getPythonMutex() { return python_mutex; }
+
+func.func @foo() {
+    return
+}
+
+// CHECK-LLC: Compilation failed:
+// CHECK-LLC: Expected LLVM IR input but received MLIR
+
+// CHECK-TRANSLATE: Failed to translate LLVM module
