@@ -104,21 +104,22 @@ def verify_static_argnums_type(static_argnums):
     return None
 
 
-def verify_static_argnums(args, static_argnums):
+def verify_static_argnums(args, sig_args, static_argnums):
     """Verify that static_argnums have correct type and range.
 
     Args:
         args (Iterable): arguments to a compiled function
+        sig_args (Iterable): arguments from the signature of a compiled function
         static_argnums (Iterable[int]): indices to verify
 
     Returns:
         None
     """
     verify_static_argnums_type(static_argnums)
-
+    arg_limit = max(len(args), len(sig_args))
     for argnum in static_argnums:
-        if argnum < 0 or argnum >= len(args):
-            msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
+        if argnum < 0 or argnum >= arg_limit:
+            msg = f"argnum {argnum} is beyond the valid range of [0, {arg_limit})."
             raise CompileError(msg)
     return None
 
