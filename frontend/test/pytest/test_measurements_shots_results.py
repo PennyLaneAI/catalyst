@@ -481,6 +481,51 @@ class TestProbs:
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 
+class TestShadow:
+    """Test shadow."""
+
+    @pytest.mark.xfail(reason="Not supported on lightning.")
+    def test_shadow(self):
+        """Test that Shadow can be used with Catalyst."""
+
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+
+        @qjit
+        @qml.qnode(dev)
+        def classical_shadow_circuit():
+            qml.Hadamard(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.classical_shadow(wires=[0, 1])
+
+        expected_bits = [[1, 1], [0, 1]]
+        expected_recipes = [[0, 1], [0, 2]]
+        actual_bits, actual_recipes = classical_shadow_circuit()
+        assert expected_bits == actual_bits
+        assert expected_recipes == actual_recipes
+
+
+class TestShadowExpval:
+    """Test shadowexpval."""
+
+    @pytest.mark.xfail(reason="TypeError in Catalyst")
+    def test_shadow_expval(self):
+        """Test that ShadowExpVal can be used with Catalyst."""
+
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+
+        @qjit
+        @qml.qnode(dev)
+        def shadow_expval_circuit(x, obs):
+            qml.Hadamard(0)
+            qml.CNOT((0, 1))
+            qml.RX(x, wires=0)
+            return qml.shadow_expval(obs)
+
+        H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
+        expected = 1.9917
+        assert shadow_expval_circuit(0, H) == expected
+
+
 class TestOtherMeasurements:
     """Test other measurement processes."""
 

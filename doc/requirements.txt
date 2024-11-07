@@ -30,6 +30,6 @@ lxml_html_clean
 
 # Pre-install PL development wheels
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.39.0-dev38
-pennylane-lightning==0.39.0-dev38
-pennylane==0.39.0.dev30
+pennylane-lightning-kokkos==0.39.0
+pennylane-lightning==0.39.0
+pennylane==0.39.0
