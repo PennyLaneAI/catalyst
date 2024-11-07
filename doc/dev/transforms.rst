@@ -107,7 +107,7 @@ Writing and running your first Catalyst pass
 
     If you are encoutering issues, or would like to quickly try out the pass described in this
     guide, you can have a look at or cherry-pick this commit which includes all changes described
-    in this section: https://github.com/PennyLaneAI/catalyst/commit/a857655b2f7afef6de19cdc1faaa226243e0bb58
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3
 
 If this is your first time writing MLIR or LLVM passes, the boilerplate can be quite overwhelming. 
 Let's first set up the various boilerplate items required to register and run a new pass. 
