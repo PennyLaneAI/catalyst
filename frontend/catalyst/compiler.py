@@ -567,82 +567,69 @@ class Compiler:
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
 
-        lower_to_llvm = (
-            self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
-        )
+        lower_to_llvm = self.options.lower_to_llvm or False
+        output_ir_ext = ".ll" if lower_to_llvm else ".mlir"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".mlir", dir=str(workspace), delete=False
+        ) as tmp_infile:
+            tmp_infile_name = tmp_infile.name
+            tmp_infile.write(ir)
+
+        output_object_name = os.path.join(str(workspace), f"{module_name}.o")
+        output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
+
+        # Prepare the command-line arguments
+        cmd = ["catalyst-cli"]
+        cmd += [tmp_infile_name, "-o", output_ir_name]
+        cmd += ["--module-name", module_name, "--workspace", str(workspace)]
+        if not lower_to_llvm:
+            cmd += ["--tool", "opt"]
+        if self.options.keep_intermediate:
+            cmd += ["--keep-intermediate"]
+        if self.options.async_qnodes:
+            cmd += ["--async-qnodes"]
+        if self.options.verbose:
+            cmd += ["--verbose"]
+        if self.options.checkpoint_stage:
+            cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+
+        pipeline_str = ""
+        for pipeline in self.options.get_pipelines():
+            pipeline_name, passes = pipeline
+            passes_str = ";".join(passes)
+            pipeline_str += f"{pipeline_name}({passes_str}),"
+        cmd += ["--catalyst-pipeline", pipeline_str]
+
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".mlir", dir=str(workspace), delete=False
-            ) as tmp_infile:
-                tmp_infile_name = tmp_infile.name
-                tmp_infile.write(ir)
-
-            if lower_to_llvm:
-                output_ir_ext = ".ll"
-            else:
-                output_ir_ext = ".mlir"
-
-            output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-            output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
-
-            # Prepare the command-line arguments
-            cmd = ["catalyst-cli"]
-
-            cmd += ["--module-name", module_name]
-            cmd += ["--workspace", str(workspace)]
-            if self.options.keep_intermediate:
-                cmd += ["--keep-intermediate"]
-            if self.options.async_qnodes:
-                cmd += ["--async-qnodes"]
             if self.options.verbose:
-                cmd += ["--verbose"]
-            if self.options.checkpoint_stage:
-                cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+                print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.options.verbose:
+                if result.stdout:
+                    print(result.stdout.strip(), file=self.options.logfile)
+                if result.stderr:
+                    print(f"[LIB] {result.stderr.strip()}", file=self.options.logfile)
+        except subprocess.CalledProcessError as e:
+            raise CompileError(
+                f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
+            ) from e
 
-            pipeline_str = ""
-            for pipeline in self.options.get_pipelines():
-                pipeline_name, passes = pipeline
-                passes_str = ";".join(passes)
-                pipeline_str += f"{pipeline_name}({passes_str}),"
-            cmd += ["--catalyst-pipeline", pipeline_str]
+        with open(output_ir_name, "r") as f:
+            out_IR = f.read()
 
-            if not lower_to_llvm:
-                cmd += ["--tool", "opt"]
+        if lower_to_llvm:
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output_object_name = str(pathlib.Path(output).absolute())
 
-            cmd += ["-o", output_ir_name]
-            cmd += [tmp_infile_name]
-
-            try:
-                if self.options.verbose:
-                    print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-                if self.options.verbose and result.stdout:
-                    for line in result.stdout.strip().split("\n"):
-                        print(f"{line}", file=self.options.logfile)
-                if self.options.verbose and result.stderr:
-                    for line in result.stderr.strip().split("\n"):
-                        print(f"[LIB] {line}", file=self.options.logfile)
-            except subprocess.CalledProcessError as e:
-                raise CompileError(
-                    f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
-                ) from e
-
-            with open(output_ir_name, "r") as f:
-                out_IR = f.read()
-
-            if lower_to_llvm:
-                output = LinkerDriver.run(output_object_name, options=self.options)
-                output_object_name = str(pathlib.Path(output).absolute())
-
-        finally:
-            if os.path.exists(tmp_infile_name):
-                os.remove(tmp_infile_name)
-            if os.path.exists(output_ir_name):
-                os.remove(output_ir_name)
+        # Clean up temporary files
+        if os.path.exists(tmp_infile_name):
+            os.remove(tmp_infile_name)
+        if os.path.exists(output_ir_name):
+            os.remove(output_ir_name)
 
         return output_object_name, out_IR
 
