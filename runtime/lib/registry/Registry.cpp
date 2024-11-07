@@ -122,6 +122,7 @@ extern "C" {
 [[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc,
                                                  va_list args)
 {
+    py::gil_scoped_acquire lock;
     auto it = references->find(identifier);
     if (it == references->end()) {
         throw std::invalid_argument("Callback called with invalid identifier");
