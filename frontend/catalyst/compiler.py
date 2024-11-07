@@ -548,6 +548,42 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
 
     @debug_logger
+    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+        """Prepare the command for catalyst-cli to compile the file.
+
+        Args:
+            module_name (str): Module name to use for naming
+            workspace (Directory): directory that holds output files and/or debug dumps.
+        Returns:
+            cmd (str): The command to be executed.
+        """
+        cli = shutil.which("catalyst-cli")
+        if cli is None:
+            raise FileNotFoundError("catalyst-cli not found in PATH.")
+        cmd = [cli]
+        cmd += [tmp_infile_name, "-o", output_ir_name]
+        cmd += ["--module-name", module_name, "--workspace", str(workspace)]
+        if not self.options.lower_to_llvm:
+            cmd += ["--tool", "opt"]
+        if self.options.keep_intermediate:
+            cmd += ["--keep-intermediate"]
+        if self.options.async_qnodes:
+            cmd += ["--async-qnodes"]
+        if self.options.verbose:
+            cmd += ["--verbose"]
+        if self.options.checkpoint_stage:
+            cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+
+        pipeline_str = ""
+        for pipeline in self.options.get_pipelines():
+            pipeline_name, passes = pipeline
+            passes_str = ";".join(passes)
+            pipeline_str += f"{pipeline_name}({passes_str}),"
+        cmd += ["--catalyst-pipeline", pipeline_str]
+
+        return cmd
+
+    @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -582,28 +618,8 @@ class Compiler:
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
         output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
 
-        # Prepare the command-line arguments
-        cmd = ["catalyst-cli"]
-        cmd += [tmp_infile_name, "-o", output_ir_name]
-        cmd += ["--module-name", module_name, "--workspace", str(workspace)]
-        if not lower_to_llvm:
-            cmd += ["--tool", "opt"]
-        if self.options.keep_intermediate:
-            cmd += ["--keep-intermediate"]
-        if self.options.async_qnodes:
-            cmd += ["--async-qnodes"]
-        if self.options.verbose:
-            cmd += ["--verbose"]
-        if self.options.checkpoint_stage:
-            cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
-
-        pipeline_str = ""
-        for pipeline in self.options.get_pipelines():
-            pipeline_name, passes = pipeline
-            passes_str = ";".join(passes)
-            pipeline_str += f"{pipeline_name}({passes_str}),"
-        cmd += ["--catalyst-pipeline", pipeline_str]
-
+        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+        print(cmd)
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
