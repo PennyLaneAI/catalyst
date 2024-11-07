@@ -472,6 +472,7 @@ changes (also called the insertion point). Let's have look at some of these elem
   operation:
 
   .. code-block:: cpp
+
         parentOp->setOperand(0, res);
 
 
