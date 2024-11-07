@@ -221,7 +221,7 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
         *reinterpret_cast<void **>(nb::cast<size_t>(ctypes.attr("addressof")(value1)));
 
     {
-        py::gil_scoped_release lock;
+        nb::gil_scoped_release lock;
         f_ptr(value0_ptr, value1_ptr);
     }
     returns = move_returns(value0_ptr, result_desc, transfer, numpy_arrays);
