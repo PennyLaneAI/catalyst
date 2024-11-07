@@ -181,7 +181,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
-        extra_compile_args=["-std=c++17"],
+        extra_compile_args=["-std=c++20"],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -198,7 +198,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
-        extra_compile_args=["-std=c++17"],
+        extra_compile_args=["-std=c++20"],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
@@ -211,7 +211,7 @@ for ext in intree_extension_list:
     ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
     ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
     ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
-    ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
+    ext._add_cflags(["-std=c++20"])  # pylint: disable=protected-access
 ext_modules.extend(intree_extension_list)
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
