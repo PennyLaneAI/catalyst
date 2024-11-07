@@ -785,12 +785,14 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     return success();
 }
 
-size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos) {
+size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
+{
     int parenCount = 1;
     for (size_t pos = openParenPos + 1; pos < str.size(); pos++) {
         if (str[pos] == '(') {
             parenCount++;
-        } else if (str[pos] == ')') {
+        }
+        else if (str[pos] == ')') {
             parenCount--;
             if (parenCount == 0) {
                 return pos;
@@ -809,7 +811,7 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
         if (pipelineRef.empty()) {
             continue;
         }
-        
+
         size_t openParenPos = pipelineRef.find('(');
         size_t closeParenPos = findMatchingClosingParen(pipelineRef, openParenPos);
 
