@@ -117,7 +117,7 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
-    let summary = "merge rotation boilerplate words";
+    let summary = "Perform merging of chained rotation gates about the same axis.";
 
     let constructor = "catalyst::createMergeRotationsPass()";
     let options = QuantumCircuitTransformationPass.options;
