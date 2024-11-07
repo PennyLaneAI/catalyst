@@ -506,6 +506,12 @@ def get_device_capabilities(device) -> DeviceCapabilities:
 
     shots_present = bool(device.shots)
     device_capabilities = get_device_toml_capabilities(device)
+
+    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+    #       when customizable multi-pathway decomposition is implemented.
+    if hasattr(device, "_to_matrix_ops"):
+        device_capabilities.options["to_matrix_ops"] = getattr(device, "_to_matrix_ops")
+
     return device_capabilities.filter(finite_shots=shots_present)
 
 

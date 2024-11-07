@@ -16,7 +16,6 @@
 
 from copy import deepcopy
 from unittest.mock import patch
-from webbrowser import Opera
 
 import pennylane as qml
 import pytest
@@ -594,11 +593,7 @@ class TestObservableValidation:
         dev_capabilities = get_device_capabilities(dev)
 
         dev_capabilities.native_obs.update(
-            {
-                "PauliX2": OperatorProperties(
-                    invertible=True, controllable=True, differentiable=True
-                )
-            }
+            {"PauliX2": OperatorProperties(invertible=True, controllable=True, differentiable=True)}
         )
 
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)

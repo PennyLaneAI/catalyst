@@ -34,6 +34,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 
+from catalyst.api_extensions import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
@@ -67,12 +68,18 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if alternative_decomp is not None:
         return alternative_decomp
 
-    # if capabilities.native_ops.get("QubitUnitary"):
-    #     # If the device supports unitary matrices, apply the relevant conversions and fallbacks.
-    #     if op.name in capabilities.to_matrix_ops or (
-    #             op.has_matrix and isinstance(op, qml.ops.Controlled)
-    #     ):
-    #         return _decompose_to_matrix(op)
+    if op.name in capabilities.options.get("to_matrix_ops", {}):
+
+        if "QubitUnitary" not in capabilities.operations:
+            raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
+
+        return _decompose_to_matrix(op)
+
+    if op.has_matrix and isinstance(op, qml.ops.Controlled):
+
+        # If the device supports unitary matrices, apply the fallback.
+        if "QubitUnitary" in capabilities.operations:
+            return _decompose_to_matrix(op)
 
     return op.decomposition()
 
@@ -113,15 +120,15 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapa
     return (tape,), lambda x: x[0]
 
 
-# def _decompose_to_matrix(op):
-#     try:
-#         mat = op.matrix()
-#     except Exception as e:
-#         raise CompileError(
-#             f"Operation {op} could not be decomposed, it might be unsupported."
-#         ) from e
-#     op = qml.QubitUnitary(mat, wires=op.wires)
-#     return [op]
+def _decompose_to_matrix(op):
+    try:
+        mat = op.matrix()
+    except Exception as e:
+        raise CompileError(
+            f"Operation {op} could not be decomposed, it might be unsupported."
+        ) from e
+    op = qml.QubitUnitary(mat, wires=op.wires)
+    return [op]
 
 
 def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
@@ -148,41 +155,41 @@ def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
     return new_op
 
 
-# @transform
-# @debug_logger
-# def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
-#     r"""Quantum transform that decomposes operations to unitary given a list of operations name.
-#
-#     Args:
-#         tape (QNode or QuantumTape or Callable): A quantum circuit.
-#         convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
-#
-#     Returns:
-#         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-#         transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
-#     """
-#     new_operations = []
-#
-#     for op in tape.operations:
-#         if op.name in convert_to_matrix_ops or isinstance(op, HybridCtrl):
-#             try:
-#                 mat = op.matrix()
-#             except Exception as e:
-#                 raise CompileError(
-#                     f"Operation {op} could not be decomposed, it might be unsupported."
-#                 ) from e
-#             op = qml.QubitUnitary(mat, wires=op.wires)
-#         new_operations.append(op)
-#
-#     new_tape = type(tape)(new_operations, tape.measurements, shots=tape.shots)
-#
-#     def null_postprocessing(results):
-#         """A postprocesing function returned by a transform that only converts the batch of results
-#         into a result for a single ``QuantumTape``.
-#         """
-#         return results[0]
-#
-#     return [new_tape], null_postprocessing
+@transform
+@debug_logger
+def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
+    r"""Quantum transform that decomposes operations to unitary given a list of operations name.
+
+    Args:
+        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+    """
+    new_operations = []
+
+    for op in tape.operations:
+        if op.name in convert_to_matrix_ops or isinstance(op, HybridCtrl):
+            try:
+                mat = op.matrix()
+            except Exception as e:
+                raise CompileError(
+                    f"Operation {op} could not be decomposed, it might be unsupported."
+                ) from e
+            op = qml.QubitUnitary(mat, wires=op.wires)
+        new_operations.append(op)
+
+    new_tape = type(tape)(new_operations, tape.measurements, shots=tape.shots)
+
+    def null_postprocessing(results):
+        """A postprocesing function returned by a transform that only converts the batch of results
+        into a result for a single ``QuantumTape``.
+        """
+        return results[0]
+
+    return [new_tape], null_postprocessing
 
 
 def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> str | None:
@@ -195,10 +202,10 @@ def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabili
         if match and op_support[match].invertible:
             return match
 
+    # There are cases where a custom controlled gate, e.g., CH, is supported, but its
+    # base, i.e., H, is not labeled controllable. In this case, we don't want to use
+    # this branch to check the support for this operation.
     elif type(op) is qml.ops.ControlledOp:
-        # There are cases where a custom controlled gate, e.g., CH, is supported, but its
-        # base, i.e., H, is not labeled controllable. In this case, we don't want to use
-        # this branch to check the support for this operation.
         match = catalyst_acceptance(op.base, capabilities)
         if match and op_support[match].controllable:
             return match
