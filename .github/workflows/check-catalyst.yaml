@@ -299,7 +299,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11
+        python3 -m pip install numpy nanobind pybind11
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
