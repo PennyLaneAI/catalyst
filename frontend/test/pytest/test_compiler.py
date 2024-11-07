@@ -227,7 +227,7 @@ class TestCompilerState:
         """Test that after compiling the intermediate files exist."""
 
         options = CompileOptions()
-        pipelines = options.get_stages(options)
+        pipelines = options.get_stages()
 
         @qjit(
             keep_intermediate=True,
