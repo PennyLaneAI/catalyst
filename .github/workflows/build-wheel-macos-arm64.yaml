@@ -344,7 +344,7 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm
 
-        cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
+        cmake --build quantum-build --target check-dialects catalyst-cli
 
     - name: Build wheel
       run: |

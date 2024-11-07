@@ -379,7 +379,7 @@ jobs:
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DLLVM_ENABLE_LLD=ON
 
-        cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
+        cmake --build quantum-build --target check-dialects catalyst-cli
 
     - name: Build wheel
       run: |

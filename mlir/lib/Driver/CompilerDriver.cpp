@@ -931,55 +931,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     outfile->os() << output->outIR;
     outfile->keep();
 
-    return 0;
-}
-
-int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
-                              const std::string &moduleName, bool keepIntermediate,
-                              bool asyncQNodes, bool verbose, bool lowerToLLVM,
-                              const std::vector<Pipeline> &passPipelines,
-                              const std::string &checkpointStage,
-                              catalyst::driver::CompilerOutput &output)
-{
-    llvm::raw_string_ostream errStream{output.diagnosticMessages};
-
-    CompilerOptions options{.source = source,
-                            .workspace = workspace,
-                            .moduleName = moduleName,
-                            .diagnosticStream = errStream,
-                            .keepIntermediate =
-                                keepIntermediate ? SaveTemps::AfterPipeline : SaveTemps::None,
-                            .asyncQnodes = asyncQNodes,
-                            .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
-                            .pipelinesCfg = passPipelines,
-                            .checkpointStage = checkpointStage,
-                            .loweringAction = lowerToLLVM ? Action::All : Action::OPT,
-                            .dumpPassPipeline = false};
-
-    DialectRegistry registry;
-    static bool initialized = false;
-    if (!initialized) {
-        registerAllPasses();
-        registerAllCatalystPasses();
-        registerAllCatalystPipelines();
-    }
-    initialized |= true;
-
-    mhlo::registerAllMhloPasses();
-    registerAllCatalystDialects(registry);
-    registerAsmPrinterCLOptions();
-    registerMLIRContextCLOptions();
-    registerPassManagerCLOptions();
-    registerDefaultTimingManagerCLOptions();
-    registerLLVMTranslations(registry);
-
-    mlir::LogicalResult result = QuantumDriverMain(options, output, registry);
-
-    errStream.flush();
-
-    if (mlir::failed(result)) {
-        llvm::errs() << "Compilation failed:\n" << output.diagnosticMessages << "\n";
-        return 1;
-    }
+    llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     return 0;
 }
