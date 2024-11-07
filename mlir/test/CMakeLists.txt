@@ -20,6 +20,10 @@ set(TEST_SUITES
     )
 
 
+if(QUANTUM_ENABLE_BINDINGS_PYTHON)
+    list(APPEND DIALECT_TESTS_DEPEND QuantumPythonModules)
+endif()
+
 add_lit_testsuite(check-dialects "Run the regression tests for mlir dialects"
     ${TEST_SUITES}
     DEPENDS ${DIALECT_TESTS_DEPEND}
