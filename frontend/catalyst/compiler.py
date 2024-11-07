@@ -402,7 +402,9 @@ class Compiler:
         """
         cli = shutil.which("catalyst-cli")
         if cli is None:
-            raise FileNotFoundError("catalyst-cli not found in PATH.")
+            cli = os.getcwd() + "/mlir/build/bin/catalyst-cli"
+        if not path.isfile(cli):
+            raise FileNotFoundError("catalyst-cli executable was not found.")
         cmd = [cli]
         cmd += [tmp_infile_name, "-o", output_ir_name]
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
