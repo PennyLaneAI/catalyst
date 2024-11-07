@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Tests for QJIT compatibility of PennyLane templates."""
 
 import jax
 import jax.numpy as jnp
@@ -20,6 +21,8 @@ import pytest
 from scipy.stats import norm
 
 from catalyst import for_loop, qjit
+
+# pylint: disable=too-many-lines
 
 
 def test_adder(backend):
