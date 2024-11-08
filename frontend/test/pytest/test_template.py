@@ -65,6 +65,7 @@ def test_basis_embedding(backend):
     jitted_fn = qjit(interpreted_fn)
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
+
 def test_cosine_window(backend):
     """Test cosine window."""
 
@@ -77,6 +78,7 @@ def test_cosine_window(backend):
     jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
+
 
 def test_iqp_embedding(backend):
     """Test iqp embedding."""
