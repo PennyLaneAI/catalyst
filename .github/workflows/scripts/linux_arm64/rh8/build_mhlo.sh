@@ -47,7 +47,7 @@ cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja \
     -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir \
     -DPython3_EXECUTABLE=/usr/bin/python3 \
     -DLLVM_ENABLE_LLD=ON \
-    -DLLVM_ENABLE_ZLIB=OFF \
+    -DLLVM_ENABLE_ZLIB=FORCE_ON \
     -DLLVM_ENABLE_ZSTD=OFF \
     -DCMAKE_CXX_VISIBILITY_PRESET=protected
 
