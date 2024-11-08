@@ -94,7 +94,7 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     the HybridOps have been passed to the decompose function.
     """
 
-    if len(tape) == 0 or tape[0] in (qml.StatePrep, qml.BasisState):
+    if len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState):
         skip_initial_state_prep = capabilities.initial_state_prep_flag
     else:
         skip_initial_state_prep = False
