@@ -50,6 +50,46 @@ from catalyst.utils.exceptions import CompileError
 # pylint: disable=too-many-lines,line-too-long
 
 
+def test_add_noise(backend):
+    """Test the add_noise transform on a simple circuit"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        fcond1 = qml.noise.op_eq(qml.RX) & qml.noise.wires_in([0, 1])
+        noise1 = qml.noise.partial_wires(qml.RX, 0.4)
+
+        fcond2 = qml.noise.op_in([qml.RX, qml.RZ])
+
+        def noise2(op, **kwargs):
+            qml.CRX(op.data[0], wires=[op.wires[0], (op.wires[0] + 1) % 2])
+
+        noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
+
+        @partial(qml.transforms.add_noise, noise_model=noise_model)
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(w, x, y, z):
+            qml.RX(w, wires=0)
+            qml.RY(x, wires=1)
+            qml.CNOT(wires=[0, 1])
+            qml.RY(y, wires=0)
+            qml.RX(z, wires=1)
+            return qml.expval(qml.Z(0) @ qml.Z(1))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.mixed")
+    qnode_backend = qnode_builder(backend)
+
+    expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
+    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
+    assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
+
+
 @pytest.mark.skip(reason="Uses part of old API")
 def test_batch_input(backend):
     """Test that batching works for a simple circuit"""
@@ -1125,48 +1165,6 @@ class TestTransformValidity:
             @qml.qnode(qml.device(backend, wires=1))
             def f():
                 return qml.state()
-
-
-@pytest.mark.xfail(reason="Noise models not supported on Lightning.")
-def test_add_noise(backend):
-    """Test the add_noise transform on a simple circuit"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        fcond1 = qml.noise.op_eq(qml.RX) & qml.noise.wires_in([0, 1])
-        noise1 = qml.noise.partial_wires(qml.PhaseDamping, 0.4)
-
-        fcond2 = qml.noise.op_in([qml.RX, qml.RZ])
-
-        def noise2(op, **kwargs):
-            qml.ThermalRelaxationError(
-                op.parameters[0] * 0.5, kwargs["t1"], kwargs["t2"], 0.6, op.wires
-            )
-
-        noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
-
-        @partial(qml.transforms.add_noise, noise_model=noise_model)
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(w, x, y, z):
-            qml.RX(w, wires=0)
-            qml.RY(x, wires=1)
-            qml.CNOT(wires=[0, 1])
-            qml.RY(y, wires=0)
-            qml.RX(z, wires=1)
-            return qml.expval(qml.Z(0) @ qml.Z(1))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.mixed")
-    qnode_backend = qnode_builder(backend)
-
-    expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
-    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
 
 
 @pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
