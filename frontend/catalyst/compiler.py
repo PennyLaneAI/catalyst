@@ -39,7 +39,7 @@ from catalyst.pipelines import (
 )
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime_environment import get_lib_path
+from catalyst.utils.runtime_environment import get_bin_path, get_lib_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -400,7 +400,7 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_lib_path("cli", "DIALECTS_BUILD_DIR")
+        cli_build_path = get_bin_path("cli")
         cli_exe = cli_build_path + "/catalyst-cli"
         if not path.isfile(cli_exe):
             raise FileNotFoundError("catalyst-cli executable was not found.")
