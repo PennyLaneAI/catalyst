@@ -9,7 +9,7 @@ on:
 jobs:
   setup:
     name: Setup the release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
   upload:
     name: Prepare & Upload wheels to TestPyPI
     needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -71,7 +71,7 @@ jobs:
     - name: Prepare wheels
       run: |
         rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_12_0_universal2/macosx_12_0_x86_64/" dist/PennyLane_Catalyst-*
+        rename "s/macosx_13_0_universal2/macosx_13_0_x86_64/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
         rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
 

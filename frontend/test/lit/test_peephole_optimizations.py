@@ -29,9 +29,9 @@ import shutil
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
-from catalyst import qjit
+from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
-from catalyst.passes import cancel_inverses, pipeline
+from catalyst.passes import cancel_inverses, merge_rotations
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):
@@ -86,11 +86,11 @@ def test_pipeline_lowering():
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {"my-option": "aloha"},
+        "merge_rotations": {},
     }
 
     @qjit(keep_intermediate=True)
-    @pipeline(pass_pipeline=my_pipeline)
+    @pipeline(my_pipeline)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_pipeline_lowering_workflow(x):
         qml.RX(x, wires=[0])
@@ -104,14 +104,14 @@ def test_pipeline_lowering():
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   options=func-name=test_pipeline_lowering_workflow_transformed0 my-option=aloha
-    # CHECK:   pass_name=merge-rotation
+    # CHECK:   options=func-name=test_pipeline_lowering_workflow_transformed0
+    # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_transformed0"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_transformed0 my-option=aloha"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=test_pipeline_lowering_workflow_transformed0"}
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_workflow, 1.2)
 
@@ -160,13 +160,13 @@ def test_pipeline_lowering_keep_original():
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=f_transformed0
-    # CHECK:   pass_name=merge-rotation
+    # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     print_jaxpr(test_pipeline_lowering_keep_original_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f_transformed0"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=f_transformed0"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=f_transformed0"}
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_keep_original_workflow, 1.2)
 
@@ -223,7 +223,7 @@ def test_pipeline_lowering_global():
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=g_transformed0
-    # CHECK:   pass_name=merge-rotation
+    # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=h_transformed1
@@ -231,15 +231,15 @@ def test_pipeline_lowering_global():
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=h_transformed1
-    # CHECK:   pass_name=merge-rotation
+    # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g_transformed0"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=g_transformed0"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=g_transformed0"}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h_transformed1"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=h_transformed1"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=h_transformed1"}
     # CHECK-NEXT: transform.yield
     print_mlir(global_wf)
 
@@ -301,20 +301,20 @@ def test_pipeline_lowering_globloc_override():
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=g_transformed1
-    # CHECK:   pass_name=merge-rotation
+    # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=h_transformed0
     # CHECK-NOT:   pass_name=remove-chained-self-inverse
-    # CHECK:   pass_name=merge-rotation
+    # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=g_transformed1"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=g_transformed1"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=g_transformed1"}
     # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=h_transformed0"}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotation" to {{%.+}} {options = "func-name=h_transformed0"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=h_transformed0"}
     # CHECK-NEXT: transform.yield
     print_mlir(global_wf)
 
@@ -563,3 +563,70 @@ def test_cancel_inverses_keep_original():
 
 
 test_cancel_inverses_keep_original()
+
+
+#
+# merge_rotations
+#
+
+
+def test_merge_rotations_tracing_and_lowering():
+    """
+    Test merge_rotations during tracing and lowering
+    """
+
+    @qjit
+    def test_merge_rotations_tracing_and_lowering_workflow(xx: float):
+
+        @merge_rotations
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @merge_rotations
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def g(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def h(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        _f = f(xx)
+        _g = g(xx)
+        _h = h(xx)
+        return _f, _g, _h
+
+    # CHECK: transform_named_sequence
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK:   options=func-name=f_merge_rotations0
+    # CHECK:   pass_name=merge-rotations
+    # CHECK: ]
+    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK:   options=func-name=g_merge_rotations1
+    # CHECK:   pass_name=merge-rotations
+    # CHECK: ]
+    # CHECK-NOT: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK-NOT:   options=func-name=h_merge_rotations
+    # CHECK-NOT:   pass_name=merge-rotations
+    print_jaxpr(test_merge_rotations_tracing_and_lowering_workflow, 1.1)
+
+    # CHECK: module @test_merge_rotations_tracing_and_lowering_workflow
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=f_merge_rotations0"}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=g_merge_rotations1"}
+    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=h_merge_rotations"}
+    # CHECK-NEXT: transform.yield
+    print_mlir(test_merge_rotations_tracing_and_lowering_workflow, 1.1)
+
+
+test_merge_rotations_tracing_and_lowering()

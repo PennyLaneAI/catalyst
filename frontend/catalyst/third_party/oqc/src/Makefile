@@ -7,7 +7,6 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 OQC_BUILD_DIR?=$(MK_DIR)/build
 RT_BUILD_DIR?=$(MK_DIR)/../../../../../runtime/build
-USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER?=OFF
 
 .PHONY: configure
 configure:
@@ -17,7 +16,6 @@ configure:
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DRUNTIME_BUILD_DIR=$(RT_BUILD_DIR) \
-		-DUSE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER_PATH=$(USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER) \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())")
 

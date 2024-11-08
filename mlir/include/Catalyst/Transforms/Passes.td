@@ -71,8 +71,10 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     let summary = "Lower scatter op from Stable HLO to loops.";
 
     let dependentDialects = [
+        "mlir::func::FuncDialect",
         "index::IndexDialect",
         "mhlo::MhloDialect",
+        "tensor::TensorDialect",
         "scf::SCFDialect"
     ];
 

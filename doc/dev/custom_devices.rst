@@ -168,7 +168,7 @@ The Pennylane device API allows you to build a QJIT compatible device in a simpl
 .. code-block:: python
 
     class CustomDevice(qml.devices.Device):
-        """Dummy Device"""
+        """Custom Device"""
 
         config = pathlib.Path("absolute/path/to/configuration/file.toml")
 
@@ -178,7 +178,7 @@ The Pennylane device API allows you to build a QJIT compatible device in a simpl
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "CustomDevice", "absolute/path/to/librtd_dummy.so"
+            return "CustomDevice", "absolute/path/to/librtd_custom.so"
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
