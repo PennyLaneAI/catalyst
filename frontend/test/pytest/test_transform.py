@@ -50,48 +50,6 @@ from catalyst.utils.exceptions import CompileError
 # pylint: disable=too-many-lines,line-too-long
 
 
-@pytest.mark.xfail(reason="Noise models not supported on Lightning.")
-def test_add_noise(backend):
-    """Test the add_noise transform on a simple circuit"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        fcond1 = qml.noise.op_eq(qml.RX) & qml.noise.wires_in([0, 1])
-        noise1 = qml.noise.partial_wires(qml.PhaseDamping, 0.4)
-
-        fcond2 = qml.noise.op_in([qml.RX, qml.RZ])
-
-        def noise2(op, **kwargs):
-            qml.ThermalRelaxationError(
-                op.parameters[0] * 0.5, kwargs["t1"], kwargs["t2"], 0.6, op.wires
-            )
-
-        noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
-
-        @partial(qml.transforms.add_noise, noise_model=noise_model)
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(w, x, y, z):
-            qml.RX(w, wires=0)
-            qml.RY(x, wires=1)
-            qml.CNOT(wires=[0, 1])
-            qml.RY(y, wires=0)
-            qml.RX(z, wires=1)
-            return qml.expval(qml.Z(0) @ qml.Z(1))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.mixed")
-    qnode_backend = qnode_builder(backend)
-
-    expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
-    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
-
-
 @pytest.mark.skip(reason="Uses part of old API")
 def test_batch_input(backend):
     """Test that batching works for a simple circuit"""
@@ -235,73 +193,6 @@ def test_cancel_inverses(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
-def test_clifford_t_decomposition(backend):
-    """Test clifford_t_decomposition"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @qml.transforms.clifford_t_decomposition
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(x, y):
-            qml.RX(x, 0)
-            qml.CNOT([0, 1])
-            qml.RY(y, 0)
-            return qml.expval(qml.Z(0))
-
-        return qfunc
-
-    x, y = 1.1, 2.2
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit(x, y)
-    observed = compiled(x, y)
-    assert np.allclose(expected, observed)
-
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert expected_shape == observed_shape
-
-
-@pytest.mark.xfail(reason="Catalyst does not support informative transforms.")
-def test_commutation_dag(backend):
-    """Test commutation DAG"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @qml.commutation_dag
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
-        def qfunc(x, y, z):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=0)
-            qml.CNOT(wires=[1, 2])
-            qml.RY(y, wires=1)
-            qml.Hadamard(wires=2)
-            qml.CRZ(z, wires=[2, 0])
-            qml.RY(-y, wires=1)
-            return qml.expval(qml.Z(0))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit(np.pi / 4, np.pi / 3, np.pi / 2)
-    observed = compiled(np.pi / 4, np.pi / 3, np.pi / 2)
-
-    assert expected.get_nodes() == observed.get_nodes()
-
-
 def test_commute_controlled(backend):
     """Test commute_controlled"""
 
@@ -370,43 +261,6 @@ def test_convert_to_numpy_parameters(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
-def test_defer_measurements(backend):
-    """Test defer_measurements"""
-    # The defer_measurements transform looks for MidMeasureMP.
-    # Catalyst's `measure` is not a MidMeasureMP.
-    # So, this transformation simply does nothing when
-    # the program uses `catalyst.measure`.
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @qml.transforms.defer_measurements
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc():
-            qml.RY(0.123, wires=0)
-            qml.Hadamard(wires=1)
-            m_0 = qml.measure(1)
-            qml.cond(m_0, qml.RY)(np.pi / 4, wires=0)
-            return qml.expval(qml.Z(0))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit()
-    observed = compiled()
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
-
-
 def test_diagonalize_measurements(backend):
     """Test diagonalize_measurements."""
 
@@ -431,42 +285,6 @@ def test_diagonalize_measurements(backend):
     x = [np.pi / 4, np.pi / 4]
     expected = jax_jit(x)
     observed = compiled(x)
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
-
-
-@pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
-def test_dynamic_one_shot(backend):
-    """Test dynamic_one_shot"""
-    # Catalyst has its own dynamic_one_shot transform
-    # Applying PennyLane's transform will result in errors.
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @qml.transforms.dynamic_one_shot
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(x, y):
-            qml.RX(x, wires=0)
-            m0 = qml.measure(0)
-            qml.cond(m0, qml.RY)(y, wires=1)
-            return qml.expval(op=m0)
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    x = np.pi / 4
-    y = np.pi / 4
-    expected = jax_jit(x, y)
-    observed = compiled(x, y)
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
 
@@ -538,48 +356,6 @@ def test_merge_amplitude_embedding(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(
-    reason="QJIT fails with ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
-)
-def test_pattern_matching_optimization(backend):
-    """Test pattern_matching_optimization"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        ops = [qml.S(0), qml.S(0), qml.Z(0)]
-        pattern = qml.tape.QuantumTape(ops)
-
-        @partial(qml.transforms.pattern_matching_optimization, pattern_tapes=[pattern])
-        @qml.qnode(qml.device(device_name, wires=5))
-        def qfunc():
-            qml.S(wires=0)
-            qml.Z(0)
-            qml.S(wires=1)
-            qml.CZ(wires=[0, 1])
-            qml.S(wires=1)
-            qml.S(wires=2)
-            qml.CZ(wires=[1, 2])
-            qml.S(wires=2)
-            return qml.expval(qml.X(0))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit()
-    observed = compiled()
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
-
-
 def test_remove_barrier(backend):
     """Test remove_barrier"""
 
@@ -594,42 +370,6 @@ def test_remove_barrier(backend):
             qml.Barrier(wires=[0, 1])
             qml.X(0)
             return qml.expval(qml.Z(0))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit()
-    observed = compiled()
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
-
-
-@pytest.mark.xfail(
-    reason="QJIT error ValueError: Passed tape must end in `qml.expval(H)` or qml.var(H)`, where H is of type `qml.Hamiltonian`"
-)
-def test_sign_expand(backend):
-    """Test sign_expand"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        H = qml.Z(0) + 0.5 * qml.Z(2) + qml.Z(1)
-
-        @qml.transforms.sign_expand
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc():
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
-            qml.X(2)
-            return qml.expval(H)
 
         return qfunc
 
@@ -722,79 +462,6 @@ def test_split_non_commuting(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="JIT and QJIT return different shapes")
-def test_split_to_single_terms(backend):
-    """Test split_to_single_terms"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @qml.transforms.split_to_single_terms
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(x):
-            qml.RY(x[0], wires=0)
-            qml.RX(x[1], wires=1)
-            return [
-                qml.expval(qml.X(0) @ qml.Z(1) + 0.5 * qml.Y(1) + qml.Z(0)),
-                qml.expval(qml.X(1) + qml.Y(1)),
-            ]
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    x = [np.pi / 4, np.pi / 4]
-    expected = jax_jit(x)
-    observed = compiled(x)
-    assert np.allclose(expected, observed)
-
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert expected_shape == observed_shape
-
-
-@pytest.mark.xfail(reason="Both JAX JIT and QJIT fail due to this transform's dependency on PyZX")
-def test_to_zx(backend):
-    """Test to_zx"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @qml.transforms.to_zx
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(p):
-            qml.RZ(p[0], wires=1)
-            qml.RZ(p[1], wires=1)
-            qml.RX(p[2], wires=0)
-            qml.Z(0)
-            qml.RZ(p[3], wires=1)
-            qml.X(1)
-            qml.CNOT(wires=[0, 1])
-            qml.CNOT(wires=[1, 0])
-            return qml.expval(qml.Z(0) @ qml.Z(1))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    params = [5 / 4 * np.pi, 3 / 4 * np.pi, 0.1, 0.3]
-    expected = jax_jit(params)
-    observed = compiled(params)
-    assert np.allclose(expected, observed)
-
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert expected_shape == observed_shape
-
-
 def test_transpile(backend):
     """Test transpile"""
 
@@ -822,44 +489,6 @@ def test_transpile(backend):
 
     expected = jax_jit()
     observed = compiled()
-    assert np.allclose(expected, observed)
-
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert expected_shape == observed_shape
-
-
-@pytest.mark.xfail(reason="QJIT result differs from PennyLane")
-def test_unitary_to_rot(backend):
-    """Test unitary_to_rot"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-        U = scipy.stats.unitary_group.rvs(4)
-
-        @qml.transforms.unitary_to_rot
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
-        def qfunc(angles):
-            qml.QubitUnitary(U, wires=[0, 1])
-            qml.RX(angles[0], wires=0)
-            qml.RY(angles[1], wires=1)
-            qml.CNOT(wires=[1, 0])
-            return qml.expval(qml.Z(0))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    params = [0.2, 0.3]
-
-    compiled = qjit(qnode_backend)
-    observed = compiled(params)
-    expected = qnode_control(params)
-    assert np.allclose(expected, observed)
-
-    jax_jit = jax.jit(qnode_control)
-    expected = jax_jit(params)
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1496,3 +1125,374 @@ class TestTransformValidity:
             @qml.qnode(qml.device(backend, wires=1))
             def f():
                 return qml.state()
+
+
+@pytest.mark.xfail(reason="Noise models not supported on Lightning.")
+def test_add_noise(backend):
+    """Test the add_noise transform on a simple circuit"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        fcond1 = qml.noise.op_eq(qml.RX) & qml.noise.wires_in([0, 1])
+        noise1 = qml.noise.partial_wires(qml.PhaseDamping, 0.4)
+
+        fcond2 = qml.noise.op_in([qml.RX, qml.RZ])
+
+        def noise2(op, **kwargs):
+            qml.ThermalRelaxationError(
+                op.parameters[0] * 0.5, kwargs["t1"], kwargs["t2"], 0.6, op.wires
+            )
+
+        noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
+
+        @partial(qml.transforms.add_noise, noise_model=noise_model)
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(w, x, y, z):
+            qml.RX(w, wires=0)
+            qml.RY(x, wires=1)
+            qml.CNOT(wires=[0, 1])
+            qml.RY(y, wires=0)
+            qml.RX(z, wires=1)
+            return qml.expval(qml.Z(0) @ qml.Z(1))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.mixed")
+    qnode_backend = qnode_builder(backend)
+
+    expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
+    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
+def test_clifford_t_decomposition(backend):
+    """Test clifford_t_decomposition"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.transforms.clifford_t_decomposition
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(x, y):
+            qml.RX(x, 0)
+            qml.CNOT([0, 1])
+            qml.RY(y, 0)
+            return qml.expval(qml.Z(0))
+
+        return qfunc
+
+    x, y = 1.1, 2.2
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    expected = jax_jit(x, y)
+    observed = compiled(x, y)
+    assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(reason="Catalyst does not support informative transforms.")
+def test_commutation_dag(backend):
+    """Test commutation DAG"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.commutation_dag
+        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        def qfunc(x, y, z):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=0)
+            qml.CNOT(wires=[1, 2])
+            qml.RY(y, wires=1)
+            qml.Hadamard(wires=2)
+            qml.CRZ(z, wires=[2, 0])
+            qml.RY(-y, wires=1)
+            return qml.expval(qml.Z(0))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    expected = jax_jit(np.pi / 4, np.pi / 3, np.pi / 2)
+    observed = compiled(np.pi / 4, np.pi / 3, np.pi / 2)
+
+    assert expected.get_nodes() == observed.get_nodes()
+
+
+@pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
+def test_defer_measurements(backend):
+    """Test defer_measurements"""
+    # The defer_measurements transform looks for MidMeasureMP.
+    # Catalyst's `measure` is not a MidMeasureMP.
+    # So, this transformation simply does nothing when
+    # the program uses `catalyst.measure`.
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.transforms.defer_measurements
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc():
+            qml.RY(0.123, wires=0)
+            qml.Hadamard(wires=1)
+            m_0 = qml.measure(1)
+            qml.cond(m_0, qml.RY)(np.pi / 4, wires=0)
+            return qml.expval(qml.Z(0))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    expected = jax_jit()
+    observed = compiled()
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
+def test_dynamic_one_shot(backend):
+    """Test dynamic_one_shot"""
+    # Catalyst has its own dynamic_one_shot transform
+    # Applying PennyLane's transform will result in errors.
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.transforms.dynamic_one_shot
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(x, y):
+            qml.RX(x, wires=0)
+            m0 = qml.measure(0)
+            qml.cond(m0, qml.RY)(y, wires=1)
+            return qml.expval(op=m0)
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    x = np.pi / 4
+    y = np.pi / 4
+    expected = jax_jit(x, y)
+    observed = compiled(x, y)
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(
+    reason="QJIT fails with ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
+)
+def test_pattern_matching_optimization(backend):
+    """Test pattern_matching_optimization"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        ops = [qml.S(0), qml.S(0), qml.Z(0)]
+        pattern = qml.tape.QuantumTape(ops)
+
+        @partial(qml.transforms.pattern_matching_optimization, pattern_tapes=[pattern])
+        @qml.qnode(qml.device(device_name, wires=5))
+        def qfunc():
+            qml.S(wires=0)
+            qml.Z(0)
+            qml.S(wires=1)
+            qml.CZ(wires=[0, 1])
+            qml.S(wires=1)
+            qml.S(wires=2)
+            qml.CZ(wires=[1, 2])
+            qml.S(wires=2)
+            return qml.expval(qml.X(0))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    expected = jax_jit()
+    observed = compiled()
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(
+    reason="QJIT error ValueError: Passed tape must end in `qml.expval(H)` or qml.var(H)`, where H is of type `qml.Hamiltonian`"
+)
+def test_sign_expand(backend):
+    """Test sign_expand"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        H = qml.Z(0) + 0.5 * qml.Z(2) + qml.Z(1)
+
+        @qml.transforms.sign_expand
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc():
+            qml.Hadamard(wires=0)
+            qml.CNOT(wires=[0, 1])
+            qml.X(2)
+            return qml.expval(H)
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    expected = jax_jit()
+    observed = compiled()
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(reason="JIT and QJIT return different shapes")
+def test_split_to_single_terms(backend):
+    """Test split_to_single_terms"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.transforms.split_to_single_terms
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(x):
+            qml.RY(x[0], wires=0)
+            qml.RX(x[1], wires=1)
+            return [
+                qml.expval(qml.X(0) @ qml.Z(1) + 0.5 * qml.Y(1) + qml.Z(0)),
+                qml.expval(qml.X(1) + qml.Y(1)),
+            ]
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    x = [np.pi / 4, np.pi / 4]
+    expected = jax_jit(x)
+    observed = compiled(x)
+    assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(reason="Both JAX JIT and QJIT fail due to this transform's dependency on PyZX")
+def test_to_zx(backend):
+    """Test to_zx"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.transforms.to_zx
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(p):
+            qml.RZ(p[0], wires=1)
+            qml.RZ(p[1], wires=1)
+            qml.RX(p[2], wires=0)
+            qml.Z(0)
+            qml.RZ(p[3], wires=1)
+            qml.X(1)
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[1, 0])
+            return qml.expval(qml.Z(0) @ qml.Z(1))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    params = [5 / 4 * np.pi, 3 / 4 * np.pi, 0.1, 0.3]
+    expected = jax_jit(params)
+    observed = compiled(params)
+    assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
+
+
+@pytest.mark.xfail(reason="QJIT result differs from PennyLane")
+def test_unitary_to_rot(backend):
+    """Test unitary_to_rot"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+        U = scipy.stats.unitary_group.rvs(4)
+
+        @qml.transforms.unitary_to_rot
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        def qfunc(angles):
+            qml.QubitUnitary(U, wires=[0, 1])
+            qml.RX(angles[0], wires=0)
+            qml.RY(angles[1], wires=1)
+            qml.CNOT(wires=[1, 0])
+            return qml.expval(qml.Z(0))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    params = [0.2, 0.3]
+
+    compiled = qjit(qnode_backend)
+    observed = compiled(params)
+    expected = qnode_control(params)
+    assert np.allclose(expected, observed)
+
+    jax_jit = jax.jit(qnode_control)
+    expected = jax_jit(params)
+    assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
