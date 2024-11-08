@@ -88,6 +88,12 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
+def IonsDecompositionPass : Pass<"ions-decomposition"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
+
+    let constructor = "catalyst::createIonsDecompositionPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
