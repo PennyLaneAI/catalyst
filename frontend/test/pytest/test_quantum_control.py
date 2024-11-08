@@ -844,7 +844,7 @@ class TestControlledMiscMethods:
 
         base = qml.S(0) + qml.T(1)
         op = C_ctrl(base, [2])
-        assert repr(op) == "Controlled(S(0) + T(wires=[1]), control_wires=[2])"
+        assert repr(op) == "Controlled(S(0) + T(1), control_wires=[2])"
 
         op = C_ctrl(base, [2, 3], control_values=[True, False], work_wires=[4])
         assert (
