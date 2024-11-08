@@ -123,7 +123,7 @@ def test_batch_params(backend):
 
 
 def test_batch_partial(backend):
-    """Test batch partial"""
+    """Test batch_partial"""
 
     def qnode_builder(device_name):
         """Builder"""
