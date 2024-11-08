@@ -163,7 +163,7 @@ def test_batch_params(backend):
 
 
 def test_batch_partial(backend):
-    """Test batch partial"""
+    """Test batch_partial"""
 
     def qnode_builder(device_name):
         """Builder"""
@@ -302,7 +302,7 @@ def test_convert_to_numpy_parameters(backend):
 
 
 def test_diagonalize_measurements(backend):
-    """Test diagonalize_measurements."""
+    """Test diagonalize_measurements"""
 
     def qnode_builder(device_name):
         """Builder"""
@@ -667,7 +667,7 @@ class TestQuantumMonteCarlo:
             target_wire = n_wires - 1
             control_wire = n_wires
             a_mat = scipy.stats.unitary_group.rvs(2 ** (n_wires - 1), random_state=1967)
-            r_mat = scipy.stats.unitary_group.rvs(2**n_wires, random_state=1967)
+            r_mat = scipy.stats.unitary_group.rvs(2 ** n_wires, random_state=1967)
 
             @partial(
                 qml.transforms.apply_controlled_Q,
@@ -707,7 +707,7 @@ class TestQuantumMonteCarlo:
             target_wire = n_wires - 1
             estimation_wires = range(n_wires, 2 * n_wires)
             a_mat = scipy.stats.unitary_group.rvs(2 ** (n_wires - 1), random_state=1967)
-            r_mat = scipy.stats.unitary_group.rvs(2**n_wires, random_state=1967)
+            r_mat = scipy.stats.unitary_group.rvs(2 ** n_wires, random_state=1967)
 
             @partial(
                 qml.transforms.quantum_monte_carlo,
