@@ -400,12 +400,11 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli = shutil.which("catalyst-cli")
-        if cli is None:
-            cli = os.getcwd() + "/mlir/build/bin/catalyst-cli"
-        if not path.isfile(cli):
+        cli_build_path = get_lib_path("cli", "DIALECTS_BUILD_DIR")
+        cli_exe = cli_build_path + "/catalyst-cli"
+        if not path.isfile(cli_exe):
             raise FileNotFoundError("catalyst-cli executable was not found.")
-        cmd = [cli]
+        cmd = [cli_exe]
         cmd += [tmp_infile_name, "-o", output_ir_name]
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
         if not self.options.lower_to_llvm:
@@ -464,7 +463,6 @@ class Compiler:
         output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
-        print(cmd)
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)

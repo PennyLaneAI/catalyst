@@ -28,8 +28,8 @@ DEFAULT_LIB_PATHS = {
     "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
     "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
     "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
+    "cli": os.path.join(package_root, "../../../mlir/build/bin"),
 }
-
 
 def get_lib_path(project, env_var):
     """Get the library path."""
