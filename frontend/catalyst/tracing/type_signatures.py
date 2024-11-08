@@ -116,7 +116,9 @@ def verify_static_argnums(args, sig_args, static_argnums):
         None
     """
     verify_static_argnums_type(static_argnums)
-    arg_limit = max(len(args), len(sig_args))  # accommodates variable args
+
+    # `static_argnums` should be compared against the maximum args that can legally be passed to a function
+    arg_limit = max(len(args), len(sig_args))
     for argnum in static_argnums:
         if argnum < 0 or argnum >= arg_limit:
             msg = f"argnum {argnum} is beyond the valid range of [0, {arg_limit})."
