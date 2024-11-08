@@ -94,10 +94,15 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     the HybridOps have been passed to the decompose function.
     """
 
+    if len(tape) == 0 or tape[0] in (qml.StatePrep, qml.BasisState):
+        skip_initial_state_prep = capabilities.initial_state_prep_flag
+    else:
+        skip_initial_state_prep = False
+
     (toplevel_tape,), _ = decompose(
         tape,
         stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
-        skip_initial_state_prep=capabilities.initial_state_prep_flag,
+        skip_initial_state_prep=skip_initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         name="catalyst on this device",
         error=CompileError,
