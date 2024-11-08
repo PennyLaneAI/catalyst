@@ -1,5 +1,24 @@
 schema = 3
 
+# The set of all gate types supported at the runtime execution interface of the
+# device, i.e., what is supported by the `execute` method of the Device API.
+# The gate definition has the following format:
+#
+#   GATE = { properties = [ PROPS ], conditions = [ CONDS ] }
+#
+# where PROPS and CONS are zero or more comma separated quoted strings.
+#
+# PROPS: zero or more comma-separated quoted strings:
+#        - "controllable": if a controlled version of this gate is supported.
+#        - "invertible": if the adjoint of this operation is supported.
+#        - "differentiable": if device gradient is supported for this gate.
+# CONDS: zero or more comma-separated quoted strings:
+#        - "analytic" or "finiteshots": if this operation is only supported in
+#          either analytic execution or with shots, respectively.
+#        - "terms-commute": if this composite operator is only supported
+#          given that its terms commute. Only relevant for Prod, SProd, Sum,
+#          LinearCombination, and Hamiltonian.
+#
 [operators.gates]
 
 QubitUnitary            = { properties = [ "controllable", "invertible", "differentiable" ] }
@@ -40,6 +59,26 @@ DoubleExcitation        = { properties = [ "controllable", "invertible", "differ
 DoubleExcitationPlus    = { properties = [ "controllable", "invertible", "differentiable" ] }
 DoubleExcitationMinus   = { properties = [ "controllable", "invertible", "differentiable" ] }
 
+# Operations supported by the execution in Python but not directly supported by the backend
+[pennylane.operators.gates]
+
+SX = {}
+ISWAP = {}
+PSWAP = {}
+SISWAP = {}
+SQISW = {}
+BasisState = {}
+QubitStateVector = {}
+StatePrep = {}
+ControlledQubitUnitary = {}
+MultiControlledX = {}
+QubitCarry = {}
+QubitSum = {}
+OrbitalRotation = {}
+QFT = {}
+ECR = {}
+DiagonalQubitUnitary = {}
+
 # Observables supported by the device
 [operators.observables]
 
@@ -49,13 +88,13 @@ PauliZ              = { properties = ["differentiable"] }
 Hadamard            = { properties = ["differentiable"] }
 Hermitian           = { properties = ["differentiable"] }
 Identity            = { properties = ["differentiable"] }
-Projector           = { }
 SparseHamiltonian   = { properties = ["differentiable"] }
 Hamiltonian         = { properties = ["differentiable"] }
 Sum                 = { properties = ["differentiable"] }
 SProd               = { properties = ["differentiable"] }
 Prod                = { properties = ["differentiable"] }
 Exp                 = { properties = ["differentiable"] }
+Projector           = {}
 
 [measurement_processes]
 
