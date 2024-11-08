@@ -94,6 +94,10 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     the HybridOps have been passed to the decompose function.
     """
 
+    # This if statement is needed because not all classes that inherit from qml.StatePrepBase
+    # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
+    # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
+    # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
     if len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState):
         skip_initial_state_prep = capabilities.initial_state_prep_flag
     else:
