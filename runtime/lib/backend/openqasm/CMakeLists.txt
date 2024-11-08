@@ -15,7 +15,30 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-fetch_pybind11()
+find_package(Python 3
+    REQUIRED COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule)
+
+# nanobind suggests including these lines to configure CMake to perform an optimized release build
+# by default unless another build type is specified. Without this addition, binding code may run
+# slowly and produce large binaries.
+# See https://nanobind.readthedocs.io/en/latest/building.html#preliminaries
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+# Detect the installed nanobind package and import it into CMake
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_VARIABLE nanobind_ROOT OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+find_package(nanobind CONFIG REQUIRED)
+
+# Create the Python `catalyst_callback_registry` module
+# Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
+# built (`STABLE_ABI` does nothing on older Python versions).
+nanobind_add_module(openqasm_python_module STABLE_ABI openqasm_python_module.cpp)
 
 add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 
@@ -24,7 +47,6 @@ target_include_directories(rtd_openqasm PRIVATE .
     ${backend_includes}
     )
 
-pybind11_add_module(openqasm_python_module SHARED openqasm_python_module.cpp)
 
 add_dependencies(rtd_openqasm openqasm_python_module)
 target_compile_definitions(rtd_openqasm PUBLIC -DOPENQASM_PY=\"$<TARGET_FILE_NAME:openqasm_python_module>\")
