@@ -52,7 +52,7 @@ from catalyst.utils.exceptions import CompileError
 
 @pytest.mark.xfail(reason="Noise models not supported on Lightning.")
 def test_add_noise(backend):
-    """Test the add noise transform on a simple circuit"""
+    """Test the add_noise transform on a simple circuit"""
 
     def qnode_builder(device_name):
         """Builder"""
