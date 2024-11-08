@@ -301,6 +301,36 @@ def test_convert_to_numpy_parameters(backend):
     assert expected_shape == observed_shape
 
 
+def test_decompose(backend):
+    """Test decompose"""
+
+    def qnode_builder(device_name):
+        """Builder"""
+
+        @qml.transforms.decompose
+        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        def qfunc():
+            qml.Hadamard(wires=[0])
+            qml.Toffoli(wires=[0, 1, 2])
+            return qml.expval(qml.Z(0))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
+
+    expected = jax_jit()
+    observed = compiled()
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
+
+
 def test_diagonalize_measurements(backend):
     """Test diagonalize_measurements"""
 
