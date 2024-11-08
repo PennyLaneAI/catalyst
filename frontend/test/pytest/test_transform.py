@@ -262,7 +262,7 @@ def test_convert_to_numpy_parameters(backend):
 
 
 def test_diagonalize_measurements(backend):
-    """Test diagonalize_measurements."""
+    """Test diagonalize_measurements"""
 
     def qnode_builder(device_name):
         """Builder"""
