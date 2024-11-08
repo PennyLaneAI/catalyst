@@ -61,7 +61,7 @@ def test_add_noise(backend):
 
         fcond2 = qml.noise.op_in([qml.RX, qml.RZ])
 
-        def noise2(op, **kwargs):
+        def noise2(op, **_):
             qml.CRX(op.data[0], wires=[op.wires[0], (op.wires[0] + 1) % 2])
 
         noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
