@@ -14,7 +14,7 @@
 
 
 """
-This module the pipelines that are used to compile a quantum function to LLVM.
+This module contains the pipelines that are used to compile a quantum function to LLVM.
 
 .. note::
 
