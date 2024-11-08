@@ -667,7 +667,7 @@ class TestQuantumMonteCarlo:
             target_wire = n_wires - 1
             control_wire = n_wires
             a_mat = scipy.stats.unitary_group.rvs(2 ** (n_wires - 1), random_state=1967)
-            r_mat = scipy.stats.unitary_group.rvs(2 ** n_wires, random_state=1967)
+            r_mat = scipy.stats.unitary_group.rvs(2**n_wires, random_state=1967)
 
             @partial(
                 qml.transforms.apply_controlled_Q,
@@ -707,7 +707,7 @@ class TestQuantumMonteCarlo:
             target_wire = n_wires - 1
             estimation_wires = range(n_wires, 2 * n_wires)
             a_mat = scipy.stats.unitary_group.rvs(2 ** (n_wires - 1), random_state=1967)
-            r_mat = scipy.stats.unitary_group.rvs(2 ** n_wires, random_state=1967)
+            r_mat = scipy.stats.unitary_group.rvs(2**n_wires, random_state=1967)
 
             @partial(
                 qml.transforms.quantum_monte_carlo,
