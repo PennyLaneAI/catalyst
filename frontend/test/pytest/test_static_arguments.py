@@ -124,6 +124,7 @@ class TestStaticArguments:
         assert function == f.compiled_function
 
     def test_default_static_arguments(self):
+        """Test QJIT with static arguments that have a default value."""
 
         @qjit(static_argnums=[1])
         def f(y, x=9):
