@@ -238,7 +238,6 @@ class Folding(Enum):
 ##############
 
 zne_p = core.Primitive("zne")
-zne_p.multiple_results = True
 qdevice_p = core.Primitive("qdevice")
 qdevice_p.multiple_results = True
 qalloc_p = core.Primitive("qalloc")
@@ -1053,7 +1052,7 @@ def _zne_abstract_eval(*args, folding, jaxpr, fn):  # pylint: disable=unused-arg
     shape = list(args[-1].shape)
     if len(jaxpr.out_avals) > 1:
         shape.append(len(jaxpr.out_avals))
-    return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
+    return core.ShapedArray(shape, jaxpr.out_avals[0].dtype)
 
 
 def _folding_attribute(ctx, folding):
@@ -1795,7 +1794,7 @@ def _probs_abstract_eval(obs, shape, shots=None):
     return core.ShapedArray(shape, jax.numpy.float64)
 
 
-@var_p.def_impl
+@probs_p.def_impl
 def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 

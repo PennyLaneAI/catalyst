@@ -44,7 +44,7 @@ from catalyst.tracing.contexts import EvaluationContext
 
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
+def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
 
     Args:
@@ -131,55 +131,55 @@ def pipeline(fn=None, *, pass_pipeline: Optional[dict[str, dict[str, str]]] = No
     will always take precedence over global pass pipelines.
     """
 
-    kwargs = copy.copy(locals())
-    kwargs.pop("fn")
+    def _decorator(fn=None, **kwargs):
+        if fn is None:
+            return functools.partial(pipeline, **kwargs)
 
-    if fn is None:
-        return functools.partial(pipeline, **kwargs)
+        if not isinstance(fn, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-    if not isinstance(fn, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        if pass_pipeline is None:
+            # TODO: design a default peephole pipeline
+            return fn
 
-    if pass_pipeline is None:
-        # TODO: design a default peephole pipeline
-        return fn
+        fn_original_name = fn.__name__
+        wrapped_qnode_function = fn.func
+        fn_clone = copy.copy(fn)
+        uniquer = str(_rename_to_unique())
+        fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
 
-    fn_original_name = fn.__name__
-    wrapped_qnode_function = fn.func
-    fn_clone = copy.copy(fn)
-    uniquer = str(_rename_to_unique())
-    fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
+        pass_names = _API_name_to_pass_name()
 
-    pass_names = _API_name_to_pass_name()
+        def wrapper(*args, **kwrags):
+            # TODO: we should not match pass targets by function name.
+            # The quantum scope work will likely put each qnode into a module
+            # instead of a `func.func ... attributes {qnode}`.
+            # When that is in place, the qnode's module can have a proper attribute
+            # (as opposed to discardable) that records its transform schedule, i.e.
+            #    module_with_transform @name_of_module {
+            #      // transform schedule
+            #    } {
+            #      // contents of the module
+            #    }
+            # This eliminates the need for matching target functions by name.
 
-    def wrapper(*args, **kwrags):
-        # TODO: we should not match pass targets by function name.
-        # The quantum scope work will likely put each qnode into a module
-        # instead of a `func.func ... attributes {qnode}`.
-        # When that is in place, the qnode's module can have a proper attribute
-        # (as opposed to discardable) that records its transform schedule, i.e.
-        #    module_with_transform @name_of_module {
-        #      // transform schedule
-        #    } {
-        #      // contents of the module
-        #    }
-        # This eliminates the need for matching target functions by name.
+            if EvaluationContext.is_tracing():
+                for API_name, pass_options in pass_pipeline.items():
+                    opt = ""
+                    for option, option_value in pass_options.items():
+                        opt += " " + str(option) + "=" + str(option_value)
+                    apply_registered_pass_p.bind(
+                        pass_name=pass_names[API_name],
+                        options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
+                    )
+            return wrapped_qnode_function(*args, **kwrags)
 
-        if EvaluationContext.is_tracing():
-            for API_name, pass_options in pass_pipeline.items():
-                opt = ""
-                for option, option_value in pass_options.items():
-                    opt += " " + str(option) + "=" + str(option_value)
-                apply_registered_pass_p.bind(
-                    pass_name=pass_names[API_name],
-                    options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
-                )
-        return wrapped_qnode_function(*args, **kwrags)
+        fn_clone.func = wrapper
+        fn_clone._peephole_transformed = True  # pylint: disable=protected-access
 
-    fn_clone.func = wrapper
-    fn_clone._peephole_transformed = True  # pylint: disable=protected-access
+        return fn_clone
 
-    return fn_clone
+    return _decorator
 
 
 def cancel_inverses(fn=None):
@@ -214,6 +214,10 @@ def cancel_inverses(fn=None):
 
         As a result, circuit inspection tools such as :func:`~.draw` will continue
         to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationPass"`` stage via the
+        :func:`~.get_compilation_stage` function.
 
     Args:
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
@@ -310,6 +314,89 @@ def cancel_inverses(fn=None):
     return fn_clone
 
 
+def merge_rotations(fn=None):
+    """
+    Specify that the ``-merge-rotations`` MLIR compiler pass
+    for merging roations (peephole) will be applied.
+
+    The full list of supported gates are as follows:
+
+    :class:`qml.RX <pennylane.RX>`,
+    :class:`qml.CRX <pennylane.CRX>`,
+    :class:`qml.RY <pennylane.RY>`,
+    :class:`qml.CRY <pennylane.CRY>`,
+    :class:`qml.RZ <pennylane.RZ>`,
+    :class:`qml.CRZ <pennylane.CRZ>`,
+    :class:`qml.PhaseShift <pennylane.PhaseShift>`,
+    :class:`qml.ControlledPhaseShift <pennylane.ControlledPhaseShift>`,
+    :class:`qml.MultiRZ <pennylane.MultiRZ>`.
+
+
+    .. note::
+
+        Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
+        the QNode itself will not be changed or transformed by applying these
+        decorators.
+
+        As a result, circuit inspection tools such as :func:`~.draw` will continue
+        to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationPass"`` stage via the
+        :func:`~.get_compilation_stage` function.
+
+    Args:
+        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    In this example the three :class:`qml.RX <pennylane.RX>` will be merged in a single
+    one with the sum of angles as parameter.
+
+    .. code-block:: python
+
+        from catalyst.debug import get_compilation_stage
+        from catalyst.passes import merge_rotations
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit(keep_intermediate=True)
+        @merge_rotations
+        @qml.qnode(dev)
+        def circuit(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(0.1, wires=0)
+            qml.RX(x**2, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit(0.54)
+    Array(0.5965506257017892, dtype=float64)
+    """
+    if not isinstance(fn, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+
+    funcname = fn.__name__
+    wrapped_qnode_function = fn.func
+    uniquer = str(_rename_to_unique())
+
+    def wrapper(*args, **kwrags):
+        if EvaluationContext.is_tracing():
+            apply_registered_pass_p.bind(
+                pass_name="merge-rotations",
+                options=f"func-name={funcname}" + "_merge_rotations" + uniquer,
+            )
+        return wrapped_qnode_function(*args, **kwrags)
+
+    fn_clone = copy.copy(fn)
+    fn_clone.func = wrapper
+    fn_clone.__name__ = funcname + "_merge_rotations" + uniquer
+
+    return fn_clone
+
+
 ## IMPL and helpers ##
 # pylint: disable=missing-function-docstring
 class _PipelineNameUniquer:
@@ -332,7 +419,7 @@ def _rename_to_unique():
 
 
 def _API_name_to_pass_name():
-    return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotation"}
+    return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotations"}
 
 
 def _inject_transform_named_sequence():

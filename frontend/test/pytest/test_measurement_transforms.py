@@ -21,16 +21,14 @@ import pathlib
 import platform
 import tempfile
 from functools import partial
-from typing import Optional
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms import split_non_commuting, split_to_single_terms
-from pennylane.transforms.core import TransformProgram
 
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, get_device_capabilities, get_device_toml_config
@@ -44,10 +42,10 @@ from catalyst.utils.toml import OperationProperties
 # pylint: disable=attribute-defined-outside-init
 
 
-class DummyDevice(Device):
-    """A dummy device from the device API."""
+class CustomDevice(Device):
+    """A Custom Device following the new API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -63,27 +61,21 @@ class DummyDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
+        # Borrowing the NullQubit library:
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        )
+        return "CustomQubit", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
 
-    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
-        """Preprocessing."""
-        if execution_config is None:
-            execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
-        transform_program.add_transform(split_non_commuting)
-        return transform_program, execution_config
+class CustomDeviceLimitedMPs(Device):
+    """A Custom Device from the device API without wires."""
 
-
-class DummyDeviceLimitedMPs(Device):
-    """A dummy device from the device API without wires."""
-
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
@@ -98,16 +90,19 @@ class DummyDeviceLimitedMPs(Device):
         """
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
-        return "dummy.remote", lib_path
+        # Borrowing the NullQubit library:
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        )
+        return "CustomDevice", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
 
     def __enter__(self, *args, **kwargs):
-        dummy_toml = self.config
-        with open(dummy_toml, mode="r", encoding="UTF-8") as f:
+        toml_file_path = self.config
+        with open(toml_file_path, mode="r", encoding="UTF-8") as f:
             toml_contents = f.readlines()
 
         updated_toml_contents = []
@@ -309,7 +304,7 @@ class TestMeasurementTransforms:
         allow_sample = "sample" in device_measurements
         allow_counts = "counts" in device_measurements
 
-        with DummyDeviceLimitedMPs(
+        with CustomDeviceLimitedMPs(
             wires=4, shots=1000, allow_counts=allow_counts, allow_samples=allow_sample
         ) as dev:
 
@@ -444,7 +439,7 @@ class TestMeasurementTransforms:
         res = qml.qjit(measurements_from_samples(circuit, dev.wires), seed=37)(theta)
 
         if len(measurement().wires) == 1:
-            samples_expected = qml.qjit(circuit)(theta)
+            samples_expected = qml.qjit(circuit, seed=37)(theta)
         else:
             samples_expected = circuit(theta)
 
@@ -489,7 +484,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=shots)
 
-        @qml.qjit
+        @qml.qjit(seed=37)
         @partial(measurements_from_samples, device_wires=dev.wires)
         @qml.qnode(dev)
         def circuit(theta: float):
@@ -543,7 +538,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=3000)
 
-        @qml.qjit
+        @qml.qjit(seed=37)
         @partial(measurements_from_counts, device_wires=dev.wires)
         @qml.qnode(dev)
         def circuit(theta: float):
@@ -738,7 +733,7 @@ class TestMeasurementTransforms:
         are added to the transform program from preprocess as expected, based on the
         sum_observables_flag and the non_commuting_observables_flag"""
 
-        dev = DummyDevice(wires=4, shots=1000)
+        dev = CustomDevice(wires=4, shots=1000)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)

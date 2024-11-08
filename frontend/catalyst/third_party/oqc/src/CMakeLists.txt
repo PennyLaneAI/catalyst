@@ -2,14 +2,10 @@ cmake_minimum_required(VERSION 3.20)
 
 project(catalyst_oqc)
 
-option(USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER_PATH OFF)
-
 set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/include")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/lib/backend/common")
-set(util_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/utils")
 set(runtime_lib "${RUNTIME_BUILD_DIR}/lib")
 set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
-set(catalyst_python_interpreter_path "${RUNTIME_BUILD_DIR}/utils/runtime-build/lib")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,24 +43,29 @@ add_library(rtd_oqc SHARED OQCDevice.cpp)
 target_include_directories(rtd_oqc PUBLIC .
     ${runtime_includes}
     ${backend_includes}
-    ${util_includes}
     )
 
 set(OQC_LIBRARIES
     rtd_oqc
-    catalyst_python_interpreter
 )
 
 set_target_properties(rtd_oqc PROPERTIES BUILD_RPATH "$ORIGIN/../utils")
 target_link_directories(rtd_oqc PRIVATE ${runtime_lib})
-target_link_libraries(rtd_oqc PRIVATE pybind11::module catalyst_python_interpreter)
 
-if(USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER_PATH)
- target_link_directories(rtd_oqc PRIVATE  ${catalyst_python_interpreter_path})
-endif()
-unset(USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER_PATH CACHE)
+pybind11_add_module(oqc_python_module SHARED oqc_python_module.cpp)
+target_include_directories(oqc_python_module PRIVATE ${runtime_includes})
+
+add_dependencies(rtd_oqc oqc_python_module)
+target_compile_definitions(rtd_oqc PUBLIC -DOQC_PY=\"$<TARGET_FILE_NAME:oqc_python_module>\")
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET rtd_oqc APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:oqc_python_module>")
+if(NOT APPLE)
+    set_property(TARGET rtd_oqc APPEND PROPERTY BUILD_RPATH $ORIGIN)
+else()
+    set_property(TARGET rtd_oqc APPEND PROPERTY BUILD_RPATH @loader_path)
+endif()
+
 file(COPY ${PROJECT_SOURCE_DIR}/oqc.toml DESTINATION ./backend)
 
 add_subdirectory(tests)
