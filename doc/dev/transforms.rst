@@ -38,10 +38,10 @@ Let's look at a simple example starting in Python:
     def circuit(x: complex):
         qml.Hadamard(wires=0)
 
-        A = np.array([1, 0], [0, np.exp(x)])
+        A = np.array([[1, 0], [0, np.exp(x)]])
         qml.QubitUnitary(A, wires=0)
 
-        B = np.array([1, 0], [0, np.exp(2*x)])
+        B = np.array([[1, 0], [0, np.exp(2*x)]])
         qml.QubitUnitary(B, wires=0)
 
         return measure(0)
@@ -55,24 +55,22 @@ The corresponding IR might look something like this (simplified):
         %c10 = complex.constant [1.0, 0.0] : complex<f64>
         %c20 = complex.constant [2.0, 0.0] : complex<f64>
 
-        %reg = quantum.alloc(1) : !quantum.reg
-        %q0 = quantum.extract %reg[0] : !quantum.bit
-
-        %q1 = quantum.custom "Hadamard"() %q0 : !quantum.bit
-
         %0 = complex.exp %arg0 : complex<f64>
-        %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
-        %q2 = quantum.unitary %A, %q1 : !quantum.bit
+        %A = tensor.from_elements %c10, %c00, %c00, %0 : tensor<2x2xcomplex<f64>>
 
         %1 = complex.mul %arg0, %c20 : complex<f64>
-        %2 = complex.exp %0 : complex<f64>
+        %2 = complex.exp %1 : complex<f64>
         %B = tensor.from_elements %c10, %c00, %c00, %2 : tensor<2x2xcomplex<f64>>
-        %q3 = quantum.unitary %B, %q2 : !quantum.bit
 
-        %m = quantum.measure %q3 : i1
+        %reg = quantum.alloc(1) : !quantum.reg
+        %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+        %q1 = quantum.custom "Hadamard"() %q0 : !quantum.bit
+        %q2 = quantum.unitary(%A : tensor<2x2xcomplex<f64>>) %q1 : !quantum.bit
+        %q3 = quantum.unitary(%B : tensor<2x2xcomplex<f64>>) %q2 : !quantum.bit
 
-        quantum.dealloc %r : !quantum.reg
-        func.return %m : i1
+        %m, %q4 = quantum.measure %q3 : i1, !quantum.bit
+
+        return %m : i1
     }
 
 A few things you might note in this representation:
@@ -100,6 +98,138 @@ classical instructions as well as side-effecting operations (e.g., print) can al
 same representation.
 
 
+Writing and running your first Catalyst pass
+============================================
+
+If this is your first time writing an MLIR pass, the boilerplate can be quite overwhelming.
+Let's first set up the various boilerplate items required to register and run a new pass. 
+
+We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout.
+Note that the ``mlir/include`` and ``mlir/lib`` directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect.
+
+The first thing to do is to create the pass object in the `tablegen <https://mlir.llvm.org/docs/PassManagement/#tablegen-specification>`_ ``mlir/include/Catalyst/Transforms/Passes.td``:
+
+.. code-block::
+
+    def MyHelloWorldPass : Pass<"my-hello-world"> {
+        let summary = "An empty pass boilerplate that prints out hello world.";
+
+        let constructor = "catalyst::createMyHelloWorldPass()";
+    }
+
+When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPassBase``, alongside the various necessary boilerplate methods in the MLIR infrastructure. 
+Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
+
+Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/MyHelloWorldPass.cpp`` with the following content:
+
+.. code-block:: cpp
+
+    #define DEBUG_TYPE "myhelloworld"
+
+    #include "Catalyst/IR/CatalystDialect.h"
+    #include "mlir/Pass/Pass.h"
+    #include "llvm/Support/Debug.h"
+
+    using namespace llvm;
+    using namespace mlir;
+    using namespace catalyst;
+
+    namespace catalyst {
+    #define GEN_PASS_DEF_MYHELLOWORLDPASS
+    #define GEN_PASS_DECL_MYHELLOWORLDPASS
+    #include "Catalyst/Transforms/Passes.h.inc"
+
+    struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {
+        using impl::MyHelloWorldPassBase<MyHelloWorldPass>::MyHelloWorldPassBase;
+
+        void runOnOperation() override { llvm::errs() << "Hello world!\n"; }
+    };
+
+    std::unique_ptr<Pass> createMyHelloWorldPass() { return std::make_unique<MyHelloWorldPass>(); }
+
+    } // namespace catalyst
+
+We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase`` that tablegen will build in the namespace ``impl``. 
+The function that determines what your pass actually does is the ``void runOnOperation()``. Currently, all this pass does is print out ``"Hello world!\n"``.
+
+(A sidenote on printing messages in MLIR: there are two major printing options in LLVM. The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``, which only prints when a debug flag is set. 
+The other option is the ``errs()`` used here, which will print no matter what.)
+
+This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file (or the CMakeLists.txt of whichever directory that has your new pass file): 
+
+.. code-block::
+
+    file(GLOB SRC
+        ...
+        MyHelloWorldPass.cpp
+    )
+
+After writing the pass, we need to register it in a few places. In ``mlir/include/Catalyst/Transforms/Passes.h``, add the method 
+
+.. code-block:: cpp
+
+    namespace catalyst {
+        ...
+        std::unique_ptr<mlir::Pass> createMyHelloWorldPass();
+        ...
+    }
+
+And in ``mlir/lib/Catalyst/Transforms/RegisterAllPasses.cpp``, register the pass via 
+
+.. code-block:: cpp
+
+    void catalyst::registerAllCatalystPasses()
+    {
+        ...
+        mlir::registerPass(catalyst::createMyHelloWorldPass);
+        ...
+    }
+
+Note that this addition in ``RegisterAllPasses.cpp`` needs to happen in the ``lib/Catalyst/Transforms`` directory, regardless of which dialect your pass belongs to.
+
+Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and call the command line instruction
+
+.. code-block::
+
+    make dialects
+
+The tool to run passes is the executable ``quantum-opt`` at the location ``mlir/build/bin/quantum-opt``.
+Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
+Alternatively, you can add ``quantum-opt``'s directory to your ``PATH`` by having the following in your ``.zshrc`` or ``.bashrc``:
+
+.. code-block::
+
+    export PATH=<path_to_catalyst_root_directory>/mlir/build/bin:$PATH
+
+We can inspect by all the available passes by running ``quantum-opt --help``:
+
+.. code-block::
+
+    OVERVIEW: Quantum optimizer driver
+    ...
+    USAGE: quantum-opt [options] <input file>
+
+    OPTIONS:
+        ...
+        --my-hello-world                   -   An empty pass boilerplate that prints out hello world.
+
+Here the displayed ``--help`` message will be the ``summary`` we wrote in the tablegen file. The command line option to run our new pass is the template string in the def line in the tablegen file. 
+
+To run the pass, simply do 
+
+.. code-block::
+
+    ./mlir/build/bin/quantum-opt -my-hello-world input.mlir
+
+on any input mlir file ``input.mlir``. And our new pass will print out ``Hello world!``. 
+
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the hello world pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3
+
+
 Writing transformations on Catalyst's IR
 ========================================
 
@@ -110,11 +240,11 @@ they act on the same qubit in immediate succession:
 .. code-block:: mlir
 
     %0 = complex.exp %arg0 : complex<f64>
-    %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
+    %A = tensor.from_elements %c10, %c00, %c00, %0 : tensor<2x2xcomplex<f64>>
     %q2 = quantum.unitary %A, %q1 : !quantum.bit                                (A)
 
     %1 = complex.mul %arg0, %c20 : complex<f64>
-    %2 = complex.exp %0 : complex<f64>
+    %2 = complex.exp %1 : complex<f64>
     %B = tensor.from_elements %c10, %c00, %c00, %2 : tensor<2x2xcomplex<f64>>
     %q3 = quantum.unitary %B, %q2 : !quantum.bit                                (B)
 
@@ -160,23 +290,29 @@ Let's implement it in C++:
 
 .. code-block:: cpp
 
-    LogicalResult QubitUnitaryFusion::match(QubitUnitaryOp op)
+    LogicalResult match(QubitUnitaryOp op) const override
     {
         ValueRange qbs = op.getInQubits();
         Operation *parent = qbs[0].getDefiningOp();
 
-        if (!isa<QubitUnitaryOp>(parent))
+        // Parent should be a QubitUnitaryOp
+        if (!isa<QubitUnitaryOp>(parent)) {
             return failure();
+        }
 
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(parent);
         ValueRange parentQbs = parentOp.getOutQubits();
 
-        if (qbs.size() != parentQbs.size())
+        // Parent's output qubits should be the current op's input qubits,
+        // and the qubits need to be in the same order
+        if (qbs.size() != parentQbs.size()) {
             return failure();
+        }
 
         for (auto [qb1, qb2] : llvm::zip(qbs, parentQbs))
-            if (qb1 != qb2)
+            if (qb1 != qb2) {
                 return failure();
+            }
 
         return success();
     }
@@ -226,21 +362,54 @@ In C++ it will look as follows:
 
 .. code-block:: cpp
 
-    void QubitUnitaryFusion::rewrite(QubitUnitaryOp op, PatternRewriter &rewriter)
+    void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
     {
         ValueRange qbs = op.getInQubits();
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(qbs[0].getDefiningOp());
 
-        Value m1 = op.getMatrix();
-        Value m2 = parentOp.getMatrix();
+        // In the tablegen definition of `QubitUnitaryOp`, there is a
+        // field called `$matrix`, storing the matrix for the unitary gate.
+        // Tablegen automatically generates getters for all of the fields.
+        mlir::Value m1 = op.getMatrix();
+        mlir::Value m2 = parentOp.getMatrix();
 
-        linalg::MatmulOp matmul = rewriter.create<linalg::MatmulOp>(op.getLoc(), {m1, m2}, {});
-        Value res = matmul.getResult(0);
+        // Get the type of a 2x2 complex matrix
+        // Note that both m1 and m2 have this type already
+        mlir::Type MatrixType = m1.getType();
 
-        rewriter.updateRootInPlace(op, [&] {
-            op->setOperand(0, res);
+        // Create the matrix multiplication operation
+        // The linalg.matmul op's semantics is:
+        //   linalg.matmul({A, B}, {C})
+        // performs C+=A*B
+        // so we need to create a zero matrix of the desired type and shape first
+        tensor::EmptyOp zeromat =
+            rewriter.create<tensor::EmptyOp>(op.getLoc(), MatrixType, ValueRange{});
+
+        // The first argument to the `create` need to be a `Location`
+        // which can usually just be a `getLoc()` from any operation you have handy
+        // The second argument needs to be (a list of) type(s) of the operation's output
+        // The third argument needs to be (a list of) input value(s) to the operation
+        linalg::MatmulOp matmul = rewriter.create<linalg::MatmulOp>(
+            op.getLoc(), TypeRange{MatrixType}, ValueRange{m1, m2}, ValueRange{zeromat});
+
+        // Some peculiarity for the matmul operation; no need to worry about it here
+        matmul->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({2, 1}));
+
+        // Replace the matrix for the parent unitary (which is the first unitary op)
+        // with the product matrix
+        // Note: we need to move the zero matrix
+        // and the matmul before the parent unitary
+        // so all of them are defined before being used by the parent unitary
+        zeromat->moveBefore(parentOp);
+        matmul->moveBefore(parentOp);
+        mlir::Value res = matmul.getResult(0);
+        rewriter.modifyOpInPlace(parentOp, [&] {
+            parentOp->setOperand(0, res);
         });
-        rewriter.replaceOp(parentOp, parentOp.getResults());
+
+        // The second unitary is not needed anymore
+        // Whoever uses the second unitary, use the first one instead!
+        op.replaceAllUsesWith(parentOp);
     }
 
 When writing transformations, the rewriter is the most important tool we have. It can create new
@@ -305,9 +474,9 @@ changes (also called the insertion point). Let's have look at some of these elem
 
   .. code-block:: cpp
 
-      rewriter.updateRootInPlace(op, [&] {
-          op->setOperand(0, res);
-      });
+        rewriter.modifyOpInPlace(parentOp, [&] {
+            parentOp->setOperand(0, res);
+        });
 
   Note that in order to change to results on an operation you will need to create a copy of it
   and erase the existing operation, they cannot be modified in-place.
@@ -353,6 +522,12 @@ To apply patterns we need a `pattern applicator <https://mlir.llvm.org/docs/Patt
 There a few in MLIR but typically you can just use the greedy pattern rewrite driver
 (``applyPatternsAndFoldGreedily``), which will iterative over the IR and apply patterns until a
 fixed point is reached.
+
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/9afcc3500e12e5a51b78dda76cd4d27bdf4c8905
 
 
 Writing more general transformations
