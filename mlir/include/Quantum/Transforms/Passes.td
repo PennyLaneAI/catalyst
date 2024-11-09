@@ -131,6 +131,13 @@ def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     let options = QuantumCircuitTransformationPass.options;
 }
 
+def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
+    let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleSWAPPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
