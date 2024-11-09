@@ -643,9 +643,7 @@ class QJIT(CatalystCallable):
             Tuple[Any]: the dynamic argument signature
         """
 
-        # use inspect to get parameters defined in the function declaration
-        sig_args = inspect.signature(self.original_function).parameters
-        verify_static_argnums(args, sig_args, self.compile_options.static_argnums)
+        verify_static_argnums(args, self.original_function, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
 

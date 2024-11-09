@@ -104,18 +104,21 @@ def verify_static_argnums_type(static_argnums):
     return None
 
 
-def verify_static_argnums(args, sig_args, static_argnums):
+def verify_static_argnums(args, fn, static_argnums):
     """Verify that static_argnums have correct type and range.
 
     Args:
         args (Iterable): arguments to a compiled function
-        sig_args (Iterable): arguments from the signature of a compiled function
+        fn (Callable): the quantum or classical function in question
         static_argnums (Iterable[int]): indices to verify
 
     Returns:
         None
     """
     verify_static_argnums_type(static_argnums)
+
+    # use inspect to get parameters defined in the function declaration
+    sig_args = inspect.signature(fn).parameters
 
     # `static_argnums` should be compared to the maximum args that can be passed to a function
     arg_limit = max(len(args), len(sig_args))
