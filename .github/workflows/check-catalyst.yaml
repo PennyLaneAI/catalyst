@@ -440,7 +440,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "DIALECTS_BUILD_DIR="$(pwd)/quantum-build" >> $GITHUB_ENV
+        echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
 
     - name: Run Python Lit Tests
       run: |
@@ -512,7 +512,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "DIALECTS_BUILD_DIR="$(pwd)/quantum-build" >> $GITHUB_ENV
+        echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -568,7 +568,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "DIALECTS_BUILD_DIR="$(pwd)/quantum-build" >> $GITHUB_ENV
+        echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
 
     - name: Run Python Pytest Tests
       run: |
