@@ -173,7 +173,7 @@ extern "C" NB_EXPORT char *runCircuit(const char *_circuit, const char *_device,
     nb::object scope = nb::module_::import_("__main__").attr("__dict__");
     nb::exec(nb::str(program.c_str()), scope);
     auto retval = nb::cast<std::string>(scope["py_get_results"](circuit, device, kwargs, shots));
-    char *retptr = (char *)malloc(sizeof(char *) * retval.size() + 1);
+    char *retptr = static_cast<char *>(malloc(sizeof(char *) * retval.size() + 1));
     std::memcpy(retptr, retval.c_str(), sizeof(char *) * retval.size());
     return retptr;
 }
