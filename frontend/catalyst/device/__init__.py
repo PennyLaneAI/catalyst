@@ -22,7 +22,7 @@ from catalyst.device.qjit_device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
-    get_device_toml_capabilities
+    get_device_toml_capabilities,
 )
 
 __all__ = (

@@ -25,7 +25,9 @@ import pennylane as qml
 import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
+from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.tape import QuantumScript
+from urllib3 import request
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (
@@ -42,35 +44,8 @@ from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    OperationProperties,
-    ProgramFeatures,
-    TOMLDocument,
-    load_device_capabilities,
-    read_toml_file,
-)
 
 # pylint: disable=unused-argument
-
-
-def get_test_config(config_text: str) -> TOMLDocument:
-    """Parse test config into the TOMLDocument structure"""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(config_text)
-        config = read_toml_file(toml_file)
-        return config
-
-
-def get_test_device_capabilities(
-    program_features: ProgramFeatures, config_text: str
-) -> DeviceCapabilities:
-    """Parse test config into the DeviceCapabilities structure"""
-    config = get_test_config(config_text)
-    device_capabilities = load_device_capabilities(config, program_features)
-    return device_capabilities
 
 
 class OtherHadamard(qml.Hadamard):
@@ -110,15 +85,17 @@ class OtherRX(qml.RX):
 class CustomDevice(Device):
     """A dummy device from the device API."""
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
+
+    _to_matrix_ops = {
+        "DiagonalQubitUnitary": OperatorProperties(),
+        "BlockEncode": OperatorProperties(),
+    }
 
     def __init__(self, wires, shots=1024):
-        print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
-        dummy_capabilities = get_device_capabilities(self)
-        dummy_capabilities.native_ops.pop("BlockEncode")
-        dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.qjit_capabilities = dummy_capabilities
+        self.capabilities.operations.pop("BlockEncode")
+        self.qjit_capabilities = self.capabilities
 
     @staticmethod
     def get_c_interface():
@@ -235,42 +212,41 @@ HYBRID_OPS = [
     (cond_op, Cond, 2),
 ]
 
-capabilities = get_test_device_capabilities(
-    ProgramFeatures(False),
-    dedent(
-        """
-        schema = 2
-        [operators.gates.native]
-        PauliX = { }
-        PauliZ = { }
-        RX = { }
-        RY = { }
-        RZ = { }
-        CNOT = { }
-        HybridAdjoint = { }
-        ForLoop = { }
-        WhileLoop = { }
-        Cond = { }
-        QubitUnitary = { }
+TEST_DEVICE_CONFIG_TEXT = """
+schema = 2
+[operators.gates.native]
+PauliX = { }
+PauliZ = { }
+RX = { }
+RY = { }
+RZ = { }
+CNOT = { }
+HybridAdjoint = { }
+ForLoop = { }
+WhileLoop = { }
+Cond = { }
+QubitUnitary = { }
 
-        [operators.gates.matrix]
-        S = { }
-    """
-    ),
-)
+[operators.gates.matrix]
+S = { }
+"""
 
 
 class TestPreprocessHybridOp:
     """Test that the operators on the tapes nested inside HybridOps are also decomposed"""
 
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
     @pytest.mark.parametrize("op, op_class, num_regions", HYBRID_OPS)
-    def test_hybrid_op_decomposition(self, op, op_class, num_regions):
+    def test_hybrid_op_decomposition(self, op, op_class, num_regions, request):
         """Tests that for a tape containing a HybridOp that contains unsupported
         Operators, the unsupported Operators are decomposed"""
 
         # hack for unit test (since it doesn't create a full context)
         for region in op.regions:
             region.trace = None
+
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
         # create and decompose the tape
         tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
@@ -433,7 +409,9 @@ class TestPreprocessHybridOp:
         assert np.isclose(res, expected_res)
         assert final_phi > 2.0
 
-    def test_decomposition_of_nested_HybridOp(self):
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
+    def test_decomposition_of_nested_HybridOp(self, request):
         """Tests that HybridOps with HybridOps nested inside them are still decomposed correctly"""
 
         # make a weird nested op
@@ -454,6 +432,8 @@ class TestPreprocessHybridOp:
         for region in conditional_op.regions:
             region.trace = None
         for_loop_op.regions[0].trace = None
+
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
         # do the decomposition and get the new tape
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -489,10 +469,14 @@ class TestPreprocessHybridOp:
         assert "Hadamard" not in [op.name for op in adj_subtape.operations]
         assert "RZ" in [op.name for op in adj_subtape.operations]
 
-    def test_controlled_decomposes_to_unitary_listed(self):
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
+    def test_controlled_decomposes_to_unitary_listed(self, request):
         """Test that a PennyLane toml-listed operation is decomposed to a QubitUnitary"""
 
         tape = qml.tape.QuantumScript([qml.PauliX(0), qml.S(0)])
+
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
@@ -501,10 +485,14 @@ class TestPreprocessHybridOp:
         assert isinstance(new_tape.operations[0], qml.PauliX)
         assert isinstance(new_tape.operations[1], qml.QubitUnitary)
 
-    def test_controlled_decomposes_to_unitary_controlled(self):
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
+    def test_controlled_decomposes_to_unitary_controlled(self, request):
         """Test that a PennyLane controlled operation is decomposed to a QubitUnitary"""
 
         tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
+
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
@@ -515,7 +503,9 @@ class TestPreprocessHybridOp:
         assert isinstance(new_op, qml.QubitUnitary)
         assert np.allclose(new_op.matrix(), tape.operations[0].matrix())
 
-    def test_error_for_pennylane_midmeasure_decompose(self):
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
+    def test_error_for_pennylane_midmeasure_decompose(self, request):
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
@@ -526,13 +516,17 @@ class TestPreprocessHybridOp:
         ops, measurements = qml.queuing.process_queue(q)
         tape = qml.tape.QuantumScript(ops, measurements)
 
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
+
         with pytest.raises(
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, capabilities)
 
-    def test_error_for_pennylane_midmeasure_decompose_nested(self):
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
+    def test_error_for_pennylane_midmeasure_decompose_nested(self, request):
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
@@ -549,17 +543,23 @@ class TestPreprocessHybridOp:
 
         tape = qml.tape.QuantumScript([adjoint_op, qml.Y(1)], [])
 
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
+
         with pytest.raises(
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, capabilities)
 
-    def test_unsupported_op_with_no_decomposition_raises_error(self):
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
+    def test_unsupported_op_with_no_decomposition_raises_error(self, request):
         """Test that an unsupported operator that doesn't provide a decomposition
         raises a CompileError"""
 
         tape = qml.tape.QuantumScript([qml.Y(0)])
+
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
         with pytest.raises(
             CompileError,
@@ -568,6 +568,8 @@ class TestPreprocessHybridOp:
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(tape, ctx, replace(capabilities, native_ops={}))
 
+    @pytest.mark.usefixtures("create_temporary_toml_file")
+    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
     def test_decompose_to_matrix_raises_error(self):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
 
@@ -580,12 +582,14 @@ class TestPreprocessHybridOp:
 
         tape = qml.tape.QuantumScript([NoMatrixMultiControlledX(wires=[0, 1, 2, 3])])
 
+        capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
+
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = catalyst_decompose(
                     tape,
                     ctx,
-                    replace(capabilities, native_ops={"QubitUnitary": OperationProperties()}),
+                    replace(capabilities, operations={"QubitUnitary": OperatorProperties()}),
                 )
 
 

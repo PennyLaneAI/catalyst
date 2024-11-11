@@ -20,8 +20,8 @@ from copy import deepcopy
 import numpy as np
 import pennylane as qml
 import pytest
-
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+
 from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities

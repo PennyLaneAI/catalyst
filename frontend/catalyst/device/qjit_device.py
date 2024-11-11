@@ -497,6 +497,7 @@ def get_device_toml_capabilities(device) -> DeviceCapabilities:
 
 def get_device_capabilities(device) -> DeviceCapabilities:
     """Get or load DeviceCapabilities structure from device"""
+
     assert not isinstance(device, QJITDevice)
 
     # TODO: This code exists purely for testing. Find another way to customize device
