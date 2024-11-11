@@ -313,6 +313,16 @@ class TestCompilerState:
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
+        print("----- JOEYDEBUG -----")  # DO NOT COMMIT! For testing only!
+        print(">> e")
+        print(e)
+        print(">> e.value")
+        print(e.value)
+        print(">> e.value.args")
+        print(e.value.args)
+        print(">> e.value.args[0]")
+        print(e.value.args[0])
+        print("----- JOEYDEBUG -----")  # DO NOT COMMIT! For testing only!
         assert "Trace" in e.value.args[0]
 
 
