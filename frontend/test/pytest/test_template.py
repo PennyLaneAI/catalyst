@@ -627,17 +627,17 @@ def test_qft(backend):
 def test_aqft(backend):
     """Test AQFT."""
 
-    def aqft():
+    def aqft(order):
         qml.X(0)
         qml.Hadamard(1)
-        qml.AQFT(order=1, wires=range(3))
+        qml.AQFT(order, wires=range(3))
         return qml.state()
 
     device = qml.device(backend, wires=3)
     interpreted_fn = qml.QNode(aqft, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, static_argnames="order")
 
-    assert np.allclose(interpreted_fn(), jitted_fn())
+    assert np.allclose(interpreted_fn(1), jitted_fn(1))
 
 
 @pytest.mark.xfail(reason="Takes quantum tape as a parameter")
