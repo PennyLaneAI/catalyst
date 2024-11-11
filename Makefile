@@ -69,6 +69,7 @@ help:
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
+	@echo "  clean-frontend     to clean build files of Catalyst Frontend"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
@@ -171,6 +172,7 @@ wheel:
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/catalyst_callback_registry*.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/openqasm_python_module*.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
@@ -200,11 +202,15 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-all: clean-mlir clean-runtime clean-oqc
+clean-all: clean-frontend clean-mlir clean-runtime clean-oqc
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
+
+.PHONY: clean-frontend
+clean-frontend:
+	find frontend/catalyst -name "*.so" -exec rm -v {} +
 
 .PHONY: clean-mlir clean-dialects clean-llvm clean-mhlo clean-enzyme
 clean-mlir:

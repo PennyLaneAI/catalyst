@@ -41,8 +41,8 @@ cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja \
     -DLLVM_ENABLE_PROJECTS="mlir" \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DLLVM_INSTALL_UTILS=ON \
-    -DLLVM_ENABLE_ZLIB=OFF \
-    -DLLVM_ENABLE_ZSTD=FORCE_ON \
+    -DLLVM_ENABLE_ZLIB=FORCE_ON \
+    -DLLVM_ENABLE_ZSTD=OFF \
     -DLLVM_ENABLE_LLD=ON \
     -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
     -DPython3_EXECUTABLE=/usr/bin/python3 \
