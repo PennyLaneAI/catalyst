@@ -21,6 +21,16 @@ if(DEFINED Python3_EXECUTABLE)
   message(STATUS "Overriding Python_EXECUTABLE to value of Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
 endif()
 
+# ----- DEBUG: DO NOT COMMIT! ----- #
+message(STATUS "Python_EXECUTABLE: ${Python_EXECUTABLE}")
+message(STATUS "Python_INCLUDE_DIRS: ${Python_INCLUDE_DIRS}")
+message(STATUS "Python_STDLIB: ${Python_STDLIB}")
+message(STATUS "Python_SOSABI: ${Python_SOSABI}")
+message(STATUS "Python_SABI_LIBRARY_DIRS: ${Python_SABI_LIBRARY_DIRS}")
+message(STATUS "Python_Development.Module_FOUND: ${Python_Development.Module_FOUND}")
+message(STATUS "Python_Development.SABIModule_FOUND: ${Python_Development.SABIModule_FOUND}")
+# ----- DEBUG: DO NOT COMMIT! ----- #
+
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
 # slowly and produce large binaries.
