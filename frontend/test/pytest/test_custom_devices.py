@@ -145,7 +145,7 @@ def test_custom_device_load():
 
         operations = OPERATIONS
         observables = OBSERVABLES
-        config = CONFIG_CUSTOM_DEVICE
+        config_filepath = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
