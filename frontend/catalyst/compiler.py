@@ -466,7 +466,7 @@ class Compiler:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            if self.options.verbose:
+            if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
                 if result.stdout:
                     print(result.stdout.strip(), file=self.options.logfile)
                 if result.stderr:
