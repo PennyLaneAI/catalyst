@@ -125,7 +125,7 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
 
 
 @transform
-def verify_operations(tape: QuantumTape, grad_method, qjit_device: catalyst.device.QJITDevice):
+def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """verify the quantum program against Catalyst requirements. This transform makes no
     transformations.
 
@@ -268,7 +268,7 @@ def validate_observables_parameter_shift(tape: QuantumTape):
 
 
 @transform
-def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device: catalyst.device.QJITDevice):
+def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     """Validate that the observables on the tape support adjoint differentiation"""
 
     def _obs_checker(obs):

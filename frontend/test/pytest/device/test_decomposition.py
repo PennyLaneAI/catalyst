@@ -21,11 +21,11 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import catalyst_decomposer
-from catalyst.utils.toml import DeviceCapabilities, OperationProperties
 
 
 class TestGateAliases:
@@ -71,7 +71,7 @@ class TestGateAliases:
         """Test the decomposition of specialized control operations."""
 
         capabilities = DeviceCapabilities(
-            native_ops={base.__name__: OperationProperties(controllable=True)}
+            operations={base.__name__: OperatorProperties(controllable=True)}
         )
         decomp = catalyst_decomposer(gate, capabilities)
 
