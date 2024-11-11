@@ -400,11 +400,10 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_bin_path("cli")
-        cli_exe = cli_build_path + "/catalyst-cli"
-        if not path.isfile(cli_exe):
+        cli_build_path = get_bin_path("cli", "DIALECTS_BUILD_DIR") + "/bin/catalyst-cli"
+        if not path.isfile(cli_build_path):
             raise FileNotFoundError("catalyst-cli executable was not found.")
-        cmd = [cli_exe]
+        cmd = [cli_build_path]
         cmd += [tmp_infile_name, "-o", output_ir_name]
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
         if not self.options.lower_to_llvm:
