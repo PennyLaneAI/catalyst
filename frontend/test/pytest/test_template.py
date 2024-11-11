@@ -1031,17 +1031,18 @@ def test_fable(backend):
 def test_qubitization(backend):
     """Test Qubitization."""
 
-    def qubitization():
-        H = qml.ops.LinearCombination([0.1, 0.3, -0.3], [qml.Z(0), qml.Z(1), qml.Z(0) @ qml.Z(2)])
+    def qubitization(coeffs):
+        H = qml.ops.LinearCombination(coeffs, [qml.Z(0), qml.Z(1), qml.Z(0) @ qml.Z(2)])
         qml.Hadamard(wires=0)
         qml.Qubitization(H, control=[3, 4])
         return qml.expval(qml.PauliZ(0) @ qml.PauliZ(4))
 
+    coeffs = [0.1, 0.3, -0.3]
     device = qml.device(backend, wires=5)
     interpreted_fn = qml.QNode(qubitization, device)
     jitted_fn = qjit(interpreted_fn)
 
-    assert np.allclose(interpreted_fn(), jitted_fn())
+    assert np.allclose(interpreted_fn(coeffs), jitted_fn(coeffs))
 
 
 def test_qrom(backend):
