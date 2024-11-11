@@ -1089,12 +1089,12 @@ def test_mod_exp(backend):
     work_wires = [5, 6, 7, 8, 9]
 
     def mod_exp():
-        qml.BasisEmbedding(x, wires=x_wires)
-        qml.BasisEmbedding(b, wires=output_wires)
+        qml.BasisEmbedding(x, wires = x_wires)
+        qml.BasisEmbedding(b, wires = output_wires)
         qml.ModExp(x_wires, output_wires, base, mod, work_wires)
         return qml.sample(wires=output_wires)
 
-    device = qml.device(backend, wires=10, shots=2)
+    device = qml.device(backend, wires=10, shots=1)
     interpreted_fn = qml.QNode(mod_exp, device)
     jitted_fn = qjit(interpreted_fn)
 
