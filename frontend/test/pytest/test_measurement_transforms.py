@@ -28,16 +28,16 @@ import pennylane as qml
 import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
+from pennylane.devices.capabilities import OperatorProperties
 from pennylane.transforms import split_non_commuting, split_to_single_terms
 
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDevice, get_device_capabilities, get_device_toml_config
+from catalyst.device import QJITDevice, get_device_capabilities
 from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import OperationProperties
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -45,15 +45,13 @@ from catalyst.utils.toml import OperationProperties
 class CustomDevice(Device):
     """A Custom Device following the new API."""
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
+
+    _to_matrix_ops = {"BlockEncode": OperatorProperties(False, False, False)}
 
     def __init__(self, wires, shots=1024):
-        print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
-        dummy_capabilities = get_device_capabilities(self)
-        dummy_capabilities.native_ops.pop("BlockEncode")
-        dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.capabilities = dummy_capabilities
+        self.capabilities.operations.pop("BlockEncode")
 
     @staticmethod
     def get_c_interface():
@@ -75,7 +73,7 @@ class CustomDevice(Device):
 class CustomDeviceLimitedMPs(Device):
     """A Custom Device from the device API without wires."""
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024, allow_counts=False, allow_samples=False):
         self.allow_samples = allow_samples
@@ -101,21 +99,21 @@ class CustomDeviceLimitedMPs(Device):
         return circuits, execution_config
 
     def __enter__(self, *args, **kwargs):
-        toml_file_path = self.config
+        toml_file_path = self.config_filepath
         with open(toml_file_path, mode="r", encoding="UTF-8") as f:
             toml_contents = f.readlines()
 
         updated_toml_contents = []
         for line in toml_contents:
-            if "Expval" in line:
+            if "ExpectationMP" in line:
                 continue
-            if "Var" in line:
+            if "VarianceMP" in line:
                 continue
-            if "Probs" in line:
+            if "ProbabilityMP" in line:
                 continue
-            if "Sample" in line and not self.allow_samples:
+            if "SampleMP" in line and not self.allow_samples:
                 continue
-            if "Counts" in line and not self.allow_counts:
+            if "CountsMP" in line and not self.allow_counts:
                 continue
 
             updated_toml_contents.append(line)
@@ -124,12 +122,12 @@ class CustomDeviceLimitedMPs(Device):
         self.toml_file.writelines(updated_toml_contents)
         self.toml_file.close()  # close for now without deleting
 
-        self.config = self.toml_file.name
+        self.config_filepath = self.toml_file.name
         return self
 
     def __exit__(self, *args, **kwargs):
         os.unlink(self.toml_file.name)
-        self.config = None
+        self.config_filepath = CONFIG_CUSTOM_DEVICE
 
 
 class TestMeasurementTransforms:
@@ -250,12 +248,14 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=100)
 
-        config = get_device_toml_config(dev)
-        config["operators"]["observables"] = {}
+        config = get_device_capabilities(dev)
+        config.observables = {}
         if unsupported_measurement:
-            del config["measurement_processes"][unsupported_measurement]
+            del config.measurement_processes[unsupported_measurement]
 
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             # transform is added to transform program
             qjit_dev = QJITDevice(dev)
 
@@ -350,10 +350,12 @@ class TestMeasurementTransforms:
             return qml.expval(qml.X(0)), qml.var(qml.Y(1))
 
         # modify config to indicate no observables supported
-        config = get_device_toml_config(dev)
-        config["operators"]["observables"] = {}
+        config = get_device_capabilities(dev)
+        config.observables = {}
 
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             with pytest.raises(
                 RuntimeError, match="The device does not support observables or sample/counts"
             ):
@@ -619,14 +621,16 @@ class TestMeasurementTransforms:
 
         expected_result = circuit(1.2)
 
-        config = get_device_toml_config(dev)
+        config = get_device_capabilities(dev)
         for obs in unsupported_obs:
-            del config["operators"]["observables"][obs]
+            del config.observables[obs]
 
         spy = mocker.spy(QJITDevice, "preprocess")
 
         # mock TOML file output to indicate some observables are not supported
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             jitted_circuit = qml.qjit(circuit)
 
             transform_program, _ = spy.spy_return
@@ -663,12 +667,14 @@ class TestMeasurementTransforms:
         for obs in unsupported_obs:
             assert f"{obs}] : !quantum.obs" in mlir
 
-        config = get_device_toml_config(dev)
+        config = get_device_capabilities(dev)
         for obs in unsupported_obs:
-            del config["operators"]["observables"][obs]
+            del config.observables[obs]
 
         # mock TOML file output to indicate some observables are not supported
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             mlir = qml.qjit(circuit, target="mlir").mlir
 
             for obs in unsupported_obs:
@@ -684,12 +690,14 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=1000)
 
-        config = get_device_toml_config(dev)
+        config = get_device_capabilities(dev)
 
-        del config["operators"]["observables"]["Hadamard"]
-        config["compilation"]["non_commuting_observables"] = non_commuting_flag
+        del config.observables["Hadamard"]
+        config.non_commuting_observables = non_commuting_flag
 
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
@@ -711,12 +719,14 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4, shots=1000)
 
-        config = get_device_toml_config(dev)
+        config = get_device_capabilities(dev)
 
-        config["operators"]["observables"] = {}
-        config["compilation"]["non_commuting_observables"] = non_commuting_flag
+        config.observables = {}
+        config.non_commuting_observables = non_commuting_flag
 
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             qjit_dev = QJITDevice(dev)
 
         # dev1 supports non-commuting observables and sum observables - no splitting
@@ -797,12 +807,14 @@ class TestMeasurementTransforms:
 
         expected_result = unjitted_circuit(1.2)
 
-        config = get_device_toml_config(dev)
+        config = get_device_capabilities(dev)
         spy = mocker.spy(QJITDevice, "preprocess")
 
         # mock TOML file output to indicate non-commuting observables are supported
-        config["compilation"]["non_commuting_observables"] = True
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        config.non_commuting_observables = True
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             jitted_circuit = qml.qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), expected_result)
@@ -811,8 +823,10 @@ class TestMeasurementTransforms:
         assert split_non_commuting not in transform_program
 
         # mock TOML file output to indicate non-commuting observables are NOT supported
-        config["compilation"]["non_commuting_observables"] = False
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        config.non_commuting_observables = False
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             jitted_circuit = qml.qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
@@ -835,14 +849,14 @@ class TestMeasurementTransforms:
 
         expected_result = unjitted_circuit(1.2)
 
-        config = get_device_toml_config(dev)
+        config = get_device_capabilities(dev)
         spy = mocker.spy(QJITDevice, "preprocess")
 
         # make sure non_commuting_observables_flag is True - otherwise we use
         # split_non_commuting instead of split_to_single_terms
-        assert config["compilation"]["non_commuting_observables"] is True
+        assert config.non_commuting_observables is True
         # make sure the testing device does in fact support sum observables
-        assert "Sum" in config["operators"]["observables"]
+        assert "Sum" in config.observables
 
         # test case where transform should not be applied
         jitted_circuit = qml.qjit(unjitted_circuit)
@@ -853,9 +867,11 @@ class TestMeasurementTransforms:
         assert split_to_single_terms not in transform_program
 
         # mock TOML file output to indicate non-commuting observables are NOT supported
-        del config["operators"]["observables"]["Sum"]
-        del config["operators"]["observables"]["Hamiltonian"]
-        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+        del config.observables["Sum"]
+        del config.observables["Hamiltonian"]
+        with patch(
+            "catalyst.device.qjit_device.get_device_capabilities", Mock(return_value=config)
+        ):
             jitted_circuit = qml.qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
