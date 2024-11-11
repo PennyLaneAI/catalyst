@@ -441,6 +441,7 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
+        chmod +x $DIALECTS_BUILD_DIR/bin/catalyst-cli  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
       run: |
@@ -513,6 +514,7 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
+        chmod +x $DIALECTS_BUILD_DIR/bin/catalyst-cli  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -569,6 +571,7 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
+        chmod +x $DIALECTS_BUILD_DIR/bin/catalyst-cli  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests
       run: |
