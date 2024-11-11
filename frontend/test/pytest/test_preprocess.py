@@ -13,12 +13,8 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
-import pathlib
 import platform
 from dataclasses import replace
-from os.path import join
-from tempfile import TemporaryDirectory
-from textwrap import dedent
 
 import numpy as np
 import pennylane as qml
@@ -40,7 +36,6 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
