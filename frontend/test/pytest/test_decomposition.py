@@ -118,9 +118,12 @@ class TestControlledDecomposition:
         dev = qml.device(backend, wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
+            """Op without a matrix"""
+
             num_wires = qml.operation.AnyWires
 
             def matrix(self):
+                """matrix undefined"""
                 raise NotImplementedError()
 
         @qml.qnode(dev)
@@ -135,9 +138,12 @@ class TestControlledDecomposition:
         """Test that unknown controlled operations without QubitUnitary support raise an error."""
 
         class UnknownOp(qml.operation.Operation):
+            """An unknown operation"""
+
             num_wires = qml.operation.AnyWires
 
             def matrix(self):
+                """The matrix"""
                 return np.array(
                     [
                         [1.0, 0.0, 0.0, 0.0],

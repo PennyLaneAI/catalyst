@@ -23,7 +23,6 @@ from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.tape import QuantumScript
-from urllib3 import request
 
 from catalyst import CompileError, ctrl
 from catalyst.api_extensions.control_flow import (

@@ -15,7 +15,6 @@
 """
 # pylint: disable=unused-argument
 import os
-import pathlib
 
 # pylint: disable=unused-argument
 import platform
