@@ -299,22 +299,35 @@ def test_gate_fabric(backend):
 def test_uccsd(backend):
     """Test UCCSD."""
 
-    def uccsd(weights):
-        qml.UCCSD(
-            weights,
-            wires=range(4),
-            s_wires=[[0, 1]],
-            d_wires=[[[0, 1], [2, 3]]],
-            init_state=np.array([1, 0, 0, 0]),
-        )
-        return qml.expval(qml.PauliZ(0))
+    symbols = ["H", "H", "H"]
+    geometry = np.array(
+        [
+            [0.01076341, 0.04449877, 0.0],
+            [0.98729513, 1.63059094, 0.0],
+            [1.87262415, -0.00815842, 0.0],
+        ]
+    )
+    electrons = 2
+    charge = 1
 
-    device = qml.device(backend, wires=4)
-    weights = jnp.array(np.random.random(size=(1, 2)))
-    interpreted_fn = qml.QNode(uccsd, device)
+    H, qubits = qml.qchem.molecular_hamiltonian(symbols, geometry, charge=charge)
+
+    hf_state = qml.qchem.hf_state(electrons, qubits)
+    singles, doubles = qml.qchem.excitations(electrons, qubits)
+    s_wires, d_wires = qml.qchem.excitations_to_wires(singles, doubles)
+    wires = range(qubits)
+
+    def circuit(params):
+        qml.UCCSD(params, wires, s_wires, d_wires, hf_state)
+        return qml.expval(H)
+
+    device = qml.device(backend, wires=qubits)
+    params = jax.numpy.array(np.zeros(len(singles) + len(doubles)))
+
+    interpreted_fn = qml.QNode(circuit, device)
     jitted_fn = qjit(interpreted_fn)
 
-    assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
+    assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
 def test_kup(backend):
@@ -1089,8 +1102,8 @@ def test_mod_exp(backend):
     work_wires = [5, 6, 7, 8, 9]
 
     def mod_exp():
-        qml.BasisEmbedding(x, wires = x_wires)
-        qml.BasisEmbedding(b, wires = output_wires)
+        qml.BasisEmbedding(x, wires=x_wires)
+        qml.BasisEmbedding(b, wires=output_wires)
         qml.ModExp(x_wires, output_wires, base, mod, work_wires)
         return qml.sample(wires=output_wires)
 
