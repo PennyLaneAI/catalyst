@@ -19,6 +19,9 @@
   `quantum-opt --ions-decomposition`.
   [(#1226)](https://github.com/PennyLaneAI/catalyst/pull/1226)
 
+* qml.CosineWindow is now compatible with QJIT.
+  [(#1166)](https://github.com/PennyLaneAI/catalyst/pull/1166)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -35,5 +38,6 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+William Maxwell
 Romain Moyard,
 Paul Haochen Wang.
