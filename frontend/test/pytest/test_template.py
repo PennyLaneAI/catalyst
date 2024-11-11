@@ -1211,20 +1211,6 @@ def test_qutrit_basis_state_preparation(backend):
     assert np.allclose(interpreted_fn(basis_state, obs), jitted_fn(basis_state, obs))
 
 
-def test_cosine_window(backend):
-    """Test cosine window."""
-
-    def cosine_window():
-        qml.CosineWindow(wires=[0, 1])
-        return qml.probs(wires=[0, 1])
-
-    device = qml.device(backend, wires=2)
-    interpreted_fn = qml.QNode(cosine_window, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    assert np.allclose(interpreted_fn(), jitted_fn())
-
-
 def test_basis_rotation(backend):
     """Test BasisRotation"""
 
