@@ -412,8 +412,8 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
         make frontend
+        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -485,8 +485,8 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
         make frontend
+        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -541,8 +541,8 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
         make frontend
+        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
