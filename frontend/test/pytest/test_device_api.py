@@ -21,7 +21,6 @@ from catalyst import qjit
 from catalyst.device import (
     QJITDevice,
     get_device_capabilities,
-    get_device_toml_config,
     qjit_device,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
@@ -102,8 +101,8 @@ def test_qjit_device_measurements(shots, mocker):
     state_measurements = {"State"}
     finite_shot_measurements = {"Counts", "Sample"}
 
-    config = get_device_toml_config(dev)
-    all_measurements = set(config["measurement_processes"])
+    capabilities = get_device_capabilities(dev)
+    all_measurements = set(capabilities.measurement_processes)
 
     assert state_measurements.issubset(all_measurements)
     assert finite_shot_measurements.issubset(all_measurements)

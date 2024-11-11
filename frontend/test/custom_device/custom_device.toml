@@ -112,7 +112,7 @@ qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
 # If the device supports mid-circuit measurements natively
-supported_mcm_methods = []
+supported_mcm_methods = [ "one-shot" ]
 # This field is currently unchecked, but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
