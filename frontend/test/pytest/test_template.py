@@ -162,7 +162,7 @@ def test_basis_state_preparation(backend):
     """Test basis state preparation."""
 
     def basis_state_preparation(basis_state):
-        qml.BasisStatePreparation(basis_state, wires=range(4))
+        qml.BasisState(basis_state, wires=range(4))
         return [qml.expval(qml.PauliZ(wires=i)) for i in range(4)]
 
     device = qml.device(backend, wires=4)
