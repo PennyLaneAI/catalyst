@@ -313,7 +313,7 @@ class TestCompilerState:
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
-        assert "Trace" in e.value.args[0]
+        assert "trace" in e.value.args[0]
 
 
 class TestCustomCall:
