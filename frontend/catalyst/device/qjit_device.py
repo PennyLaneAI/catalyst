@@ -308,7 +308,6 @@ class QJITDevice(qml.devices.Device):
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
-
         self.capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @debug_logger
@@ -382,17 +381,17 @@ class QJITDevice(qml.devices.Device):
             return measurement_program
 
         supports_sum_observables = any(
-            obs in self.capabilities.native_obs for obs in ("Sum", "Hamiltonian")
+            obs in self.capabilities.observables for obs in ("Sum", "Hamiltonian")
         )
 
-        if self.capabilities.non_commuting_observables_flag is False:
+        if self.capabilities.non_commuting_observables is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
         # if no observables are supported, we apply a transform to convert *everything* to the
         # readout basis, using either sample or counts based on device specification
-        if not self.capabilities.native_obs:
+        if not self.capabilities.observables:
             if not split_non_commuting in measurement_program:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
@@ -404,7 +403,7 @@ class QJITDevice(qml.devices.Device):
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
-        elif not self.capabilities.measurement_processes - {"Counts", "Sample"}:
+        elif not self.capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
             # ToDo: this branch should become unnecessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
             if not split_non_commuting in measurement_program:
@@ -417,7 +416,7 @@ class QJITDevice(qml.devices.Device):
             measurement_program.add_transform(mp_transform, self.wires)
 
         # if only some observables are supported, we try to diagonalize those that aren't
-        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.native_obs):
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.observables):
             if not split_non_commuting in measurement_program:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
@@ -430,7 +429,7 @@ class QJITDevice(qml.devices.Device):
             }
             # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
-                self.capabilities.native_obs
+                self.capabilities.observables
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
@@ -467,11 +466,14 @@ def filter_out_modifiers(operations):
     return set(filter(is_not_modifier, operations))
 
 
-def get_device_toml_capabilities(device) -> DeviceCapabilities:
+def _load_device_capabilities(device) -> DeviceCapabilities:
     """Get the contents of the device config file."""
 
-    if device.config_filepath is not None:
-        # The expected case: device specifies its own config.
+    # TODO: find a better way for a device to customize its capabilities as seen by Catalyst.
+    if hasattr(device, "qjit_capabilities"):
+        return device.qjit_capabilities
+
+    if getattr(device, "config_filepath") is not None:
         toml_file = device.config_filepath
 
     else:
@@ -486,6 +488,7 @@ def get_device_toml_capabilities(device) -> DeviceCapabilities:
 
     try:
         capabilities = DeviceCapabilities.from_toml_file(toml_file, "qjit")
+
     except FileNotFoundError as e:
         raise CompileError(
             "Attempting to compile program for incompatible device: "
@@ -496,17 +499,12 @@ def get_device_toml_capabilities(device) -> DeviceCapabilities:
 
 
 def get_device_capabilities(device) -> DeviceCapabilities:
-    """Get or load DeviceCapabilities structure from device"""
+    """Get or load the original DeviceCapabilities from device"""
 
     assert not isinstance(device, QJITDevice)
 
-    # TODO: This code exists purely for testing. Find another way to customize device
-    #       support easily without injecting code into the package.
-    if hasattr(device, "qjit_capabilities"):
-        return device.qjit_capabilities
-
     shots_present = bool(device.shots)
-    device_capabilities = get_device_toml_capabilities(device)
+    device_capabilities = _load_device_capabilities(device)
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented.
