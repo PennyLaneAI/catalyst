@@ -476,7 +476,7 @@ class Compiler:
                 f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
             ) from e
 
-        with open(output_ir_name, "r") as f:
+        with open(output_ir_name, "r", encoding="utf-8") as f:
             out_IR = f.read()
 
         if lower_to_llvm:
