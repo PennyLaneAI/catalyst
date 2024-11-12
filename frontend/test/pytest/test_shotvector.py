@@ -124,7 +124,7 @@ class TestShotVector:
         with pytest.raises(
             NotImplementedError,
             match=re.escape(
-                "Measurement probs is not supported a shot-vector. Use qml.sample() instead."
+                "Measurement ProbabilityMP is not supported a shot-vector. Use qml.sample() instead."
             ),
         ):
 
