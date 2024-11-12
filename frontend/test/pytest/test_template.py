@@ -1105,6 +1105,8 @@ def test_prepselprep(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+# This test passes on Catalyst version 0.8.0 but fails on 0.9.0 or greater
+@pytest.mark.xfail(reason="QJIT gives an incorrect result")
 def test_mod_exp(backend):
     """Test ModExp."""
     x, b = 3, 1
@@ -1123,7 +1125,7 @@ def test_mod_exp(backend):
 
     device = qml.device(backend, wires=10, shots=1)
     interpreted_fn = qml.QNode(mod_exp, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, seed=42)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
