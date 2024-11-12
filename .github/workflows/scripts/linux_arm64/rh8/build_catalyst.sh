@@ -42,6 +42,7 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
     -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+    -DPYTHON_VERSION_TO_FIND=${PYTHON_VERSION} \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
