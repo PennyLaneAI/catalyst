@@ -66,6 +66,20 @@ def test_basis_embedding(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+def test_cosine_window(backend):
+    """Test cosine window."""
+
+    def cosine_window():
+        qml.CosineWindow(wires=[0, 1])
+        return qml.probs(wires=[0, 1])
+
+    device = qml.device(backend, wires=2)
+    interpreted_fn = qml.QNode(cosine_window, device)
+    jitted_fn = qjit(interpreted_fn)
+
+    assert np.allclose(interpreted_fn(), jitted_fn())
+
+
 def test_iqp_embedding(backend):
     """Test iqp embedding."""
 
@@ -153,21 +167,6 @@ def test_basic_entangler_layers(backend):
     device = qml.device(backend, wires=3)
     params = jnp.array([[jnp.pi, jnp.pi, jnp.pi]])
     interpreted_fn = qml.QNode(basic_entangler_layers, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(interpreted_fn(params), jitted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore::pennylane.PennyLaneDeprecationWarning")
-def test_basis_state_preparation(backend):
-    """Test basis state preparation."""
-
-    def basis_state_preparation(basis_state):
-        qml.BasisStatePreparation(basis_state, wires=range(4))
-        return [qml.expval(qml.PauliZ(wires=i)) for i in range(4)]
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([0, 1, 1, 0.0])
-    interpreted_fn = qml.QNode(basis_state_preparation, device)
     jitted_fn = qjit(interpreted_fn)
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
