@@ -396,9 +396,9 @@ class QJITDevice(qml.devices.Device):
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
                 measurement_program.add_transform(split_non_commuting)
-            if "Sample" in self.capabilities.measurement_processes:
+            if "SampleMP" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
-            elif "Counts" in self.capabilities.measurement_processes:
+            elif "CountsMP" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
