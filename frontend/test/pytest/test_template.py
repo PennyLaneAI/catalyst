@@ -1009,9 +1009,6 @@ def test_select(backend):
     interpreted_fn = qml.QNode(select, device)
     jitted_fn = qjit(interpreted_fn)
 
-    interpreted_result = interpreted_fn()
-    jitted_result = jitted_fn()
-
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
@@ -1109,7 +1106,6 @@ def test_prepselprep(backend):
 @pytest.mark.xfail(reason="QJIT gives an incorrect result")
 def test_mod_exp(backend):
     """Test ModExp."""
-    x, b = 3, 1
     base = 2
     mod = 7
 
