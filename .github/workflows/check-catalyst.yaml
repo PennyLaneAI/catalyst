@@ -668,6 +668,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
+          python3 -m pip install nanobind
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
