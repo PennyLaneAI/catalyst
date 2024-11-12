@@ -196,7 +196,11 @@ def extract_backend_info(
             )
 
     for k, v in capabilities.options.items():
-        if hasattr(device, v) and not k in device_kwargs:
+        # TODO: v should always be a string, but we're temporarily putting a dictionary
+        #       of _to_matrix_ops in the `options` field of DeviceCapabilities that forces
+        #       certain ops to decompose to a matrix. When this logic is removed in favour
+        #       of the new decompositions, the instance check can be removed.
+        if isinstance(v, str) and hasattr(device, v) and not k in device_kwargs:
             device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)

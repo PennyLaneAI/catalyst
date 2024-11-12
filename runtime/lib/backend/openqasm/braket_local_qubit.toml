@@ -76,9 +76,9 @@ Prod = { }
 ExpectationMP = { }
 VarianceMP = { }
 ProbabilityMP = { }
-StateMP = { condition = ["analytic"] }
-SampleMP = { condition = ["finiteshots"] }
-CountsMP = { condition = ["finiteshots"] }
+StateMP = { conditions = ["analytic"] }
+SampleMP = { conditions = ["finiteshots"] }
+CountsMP = { conditions = ["finiteshots"] }
 
 # Additional support that the device may provide. All accepted fields and their
 # default values are listed below. Any fields missing from the TOML file will be
