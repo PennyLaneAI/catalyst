@@ -238,7 +238,7 @@ class TestPreprocessHybridOp:
             region.trace = None
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         # create and decompose the tape
         tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
@@ -426,7 +426,7 @@ class TestPreprocessHybridOp:
         for_loop_op.regions[0].trace = None
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         # do the decomposition and get the new tape
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -470,7 +470,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([qml.PauliX(0), qml.S(0)])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
@@ -487,7 +487,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
@@ -512,7 +512,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript(ops, measurements)
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         with pytest.raises(
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
@@ -540,7 +540,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([adjoint_op, qml.Y(1)], [])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         with pytest.raises(
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
@@ -557,7 +557,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([qml.Y(0)])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         with pytest.raises(
             CompileError,
@@ -581,7 +581,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([NoMatrixMultiControlledX(wires=[0, 1, 2, 3])])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-        capabilities.options["_to_matrix_ops"] = {"S": OperatorProperties()}
+        capabilities.options["to_matrix_ops"] = {"S": OperatorProperties()}
 
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
