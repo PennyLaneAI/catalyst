@@ -35,6 +35,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
     class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
+        name = "lightning.qubit"
         config_filepath = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
