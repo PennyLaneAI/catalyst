@@ -6,8 +6,9 @@
 
 <h3>Improvements 🛠</h3>
 
-* Replace pybind11 with nanobind for C++/Python bindings in the frontend.
+* Replace pybind11 with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
+  [(#1293)](https://github.com/PennyLaneAI/catalyst/pull/1293)
 
   Nanobind has been developed as a natural successor to the pybind11 library and offers a number of
   [advantages](https://nanobind.readthedocs.io/en/latest/why.html#major-additions), in particular,
