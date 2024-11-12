@@ -410,7 +410,8 @@ class Compiler:
             cmd += ["--tool", "opt"]
         if self.options.keep_intermediate:
             cmd += ["--keep-intermediate"]
-        if self.options.async_qnodes:
+        # The async tests are not included as part of coverage.
+        if self.options.async_qnodes:  # pragma: nocover
             cmd += ["--async-qnodes"]
         if self.options.verbose:
             cmd += ["--verbose"]
