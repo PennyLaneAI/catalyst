@@ -1,4 +1,5 @@
 PYTHON?=$(shell which python3)
+PYTHON_VERSION?=$(shell python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
@@ -76,6 +77,7 @@ configure:
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
@@ -102,6 +104,7 @@ lq_configure:
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \

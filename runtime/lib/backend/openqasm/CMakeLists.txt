@@ -15,7 +15,9 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-find_package(Python 3
+set(PYTHON_VERSION_TO_FIND "3" CACHE STRING "Python version to find and use")
+
+find_package(Python ${PYTHON_VERSION_TO_FIND} EXACT
     REQUIRED COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.SABIModule)
 
