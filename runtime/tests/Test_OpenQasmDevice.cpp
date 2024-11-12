@@ -22,6 +22,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <pybind11/embed.h>
+
 using namespace Catalyst::Runtime::Device;
 using BType = OpenQasm::BuilderType;
 
@@ -68,6 +70,10 @@ TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
     builder.Gate("CNOT", {}, {}, {0, 1}, false);
 
     auto &&circuit = builder.toOpenQasm();
+
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
 
     OpenQasm::BraketRunner runner{};
     auto &&results = runner.runCircuit(circuit, "default", 100);
