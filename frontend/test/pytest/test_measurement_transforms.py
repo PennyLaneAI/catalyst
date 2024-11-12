@@ -232,8 +232,8 @@ class TestMeasurementTransforms:
     @pytest.mark.parametrize(
         "unsupported_measurement, measurement_transform, target_measurement",
         [
-            ("Sample", measurements_from_counts, "counts"),
-            ("Counts", measurements_from_samples, "sample"),
+            ("SampleMP", measurements_from_counts, "counts"),
+            ("CountsMP", measurements_from_samples, "sample"),
             (None, measurements_from_samples, "sample"),
         ],
     )

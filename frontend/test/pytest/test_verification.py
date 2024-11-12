@@ -647,7 +647,7 @@ class TestMeasurementTypeValidation:
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         qjit_capabilities = get_device_capabilities(dev)
-        qjit_capabilities.measurement_processes.remove("Expval")
+        qjit_capabilities.measurement_processes.pop("ExpectationMP")
 
         with pytest.raises(CompileError, match=msg):
             validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)

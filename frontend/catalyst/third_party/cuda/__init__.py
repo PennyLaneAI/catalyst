@@ -131,7 +131,7 @@ class BaseCudaInstructionSet(qml.devices.QubitDevice):
         "PauliX",
         "PauliZ",
     ]
-    config = Path(__file__).parent / "cuda_quantum.toml"
+    config_filepath = Path(__file__).parent / "cuda_quantum.toml"
 
     def __init__(self, shots=None, wires=None):
         _check_version_compatibility()
