@@ -66,6 +66,20 @@ def test_basis_embedding(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+def test_cosine_window(backend):
+    """Test cosine window."""
+
+    def cosine_window():
+        qml.CosineWindow(wires=[0, 1])
+        return qml.probs(wires=[0, 1])
+
+    device = qml.device(backend, wires=2)
+    interpreted_fn = qml.QNode(cosine_window, device)
+    jitted_fn = qjit(interpreted_fn)
+
+    assert np.allclose(interpreted_fn(), jitted_fn())
+
+
 def test_iqp_embedding(backend):
     """Test iqp embedding."""
 
@@ -153,21 +167,6 @@ def test_basic_entangler_layers(backend):
     device = qml.device(backend, wires=3)
     params = jnp.array([[jnp.pi, jnp.pi, jnp.pi]])
     interpreted_fn = qml.QNode(basic_entangler_layers, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(interpreted_fn(params), jitted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore::pennylane.PennyLaneDeprecationWarning")
-def test_basis_state_preparation(backend):
-    """Test basis state preparation."""
-
-    def basis_state_preparation(basis_state):
-        qml.BasisStatePreparation(basis_state, wires=range(4))
-        return [qml.expval(qml.PauliZ(wires=i)) for i in range(4)]
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([0, 1, 1, 0.0])
-    interpreted_fn = qml.QNode(basis_state_preparation, device)
     jitted_fn = qjit(interpreted_fn)
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -507,96 +506,6 @@ def test_flip_sign(backend):
     interpreted_fn = qml.QNode(flip_sign, device)
     jitted_fn = qjit(interpreted_fn)
     assert np.allclose(jitted_fn(), interpreted_fn())
-
-
-@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
-def test_broadcast_single(backend):
-    """Test broadcast single."""
-
-    def broadcast_single(pars):
-        qml.broadcast(unitary=qml.RX, pattern="single", wires=[0, 1, 2], parameters=pars)
-        return qml.expval(qml.PauliZ(0))
-
-    device = qml.device(backend, wires=3)
-    params = jnp.array([1, 1, 2])
-    interpreted_fn = qml.QNode(broadcast_single, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(jitted_fn(params), interpreted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
-def test_broadcast_double(backend):
-    """Test broadcast double."""
-
-    def broadcast_double(pars):
-        qml.broadcast(unitary=qml.CRot, pattern="double", wires=[0, 1, 2, 3], parameters=pars)
-        return qml.expval(qml.PauliZ(0))
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([[-1, 2.5, 3], [-1, 4, 2.0]])
-    interpreted_fn = qml.QNode(broadcast_double, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(jitted_fn(params), interpreted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
-def test_broadcast_chain(backend):
-    """Test broadcast chain."""
-
-    def broadcast_chain(pars):
-        qml.broadcast(unitary=qml.CRot, pattern="chain", wires=[0, 1, 2, 3], parameters=pars)
-        return qml.expval(qml.PauliZ(0))
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([[1.8, 2, 3], [-1.0, 3, 1], [2, 1.2, 4]])
-    interpreted_fn = qml.QNode(broadcast_chain, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(jitted_fn(params), interpreted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
-def test_broadcast_ring(backend):
-    """Test broadcast ring."""
-
-    def broadcast_ring(pars):
-        qml.broadcast(unitary=qml.CRot, pattern="ring", wires=[0, 1, 2], parameters=pars)
-        return qml.expval(qml.PauliZ(0))
-
-    device = qml.device(backend, wires=3)
-    params = jnp.array([[1, 2.2, 3], [-1, 3, 1.0], [2.6, 1, 4]])
-    interpreted_fn = qml.QNode(broadcast_ring, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(jitted_fn(params), interpreted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
-def test_broadcast_pyramid(backend):
-    """Test broadcast pyramid."""
-
-    def broadcast_pyramid(pars):
-        qml.broadcast(unitary=qml.CRot, pattern="pyramid", wires=[0, 1, 2, 3], parameters=pars)
-        return qml.expval(qml.PauliZ(0))
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([[1, 2.2, 3]] * 3)
-    interpreted_fn = qml.QNode(broadcast_pyramid, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(jitted_fn(params), interpreted_fn(params))
-
-
-@pytest.mark.filterwarnings("ignore:qml.broadcast:pennylane.PennyLaneDeprecationWarning")
-def test_broadcast_all_to_all(backend):
-    """Test broadcast all to all."""
-
-    def broadcast_all_to_all(pars):
-        qml.broadcast(unitary=qml.CRot, pattern="all_to_all", wires=[0, 1, 2, 3], parameters=pars)
-        return qml.expval(qml.PauliZ(0))
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([[1, 2.2, 3]] * 6)
-    interpreted_fn = qml.QNode(broadcast_all_to_all, device)
-    jitted_fn = qjit(interpreted_fn)
-    assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 
 def test_approx_time_evoluation(backend):
