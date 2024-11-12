@@ -64,6 +64,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
     -DPython3_EXECUTABLE=/usr/bin/python3 \
+    -DPYTHON_VERSION_TO_FIND=${PYTHON_VERSION} \
     -DPython3_NumPy_INCLUDE_DIRS=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include \
     -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir \
     -DMHLO_DIR=/catalyst/mhlo-build/lib/cmake/mlir-hlo \
