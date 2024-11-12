@@ -402,7 +402,7 @@ class Compiler:
         """
         cli_build_path = get_bin_path("cli", "DIALECTS_BUILD_DIR") + "/bin/catalyst-cli"
         if not path.isfile(cli_build_path):
-            raise FileNotFoundError("catalyst-cli executable was not found.")
+            raise FileNotFoundError("catalyst-cli executable was not found.")  # pragma: nocover
         cmd = [cli_build_path]
         cmd += [tmp_infile_name, "-o", output_ir_name]
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
