@@ -170,7 +170,8 @@ class LinesCount {
 
         std::string modStrBef;
         llvm::raw_string_ostream rawStrBef{modStrBef};
-        op->print(rawStrBef);
+        AsmState state(op, OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+        op->print(rawStrBef, state);
 
         dump(modStrBef, name);
     }
@@ -348,7 +349,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
-        llvmModule->print(rawStringOstream, nullptr);
+        llvmModule->print(rawStringOstream, nullptr, false, true);
         auto outFile = output.nextPipelineDumpFilename("CoroOpt", ".ll");
         dumpToFile(options, outFile, tmp);
     }
@@ -400,7 +401,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
-        llvmModule->print(rawStringOstream, nullptr);
+        llvmModule->print(rawStringOstream, nullptr, false, true);
         auto outFile = output.nextPipelineDumpFilename("O2Opt", ".ll");
         dumpToFile(options, outFile, tmp);
     }
@@ -448,7 +449,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
-        llvmModule->print(rawStringOstream, nullptr);
+        llvmModule->print(rawStringOstream, nullptr, false, true);
         auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
         dumpToFile(options, outFile, tmp);
     }
@@ -541,7 +542,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     if (options.keepIntermediate && options.checkpointStage.empty()) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
-        s << moduleOp;
+        AsmState state(moduleOp, OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+        moduleOp->print(s, state);
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
                    tmp);
     }
@@ -590,7 +592,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (options.keepIntermediate && options.checkpointStage.empty()) {
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
-            s << moduleOp;
+            AsmState state(moduleOp,
+                           OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+            moduleOp->print(s, OpPrintingFlags().enableDebugInfo());
             dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
         }
     }
@@ -691,7 +695,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.outIR.clear();
-        outIRStream << *mlirModule;
+        AsmState state(*mlirModule,
+                       OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+        mlirModule->print(outIRStream, OpPrintingFlags().enableDebugInfo());
         optTiming.stop();
     }
 
@@ -711,12 +717,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (options.keepIntermediate) {
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
-            llvmModule->print(rawStringOstream, nullptr);
+            llvmModule->print(rawStringOstream, nullptr, false, true);
             auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();
-        outIRStream << *llvmModule;
+        llvmModule->print(outIRStream, nullptr, false, true);
         translateTiming.stop();
     }
 
@@ -772,7 +778,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
-        outIRStream << *llvmModule;
+        llvmModule->print(outIRStream, nullptr, false, true);
 
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
                                 std::move(llvmModule), targetMachine, options.getObjectFile()))) {
