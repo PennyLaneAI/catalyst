@@ -765,7 +765,7 @@ def test_qsvt(backend):
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
-    
+
 def test_approx_time_evoluation(backend):
     """Test ApproxTimeEvolution."""
 
