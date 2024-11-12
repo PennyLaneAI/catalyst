@@ -201,7 +201,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
-        python3 -m pip install nanobind
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
