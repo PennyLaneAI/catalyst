@@ -8,28 +8,13 @@ add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=mlir_quantum.")
 # Python and nanobind
 ################################################################################
 
+set(PYTHON_VERSION_TO_FIND "3" CACHE STRING "Python version to find and use")
+
 # nanobind currently requires (as of 2.2.0) that we use the `Python` package, NOT the `Python3` package
 # We still require at least Python version 3
-find_package(Python 3
+find_package(Python ${PYTHON_VERSION_TO_FIND} EXACT
   REQUIRED COMPONENTS Interpreter Development.Module
   OPTIONAL_COMPONENTS Development.SABIModule)
-
-# Check if we have overridden the Python3_EXECUTABLE variable
-# If so, set Python_EXECUTABLE to the same value for nanobind compatibility
-if(DEFINED Python3_EXECUTABLE)
-  set(Python_EXECUTABLE ${Python3_EXECUTABLE})
-  message(STATUS "Overriding Python_EXECUTABLE to value of Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
-endif()
-
-# ----- DEBUG: DO NOT COMMIT! ----- #
-message(STATUS "Python_EXECUTABLE: ${Python_EXECUTABLE}")
-message(STATUS "Python_INCLUDE_DIRS: ${Python_INCLUDE_DIRS}")
-message(STATUS "Python_STDLIB: ${Python_STDLIB}")
-message(STATUS "Python_SOSABI: ${Python_SOSABI}")
-message(STATUS "Python_SABI_LIBRARY_DIRS: ${Python_SABI_LIBRARY_DIRS}")
-message(STATUS "Python_Development.Module_FOUND: ${Python_Development.Module_FOUND}")
-message(STATUS "Python_Development.SABIModule_FOUND: ${Python_Development.SABIModule_FOUND}")
-# ----- DEBUG: DO NOT COMMIT! ----- #
 
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
