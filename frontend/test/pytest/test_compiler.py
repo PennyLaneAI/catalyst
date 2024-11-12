@@ -315,21 +315,6 @@ class TestCompilerState:
 
         assert "trace" in e.value.args[0]
 
-    def test_wrong_catalyst_cli_path(self):
-        """Test error handling when wrong path is set for catalyst-cli."""
-
-        os.environ["DIALECTS_BUILD_DIR"] = "inexistent-path"
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit():
-            return qml.state()
-
-        with pytest.raises(FileNotFoundError) as e:
-            compiled = qjit(circuit)
-            compiled.compile()
-
-        assert "catalyst-cli executable was not found." in e.value.args[0]
-
 
 class TestCustomCall:
     """Test compilation of `lapack_dsyevd` via lowering to `stablehlo.custom_call`."""

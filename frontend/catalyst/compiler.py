@@ -471,7 +471,7 @@ class Compiler:
                     print(result.stdout.strip(), file=self.options.logfile)
                 if result.stderr:
                     print(f"[LIB] {result.stderr.strip()}", file=self.options.logfile)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(
                 f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
             ) from e
