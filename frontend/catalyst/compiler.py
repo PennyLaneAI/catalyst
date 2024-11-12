@@ -400,7 +400,7 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_bin_path("cli", "DIALECTS_BUILD_DIR") + "/bin/catalyst-cli"
+        cli_build_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/catalyst-cli"
         if not path.isfile(cli_build_path):
             raise FileNotFoundError("catalyst-cli executable was not found.")  # pragma: nocover
         cmd = [cli_build_path]

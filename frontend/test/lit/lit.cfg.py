@@ -66,7 +66,7 @@ try:
     llvm_config.with_environment("MLIR_LIB_DIR", config.mlir_lib_dir, append_path=True)
     llvm_config.with_environment("ENZYME_LIB_DIR", config.enzyme_lib_dir, append_path=True)
     llvm_config.with_environment(
-        "DIALECTS_BUILD_DIR", config.mlir_lib_dir + "/..", append_path=True
+        "CATALYST_BIN_DIR", config.mlir_lib_dir + "/../..", append_path=True
     )
 
     # Define PYTHONPATH to include the dialect python bindings.
@@ -82,5 +82,5 @@ except AttributeError:
     llvm_config.with_system_environment("PYTHONPATH")
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
     llvm_config.with_system_environment("MLIR_LIB_DIR")
-    llvm_config.with_system_environment("DIALECTS_BUILD_DIR")
+    llvm_config.with_system_environment("CATALYST_BIN_DIR")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")

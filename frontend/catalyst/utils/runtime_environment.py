@@ -31,7 +31,7 @@ DEFAULT_LIB_PATHS = {
 }
 
 DEFAULT_BIN_PATHS = {
-    "cli": os.path.join(package_root, "../../../mlir/build"),
+    "cli": os.path.join(package_root, "../../../mlir/build/bin"),
 }
 
 def get_lib_path(project, env_var):
@@ -43,5 +43,5 @@ def get_lib_path(project, env_var):
 def get_bin_path(project, env_var):
     """Get the library path."""
     if INSTALLED:
-        return os.path.join(package_root, "..")  # pragma: no cover
+        return os.path.join(package_root, "..", "bin")  # pragma: no cover
     return os.getenv(env_var, DEFAULT_BIN_PATHS.get(project, ""))
