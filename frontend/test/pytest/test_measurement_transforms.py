@@ -126,7 +126,7 @@ class CustomDeviceLimitedMPs(Device):
 
     def __exit__(self, *args, **kwargs):
         os.unlink(self.toml_file.name)
-        self.config_filepath = CONFIG_CUSTOM_DEVICE
+        self.config_filepath = None
 
 
 class TestMeasurementTransforms:
@@ -746,19 +746,19 @@ class TestMeasurementTransforms:
 
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)
-        assert "Sum" in qjit_dev1.capabilities.native_obs
-        assert "Hamiltonian" in qjit_dev1.capabilities.native_obs
+        assert "Sum" in qjit_dev1.capabilities.observables
+        assert "Hamiltonian" in qjit_dev1.capabilities.observables
         assert qjit_dev1.capabilities.non_commuting_observables is True
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
         qjit_dev2 = QJITDevice(dev)
-        del qjit_dev2.capabilities.native_obs["Sum"]
-        del qjit_dev2.capabilities.native_obs["Hamiltonian"]
+        del qjit_dev2.capabilities.observables["Sum"]
+        del qjit_dev2.capabilities.observables["Hamiltonian"]
 
         # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
         qjit_dev3 = QJITDevice(dev)
-        del qjit_dev3.capabilities.native_obs["Sum"]
-        del qjit_dev3.capabilities.native_obs["Hamiltonian"]
+        del qjit_dev3.capabilities.observables["Sum"]
+        del qjit_dev3.capabilities.observables["Hamiltonian"]
         qjit_dev3.capabilities.non_commuting_observables = False
 
         # dev4 supports sums but NOT non-commuting observables - split_non_commuting

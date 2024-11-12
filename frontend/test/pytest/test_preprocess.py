@@ -255,7 +255,7 @@ class TestPreprocessHybridOp:
 
         # the HybridOp on the original tape is unmodified, i.e. continues to contain ops
         # not in `expected_ops`. The post-decomposition HybridOp tape does not
-        expected_ops = capabilities.native_ops
+        expected_ops = capabilities.operations
         for i in range(num_regions):
             if old_op.regions[i].quantum_tape:
                 assert not np.all(
@@ -451,7 +451,7 @@ class TestPreprocessHybridOp:
         )
         # unsupported ops in the subtape decomposed (original tapes contained Hadamard)
         for subtape in cond_subtapes:
-            assert np.all([op.name in capabilities.native_ops for op in subtape.operations])
+            assert np.all([op.name in capabilities.operations for op in subtape.operations])
             assert "Hadamard" not in [op.name for op in subtape.operations]
             assert "RZ" in [op.name for op in subtape.operations]
 
@@ -564,7 +564,7 @@ class TestPreprocessHybridOp:
             match="not supported with catalyst on this device and does not provide a decomposition",
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, replace(capabilities, native_ops={}))
+                _ = catalyst_decompose(tape, ctx, replace(capabilities, operations={}))
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)

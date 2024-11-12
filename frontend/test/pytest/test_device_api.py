@@ -97,12 +97,6 @@ def test_qjit_device_measurements(shots, mocker):
     state_measurements = {"StateMP"}
     finite_shot_measurements = {"CountsMP", "SampleMP"}
 
-    capabilities = get_device_capabilities(dev)
-    all_measurements = set(capabilities.measurement_processes)
-
-    assert state_measurements.issubset(all_measurements)
-    assert finite_shot_measurements.issubset(all_measurements)
-
     dev_capabilities = get_device_capabilities(dev)
     expected_measurements = dev_capabilities.measurement_processes
 

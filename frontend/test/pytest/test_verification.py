@@ -581,7 +581,7 @@ class TestObservableValidation:
         # all good
         validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
-        del qjit_capabilities.native_obs[obs_type]
+        del qjit_capabilities.observables[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
             validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
 
@@ -592,7 +592,7 @@ class TestObservableValidation:
         dev = qml.device(backend, wires=1)
         dev_capabilities = get_device_capabilities(dev)
 
-        dev_capabilities.native_obs.update(
+        dev_capabilities.observables.update(
             {"PauliX2": OperatorProperties(invertible=True, controllable=True, differentiable=True)}
         )
 

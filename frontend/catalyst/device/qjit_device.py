@@ -410,7 +410,7 @@ class QJITDevice(qml.devices.Device):
                 measurement_program.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
-                if "Sample" in self.capabilities.measurement_processes
+                if "SampleMP" in self.capabilities.measurement_processes
                 else measurements_from_counts
             )
             measurement_program.add_transform(mp_transform, self.wires)
