@@ -75,6 +75,7 @@ class TestCompilerOptions:
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
+        assert ("[DIAGNOSTICS]" in capture) if verbose else True
         workflow.workspace.cleanup()
 
 
