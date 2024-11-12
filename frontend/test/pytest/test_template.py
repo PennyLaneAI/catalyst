@@ -1118,14 +1118,15 @@ def test_mod_exp(backend):
     work_wires = [5, 6, 7, 8, 9]
 
     def mod_exp():
-        qml.BasisEmbedding(x, wires=x_wires)
-        qml.BasisEmbedding(b, wires=output_wires)
+        qml.X(0)
+        qml.X(1)
+        qml.X(4)
         qml.ModExp(x_wires, output_wires, base, mod, work_wires)
         return qml.sample(wires=output_wires)
 
     device = qml.device(backend, wires=10, shots=1)
     interpreted_fn = qml.QNode(mod_exp, device)
-    jitted_fn = qjit(interpreted_fn, seed=42)
+    jitted_fn = qjit(interpreted_fn)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
