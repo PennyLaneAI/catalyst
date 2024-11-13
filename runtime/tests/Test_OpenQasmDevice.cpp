@@ -60,7 +60,7 @@ TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
                                         "Not implemented method"));
 }
 
-TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
+TEST_CASE("Test BraketRunner", "[openqasm]")
 {
     OpenQasm::BraketBuilder builder{};
 
@@ -71,13 +71,49 @@ TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
 
     auto &&circuit = builder.toOpenQasm();
 
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
     if (!Py_IsInitialized()) {
         pybind11::initialize_interpreter();
     }
 
     OpenQasm::BraketRunner runner{};
-    auto &&results = runner.runCircuit(circuit, "default", 100);
-    CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
+
+    SECTION("Test BraketRunner::runCircuit()")
+    {
+        auto &&results = runner.runCircuit(circuit, "default", 100);
+        CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
+    }
+
+    SECTION("Test BraketRunner::Probs()")
+    {
+        auto &&probs = runner.Probs(circuit, "default", 100, 2);
+        CHECK(probs.size() == 4); // For a 2-qubit system
+        CHECK((probs[0] >= 0.0 && probs[0] <= 1.0));
+        CHECK((probs[1] >= 0.0 && probs[1] <= 1.0));
+        CHECK((probs[2] >= 0.0 && probs[2] <= 1.0));
+        CHECK((probs[3] >= 0.0 && probs[3] <= 1.0));
+    }
+
+    SECTION("Test BraketRunner::Sample()")
+    {
+        auto &&samples = runner.Sample(circuit, "default", 100, 2);
+        CHECK(samples.size() == 200); // Expecting 100 * 2 = 200 samples
+        for (const auto &sample : samples) {
+            REQUIRE(
+                (sample == 0 || sample == 1)); // Each sample should be 0 or 1 for a 2-qubit state
+        }
+    }
+
+    // TODO: These operations are not yet functional
+    // SECTION("Test BraketRunner::Expval()") {
+    //     auto &&expval = runner.Expval(circuit, "default", 100);
+    // }
+
+    // SECTION("Test BraketRunner::Var()") {
+    //     auto &&var = runner.Var(circuit, "default", 100);
+    // }
 }
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
