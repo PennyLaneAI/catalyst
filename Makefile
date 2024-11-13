@@ -246,10 +246,6 @@ ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif
 
-.PHONY: examples-runtime
-examples-runtime:
-	$(MAKE) -C runtime examples
-
 .PHONY: format
 format:
 ifeq ($(shell test $(BLACKVERSIONMAJOR) -lt 22; echo $$?), 0)

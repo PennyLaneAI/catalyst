@@ -111,15 +111,10 @@ ifeq ($(ENABLE_OPENQASM), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
 
-.PHONY: examples
-examples: lq_target
-	$(MAKE) -C examples all
-
 .PHONY: clean
 clean:
 	@echo "clean build files"
 	rm -rf $(RT_BUILD_DIR) $(MK_DIR)/BuildTidy
-	$(MAKE) -C examples clean
 
 .PHONY: format
 format:
