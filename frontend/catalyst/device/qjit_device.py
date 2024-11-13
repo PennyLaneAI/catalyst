@@ -195,9 +195,8 @@ def extract_backend_info(
                 device.target_device._s3_folder  # pylint: disable=protected-access
             )
 
-    for k, v in capabilities.options.items():
-        if hasattr(device, v) and not k in device_kwargs:
-            device_kwargs[k] = getattr(device, v)
+    if hasattr(device, "device_kwargs"):
+        device_kwargs.update({k: getattr(device, v) for k, v in device.device_kwargs.items()})
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
@@ -303,6 +302,16 @@ class QJITDevice(qml.devices.Device):
 
         # Capability loading
         original_device_capabilities = get_device_capabilities(original_device)
+
+        # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+        #       when customizable multi-pathway decomposition is implemented.
+        if hasattr(original_device, "_to_matrix_ops"):
+            setattr(
+                original_device_capabilities,
+                "to_matrix_ops",
+                getattr(original_device, "_to_matrix_ops"),
+            )
+
         backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
 
         self.backend_name = backend.c_interface_name
@@ -505,11 +514,6 @@ def get_device_capabilities(device) -> DeviceCapabilities:
 
     shots_present = bool(device.shots)
     device_capabilities = _load_device_capabilities(device)
-
-    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
-    #       when customizable multi-pathway decomposition is implemented.
-    if hasattr(device, "_to_matrix_ops"):
-        setattr(device_capabilities, "to_matrix_ops", getattr(device, "_to_matrix_ops"))
 
     return device_capabilities.filter(finite_shots=shots_present)
 
