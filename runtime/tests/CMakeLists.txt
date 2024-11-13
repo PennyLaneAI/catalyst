@@ -67,3 +67,5 @@ if(ENABLE_OPENQASM)
 
     catch_discover_tests(runner_tests_openqasm)
 endif()
+
+add_executable(runner_tests_lightning runner_main.cpp)
