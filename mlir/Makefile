@@ -1,5 +1,6 @@
 PYTHON?=$(shell which python3)
 PYTHON_VERSION?=$(shell python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_PREFIX?=$(shell python3 -c "import sys; print(sys.prefix)")
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
@@ -130,6 +131,7 @@ dialects:
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
 		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython_ROOT_DIR=$(PYTHON_PREFIX) \
 		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
