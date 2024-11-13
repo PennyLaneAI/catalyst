@@ -196,7 +196,7 @@ def extract_backend_info(
             )
 
     for k, v in capabilities.options.items():
-        if isinstance(v, str) and hasattr(device, v) and not k in device_kwargs:
+        if hasattr(device, v) and not k in device_kwargs:
             device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
@@ -509,7 +509,7 @@ def get_device_capabilities(device) -> DeviceCapabilities:
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented.
     if hasattr(device, "_to_matrix_ops"):
-        device_capabilities.options["to_matrix_ops"] = getattr(device, "_to_matrix_ops")
+        setattr(device_capabilities, "to_matrix_ops", getattr(device, "_to_matrix_ops"))
 
     return device_capabilities.filter(finite_shots=shots_present)
 

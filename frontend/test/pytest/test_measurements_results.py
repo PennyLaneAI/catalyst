@@ -1,23 +1,29 @@
 # Copyright 2022-2023 Xanadu Quantum Technologies Inc.
-
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import platform
+from copy import deepcopy
+
 import numpy as np
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 from jax import numpy as jnp
 
 from catalyst import qjit
+from catalyst.device import get_device_capabilities
+from catalyst.utils.runtime_environment import get_lib_path
 
 # pylint: disable=too-many-lines
 
@@ -1000,17 +1006,50 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
 
+class CustomDevice(qml.devices.Device):
+    """Custom Gate Set Device"""
+
+    name = "Custom Device"
+    config_filepath = CONFIG_CUSTOM_DEVICE
+
+    _to_matrix_ops = {}
+
+    def __init__(self, shots=None, wires=None):
+        super().__init__(wires=wires, shots=shots)
+        self.qjit_capabilities = deepcopy(get_device_capabilities(self))
+        self.qjit_capabilities.measurement_processes["DensityMatrixMP"] = []
+
+    def apply(self, operations, **kwargs):
+        """Unused"""
+        raise RuntimeError("Only C/C++ interface is defined")
+
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        )
+        return "NullQubit", lib_path
+
+    def execute(self, circuits, execution_config):
+        """Execution."""
+        return circuits, execution_config
+
+
 class TestDensityMatrixMP:
     """Tests for density_matrix"""
 
-    def test_error(self, backend):
+    def test_error(self):
         """Test that tracing density matrix produces an error"""
 
         err_msg = "Measurement .* is not implemented"
         with pytest.raises(NotImplementedError, match=err_msg):
 
             @qml.qjit
-            @qml.qnode(qml.device(backend, wires=1))
+            @qml.qnode(CustomDevice(wires=1))
             def circuit():
                 return qml.density_matrix([0])
 

@@ -68,7 +68,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if alternative_decomp is not None:
         return alternative_decomp
 
-    if op.name in capabilities.options.get("to_matrix_ops", {}):
+    if op.name in getattr(capabilities, "to_matrix_ops", {}):
 
         if "QubitUnitary" not in capabilities.operations:
             raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
