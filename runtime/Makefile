@@ -1,4 +1,5 @@
 PYTHON?=$(shell which python3)
+PYTHON_PREFIX?=$(shell python3 -c "import sys; print(sys.prefix)")
 PYTHON_VERSION?=$(shell python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
@@ -77,6 +78,7 @@ configure:
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-DPython_ROOT_DIR=$(PYTHON_PREFIX) \
 		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
@@ -104,6 +106,7 @@ lq_configure:
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-DPython_ROOT_DIR=$(PYTHON_PREFIX) \
 		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
