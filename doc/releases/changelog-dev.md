@@ -23,6 +23,9 @@
 * qml.CosineWindow is now compatible with QJIT.
   [(#1166)](https://github.com/PennyLaneAI/catalyst/pull/1166)
 
+* All PennyLane templates are tested for QJIT compatibility.
+  [(#1161)](https://github.com/PennyLaneAI/catalyst/pull/1161)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
