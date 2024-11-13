@@ -10,7 +10,6 @@ enzyme=v0.0.149
 # 'doc/requirements.txt
 pennylane=0.40.0-dev11
 
-
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'. Also, update the 'LIGHTNING_GIT_TAG' at
 # 'runtime/Makefile' and at all GitHub workflows, using the exact

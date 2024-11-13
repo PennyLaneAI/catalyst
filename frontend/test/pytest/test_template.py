@@ -526,7 +526,7 @@ def test_grover(backend):
 
 
 def test_reflection(backend):
-    """Test reflection."""
+    """Test Reflection."""
 
     @qml.prod
     def hadamards(wires):
@@ -552,7 +552,7 @@ def test_reflection(backend):
 
 
 def test_amplitude_amplification(backend):
-    """Test amplitude amplification."""
+    """Test AmplitudeAmplification."""
 
     def amplitude_amplification(params):
         qml.RY(params[0], wires=0)
@@ -605,7 +605,7 @@ def test_fermionic_double(backend):
 
 
 def test_arbitrary_unitary(backend):
-    """Test arbitrary unitary."""
+    """Test ArbitraryUnitary."""
 
     def arbitrary_unitary(weights):
         qml.ArbitraryUnitary(weights, wires=range(2))
@@ -669,7 +669,7 @@ def test_aqft(backend):
 
 @pytest.mark.xfail(reason="Takes quantum tape as a parameter")
 def test_hilbert_schmidt(backend):
-    """Test Hilbert Schmidt."""
+    """Test HilbertSchmidt."""
     with qml.QueuingManager.stop_recording():
         u_tape = qml.tape.QuantumTape([qml.Hadamard(0)])
 
@@ -690,7 +690,7 @@ def test_hilbert_schmidt(backend):
 
 @pytest.mark.xfail(reason="Takes quantum tape as a parameter")
 def test_local_hilbert_schmidt(backend):
-    """Test Local Hilbert Schmidt."""
+    """Test LocalHilbertSchmidt."""
     with qml.QueuingManager.stop_recording():
         u_tape = qml.tape.QuantumTape([qml.CZ(wires=(0, 1))])
 
@@ -917,7 +917,7 @@ def test_select(backend):
 
 
 def test_controlled_sequence(backend):
-    """Test controlled sequence."""
+    """Test ControlledSequence."""
 
     def controlled_sequence(x):
         """Test circuit"""
