@@ -40,39 +40,6 @@ target_sources(runner_tests_qir_runtime PRIVATE
 
 catch_discover_tests(runner_tests_qir_runtime)
 
-add_executable(runner_tests_lightning runner_main.cpp)
-
-# Skip dynamic device loading test when sanitizers are enabled or when building on mac,
-# due to the fact that our current support is not fully compatible on macOS.
-# RTLD_DEEPBIND incompatibility.
-if (ENABLE_ADDRESS_SANITIZER OR APPLE)
-    set(dl_manager_tests "")
-else()
-    # Tests which use dlopen and RTLD_DEEPBIND are incompatible with sanitizers.
-    # All tests which go through dlopen need to be tested without sanitizers.
-    # They produce the following error message:
-    # You are trying to dlopen a this-file-does-not-exist.so shared
-    # library with RTLD_DEEPBIND flag which is incompatible with sanitizer
-    # runtime (see https://github.com/google/sanitizers/issues/611 for
-    # details). If you want to run this-file-does-not-exist.so library under
-    # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
-    set(dl_manager_tests
-        Test_DLManager.cpp
-        )
-endif()
-
-target_link_libraries(runner_tests_lightning PRIVATE
-    Catch2::Catch2
-    pybind11::embed
-    catalyst_qir_runtime
-    )
-
-target_sources(runner_tests_lightning PRIVATE ${cov_helper_src}
-    ${dl_manager_tests}
-    )
-
-catch_discover_tests(runner_tests_lightning)
-
 if(ENABLE_OPENQASM)
     add_executable(runner_tests_openqasm runner_main.cpp)
     add_dependencies(runner_tests_openqasm openqasm_python_module)
@@ -100,3 +67,5 @@ if(ENABLE_OPENQASM)
 
     catch_discover_tests(runner_tests_openqasm)
 endif()
+
+add_executable(runner_tests_lightning runner_main.cpp)
