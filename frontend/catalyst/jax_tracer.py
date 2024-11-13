@@ -644,9 +644,17 @@ def trace_quantum_operations(
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp):
-            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+            return bind_native_operation(
+                qrp,
+                op.base,
+                controlled_wires + op.control_wires,
+                controlled_values + op.control_values,
+                adjoint,
+            )
         elif isinstance(op, Adjoint):
-            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
+            return bind_native_operation(
+                qrp, op.base, controlled_wires, controlled_values, not adjoint
+            )
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
