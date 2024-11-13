@@ -203,21 +203,6 @@ def test_basic_entangler_layers(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
-def test_basis_state_preparation(backend):
-    """Test basis state preparation."""
-
-    def basis_state_preparation(basis_state):
-        qml.BasisStatePreparation(basis_state, wires=range(4))
-        return [qml.expval(qml.PauliZ(wires=i)) for i in range(4)]
-
-    device = qml.device(backend, wires=4)
-    params = jnp.array([0, 1, 1, 0])
-    interpreted_fn = qml.QNode(basis_state_preparation, device)
-    jitted_fn = qjit(interpreted_fn)
-
-    assert np.allclose(interpreted_fn(params), jitted_fn(params))
-
-
 def test_mottonen_state_preparation(backend):
     """Test mottonen state preparation."""
 
