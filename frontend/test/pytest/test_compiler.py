@@ -304,16 +304,18 @@ class TestCompilerState:
             )
             compiled.compile()
 
+        stack_trace_pattern = "diagnostic emitted with trace"
+
         assert "Failed to lower MLIR module" in e.value.args[0]
         assert "While processing 'TestPass' pass " in e.value.args[0]
-        assert "Trace" not in e.value.args[0]
+        assert stack_trace_pattern not in e.value.args[0]
         assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
-        assert "Trace" in e.value.args[0]
+        assert stack_trace_pattern in e.value.args[0]
 
 
 class TestCustomCall:
