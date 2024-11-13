@@ -42,6 +42,11 @@ find_package(nanobind CONFIG REQUIRED)
 # built (`STABLE_ABI` does nothing on older Python versions).
 nanobind_add_module(openqasm_python_module STABLE_ABI openqasm_python_module.cpp)
 
+# Use a consistant suffix ".so" rather than, e.g. ".abi3.so" (when using the Stable ABI) or
+# ".cpython-3xx-darwin.so". This ensures we can locate it when calling `dlopen(OPENQASM_PY)` in
+# runtime/lib/backend/openqasm/OpenQasmRunner.hpp.
+set_target_properties(openqasm_python_module PROPERTIES SUFFIX ".so")
+
 add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 
 target_include_directories(rtd_openqasm PRIVATE .

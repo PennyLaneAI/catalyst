@@ -37,7 +37,7 @@ set(REGISTRY_SRC_FILES
 # built (`STABLE_ABI` does nothing on older Python versions).
 nanobind_add_module(catalyst_callback_registry STABLE_ABI ${REGISTRY_SRC_FILES})
 
-# Use a consistant suffix ".so" rather than, e.g. ".abi3.so" when using the Stable ABI, or
+# Use a consistant suffix ".so" rather than, e.g. ".abi3.so" (when using the Stable ABI) or
 # ".cpython-3xx-darwin.so". This ensures we can locate it when calling `dlopen(LIBREGISTRY)` in
 # runtime/lib/capi/RuntimeCAPI.cpp.
 set_target_properties(catalyst_callback_registry PROPERTIES SUFFIX ".so")
