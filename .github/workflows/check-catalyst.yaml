@@ -652,23 +652,3 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
           make examples-runtime
-
-  runtime-code-cov:
-    name: Runtime Code Coverage (Linux)
-    needs: [constants, determine_runner]
-    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
-
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
