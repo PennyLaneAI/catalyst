@@ -164,7 +164,7 @@ def test_strongly_entangled_layers(backend):
     n_wires = 4
     device = qml.device(backend, wires=n_wires)
     size = qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_wires)
-    params = jnp.array(np.random.random(size))
+    params = jnp.array(np.ones(size))
     interpreted_fn = qml.QNode(strongly_entangled_layers, device)
     jitted_fn = qjit(interpreted_fn)
 
@@ -302,7 +302,7 @@ def test_gate_fabric(backend):
 
     layers = 2
     shape = qml.GateFabric.shape(n_layers=layers, n_wires=qubits)
-    params = jnp.array(np.random.random(size=shape))
+    params = jnp.array(np.ones(shape))
 
     interpreted_fn = qml.QNode(ansatz, device)
     jitted_fn = qjit(interpreted_fn)
@@ -352,7 +352,7 @@ def test_kup(backend):
         return qml.state()
 
     device = qml.device(backend, wires=4)
-    params = jnp.array(np.random.random(size=(1, 6)))
+    params = jnp.array(np.ones((1, 6)))
     interpreted_fn = qml.QNode(kup, device)
     jitted_fn = qjit(interpreted_fn)
 
@@ -367,7 +367,7 @@ def test_particle_conserving_u1(backend):
         return qml.expval(qml.PauliZ(0))
 
     device = qml.device(backend, wires=2)
-    weights = jnp.array(np.random.random(size=(1, 1, 2)))
+    weights = jnp.array(np.ones((1, 1, 2)))
     interpreted_fn = qml.QNode(particle_conserving_u1, device)
     jitted_fn = qjit(interpreted_fn)
 
@@ -382,7 +382,7 @@ def test_particle_conserving_u2(backend):
         return qml.expval(qml.PauliZ(0))
 
     device = qml.device(backend, wires=2)
-    weights = jnp.array(np.random.random(size=(1, 3)))
+    weights = jnp.array(np.ones((1, 3)))
     interpreted_fn = qml.QNode(particle_conserving_u2, device)
     jitted_fn = qjit(interpreted_fn)
 
@@ -472,7 +472,7 @@ def test_two_local_swap_network(backend):
         return qml.expval(qml.PauliZ(0))
 
     device = qml.device(backend, wires=4)
-    weights = jnp.array(np.random.random(size=6))
+    weights = jnp.array(np.ones(6))
     interpreted_fn = qml.QNode(two_local_swap_network, device)
     jitted_fn = qjit(interpreted_fn)
 
@@ -611,7 +611,7 @@ def test_arbitrary_unitary(backend):
         qml.ArbitraryUnitary(weights, wires=range(2))
         return qml.expval(qml.PauliZ(0))
 
-    weights = jnp.array(np.random.random(size=(15,)))
+    weights = jnp.array(np.ones((15,)))
     device = qml.device(backend, wires=2)
     interpreted_fn = qml.QNode(arbitrary_unitary, device)
     jitted_fn = qjit(interpreted_fn)
