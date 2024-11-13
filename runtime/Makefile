@@ -99,11 +99,8 @@ lq_target: lq_configure
 runtime: configure
 	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
-$(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
-	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
-
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
+test:
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
