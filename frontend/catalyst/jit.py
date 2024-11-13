@@ -39,6 +39,7 @@ from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.passes import PipelineNameUniquer, _inject_transform_named_sequence
+from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -663,6 +664,15 @@ class QJIT(CatalystCallable):
             jaxpr. It is never executed or used anywhere, except being traced here.
             """
             _inject_transform_named_sequence()
+
+            if self.user_function.device == "ionic":
+                apply_registered_pass_p.bind(
+                    pass_name="ions-decomposition",
+                    options=f"func-name={self.user_functionself.user_function.__name__}" + "_ion",
+                )
+                fn_clone = copy.copy(self.user_function)
+                fn_clone.__name__ = self.user_function.__name__ + "_ion"
+                return fn_clone(*args, **kwargs)
             return self.user_function(*args, **kwargs)
 
         if self.compile_options.experimental_capture:
