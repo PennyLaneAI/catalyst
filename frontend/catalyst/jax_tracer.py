@@ -32,6 +32,7 @@ from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
+from catalyst.jax_primitives import apply_registered_pass_p
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -1129,6 +1130,8 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
+    _add_mlir_quantum_decomposition(f, device)
+
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
@@ -1238,3 +1241,12 @@ def trace_quantum_function(
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree, return_values_tree
+
+
+def _add_mlir_quantum_decomposition(f, device):
+    decomposition_pass = device.backend_kwargs.get("mlir_decomposition")
+    if decomposition_pass:
+        apply_registered_pass_p.bind(
+            pass_name=decomposition_pass,
+            options=f"func-name={f.__name__}",
+        )
