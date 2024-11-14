@@ -24,16 +24,17 @@ running -apply-transform-sequence.
 
 # pylint: disable=line-too-long
 
-import shutil
 import platform
+import shutil
+
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
 from catalyst import pipeline, qjit
 from catalyst.debug import get_compilation_stage
+from catalyst.device import get_device_capabilities
 from catalyst.passes import cancel_inverses, merge_rotations
 from catalyst.utils.runtime_environment import get_lib_path
-from catalyst.device import get_device_capabilities
 
 
 def flush_peephole_opted_mlir_to_iostream(QJIT):

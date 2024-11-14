@@ -32,7 +32,6 @@ from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
-from catalyst.jax_primitives import apply_registered_pass_p
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -65,6 +64,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import (
     AbstractQreg,
+    apply_registered_pass_p,
     compbasis_p,
     counts_p,
     expval_p,
