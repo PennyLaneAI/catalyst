@@ -534,7 +534,7 @@ jobs:
 
     - name: Install device dependencies (OpenQasm device)
       run: |
-        pip install amazon-braket-pennylane-plugin
+        pip install git+https://github.com/astralcai/amazon-braket-pennylane-plugin-python.git@qubit-device
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Install Deps

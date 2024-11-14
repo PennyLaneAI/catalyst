@@ -29,4 +29,4 @@ nbmake
 
 # optional rt/test dependencies
 pennylane-lightning-kokkos
-amazon-braket-pennylane-plugin>1.27.1
+git+https://github.com/astralcai/amazon-braket-pennylane-plugin-python.git@qubit-device
