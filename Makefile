@@ -235,8 +235,8 @@ clean-runtime:
 clean-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
 
-.PHONY: coverage coverage-frontend
-coverage: coverage-frontend
+.PHONY: coverage coverage-frontend coverage-runtime
+coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
@@ -245,6 +245,9 @@ coverage-frontend:
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif
+
+coverage-runtime:
+	$(MAKE) -C runtime coverage
 
 .PHONY: format
 format:
