@@ -49,7 +49,7 @@ U3 = { }
 
 [measurement_processes]
 
-CountsMP = { condition = ["finiteshots"] }
+CountsMP = { conditions = ["finiteshots"] }
 
 # Additional support that the device may provide. All accepted fields and their
 # default values are listed below. Any fields missing from the TOML file will be

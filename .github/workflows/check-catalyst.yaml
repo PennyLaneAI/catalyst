@@ -476,9 +476,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-#    - name: Install lightning.kokkos used in Python tests
-#      run: |
-#        pip install PennyLane-Lightning-Kokkos==0.39.0 --extra-index-url https://test.pypi.org/simple
+    - name: Install lightning.kokkos used in Python tests
+      run: |
+        git clone https://github.com/PennyLaneAI/pennylane-lightning@toml-updates
+        PL_BACKEND=lightning.kokkos python scripts/configure_pyproject_toml.py
+        pip install .
 
     - name: Install Deps
       run: |
