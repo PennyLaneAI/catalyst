@@ -233,10 +233,11 @@ def test_incorrect_return(arg):
     def cir(x):
         return identity(x)
 
-    # NOTE: Currently, this will raise a TypeError exception on Linux and the same exception wrapped
-    # as a RuntimeError on macOS. This appears to be related to using nanobind for the Python/C++
-    # bindings. To avoid separate test cases for Linux and macOS, we accept either exception type
-    # here and match on the string below, which should be contained in the messages of both.
+    # NOTE: Currently, this will raise a TypeError exception on Linux and the same exception
+    # wrapped as a RuntimeError on macOS. This appears to be related to using nanobind for the
+    # Python/C++ bindings. To avoid separate test cases for Linux and macOS, we accept either
+    # exception type here and match on the string below, which should be contained in the messages
+    # of both.
     # TODO: Why does this happen?
     with pytest.raises((TypeError, RuntimeError), match="Callback identity expected type"):
         cir(arg)
@@ -339,10 +340,11 @@ def test_debug_callback_returns_something(capsys):
     captured = capsys.readouterr()
     assert captured.out.strip() == ""
 
-    # NOTE: Currently, this will raise a ValueError exception on Linux and the same exception wrapped
-    # as a RuntimeError on macOS. This appears to be related to using nanobind for the Python/C++
-    # bindings. To avoid separate test cases for Linux and macOS, we accept either exception type
-    # here and match on the string below, which should be contained in the messages of both.
+    # NOTE: Currently, this will raise a ValueError exception on Linux and the same exception
+    # wrapped as a RuntimeError on macOS. This appears to be related to using nanobind for the
+    # Python/C++ bindings. To avoid separate test cases for Linux and macOS, we accept either
+    # exception type here and match on the string below, which should be contained in the messages
+    # of both.
     # TODO: Why does this happen?
     with pytest.raises(
         (ValueError, RuntimeError), match="debug.callback is expected to return None"
@@ -965,10 +967,11 @@ def test_scalar_in_array_out_float32_wrong():
         return jnp.sum(some_func(jnp.sin(x)))
 
     x = 0.435
-    # NOTE: Currently, this will raise a TypeError exception on Linux and the same exception wrapped
-    # as a RuntimeError on macOS. This appears to be related to using nanobind for the Python/C++
-    # bindings. To avoid separate test cases for Linux and macOS, we accept either exception type
-    # here and match on the string below, which should be contained in the messages of both.
+    # NOTE: Currently, this will raise a TypeError exception on Linux and the same exception
+    # wrapped as a RuntimeError on macOS. This appears to be related to using nanobind for the
+    # Python/C++ bindings. To avoid separate test cases for Linux and macOS, we accept either
+    # exception type here and match on the string below, which should be contained in the messages
+    # of both.
     # TODO: Why does this happen?
     with pytest.raises((TypeError, RuntimeError), match="Callback some_func expected type"):
         result(x)
