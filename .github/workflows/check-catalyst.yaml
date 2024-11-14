@@ -476,9 +476,9 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Install lightning.kokkos used in Python tests
-      run: |
-        pip install PennyLane-Lightning-Kokkos==0.39.0 --extra-index-url https://test.pypi.org/simple
+#    - name: Install lightning.kokkos used in Python tests
+#      run: |
+#        pip install PennyLane-Lightning-Kokkos==0.39.0 --extra-index-url https://test.pypi.org/simple
 
     - name: Install Deps
       run: |
@@ -488,7 +488,7 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
         python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane-lightning@toml-updates
+        python3 -m pip install --no-deps --force git+https://github.com/astralcai/pennylane-lightning@master
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
