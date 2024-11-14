@@ -36,10 +36,7 @@ def test_custom_device_load():
         name = "custom.device"
         config_filepath = CONFIG_CUSTOM_DEVICE
 
-        device_kwargs = {
-            "option1": "_option1",
-            "option2": "_option2"
-        }
+        device_kwargs = {"option1": "_option1", "option2": "_option2"}
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)

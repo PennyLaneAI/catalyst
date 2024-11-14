@@ -488,7 +488,7 @@ class TestPreprocessHybridOp:
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
-        
+
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = catalyst_decompose(tape, ctx, capabilities)
 
