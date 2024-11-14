@@ -4,9 +4,6 @@
 
 <h3>New features since last release</h3>
 
-* Remove Lightning Qubit Dynamic plugin from Catalyst.
-  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
-
 <h3>Improvements 🛠</h3>
 
 * Replace pybind11 with nanobind for C++/Python bindings in the frontend.
@@ -38,6 +35,11 @@
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
 
 <h3>Bug fixes 🐛</h3>
+
+<h3>Internal changes</h3>
+
+* Remove Lightning Qubit Dynamic plugin from Catalyst.
+  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
 
 <h3>Contributors ✍️</h3>
 
