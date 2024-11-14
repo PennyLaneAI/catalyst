@@ -478,9 +478,7 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        git clone https://github.com/PennyLaneAI/pennylane-lightning.git
-        git fetch
-        git checkout toml-updates
+        git clone https://github.com/astralcai/pennylane-lightning.git
         PL_BACKEND=lightning.kokkos python scripts/configure_pyproject_toml.py
         pip install .
 
