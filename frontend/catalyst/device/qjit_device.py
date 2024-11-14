@@ -96,7 +96,6 @@ RUNTIME_OBSERVABLES = [
     "PauliZ",
     "Hadamard",
     "Hermitian",
-    "Hamiltonian",
     "LinearCombination",
     "Prod",
     "SProd",
@@ -390,9 +389,7 @@ class QJITDevice(qml.devices.Device):
         if isinstance(self.original_device, SoftwareQQPP):
             return measurement_program
 
-        supports_sum_observables = any(
-            obs in self.capabilities.observables for obs in ("Sum", "Hamiltonian")
-        )
+        supports_sum_observables = "Sum" in self.capabilities.observables
 
         if self.capabilities.non_commuting_observables is False:
             measurement_program.add_transform(split_non_commuting)

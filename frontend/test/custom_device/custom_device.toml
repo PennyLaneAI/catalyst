@@ -89,7 +89,6 @@ Hadamard            = { properties = ["differentiable"] }
 Hermitian           = { properties = ["differentiable"] }
 Identity            = { properties = ["differentiable"] }
 SparseHamiltonian   = { properties = ["differentiable"] }
-Hamiltonian         = { properties = ["differentiable"] }
 Sum                 = { properties = ["differentiable"] }
 SProd               = { properties = ["differentiable"] }
 Prod                = { properties = ["differentiable"] }
