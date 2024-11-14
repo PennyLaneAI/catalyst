@@ -258,7 +258,6 @@ headers and fields are generally required, unless stated otherwise.
         SQISW = {}
         CPhase = {}
         BasisState = {}
-        QubitStateVector = {}
         StatePrep = {}
         ControlledQubitUnitary = {}
         MultiControlledX = {}
