@@ -26,7 +26,9 @@ class TestOQCDevice:
         """Test the initialization."""
 
         device = qml.device("oqc.cloud", backend="lucy", shots=1000, wires=8)
-
+        with open(device.config, "r") as file:
+            config_data = file.read()
+            print(config_data)
         assert device.backend == "lucy"
         assert device.shots == qml.measurements.Shots(1000)
         assert device.wires == qml.wires.Wires(range(0, 8))
