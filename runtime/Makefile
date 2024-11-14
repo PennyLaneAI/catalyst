@@ -12,7 +12,6 @@ BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-ENABLE_LAPACK?=OFF
 
 BUILD_TARGETS := rt_capi rtd_null_qubit
 TEST_TARGETS := runner_tests_qir_runtime
@@ -67,7 +66,6 @@ configure:
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
-		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 lq_configure:
@@ -91,7 +89,6 @@ lq_configure:
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
-		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 lq_target: lq_configure
