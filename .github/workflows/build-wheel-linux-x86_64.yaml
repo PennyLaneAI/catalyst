@@ -342,10 +342,8 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=4659093de5d5ff1ecca061f1b38a0a60db210376 \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit

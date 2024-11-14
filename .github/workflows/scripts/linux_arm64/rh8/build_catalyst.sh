@@ -45,11 +45,9 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
-    -DLIGHTNING_GIT_TAG=4659093de5d5ff1ecca061f1b38a0a60db210376 \
     -DENABLE_LAPACK=OFF \
     -DENABLE_WARNINGS=OFF \
     -DENABLE_OPENQASM=ON \
-    -DENABLE_OPENMP=OFF \
     -DLQ_ENABLE_KERNEL_OMP=OFF
 cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 

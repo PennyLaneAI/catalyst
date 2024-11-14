@@ -111,7 +111,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         ENABLE_LLD=OFF \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=master \
         make runtime
 
     - name: Build Catalyst Runtime (stable)
@@ -121,7 +120,6 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=latest_release \
         ENABLE_OPENQASM=ON \
         make runtime
 
@@ -132,7 +130,6 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=v0.39.0_rc \
         ENABLE_OPENQASM=ON \
         make runtime
 
