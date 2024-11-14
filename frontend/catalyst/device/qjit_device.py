@@ -195,8 +195,9 @@ def extract_backend_info(
                 device.target_device._s3_folder  # pylint: disable=protected-access
             )
 
-    if hasattr(device, "device_kwargs"):
-        device_kwargs.update({k: getattr(device, v) for k, v in device.device_kwargs.items()})
+    for k, v in getattr(device, "device_kwargs", {}).items():
+        if hasattr(device, v) and not k in device_kwargs:
+            device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
