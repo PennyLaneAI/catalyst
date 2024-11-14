@@ -1,6 +1,6 @@
 PYTHON?=$(shell which python3)
-PYTHON_PREFIX?=$(shell $(PYTHON) -c "import sys; print(sys.prefix)")
-PYTHON_VERSION?=$(shell $(PYTHON) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_PREFIX:=$(shell $(PYTHON) -c "import sys; print(sys.prefix)")
+PYTHON_VERSION:=$(shell $(PYTHON) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
