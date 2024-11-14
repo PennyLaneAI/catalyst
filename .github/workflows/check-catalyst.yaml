@@ -658,7 +658,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-
       - name: Build Runtime test suite for Lightning simulator
         run: |
           C_COMPILER=$(which gcc) \
@@ -666,7 +665,6 @@ jobs:
           COMPILER_LAUNCHER="" \
           make coverage-runtime
           mv runtime/build/coverage.info coverage-${{ github.job }}.info
-
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
