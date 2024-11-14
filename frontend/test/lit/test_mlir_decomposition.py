@@ -55,22 +55,13 @@ def get_custom_device_without(num_wires):
     class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
-        name = "Custom Device"
-        pennylane_requires = "0.35.0"
-        version = "0.0.2"
-        author = "Tester"
-
-        config = None
-        backend_name = "default"
-        backend_lib = "default"
-        _mlir_decomposition = "ions-decomposition"
+        name = "oqc.cloud"
 
         lightning_device = qml.device("lightning.qubit", wires=0)
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
             lightning_capabilities = get_device_capabilities(self.lightning_device)
-            lightning_capabilities.options["mlir_decomposition"] = "_mlir_decomposition"
             self.qjit_capabilities = lightning_capabilities
 
         def apply(self, operations, **kwargs):

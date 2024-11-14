@@ -1244,9 +1244,8 @@ def trace_quantum_function(
 
 
 def _add_mlir_quantum_decomposition(f, device):
-    decomposition_pass = device.backend_kwargs.get("mlir_decomposition")
-    if decomposition_pass:
+    if device.original_device.name == "oqc.cloud":
         apply_registered_pass_p.bind(
-            pass_name=decomposition_pass,
+            pass_name="ions-decomposition",
             options=f"func-name={f.__name__}",
         )

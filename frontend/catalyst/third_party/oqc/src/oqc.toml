@@ -63,3 +63,6 @@ dynamic_qubit_management = false
 # whether the device can support non-commuting measurements together 
 # in a single execution
 non_commuting_observables = false
+
+
+mlir_decomposition = "ions-decomposition"
