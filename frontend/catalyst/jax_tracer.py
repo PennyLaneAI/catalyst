@@ -875,8 +875,8 @@ def trace_quantum_measurements(
                 if o.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(o.mv)
                 else:
-                    numqubits = nqubits if using_compbasis else None
-                    result = sample_p.bind(obs_tracers, shots, numqubits)
+                    shape = (shots, nqubits) if using_compbasis else (shots,)
+                    result = sample_p.bind(obs_tracers, shots, shape=shape)
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
@@ -895,9 +895,9 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(reshaped_result)
 
             elif o.return_type.value == "expval":
-                out_classical_tracers.append(expval_p.bind(obs_tracers))
+                out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
-                out_classical_tracers.append(var_p.bind(obs_tracers))
+                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
                 shape = (2**nqubits,)

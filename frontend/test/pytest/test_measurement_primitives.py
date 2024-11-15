@@ -33,7 +33,7 @@ def test_sample():
 
     def f():
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots=5, numqubits=0)
+        return sample_p.bind(obs, shots=5, shape=(5,0))
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
     assert jaxpr.eqns[1].primitive == sample_p
@@ -47,7 +47,7 @@ def test_sample_dynamic():
 
     def f(shots):
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots, numqubits=0)
+        return sample_p.bind(obs, shots, shape=(shots, 0))
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
     (shape_value,) = jaxpr.eqns[1].params.values()
@@ -94,11 +94,11 @@ def test_expval():
 
     def f():
         obs = compbasis_p.bind()
-        return expval_p.bind(obs, shape=(1,))
+        return expval_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == expval_p
-    assert jaxpr.eqns[1].params == {"shape": (1,)}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
 
 
@@ -107,11 +107,11 @@ def test_var():
 
     def f():
         obs = compbasis_p.bind()
-        return var_p.bind(obs, shape=(1,))
+        return var_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == var_p
-    assert jaxpr.eqns[1].params == {"shape": (1,)}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
 
 
