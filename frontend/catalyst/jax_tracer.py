@@ -742,12 +742,6 @@ def trace_observables(
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
-    elif isinstance(obs, qml.operation.Tensor):
-        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.obs]
-        obs_tracers = tensorobs_p.bind(*nested_obs)
-    elif isinstance(obs, qml.Hamiltonian):
-        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
-        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
