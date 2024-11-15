@@ -53,7 +53,6 @@ PSWAP = {}
 SISWAP = {}
 SQISW = {}
 BasisState = {}
-QubitStateVector = {}
 StatePrep = {}
 ControlledQubitUnitary = {}
 MultiControlledX = {}
