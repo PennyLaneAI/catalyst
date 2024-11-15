@@ -42,10 +42,6 @@ help:
 configure:
 	@echo "Configure Catalyst Runtime"
 
-	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
-	# is always built with proper cmake values.
-	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
-
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
