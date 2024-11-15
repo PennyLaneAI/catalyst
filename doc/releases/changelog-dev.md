@@ -46,13 +46,19 @@
 
 <h3>Bug fixes 🐛</h3>
 
+<h3>Internal changes</h3>
+
+* Remove Lightning Qubit Dynamic plugin from Catalyst.
+  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Erick Ochoa Lopez,
+Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
-Paul Haochen Wang,
-Mehrdad Malekmohammadi.
+Raul Torres,
+Paul Haochen Wang.

@@ -95,46 +95,14 @@ jobs:
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
+        ENABLE_LLD=ON \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        ENABLE_LLD=ON \
-        make dialects
-        make frontend
-
-    - name: Build Catalyst Runtime (latest)
-      if: ${{ inputs.lightning == 'latest' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        ENABLE_LLD=OFF \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=master \
-        make runtime
-
-    - name: Build Catalyst Runtime (stable)
-      if: ${{ inputs.lightning == 'stable' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=latest_release \
         ENABLE_OPENQASM=ON \
-        make runtime
-
-    - name: Build Catalyst Runtime (release-candidate)
-      if: ${{ inputs.lightning == 'release-candidate' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=v0.39.0_rc \
-        ENABLE_OPENQASM=ON \
-        make runtime
+        make catalyst
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
