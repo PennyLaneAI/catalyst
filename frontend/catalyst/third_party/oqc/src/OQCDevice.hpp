@@ -31,9 +31,7 @@
 #include "QubitManager.hpp"
 #include "Utils.hpp"
 
-#include <pybind11/embed.h>
-
-#include "OQCRunner.hpp" // <pybind11/embed.h>
+#include "OQCRunner.hpp"
 #include "OpenQASM2Builder.hpp"
 
 using namespace Catalyst::Runtime::OpenQASM2;

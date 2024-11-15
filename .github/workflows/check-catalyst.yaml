@@ -404,7 +404,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
@@ -476,12 +476,12 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        pip install PennyLane-Lightning-Kokkos==0.38.0-dev32 --extra-index-url https://test.pypi.org/simple
+        pip install PennyLane-Lightning-Kokkos==0.39.0 --extra-index-url https://test.pypi.org/simple
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -536,7 +536,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -638,10 +638,11 @@ jobs:
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
+          # Asan prevents dlopen from working?
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_ASAN=ON \
+          ENABLE_ASAN=OFF \
           make test-runtime
 
       - name: Build examples

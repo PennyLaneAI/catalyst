@@ -122,7 +122,7 @@ class TestCompilerErrors:
         """Test the return value if a user requests an intermediate file that doesn't exist."""
         compiler = Compiler()
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("inexistent-file")
+            compiler.get_output_of("inexistent-file", ".")
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
@@ -222,15 +222,15 @@ class TestCompilerState:
 
         compiler = workflow.compiler
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("EmptyPipeline1")
-        assert compiler.get_output_of("HLOLoweringPass")
-        assert compiler.get_output_of("QuantumCompilationPass")
+            compiler.get_output_of("EmptyPipeline1", workflow.workspace)
+        assert compiler.get_output_of("HLOLoweringPass", workflow.workspace)
+        assert compiler.get_output_of("QuantumCompilationPass", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("EmptyPipeline2")
-        assert compiler.get_output_of("BufferizationPass")
-        assert compiler.get_output_of("MLIRToLLVMDialect")
+            compiler.get_output_of("EmptyPipeline2", workflow.workspace)
+        assert compiler.get_output_of("BufferizationPass", workflow.workspace)
+        assert compiler.get_output_of("MLIRToLLVMDialect", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("None-existing-pipeline")
+            compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
     def test_print_nonexistent_stages(self, backend):
@@ -243,7 +243,7 @@ class TestCompilerState:
             return qml.state()
 
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            workflow.compiler.get_output_of("None-existing-pipeline")
+            workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
     def test_workspace(self):
@@ -304,17 +304,18 @@ class TestCompilerState:
             )
             compiled.compile()
 
+        stack_trace_pattern = "diagnostic emitted with trace"
+
         assert "Failed to lower MLIR module" in e.value.args[0]
-        assert "While processing 'TestPass' pass of the 'PipelineB' pipeline" in e.value.args[0]
-        assert "PipelineA" not in e.value.args[0]
-        assert "Trace" not in e.value.args[0]
-        assert isfile(os.path.join(str(compiled.workspace), "2_PipelineB_FAILED.mlir"))
+        assert "While processing 'TestPass' pass " in e.value.args[0]
+        assert stack_trace_pattern not in e.value.args[0]
+        assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
-        assert "Trace" in e.value.args[0]
+        assert stack_trace_pattern in e.value.args[0]
 
 
 class TestCustomCall:

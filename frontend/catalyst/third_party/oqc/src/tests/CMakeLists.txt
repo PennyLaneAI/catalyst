@@ -24,6 +24,15 @@ include(CTest)
 include(Catch)
 
 add_executable(runner_tests_oqc runner_main.cpp)
+add_dependencies(runner_tests_oqc oqc_python_module)
+set_property(TARGET runner_tests_oqc APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:oqc_python_module>")
+if(NOT APPLE)
+    set_property(TARGET runner_tests_oqc APPEND PROPERTY BUILD_RPATH $ORIGIN)
+    set_property(TARGET runner_tests_oqc APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+else()
+    set_property(TARGET runner_tests_oqc APPEND PROPERTY BUILD_RPATH @loader_path)
+    set_property(TARGET runner_tests_oqc APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+endif()
 
 target_include_directories(runner_tests_oqc PRIVATE
     ${OQC_LIBRARIES}
@@ -31,6 +40,7 @@ target_include_directories(runner_tests_oqc PRIVATE
 
 target_link_directories(runner_tests_oqc PRIVATE ${runtime_lib})
 # To avoid link to libpython, we use pybind11::module interface library.
+target_compile_definitions(runner_tests_oqc PUBLIC INITIALIZE_PYTHON)
 target_link_libraries(runner_tests_oqc PRIVATE
     Catch2::Catch2
     pybind11::embed

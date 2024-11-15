@@ -88,6 +88,12 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
+def IonsDecompositionPass : Pass<"ions-decomposition"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
+
+    let constructor = "catalyst::createIonsDecompositionPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
@@ -111,7 +117,7 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
-    let summary = "merge rotation boilerplate words";
+    let summary = "Perform merging of chained rotation gates about the same axis.";
 
     let constructor = "catalyst::createMergeRotationsPass()";
     let options = QuantumCircuitTransformationPass.options;

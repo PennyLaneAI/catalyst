@@ -60,7 +60,7 @@ def test_global_phase_in_region(backend, inp):
 def test_global_phase_control(backend):
     """Test global phase controlled"""
 
-    if backend == "lightning.kokkos":
+    if backend in ("lightning.kokkos", "lightning.gpu"):
         pytest.skip("control phase is unsupported in kokkos or at least its toml file.")
 
     dev = qml.device(backend, wires=2)

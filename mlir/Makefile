@@ -24,8 +24,8 @@ SYMBOL_VISIBILITY := protected
 endif
 
 ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
-ENABLE_ZLIB?=OFF
-ENABLE_ZSTD?=ON
+ENABLE_ZLIB?=ON
+ENABLE_ZSTD?=OFF
 
 ifeq ($(ENABLE_ASAN), ON)
 USE_SANITIZER_NAMES="Address"
@@ -146,7 +146,7 @@ dialects:
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver catalyst-cli
 
 .PHONY: test
 test:

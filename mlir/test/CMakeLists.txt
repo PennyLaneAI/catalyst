@@ -8,6 +8,7 @@ configure_lit_site_cfg(
 set(DIALECT_TESTS_DEPEND
     FileCheck
     quantum-opt
+    catalyst-cli
 )
 
 set(TEST_SUITES
@@ -15,6 +16,7 @@ set(TEST_SUITES
     Gradient
     Mitigation
     Catalyst
+    cli
     )
 
 
