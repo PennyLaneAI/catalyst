@@ -70,6 +70,11 @@ function(fetch_pybind11)
     endif()
 endfunction()
 
+if(RUNTIME_ENABLE_WARNINGS)
+    message(STATUS "Building with compiler warnings as errors enabled.")
+    add_compile_options(-Werror -Wall)
+endif()
+
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
