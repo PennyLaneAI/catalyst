@@ -15,7 +15,7 @@
   starting with Python 3.12.
 
 * Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"} to
-  the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to 
+  the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to
   `quantum-opt --ions-decomposition`.
   [(#1226)](https://github.com/PennyLaneAI/catalyst/pull/1226)
 
@@ -24,6 +24,14 @@
 
 * All PennyLane templates are tested for QJIT compatibility.
   [(#1161)](https://github.com/PennyLaneAI/catalyst/pull/1161)
+
+* Decouple Python from the Runtime by using the Python Global Interpreter Lock (GIL) instead of
+  custom mutexes.
+  [(#624)](https://github.com/PennyLaneAI/catalyst/pull/624)
+
+  In addition, executables created using :func:`~.debug.compile_executable` no longer require
+  linking against Python shared libraries after decoupling Python from the Runtime C-API.
+  [(#1305)](https://github.com/PennyLaneAI/catalyst/pull/1305)
 
 <h3>Breaking changes 💔</h3>
 
@@ -41,6 +49,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Erick Ochoa Lopez,
 William Maxwell
 Romain Moyard,
 Paul Haochen Wang.
