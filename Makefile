@@ -110,7 +110,7 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime runtime
+	$(MAKE) -C runtime all
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
@@ -249,10 +249,6 @@ endif
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
-
-.PHONY: examples-runtime
-examples-runtime:
-	$(MAKE) -C runtime examples
 
 .PHONY: format
 format:
