@@ -26,8 +26,8 @@ each stage individually. For example:
     # Only lowers LLVM dialect input to LLVM IR
     catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
 
-    # Only performs lower-level optimizations and creates object file
-    catalyst-cli --tool=llc llvm-ir.ll -o output.o
+    # Only performs lower-level optimizations and creates object file (object.o)
+    catalyst-cli --tool=llc llvm-ir.ll -o output.ll --module-name object
 
 .. note::
 
@@ -46,9 +46,8 @@ Usage
 
 Calling ``catalyst-cli`` without any options runs the three compilation stages (``quantum-opt``,
 ``mlir-translate`` and ``llc``) using all default configurations, and outputs by default an object
-file named ``catalyst_module.o``. The name of the output file can be set directly using the ``-o``
-option, or by changing the output module name using the ``--module-name`` option (the default module
-name is ``catalyst_module``).
+file named ``catalyst_module.o``. The name of the output file can be set by changing the output 
+module name using the ``--module-name`` option (the default module name is ``catalyst_module``).
 
 Command line options
 ^^^^^^^^^^^^^^^^^^^^
@@ -70,8 +69,7 @@ Emit verbose messages.
 ``-o <filename>``
 """""""""""""""""
 
-Output filename. If no output filename is provided, and if the ``llc`` compilation step is not run
-to produce an object file, the resulting IR is output to stdout.
+Output IR filename. If no output filename is provided, the resulting IR is output to stdout.
 
 ``--tool=<opt|translate|llc|all>``
 """"""""""""""""""""""""""""""""""
@@ -186,7 +184,7 @@ we can do so as follows:
     pipe(remove-chained-self-inverse{func-name=my_circuit};merge-rotations{func-name=my_circuit})
 
 Finally, we'll use the option ``--mlir-print-ir-after-all`` to print the resulting MLIR after each
-pass that is applied, and the ``-o`` option to set the name of the output file:
+pass that is applied, and the ``-o`` option to set the name of the output IR file:
 
 .. code-block::
 
