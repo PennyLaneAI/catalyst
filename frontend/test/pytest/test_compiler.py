@@ -332,6 +332,7 @@ class TestCompilerState:
 
         assert stack_trace_pattern in e.value.args[0]
 
+
 class TestCustomCall:
     """Test compilation of `lapack_dsyevd` via lowering to `stablehlo.custom_call`."""
 
