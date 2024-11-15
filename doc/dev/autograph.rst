@@ -639,11 +639,6 @@ Array(8.4, dtype=float64)
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
 
-Python list manipulations
--------------------------
-
-
-
 Logical statements
 ------------------
 
