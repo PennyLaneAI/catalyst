@@ -110,7 +110,7 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime runtime
+	$(MAKE) -C runtime all
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc

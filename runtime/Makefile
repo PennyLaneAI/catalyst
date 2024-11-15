@@ -9,7 +9,6 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=RelWithDebInfo
-ENABLE_WARNINGS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
 
@@ -32,16 +31,12 @@ test: BUILD_TYPE?=RelWithDebInfo
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build Catalyst Runtime"
-	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
 	@echo "  coverage           to generate a coverage report using lcov"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  test               to run the Catalyst runtime test suite"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
-
-.PHONY: all
-all: runtime
 
 .PHONY: configure
 configure:
@@ -60,8 +55,6 @@ configure:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
-		-DENABLE_WARNINGS=OFF \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
@@ -69,8 +62,8 @@ configure:
 capi_target: configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
 
-.PHONY: runtime
-runtime: configure
+.PHONY: all
+all: configure
 	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
 $(RT_BUILD_DIR)/tests/runner_tests_all_targets: configure
