@@ -28,12 +28,11 @@ import platform
 import shutil
 
 import pennylane as qml
-from lit_util_printers import print_jaxpr, print_mlir
+from lit_util_printers import print_jaxpr
 
-from catalyst import pipeline, qjit
+from catalyst import qjit
 from catalyst.debug import get_compilation_stage
 from catalyst.device import get_device_capabilities
-from catalyst.passes import cancel_inverses, merge_rotations
 from catalyst.utils.runtime_environment import get_lib_path
 
 
