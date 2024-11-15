@@ -31,6 +31,7 @@ import pytest
 
 from catalyst import qjit
 from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
+from catalyst.debug import instrumentation
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
@@ -76,6 +77,20 @@ class TestCompilerOptions:
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
         workflow.workspace.cleanup()
+
+    def test_compilation_with_instrumentation(self, capsys, backend):
+        """Test compilation with instrumentation"""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            return qml.state()
+
+        with instrumentation(circuit.__name__, filename=None, detailed=True):
+            qjit(circuit)()
+
+        capture_result = capsys.readouterr()
+        capture = capture_result.out + capture_result.err
+        assert "[DIAGNOSTICS]" in capture
 
 
 class TestCompilerWarnings:
