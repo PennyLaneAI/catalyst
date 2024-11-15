@@ -774,18 +774,32 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.outIR.clear();
         outIRStream << *llvmModule;
 
-        bool outputFileSpecified = !output.outputFilename.empty() && output.outputFilename != "-";
-        auto outfile = outputFileSpecified ? output.outputFilename : options.getObjectFile();
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                std::move(llvmModule), targetMachine, outfile))) {
+                                std::move(llvmModule), targetMachine, options.getObjectFile()))) {
             return failure();
         }
-        output.outputFilename = outfile;
         outputTiming.stop();
         llcTiming.stop();
     }
 
     return success();
+}
+
+size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
+{
+    int parenCount = 1;
+    for (size_t pos = openParenPos + 1; pos < str.size(); pos++) {
+        if (str[pos] == '(') {
+            parenCount++;
+        }
+        else if (str[pos] == ')') {
+            parenCount--;
+            if (parenCount == 0) {
+                return pos;
+            }
+        }
+    }
+    return llvm::StringRef::npos;
 }
 
 std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
@@ -794,8 +808,12 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
     for (const auto &pipelineStr : catalystPipeline) {
         llvm::StringRef pipelineRef = llvm::StringRef(pipelineStr).trim();
 
+        if (pipelineRef.empty()) {
+            continue;
+        }
+
         size_t openParenPos = pipelineRef.find('(');
-        size_t closeParenPos = pipelineRef.find(')', openParenPos);
+        size_t closeParenPos = findMatchingClosingParen(pipelineRef, openParenPos);
 
         if (openParenPos == llvm::StringRef::npos || closeParenPos == llvm::StringRef::npos) {
             llvm::errs() << "Error: Invalid pipeline format: " << pipelineStr << "\n";
@@ -911,66 +929,15 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     }
 
     // If not creating object file, output the IR to the specified file.
-    if (LoweringAction < Action::LLC) {
-        std::string errorMessage;
-        auto outfile = openOutputFile(outputFilename, &errorMessage);
-        if (!outfile) {
-            llvm::errs() << errorMessage << "\n";
-            return 1;
-        }
-        outfile->os() << output->outIR;
-        outfile->keep();
-    }
-
-    return 0;
-}
-
-int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
-                              const std::string &moduleName, bool keepIntermediate,
-                              bool asyncQNodes, bool verbose, bool lowerToLLVM,
-                              const std::vector<Pipeline> &passPipelines,
-                              const std::string &checkpointStage,
-                              catalyst::driver::CompilerOutput &output)
-{
-    llvm::raw_string_ostream errStream{output.diagnosticMessages};
-
-    CompilerOptions options{.source = source,
-                            .workspace = workspace,
-                            .moduleName = moduleName,
-                            .diagnosticStream = errStream,
-                            .keepIntermediate =
-                                keepIntermediate ? SaveTemps::AfterPipeline : SaveTemps::None,
-                            .asyncQnodes = asyncQNodes,
-                            .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
-                            .pipelinesCfg = passPipelines,
-                            .checkpointStage = checkpointStage,
-                            .loweringAction = lowerToLLVM ? Action::All : Action::OPT,
-                            .dumpPassPipeline = false};
-
-    DialectRegistry registry;
-    static bool initialized = false;
-    if (!initialized) {
-        registerAllPasses();
-        registerAllCatalystPasses();
-        registerAllCatalystPipelines();
-    }
-    initialized |= true;
-
-    mhlo::registerAllMhloPasses();
-    registerAllCatalystDialects(registry);
-    registerAsmPrinterCLOptions();
-    registerMLIRContextCLOptions();
-    registerPassManagerCLOptions();
-    registerDefaultTimingManagerCLOptions();
-    registerLLVMTranslations(registry);
-
-    mlir::LogicalResult result = QuantumDriverMain(options, output, registry);
-
-    errStream.flush();
-
-    if (mlir::failed(result)) {
-        llvm::errs() << "Compilation failed:\n" << output.diagnosticMessages << "\n";
+    std::string errorMessage;
+    auto outfile = openOutputFile(outputFilename, &errorMessage);
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
         return 1;
     }
+    outfile->os() << output->outIR;
+    outfile->keep();
+    if (Verbose)
+        llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     return 0;
 }
