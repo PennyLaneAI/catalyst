@@ -3,7 +3,6 @@
 pip>=22.3
 
 # Build dependencies for non-Python components
-nanobind
 # Do not allow NumPy 2.0.0 due to a bug with their C API that blocks the usage of the Stable ABI;
 # this bug was fixed in 2.0.1 (https://github.com/numpy/numpy/pull/26995)
 nanobind

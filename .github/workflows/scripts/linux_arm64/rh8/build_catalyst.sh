@@ -35,7 +35,7 @@ export PYTHON=/usr/bin/python3
 export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
 
 # Install python dependencies
-/usr/bin/python3 -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
+/usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
 
 # Build Catalyst runtime
 cmake -S runtime -B runtime-build -G Ninja \
@@ -64,7 +64,6 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
     -DPython3_EXECUTABLE=/usr/bin/python3 \
-    -DPYTHON_VERSION_TO_FIND=${PYTHON_VERSION} \
     -DPython3_NumPy_INCLUDE_DIRS=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include \
     -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir \
     -DMHLO_DIR=/catalyst/mhlo-build/lib/cmake/mlir-hlo \

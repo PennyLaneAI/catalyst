@@ -1,9 +1,7 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(PYTHON_VERSION_TO_FIND "3" CACHE STRING "Python version to find and use")
-
-find_package(Python ${PYTHON_VERSION_TO_FIND} EXACT
+find_package(Python 3
     REQUIRED COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.SABIModule)
 

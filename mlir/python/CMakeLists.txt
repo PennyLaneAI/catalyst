@@ -5,35 +5,6 @@ add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=mlir_quantum.")
 
 
 ################################################################################
-# Python and nanobind
-################################################################################
-
-set(PYTHON_VERSION_TO_FIND "3" CACHE STRING "Python version to find and use")
-
-# nanobind currently requires (as of 2.2.0) that we use the `Python` package, NOT the `Python3` package
-# We still require at least Python version 3
-find_package(Python ${PYTHON_VERSION_TO_FIND} EXACT
-  REQUIRED COMPONENTS Interpreter Development.Module
-  OPTIONAL_COMPONENTS Development.SABIModule)
-
-# nanobind suggests including these lines to configure CMake to perform an optimized release build
-# by default unless another build type is specified. Without this addition, binding code may run
-# slowly and produce large binaries.
-# See https://nanobind.readthedocs.io/en/latest/building.html#preliminaries
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
-
-# Detect the installed nanobind package and import it into CMake
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-  OUTPUT_VARIABLE nanobind_ROOT OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-find_package(nanobind CONFIG REQUIRED)
-
-
-################################################################################
 # Sources
 ################################################################################
 
@@ -76,6 +47,7 @@ declare_mlir_dialect_python_bindings(
 # Common CAPI
 ################################################################################
 
+
 add_mlir_python_common_capi_library(QuantumPythonCAPI
   INSTALL_COMPONENT QuantumPythonModules
   INSTALL_DESTINATION python_packages/quantum/mlir_quantum/_mlir_libs
@@ -100,4 +72,4 @@ add_mlir_python_modules(QuantumPythonModules
     MLIRPythonSources
   COMMON_CAPI_LINK_LIBS
     QuantumPythonCAPI
-)
+  )
