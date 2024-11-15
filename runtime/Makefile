@@ -48,8 +48,7 @@ configure:
 	@echo "Configure Catalyst Runtime"
 
 	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
-	# is always built with proper cmake values. There is currently an issue with caching the
-	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
+	# is always built with proper cmake values.
 	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
 
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
@@ -65,44 +64,20 @@ configure:
 		-DENABLE_WARNINGS=OFF \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
-		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
-		$(CMAKE_ARGS)
+		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
 
-lq_configure:
-	@echo "Configure Catalyst Runtime"
-
-	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
-	# is always built with proper cmake values. There is currently an issue with caching the
-	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
-	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
-
-	cmake -G Ninja -B $(RT_BUILD_DIR) . \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
-		-DENABLE_WARNINGS=OFF \
-		-DPYTHON_EXECUTABLE=$(PYTHON) \
-		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
-		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
-		$(CMAKE_ARGS)
-
-lq_target: lq_configure
+capi_target: configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
 
 .PHONY: runtime
 runtime: configure
 	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
-$(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
+$(RT_BUILD_DIR)/tests/runner_tests_all_targets: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
+test: $(RT_BUILD_DIR)/tests/runner_tests_all_targets
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
@@ -111,7 +86,7 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 
 .PHONY: coverage
-coverage: lq_target $(RT_BUILD_DIR)/tests/runner_tests_lightning
+coverage: capi_target $(RT_BUILD_DIR)/tests/runner_tests_all_targets
 	@echo "check C++ code coverage"
 
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
