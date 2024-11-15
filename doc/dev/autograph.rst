@@ -333,7 +333,6 @@ after the if statement will result in an error:
 >>> f(0.5)
 TypeError: Value 'a' with type <class 'str'> is not a valid JAX type
 
-
 For loops
 ---------
 
@@ -464,6 +463,24 @@ for instance by indexing a Python list with it. In that case, the list should be
 To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
 If you did not intend for the conversion to happen, you may safely ignore this warning.
 
+Something similar will also happen with list manipulations/operations:
+
+>>> @qjit(autograph=True)
+... def f():
+...     my_list = []
+...     for i in range(2):
+...         my_list.append(i)
+...     return my_list
+...
+>>> f()
+UserWarning: Tracing of an AutoGraph converted for loop failed with an exception:
+AutoGraphError: The variable 'my_list' was initialized with type <class 'list'>, which is not compatible with JAX. Typically, this is the case for
+non-numeric values. You may still use such a variable as a constant inside a loop, but it cannot be updated from one iteration to the next, 
+or accessed outside the loop scope if it was defined inside of it.
+...
+[Array(0, dtype=int64), Array(1, dtype=int64)]
+
+In this case, the code still executes, but AutoGraph is telling us that it fell back to executing the loop at compile time.
 
 .. note::
 
@@ -621,6 +638,11 @@ Array(8.4, dtype=float64)
 
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
+
+Python list manipulations
+-------------------------
+
+
 
 Logical statements
 ------------------
