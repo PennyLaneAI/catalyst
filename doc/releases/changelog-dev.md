@@ -25,6 +25,10 @@
 * All PennyLane templates are tested for QJIT compatibility.
   [(#1161)](https://github.com/PennyLaneAI/catalyst/pull/1161)
 
+* Measurement primitives now support dynamic shape at the frontend,
+  although at the PennyLane side, the corresponding operations still lack such support.
+  [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -43,4 +47,5 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 William Maxwell
 Romain Moyard,
+Raul Torres,
 Paul Haochen Wang.
