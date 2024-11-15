@@ -31,6 +31,8 @@
 
 <h3>Deprecations 👋</h3>
 
+<h3>Internal changes ⚙️</h3>
+
 * The `QuantumExtension` module (previously implemented with pybind11) has been removed. This module
   was not included in the distributed wheels and has been deprecated to align with our adoption of
   Python's stable ABI, which pybind11 does not support.
