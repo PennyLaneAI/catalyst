@@ -33,7 +33,7 @@ target_include_directories(catalyst_qir_qis_obj PUBLIC .
 # The MLIR Runner Utils raises this warning so we need to disable it for our -Werror builds.
 if(RUNTIME_ENABLE_WARNINGS)
     target_compile_options(catalyst_qir_qis_obj PRIVATE "-Wno-unused-parameter")
-endif()    
+endif()
 
 set_property(TARGET catalyst_qir_qis_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
 
