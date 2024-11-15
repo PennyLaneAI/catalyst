@@ -1,5 +1,3 @@
-:orphan:
-
 # Release 0.10.0-dev (development release)
 
 <h3>New features since last release</h3>
@@ -14,6 +12,10 @@
   [advantages](https://nanobind.readthedocs.io/en/latest/why.html#major-additions), in particular,
   its ability to target Python's [stable ABI interface](https://docs.python.org/3/c-api/stable.html)
   starting with Python 3.12.
+
+* Catalyst now uses the new compiler API to compile quantum code from the python frontend.
+  Frontend no longer uses pybind11 to connect to the compiler. Instead, it uses subprocess instead.
+  [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
 
 * Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"} to
   the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to 
@@ -37,11 +39,18 @@
 
 <h3>Bug fixes 🐛</h3>
 
+<h3>Internal changes</h3>
+
+* Remove Lightning Qubit Dynamic plugin from Catalyst.
+  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
+Raul Torres,
 Paul Haochen Wang.

@@ -61,7 +61,6 @@ OPERATIONS = [
     "SISWAP",
     "SQISW",
     "BasisState",
-    "QubitStateVector",
     "StatePrep",
     "ControlledQubitUnitary",
     "DiagonalQubitUnitary",
