@@ -153,7 +153,7 @@ Integration with Python devices
 There are two things that are needed in order to integrate with PennyLane devices:
 
 * Adding a ``get_c_interface`` method to your ``qml.devices.Device`` class.
-* Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
+* Adding a ``config_filepath`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
@@ -170,7 +170,7 @@ The Pennylane device API allows you to build a QJIT compatible device in a simpl
     class CustomDevice(qml.devices.Device):
         """Custom Device"""
 
-        config = pathlib.Path("absolute/path/to/configuration/file.toml")
+        config_filepath = pathlib.Path("absolute/path/to/configuration/file.toml")
 
         @staticmethod
         def get_c_interface():
@@ -196,137 +196,135 @@ headers and fields are generally required, unless stated otherwise.
 
 .. code-block:: toml
 
-        # Which version of the specification format is being used.
-        schema = 2
+    schema = 3
 
-        # The union of all gate types listed in this section must match what
-        # the device considers "supported" through PennyLane's device API.
-        # The gate definition has the following format:
-        #
-        #   GATE = { properties = [ PROPS ], condition = [ COND ] }
-        #
-        # Where:
-        #
-        #   PROPS: zero or more comma-separated quoted strings:
-        #          "controllable", "invertible", "differentiable"
-        #   COND: quoted string, on of:
-        #         "analytic", "finiteshots"
-        #
-        [operators.gates.native]
+    # The set of all gate types supported at the runtime execution interface of the
+    # device, i.e., what is supported by the `execute` method. The gate definitions
+    # should have the following format:
+    #
+    #   GATE = { properties = [ PROPS ], conditions = [ CONDS ] }
+    #
+    # where PROPS and CONS are zero or more comma separated quoted strings.
+    #
+    # PROPS: additional support provided for each gate.
+    #        - "controllable": if a controlled version of this gate is supported.
+    #        - "invertible": if the adjoint of this operation is supported.
+    #        - "differentiable": if device gradient is supported for this gate.
+    # CONDS: constraints on the support for each gate.
+    #        - "analytic" or "finiteshots": if this operation is only supported in
+    #          either analytic execution or with shots, respectively.
+    #
+    [operators.gates]
 
-        QubitUnitary = { properties = [ "controllable", "invertible"]  }
-        PauliX = { properties = [ "controllable", "invertible"] }
-        PauliY = { properties = [ "controllable", "invertible"] }
-        PauliZ = { properties = [ "controllable", "invertible"] }
-        MultiRZ = { properties = [ "controllable", "invertible" ] }
-        Hadamard = { properties = [ "controllable", "invertible"] }
-        S = { properties = [ "controllable", "invertible" ] }
-        T = { properties = [ "controllable", "invertible" ] }
-        CNOT = { properties = [ "invertible" ] }
-        SWAP = { properties = [ "controllable", "invertible" ] }
-        CSWAP = { properties = [ "invertible" ] }
-        Toffoli = { properties = [ "controllable", "invertible" ] }
-        CY = { properties = [ "invertible" ] }
-        CZ = { properties = [ "invertible" ] }
-        PhaseShift = { properties = [ "controllable", "invertible" ] }
-        ControlledPhaseShift = { properties = [ "invertible" ] }
-        RX = { properties = [ "controllable", "invertible" ] }
-        RY = { properties = [ "controllable", "invertible" ] }
-        RZ = { properties = [ "controllable", "invertible" ] }
-        Rot = { properties = [ "controllable", "invertible" ] }
-        CRX = { properties = [ "invertible" ] }
-        CRY = { properties = [ "invertible" ] }
-        CRZ = { properties = [ "invertible" ] }
-        CRot = { properties = [ "invertible" ] }
-        Identity = { properties = [ "controllable", "invertible" ] }
-        IsingXX = { properties = [ "controllable", "invertible" ] }
-        IsingYY = { properties = [ "controllable", "invertible" ] }
-        IsingZZ = { properties = [ "controllable", "invertible" ] }
-        IsingXY = { properties = [ "controllable", "invertible" ] }
+    PauliX = { properties = ["controllable", "invertible"] }
+    PauliY = { properties = ["controllable", "invertible"] }
+    PauliZ = { properties = ["controllable", "invertible"] }
+    RY = { properties = ["controllable", "invertible", "differentiable"] }
+    RZ = { properties = ["controllable", "invertible", "differentiable"] }
+    CRY = { properties = ["invertible", "differentiable"] }
+    CRZ = { properties = ["invertible", "differentiable"] }
+    CNOT = { properties = ["invertible"] }
 
-        # Operators that should be decomposed according to the algorithm used
-        # by PennyLane's device API.
-        # Optional, since gates not listed in this list will typically be decomposed by
-        # default, but can be useful to express a deviation from this device's regular
-        # strategy in PennyLane.
-        [operators.gates.decomp]
+    # Observables supported by the device for measurements. The observables defined
+    # in this section should have the following format:
+    #
+    #   OBSERVABLE = { conditions = [ CONDS ] }
+    #
+    # where CONDS is zero or more comma separated quoted strings, same as above.
+    #
+    # CONDS: constraints on the support for each observable.
+    #        - "analytic" or "finiteshots": if this observable is only supported in
+    #          either analytic execution or with shots, respectively.
+    #        - "terms-commute": if a composite operator is only supported under the
+    #          condition that its terms commute.
+    #
+    [operators.observables]
 
-        SX = {}
-        ISWAP = {}
-        PSWAP = {}
-        SISWAP = {}
-        SQISW = {}
-        CPhase = {}
-        BasisState = {}
-        StatePrep = {}
-        ControlledQubitUnitary = {}
-        MultiControlledX = {}
-        SingleExcitation = {}
-        SingleExcitationPlus = {}
-        SingleExcitationMinus = {}
-        DoubleExcitation = {}
-        DoubleExcitationPlus = {}
-        DoubleExcitationMinus = {}
-        QubitCarry = {}
-        QubitSum = {}
-        OrbitalRotation = {}
-        QFT = {}
-        ECR = {}
+    PauliX = { }
+    PauliY = { }
+    PauliZ = { }
+    Hamiltonian = { conditions = [ "terms-commute" ] }
+    Sum = { conditions = [ "terms-commute" ] }
+    SProd = { }
+    Prod = { }
 
-        # Gates which should be translated to QubitUnitary
-        [operators.gates.matrix]
+    # Types of measurement processes supported on the device. The measurements in
+    # this section should have the following format:
+    #
+    #   MEASUREMENT_PROCESS = { conditions = [ CONDS ] }
+    #
+    # where CONDS is zero or more comma separated quoted strings, same as above.
+    #
+    # CONDS: constraints on the support for each measurement process.
+    #        - "analytic" or "finiteshots": if this measurement is only supported
+    #          in either analytic execution or with shots, respectively.
+    #
+    [measurement_processes]
 
-        DiagonalQubitUnitary = {}
+    ExpectationMP = { }
+    SampleMP = { }
+    CountsMP = { conditions = ["finiteshots"] }
+    StateMP = { conditions = ["analytic"] }
 
-        # Observables supported by the device
-        [operators.observables]
+    # Additional support that the device may provide that informs the compilation
+    # process. All accepted fields and their default values are listed below.
+    [compilation]
 
-        PauliX = {}
-        PauliY = {}
-        PauliZ = {}
-        Hadamard = {}
-        Hermitian = {}
-        Identity = {}
-        Projector = {}
-        SparseHamiltonian = {}
-        Hamiltonian = {}
-        Sum = {}
-        SProd = {}
-        Prod = {}
-        Exp = {}
+    # Whether the device is compatible with qjit.
+    qjit_compatible = false
 
-        [measurement_processes]
+    # Whether the device requires run time generation of the quantum circuit.
+    runtime_code_generation = false
 
-        Expval = {}
-        Var = {}
-        Probs = {}
-        Sample = {}
-        Counts = { condition = [ "finiteshots" ] }
+    # Whether the device supports allocating and releasing qubits during execution.
+    dynamic_qubit_management = false
 
-        [compilation]
+    # Whether simultaneous measurements on overlapping wires is supported.
+    overlapping_observables = true
 
-        # If the device is compatible with qjit
-        qjit_compatible = true
-        # If the device requires run time generation of the quantum circuit.
-        runtime_code_generation = false
-        # If the device supports mid circuit measurements natively
-        mid_circuit_measurement = true
-        # This field is currently unchecked but it is reserved for the purpose of
-        # determining if the device supports dynamic qubit allocation/deallocation.
-        dynamic_qubit_management = false
+    # Whether simultaneous measurements of non-commuting observables is supported.
+    # If false, a circuit with multiple non-commuting measurements will have to be
+    # split into multiple executions for each subset of commuting measurements.
+    non_commuting_observables = false
 
-        [options]
-        # Options is an optional field.
-        # These options represent runtime parameters that can be passed to the device
-        # upon the device initialization.
-        # The option key will be the key in a dictionary.
-        # The string corresponds to a field queried in the `qml.Device` instance.
-        option_key = "option_field"
-        # In the above example, a dictionary will be constructed at run time.
-        # The dictionary will contain the string key "option_key" and its value
-        # will be the value in `qml.Device` `option_field`.
-        # The value can be any Python type, but will be converted to a string.
-        # During the initialization of your `class QuantumDevice`, the dictionary
-        # will be sent to the constructor of your implementation of `class QuantumDevice`.
-        # The dictionary will be a JSON string like the following:
-        # { 'option_key': option_field }
+    # Whether the device supports initial state preparation.
+    initial_state_prep = false
+
+    # The methods of handling mid-circuit measurements that the device supports,
+    # e.g., "one-shot", "tree-traversal", "device", etc. An empty list indicates
+    # that the device does not support mid-circuit measurements.
+    supported_mcm_methods = [ ]
+
+This TOML file is used by both Catalyst frontend and PennyLane. Regular circuit execution is
+performed by your implementation of ``Device.execute``, whereas for a QJIT-compiled workflow,
+execution is performed by the ``QuantumDevice``. The TOML file should declare the capabilities
+of the two execution interfaces. If one of the interfaces have additional support that the other
+does not have, include them in a separate section:
+
+.. code-block:: toml
+
+    # Gates supported by the Python implementation of Device.execute but not by the QuantumDevice.
+    [pennylane.operators.gates]
+
+    MultiControlledX  = { }
+
+    # Observables supported by the QuantumDevice but not by your implementation of Device.execute.
+    [qjit.operators.observables]
+
+    Sum = { }
+
+Additionally, any runtime parameters to be passed to the ``QuantumDevice`` upon initialization
+should be specified in a dictionary class property ``device_kwargs`` that links keyword arguments
+of the ``QuantumDevice`` constructor to attributes of the ``qml.device.Device`` implementation.
+For example:
+
+.. code-block:: python
+
+    class CustomDevice(qml.devices.Device):
+        """Custom Device"""
+
+        config_filepath = pathlib.Path("absolute/path/to/configuration/file.toml")
+        device_kwargs = {"arg1": "field1"}
+
+In the above example, a dictionary will be constructed at runtime with ``{"args1": dev.field1}``
+and passed to the constructor of the ``QuantumDevice`` implementation.

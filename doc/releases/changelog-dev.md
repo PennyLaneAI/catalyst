@@ -27,6 +27,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `toml` module has been migrated to PennyLane with an updated schema for declaring device capabilities. All TOML files of custom devices should now be updated to use the new schema.
+  [(#1275)](https://github.com/PennyLaneAI/catalyst/pull/1275)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Documentation 📝</h3>
@@ -40,6 +43,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Astral Cai,
 Joey Carter,
 William Maxwell
 Romain Moyard,
