@@ -81,17 +81,6 @@ if(ENABLE_OPENQASM)
     list(APPEND devices_list rtd_openqasm)
 endif()
 
-# On macOS libomp is typically installed via brew, which doesn't make the package discoverable by
-# default to avoid conflicting with GCC's OpenMP library.
-if(APPLE)
-    execute_process (
-        COMMAND brew --prefix libomp
-        OUTPUT_VARIABLE BREW_OMP
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(OpenMP_ROOT ${BREW_OMP})
-endif()
-
 add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
