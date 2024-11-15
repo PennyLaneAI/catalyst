@@ -1130,6 +1130,7 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
+    # Add the decomposition passes with the transform dialect
     _add_mlir_quantum_decomposition(f, device)
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -1244,7 +1245,8 @@ def trace_quantum_function(
 
 
 def _add_mlir_quantum_decomposition(f, device):
-    if device.original_device.name == "oqc.cloud":
+    # TODO: make this non related to the name of the device
+    if device.original_device.name == "oqd.cloud":
         apply_registered_pass_p.bind(
             pass_name="ions-decomposition",
             options=f"func-name={f.__name__}",

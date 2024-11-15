@@ -55,7 +55,7 @@ def get_custom_device_without(num_wires):
     class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
-        name = "oqc.cloud"
+        name = "oqd.cloud"
 
         lightning_device = qml.device("lightning.qubit", wires=0)
 
