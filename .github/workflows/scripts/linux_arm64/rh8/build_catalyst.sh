@@ -45,13 +45,8 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
-    -DLIGHTNING_GIT_TAG=latest_release \
-    -DENABLE_LAPACK=OFF \
-    -DENABLE_WARNINGS=OFF \
-    -DENABLE_OPENQASM=ON \
-    -DENABLE_OPENMP=OFF \
-    -DLQ_ENABLE_KERNEL_OMP=OFF
-cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
+    -DENABLE_OPENQASM=ON
+cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
@@ -74,7 +69,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_ENABLE_ZSTD=OFF \
     -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
-cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
+cmake --build quantum-build --target check-dialects catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib

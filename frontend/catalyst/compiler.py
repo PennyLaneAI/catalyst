@@ -23,6 +23,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
@@ -30,12 +31,15 @@ from io import TextIOWrapper
 from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-from mlir_quantum.compiler_driver import run_compiler_driver
-
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.pipelines import (
+    DEFAULT_ASYNC_PIPELINES,
+    DEFAULT_PIPELINES,
+    QUANTUM_COMPILATION_PASS,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime_environment import get_lib_path
+from catalyst.utils.runtime_environment import get_bin_path, get_lib_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -169,168 +173,6 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     if compile_options.verbose:
         print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
-
-
-ENFORCE_RUNTIME_INVARIANTS_PASS = (
-    "EnforeRuntimeInvariantsPass",
-    [
-        # We want the invariant that transforms that generate multiple
-        # tapes will generate multiple qnodes. One for each tape.
-        # Split multiple tapes enforces that invariant.
-        "split-multiple-tapes",
-        # Run the transform sequence defined in the MLIR module
-        "apply-transform-sequence",
-        # Nested modules are something that will be used in the future
-        # for making device specific transformations.
-        # Since at the moment, nothing in the runtime is using them
-        # and there is no lowering for them,
-        # we inline them to preserve the semantics. We may choose to
-        # keep inlining modules targetting the Catalyst runtime.
-        # But qnodes targetting other backends may choose to lower
-        # this into something else.
-        "inline-nested-module",
-    ],
-)
-
-HLO_LOWERING_PASS = (
-    "HLOLoweringPass",
-    [
-        "canonicalize",
-        "func.func(chlo-legalize-to-hlo)",
-        "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-to-linalg)",
-        "func.func(mhlo-legalize-to-std)",
-        "func.func(hlo-legalize-sort)",
-        "convert-to-signless",
-        "canonicalize",
-        "scatter-lowering",
-        "hlo-custom-call-lowering",
-        "cse",
-        "func.func(linalg-detensorize{aggressive-mode})",
-        "detensorize-scf",
-        "canonicalize",
-    ],
-)
-
-QUANTUM_COMPILATION_PASS = (
-    "QuantumCompilationPass",
-    [
-        "annotate-function",
-        "lower-mitigation",
-        "lower-gradients",
-        "adjoint-lowering",
-        "disable-assertion",
-    ],
-)
-
-BUFFERIZATION_PASS = (
-    "BufferizationPass",
-    [
-        "one-shot-bufferize{dialect-filter=memref}",
-        "inline",
-        "gradient-preprocess",
-        "gradient-bufferize",
-        "scf-bufferize",
-        "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        "arith-bufferize",
-        "empty-tensor-to-alloc-tensor",
-        "func.func(bufferization-bufferize)",
-        "func.func(tensor-bufferize)",
-        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        "func.func(linalg-bufferize)",
-        "func.func(tensor-bufferize)",
-        "quantum-bufferize",
-        "func-bufferize",
-        "func.func(finalizing-bufferize)",
-        "canonicalize",  # Remove dead memrefToTensorOp's
-        "gradient-postprocess",
-        # introduced during gradient-bufferize of callbacks
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
-        "func.func(buffer-deallocation)",
-        "convert-arraylist-to-memref",
-        "convert-bufferization-to-memref",
-        "canonicalize",  # Must be after convert-bufferization-to-memref
-        # otherwise there are issues in lowering of dynamic tensors.
-        # "cse",
-        "cp-global-memref",
-    ],
-)
-
-
-MLIR_TO_LLVM_PASS = (
-    "MLIRToLLVMDialect",
-    [
-        "expand-realloc",
-        "convert-gradient-to-llvm",
-        "memrefcpy-to-linalgcpy",
-        "func.func(convert-linalg-to-loops)",
-        "convert-scf-to-cf",
-        # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
-        # strides) into a sequence of easier to analyze constructs. In particular, this pass
-        # transforms ops into explicit sequence of operations that model the effect of this
-        # operation on the different metadata. This pass uses affine constructs to materialize
-        # these effects. Concretely, expanded-strided-metadata is used to decompose
-        # memref.subview as it has no lowering in -finalize-memref-to-llvm.
-        "expand-strided-metadata",
-        "lower-affine",
-        "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-        "convert-complex-to-standard",  # added for complex.exp lowering
-        "convert-complex-to-llvm",
-        "convert-math-to-llvm",
-        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-        "convert-math-to-libm",
-        "convert-arith-to-llvm",
-        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
-        "finalize-memref-to-llvm{use-generic-functions}",
-        "convert-index-to-llvm",
-        "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm",
-        # There should be no identical code folding
-        # (`mergeIdenticalBlocks` in the MLIR source code)
-        # between convert-async-to-llvm and
-        # add-exception-handling.
-        # So, if there's a pass from the beginning
-        # of this list to here that does folding
-        # add-exception-handling will fail to add async.drop_ref
-        # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
-        "add-exception-handling",
-        "emit-catalyst-py-interface",
-        # Remove any dead casts as the final pass expects to remove all existing casts,
-        # but only those that form a loop back to the original type.
-        "canonicalize",
-        "reconcile-unrealized-casts",
-        "gep-inbounds",
-        "register-inactive-callback",
-    ],
-)
-
-
-DEFAULT_PIPELINES = [
-    ENFORCE_RUNTIME_INVARIANTS_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_PASS,
-]
-
-MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
-MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
-    "qnode-to-async-lowering",
-    "async-func-to-async-runtime",
-    "async-to-async-runtime",
-    "convert-async-to-llvm",
-]
-
-DEFAULT_ASYNC_PIPELINES = [
-    ENFORCE_RUNTIME_INVARIANTS_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_ASYNC_PASS,
-]
 
 
 class LinkerDriver:
@@ -549,6 +391,43 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
 
     @debug_logger
+    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+        """Prepare the command for catalyst-cli to compile the file.
+
+        Args:
+            module_name (str): Module name to use for naming
+            workspace (Directory): directory that holds output files and/or debug dumps.
+        Returns:
+            cmd (str): The command to be executed.
+        """
+        cli_build_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/catalyst-cli"
+        if not path.isfile(cli_build_path):
+            raise FileNotFoundError("catalyst-cli executable was not found.")  # pragma: nocover
+        cmd = [cli_build_path]
+        cmd += [tmp_infile_name, "-o", output_ir_name]
+        cmd += ["--module-name", module_name, "--workspace", str(workspace)]
+        if not self.options.lower_to_llvm:
+            cmd += ["--tool", "opt"]
+        if self.options.keep_intermediate:
+            cmd += ["--keep-intermediate"]
+        # The async tests are not included as part of coverage.
+        if self.options.async_qnodes:  # pragma: nocover
+            cmd += ["--async-qnodes"]
+        if self.options.verbose:
+            cmd += ["--verbose"]
+        if self.options.checkpoint_stage:
+            cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+
+        pipeline_str = ""
+        for pipeline in self.options.get_pipelines():
+            pipeline_name, passes = pipeline
+            passes_str = ";".join(passes)
+            pipeline_str += f"{pipeline_name}({passes_str}),"
+        cmd += ["--catalyst-pipeline", pipeline_str]
+
+        return cmd
+
+    @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -559,7 +438,7 @@ class Compiler:
 
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
-                                   shard object library path.
+                                   shared object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
         """
@@ -568,42 +447,50 @@ class Compiler:
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
 
-        lower_to_llvm = (
-            self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
-        )
+        lower_to_llvm = self.options.lower_to_llvm or False
+        output_ir_ext = ".ll" if lower_to_llvm else ".mlir"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".mlir", dir=str(workspace), delete=False
+        ) as tmp_infile:
+            tmp_infile_name = tmp_infile.name
+            tmp_infile.write(ir)
+
+        output_object_name = os.path.join(str(workspace), f"{module_name}.o")
+        output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
+
+        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
         try:
-            compiler_output = run_compiler_driver(
-                ir,
-                str(workspace),
-                module_name,
-                keep_intermediate=self.options.keep_intermediate,
-                async_qnodes=self.options.async_qnodes,
-                verbose=self.options.verbose,
-                pipelines=self.options.get_pipelines(),
-                lower_to_llvm=lower_to_llvm,
-                checkpoint_stage=self.options.checkpoint_stage,
-            )
-        except RuntimeError as e:
-            raise CompileError(*e.args) from e
+            if self.options.verbose:
+                print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
+                if result.stdout:
+                    print(result.stdout.strip(), file=self.options.logfile)
+                if result.stderr:
+                    print(result.stderr.strip(), file=self.options.logfile)
+        except subprocess.CalledProcessError as e:  # pragma: nocover
+            raise CompileError(
+                f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
+            ) from e
 
-        if self.options.verbose:
-            for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
-                print(f"[LIB] {line}", file=self.options.logfile)
-
-        filename = compiler_output.get_object_filename()
-        out_IR = compiler_output.get_output_ir()
+        with open(output_ir_name, "r", encoding="utf-8") as f:
+            out_IR = f.read()
 
         if lower_to_llvm:
-            output = LinkerDriver.run(filename, options=self.options)
-            output_filename = str(pathlib.Path(output).absolute())
-        else:
-            output_filename = filename
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output_object_name = str(pathlib.Path(output).absolute())
 
-        return output_filename, out_IR
+        # Clean up temporary files
+        if os.path.exists(tmp_infile_name):
+            os.remove(tmp_infile_name)
+        if os.path.exists(output_ir_name):
+            os.remove(output_ir_name)
+
+        return output_object_name, out_IR
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):

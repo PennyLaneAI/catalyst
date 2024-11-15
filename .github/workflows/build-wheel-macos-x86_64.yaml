@@ -292,14 +292,9 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=latest_release \
-              -DENABLE_LAPACK=OFF \
-              -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF \
-              -DLQ_ENABLE_KERNEL_OMP=OFF
+              -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
+        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -312,8 +307,7 @@ jobs:
     - name: Test Catalyst-Runtime
       run: |
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
-        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
-        ./runtime-build/tests/runner_tests_lightning
+        cmake --build runtime-build --target runner_tests_openqasm
         ./runtime-build/tests/runner_tests_openqasm
 
     # Build Quantum and Gradient Dialects
@@ -334,7 +328,7 @@ jobs:
               -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF
 
-        cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
+        cmake --build quantum-build --target check-dialects catalyst-cli
 
     - name: Build wheel
       run: |
