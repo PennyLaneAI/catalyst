@@ -87,32 +87,6 @@ add_mlir_python_common_capi_library(QuantumPythonCAPI
     MLIRPythonSources.Core
 )
 
-
-################################################################################
-# Compiler Driver Nanobind Module
-################################################################################
-
-# Source files for the Python `compiler_driver` module
-set(COMPILER_DRIVER_SRC_FILES
-  PyCompilerDriver.cpp
-)
-
-# Create the `compiler_driver` module
-# Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
-# built (`STABLE_ABI` does nothing on older Python versions).
-nanobind_add_module(compiler_driver STABLE_ABI ${COMPILER_DRIVER_SRC_FILES})
-
-# Output library name will be compiler_driver.so
-set_target_properties(compiler_driver
-  PROPERTIES
-  PREFIX ""     # Removes 'lib' prefix
-  SUFFIX ".so"  # Replaces '.abi3.so' suffix (for Stable ABI) with '.so'
-  LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum
-)
-
-target_link_libraries(compiler_driver PRIVATE CatalystCompilerDriver)
-
-
 ################################################################################
 # Instantiation of all Python modules
 ################################################################################
