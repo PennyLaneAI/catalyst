@@ -734,8 +734,8 @@ def SampleOp : Measurement_Op<"sample"> {
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
         from an observable on the current quantum state. Given the nature of the operation, an
-        attribute specifying the shot number, i.e. the number of samples to draw, must be specified.
-        The only SSA argument is an observable that must be defined by an operation in the local
+        argument specifying the shot number, i.e. the number of samples to draw, must be specified.
+        The only other SSA argument is an observable that must be defined by an operation in the local
         scope.
 
         Note that the return value type depends on the type of observable provided. Computational
@@ -760,13 +760,14 @@ def SampleOp : Measurement_Op<"sample"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        I64:$shots,
         Optional<
            AnyTypeOf<[
             MemRefRankOf<[F64], [1]>,
             MemRefRankOf<[F64], [2]>
            ]>
-        >:$in_data,
-        I64Attr:$shots
+        >:$in_data
+        //I64Attr:$shots
     );
 
     let results = (outs
@@ -779,7 +780,7 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? $shots attr-dict ( `:` type($samples)^ )?
     }];
 
     let extraClassDeclaration = [{

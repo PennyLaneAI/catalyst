@@ -733,13 +733,14 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
         ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
 
-        Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShotsAttr());
+        // Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShotsAttr());
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-        SmallVector<Value> args = {structPtr, numShots, numQubits};
-        args.insert(args.end(), qubits.begin(), qubits.end());
+        // SmallVector<Value> args = {structPtr, numShots, numQubits};
+        SmallVector<Value> args = {structPtr};
 
         if constexpr (std::is_same_v<T, SampleOp>) {
+            args.push_back(cast<SampleOpAdaptor>(adaptor).getShots());
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
@@ -750,6 +751,9 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
                 rewriter.create<LLVM::InsertValueOp>(loc, bStruct, adaptor.getInCounts(), 1);
             rewriter.create<LLVM::StoreOp>(loc, cStruct, structPtr);
         }
+
+        args.push_back(numQubits);
+        args.insert(args.end(), qubits.begin(), qubits.end());
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 

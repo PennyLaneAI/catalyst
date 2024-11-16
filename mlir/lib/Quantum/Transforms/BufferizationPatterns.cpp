@@ -72,7 +72,8 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-        rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
+        rewriter.create<SampleOp>(loc, TypeRange{},
+                                  ValueRange{adaptor.getObs(), adaptor.getShots(), allocVal},
                                   op->getAttrs());
         return success();
     }
