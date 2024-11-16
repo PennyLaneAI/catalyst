@@ -37,17 +37,22 @@ def test_sample():
         return sample_p.bind(obs, shots=5, shape=(5, 0))
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
-    #breakpoint()
+    # breakpoint()
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
-    #breakpoint()
-    assert jaxpr == """
+    # breakpoint()
+    assert (
+        jaxpr
+        == """
 { lambda ; . let
     a:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
     b:f64[5,0] = sample[shape=(5, 0) shots=5] a
   in (b,) }
 """
+    )
 
-    assert mlir == """
+    assert (
+        mlir
+        == """
 module @foo {
   func.func public @jit_foo() -> tensor<5x0xf64> {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
@@ -57,10 +62,11 @@ module @foo {
   }
 }
 """
+    )
 
-    #assert jaxpr.eqns[1].primitive == sample_p
-    #assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
-    #assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
+    # assert jaxpr.eqns[1].primitive == sample_p
+    # assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
+    # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
 
 def test_sample_dynamic_shape():
@@ -68,7 +74,7 @@ def test_sample_dynamic_shape():
 
     def f(shots):
         obs = compbasis_p.bind()
-        x = shots+1
+        x = shots + 1
         # Note that in `primitive.bind(args, kwargs)`, args are treated as jaxpr primitive's
         # proper arguments, and kwargs are treated as primitive's `params`
         # Proper primitive arguments are propagated as jaxpr variables,
@@ -76,10 +82,12 @@ def test_sample_dynamic_shape():
         return sample_p.bind(obs, x, shape=(x, 0))
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
-    #breakpoint()
+    # breakpoint()
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
     breakpoint()
-    assert jaxpr == """
+    assert (
+        jaxpr
+        == """
 { lambda ; a:i64[]. let
     b:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
     c:i64[] = add a 1
@@ -88,8 +96,11 @@ def test_sample_dynamic_shape():
     ] b c
   in (c, d) }
 """
+    )
 
-    assert mlir == """
+    assert (
+        mlir
+        == """
 module @foo {
   func.func public @jit_foo(%arg0: tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>) {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
@@ -100,26 +111,28 @@ module @foo {
   }
 }
 """
+    )
 
-    #assert jaxpr.eqns[1].primitive == sample_p
-    #assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
-    #assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
-
+    # assert jaxpr.eqns[1].primitive == sample_p
+    # assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
+    # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
 
 def test_new_sampleop_still_good_with_backend():
-    from catalyst.debug import replace_ir
     import pennylane as qml
+
+    from catalyst.debug import replace_ir
 
     @catalyst.qjit
     def workflow(shots):
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
-        #breakpoint()
+
+        # breakpoint()
         @qml.qnode(device)
         def circuit():
             qml.RX(0.1, 0)
-            #return qml.expval(qml.PauliZ(wires=0))
+            # return qml.expval(qml.PauliZ(wires=0))
             return qml.sample()
 
         return circuit()
@@ -168,10 +181,12 @@ def test_new_sampleop_still_good_with_backend():
         return
       }
     }"""
-    #breakpoint()
+    # breakpoint()
     replace_ir(workflow, "mlir", new_ir)
     print("after: ", workflow(10))
-'''
+
+
+"""
 >> pytest test_measurement_primitives.py -k new_sample -s
     test_measurement_primitives.py after:  [[1]
  [0]
@@ -184,7 +199,8 @@ def test_new_sampleop_still_good_with_backend():
  [1]
  [1]]
 
-'''
+"""
+
 
 def test_counts():
     """Test that the counts primitive can be captured by jaxpr."""

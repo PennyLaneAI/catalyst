@@ -1657,14 +1657,14 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 def _sample_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
-    '''
+    """
     # TODO: restructure these checks now that `shots` is a proper argument instead of an attribute
     # Is `shape` even necessary now?
     if obs.primitive is compbasis_p:
         assert shape == (shots, obs.num_qubits)
     else:
         assert shape == (shots,)
-    '''
+    """
 
     # return core.ShapedArray(shape, jax.numpy.float64)
     return core.DShapedArray(shape, jax.numpy.dtype("float64"))
@@ -1675,23 +1675,32 @@ def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple):
+def _sample_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    #breakpoint()
+    # breakpoint()
     shots_value = ConstantOp(i64_type, shots) if isinstance(shots, int) else shots
-    #shots_attr = ir.IntegerAttr.get(i64_type, shots)
+    # shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
-    #breakpoint()
+    # breakpoint()
     # TODO: use actual dynamic shape tensor type API
     # Somehow this magic number means dynamic shapes in jax
-    _shape = [-9223372036854775808 if isinstance(dim, jax.interpreters.partial_eval.DynamicJaxprTracer) else dim for dim in shape]
-    #breakpoint()
+    _shape = [
+        (
+            -9223372036854775808
+            if isinstance(dim, jax.interpreters.partial_eval.DynamicJaxprTracer)
+            else dim
+        )
+        for dim in shape
+    ]
+    # breakpoint()
     result_type = ir.RankedTensorType.get(_shape, f64_type)
 
-    #breakpoint()
+    # breakpoint()
     return SampleOp(result_type, obs, shots_value).results
 
 
