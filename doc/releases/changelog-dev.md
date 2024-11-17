@@ -39,6 +39,13 @@
 
 <h3>Deprecations 👋</h3>
 
+<h3>Internal changes ⚙️</h3>
+
+* The `QuantumExtension` module (previously implemented with pybind11) has been removed. This module
+  was not included in the distributed wheels and has been deprecated to align with our adoption of
+  Python's stable ABI, which pybind11 does not support.
+  [(#1187)](https://github.com/PennyLaneAI/catalyst/pull/1187)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an empty pass that prints hello world. The code of the tutorial is at [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
