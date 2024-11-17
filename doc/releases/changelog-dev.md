@@ -49,6 +49,7 @@
 
 * Remove Lightning Qubit Dynamic plugin from Catalyst.
   [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
+  [(#1307)](https://github.com/PennyLaneAI/catalyst/pull/1307)
 
 <h3>Contributors ✍️</h3>
 
