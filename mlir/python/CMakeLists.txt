@@ -42,17 +42,6 @@ declare_mlir_dialect_python_bindings(
   dialects/mitigation.py
   DIALECT_NAME mitigation)
 
-declare_mlir_python_extension(QuantumPythonSources.Extension
-  MODULE_NAME _quantumDialects
-  ADD_TO_PARENT QuantumPythonSources
-  SOURCES
-    QuantumExtension.cpp
-  PRIVATE_LINK_LIBS
-    LLVMSupport
-    MLIRIR
-  EMBED_CAPI_LINK_LIBS
-    QuantumCAPI
-)
 
 ################################################################################
 # Common CAPI

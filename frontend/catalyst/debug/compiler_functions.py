@@ -21,16 +21,12 @@ import platform
 import re
 import shutil
 import subprocess
-import sys
-import sysconfig
-from itertools import product
 
 import catalyst
 from catalyst.compiler import LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
-from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -235,47 +231,6 @@ def compile_executable(fn, *args):
     if not fn.compiled_function:
         fn(*args)
 
-    # Try default library paths in case the targeted python-dev is shipped with OS.
-    path_candidates = [
-        sysconfig.get_config_var("LIBDIR"),
-        "/usr/lib/x86_64-linux-gnu",
-        "/usr/local/lib64",
-        "/usr/local/lib",
-        "/usr/lib64",
-        "/usr/lib",
-    ]
-    version_info = sys.version_info
-    # Check libpython3.x.so first because libpython3.so might not link to it.
-    version_candidates = [f"{version_info.major}.{version_info.minor}", f"{version_info.major}"]
-
-    file_extension = ".so" if platform.system() == "Linux" else ".dylib"
-    python_lib_dir_path = ""
-    version_str = ""
-
-    for candidate in list(product(path_candidates, version_candidates)):
-        path_candidate, version_candidate = candidate
-        if os.path.isfile(path_candidate + f"/libpython{version_candidate}{file_extension}"):
-            version_str = version_candidate
-            python_lib_dir_path = path_candidate
-            break
-
-    if not python_lib_dir_path or not version_str:  # pragma: nocover
-        raise CompileError(
-            f'Unable to find Python library {version_candidates} at "{path_candidates}". '
-            "Please ensure that python-dev or python-devel is installed and available via pip."
-        )
-
-    lib_path_flags = [
-        f"-Wl,-rpath,{python_lib_dir_path}",
-        f"-L{python_lib_dir_path}",
-        "-lpython" + version_str,
-    ]
-
-    # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
-    if platform.system() == "Darwin":  # pragma: nocover
-        python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
-        lib_path_flags.insert(1, f"-Wl,-rpath,{python_lib_dir_rpath}")
-
     f_name = str(fn.__name__)
     workspace = str(fn.workspace) if fn.compile_options.keep_intermediate else os.getcwd()
     main_c_file = workspace + "/main.c"
@@ -303,7 +258,7 @@ def compile_executable(fn, *args):
         "-Wl,-rpath," + workspace,
         shared_object_file,
         f"-Wl,-rpath,{object_directory}",
-    ] + lib_path_flags
+    ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
     # Patch DLC prefix related to openblas
