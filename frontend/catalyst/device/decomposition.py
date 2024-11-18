@@ -29,11 +29,8 @@ from pennylane.measurements import (
     ExpectationMP,
     MidMeasureMP,
     ProbabilityMP,
+    SampleMP,
     VarianceMP,
-)
-from pennylane.tape.tape import (
-    _validate_computational_basis_sampling,
-    rotations_and_diagonal_measurements,
 )
 
 from catalyst.api_extensions import HybridCtrl
@@ -52,10 +49,8 @@ def check_alternative_support(op, capabilities):
 
     if isinstance(op, qml.ops.Controlled):
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
-        if (
-            capabilities.native_ops.get(op.base.name)
-            and capabilities.native_ops.get(op.base.name).controllable
-        ):
+        supported = capabilities.native_ops.get(op.base.name)
+        if supported and supported.controllable:
             return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
@@ -74,7 +69,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
     if capabilities.native_ops.get("QubitUnitary"):
         # If the device supports unitary matrices, apply the relevant conversions and fallbacks.
-        if capabilities.to_matrix_ops.get(op.name) or (
+        if op.name in capabilities.to_matrix_ops or (
             op.has_matrix and isinstance(op, qml.ops.Controlled)
         ):
             return _decompose_to_matrix(op)
@@ -84,13 +79,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
 @transform
 @debug_logger
-def catalyst_decompose(
-    tape: qml.tape.QuantumTape,
-    ctx,
-    stopping_condition,
-    capabilities,
-    max_expansion=None,
-):
+def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities):
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -105,12 +94,20 @@ def catalyst_decompose(
     the HybridOps have been passed to the decompose function.
     """
 
+    # This if statement is needed because not all classes that inherit from qml.StatePrepBase
+    # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
+    # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
+    # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
+    if len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState):
+        skip_initial_state_prep = capabilities.initial_state_prep_flag
+    else:
+        skip_initial_state_prep = False
+
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition,
-        skip_initial_state_prep=capabilities.initial_state_prep_flag,
+        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
+        skip_initial_state_prep=skip_initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
-        max_expansion=max_expansion,
         name="catalyst on this device",
         error=CompileError,
     )
@@ -118,7 +115,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion)
+            op = _decompose_nested_tapes(op, ctx, capabilities)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -136,7 +133,7 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion):
+def _decompose_nested_tapes(op, ctx, capabilities):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
@@ -144,11 +141,7 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
         else:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 tapes, _ = catalyst_decompose(
-                    region.quantum_tape,
-                    ctx=ctx,
-                    stopping_condition=stopping_condition,
-                    capabilities=capabilities,
-                    max_expansion=max_expansion,
+                    region.quantum_tape, ctx=ctx, capabilities=capabilities
                 )
                 new_tape = tapes[0]
         new_regions.append(
@@ -201,15 +194,88 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
-    """Specify whether or not an Operator is supported."""
-    return op.name in operations
+def catalyst_acceptance(op: qml.operation.Operation, capabilities: DeviceCapabilities) -> str:
+    """Check whether or not an Operator is supported."""
+    op_support = capabilities.native_ops
+
+    if isinstance(op, qml.ops.Adjoint):
+        match = catalyst_acceptance(op.base, capabilities)
+        if not match or not op_support[match].invertible:
+            return None
+    elif type(op) is qml.ops.ControlledOp:
+        match = catalyst_acceptance(op.base, capabilities)
+        if not match or not op_support[match].controllable:
+            return None
+    else:
+        match = op.name if op.name in op_support else None
+
+    return match
 
 
 @transform
 @debug_logger
-def measurements_from_counts(tape):
+def measurements_from_counts(tape, device_wires):
     r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
+    functions for each original measurement.
+
+    Args:
+        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        device_wires (Wires): the wires from the device, for assessing what wires to use
+            when a measurement applies to all wires.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+
+    .. note::
+
+        Samples are not supported.
+    """
+
+    new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
+
+    new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
+
+    def postprocessing_counts(results):
+        """A processing function to get expecation values from counts."""
+        states = results[0][0]
+        counts_outcomes = results[0][1]
+        results_processed = []
+        for m in tape.measurements:
+            wires = m.wires if m.wires else device_wires
+            mapped_counts_outcome = _map_counts(
+                counts_outcomes, wires, qml.wires.Wires(list(measured_wires))
+            )
+            if isinstance(m, ExpectationMP):
+                probs = _probs_from_counts(mapped_counts_outcome)
+                results_processed.append(_expval_from_probs(eigvals=m.eigvals(), prob_vector=probs))
+            elif isinstance(m, VarianceMP):
+                probs = _probs_from_counts(mapped_counts_outcome)
+                results_processed.append(_var_from_probs(eigvals=m.eigvals(), prob_vector=probs))
+            elif isinstance(m, ProbabilityMP):
+                probs = _probs_from_counts(mapped_counts_outcome)
+                results_processed.append(probs)
+            elif isinstance(m, CountsMP):
+                results_processed.append(
+                    tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
+                )
+            else:
+                raise NotImplementedError(
+                    f"Measurement type {type(m)} is not implemented with measurements_from_counts"
+                )
+        if len(tape.measurements) == 1:
+            results_processed = results_processed[0]
+        else:
+            results_processed = tuple(results_processed)
+        return results_processed
+
+    return [new_tape], postprocessing_counts
+
+
+@transform
+@debug_logger
+def measurements_from_samples(tape, device_wires):
+    r"""Replace all measurements from a tape with sample measurements, and adds postprocessing
     functions for each original measurement.
 
     Args:
@@ -221,47 +287,27 @@ def measurements_from_counts(tape):
 
     .. note::
 
-        Samples are not supported.
+        Counts are not supported.
     """
-    if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape)
-    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
-    for i, m in enumerate(diagonal_measurements):
-        if m.obs is not None:
-            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
-            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=m.wires)
-    # Add diagonalizing gates
-    news_operations = tape.operations
-    news_operations.extend(diagonalizing_gates)
-    # Transform tape
-    measured_wires = set()
-    for m in diagonal_measurements:
-        measured_wires.update(m.wires.tolist())
 
-    new_measurements = [qml.counts(wires=list(measured_wires))]
-    new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+    new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
-    def postprocessing_counts_to_expval(results):
-        """A processing function to get expecation values from counts."""
-        states = results[0][0]
-        counts_outcomes = results[0][1]
+    new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
+
+    def postprocessing_samples(results):
+        """A processing function to get expecation values from samples."""
+        samples = results[0]
         results_processed = []
         for m in tape.measurements:
-            mapped_counts_outcome = _map_counts(
-                counts_outcomes, m.wires, qml.wires.Wires(list(measured_wires))
-            )
-            if isinstance(m, ExpectationMP):
-                probs = _get_probs(mapped_counts_outcome)
-                results_processed.append(_get_expval(eigvals=m.eigvals(), prob_vector=probs))
-            elif isinstance(m, VarianceMP):
-                probs = _get_probs(mapped_counts_outcome)
-                results_processed.append(_get_var(eigvals=m.eigvals(), prob_vector=probs))
-            elif isinstance(m, ProbabilityMP):
-                probs = _get_probs(mapped_counts_outcome)
-                results_processed.append(probs)
-            elif isinstance(m, CountsMP):
-                results_processed.append(
-                    tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
+            if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
+                if len(tape.shots.shot_vector) > 1:
+                    res = tuple(m.process_samples(s, measured_wires) for s in samples)
+                else:
+                    res = m.process_samples(samples, measured_wires)
+                results_processed.append(res)
+            else:
+                raise NotImplementedError(
+                    f"Measurement type {type(m)} is not implemented with measurements_from_samples"
                 )
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
@@ -269,10 +315,33 @@ def measurements_from_counts(tape):
             results_processed = tuple(results_processed)
         return results_processed
 
-    return [new_tape], postprocessing_counts_to_expval
+    return [new_tape], postprocessing_samples
 
 
-def _get_probs(counts_outcome):
+def _diagonalize_measurements(tape, device_wires):
+    """Takes a tape and returns the information needed to create a new tape based on
+    diagonalization and readout in the measurement basis.
+
+    Args:
+        tape (QuantumTape): A quantum circuit.
+
+    Returns:
+        new_operations (list): The original operations, plus the diagonalizing gates for the circuit
+        measured_wires (list): A list of all wires that are measured on the tape
+
+    """
+
+    (diagonalized_tape,), _ = qml.transforms.diagonalize_measurements(tape)
+
+    measured_wires = set()
+    for m in diagonalized_tape.measurements:
+        wires = m.wires if m.wires else device_wires
+        measured_wires.update(wires.tolist())
+
+    return diagonalized_tape.operations, list(measured_wires)
+
+
+def _probs_from_counts(counts_outcome):
     """From the counts outcome, calculate the probability vector."""
     prob_vector = []
     num_shots = jax.numpy.sum(counts_outcome)
@@ -282,17 +351,17 @@ def _get_probs(counts_outcome):
     return jax.numpy.array(prob_vector)
 
 
-def _get_expval(eigvals, prob_vector):
+def _expval_from_probs(eigvals, prob_vector):
     """From the observable eigenvalues and the probability vector
     it calculates the expectation value."""
     expval = jax.numpy.dot(jax.numpy.array(eigvals), prob_vector)
     return expval
 
 
-def _get_var(eigvals, prob_vector):
+def _var_from_probs(eigvals, prob_vector):
     """From the observable eigenvalues and the probability vector
     it calculates the variance."""
-    var = jax.numpy.dot(prob_vector, (eigvals**2)) - jax.numpy.dot(prob_vector, eigvals)
+    var = jax.numpy.dot(prob_vector, (eigvals**2)) - jax.numpy.dot(prob_vector, eigvals) ** 2
     return var
 
 

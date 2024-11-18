@@ -4,7 +4,7 @@ Installation
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) 
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
-Python versions 3.9 and higher. To install it, simply run the following ``pip`` command:
+Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -112,7 +112,12 @@ The essential steps are:
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
         pip install cmake ninja
-        brew install libomp
+
+        # If not present yet, install Homebrew (https://brew.sh/)
+        brew install libomp ccache
+
+        # Add ccache drop-in compiler replacements to the PATH
+        export PATH=/usr/local/opt/ccache/libexec:$PATH
 
         # Clone the Catalyst repository  
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
@@ -156,7 +161,7 @@ installed and available on the path (depending on the platform):
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
   `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
 
-- `Python <https://www.python.org/>`_ 3.9 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.10 or higher for the Python frontend.
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
@@ -195,13 +200,16 @@ They can be installed via:
 
    .. group-tab:: macOS
 
-      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and ``brew``:
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``).
+      The remaining packages can then be installed via ``pip`` and ``brew``.
+      If ``brew`` is not present yet, install it from https://brew.sh/:
 
       .. code-block:: console
 
         xcode-select --install
         pip install cmake ninja
-        brew install libomp
+        brew install libomp ccache
+        export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 
 
@@ -414,3 +422,144 @@ To generate html files for the documentation for Catalyst:
   make docs
 
 The generated files are located in ``doc/_build/html``
+
+Known Issues
+------------
+
+.. tabs::
+
+   .. group-tab:: Linux Debian/Ubuntu
+
+      If you get this error: 
+
+      .. code-block:: console
+        
+        cannot find -lstdc++: No such file or directory
+
+      you might need to install a recent version of ``libstdc``. E.g.: 
+
+      .. code-block:: console
+        
+        sudo apt install libstdc++-12-dev
+
+      (See user's report `here <https://discourse.llvm.org/t/usr-bin-clang-is-not-able-to-compile-a-simple-test-program/72889/3>`_)
+
+      .. raw:: html
+
+        <hr>
+
+      Under Ubuntu 24.04, if you get this error:
+
+      .. code-block:: console
+      
+        fatal error: 'Python.h' file not found
+      
+      you might need to install the Python Dev package:
+
+      .. code-block:: console
+        
+        sudo apt install python3-dev
+
+      (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/1084>`_)
+
+   .. group-tab:: macOS
+
+      If using Anaconda or Miniconda, you might need to set up the PYTHON environment variable
+      with the path to the Conda Python binary. E.g.:
+
+      .. code-block:: console
+
+        export PYTHON=/Users/<username>/anaconda3/envs/<envname>/bin/python
+
+      If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
+      (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/377>`_)
+
+Install a Frontend-Only Development Environment from TestPyPI Wheels
+--------------------------------------------------------------------
+
+It is possible to work on the source code repository and test the changes without 
+having to compile Catalyst. This is ideal for situations where the changes do not target the 
+runtime or the MLIR infrastructure, and only concern the frontend. It basically 
+makes use of the shared libraries already shipped with the TestPyPI Catalyst wheels.
+
+Essential Steps
+^^^^^^^^^^^^^^^
+
+To activate the development environment, open a terminal and issue the following commands:
+
+.. code-block:: console
+
+  # Clone the Catalyst repository without submodules, as they are not needed for frontend
+  # development
+  git clone git@github.com:PennyLaneAI/catalyst.git
+
+  # Setup the development environment based on the latest TestPyPI wheels.
+  # Please provide a path for the Python virtual environment
+  cd catalyst
+  bash ./setup_dev_from_wheel.sh /path/to/virtual/env
+
+  # Activate the Python virtual environment
+  source /path/to/virtual/env/bin/activate
+
+To exit the Python virtual environment, type:
+
+.. code-block:: console
+
+  deactivate
+
+Special Considerations
+^^^^^^^^^^^^^^^^^^^^^^
+
+Catalyst dev wheels are tied to fixed versions of PennyLane and Lightning, which are installed
+together as a bundle. If you want to use different versions of Pennylane or Lightning, reinstall the
+desired versions after having run the script:
+
+.. code-block:: console
+
+  python -m pip install pennylane==0.*.*
+  python -m pip install pennylane-lightning==0.*.*
+
+If you require the Catalyst repository with all its submodules, clone it this way:
+
+.. code-block:: console
+
+  git clone --recurse-submodules --shallow-submodules git@github.com:PennyLaneAI/catalyst.git
+
+How Does it Work?
+^^^^^^^^^^^^^^^^^
+
+The provided script first creates and activates a Python virtual environment, so the system Python
+configurations do not get affected, nor other virtual environments.
+
+In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard 
+links from the wheel code to the frontend code of the repository, in order to allow working
+directly with the frontend code of the repository and at the same time test the changes while
+using the installed Catalyst wheel libraries, hence avoiding compilation.
+
+Further Steps
+^^^^^^^^^^^^^
+
+If everything goes well, ``git status`` should not report any changed files. 
+
+Before making changes to the frontend, make sure you create a new branch:
+
+.. code-block:: console
+
+  git checkout -b new-branch-name
+
+Once in the new branch, make the wanted changes. Use the IDE of your preference.
+
+You can test the changes by executing your sample code under the same virtual environment you used
+with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually 
+changing the code stored at the Python ``site-packages`` folder as well, and you will be automatically
+using the shared libraries provided by the Python wheels. Again, there is no need to compile Catalyst
+from source.
+
+You can commit your changes as usual. Once ready, push the new branch to the remote
+repository:
+
+.. code-block:: console
+  
+  git push -u origin new-branch-name
+
+Now you can go to GitHub and issue a Pull Request based on the new branch.

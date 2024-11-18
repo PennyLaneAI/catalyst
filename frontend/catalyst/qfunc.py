@@ -33,30 +33,26 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.transforms.dynamic_one_shot import (
+    gather_non_mcm,
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
 )
 
 import catalyst
-from catalyst.device import (
-    BackendInfo,
-    QJITDevice,
-    QJITDeviceNewAPI,
-    extract_backend_info,
-    get_device_capabilities,
-    get_device_shots,
-    validate_device_capabilities,
-)
+from catalyst.api_extensions import MidCircuitMeasure
+from catalyst.device import QJITDevice, get_device_shots
 from catalyst.jax_extras import (
     deduce_avals,
     get_implicit_and_explicit_flat_args,
     unzip2,
 )
-from catalyst.jax_primitives import func_p
-from catalyst.jax_tracer import trace_quantum_function
+from catalyst.jax_primitives import quantum_kernel_p
+from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
+from catalyst.passes import pipeline
+from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
-from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
+from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -98,18 +94,22 @@ class QFunc:
     def __new__(cls):
         raise NotImplementedError()  # pragma: no-cover
 
-    @staticmethod
-    @debug_logger
-    def extract_backend_info(
-        device: qml.QubitDevice, capabilities: DeviceCapabilities
-    ) -> BackendInfo:
-        """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device, capabilities)
-
     # pylint: disable=no-member
+    # pylint: disable=self-cls-assignment
     @debug_logger
     def __call__(self, *args, **kwargs):
+
+        if EvaluationContext.is_quantum_tracing():
+            raise CompileError("Can't nest qnodes under qjit")
+
         assert isinstance(self, qml.QNode)
+
+        # Update the qnode with peephole pipeline
+        if "pass_pipeline" in kwargs.keys():
+            pass_pipeline = kwargs["pass_pipeline"]
+            if not hasattr(self, "_peephole_transformed"):
+                self = pipeline(pass_pipeline=pass_pipeline)(self)
+            kwargs.pop("pass_pipeline")
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
@@ -120,21 +120,9 @@ class QFunc:
 
             if mcm_config.mcm_method == "one-shot":
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
-                return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
+                return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
-        # TODO: Move the capability loading and validation to the device constructor when the
-        # support for old device api is dropped.
-        program_features = ProgramFeatures(shots_present=bool(self.device.shots))
-        device_capabilities = get_device_capabilities(self.device, program_features)
-        backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
-
-        # Validate decive operations against the declared capabilities
-        validate_device_capabilities(self.device, device_capabilities)
-
-        if isinstance(self.device, qml.devices.Device):
-            qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
-        else:
-            qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
+        qjit_device = QJITDevice(self.device)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
@@ -162,7 +150,7 @@ class QFunc:
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
-        res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
+        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, qnode=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
@@ -257,8 +245,8 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = get_device_shots(dev)
 
     new_dev = copy(dev)
-    if isinstance(new_dev, qml.devices.LegacyDevice):
-        new_dev.shots = 1  # pragma: no cover
+    if isinstance(new_dev, qml.devices.LegacyDeviceFacade):
+        new_dev.target_device.shots = 1  # pragma: no cover
     else:
         new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
@@ -271,12 +259,22 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-
-        out = parse_native_mid_circuit_measurements(
-            cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
-        )
-        if len(cpy_tape.measurements) == 1:
-            out = (out,)
+        has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+        out = list(results)
+        if has_mcm:
+            out = parse_native_mid_circuit_measurements(
+                cpy_tape, aux_tapes, results, postselect_mode="pad-invalid-samples"
+            )
+            if len(cpy_tape.measurements) == 1:
+                out = (out,)
+        else:
+            for m_count, m in enumerate(cpy_tape.measurements):
+                # Without MCMs and postselection, all samples are valid for use in MP computation.
+                is_valid = jnp.array([True] * len(out[m_count]))
+                out[m_count] = gather_non_mcm(
+                    m, out[m_count], is_valid, postselect_mode="pad-invalid-samples"
+                )
+            out = tuple(out)
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         out = tree_unflatten(out_tree_expected[0], out)
         return out

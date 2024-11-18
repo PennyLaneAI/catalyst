@@ -15,18 +15,16 @@
 # RUN: %PYTHON %s | FileCheck %s
 """ Test the lowering cases involving quantum control """
 
+import platform
 from copy import deepcopy
 
 import jax.numpy as jnp
 import pennylane as qml
 
 from catalyst import qjit
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
+from catalyst.utils.toml import OperationProperties
 
 
 def get_custom_qjit_device(num_wires, discards, additions):
@@ -48,29 +46,25 @@ def get_custom_qjit_device(num_wires, discards, additions):
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(shots))
-            lightning_capabilities = get_device_capabilities(
-                self.lightning_device, program_features
-            )
+            lightning_capabilities = get_device_capabilities(self.lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in discards:
                 custom_capabilities.native_ops.pop(gate)
             custom_capabilities.native_ops.update(additions)
             self.qjit_capabilities = custom_capabilities
 
-        @property
-        def operations(self):
-            """Get PennyLane operations."""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
 
-        @property
-        def observables(self):
-            """Get PennyLane observables."""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
 
         def execute(self, circuits, execution_config):
             """Exececute the device (no)."""

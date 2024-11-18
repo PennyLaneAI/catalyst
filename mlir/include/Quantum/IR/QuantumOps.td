@@ -194,24 +194,56 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
+        Quantum_Op<mnemonic, traits # [QuantumOperation]> {
 
     code extraBaseClassDeclaration = [{
         std::vector<mlir::Value> getQubitOperands() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getInQubits().begin(),
-                          getInQubits().end());
-            values.insert(values.end(), getInCtrlQubits().begin(),
-                          getInCtrlQubits().end());
+            values.insert(values.end(), getInQubits().begin(), getInQubits().end());
             return values;
+        }
+
+        void setQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getInQubitsMutable();
+            assert(qubits.size() == replacements.size() && "must provide values for all qubits");
+            qubits.assign(replacements);
         }
 
         std::vector<mlir::Value> getQubitResults() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getOutQubits().begin(),
-                          getOutQubits().end());
-            values.insert(values.end(), getOutCtrlQubits().begin(),
-                          getOutCtrlQubits().end());
+            values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
+            return values;
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
+        Gate_Op<mnemonic, traits # [QuantumGate, Unitary]> {
+
+    code extraBaseClassDeclaration = [{
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInQubits().begin(), getInQubits().end());
+            values.insert(values.end(), getInCtrlQubits().begin(), getInCtrlQubits().end());
+            return values;
+        }
+
+        void setQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getInQubitsMutable();
+            mlir::MutableOperandRange ctrls = getInCtrlQubitsMutable();
+            assert(qubits.size() + ctrls.size() == replacements.size() &&
+                   "must provide values for all qubits (including controls)");
+
+            qubits.assign(replacements.take_front(qubits.size()));
+            ctrls.assign(replacements.take_back(ctrls.size()));
+        }
+
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
+            values.insert(values.end(), getOutCtrlQubits().begin(), getOutCtrlQubits().end());
             return values;
         }
 
@@ -225,11 +257,29 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ValueRange getCtrlValueOperands() {
             return getInCtrlValues();
         }
+        void setCtrlValueOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange ctrlValues = getInCtrlValuesMutable();
+            assert(ctrlValues.size() == replacements.size() &&
+                   "must provide values for all control values");
+            ctrlValues.assign(replacements);
+        }
         mlir::ValueRange getNonCtrlQubitOperands() {
             return getInQubits();
         }
+        void setNonCtrlQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getInQubitsMutable();
+            assert(qubits.size() == replacements.size() &&
+                   "must provide values for all qubit values");
+            qubits.assign(replacements);
+        }
         mlir::ValueRange getCtrlQubitOperands() {
             return getInCtrlQubits();
+        }
+        void setCtrlQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange ctrls = getInCtrlQubitsMutable();
+            assert(ctrls.size() == replacements.size() &&
+                   "must provide values for all control qubit values");
+            ctrls.assign(replacements);
         }
         mlir::ValueRange getNonCtrlQubitResults() {
             return getOutQubits();
@@ -242,7 +292,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Quantum_Op<"set_state", []> {
+def SetStateOp : Gate_Op<"set_state", []> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -265,7 +315,7 @@ def SetStateOp : Quantum_Op<"set_state", []> {
         `(` $in_state `)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
-    let extraClassDeclaration = [{
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
         bool isBufferized() {
             return mlir::isa<mlir::MemRefType>(getInState().getType());
         }
@@ -273,7 +323,7 @@ def SetStateOp : Quantum_Op<"set_state", []> {
 
 }
 
-def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
+def SetBasisStateOp : Gate_Op<"set_basis_state", []> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -298,15 +348,15 @@ def SetBasisStateOp : Quantum_Op<"set_basis_state", []> {
         `(` $basis_state`)` $in_qubits attr-dict `:` functional-type(operands, results)
     }];
 
-    let extraClassDeclaration = [{
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
         bool isBufferized() {
             return mlir::isa<mlir::MemRefType>(getBasisState().getType());
         }
     }];
 }
 
-def CustomOp : Gate_Op<"custom", [DifferentiableGate,
-                                  AttrSizedOperandSegments, AttrSizedResultSegments ]> {
+def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -334,9 +384,10 @@ def CustomOp : Gate_Op<"custom", [DifferentiableGate,
             return getParams();
         }
     }];
+    let hasCanonicalizeMethod = 1;
 }
 
-def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
     let description = [{
     }];
@@ -356,54 +407,26 @@ def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSe
         `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
-    code extraBaseClassDeclaration = [{
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getODSOperands(getParamOperandIdx());
         }
 
-        std::vector<mlir::Value> getQubitOperands() {
-            std::vector<mlir::Value> values;
-            values.insert(values.end(), getInCtrlQubits().begin(),
-                          getInCtrlQubits().end());
-            return values;
+        // Simulate missing operands and results for the default impl of the quantum gate interface.
+        mlir::OperandRange getInQubits() {
+            return {getOperands().begin(), getOperands().begin()};
         }
-
-        std::vector<mlir::Value> getQubitResults() {
-            std::vector<mlir::Value> values;
-            values.insert(values.end(), getOutCtrlQubits().begin(),
-                          getOutCtrlQubits().end());
-            return values;
+        mlir::MutableOperandRange getInQubitsMutable() {
+            return mlir::MutableOperandRange(getOperation(), 0, 0);
         }
-
-        bool getAdjointFlag() {
-            return getAdjoint().has_value() ? getAdjoint().value() : false;
-        }
-        void setAdjointFlag(bool adjoint) {
-            setAdjoint(adjoint);
-        };
-
-        mlir::ValueRange getCtrlValueOperands() {
-            return getInCtrlValues();
-        }
-        mlir::ValueRange getNonCtrlQubitOperands() {
-            return mlir::ValueRange();
-        }
-        mlir::ValueRange getCtrlQubitOperands() {
-            return getInCtrlQubits();
-        }
-        mlir::ValueRange getNonCtrlQubitResults() {
-            return mlir::ValueRange();
-        }
-        mlir::ValueRange getCtrlQubitResults() {
-            return getOutCtrlQubits();
+        mlir::ResultRange getOutQubits() {
+            return {getResults().begin(), getResults().begin()};
         }
     }];
-
-    let extraClassDeclaration = extraBaseClassDeclaration;
-
 }
 
-def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments ]> {
+def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -432,12 +455,12 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments
             return getODSOperands(getParamOperandIdx());
         }
     }];
+    
+    let hasCanonicalizeMethod = 1;
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate
-        , AttrSizedOperandSegments
-        , AttrSizedResultSegments
-        ]> {
+def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
+                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the

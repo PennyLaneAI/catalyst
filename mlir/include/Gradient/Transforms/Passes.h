@@ -22,6 +22,8 @@ namespace catalyst {
 
 // Pass creation for use in mlir opt tools
 std::unique_ptr<mlir::Pass> createGradientBufferizationPass();
+std::unique_ptr<mlir::Pass> createGradientPreprocessingPass();
+std::unique_ptr<mlir::Pass> createGradientPostprocessingPass();
 std::unique_ptr<mlir::Pass> createGradientLoweringPass();
 std::unique_ptr<mlir::Pass> createGradientConversionPass();
 

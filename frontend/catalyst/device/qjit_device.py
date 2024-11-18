@@ -22,19 +22,21 @@ import pathlib
 import platform
 import re
 from copy import deepcopy
-from dataclasses import dataclass
-from functools import partial
-from typing import Any, Dict, Optional, Set, Union
+from dataclasses import dataclass, replace
+from typing import Any, Dict, Optional
 
 import pennylane as qml
-from pennylane.measurements import MidMeasureMP
-from pennylane.transforms import split_non_commuting, split_to_single_terms
+from pennylane.transforms import (
+    diagonalize_measurements,
+    split_non_commuting,
+    split_to_single_terms,
+)
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
-    catalyst_acceptance,
     catalyst_decompose,
     measurements_from_counts,
+    measurements_from_samples,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -44,8 +46,8 @@ from catalyst.device.verification import (
     verify_operations,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
 from catalyst.utils.toml import (
     DeviceCapabilities,
@@ -54,7 +56,6 @@ from catalyst.utils.toml import (
     TOMLDocument,
     intersect_operations,
     load_device_capabilities,
-    pennylane_operation_set,
     read_toml_file,
 )
 
@@ -125,7 +126,7 @@ RUNTIME_OBSERVABLES = {
 # TODO: This should be removed after implementing `get_c_interface`
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
-    "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
+    "null.qubit": ("NullQubit", "librtd_null_qubit"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
 }
@@ -133,7 +134,7 @@ SUPPORTED_RT_DEVICES = {
 
 def get_device_shots(dev):
     """Helper function to get device shots."""
-    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+    return dev.shots.total_shots if isinstance(dev, qml.devices.Device) else dev.shots
 
 
 @dataclass
@@ -148,13 +149,15 @@ class BackendInfo:
 
 # pylint: disable=too-many-branches
 @debug_logger
-def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
+def extract_backend_info(
+    device: qml.devices.QubitDevice, capabilities: DeviceCapabilities
+) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
     dname = device.name
-    if isinstance(device, qml.devices.LegacyDevice):
-        dname = device.short_name
+    if isinstance(device, qml.devices.LegacyDeviceFacade):
+        dname = device.target_device.short_name
 
     device_name = ""
     device_lpath = ""
@@ -189,25 +192,25 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         device_kwargs["device_type"] = dname
         device_kwargs["backend"] = (
             # pylint: disable=protected-access
-            device._device._delegate.DEVICE_ID
+            device.target_device._device._delegate.DEVICE_ID
         )
     elif dname == "braket.aws.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
-        if device._s3_folder:  # pylint: disable=protected-access
+        if device.target_device._s3_folder:  # pylint: disable=protected-access
             device_kwargs["s3_destination_folder"] = str(
-                device._s3_folder  # pylint: disable=protected-access
+                device.target_device._s3_folder  # pylint: disable=protected-access
             )
 
     for k, v in capabilities.options.items():
-        if hasattr(device, v):
+        if hasattr(device, v) and not k in device_kwargs:
             device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
 
 @debug_logger
-def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
+def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> DeviceCapabilities:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
@@ -268,125 +271,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     return qjit_capabilities
 
 
-class QJITDevice(qml.QubitDevice):
-    """QJIT device.
-
-    A device that interfaces the compilation pipeline of Pennylane programs.
-
-    Args:
-        wires (int): the number of wires to initialize the device with
-        shots (int): How many times the circuit should be evaluated (or sampled) to estimate
-            the expectation values. Defaults to ``None`` if not specified. Setting
-            to ``None`` results in computing statistics like expectation values and
-            variances analytically
-        backend_name (str): name of the device from the list of supported and compiled backend
-            devices by the runtime
-        backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
-    """
-
-    name = "QJIT device"
-    short_name = "qjit.device"
-    pennylane_requires = "0.1.0"
-    version = "0.0.1"
-    author = ""
-
-    @staticmethod
-    def _get_operations_to_convert_to_matrix(_capabilities: DeviceCapabilities) -> Set[str]:
-        # We currently override and only set a few gates to preserve existing behaviour.
-        # We could choose to read from config and use the "matrix" gates.
-        # However, that affects differentiability.
-        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
-        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX", "BlockEncode"}
-
-    @debug_logger_init
-    def __init__(
-        self,
-        original_device,
-        original_device_capabilities: DeviceCapabilities,
-        backend: Optional[BackendInfo] = None,
-    ):
-        self.original_device = original_device
-        super().__init__(wires=original_device.wires, shots=original_device.shots)
-
-        check_device_wires(self.wires)
-
-        self.backend_name = backend.c_interface_name if backend else "default"
-        self.backend_lib = backend.lpath if backend else ""
-        self.backend_kwargs = backend.kwargs if backend else {}
-
-        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
-
-    @property
-    def operations(self) -> Set[str]:
-        """Get the device operations using PennyLane's syntax"""
-        return pennylane_operation_set(self.qjit_capabilities.native_ops)
-
-    @property
-    def observables(self) -> Set[str]:
-        """Get the device observables"""
-        return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
-    def apply(self, operations, **kwargs):
-        """
-        Raises: RuntimeError
-        """
-        raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
-
-    @debug_logger
-    def default_expand_fn(self, circuit, max_expansion=10):
-        """
-        Most decomposition logic will be equivalent to PennyLane's decomposition.
-        However, decomposition logic will differ in the following cases:
-
-        1. All unsupported :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` instances
-            will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-        2. The list of device-supported gates employed by Catalyst is currently different than
-            that of the ``lightning.qubit`` device, as defined by the
-            :class:`~.qjit_device.QJITDevice`.
-
-        Args:
-            circuit: circuit to expand
-            max_expansion: the maximum number of expansion steps if no fixed-point is reached.
-        """
-        # Ensure catalyst.measure is used instead of qml.measure.
-        if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
-            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-
-        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
-            self.qjit_capabilities
-        )
-
-        def _decomp_to_unitary(self, *_args, **_kwargs):
-            try:
-                mat = self.matrix()
-            except Exception as e:
-                raise CompileError(
-                    f"Operation {self} could not be decomposed, it might be unsupported."
-                ) from e
-            return [qml.QubitUnitary(mat, wires=self.wires)]
-
-        # Fallback for controlled gates that won't decompose successfully.
-        # Doing so before rather than after decomposition is generally a trade-off. For low
-        # numbers of qubits, a unitary gate might be faster, while for large qubit numbers prior
-        # decomposition is generally faster.
-        # At the moment, bypassing decomposition for controlled gates will generally have a higher
-        # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-        overriden_methods = [  # pragma: no cover
-            (qml.ops.Controlled, "has_decomposition", lambda self: True),
-            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
-        ]
-        for gate in decompose_to_qubit_unitary:
-            overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
-
-        with Patcher(*overriden_methods):
-            expanded_tape = super().default_expand_fn(circuit, max_expansion)
-
-        self.check_validity(expanded_tape.operations, [])
-        return expanded_tape
-
-
-class QJITDeviceNewAPI(qml.devices.Device):
+class QJITDevice(qml.devices.Device):
     """QJIT device for the new device API.
     A device that interfaces the compilation pipeline of Pennylane programs.
     Args:
@@ -400,13 +285,14 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
+    @staticmethod
+    @debug_logger
+    def extract_backend_info(device, capabilities: DeviceCapabilities) -> BackendInfo:
+        """Wrapper around extract_backend_info in the runtime module."""
+        return extract_backend_info(device, capabilities)
+
     @debug_logger_init
-    def __init__(
-        self,
-        original_device,
-        original_device_capabilities: DeviceCapabilities,
-        backend: Optional[BackendInfo] = None,
-    ):
+    def __init__(self, original_device):
         self.original_device = original_device
 
         for key, value in original_device.__dict__.items():
@@ -416,32 +302,21 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
-        self.backend_name = backend.c_interface_name if backend else "default"
-        self.backend_lib = backend.lpath if backend else ""
-        self.backend_kwargs = backend.kwargs if backend else {}
+        # Capability loading
+        original_device_capabilities = get_device_capabilities(original_device)
+        backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
 
-        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
+        self.backend_name = backend.c_interface_name
+        self.backend_lib = backend.lpath
+        self.backend_kwargs = backend.kwargs
 
-    @property
-    def operations(self) -> Set[str]:
-        """Get the device operations"""
-        return pennylane_operation_set(self.qjit_capabilities.native_ops)
-
-    @property
-    def observables(self) -> Set[str]:
-        """Get the device observables"""
-        return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
-    @property
-    def measurement_processes(self) -> Set[str]:
-        """Get the device measurement processes"""
-        return self.qjit_capabilities.measurement_processes
+        self.capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @debug_logger
     def preprocess(
         self,
         ctx,
-        execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
+        execution_config: Optional[qml.devices.ExecutionConfig] = None,
     ):
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
@@ -464,6 +339,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend according to the backend TOML file).
         """
 
+        if execution_config is None:
+            execution_config = qml.devices.ExecutionConfig()
+
         _, config = self.original_device.preprocess(execution_config)
 
         program = TransformProgram()
@@ -471,17 +349,12 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program()
+        config = replace(config, device_options=deepcopy(config.device_options))
         config.device_options["transforms_modify_measurements"] = bool(measurement_transforms)
         program = program + measurement_transforms
 
         # decomposition to supported ops/measurements
-        ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(
-            catalyst_decompose,
-            ctx=ctx,
-            stopping_condition=ops_acceptance,
-            capabilities=self.qjit_capabilities,
-        )
+        program.add_transform(catalyst_decompose, ctx=ctx, capabilities=self.capabilities)
 
         # Catalyst program verification and validation
         program.add_transform(
@@ -489,7 +362,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         )
         program.add_transform(
             validate_measurements,
-            self.qjit_capabilities,
+            self.capabilities,
             self.original_device.name,
             self.original_device.shots,
         )
@@ -506,18 +379,68 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def _measurement_transform_program(self):
 
         measurement_program = TransformProgram()
+        if isinstance(self.original_device, SoftwareQQPP):
+            return measurement_program
 
         supports_sum_observables = any(
-            obs in self.qjit_capabilities.native_obs for obs in ("Sum", "Hamiltonian")
+            obs in self.capabilities.native_obs for obs in ("Sum", "Hamiltonian")
         )
 
-        if self.qjit_capabilities.non_commuting_observables_flag is False:
+        if self.capabilities.non_commuting_observables_flag is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
-        if self.measurement_processes == {"Counts"}:
-            measurement_program.add_transform(measurements_from_counts)
+        # if no observables are supported, we apply a transform to convert *everything* to the
+        # readout basis, using either sample or counts based on device specification
+        if not self.capabilities.native_obs:
+            if not split_non_commuting in measurement_program:
+                # this *should* be redundant, a TOML that doesn't have observables should have
+                # a False non_commuting_observables flag, but we aren't enforcing that
+                measurement_program.add_transform(split_non_commuting)
+            if "Sample" in self.capabilities.measurement_processes:
+                measurement_program.add_transform(measurements_from_samples, self.wires)
+            elif "Counts" in self.capabilities.measurement_processes:
+                measurement_program.add_transform(measurements_from_counts, self.wires)
+            else:
+                raise RuntimeError("The device does not support observables or sample/counts")
+
+        elif not self.capabilities.measurement_processes - {"Counts", "Sample"}:
+            # ToDo: this branch should become unneccessary when selective conversion of
+            # unsupported MPs is finished, see ToDo below
+            if not split_non_commuting in measurement_program:
+                measurement_program.add_transform(split_non_commuting)
+            mp_transform = (
+                measurements_from_samples
+                if "Sample" in self.capabilities.measurement_processes
+                else measurements_from_counts
+            )
+            measurement_program.add_transform(mp_transform, self.wires)
+
+        # if only some observables are supported, we try to diagonalize those that aren't
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.native_obs):
+            if not split_non_commuting in measurement_program:
+                # the device might support non commuting measurements but not all the
+                # Pauli + Hadamard observables, so here it is needed
+                measurement_program.add_transform(split_non_commuting)
+            _obs_dict = {
+                "PauliX": qml.X,
+                "PauliY": qml.Y,
+                "PauliZ": qml.Z,
+                "Hadamard": qml.Hadamard,
+            }
+            # checking which base observables are unsupported and need to be diagonalized
+            supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
+                self.capabilities.native_obs
+            )
+            supported_observables = [_obs_dict[obs] for obs in supported_observables]
+
+            measurement_program.add_transform(
+                diagonalize_measurements, supported_base_obs=supported_observables
+            )
+
+        # ToDo: if some measurement types are unsupported, convert the unsupported MPs to
+        # samples or counts (without diagonalizing or modifying observables). See ToDo above.
 
         return measurement_program
 
@@ -526,10 +449,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         Raises: RuntimeError
         """
         raise RuntimeError("QJIT devices cannot execute tapes.")
-
-
-# Alias for either an old-style or a new-style QJITDevice
-AnyQJITDevice = Union[QJITDevice, QJITDeviceNewAPI]
 
 
 def filter_out_modifiers(operations):
@@ -549,72 +468,13 @@ def filter_out_modifiers(operations):
     return set(filter(is_not_modifier, operations))
 
 
-@debug_logger
-def validate_device_capabilities(
-    device: qml.QubitDevice, device_capabilities: DeviceCapabilities
-) -> None:
-    """Validate configuration document against the device attributes.
-    Raise CompileError in case of mismatch:
-    * If device is not qjit-compatible.
-    * If configuration file does not exists.
-    * If decomposable, matrix, and native gates have some overlap.
-    * If decomposable, matrix, and native gates do not match gates in ``device.operations`` and
-      ``device.observables``.
-
-    Args:
-        device (qml.devices.LegacyDevice): An instance of a quantum device.
-        config (TOMLDocument): A TOML document representation.
-
-    Raises: CompileError
-    """
-
-    if not device_capabilities.qjit_compatible_flag:
-        raise CompileError(
-            f"Attempting to compile program for incompatible device '{device.name}': "
-            f"Config is not marked as qjit-compatible"
-        )
-
-    device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-
-    native = set(device_capabilities.native_ops.keys())
-    decomposable = set(device_capabilities.to_decomp_ops.keys())
-    matrix = set(device_capabilities.to_matrix_ops.keys())
-
-    overlap = (native & decomposable) | (native & matrix) | (decomposable & matrix)
-    if overlap:
-        raise CompileError(f"Device '{device_name}' has overlapping gates: {overlap}")
-
-    if hasattr(device, "operations") and hasattr(device, "observables"):
-        # For validation against PL device properties we only check base gates as Adjoint/Control
-        # declarations can be very sporadic.
-        device_gates = filter_out_modifiers(device.operations)
-        spec_gates = native | decomposable | matrix
-        if device_gates != spec_gates:
-            raise CompileError(
-                "Gates in qml.device.operations and specification file do not match for "
-                f'"{device_name}".\n'
-                f"Gates that present only in the device: {device_gates - spec_gates}\n"
-                f"Gates that present only in spec: {spec_gates - device_gates}\n"
-            )
-
-        # For observables, we do not have `non-native` section in the config, so we check that
-        # device data supercedes the specification.
-        device_observables = set(device.observables)
-        spec_observables = pennylane_operation_set(device_capabilities.native_obs)
-        if (spec_observables - device_observables) != set():
-            raise CompileError(
-                "Observables in qml.device.observables and specification file do not match.\n"
-                f"Observables that present only in spec: {spec_observables - device_observables}\n"
-            )
-
-
 def get_device_toml_config(device) -> TOMLDocument:
     """Get the contents of the device config file."""
     if hasattr(device, "config"):
         # The expected case: device specifies its own config.
         toml_file = device.config
     else:
-        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # TODO: Remove this section when `qml.devices.Device`s are guaranteed to have their own config file
         # field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
@@ -636,20 +496,18 @@ def get_device_toml_config(device) -> TOMLDocument:
     return config
 
 
-def get_device_capabilities(
-    device, program_features: Optional[ProgramFeatures] = None
-) -> DeviceCapabilities:
+def get_device_capabilities(device) -> DeviceCapabilities:
     """Get or load DeviceCapabilities structure from device"""
+    assert not isinstance(device, QJITDevice)
+
+    # TODO: This code exists purely for testing. Find another way to customize device
+    #       support easily without injecting code into the package.
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
-    else:
-        program_features = (
-            program_features
-            if program_features
-            else ProgramFeatures(shots_present=bool(device.shots))
-        )
-        device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features)
+
+    program_features = ProgramFeatures(shots_present=bool(device.shots))
+    device_config = get_device_toml_config(device)
+    return load_device_capabilities(device_config, program_features)
 
 
 def check_device_wires(wires):

@@ -39,7 +39,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
-from catalyst.device import BackendInfo
+from catalyst.device import BackendInfo, QJITDevice
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
@@ -53,6 +53,7 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     jvp_p,
+    quantum_kernel_p,
     namedobs_p,
     print_p,
     probs_p,
@@ -135,7 +136,8 @@ def remove_host_context(jaxpr):
     in (b,) }
     """
     is_one_equation = len(jaxpr.jaxpr.eqns) == 1
-    is_single_equation_call = jaxpr.jaxpr.eqns[0].primitive == func_p
+    prim = jaxpr.jaxpr.eqns[0].primitive
+    is_single_equation_call = prim in {func_p, quantum_kernel_p}
     is_valid = is_one_equation and is_single_equation_call
     if is_valid:
         return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
@@ -825,12 +827,19 @@ class QJIT_CUDAQ:
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
             device_name = (
-                device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+                device.target_device.short_name
+                if isinstance(device, qml.devices.LegacyDeviceFacade)
+                else device.name
             )
-            return BackendInfo(device_name, device.name, "", {})
+            interface_name = (
+                device.target_device.name
+                if isinstance(device, qml.devices.LegacyDeviceFacade)
+                else device.name
+            )
+            return BackendInfo(device_name, interface_name, "", {})
 
         with Patcher(
-            (QFunc, "extract_backend_info", cudaq_backend_info),
+            (QJITDevice, "extract_backend_info", cudaq_backend_info),
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
@@ -892,7 +901,7 @@ def interpret(fun):
         #
         # So, a good solution to get rid of this call here is to just interpret the host context.
         # This is not too difficult to do. The only changes would be that we now need to provide
-        # semantics for func_p.
+        # semantics for quantum_kernel_p.
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
 
         # Because they become args...

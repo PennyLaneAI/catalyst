@@ -25,7 +25,7 @@ import pytest
 from numpy.testing import assert_allclose
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
-from catalyst import adjoint, cond, debug, for_loop, qjit, while_loop
+from catalyst import adjoint, cond, debug, for_loop, measure, qjit, while_loop
 
 # pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
@@ -682,20 +682,22 @@ class TestInheritanceMixins:
             num_params = 0
 
         base = CustomObs(wires=0)
-        ob = adjoint(base)
+        ob0 = adjoint(base)
 
-        assert isinstance(ob, Adjoint)
-        assert isinstance(ob, qml.operation.Operator)
-        assert not isinstance(ob, qml.operation.Operation)
-        assert isinstance(ob, qml.operation.Observable)
-        assert not isinstance(ob, AdjointOperation)
+        ob1 = adjoint(CustomObs(wires=1))
+
+        assert isinstance(ob0, Adjoint)
+        assert isinstance(ob0, qml.operation.Operator)
+        assert not isinstance(ob0, qml.operation.Operation)
+        assert isinstance(ob0, qml.operation.Observable)
+        assert not isinstance(ob0, AdjointOperation)
 
         # Check some basic observable functionality
-        assert ob.compare(ob)
-        assert isinstance(1.0 * ob @ ob, qml.Hamiltonian)
+        assert ob0.compare(ob0)
+        assert isinstance(1.0 * ob0 @ ob1, qml.Hamiltonian)
 
         # check the dir
-        assert "grad_recipe" not in dir(ob)
+        assert "grad_recipe" not in dir(ob0)
 
 
 class TestInitialization:
@@ -757,7 +759,7 @@ class TestInitialization:
     @pytest.mark.usefixtures("use_legacy_opmath")
     def test_hamiltonian_base(self):
         """Test adjoint initialization for a hamiltonian."""
-        base = 2.0 * qml.PauliX(0) @ qml.PauliY(0) + qml.PauliZ("b")
+        base = 2.0 * qml.PauliX(0) @ qml.PauliY(1) + qml.PauliZ("b")
 
         op = adjoint(base)
 
@@ -769,7 +771,7 @@ class TestInitialization:
         assert qml.math.allclose(op.parameters, [2.0, 1.0])
         assert qml.math.allclose(op.data, [2.0, 1.0])
 
-        assert op.wires == qml.wires.Wires([0, "b"])
+        assert op.wires == qml.wires.Wires([0, 1, "b"])
 
 
 class TestProperties:
@@ -997,11 +999,11 @@ class TestMiscMethods:
 
     def test_repr(self):
         """Test __repr__ method."""
-        assert repr(adjoint(qml.S(0))) == "Adjoint(S(wires=[0]))"
+        assert repr(adjoint(qml.S(0))) == "Adjoint(S(0))"
 
         base = qml.S(0) + qml.T(0)
         op = adjoint(base)
-        assert repr(op) == "Adjoint(S(wires=[0]) + T(wires=[0]))"
+        assert repr(op) == "Adjoint(S(0) + T(0))"
 
     def test_label(self):
         """Test that the label method for the adjoint class adds a † to the end."""
@@ -1011,7 +1013,7 @@ class TestMiscMethods:
 
         base = qml.S(0) + qml.T(0)
         op = adjoint(base)
-        assert op.label() == "(S+T)†"
+        assert op.label() == "𝓗†"
 
     def test_adjoint_of_adjoint(self):
         """Test that the adjoint of an adjoint is the original operation."""
@@ -1279,22 +1281,14 @@ class TestEigvals:
             adjoint(base).eigvals()
 
 
-class TestDecompositionExpand:
-    """Test the decomposition and expand methods for the Adjoint class."""
+class TestDecomposition:
+    """Test the decomposition methods for the Adjoint class."""
 
     def test_decomp_custom_adjoint_defined(self):
         """Test decomposition method when a custom adjoint is defined."""
         decomp = adjoint(qml.Hadamard(0)).decomposition()
         assert len(decomp) == 1
         assert isinstance(decomp[0], qml.Hadamard)
-
-    def test_expand_custom_adjoint_defined(self):
-        """Test expansion method when a custom adjoint is defined."""
-        base = qml.Hadamard(0)
-        tape = adjoint(base).expand()
-
-        assert len(tape) == 1
-        assert isinstance(tape[0], qml.Hadamard)
 
     def test_decomp(self):
         """Test decomposition when base has decomposition but no custom adjoint."""
@@ -1305,18 +1299,6 @@ class TestDecompositionExpand:
         for adj_op, base_op in zip(decomp, reversed(base_decomp)):
             assert isinstance(adj_op, Adjoint)
             assert adj_op.base.__class__ == base_op.__class__
-            assert qml.math.allclose(adj_op.data, base_op.data)
-
-    def test_expand(self):
-        """Test expansion when base has decomposition but no custom adjoint."""
-
-        base = qml.SX(0)
-        base_tape = base.expand()
-        tape = adjoint(base).expand()
-
-        for base_op, adj_op in zip(reversed(base_tape), tape):
-            assert isinstance(adj_op, Adjoint)
-            assert base_op.__class__ == adj_op.base.__class__
             assert qml.math.allclose(adj_op.data, base_op.data)
 
     def test_no_base_gate_decomposition(self):
@@ -1331,17 +1313,13 @@ class TestDecompositionExpand:
             adjoint(base).decomposition()
 
     def test_adjoint_of_adjoint(self):
-        """Test that the adjoint an adjoint returns the base operator through both decomposition
-        and expand."""
+        """Test that the adjoint an adjoint returns the base operator through both decomposition."""
 
         base = qml.PauliX(0)
         adj1 = adjoint(base)
         adj2 = adjoint(adj1)
 
         assert adj2.decomposition()[0] is base
-
-        tape = adj2.expand()
-        assert tape.circuit[0] is base
 
 
 class TestIntegration:
@@ -1683,6 +1661,30 @@ class TestAdjointConstructorIntegration:
         expected_grad = jnp.cos(x)
         assert qml.math.allclose(circ(x), expected_res)
         assert qml.math.allclose(jax.grad(circ)(x), expected_grad)
+
+
+class TestMidCircuitMeasurementAfterAdjoint:
+
+    def test_issue_1055(self, backend):
+        """See https://github.com/PennyLaneAI/catalyst/issues/1055"""
+
+        def subroutine():
+            qml.Hadamard(wires=1)
+
+        @qml.qjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            # Comment/uncomment to toggle bug
+            adjoint(subroutine)()
+
+            res = measure(0)
+
+            # This call is just to show that it works after the measurement
+            adjoint(subroutine)()
+
+            return res
+
+        assert not circuit()
 
 
 if __name__ == "__main__":

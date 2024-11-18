@@ -840,16 +840,15 @@ class TestControlledMiscMethods:
 
     def test_repr(self):
         """Test __repr__ method."""
-        assert repr(C_ctrl(qml.S(0), [1])) == "Controlled(S(wires=[0]), control_wires=[1])"
+        assert repr(C_ctrl(qml.S(0), [1])) == "Controlled(S(0), control_wires=[1])"
 
         base = qml.S(0) + qml.T(1)
         op = C_ctrl(base, [2])
-        assert repr(op) == "Controlled(S(wires=[0]) + T(wires=[1]), control_wires=[2])"
+        assert repr(op) == "Controlled(S(0) + T(1), control_wires=[2])"
 
         op = C_ctrl(base, [2, 3], control_values=[True, False], work_wires=[4])
         assert (
-            repr(op)
-            == "Controlled(S(wires=[0]) + T(wires=[1]), control_wires=[2, 3], work_wires=[4],"
+            repr(op) == "Controlled(S(0) + T(1), control_wires=[2, 3], work_wires=[4],"
             " control_values=[True, False])"
         )
 
@@ -1686,7 +1685,6 @@ class TestDecomposition:
         ctrl_op = C_ctrl(base_op, control=ctrl_wires, work_wires=Wires("aux"))
 
         assert ctrl_op.decomposition() == expected
-        assert ctrl_op.expand().circuit == expected
 
     def test_decomposition_nested(self):
         """Tests decompositions of nested controlled operations"""
@@ -1696,7 +1694,6 @@ class TestDecomposition:
             qml.ops.Controlled(qml.RZ(0.123, wires=0), control_wires=[1, 2]),
         ]
         assert ctrl_op.decomposition() == expected
-        assert ctrl_op.expand().circuit == expected
 
     def test_decomposition_undefined(self):
         """Tests error raised when decomposition is undefined"""
@@ -1721,18 +1718,16 @@ class TestDecomposition:
         base = TempOperator("a")
         op = C_ctrl(base, control, control_values)
 
-        decomp1 = op.decomposition()
-        decomp2 = op.expand().circuit
+        decomp = op.decomposition()
 
-        for decomp in [decomp1, decomp2]:
-            assert qml.equal(decomp[0], qml.PauliX(1))
-            assert qml.equal(decomp[1], qml.PauliX(2))
+        assert qml.equal(decomp[0], qml.PauliX(1))
+        assert qml.equal(decomp[1], qml.PauliX(2))
 
-            assert isinstance(decomp[2], Controlled)
-            assert decomp[2].control_values == [True, True, True]
+        assert isinstance(decomp[2], Controlled)
+        assert decomp[2].control_values == [True, True, True]
 
-            assert qml.equal(decomp[3], qml.PauliX(1))
-            assert qml.equal(decomp[4], qml.PauliX(2))
+        assert qml.equal(decomp[3], qml.PauliX(1))
+        assert qml.equal(decomp[4], qml.PauliX(2))
 
     @pytest.mark.parametrize(
         "base_cls, params, base_wires, ctrl_wires, _, expected",

@@ -23,7 +23,7 @@ config.test_format = lit.formats.ShTest(True)
 
 # Define the file extensions to treat as test files (with the exception of this file).
 config.suffixes = [".py"]
-config.excludes = ["lit.cfg.py"]
+config.excludes = ["lit.cfg.py", "lit_util_printers.py"]
 
 # Define the root path of where to look for tests.
 config.test_source_root = path.dirname(__file__)
@@ -65,6 +65,9 @@ try:
     llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)
     llvm_config.with_environment("MLIR_LIB_DIR", config.mlir_lib_dir, append_path=True)
     llvm_config.with_environment("ENZYME_LIB_DIR", config.enzyme_lib_dir, append_path=True)
+    llvm_config.with_environment(
+        "CATALYST_BIN_DIR", config.mlir_lib_dir + "/../..", append_path=True
+    )
 
     # Define PYTHONPATH to include the dialect python bindings.
     # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
@@ -79,4 +82,5 @@ except AttributeError:
     llvm_config.with_system_environment("PYTHONPATH")
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
     llvm_config.with_system_environment("MLIR_LIB_DIR")
+    llvm_config.with_system_environment("CATALYST_BIN_DIR")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")

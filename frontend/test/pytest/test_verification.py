@@ -14,6 +14,7 @@
 
 """ Test program verification routines """
 
+import platform
 from copy import deepcopy
 from unittest.mock import patch
 
@@ -33,14 +34,11 @@ from catalyst import (
     while_loop,
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
+from catalyst.utils.toml import OperationProperties
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
@@ -70,8 +68,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(kwargs.get("shots")))
-            lightning_capabilities = get_device_capabilities(lightning_device, program_features)
+            lightning_capabilities = get_device_capabilities(lightning_device)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
                 custom_capabilities.native_ops[gate] = OperationProperties(True, True, True)
@@ -85,25 +82,24 @@ def get_custom_device(
                 custom_capabilities.native_obs[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
 
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
+
         def execute(self, _circuits, _execution_config):
             """
             Raises: RuntimeError
             """
             raise RuntimeError("QJIT devices cannot execute tapes.")
-
-        @property
-        def operations(self):
-            """Return operations using PennyLane's C(.) syntax"""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Return PennyLane observables"""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         def supports_derivatives(self, config, circuit=None):  # pylint: disable=unused-argument
             """Pretend we support any derivatives"""
@@ -547,11 +543,7 @@ class TestObservableValidation:
             ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
-            (
-                [qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))],
-                None,
-            ),  # legacy hamiltonian
-            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
+            ([qml.expval(qml.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
             # sample with observable is currently unsupported
@@ -768,7 +760,6 @@ class TestAdjointMethodVerification:
             qml.operation.Tensor(qml.X(0), qml.Z(1)),  # tensor
             qml.PauliX(0) + qml.PauliY(1),  # sum
             qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # hamiltonian
-            qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]),  # legacy hamiltonian
             2 * qml.PauliX(0),  # sprod
             (2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1),  # nested prod+sprod
         ],

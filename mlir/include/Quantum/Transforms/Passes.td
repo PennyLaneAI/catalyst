@@ -82,10 +82,26 @@ def AnnotateFunctionPass : Pass<"annotate-function"> {
     let constructor = "catalyst::createAnnotateFunctionPass()";
 }
 
+def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
+    let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
+
+    let constructor = "catalyst::createSplitMultipleTapesPass()";
+}
+
+def IonsDecompositionPass : Pass<"ions-decomposition"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
+
+    let constructor = "catalyst::createIonsDecompositionPass()";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
-class QuantumCircuitTransformationPass<string CmdlineName> : Pass<CmdlineName> {
+class QuantumCircuitTransformationPassBase {
+    list<Option> options = [];
+}
+
+def QuantumCircuitTransformationPass: QuantumCircuitTransformationPassBase {
     let options = [
     Option<"FuncNameOpt", "func-name",
            "std::string", /*default=*/"\"\"",
@@ -93,10 +109,18 @@ class QuantumCircuitTransformationPass<string CmdlineName> : Pass<CmdlineName> {
     ];
 }
 
-def RemoveChainedSelfInversePass : QuantumCircuitTransformationPass<"remove-chained-self-inverse"> {
+def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
+def MergeRotationsPass : Pass<"merge-rotations"> {
+    let summary = "Perform merging of chained rotation gates about the same axis.";
+
+    let constructor = "catalyst::createMergeRotationsPass()";
+    let options = QuantumCircuitTransformationPass.options;
 }
 
 // ----- Quantum circuit transformation passes end ----- //

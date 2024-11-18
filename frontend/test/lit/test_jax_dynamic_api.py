@@ -19,30 +19,9 @@
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import ShapedArray
+from lit_util_printers import print_jaxpr, print_mlir
 
 from catalyst import qjit
-
-
-def print_attr(f, attr, *args, aot: bool = False, **kwargs):
-    """Print function attribute"""
-    name = f"TEST {f.__name__}"
-    print("\n" + "-" * len(name))
-    print(f"{name}\n")
-    res = None
-    if not aot:
-        res = f(*args, **kwargs)
-    print(getattr(f, attr))
-    return res
-
-
-def print_jaxpr(f, *args, **kwargs):
-    """Print jaxpr code of a function"""
-    return print_attr(f, "jaxpr", *args, **kwargs)
-
-
-def print_mlir(f, *args, **kwargs):
-    """Print mlir code of a function"""
-    return print_attr(f, "mlir", *args, **kwargs)
 
 
 # CHECK-LABEL: test_qjit_dynamic_argument
@@ -62,7 +41,7 @@ def test_qnode_dynamic_arg(a):
     """Test passing a dynamic argument to qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[] [[b:.]]:i64[[[a]]]. let
-    # CHECK:         [[c:.]]:i64[[[a]]] = func[
+    # CHECK:         [[c:.]]:i64[[[a]]] = quantum_kernel[
     # CHECK:                                  ] [[a]] [[b]]
     # CHECK:       in ([[c]],) }
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -95,7 +74,7 @@ def test_qnode_dynamic_result(a):
     """Test getting a dynamic result from qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
-    # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[[[b]]] = func[
+    # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[[[b]]] = quantum_kernel[
     # CHECK:                                                ] [[a]]
     # CHECK:       in ([[b]], [[c]]) }
     @qml.qnode(qml.device("lightning.qubit", wires=1))

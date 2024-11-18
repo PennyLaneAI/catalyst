@@ -129,8 +129,8 @@ func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter, Locati
         rewriter.setInsertionPointToStart(qGradFn.addEntryBlock());
 
         AdjointOp qGradOp = rewriter.create<AdjointOp>(
-            loc, computeQGradTypes(callee), unallocFn.getName(), qGradFn.getArguments().back(),
-            qGradFn.getArguments().drop_back(), ValueRange{});
+            loc, computeQGradTypes(callee), SymbolRefAttr::get(unallocFn),
+            qGradFn.getArguments().back(), qGradFn.getArguments().drop_back(), ValueRange{});
 
         rewriter.create<func::ReturnOp>(loc, qGradOp.getResults());
     }

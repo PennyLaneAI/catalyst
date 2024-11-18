@@ -96,7 +96,7 @@ def cudaqjit(fn=None, **kwargs):
 
 
 # Do we need to reimplement apply for every child?
-class BaseCudaInstructionSet(qml.QubitDevice):
+class BaseCudaInstructionSet(qml.devices.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 
     pennylane_requires = ">=0.34"
@@ -127,7 +127,10 @@ class BaseCudaInstructionSet(qml.QubitDevice):
         "SWAP",
         "CSWAP",
     ]
-    observables = []
+    observables = [
+        "PauliX",
+        "PauliZ",
+    ]
     config = Path(__file__).parent / "cuda_quantum.toml"
 
     def __init__(self, shots=None, wires=None):

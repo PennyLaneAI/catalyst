@@ -415,6 +415,42 @@ class TestCond:
         assert circuit(False) == 0
         assert circuit(True) == 1
 
+    def test_argument_error_with_callables(self):
+        """Test for the error when arguments are supplied and the target is not a function."""
+
+        def f(x: int):
+
+            res = qml.cond(x < 5, lambda z: z + 1)(0)
+
+            return res
+
+        with pytest.raises(TypeError, match="not allowed to have any arguments"):
+            qjit(f)
+
+        def g(x: int):
+
+            res = qml.cond(x < 5, qml.Hadamard, lambda z: z + 1)(0)
+
+            return res
+
+        with pytest.raises(
+            TypeError,
+            match="Conditional 'False' function can have arguments only if it is a PennyLane gate.",
+        ):
+            qjit(g)
+
+        def h(x: int):
+
+            res = qml.cond(x < 5, qml.Hadamard, qml.Hadamard, ((x < 6, lambda z: z + 1),))(0)
+
+            return res
+
+        with pytest.raises(
+            TypeError,
+            match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
+        ):
+            qjit(h)
+
 
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent
@@ -662,6 +698,48 @@ class TestCondOperatorAccess:
 
         assert func(True) == 1
         assert func(False) == 0
+
+    def test_cond_single_gate(self, backend):
+        """
+        Test standard pennylane qml.cond usage on single quantum gates.
+        Fixes https://github.com/PennyLaneAI/catalyst/issues/449
+        """
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def func(x, y):
+            qml.cond(x == 42, qml.Hadamard, qml.PauliX)(wires=0)
+            qml.cond(x == 42, qml.RY, qml.RZ)(1.5, wires=0)
+            qml.cond(x == 42, qml.CNOT)(wires=[1, 0])
+            qml.cond(y == 37, qml.PauliX)(wires=1)
+            qml.cond(
+                y == 36,
+                qml.RZ,
+                qml.RY,
+                (
+                    (x == 42, qml.RX),
+                    (x == 41, qml.RZ),
+                ),
+            )(5.1, wires=0)
+            qml.cond(y == 37, qml.Rot)(1.2, 3.4, 5.6, wires=1)
+
+            return qml.probs()
+
+        expected_0 = func(42, 37)
+        expected_1 = func(0, 37)
+        expected_2 = func(42, 0)
+        expected_3 = func(41, 0)
+
+        jitted_func = qjit(func)
+
+        observed_0 = jitted_func(42, 37)
+        observed_1 = jitted_func(0, 37)
+        observed_2 = jitted_func(42, 0)
+        observed_3 = jitted_func(41, 0)
+
+        assert np.allclose(expected_0, observed_0)
+        assert np.allclose(expected_1, observed_1)
+        assert np.allclose(expected_2, observed_2)
+        assert np.allclose(expected_3, observed_3)
 
 
 class TestCondPredicateConversion:

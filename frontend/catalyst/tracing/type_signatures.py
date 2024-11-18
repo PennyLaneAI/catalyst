@@ -32,19 +32,31 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 
+def get_stripped_signature(fn: Callable):
+    """Return the function's signature without annotations."""
+
+    old_params = inspect.signature(fn).parameters.values()
+    new_params = [param.replace(annotation=inspect.Parameter.empty) for param in old_params]
+
+    return inspect.Signature(new_params)
+
+
 def get_param_annotations(fn: Callable):
     """Return true all parameters typed-annotations."""
     assert isinstance(fn, Callable)
     signature = inspect.signature(fn)
     parameters = signature.parameters
-    return (p.annotation for p in parameters.values())
+    return [p.annotation for p in parameters.values()]
 
 
 def params_are_annotated(fn: Callable):
     """Return true if all parameters are typed-annotated, or no parameters are present."""
     assert isinstance(fn, Callable)
     annotations = get_param_annotations(fn)
-    return all(annotation is not inspect.Parameter.empty for annotation in annotations)
+    are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
+    if not are_annotated:
+        return False
+    return all(isinstance(annotation, (type, jax.core.ShapedArray)) for annotation in annotations)
 
 
 def get_type_annotations(fn: Callable):
@@ -144,6 +156,38 @@ def split_static_args(args, static_argnums):
     return tuple(dynamic_args), tuple(static_args)
 
 
+def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnums):
+    """Map static_argnames of the callable to the corresponding argument indices,
+    and add them to static_argnums"""
+    new_static_argnums = [] if (static_argnums is None) else list(static_argnums)
+    fn_argnames = list(inspect.signature(fn).parameters.keys())
+
+    # static_argnames can be a single str, or a list/tuple of strs
+    # convert all of them to list
+    if isinstance(static_argnames, str):
+        static_argnames = [static_argnames]
+
+    non_existent_args = []
+    for static_argname in static_argnames:
+        if static_argname in fn_argnames:
+            new_static_argnums.append(fn_argnames.index(static_argname))
+            continue
+        non_existent_args.append(static_argname)
+
+    if non_existent_args:
+        non_existent_args_str = "{" + ", ".join(repr(item) for item in non_existent_args) + "}"
+
+        raise ValueError(
+            f"qjitted function has invalid argname {non_existent_args_str} in static_argnames. "
+            "Function does not take these args."
+        )
+
+    # Remove potential duplicates from static_argnums and static_argnames
+    new_static_argnums = tuple(sorted(set(new_static_argnums)))
+
+    return new_static_argnums
+
+
 def merge_static_args(signature, args, static_argnums):
     """Merge static arguments back into an abstract signature, retaining the original ordering.
 
@@ -232,8 +276,8 @@ def typecheck_signatures(compiled_signature, runtime_signature, abstracted_axes=
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
     ):
         # TODO: do away with private jax functions
-        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
-        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
+        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature)
+        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature)
         in_type_compiled = infer_lambda_input_type(axes_specs_compile, flat_compiled_sig)
         in_type_runtime = infer_lambda_input_type(axes_specs_runtime, flat_runtime_sig)
 

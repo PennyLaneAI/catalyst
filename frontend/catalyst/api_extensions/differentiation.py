@@ -24,6 +24,8 @@ import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
 import jax
+import jax.numpy as jnp
+from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
@@ -36,19 +38,20 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
+    quantum_kernel_p,
     value_and_grad_p,
     vjp_p,
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 Differentiable = Union[Function, QNode]
-DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 ## API ##
-def grad(fn=None, *, method=None, h=None, argnum=None):
+def grad(fn=None, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function to be computed within
@@ -75,7 +78,7 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
                         function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+        argnums (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
         Callable: A callable object that computes the gradient of the wrapped function for the given
@@ -180,12 +183,10 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
     if fn is None:
         return functools.partial(grad, **kwargs)
 
-    scalar_out = True
-
-    return Grad(fn, GradParams(method, scalar_out, h, argnum))
+    return GradCallable(fn, GradParams(method=method, scalar_out=True, h=h, argnums=argnums))
 
 
-def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
+def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit`-compatible transformation for returning the result and gradient of a
     function.
 
@@ -216,7 +217,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
                         function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+        argnums (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
         Callable: A callable object that computes the value and gradient of the wrapped function
@@ -294,12 +295,12 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
     if fn is None:
         return functools.partial(value_and_grad, **kwargs)
 
-    scalar_out = True
+    return GradCallable(
+        fn, GradParams(method=method, scalar_out=True, h=h, argnums=argnums, with_value=True)
+    )
 
-    return Grad(fn, GradParams(method, scalar_out, h, argnum, with_value=True))
 
-
-def jacobian(fn=None, *, method=None, h=None, argnum=None):
+def jacobian(fn=None, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
     This function allows the Jacobian of a hybrid quantum-classical function to be computed within
@@ -321,7 +322,7 @@ def jacobian(fn=None, *, method=None, h=None, argnum=None):
                         function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+        argnums (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
         Callable: A callable object that computes the Jacobian of the wrapped function for the given
@@ -364,15 +365,13 @@ def jacobian(fn=None, *, method=None, h=None, argnum=None):
     kwargs.pop("fn")
 
     if fn is None:
-        return functools.partial(grad, **kwargs)
+        return functools.partial(jacobian, **kwargs)
 
-    scalar_out = False
-
-    return Grad(fn, GradParams(method, scalar_out, h, argnum))
+    return GradCallable(fn, GradParams(method=method, scalar_out=False, h=h, argnums=argnums))
 
 
 # pylint: disable=too-many-arguments
-def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
+def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
@@ -384,12 +383,12 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         f (Callable): Function-like object to calculate JVP for
         params (List[Array]): List (or a tuple) of the function arguments specifying the point
                               to calculate JVP at. A subset of these parameters are declared as
-                              differentiable by listing their indices in the ``argnum`` parameter.
+                              differentiable by listing their indices in the ``argnums`` parameter.
         tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
                                shapes must match the ones of differentiable params.
         method(str): Differentiation method to use, same as in :func:`~.grad`.
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (Union[int, List[int]]): the params' indices to differentiate.
+        argnums (Union[int, List[int]]): the params' indices to differentiate.
 
     Returns:
         Tuple[Any]: Return values of ``f`` paired with the JVP values.
@@ -416,11 +415,11 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
      Array([0.29850125, 0.24      , 0.12      ], dtype=float64))
 
-    **Example 2 (argnum usage)**
+    **Example 2 (argnums usage)**
 
-    Here we show how to use ``argnum`` to ignore the non-differentiable parameter ``n`` of the
+    Here we show how to use ``argnums`` to ignore the non-differentiable parameter ``n`` of the
     target function. Note that the length and shapes of tangents must match the length and shape of
-    primal parameters which we mark as differentiable by passing their indices to ``argnum``.
+    primal parameters which we mark as differentiable by passing their indices to ``argnums``.
 
     .. code-block:: python
 
@@ -433,7 +432,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
         @qjit
         def workflow(primals, tangents):
-            return catalyst.jvp(circuit, [1, primals], [tangents], argnum=[1])
+            return catalyst.jvp(circuit, [1, primals], [tangents], argnums=[1])
 
     >>> params = jnp.array([[0.54, 0.3154], [0.654, 0.123]])
     >>> dy = jnp.array([[1.0, 1.0], [1.0, 1.0]])
@@ -450,10 +449,36 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     if EvaluationContext.is_tracing():
         scalar_out = False
-        fn = _ensure_differentiable(f)
+        fn = wrap_callable(f)
         args_flatten, in_tree = tree_flatten(params)
         tangents_flatten, _ = tree_flatten(tangents)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
+        grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
+
+        if len(tangents_flatten) != len(grad_params.expanded_argnums):
+            raise TypeError(
+                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "match; the number of parameters must be equal. "
+                f"Got {len(grad_params.expanded_argnums)} differentiable parameters and so expected "
+                f"as many tangents, but got {len(tangents_flatten)} instead."
+            )
+
+        # Only check dtypes and shapes of parameters marked as differentiable by the `argnum` param
+        args_to_check = [args_flatten[i] for i in grad_params.argnums]
+
+        for p, t in zip(args_to_check, tangents_flatten):
+            if _dtype(p) != _dtype(t):
+                raise TypeError(
+                    "function params and tangents arguments to catalyst.jvp do not match; "
+                    "dtypes must be equal. "
+                    f"Got function params dtype {_dtype(p)} and so expected tangent dtype "
+                    f"{_dtype(p)}, but got tangent dtype {_dtype(t)} instead."
+                )
+
+            if jnp.shape(p) != jnp.shape(t):
+                raise ValueError(
+                    "catalyst.jvp called with different function params and tangent shapes; "
+                    f"got function params shape {jnp.shape(p)} and tangent shape {jnp.shape(t)}"
+                )
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
@@ -476,7 +501,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
 
 # pylint: disable=too-many-arguments
-def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
+def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
@@ -488,12 +513,12 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         f(Callable): Function-like object to calculate JVP for
         params(List[Array]): List (or a tuple) of f's arguments specifying the point to calculate
                              VJP at. A subset of these parameters are declared as
-                             differentiable by listing their indices in the ``argnum`` parameter.
+                             differentiable by listing their indices in the ``argnums`` parameter.
         cotangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size
                                  and shapes must match the size and shape of ``f`` outputs.
         method(str): Differentiation method to use, same as in ``grad``.
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (Union[int, List[int]]): the params' indices to differentiate.
+        argnums (Union[int, List[int]]): the params' indices to differentiate.
 
     Returns:
         Tuple[Any]): Return values of ``f`` paired with the VJP values.
@@ -530,17 +555,41 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     if EvaluationContext.is_tracing():
         scalar_out = False
-        fn = _ensure_differentiable(f)
+        fn = wrap_callable(f)
 
         args_flatten, in_tree = tree_flatten(params)
         cotangents_flatten, _ = tree_flatten(cotangents)
 
-        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
+        grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
 
-        args_argnum = tuple(params[i] for i in grad_params.argnum)
-        _, in_tree = tree_flatten(args_argnum)
+        args_argnums = tuple(params[i] for i in grad_params.argnums)
+        _, in_tree = tree_flatten(args_argnums)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        if len(jaxpr.out_avals) != len(cotangents_flatten):
+            raise TypeError(
+                "number of cotangent and number of function output parameters in catalyst.vjp do "
+                "not match; the number of parameters must be equal. "
+                f"Got {len(jaxpr.out_avals)} function output parameters and so expected as many "
+                f"cotangents, but got {len(cotangents_flatten)} instead."
+            )
+
+        for p, t in zip(jaxpr.out_avals, cotangents_flatten):
+            if _dtype(p) != _dtype(t):
+                raise TypeError(
+                    "function output params and cotangents arguments to catalyst.vjp do not match; "
+                    "dtypes must be equal. "
+                    f"Got function output params dtype {_dtype(p)} and so expected cotangent dtype "
+                    f"{_dtype(p)}, but got cotangent dtype {_dtype(t)} instead."
+                )
+
+            if jnp.shape(p) != jnp.shape(t):
+                raise ValueError(
+                    "catalyst.vjp called with different function output params and cotangent "
+                    f"shapes; got function output params shape {jnp.shape(p)} and cotangent shape "
+                    f"{jnp.shape(t)}"
+                )
 
         cotangents, _ = tree_flatten(cotangents)
 
@@ -567,14 +616,14 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
 
 ## IMPL ##
-class Grad:
+class GradCallable(CatalystCallable):
     """An object that specifies that a function will be differentiated.
 
     Args:
         fn (Differentiable): the function to differentiate
         method (str): the method used for differentiation
         h (float): the step-size value for the finite difference method
-        argnum (list[int]): the argument indices which define over which arguments to differentiate
+        argnums (list[int]): the argument indices which define over which arguments to differentiate
 
     Raises:
         ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
@@ -583,9 +632,12 @@ class Grad:
     """
 
     def __init__(self, fn: Differentiable, grad_params: GradParams):
+        functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
+
+        super().__init__("fn")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -595,14 +647,14 @@ class Grad:
 
         with GradContext():
             if EvaluationContext.is_tracing():
-                fn = _ensure_differentiable(self.fn)
+                fn = wrap_callable(self.fn)
 
                 args_data, in_arg_tree = tree_flatten(args)
                 grad_params = _check_grad_params(
                     self.grad_params.method,
                     self.grad_params.scalar_out,
                     self.grad_params.h,
-                    self.grad_params.argnum,
+                    self.grad_params.argnums,
                     len(args_data),
                     in_arg_tree,
                     self.grad_params.with_value,
@@ -610,6 +662,9 @@ class Grad:
                 input_data_flat, _ = tree_flatten((args, kwargs))
                 jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args, **kwargs)
                 if self.grad_params.with_value:  # use value_and_grad
+                    args_argnum = tuple(args[i] for i in grad_params.argnums)
+                    _, in_arg_tree = tree_flatten(args_argnum)
+
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
                         *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
@@ -626,7 +681,7 @@ class Grad:
                     )
                     results = (vals, gradients)
                 else:  # use grad
-                    args_argnum = tuple(args[i] for i in grad_params.argnum)
+                    args_argnum = tuple(args[i] for i in grad_params.argnums)
                     _, in_arg_tree = tree_flatten(args_argnum)
 
                     # It always returns list as required by catalyst control-flows
@@ -641,7 +696,7 @@ class Grad:
                         results, in_arg_tree, out_tree, grad_params, len(jaxpr.out_avals)
                     )
             else:
-                if argnums := self.grad_params.argnum is None:
+                if argnums := self.grad_params.argnums is None:
                     argnums = 0
                 if self.grad_params.scalar_out:
                     if self.grad_params.with_value:
@@ -663,7 +718,7 @@ def _check_grad_params(
     method: str,
     scalar_out: bool,
     h: Optional[float],
-    argnum: Optional[Union[int, List[int]]],
+    argnums: Optional[Union[int, List[int]]],
     len_flatten_args: int,
     in_tree: PyTreeDef,
     with_value: bool = False,
@@ -681,30 +736,37 @@ def _check_grad_params(
         h = 1e-7
     if not (h is None or isinstance(h, numbers.Number)):
         raise ValueError(f"Invalid h value ({h}). None or number was expected.")
-    if argnum is None:
+    if argnums is None:
         argnum_list = [0]
-    elif isinstance(argnum, int):
-        argnum_list = [argnum]
-    elif isinstance(argnum, tuple):
-        argnum_list = list(argnum)
-    elif isinstance(argnum, list) and all(isinstance(i, int) for i in argnum):
-        argnum_list = argnum
+    elif isinstance(argnums, int):
+        argnum_list = [argnums]
+    elif isinstance(argnums, tuple):
+        argnum_list = list(argnums)
+    elif isinstance(argnums, list) and all(isinstance(i, int) for i in argnums):
+        argnum_list = argnums
     else:
-        raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
+        raise ValueError(f"argnums should be integer or a list of integers, not {argnums}")
     # Compute the argnums of the pytree arg
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
     argnum_expanded, _ = tree_flatten(argnum_selected)
-    scalar_argnum = isinstance(argnum, int) or argnum is None
+    scalar_argnums = isinstance(argnums, int) or argnums is None
+
     return GradParams(
-        method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded, with_value
+        method=method,
+        scalar_out=scalar_out,
+        h=h,
+        argnums=argnum_list,
+        scalar_argnums=scalar_argnums,
+        expanded_argnums=argnum_expanded,
+        with_value=with_value,
     )
 
 
 def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
-    num_trainable_params = len(grad_params.expanded_argnum)
+    num_trainable_params = len(grad_params.expanded_argnums)
     results_final = []
 
     for i in range(0, num_results):
@@ -712,7 +774,7 @@ def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results)
             i * num_trainable_params : i * num_trainable_params + num_trainable_params
         ]
         intermediate_results = tree_unflatten(in_tree, intermediate_results)
-        if grad_params.scalar_argnum:
+        if grad_params.scalar_argnums:
             intermediate_results = intermediate_results[0]
         else:
             intermediate_results = tuple(intermediate_results)
@@ -722,8 +784,9 @@ def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results)
     return results_final
 
 
-def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
-    """Narrows down the set of the supported differentiable objects."""
+def wrap_callable(f: Callable) -> Differentiable:
+    """The differentiation target needs to either a QNode or wrapped in a Function object. The
+    reason is that we need to lower the target as a real function in MLIR with its own symbol."""
 
     # Unwrap the function from an existing QJIT object.
     if isinstance(f, catalyst.QJIT):
@@ -734,7 +797,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
 
-    raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
+    raise TypeError(f"Differentiation target must be callable, got: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(
@@ -746,11 +809,9 @@ def _make_jaxpr_check_differentiable(
     with mark_gradient_tracing(method):
         jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args, **kwargs)
     _, out_tree = tree_flatten(shape)
-    assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
-    assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
+        if arg.dtype.kind != "f" and pos in grad_params.expanded_argnums:
             raise DifferentiableCompileError(
                 "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
@@ -780,7 +841,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
             primitive = eqn.primitive
-            if primitive is func_p:
+            if primitive in {func_p, quantum_kernel_p}:
                 child_jaxpr = eqn.params.get("call_jaxpr")
             elif primitive is grad_p:
                 child_jaxpr = eqn.params.get("jaxpr")
@@ -789,7 +850,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
             _check_primitive_is_differentiable(primitive, method)
 
-            py_callable = eqn.params.get("fn")
+            py_callable = eqn.params.get("qnode")
             if py_callable not in visited:
                 if isinstance(py_callable, QNode):
                     _check_qnode_against_grad_method(py_callable, method, child_jaxpr)

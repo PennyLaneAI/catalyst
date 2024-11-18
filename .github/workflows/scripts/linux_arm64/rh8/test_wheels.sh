@@ -5,15 +5,15 @@ cd /catalyst
 
 # Process args
 export GCC_VERSION=$1
-export PYTHON_VERSION=$2
-export PYTHON_SUBVERSION=$3
+export PYTHON_MAJOR_MINOR=$2
+export PYTHON_PATCH=$3
 export PYTHON_PACKAGE=$4
 
 # Install system dependencies (gcc gives access to c99, which is needed by some tests)
 dnf update -y 
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
-if [ "$PYTHON_VERSION" != "3.10" ]; then
-    dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
+if [ "$PYTHON_MAJOR_MINOR" != "3.10" ]; then
+    dnf install -y ${PYTHON_PACKAGE}
 fi
 dnf clean all -y
 
@@ -24,7 +24,7 @@ export CXX_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/g++
 
 # Set the right Python interpreter
 rm -rf /usr/bin/python3
-ln -s /opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin/python3 /usr/bin/python3
+ln -s /opt/_internal/cpython-${PYTHON_MAJOR_MINOR}.${PYTHON_PATCH}/bin/python3 /usr/bin/python3
 export PYTHON=/usr/bin/python3
 
 # Set llvm-symbolizer
@@ -32,7 +32,7 @@ ls -la /catalyst/llvm-build/bin/llvm-symbolizer
 export LLVM_SYMBOLIZER_PATH=/catalyst/llvm-build/bin/llvm-symbolizer
 
 # Add LLVM, Python and GCC to the PATH env var
-export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
+export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_MAJOR_MINOR}.${PYTHON_PATCH}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
 
 # Install python dependencies
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja pytest pytest-xdist pytest-mock autoray PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1'

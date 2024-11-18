@@ -25,8 +25,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
+from pennylane import QubitUnitary, QueuingManager
+from pennylane.devices import QubitDevice
+from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -34,7 +35,6 @@ from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
-from catalyst.debug.assertion import debug_assert
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -63,17 +63,14 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
-    CALLBACK_OP_CACHE,
     AbstractQreg,
     compbasis_p,
-    cond_p,
     counts_p,
     expval_p,
     func_p,
     gphase_p,
     hamiltonian_p,
     hermitian_p,
-    mlir_fn_cache,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -82,7 +79,6 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
-    qmeasure_p,
     qunitary_p,
     sample_p,
     set_basis_state_p,
@@ -132,19 +128,21 @@ def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
+    execution_config = qml.devices.ExecutionConfig()
     if qnode:
-        _gradient_method = _in_gradient_tracing(qnode)
-    else:
-        _gradient_method = None
+        execution_config.gradient_method = _in_gradient_tracing(qnode)
 
-    execution_config = qml.devices.DefaultExecutionConfig
-    execution_config.gradient_method = _gradient_method
     return execution_config
 
 
 def get_device_shots(dev):
     """Helper function to get device shots."""
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+
+
+def get_device_shot_vector(dev):
+    """Helper function to get device shot vector."""
+    return [(shot_copy.shots, shot_copy.copies) for shot_copy in dev.shots.shot_vector]
 
 
 class Function:
@@ -159,6 +157,15 @@ class Function:
     Raises:
         AssertionError: Invalid function type.
     """
+
+    CACHE = {}
+
+    def __new__(cls, fn):
+        if cached_instance := cls.CACHE.get(fn):
+            return cached_instance
+        new_instance = super().__new__(cls)
+        cls.CACHE[fn] = new_instance
+        return new_instance
 
     @debug_logger_init
     def __init__(self, fn):
@@ -245,7 +252,7 @@ def _apply_result_type_conversion(
         OutputSignature: new output signature of the function
     """
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
-    args = [AbstractQreg(target_types[-1].length)] if with_qreg else []
+    args = [AbstractQreg()] if with_qreg else []
 
     def _fun(*in_tracers):
         out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
@@ -285,12 +292,9 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
     if all_ends_with_qreg:  # [1]
-        length = types[-1][-1].length
         types = [t[:-1] for t in types]
-    else:
-        length = None
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg(length)] if all_ends_with_qreg else [])
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
 
 
 @debug_logger
@@ -529,11 +533,11 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "static_argnums": static_argnums,
-                "abstracted_axes": abstracted_axes,
-            }
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_type, out_treedef
@@ -552,13 +556,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
         ir.Context: the MLIR context
     """
 
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
     MemrefCallable.clearcache()
-    CALLBACK_OP_CACHE.clear()
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
@@ -603,17 +601,7 @@ def trace_basis_state(op, qrp):
     assert isinstance(op, qml.BasisState), "qml.BasisState expected"
 
     qubits = qrp.extract(op.wires)
-    basis_state = op.parameters[0]
-    err_msg = "BasisState parameter must consist of 0 or 1 integers."
-    if not jnp.can_cast(basis_state.dtype, jnp.dtype(jnp.int64)):
-        raise ValueError(err_msg)
-
-    basis_state_invalid_bits = jax.lax.bitwise_and(basis_state, ~0b1)
-    is_basis_state_invalid = jnp.any(basis_state_invalid_bits)
-    is_basis_state_valid = jnp.logical_not(is_basis_state_invalid)
-    debug_assert(is_basis_state_valid, err_msg)
-
-    basis_state = jax.lax.convert_element_type(basis_state, jnp.dtype(jnp.bool))
+    basis_state = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.bool))
     qubits2 = set_basis_state_p.bind(*qubits, basis_state)
     qrp.insert(op.wires, qubits2)
 
@@ -776,7 +764,7 @@ def trace_observables(
         obs_tracers = hamiltonian_p.bind(coeffs, *nested_obs)
     else:
         raise NotImplementedError(
-            f"Observable {obs} (of type {type(obs)}) is not impemented"
+            f"Observable {obs} (of type {type(obs)}) is not implemented"
         )  # pragma: no cover
     return obs_tracers, (len(qubits) if qubits else 0)
 
@@ -859,6 +847,14 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
+
+            # Check if the measurement is supported shot-vector where num_of_total_copies > 1
+            if device.shots.num_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+                raise NotImplementedError(
+                    f"Measurement {o.return_type.value} is not supported a shot-vector. "
+                    "Use qml.sample() instead."
+                )
+
             if isinstance(device, qml.devices.LegacyDevice):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
@@ -869,6 +865,8 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
+                results = []  # list of results per copy
+
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -881,7 +879,21 @@ def trace_quantum_measurements(
                     result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
-                    out_classical_tracers.append(result)
+
+                    reshaped_result = ()
+                    shot_vector = get_device_shot_vector(device)
+                    start_idx = 0  # Start index for slicing
+                    for shot, copies in shot_vector:
+                        for _ in range(copies):
+                            sliced_result = result[start_idx : start_idx + shot]
+                            reshaped_result += (sliced_result.reshape(shot, nqubits),)
+                            start_idx += shot
+
+                    if len(reshaped_result) == 1:
+                        reshaped_result = reshaped_result[0]
+
+                    out_classical_tracers.append(reshaped_result)
+
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
@@ -912,13 +924,13 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif o.return_type.value == "state":
+            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not impemented"
+                    f"Measurement {type(o)} is not implemented"
                 )  # pragma: no cover
         elif isinstance(o, DynamicJaxprTracer):
             out_classical_tracers.append(o)
@@ -1059,37 +1071,6 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
 
 
 @debug_logger
-def reset_qubit(qreg_in, w):
-    """Perform a qubit reset on a single wire. Suitable for use during late-stage tracing,
-    as JAX primitives are used directly. These operations will not appear on tape."""
-
-    def flip(qreg):
-        """Flip a qubit."""
-        qbit = qextract_p.bind(qreg, w)
-        qbit2 = qinst_p.bind(qbit, op="PauliX", qubits_len=1)[0]
-        return qinsert_p.bind(qreg, w, qbit2)
-
-    def dont_flip(qreg):
-        """Identity function."""
-        return qreg
-
-    qbit = qextract_p.bind(qreg_in, w)
-    m, qbit2 = qmeasure_p.bind(qbit)
-    qreg_mid = qinsert_p.bind(qreg_in, w, qbit2)
-
-    jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
-    jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(
-        m,
-        qreg_mid,
-        branch_jaxprs=[jaxpr_true, jaxpr_false],
-        nimplicit_outputs=0,
-    )[0]
-
-    return qreg_out
-
-
-@debug_logger
 def trace_function(
     ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
 ) -> Tuple[List[Any], InputSignature, OutputSignature]:
@@ -1198,17 +1179,19 @@ def trace_quantum_function(
         transformed_results = []
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            # Set up same device and quantum register for all tapes in the program.
-            # We just need to ensure the qubits are reset in between each.
-            qdevice_p.bind(
-                rtd_lib=device.backend_lib,
-                rtd_name=device.backend_name,
-                rtd_kwargs=str(device.backend_kwargs),
-            )
-            qreg_in = qalloc_p.bind(len(device.wires), static_size=len(device.wires))
-
             qnode_transformed = len(qnode_program) > 0
-            for i, tape in enumerate(tapes):
+            for tape in tapes:
+                # Set up quantum register for the current tape.
+                # We just need to ensure there is a tape cut in between each.
+                # Each tape will be outlined into its own function with mlir pass
+                # -split-multiple-tapes
+                qdevice_p.bind(
+                    rtd_lib=device.backend_lib,
+                    rtd_name=device.backend_name,
+                    rtd_kwargs=str(device.backend_kwargs),
+                )
+                qreg_in = qalloc_p.bind(len(device.wires))
+
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
@@ -1225,7 +1208,14 @@ def trace_quantum_function(
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
-                meas_tracers = [trace.full_raise(m) for m in meas]
+                # Check if the measurements are nested then apply the full_raise
+                def check_full_raise(arr, func):
+                    if isinstance(arr, (list, tuple)):
+                        return type(arr)(check_full_raise(x, func) for x in arr)
+                    else:
+                        return func(arr)
+
+                meas_tracers = check_full_raise(meas, trace.full_raise)
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
@@ -1238,14 +1228,9 @@ def trace_quantum_function(
                 else:
                     transformed_results.append(meas_results)
 
-                # Reset the qubits and update the register value for the next tape.
-                if len(tapes) > 1 and i < len(tapes) - 1:
-                    for w in device.wires:
-                        qreg_out = reset_qubit(qreg_out, w)
-                    qreg_in = qreg_out
-
-            # Deallocate the register before tracing the post-processing.
-            qdealloc_p.bind(qreg_out)
+                # Deallocate the register after the current tape is finished
+                # This dealloc primitive also serves as the tape cut when splitting tapes
+                qdealloc_p.bind(qreg_out)
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results

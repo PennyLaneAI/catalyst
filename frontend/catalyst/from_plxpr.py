@@ -19,15 +19,22 @@ from typing import Callable
 
 import jax
 from jax.extend.linear_util import wrap_init
-from pennylane.capture import AbstractMeasurement, AbstractOperator, qnode_prim
+from pennylane.capture import (
+    AbstractMeasurement,
+    AbstractOperator,
+    disable,
+    enable,
+    enabled,
+    qnode_prim,
+)
 
 from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
     compbasis_p,
     expval_p,
-    func_p,
     gphase_p,
     namedobs_p,
     probs_p,
@@ -37,12 +44,12 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
+    quantum_kernel_p,
     qunitary_p,
     sample_p,
     state_p,
     var_p,
 )
-from catalyst.utils.toml import ProgramFeatures
 
 measurement_map = {
     "sample_wires": sample_p,
@@ -70,10 +77,9 @@ def _read(var, env: dict):
     return var.val if type(var) is jax.core.Literal else env[var]
 
 
-def _get_device_kwargs(device: "pennylane.devices.Device") -> dict:
+def _get_device_kwargs(device) -> dict:
     """Calulcate the params for a device equation."""
-    features = ProgramFeatures(device.shots is not None)
-    capabilities = get_device_capabilities(device, features)
+    capabilities = get_device_capabilities(device)
     info = extract_backend_info(device, capabilities)
     # Note that the value of rtd_kwargs is a string version of
     # the info kwargs, not the info kwargs itself
@@ -143,7 +149,7 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
                 j:AbstractQreg() = qinsert d 0 f
                 qdealloc j
                 in (i,) }
-            fn=<QNode: device='<lightning.qubit device (wires=2) at 0x302761c90>', interface='auto', diff_method='best'>
+            qnode=<QNode: device='<lightning.qubit device (wires=2) at 0x302761c90>', interface='auto', diff_method='best'>
             ] a
         in (b,) }
 
@@ -160,7 +166,7 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
     `Writing custom interpreters in JAX <https://jax.readthedocs.io/en/latest/notebooks/Writing_custom_interpreters_in_Jax.html>`_
     for a walkthrough on the general architecture and behavior of this function.
 
-    Given that ``catalyst.jax_primitives.func_p`` does not define a concrete implementation, this
+    Given that ``catalyst.jax_primitives.quantum_kernel_p`` does not define a concrete implementation, this
     function will fail outside of an abstract evaluation call.
 
     """
@@ -182,10 +188,10 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
                 eqn.params["qfunc_jaxpr"],
                 n_consts=eqn.params["n_consts"],
             )
-            # func_p is a CallPrimitive, so interpreter passed as first arg
+            # quantum_kernel_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
             # transformations
-            outvals = func_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
+            outvals = quantum_kernel_p.bind(wrap_init(f), *invals, qnode=eqn.params["qnode"])
         else:
             outvals = eqn.primitive.bind(*invals, **eqn.params)
         # Primitives may return multiple outputs or not
@@ -209,7 +215,7 @@ class QFuncPlxprInterpreter:
 
     wire_map: dict
     """A map from wire values to ``AbstractQbit`` instances.
-    
+
     If a value is not present in this dictionary, it needs to be extracted
     from the ``qreg`` property.
     """
@@ -235,7 +241,7 @@ class QFuncPlxprInterpreter:
         resets the wire map.
         """
         qdevice_p.bind(**_get_device_kwargs(self._device))
-        self.qreg = qalloc_p.bind(len(self._device.wires), static_size=len(self._device.wires))
+        self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
     def cleanup(self):
@@ -381,3 +387,39 @@ class QFuncPlxprInterpreter:
         self.cleanup()
         # Read the final result of the Jaxpr from the environment
         return [self.read(outvar) for outvar in jaxpr.outvars]
+
+
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
+    """Capture the JAX program representation (JAXPR) of the wrapped function, using
+    PL capure module.
+
+    Args:
+        args (Iterable): arguments to use for program capture
+
+    Returns:
+        ClosedJaxpr: captured JAXPR
+        PyTreeDef: PyTree metadata of the function output
+        Tuple[Any]: the dynamic argument signature
+    """
+
+    with transient_jax_config({"jax_dynamic_shapes": True}):
+
+        make_jaxpr_kwargs = {
+            "static_argnums": static_argnums,
+            "abstracted_axes": abstracted_axes,
+        }
+
+        if enabled():
+            capture_on = True
+        else:
+            capture_on = False
+            enable()
+
+        args = sig
+        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+
+        if not capture_on:
+            disable()
+
+        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
+    return jaxpr, out_type, out_treedef, sig

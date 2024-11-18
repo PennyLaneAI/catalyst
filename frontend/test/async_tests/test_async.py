@@ -334,7 +334,7 @@ def test_gradient_exception(inp, diff_methods, backend):
     @qjit(async_qnodes=True)
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
-        h = grad(g, method=diff_methods[1], argnum=[0])
+        h = grad(g, method=diff_methods[1], argnums=[0])
         return h(x, 0)
 
     msg = "Unrecoverable error"

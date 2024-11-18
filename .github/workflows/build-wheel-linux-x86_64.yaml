@@ -23,7 +23,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-latest
+      default_runner: ubuntu-22.04
 
   check_if_wheel_build_required:
     if: github.event.pull_request.draft == false
@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.9]
+        python_version: ["3.10"]
         container_img: ["manylinux_2_28_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -179,8 +179,8 @@ jobs:
               -DLLVM_ENABLE_PROJECTS="mlir" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
@@ -215,8 +215,8 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DCMAKE_CXX_VISIBILITY_PRESET=protected \
               -DLLVM_ENABLE_LLD=ON
 
@@ -296,7 +296,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -344,13 +344,9 @@ jobs:
               -DPYTHON_INCLUDE_DIR=$(python${{ matrix.python_version }} -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
               -DPYTHON_LIBRARY=$(python3${{ matrix.python_version }} -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LIBRARY')))") \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=77a8b21 \
-              -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF \
-              -DLQ_ENABLE_KERNEL_OMP=OFF
+              -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -377,11 +373,11 @@ jobs:
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=ON
 
-        cmake --build quantum-build --target check-dialects compiler_driver
+        cmake --build quantum-build --target check-dialects catalyst-cli
 
     - name: Build wheel
       run: |

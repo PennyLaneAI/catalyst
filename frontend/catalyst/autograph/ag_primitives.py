@@ -18,6 +18,7 @@ functions. The purpose is to convert imperative style code to functional or grap
 """
 import copy
 import functools
+import operator
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
@@ -35,6 +36,7 @@ from pennylane.queuing import AnnotatedQueue
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
@@ -47,6 +49,7 @@ __all__ = [
     "or_",
     "not_",
     "set_item",
+    "update_item_with_op",
 ]
 
 
@@ -534,12 +537,16 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # HOTFIX: pass through calls of known Catalyst wrapper functions
         if fn in (
             catalyst.adjoint,
+            qml.adjoint,
             catalyst.ctrl,
+            qml.ctrl,
             catalyst.grad,
+            catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
             catalyst.jvp,
             catalyst.vmap,
+            catalyst.mitigate_with_zne,
         ):
             assert args and callable(args[0])
             wrapped_fn = args[0]
@@ -553,18 +560,22 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 **(kwargs if kwargs is not None else {}),
             )
 
-        # TODO: find a way to handle custom decorators more effectively with autograph
-        # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
-        # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
-        # than the QNode or QJIT call method.
+        # Catalyst decorators / transforms generate a callable class instance. When we invoke
+        # these instances from autograph code, we want to transform the wrapped function as well
+        # but not the __call__ method itself or other class code.
+        # The CatalystCallable class provides a method a transparently call the wrapped function
+        # through an additional wrapper, while the class is invoked.
+        if isinstance(fn, CatalystCallable):
 
-        # For nested QJIT calls, the class already forwards to the wrapped function, bypassing any
-        # class functionality. We just do the same here:
-        if isinstance(fn, catalyst.QJIT):
-            fn = fn.user_function
+            def ag_wrapper(inner_fn):
+                return lambda *inner_args, **inner_kwargs: converted_call(
+                    inner_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                )
 
-        # For QNode calls, we employ a wrapper to correctly forward the quantum function call to
-        # autograph, while still invoking the QNode call method in the surrounding tracing context.
+            return fn.call_with_wrapper(ag_wrapper, args, kwargs if kwargs is not None else {})
+
+        # For QNode calls, since the class is not part of the Catalyst package, we manually add a
+        # wrapper to correctly forward the quantum function call to autograph.
         if isinstance(fn, qml.QNode):
 
             @functools.wraps(fn.func)
@@ -582,9 +593,8 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 def set_item(target, i, x):
     """An implementation of the AutoGraph 'set_item' function. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives.
-    The idea is to accept the much simpler single index assigment syntax for Jax arrays,
-    to subsequently transform it under the hood into the set of 'at' and 'set' calls that
-    Autograph supports. E.g.:
+    The idea is to accept a simple assigment syntax for Jax arrays, to subsequently transform
+    it under the hood into the set of 'at' and 'set' calls that Autograph supports. E.g.:
         target[i] = x -> target = target.at[i].set(x)
 
     .. note::
@@ -604,6 +614,47 @@ def set_item(target, i, x):
     else:
         target[i] = x
 
+    return target
+
+
+def update_item_with_op(target, index, x, op):
+    """An implementation of the 'update_item_with_op' function from operator_update. The interface
+    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
+    implementation in terms of Catalyst primitives. The idea is to accept an operator assignment
+    syntax for Jax arrays, to subsequently transform it under the hood into the set of 'at' and
+    operator calls that Autograph supports. E.g.:
+        target[i] **= x -> target = target.at[i].power(x)
+
+    .. note::
+        For this feature to work, 'converter.Feature.LISTS' had to be added to the
+        TOP_LEVEL_OPTIONS and NESTED_LEVEL_OPTIONS conversion options of our own Catalyst
+        Autograph transformer. If you create a new transformer and want to support this feature,
+        make sure you enable such option there as well.
+    """
+    # Mapping of the gast attributes to the corresponding JAX operation
+    gast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
+    # Mapping of the gast attributes to the corresponding in-place operation
+    inplace_operation_map = {
+        "mult": "mul",
+        "div": "truediv",
+        "add": "add",
+        "sub": "add",
+        "pow": "pow",
+    }
+    ## For sub, we need to use add and negate the value of x
+    if op == "sub":
+        x = -x
+
+    # Apply the 'at...op' transformation only to Jax arrays.
+    # Otherwise, fallback to Python's default syntax.
+    if isinstance(target, DynamicJaxprTracer):
+        if isinstance(index, slice):
+            target = getattr(target.at[index.start : index.stop : index.step], gast_op_map[op])(x)
+        else:
+            target = getattr(target.at[index], gast_op_map[op])(x)
+    else:
+        # Use Python's in-place operator
+        target[index] = getattr(operator, f"__i{inplace_operation_map[op]}__")(target[index], x)
     return target
 
 

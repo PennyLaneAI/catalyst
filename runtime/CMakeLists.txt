@@ -16,7 +16,6 @@ option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
-option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -25,7 +24,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
-set(util_includes "${PROJECT_SOURCE_DIR}/utils")
 
 
 # Get LLVM hash to target from source tree.
@@ -77,31 +75,15 @@ if(RUNTIME_ENABLE_WARNINGS)
     add_compile_options(-Werror -Wall)
 endif()
 
-message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
-list(APPEND devices_list rtd_dummy)
-
-if(ENABLE_LIGHTNING)
-    list(APPEND devices_list pennylane_lightning rtd_lightning)
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_dynamic")
-endif()
+list(APPEND devices_list rtd_null_qubit)
+list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_qubit")
 
 if(ENABLE_OPENQASM)
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
     list(APPEND devices_list rtd_openqasm)
-endif()
-
-# On macOS libomp is typically installed via brew, which doesn't make the package discoverable by
-# default to avoid conflicting with GCC's OpenMP library.
-if(APPLE)
-    execute_process (
-        COMMAND brew --prefix libomp
-        OUTPUT_VARIABLE BREW_OMP
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(OpenMP_ROOT ${BREW_OMP})
 endif()
 
 add_library(catalyst_qir_runtime INTERFACE)
@@ -129,4 +111,3 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(tests)
-add_subdirectory(utils)

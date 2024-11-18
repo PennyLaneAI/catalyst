@@ -16,21 +16,27 @@
 
 """Test for the device API.
 """
+import os
+import pathlib
 import platform
+from typing import Optional
 
 import pennylane as qml
 from pennylane.devices import Device
-from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
-class DummyDevice(Device):
-    """A dummy device from the device API."""
 
-    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
+class CustomDevice(Device):
+    """A custom device that does nothing."""
+
+    config = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
@@ -41,18 +47,21 @@ class DummyDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lightning_lib_path = (
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_lightning" + system_extension
+        null_qubit_lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
         )
 
-        return "dummy.remote", lightning_lib_path
+        return "Custom", null_qubit_lib_path
 
     def execute(self, circuits, execution_config):
         """Execute"""
         return circuits, execution_config
 
-    def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+    def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
         """Preprocess"""
+        if execution_config is None:
+            execution_config = ExecutionConfig()
+
         transform_program = TransformProgram()
         transform_program.add_transform(qml.transforms.split_non_commuting)
         return transform_program, execution_config
@@ -61,8 +70,8 @@ class DummyDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
-    dev = DummyDevice(wires=2, shots=2048)
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
+    dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)
@@ -86,8 +95,8 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
-    dev = DummyDevice(wires=2, shots=2048)
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
+    dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)

@@ -14,7 +14,7 @@ on:
   workflow_call:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 12
+  MACOSX_DEPLOYMENT_TARGET: 13
 
 concurrency:
   group: Build Catalyst Wheel on macOS (x86_64)-${{ github.ref }}
@@ -37,10 +37,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.9]
+        python_version: ["3.10"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-12
+    runs-on: macos-13
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -140,8 +140,8 @@ jobs:
               -DLLVM_ENABLE_PROJECTS="mlir" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
@@ -176,8 +176,8 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_LLD=OFF \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         cmake --build mhlo-build --target check-mlir-hlo
@@ -217,7 +217,7 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: macos-12
+    runs-on: macos-13
 
     steps:
     - name: Checkout Catalyst repo
@@ -246,7 +246,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-wheel-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -292,13 +292,9 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=77a8b21 \
-              -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF \
-              -DLQ_ENABLE_KERNEL_OMP=OFF
+              -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -311,8 +307,7 @@ jobs:
     - name: Test Catalyst-Runtime
       run: |
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
-        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
-        ./runtime-build/tests/runner_tests_lightning
+        cmake --build runtime-build --target runner_tests_openqasm
         ./runtime-build/tests/runner_tests_openqasm
 
     # Build Quantum and Gradient Dialects
@@ -329,11 +324,11 @@ jobs:
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF
 
-        cmake --build quantum-build --target check-dialects compiler_driver
+        cmake --build quantum-build --target check-dialects catalyst-cli
 
     - name: Build wheel
       run: |
@@ -367,7 +362,7 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Mac x86
-    runs-on: macos-12
+    runs-on: macos-13
 
     steps:
     - name: Checkout Catalyst repo

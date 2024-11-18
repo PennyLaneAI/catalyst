@@ -29,8 +29,10 @@ from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     get_abstract_signature,
+    params_are_annotated,
     typecheck_signatures,
 )
+from catalyst.utils.exceptions import CompileError
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
@@ -87,7 +89,6 @@ class TestDifferentPrecisions:
         assert jnp.allclose(res_float32, res_float64)
 
 
-@pytest.mark.filterwarnings("ignore:Casting complex")
 class TestJittedWithOneTypeRunWithAnother:
     @pytest.mark.parametrize(
         "from_type,to_type",
@@ -112,6 +113,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if x.dtype == jnp.dtype(jnp.complex64):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -167,6 +170,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
+            if x.dtype == jnp.dtype(jnp.complex64):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -195,6 +200,8 @@ class TestJittedWithOneTypeRunWithAnother:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if x.dtype == jnp.dtype(jnp.complex128):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -238,7 +245,6 @@ class TestJittedWithOneTypeRunWithAnother:
         assert jnp.allclose(res_from, res_to)
 
 
-@pytest.mark.filterwarnings("ignore:Casting complex")
 class TestTypePromotion:
     @pytest.mark.parametrize(
         "promote_from,val",
@@ -289,6 +295,8 @@ class TestTypePromotion:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
+            if x.dtype == jnp.dtype(jnp.complex128):
+                x = jnp.real(x)
             qml.RX(x.astype(float), wires=0)
             return qml.state()
 
@@ -447,10 +455,10 @@ class TestCaching:
         def g(x: float):
             return f(x) + f(x)
 
-        assert "func.func private @f(" in g.mlir
-        assert g.mlir.count("call @f(") == 2
+        assert "func.func public @f(" in g.mlir
+        assert g.mlir.count("launch_kernel @module_f::@f") == 2
         # Duplicate function generation results in a "_0" suffix
-        assert not "func.func private @f_0(" in g.mlir
+        assert not "func.func public @f_0(" in g.mlir
 
 
 class TestShots:
@@ -977,6 +985,39 @@ class TestGradPartial:
         expected = jax.grad(partial_fn)(0.3)
 
         assert np.allclose(grad_partial_fn(0.3), expected)
+
+
+class TestParamsAnnotations:
+    """Test param annotations"""
+
+    def test_params_invalid_annotation(self):
+        def foo(hello: "BAD ANNOTATION"): ...
+
+        assert not params_are_annotated(foo)
+
+
+class TestErrorNestedQNode:
+    """Test error is raised with nested qnodes"""
+
+    def test_nested_qnode(self):
+        """Test autograph on a QNode raises error."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def inner():
+            return qml.state()
+
+        @qml.qnode(dev)
+        def outer():
+            inner()
+            return qml.state()
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            def fn():
+                return outer()
 
 
 if __name__ == "__main__":
