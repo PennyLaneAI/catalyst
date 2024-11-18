@@ -138,8 +138,8 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
         Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
-        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), allocVal0, allocVal1,
-                                  adaptor.getShotsAttr());
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), adaptor.getShots(),
+                                  allocVal0, allocVal1);
         return success();
     }
 };
