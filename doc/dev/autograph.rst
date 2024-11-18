@@ -480,7 +480,19 @@ or accessed outside the loop scope if it was defined inside of it.
 ...
 [Array(0, dtype=int64), Array(1, dtype=int64)]
 
-In this case, the code still executes, but AutoGraph is telling us that it fell back to executing the loop at compile time.
+In this case, the code still executes, but AutoGraph is telling us that it fell back to executing the loop at compile time. Instead, results can be accumulated by indexing into a pre-allocated JAX array, provided the type and size are known ahead of time:
+
+>>> @qjit(autograph=True)
+... def f():
+...     my_list = jnp.empty(2, dtype=int)
+...     for i in range(2):
+...         my_list[i] = i
+...     return my_list
+...
+>>> f()
+Array([0, 1], dtype=int64)
+
+Here, AutoGraph is able to properly capture the for loop.
 
 .. note::
 
