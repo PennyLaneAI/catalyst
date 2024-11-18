@@ -427,7 +427,7 @@ func.func @sample(%q : !quantum.bit) {
     // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
     // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
-    %shots_2000 = llvm.mlir.constant(1000 : i64) : i64
+    %shots_2000 = llvm.mlir.constant(2000 : i64) : i64
     %alloc2 = memref.alloc() : memref<2000x2xf64>
     quantum.sample %o2 in(%alloc2 : memref<2000x2xf64>) %shots_2000
 
