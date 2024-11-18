@@ -66,8 +66,10 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
 
-    builder.Gate("Hadamard", {}, {}, {0}, false);
+    builder.Gate("RX", {0.5}, {}, {0}, false);
+    builder.Gate("Hadamard", {}, {}, {1}, false);
     builder.Gate("CNOT", {}, {}, {0, 1}, false);
+    builder.Gate("PauliY", {}, {}, {0}, false);
 
     auto &&circuit = builder.toOpenQasm();
 
@@ -105,15 +107,46 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
                 (sample == 0 || sample == 1)); // Each sample should be 0 or 1 for a 2-qubit state
         }
     }
+}
 
-    // TODO: These operations are not yet functional
-    // SECTION("Test BraketRunner::Expval()") {
-    //     auto &&expval = runner.Expval(circuit, "default", 100);
-    // }
+TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
+{
+    OpenQasm::BraketBuilder builder{};
 
-    // SECTION("Test BraketRunner::Var()") {
-    //     auto &&var = runner.Var(circuit, "default", 100);
-    // }
+    builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
+
+    builder.Gate("RX", {0.5}, {}, {0}, false);
+    builder.Gate("Hadamard", {}, {}, {1}, false);
+    builder.Gate("CNOT", {}, {}, {0, 1}, false);
+
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
+    OpenQasm::BraketRunner runner{};
+
+    SECTION("Test BraketRunner::Expval()")
+    {
+        // Compute expectation value of PauliY operator on qubit 0
+        auto &&circuit_expval =
+            builder.toOpenQasmWithCustomInstructions("#pragma braket result expectation y(q[0])");
+
+        auto &&expval = runner.Expval(circuit_expval, "default", 100);
+        CHECK((expval >= -1.0 && expval <= 1.0));
+    }
+
+    SECTION("Test BraketRunner::Var()")
+    {
+        // Compute variance of PauliY operator on qubit 0
+        auto &&circuit_var =
+            builder.toOpenQasmWithCustomInstructions("#pragma braket result variance y(q[0])");
+
+        auto &&var = runner.Var(circuit_var, "default", 100);
+        CHECK((var >= 0.0 && var <= 1.0));
+    }
 }
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
