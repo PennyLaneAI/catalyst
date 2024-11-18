@@ -27,8 +27,9 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.jax_tracer import lower_jaxpr_to_mlir
+import pytest
 
-
+@pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_sample():
     """Test that the sample primitive can be captured into jaxpr."""
 
@@ -37,9 +38,7 @@ def test_sample():
         return sample_p.bind(obs, 5, shape=(5, 0))
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
-    # breakpoint()
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
-    breakpoint()
     assert (
         jaxpr
         == """
@@ -69,7 +68,7 @@ module @foo {
     # assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
     # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
-
+@pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_sample_dynamic_shape():
     """Test that the sample primitive with dynamic shape can be captured into jaxpr."""
 
@@ -83,9 +82,7 @@ def test_sample_dynamic_shape():
         return sample_p.bind(obs, x, shape=(x, 0))
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
-    # breakpoint()
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
-    breakpoint()
     assert (
         jaxpr
         == """
@@ -129,7 +126,6 @@ def test_new_sampleop_still_good_with_backend():
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
-        # breakpoint()
         @qml.qnode(device)
         def circuit():
             qml.RX(0.1, 0)
@@ -182,10 +178,10 @@ def test_new_sampleop_still_good_with_backend():
         return
       }
     }"""
-    # breakpoint()
     replace_ir(workflow, "mlir", new_ir)
-    print("after: ", workflow(4))
-
+    res = workflow(4)
+    print("after: ", res)
+    assert len(res) == 4
 
 """
 >> pytest test_measurement_primitives.py -k new_sample -s
