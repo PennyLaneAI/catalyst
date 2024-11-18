@@ -51,7 +51,7 @@ def py_run_circuit(circuit, braket_device, kwargs, shots):
     if not kwargs:
         result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
     else:
-        result = device.run(OpenQasmProgram(source=circuit), shots=int(shots), s3_desination_folder=tuple(kwargs)).result()
+        result = device.run(OpenQasmProgram(source=circuit), shots=int(shots), s3_destination_folder=tuple(kwargs)).result()
     return result
 
 def py_var(circuit, braket_device, kwargs, shots):
