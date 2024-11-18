@@ -17,12 +17,15 @@
 
 import os
 import pathlib
+import platform
+from copy import deepcopy
 
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
 
 from catalyst import qjit
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 
 TEST_PATH = os.path.dirname(__file__)
@@ -44,6 +47,19 @@ def get_custom_qjit_device(num_wires, discards, additions):
             for gate in discards:
                 self.qjit_capabilities.operations.pop(gate, None)
             self.qjit_capabilities.operations.update(additions)
+
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
 
         def execute(self, circuits, execution_config):
             """Exececute the device (no)."""
