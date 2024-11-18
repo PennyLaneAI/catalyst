@@ -9,6 +9,7 @@ extend-exclude = '''
   | build
   | env
   | demos
+  | standalone
 )
 '''
 
@@ -55,6 +56,7 @@ omit = [
     "*/python_bindings/*",
     "./frontend/catalyst/_version.py",
     "./frontend/catalyst/_revision.py",
+    "./standalone/*",
 ]
 
 [tool.coverage.html]
