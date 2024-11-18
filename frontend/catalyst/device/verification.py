@@ -31,13 +31,7 @@ from pennylane.measurements import (
 )
 from pennylane.measurements.shots import Shots
 from pennylane.operation import Operation, StatePrepBase
-from pennylane.ops import (
-    Adjoint,
-    CompositeOp,
-    Controlled,
-    ControlledOp,
-    SymbolicOp,
-)
+from pennylane.ops import Adjoint, CompositeOp, Controlled, ControlledOp, SymbolicOp
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
