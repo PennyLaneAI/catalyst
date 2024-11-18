@@ -30,13 +30,12 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.measurements.shots import Shots
-from pennylane.operation import Operation, StatePrepBase, Tensor
+from pennylane.operation import Operation, StatePrepBase
 from pennylane.ops import (
     Adjoint,
     CompositeOp,
     Controlled,
     ControlledOp,
-    Hamiltonian,
     SymbolicOp,
 )
 from pennylane.tape import QuantumTape
@@ -86,24 +85,13 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     both that the overall observable is supported, and that its component
     parts are supported."""
 
-    # ToDo: currently we don't check that Tensor itself is supported, only its obs
-    # The TOML files have followed the convention of dev.observables from PL and not
-    # included Tensor, but this could be updated to validate
-    if isinstance(obs, Tensor):
-        for o in obs.obs:
+    _obs_checker(obs)
+
+    if isinstance(obs, CompositeOp):
+        for o in obs.operands:
             _verify_observable(o, _obs_checker)
-
-    else:
-        _obs_checker(obs)
-
-        if isinstance(obs, CompositeOp):
-            for o in obs.operands:
-                _verify_observable(o, _obs_checker)
-        elif isinstance(obs, Hamiltonian):
-            for o in obs.ops:
-                _verify_observable(o, _obs_checker)
-        elif isinstance(obs, SymbolicOp):
-            _verify_observable(obs.base, _obs_checker)
+    elif isinstance(obs, SymbolicOp):
+        _verify_observable(obs.base, _obs_checker)
 
 
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
@@ -256,10 +244,7 @@ def validate_observables_parameter_shift(tape: QuantumTape):
 
     for m in tape.measurements:
         if m.obs:
-            if isinstance(m.obs, Tensor):
-                _ = [_obs_checker(o) for o in m.obs.obs]
-            else:
-                _obs_checker(m.obs)
+            _obs_checker(m.obs)
 
     return (tape,), lambda x: x[0]
 
