@@ -22,7 +22,8 @@ Lark grammar reference:
 
 import sys
 from argparse import ArgumentParser
-from pennylane.devices.toml_check import parser, LarkError, UnexpectedInput
+
+from pennylane.devices.toml_check import LarkError, UnexpectedInput, parser
 
 if __name__ == "__main__":
     ap = ArgumentParser(prog="toml-check.py")

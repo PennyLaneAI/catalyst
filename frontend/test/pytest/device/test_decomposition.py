@@ -19,12 +19,13 @@ import platform
 import numpy as np
 import pennylane as qml
 import pytest
-from ..conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 
 from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decomposer
+
+from ..conftest import CONFIG_CUSTOM_DEVICE
 
 
 class TestGateAliases:
