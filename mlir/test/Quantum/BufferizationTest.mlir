@@ -28,8 +28,11 @@ func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) -> (tensor<4xf64>, tenso
 
 func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-    // CHECK: quantum.sample {{.*}} : memref<1000x2xf64>
-    %samples = quantum.sample %obs {shots=1000} : tensor<1000x2xf64>
+    %shots = arith.constant 1000 : i64
+    // CHECK: [[shots:%.+]] = arith.constant 1000 : i64
+    // CHECK: [[alloc:%.+]] = memref.alloc() : memref<1000x2xf64>
+    // CHECK: quantum.sample {{.*}} in([[alloc]] : memref<1000x2xf64>) [[shots]]
+    %samples = quantum.sample %obs %shots : tensor<1000x2xf64>
     func.return
 }
 

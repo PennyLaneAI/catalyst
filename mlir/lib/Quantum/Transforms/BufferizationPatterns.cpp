@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -73,10 +74,19 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        auto shots =
-            rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), adaptor.getShots());
-        Value allocVal =
-            rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange{shots});
+
+        // SampleOp's result shape is (shots, num_qubits)
+        // shots might be dynamic, in which case we need to memref alloc from the shots SSA value
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+
+        SmallVector<Value> allocSizes;
+        if (shape[0] == ShapedType::kDynamic) {
+            auto shots =
+                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), adaptor.getShots());
+            allocSizes.push_back(shots);
+        }
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<SampleOp>(loc, TypeRange{},
                                   ValueRange{adaptor.getObs(), adaptor.getShots(), allocVal},
                                   op->getAttrs());
