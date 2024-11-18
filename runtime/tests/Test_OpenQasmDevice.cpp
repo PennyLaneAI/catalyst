@@ -138,6 +138,15 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
         CHECK((expval >= -1.0 && expval <= 1.0));
     }
 
+    SECTION("Test BraketRunner::Expval() with no measurement process")
+    {
+        // Cannot compute expectation value if no measurement process is defined
+        auto &&circuit_expval = builder.toOpenQasmWithCustomInstructions("");
+
+        REQUIRE_THROWS_WITH(runner.Expval(circuit_expval, "default", 100),
+                            Catch::Contains("Unable to compute expectation value"));
+    }
+
     SECTION("Test BraketRunner::Var()")
     {
         // Compute variance of PauliY operator on qubit 0
@@ -146,6 +155,15 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
 
         auto &&var = runner.Var(circuit_var, "default", 100);
         CHECK((var >= 0.0 && var <= 1.0));
+    }
+
+    SECTION("Test BraketRunner::Var() with no measurement process")
+    {
+        // Cannot compute variance if no measurement process is defined
+        auto &&circuit_var = builder.toOpenQasmWithCustomInstructions("");
+
+        REQUIRE_THROWS_WITH(runner.Var(circuit_var, "default", 100),
+                            Catch::Contains("Unable to compute variance"));
     }
 }
 

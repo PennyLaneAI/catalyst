@@ -55,10 +55,18 @@ def py_run_circuit(circuit, braket_device, kwargs, shots):
     return result
 
 def py_var(circuit, braket_device, kwargs, shots):
-    return py_run_circuit(circuit, braket_device, kwargs, shots).values
+    values = py_run_circuit(circuit, braket_device, kwargs, shots).values
+    if not values:
+        raise RuntimeError(
+            "Unable to compute variance; no measurement process was specified")
+    return values
 
 def py_expval(circuit, braket_device, kwargs, shots):
-    return py_run_circuit(circuit, braket_device, kwargs, shots).values
+    values = py_run_circuit(circuit, braket_device, kwargs, shots).values
+    if not values:
+        raise RuntimeError(
+            "Unable to compute expectation value; no measurement process was specified")
+    return values
 
 def py_samples(circuit, braket_device, kwargs, shots):
     result = py_run_circuit(circuit, braket_device, kwargs, shots)
