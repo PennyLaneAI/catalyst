@@ -306,11 +306,12 @@ class QJITDevice(qml.devices.Device):
         # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
         #       when customizable multi-pathway decomposition is implemented.
         if hasattr(original_device, "_to_matrix_ops"):
-            setattr(
-                original_device_capabilities,
-                "to_matrix_ops",
-                getattr(original_device, "_to_matrix_ops"),
-            )
+            _to_matrix_ops = (getattr(original_device, "_to_matrix_ops"),)
+            setattr(original_device_capabilities, "to_matrix_ops", _to_matrix_ops)
+            if _to_matrix_ops and "QubitUnitary" not in original_device_capabilities.operations:
+                raise CompileError(
+                    "The device that specifies to_matrix_ops must support QubitUnitary."
+                )
 
         backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
 
@@ -476,7 +477,8 @@ def filter_out_modifiers(operations):
 def _load_device_capabilities(device) -> DeviceCapabilities:
     """Get the contents of the device config file."""
 
-    # TODO: find a better way for a device to customize its capabilities as seen by Catalyst.
+    # TODO: This code exists purely for testing. Find another way to customize device Find a
+    #       better way for a device to customize its capabilities as seen by Catalyst.
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
 

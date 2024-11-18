@@ -28,7 +28,14 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
-from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementProcess,
+    ProbabilityMP,
+    StateMP,
+    VarianceMP,
+)
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -891,15 +898,15 @@ def trace_quantum_measurements(
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif isinstance(o, qml.measurements.ExpectationMP):
+            elif type(o) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
-            elif isinstance(o, qml.measurements.VarianceMP):
+            elif type(o) is VarianceMP:
                 out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
-            elif isinstance(o, qml.measurements.ProbabilityMP):
+            elif type(o) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif isinstance(o, qml.measurements.CountsMP):
+            elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -921,7 +928,7 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
+            elif type(o) is StateMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))

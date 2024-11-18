@@ -154,6 +154,7 @@ There are two things that are needed in order to integrate with PennyLane device
 
 * Adding a ``get_c_interface`` method to your ``qml.devices.Device`` class.
 * Adding a ``config_filepath`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
+* Optionally, adding a ``device_kwargs`` dictionary for runtime parameters to pass from the PennyLane device to the ``QuantumDevice`` upon initialization.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.

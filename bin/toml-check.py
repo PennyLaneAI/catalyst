@@ -47,7 +47,6 @@ parser = Lark(
                compilation_section \
                pennylane_compilation_section? \
                qjit_compilation_section? \
-               options_section?
         schema_body: schema_decl
         gates_section: "[operators.gates]" operator_decl*
         pennylane_gates_section: "[pennylane.operators.gates]" operator_decl*
@@ -61,7 +60,6 @@ parser = Lark(
         compilation_section: "[compilation]" compilation_option_decl*
         pennylane_compilation_section: "[pennylane.compilation]" compilation_option_decl*
         qjit_compilation_section: "[qjit.compilation]" compilation_option_decl*
-        options_section: "[options]" option_decl*
         schema_decl: "schema" "=" "3"
         operator_decl: name "=" "{" (operator_trait ("," operator_trait)*)? "}"
         operator_trait: conditions | properties
@@ -77,7 +75,6 @@ parser = Lark(
             "overlapping_observables" | "non_commuting_observables" | "initial_state_prep" | \
         ) "=" boolean
         mcm_option: "supported_mcm_methods" "=" "[" (name ("," name)*)? "]"
-        custom_option_decl: name "=" (name | "\\"" name "\\"")
         name: /[a-zA-Z0-9_]+/
         boolean: "true" | "false"
         COMMENT: "#" /./*
