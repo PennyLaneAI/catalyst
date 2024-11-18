@@ -481,7 +481,7 @@ class QJIT(CatalystCallable):
         self.jaxed_function = None
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
-        self.mlir = None  # string form (historic presence)
+        self._mlir = None  # string form (historic presence)
         self.mlir_module = None
         self.qir = None
         self.out_type = None
@@ -513,6 +513,12 @@ class QJIT(CatalystCallable):
             self.aot_compile()
 
         super().__init__("user_function")
+
+    @property
+    def mlir(self):
+        if not self._mlir and self.mlir_module:
+            _, self._mlir = self.canonicalize(self.mlir_module)
+        return self._mlir
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -554,8 +560,8 @@ class QJIT(CatalystCallable):
                     self.user_sig or ()
                 )
 
-        if self.compile_options.target in ("mlir", "binary"):
-            self.mlir_module, self.mlir = self.generate_ir()
+        if self.compile_options.target in ("binary", "mlir"):
+            self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
             self.compiled_function, self.qir = self.compile()
@@ -599,7 +605,7 @@ class QJIT(CatalystCallable):
                     args, **kwargs
                 )
 
-            self.mlir_module, self.mlir = self.generate_ir()
+            self.mlir_module = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
@@ -696,7 +702,20 @@ class QJIT(CatalystCallable):
         PipelineNameUniquer.reset()
         return jaxpr, out_type, treedef, dynamic_sig
 
-    @instrument(size_from=0, has_finegrained=True)
+    @debug_logger
+    def canonicalize(self, mlir_module):
+        """Canonicalize the mlir_module"""
+
+        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
+        options = copy.deepcopy(self.compile_options)
+        options.pipelines = [("0_canonicalize", ["canonicalize"])]
+        options.lower_to_llvm = False
+        canonicalizer = Compiler(options)
+
+        # TODO: the in-memory and textual form are different after this, consider unification
+        return canonicalizer.run(mlir_module, self.workspace)
+
+    @instrument(has_finegrained=True)
     @debug_logger
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
@@ -710,16 +729,7 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        canonicalizer = Compiler(options)
-
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
-
-        return mlir_module, mlir_string
+        return mlir_module
 
     @instrument(size_from=1, has_finegrained=True)
     @debug_logger
