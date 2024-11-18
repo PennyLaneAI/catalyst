@@ -325,7 +325,13 @@ For example:
         """Custom Device"""
 
         config_filepath = pathlib.Path("absolute/path/to/configuration/file.toml")
-        device_kwargs = {"arg1": "field1"}
 
-In the above example, a dictionary will be constructed at runtime with ``{"args1": dev.field1}``
-and passed to the constructor of the ``QuantumDevice`` implementation.
+        def __init__(self, wires, do_something=False, special_param=""):
+            ...
+            self.device_kwargs = {
+              'cpp_do_something' = do_something,
+              'cpp_special_param' = special_param
+            }
+
+In the above example, a dictionary will be constructed at runtime and passed to the constructor of
+the ``QuantumDevice`` implementation.
