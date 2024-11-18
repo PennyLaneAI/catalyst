@@ -1691,7 +1691,7 @@ def _sample_abstract_eval(obs, shots, shape):
         assert shape[1] == obs.num_qubits
     else:
         # assert shape == (shots,)
-        assert len(shape) == 0
+        assert len(shape) == 1
 
     return core.DShapedArray(shape, jax.numpy.dtype("float64"))
 
