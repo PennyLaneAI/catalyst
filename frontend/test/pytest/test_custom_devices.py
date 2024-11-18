@@ -36,11 +36,12 @@ def test_custom_device_load():
         name = "custom.device"
         config_filepath = CONFIG_CUSTOM_DEVICE
 
-        device_kwargs = {"option1": "_option1", "option2": "_option2"}
-
-        def __init__(self, shots=None, wires=None):
+        def __init__(self, shots=None, wires=None, options1=42, options2=38):
             super().__init__(wires=wires, shots=shots)
-            self._option1 = 42
+            self.device_kwargs = {
+                "option1": options1,
+                "option2": options2,
+            }
 
         def apply(self, operations, **kwargs):
             """Unused"""
@@ -65,7 +66,7 @@ def test_custom_device_load():
     capabilities = get_device_capabilities(device)
     backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
-    assert "option2" not in backend_info.kwargs
+    assert backend_info.kwargs["option2"] == 38
 
     @qjit
     @qml.qnode(device)

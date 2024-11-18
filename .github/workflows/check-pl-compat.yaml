@@ -115,7 +115,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
-        ref: toml-updates
+        ref: master
         path: lightning_build
         fetch-depth: 0
 
@@ -143,8 +143,8 @@ jobs:
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@device-api-cap
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}
