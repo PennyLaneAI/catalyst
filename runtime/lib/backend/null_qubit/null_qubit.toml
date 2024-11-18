@@ -46,8 +46,8 @@ PauliX                 = { properties = [ "invertible", "controllable", "differe
 PauliY                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PhaseShift             = { properties = [ "invertible", "controllable", "differentiable" ] }
-QubitUnitary           = { properties = [ "invertible", "controllable",                  ] }
-Rot                    = { properties = [ "invertible", "controllable",                  ] }
+QubitUnitary           = { properties = [ "invertible", "controllable"                   ] }
+Rot                    = { properties = [ "invertible", "controllable"                   ] }
 RX                     = { properties = [ "invertible", "controllable", "differentiable" ] }
 RY                     = { properties = [ "invertible", "controllable", "differentiable" ] }
 RZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
@@ -102,9 +102,3 @@ dynamic_qubit_management = false
 non_commuting_observables = true
 # Whether the device supports (arbitrary) initial state preparation.
 initial_state_prep = true
-
-[options]
-
-mcmc = "_mcmc"
-num_burnin = "_num_burnin"
-kernel_name = "_kernel_name"

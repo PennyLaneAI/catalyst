@@ -19,7 +19,7 @@ import platform
 import numpy as np
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
+from ..conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 
 from catalyst import CompileError, ctrl, qjit

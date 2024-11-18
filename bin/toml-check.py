@@ -22,69 +22,7 @@ Lark grammar reference:
 
 import sys
 from argparse import ArgumentParser
-from textwrap import dedent
-
-try:
-    from lark import Lark, LarkError, UnexpectedInput
-except ImportError as e:
-    raise RuntimeError(
-        "toml-check.py requires `lark` library. Consider using `pip install lark`"
-    ) from e
-
-parser = Lark(
-    dedent(
-        """
-        start: schema_body \
-               gates_section \
-               pennylane_gates_section? \
-               qjit_gates_section? \
-               observables_section \
-               pennylane_observables_section? \
-               qjit_observables_section? \
-               measurement_processes_section \
-               pennylane_measurement_processes_section? \
-               qjit_measurement_processes_section? \
-               compilation_section \
-               pennylane_compilation_section? \
-               qjit_compilation_section? \
-        schema_body: schema_decl
-        gates_section: "[operators.gates]" operator_decl*
-        pennylane_gates_section: "[pennylane.operators.gates]" operator_decl*
-        qjit_gates_section: "[qjit.operators.gates]" operator_decl*
-        observables_section: "[operators.observables]" operator_decl*
-        pennylane_observables_section: "[pennylane.operators.observables]" operator_decl*
-        qjit_observables_section: "[qjit.operators.observables]" operator_decl*
-        measurement_processes_section: "[measurement_processes]" mp_decl*
-        pennylane_measurement_processes_section: "[pennylane.measurement_processes]" mp_decl*
-        qjit_measurement_processes_section: "[qjit.measurement_processes]" mp_decl*
-        compilation_section: "[compilation]" compilation_option_decl*
-        pennylane_compilation_section: "[pennylane.compilation]" compilation_option_decl*
-        qjit_compilation_section: "[qjit.compilation]" compilation_option_decl*
-        schema_decl: "schema" "=" "3"
-        operator_decl: name "=" "{" (operator_trait ("," operator_trait)*)? "}"
-        operator_trait: conditions | properties
-        conditions: "conditions" "=" "[" condition ("," condition)* "]"
-        properties: "properties" "=" "[" property ("," property)* "]"
-        condition: "\\"finiteshots\\"" | "\\"analytic\\"" | "\\"terms-commute\\""
-        property: "\\"controllable\\"" | "\\"invertible\\"" | "\\"differentiable\\""
-        mp_decl: name "=" "{" (mp_trait)? "}"
-        mp_trait: conditions
-        compilation_option_decl: boolean_option | mcm_option
-        boolean_option: ( \
-            "qjit_compatible" | "runtime_code_generation" | "dynamic_qubit_management" | \
-            "overlapping_observables" | "non_commuting_observables" | "initial_state_prep" | \
-        ) "=" boolean
-        mcm_option: "supported_mcm_methods" "=" "[" (name ("," name)*)? "]"
-        name: /[a-zA-Z0-9_]+/
-        boolean: "true" | "false"
-        COMMENT: "#" /./*
-        %import common.WS
-        %ignore WS
-        %ignore COMMENT
-        """
-    )
-)
-
+from pennylane.devices.toml_check import parser, LarkError, UnexpectedInput
 
 if __name__ == "__main__":
     ap = ArgumentParser(prog="toml-check.py")
