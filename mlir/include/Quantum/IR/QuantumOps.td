@@ -733,10 +733,11 @@ def SampleOp : Measurement_Op<"sample"> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
-        from an observable on the current quantum state. Given the nature of the operation, an
-        argument specifying the shot number, i.e. the number of samples to draw, must be specified.
-        The only other SSA argument is an observable that must be defined by an operation in the local
-        scope.
+        from an observable on the current quantum state.
+        The first SSA argument is an observable that must be defined by an operation in the local scope.
+        Given the nature of the operation, another SSA
+        argument specifying the shot number, i.e. the number of samples to draw, must also be specified.
+
 
         Note that the return value type depends on the type of observable provided. Computational
         basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
@@ -748,10 +749,11 @@ def SampleOp : Measurement_Op<"sample"> {
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
         {
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %samples = quantum.samples %obs1 {shots=1000} : tensor<1000xf64>
+            %shots = stablehlo.constant dense<1000> : tensor<i64>
+            %samples = quantum.samples %obs1 %shots : tensor<1000xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 {shots=1000} : tensor<1000x2xf64>
+            %samples2 = quantum.samples %obs2 %shots : tensor<1000x2xf64>
 
             func.return
         }
@@ -767,7 +769,6 @@ def SampleOp : Measurement_Op<"sample"> {
             MemRefRankOf<[F64], [2]>
            ]>
         >:$in_data
-        //I64Attr:$shots
     );
 
     let results = (outs
