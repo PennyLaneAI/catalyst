@@ -749,7 +749,7 @@ def SampleOp : Measurement_Op<"sample"> {
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
         {
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %shots = stablehlo.constant dense<1000> : tensor<i64>
+            %shots = arith.constant 1000 : i64
             %samples = quantum.samples %obs1 %shots : tensor<1000xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
@@ -798,10 +798,10 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
         from an observable on the current quantum state and counting the frequency of each
-        eigenvalue. Given the nature of the operation, an attribute specifying the shot number,
-        i.e. the number of samples to draw, must be specified.
-        The only SSA argument is an observable that must be defined by an operation in the local
-        scope.
+        eigenvalue.
+        The first SSA argument is an observable that must be defined by an operation in the local scope.
+        Given the nature of the operation, another SSA
+        argument specifying the shot number, i.e. the number of samples to draw, must also be specified.
 
         Note that the "counts dictionary" is returned as two separate arrays of the same length, one
         array for the eigenvalues, and one for count of each eigenvalue. When operating in the
@@ -814,10 +814,11 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
         {
             %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-            %counts = quantum.counts %obs {shots=1000} : tensor<4xf64>, tensor<4xi64>
+            %shots = arith.constant 1000 : i64
+            %counts = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %counts2 = quantum.counts %obs2 {shots=1000} : tensor<2xf64>, tensor<2xi64>
+            %counts2 = quantum.counts %obs2 %shots : tensor<2xf64>, tensor<2xi64>
 
             func.return
         }
@@ -826,9 +827,9 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
 
     let arguments = (ins
         ObservableType:$obs,
+        I64:$shots,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
-        Optional<MemRefRankOf<[I64], [1]>>:$in_counts,
-        I64Attr:$shots
+        Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
 
     let results = (outs
@@ -838,7 +839,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
 
     let assemblyFormat = [{
         $obs
-        ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
+        ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )? $shots
         attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
 
