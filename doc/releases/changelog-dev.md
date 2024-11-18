@@ -63,6 +63,9 @@
   [(#1307)](https://github.com/PennyLaneAI/catalyst/pull/1307)
   [(#1312)](https://github.com/PennyLaneAI/catalyst/pull/1312)
 
+* `catalyst-cli` and `quantum-opt` are compiled with `default` visibility, which allows for MLIR plugins to work.
+  [(#1287)](https://github.com/PennyLaneAI/catalyst/pull/1287)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
