@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -71,7 +73,10 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        auto shots =
+            rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), adaptor.getShots());
+        Value allocVal =
+            rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange{shots});
         rewriter.create<SampleOp>(loc, TypeRange{},
                                   ValueRange{adaptor.getObs(), adaptor.getShots(), allocVal},
                                   op->getAttrs());
