@@ -90,7 +90,6 @@ coverage: capi_target $(RT_BUILD_DIR)/tests/runner_tests_all_targets
 clean:
 	@echo "clean build files"
 	rm -rf $(RT_BUILD_DIR) cov coverage.info $(MK_DIR)/BuildTidy
-	$(MAKE) -C examples clean
 
 .PHONY: format
 format:

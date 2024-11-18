@@ -47,18 +47,17 @@
   Python's stable ABI, which pybind11 does not support.
   [(#1187)](https://github.com/PennyLaneAI/catalyst/pull/1187)
 
+* Remove Lightning Qubit Dynamic plugin from Catalyst.
+  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
+  [(#1307)](https://github.com/PennyLaneAI/catalyst/pull/1307)
+  [(#1312)](https://github.com/PennyLaneAI/catalyst/pull/1312)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an empty pass that prints hello world. The code of the tutorial is at [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
 
 <h3>Bug fixes 🐛</h3>
-
-<h3>Internal changes</h3>
-
-* Remove Lightning Qubit Dynamic plugin from Catalyst.
-  [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
-  [(#1307)](https://github.com/PennyLaneAI/catalyst/pull/1307)
 
 <h3>Contributors ✍️</h3>
 
