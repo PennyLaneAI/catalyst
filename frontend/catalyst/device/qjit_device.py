@@ -103,6 +103,8 @@ RUNTIME_OBSERVABLES = [
     "Tensor",
 ]
 
+RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
+
 # The runtime interface does not care about specific gate properties, so set them all to True.
 RUNTIME_OPERATIONS = {
     op: OperatorProperties(invertible=True, controllable=True, differentiable=True)
@@ -113,6 +115,8 @@ RUNTIME_OBSERVABLES = {
     obs: OperatorProperties(invertible=True, controllable=True, differentiable=True)
     for obs in RUNTIME_OBSERVABLES
 }
+
+RUNTIME_MPS = {mp: [] for mp in RUNTIME_MPS}
 
 # TODO: This should be removed after implementing `get_c_interface`
 # for the following backend devices:
@@ -208,6 +212,11 @@ def intersect_operations(
     return {k: a[k] & b[k] for k in (a.keys() & b.keys())}
 
 
+def intersect_mps(a: dict[str, list], b: dict[str, list]) -> dict[str, list]:
+    """Intersects two sets of measurement processes"""
+    return {k: list(set(a[k]) | set(b[k])) for k in (a.keys() & b.keys())}
+
+
 @debug_logger
 def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> DeviceCapabilities:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
@@ -222,6 +231,9 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     )
     qjit_capabilities.observables = intersect_operations(
         target_capabilities.observables, RUNTIME_OBSERVABLES
+    )
+    qjit_capabilities.measurement_processes = intersect_mps(
+        target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
