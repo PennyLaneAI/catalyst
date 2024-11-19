@@ -25,7 +25,127 @@ This module contains the pipelines that are used to compile a quantum function t
 
 """
 
+import sys
 from copy import deepcopy
+from functools import partial
+from dataclasses import dataclass
+from io import TextIOWrapper
+from operator import is_not
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+
+# pylint: disable=too-many-instance-attributes
+@dataclass
+class CompileOptions:
+    """Generic compilation options, for which reasonable default values exist.
+
+    Args:
+        verbose (Optional[bool]): flag indicating whether to enable verbose output.
+            Default is ``False``
+        logfile (Optional[TextIOWrapper]): the logfile to write output to.
+            Default is ``sys.stderr``
+        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
+            Default is ``False``
+        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
+            tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
+            to a list of MLIR passes.
+        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
+            be enabled.
+        autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
+        for autograph conversion.
+        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
+            of QNodes support is to be enabled.
+        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
+            the main compilation pipeline is complete. Default is ``True``.
+        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
+            Default is ``None``.
+        static_argnames (Optional[Union[str, Iterable[str]]]): names of static arguments.
+            Default is ``None``.
+        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
+        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
+        seed (Optional[int]) : the seed for random operations in a qjit call.
+            Default is None.
+        experimental_capture (bool): If set to ``True``,
+            use PennyLane's experimental program capture capabilities
+            to capture the function for compilation.
+        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
+            A dictionary that specifies the quantum circuit transformation pass pipeline order,
+            and optionally arguments for each pass in the pipeline.
+            Default is None.
+    """
+
+    verbose: Optional[bool] = False
+    logfile: Optional[TextIOWrapper] = sys.stderr
+    target: Optional[str] = "binary"
+    keep_intermediate: Optional[bool] = False
+    pipelines: Optional[List[Any]] = None
+    autograph: Optional[bool] = False
+    autograph_include: Optional[Iterable[str]] = ()
+    async_qnodes: Optional[bool] = False
+    static_argnums: Optional[Union[int, Iterable[int]]] = None
+    static_argnames: Optional[Union[str, Iterable[str]]] = None
+    abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+    lower_to_llvm: Optional[bool] = True
+    checkpoint_stage: Optional[str] = ""
+    disable_assertions: Optional[bool] = False
+    seed: Optional[int] = None
+    experimental_capture: Optional[bool] = False
+    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
+
+    def __post_init__(self):
+        # Check that async runs must not be seeded
+        if self.async_qnodes and self.seed != None:
+            raise CompileError(
+                """
+                Seeding has no effect on asyncronous qnodes,
+                as the execution order of parallel runs is not guaranteed.
+                As such, seeding an asynchronous run is not supported.
+                """
+            )
+
+        # Check that seed is 32-bit unsigned int
+        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
+            raise ValueError(
+                """
+                Seed must be an unsigned 32-bit integer!
+                """
+            )
+
+        # Make the format of static_argnums easier to handle.
+        static_argnums = self.static_argnums
+        if static_argnums is None:
+            self.static_argnums = ()
+        elif isinstance(static_argnums, int):
+            self.static_argnums = (static_argnums,)
+        elif isinstance(static_argnums, Iterable):
+            self.static_argnums = tuple(static_argnums)
+
+    def __deepcopy__(self, memo):
+        """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
+        copied directly"""
+        return CompileOptions(
+            **{
+                k: (deepcopy(v) if k != "logfile" else self.logfile)
+                for k, v in self.__dict__.items()
+                if k != "logfile"
+            }
+        )
+
+    def get_pipelines(self) -> List[Tuple[str, List[str]]]:
+        """Get effective pipelines"""
+        if self.pipelines:
+            return self.pipelines
+        return self.get_stages()
+
+    def get_stages(self):
+        """Returns all stages in order for compilation"""
+        # Dictionaries in python are ordered
+        stages = {}
+        stages["EnforeRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
+        stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
+        stages["BufferizationPass"] = get_bufferization_stage(self)
+        stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
+        return list(stages.items())
 
 def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes in the enforce runtime invariant stage."""
