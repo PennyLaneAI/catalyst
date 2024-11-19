@@ -745,7 +745,7 @@ class TestInitialization:
 
         assert op.base is base
         assert op.hyperparameters["base"] is base
-        assert op.name == "Adjoint(LinearCombination)"
+        assert op.name == "Adjoint(Sum)"
 
         assert op.num_params == 2
         assert qml.math.allclose(op.parameters, [2.0, 1.0])
