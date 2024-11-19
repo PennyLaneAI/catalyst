@@ -25,13 +25,11 @@ import subprocess
 import sys
 import tempfile
 import warnings
-from functools import partial
-from operator import is_not
 from os import path
 from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import CompileOptions, get_stages
+from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_bin_path, get_lib_path

@@ -32,7 +32,6 @@ import pytest
 from catalyst import qjit
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.debug import instrumentation
-from catalyst.pipelines import get_stages
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
