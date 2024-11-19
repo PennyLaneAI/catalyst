@@ -610,6 +610,7 @@ class TestCatalyst:
 # - change string wires to integers
 # - remove pickle tetst
 
+
 # pylint: disable=too-few-public-methods
 class PlainOperator(qml.operation.Operator):
     """just an operator."""
@@ -675,7 +676,6 @@ class TestInheritanceMixins:
 
         # Check some basic observable functionality
         assert ob0.compare(ob0)
-
 
         # check the dir
         assert "grad_recipe" not in dir(ob0)
@@ -877,7 +877,7 @@ class TestProperties:
 
     def test_queue_category_None(self):
         """Test that the queue category `None` for some observables carries over."""
-        op = adjoint(qml.Hermitian([[1, 0],[0, 1]], wires=0))
+        op = adjoint(qml.Hermitian([[1, 0], [0, 1]], wires=0))
         assert op._queue_category is None  # pylint: disable=protected-access
 
     @pytest.mark.parametrize("value", (True, False))
@@ -1375,7 +1375,7 @@ class TestAdjointConstructorPreconstructedOp:
         """Test passing a single preconstructed observable in a queuing context."""
 
         with qml.queuing.AnnotatedQueue() as q:
-            base = qml.Hermitian([[1, 0],[0, 1]], wires=0)
+            base = qml.Hermitian([[1, 0], [0, 1]], wires=0)
             out = adjoint(base)
 
         assert len(q) == 1
