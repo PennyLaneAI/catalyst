@@ -270,6 +270,7 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
+        workflow.mlir
         directory = os.path.join(os.getcwd(), workflow.__name__)
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file

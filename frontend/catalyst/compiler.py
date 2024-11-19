@@ -453,9 +453,7 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".mlir", dir=str(workspace), delete=False
-        ) as tmp_infile:
+        with open(str(workspace) + "/input.test", "w") as tmp_infile:
             tmp_infile_name = tmp_infile.name
             tmp_infile.write(ir)
 
@@ -477,9 +475,6 @@ class Compiler:
                 f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
             ) from e
 
-        with open(output_ir_name, "r", encoding="utf-8") as f:
-            out_IR = f.read()
-
         if lower_to_llvm:
             output = LinkerDriver.run(output_object_name, options=self.options)
             output_object_name = str(pathlib.Path(output).absolute())
@@ -487,10 +482,8 @@ class Compiler:
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
             os.remove(tmp_infile_name)
-        if os.path.exists(output_ir_name):
-            os.remove(output_ir_name)
 
-        return output_object_name, out_IR
+        return output_object_name, output_ir_name
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):

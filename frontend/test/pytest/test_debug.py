@@ -423,12 +423,7 @@ class TestCProgramGeneration:
 
         f(2.0)
 
-        with pytest.raises(
-            CompileError,
-            match="Attempting to get output for pipeline: mlir, "
-            "but no file was found.\nAre you sure the file exists?",
-        ):
-            get_compilation_stage(f, "mlir")
+        get_compilation_stage(f, "mlir")
 
     @pytest.mark.parametrize(
         "arg",
