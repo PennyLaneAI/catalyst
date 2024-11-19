@@ -535,8 +535,6 @@ class TestObservableValidation:
             ),  # nested prod+sprod
             ([qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.RY(1.2, 3)) @ qml.Y(1))], "RY"),
             ([qml.var((2 * qml.X(0) @ qml.RY(1.2, 2)) @ (2 * qml.X(3)) @ qml.Y(1))], "RY"),
-            ([qml.var(qml.operation.Tensor(qml.X(0), qml.Y(2)))], None),  # tensor
-            ([qml.var(qml.operation.Tensor(qml.X(0), PauliX2(2)))], "PauliX2"),
             ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
             ([qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
             ([qml.expval(2 * qml.Z(1))], None),  # sprod
@@ -757,9 +755,8 @@ class TestAdjointMethodVerification:
         [
             qml.PauliX(0),  # single observable
             qml.PauliX(0) @ qml.PauliZ(1),  # prod
-            qml.operation.Tensor(qml.X(0), qml.Z(1)),  # tensor
             qml.PauliX(0) + qml.PauliY(1),  # sum
-            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # hamiltonian
+            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # linearcombination
             2 * qml.PauliX(0),  # sprod
             (2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1),  # nested prod+sprod
         ],
@@ -850,7 +847,6 @@ class TestParameterShiftMethodVerification:
         [
             qml.PauliX(0),
             # qml.PauliX(0) @ qml.PauliZ(1),
-            qml.operation.Tensor(qml.X(0), qml.Z(1)),
             # qml.PauliX(0)+qml.PauliY(1)
         ],
     )

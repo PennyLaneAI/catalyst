@@ -610,22 +610,6 @@ class TestCatalyst:
 # - change string wires to integers
 # - remove pickle tetst
 
-
-@pytest.fixture(scope="function")
-def use_legacy_opmath():
-    with qml.operation.disable_new_opmath_cm() as cm:
-        yield cm
-
-
-@pytest.fixture(
-    params=[qml.operation.disable_new_opmath_cm, qml.operation.enable_new_opmath_cm],
-    scope="function",
-)
-def use_legacy_and_new_opmath(request):
-    with request.param() as cm:
-        yield cm
-
-
 # pylint: disable=too-few-public-methods
 class PlainOperator(qml.operation.Operator):
     """just an operator."""
@@ -672,7 +656,6 @@ class TestInheritanceMixins:
         assert "grad_recipe" in dir(op)
         assert "control_wires" in dir(op)
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
     def test_observable(self):
         """Test that when the base is an Observable, Adjoint will also inherit from Observable."""
 
@@ -694,7 +677,6 @@ class TestInheritanceMixins:
 
         # Check some basic observable functionality
         assert ob0.compare(ob0)
-        assert isinstance(1.0 * ob0 @ ob1, qml.Hamiltonian)
 
         # check the dir
         assert "grad_recipe" not in dir(ob0)
@@ -756,7 +738,6 @@ class TestInitialization:
 
         assert op.wires == qml.wires.Wires((0, 1))
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
     def test_hamiltonian_base(self):
         """Test adjoint initialization for a hamiltonian."""
         base = 2.0 * qml.PauliX(0) @ qml.PauliY(1) + qml.PauliZ("b")
@@ -765,7 +746,7 @@ class TestInitialization:
 
         assert op.base is base
         assert op.hyperparameters["base"] is base
-        assert op.name == "Adjoint(Hamiltonian)"
+        assert op.name == "Adjoint(LinearCombination)"
 
         assert op.num_params == 2
         assert qml.math.allclose(op.parameters, [2.0, 1.0])
@@ -895,10 +876,9 @@ class TestProperties:
         op = adjoint(qml.PauliX(0))
         assert op._queue_category == "_ops"  # pylint: disable=protected-access
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
     def test_queue_category_None(self):
         """Test that the queue category `None` for some observables carries over."""
-        op = adjoint(qml.PauliX(0) @ qml.PauliY(1))
+        op = adjoint(qml.Hermitian([[1, 0],[0, 1]], wires=0))
         assert op._queue_category is None  # pylint: disable=protected-access
 
     @pytest.mark.parametrize("value", (True, False))
@@ -1067,7 +1047,6 @@ class TestAdjointOperation:
 
         assert op.has_generator is False
 
-    @pytest.mark.usefixtures("use_legacy_and_new_opmath")
     def test_generator(self):
         """Assert that the generator of an Adjoint is -1.0 times the base generator."""
         base = qml.RX(1.23, wires=0)
@@ -1209,7 +1188,6 @@ class TestMatrix:
         with pytest.raises(qml.operation.MatrixUndefinedError):
             adjoint(base).matrix()
 
-    @pytest.mark.usefixtures("use_legacy_and_new_opmath")
     def test_adj_hamiltonian(self):
         """Test that a we can take the adjoint of a hamiltonian."""
         U = qml.Hamiltonian([1.0], [qml.PauliX(wires=0) @ qml.PauliZ(wires=1)])
@@ -1394,12 +1372,11 @@ class TestAdjointConstructorPreconstructedOp:
         assert len(q) == 1
         assert q.queue[0] is out
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
     def test_single_observable(self):
         """Test passing a single preconstructed observable in a queuing context."""
 
         with qml.queuing.AnnotatedQueue() as q:
-            base = qml.PauliX(0) @ qml.PauliY(1)
+            base = qml.Hermitian([[1, 0],[0, 1]], wires=0)
             out = adjoint(base)
 
         assert len(q) == 1
