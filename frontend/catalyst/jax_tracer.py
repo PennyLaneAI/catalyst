@@ -876,7 +876,11 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = sample_p.bind(obs_tracers, shots, shape=shape)
+                    result = (
+                        sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                        if isinstance(shots, int)
+                        else sample_p.bind(obs_tracers, shots, shape=shape)
+                    )
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
