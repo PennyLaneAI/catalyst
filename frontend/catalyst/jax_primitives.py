@@ -1657,8 +1657,6 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 def _sample_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
-    # TODO: restructure these checks now that `shots` is a proper argument instead of an attribute
-    # Is `shape` even necessary now?
     if isinstance(shots, int):
         if obs.primitive is compbasis_p:
             assert shape == (shots, obs.num_qubits)
