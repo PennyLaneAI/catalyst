@@ -1743,20 +1743,20 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
+    return core.DShapedArray(shape, jax.numpy.dtype("float64")), core.DShapedArray(shape, jax.numpy.dtype("int64"))
 
 
-def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
+    shots_value = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs, shots_attr).results
+    return CountsOp(eigvals_type, counts_type, obs, shots_value).results
 
 
 #
