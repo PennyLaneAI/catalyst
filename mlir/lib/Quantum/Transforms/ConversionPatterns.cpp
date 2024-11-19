@@ -733,14 +733,18 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
         ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
 
-        // Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShotsAttr());
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-        // SmallVector<Value> args = {structPtr, numShots, numQubits};
         SmallVector<Value> args = {structPtr};
 
         if constexpr (std::is_same_v<T, SampleOp>) {
-            args.push_back(cast<SampleOpAdaptor>(adaptor).getShots());
+            if (op.hasDynamicShots()) {
+                args.push_back(cast<SampleOpAdaptor>(adaptor).getShots());
+            }
+            else {
+                Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getStaticShotsAttr());
+                args.push_back(numShots);
+            }
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {

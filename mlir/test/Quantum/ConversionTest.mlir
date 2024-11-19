@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --finalize-memref-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --convert-index-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
 
 ////////////////////////
 // Runtime Management //
@@ -409,27 +409,35 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 // CHECK: llvm.func @__catalyst__qis__Sample(!llvm.ptr, i64, i64, ...)
 
 // CHECK-LABEL: @sample
-func.func @sample(%q : !quantum.bit) {
+func.func @sample(%q : !quantum.bit, %dyn_shots: i64) {
 
     %o1 = quantum.compbasis %q : !quantum.obs
     %o2 = quantum.compbasis %q, %q : !quantum.obs
+    %odyn = quantum.compbasis %q : !quantum.obs
 
-    // CHECK-DAG: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
-    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
     // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c1000]], [[c1]], %arg0)
-    %shots_1000 = llvm.mlir.constant(1000 : i64) : i64
     %alloc1 = memref.alloc() : memref<1000x1xf64>
-    quantum.sample %o1 in(%alloc1 : memref<1000x1xf64>) %shots_1000
-    // CHECK-DAG: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
-    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    quantum.sample %o1 in(%alloc1 : memref<1000x1xf64>) {static_shots = 1000 : i64}
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
     // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
-    %shots_2000 = llvm.mlir.constant(2000 : i64) : i64
     %alloc2 = memref.alloc() : memref<2000x2xf64>
-    quantum.sample %o2 in(%alloc2 : memref<2000x2xf64>) %shots_2000
+    quantum.sample %o2 in(%alloc2 : memref<2000x2xf64>) {static_shots = 2000 : i64}
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], %arg1, [[c1]], %arg0)
+    %idx = index.casts %dyn_shots : i64 to index
+    %dyn_alloc = memref.alloc(%idx) : memref<?x1xf64>
+    quantum.sample %odyn in(%dyn_alloc : memref<?x1xf64>) shots %dyn_shots
 
     return
 }

@@ -77,19 +77,33 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
 
         // SampleOp's result shape is (shots, num_qubits)
         // shots might be dynamic, in which case we need to memref alloc from the shots SSA value
-        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        if (op.hasDynamicShots()) {
+            auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
 
-        SmallVector<Value> allocSizes;
-        if (shape[0] == ShapedType::kDynamic) {
-            auto shots =
-                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), adaptor.getShots());
-            allocSizes.push_back(shots);
+            SmallVector<Value> allocSizes;
+            if (shape[0] == ShapedType::kDynamic) {
+                auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                             adaptor.getShots());
+                allocSizes.push_back(shots);
+            }
+
+            Value allocVal =
+                rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
+            auto bufferedSampleOp = rewriter.create<SampleOp>(
+                loc, TypeRange{}, ValueRange{adaptor.getObs(), adaptor.getShots(), allocVal},
+                op->getAttrs());
+            bufferedSampleOp->setAttr("operandSegmentSizes",
+                                      rewriter.getDenseI32ArrayAttr({1, 1, 1}));
         }
-
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
-        rewriter.create<SampleOp>(loc, TypeRange{},
-                                  ValueRange{adaptor.getObs(), adaptor.getShots(), allocVal},
-                                  op->getAttrs());
+        else {
+            // static shots are kept as an plain I64 literal attribute,
+            // thus is covered by the overall op->getAttrs()
+            Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+            auto bufferedSampleOp = rewriter.create<SampleOp>(
+                loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal}, op->getAttrs());
+            bufferedSampleOp->setAttr("operandSegmentSizes",
+                                      rewriter.getDenseI32ArrayAttr({1, 0, 1}));
+        }
         return success();
     }
 };
