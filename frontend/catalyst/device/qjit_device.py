@@ -213,6 +213,9 @@ def intersect_operations(
 
 def intersect_mps(a: dict[str, list], b: dict[str, list]) -> dict[str, list]:
     """Intersects two sets of measurement processes"""
+    # In the dictionary, each measurement process is associated with a list of conditions.
+    # Therefore, the intersection is really the union of constraints from both measurement
+    # processes declarations, thus the | operator.
     return {k: list(set(a[k]) | set(b[k])) for k in (a.keys() & b.keys())}
 
 
@@ -315,7 +318,7 @@ class QJITDevice(qml.devices.Device):
         original_device_capabilities = get_device_capabilities(original_device)
 
         # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
-        #       when customizable multi-pathway decomposition is implemented.
+        #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
         if hasattr(original_device, "_to_matrix_ops"):
             _to_matrix_ops = (getattr(original_device, "_to_matrix_ops"),)
             setattr(original_device_capabilities, "to_matrix_ops", _to_matrix_ops)
