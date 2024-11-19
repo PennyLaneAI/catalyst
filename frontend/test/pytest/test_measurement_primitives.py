@@ -15,6 +15,7 @@
 This file contains a couple of tests for the capture of measurement primitives into jaxpr.
 """
 import jax
+import pytest
 
 import catalyst
 from catalyst.jax_primitives import (
@@ -27,7 +28,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.jax_tracer import lower_jaxpr_to_mlir
-import pytest
+
 
 @pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_sample():
@@ -67,6 +68,7 @@ module @foo {
     # assert jaxpr.eqns[1].primitive == sample_p
     # assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
     # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
+
 
 @pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_sample_dynamic_shape():
@@ -183,6 +185,7 @@ def test_new_sampleop_still_good_with_backend():
     print("after: ", res)
     assert len(res) == 7
 
+
 """
 >> pytest test_measurement_primitives.py -k new_sample -s
     test_measurement_primitives.py after:  [[1]
@@ -192,6 +195,7 @@ def test_new_sampleop_still_good_with_backend():
 
 
 """
+
 
 @pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_counts():
@@ -229,10 +233,11 @@ module @foo {
 """
     )
 
-    #assert jaxpr.eqns[1].primitive == counts_p
-    #assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
-    #assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
-    #assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
+    # assert jaxpr.eqns[1].primitive == counts_p
+    # assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    # assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
+    # assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
+
 
 @pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_counts_dynamic_shape():
@@ -270,10 +275,11 @@ module @foo {
 """
     )
 
-    #assert jaxpr.eqns[1].primitive == counts_p
-    #assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
-    #assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
-    #assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
+    # assert jaxpr.eqns[1].primitive == counts_p
+    # assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    # assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
+    # assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
+
 
 '''
 def test_new_countsop_still_good_with_backend():
@@ -352,6 +358,7 @@ def test_new_countsop_still_good_with_backend():
 
 """
 '''
+
 
 def test_expval():
     """Test that the expval primitive can be captured by jaxpr."""

@@ -1743,10 +1743,17 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return core.DShapedArray(shape, jax.numpy.dtype("float64")), core.DShapedArray(shape, jax.numpy.dtype("int64"))
+    return core.DShapedArray(shape, jax.numpy.dtype("float64")), core.DShapedArray(
+        shape, jax.numpy.dtype("int64")
+    )
 
 
-def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple):
+def _counts_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+):
+    # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
+    # where N = 2**number_of_qubits
+    # This means even with dynamic shots, result shape is still static.
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
