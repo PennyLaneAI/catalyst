@@ -27,13 +27,14 @@ This module contains the pipelines that are used to compile a quantum function t
 
 import sys
 from copy import deepcopy
-from functools import partial
 from dataclasses import dataclass
+from functools import partial
 from io import TextIOWrapper
 from operator import is_not
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
+
 
 # pylint: disable=too-many-instance-attributes
 @dataclass
@@ -148,6 +149,7 @@ class CompileOptions:
         stages["BufferizationPass"] = get_bufferization_stage(self)
         stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
         return list(stages.items())
+
 
 def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes in the enforce runtime invariant stage."""
