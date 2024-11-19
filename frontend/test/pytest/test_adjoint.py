@@ -667,8 +667,6 @@ class TestInheritanceMixins:
         base = CustomObs(wires=0)
         ob0 = adjoint(base)
 
-        ob1 = adjoint(CustomObs(wires=1))
-
         assert isinstance(ob0, Adjoint)
         assert isinstance(ob0, qml.operation.Operator)
         assert not isinstance(ob0, qml.operation.Operation)
@@ -677,6 +675,7 @@ class TestInheritanceMixins:
 
         # Check some basic observable functionality
         assert ob0.compare(ob0)
+
 
         # check the dir
         assert "grad_recipe" not in dir(ob0)
