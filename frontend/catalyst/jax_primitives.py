@@ -1651,33 +1651,6 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 
 
 #
-# Measurement primitives
-#
-
-
-def shots_is_static(shots: ir.Value):
-    """
-    In many measurement primitives, `shots` might be dynamic or static
-    Hence the corresponding measurement op's result shape might be
-    dynamic or static.
-    It is thus necessary to judge whether a shots value is dynamic or static.
-
-    Static shots will be binded with integer literals, e.g.
-    `sample_p.bind(obs, 5)`
-    These will be stablehlo.constant ops in mlir.
-    """
-    return shots.owner.name == "stablehlo.constant"
-
-
-def get_static_shots_literal_value(shots: ir.Value):
-    """
-    Return the integer literal shots value from a static shots.
-    """
-    assert shots_is_static(shots)
-    return shots.owner.attributes["value"].get_splat_value().value
-
-
-#
 # sample measurement
 #
 @sample_p.def_abstract_eval
@@ -1686,12 +1659,11 @@ def _sample_abstract_eval(obs, shots, shape):
 
     # TODO: restructure these checks now that `shots` is a proper argument instead of an attribute
     # Is `shape` even necessary now?
-    if obs.primitive is compbasis_p:
-        # assert shape == (shots, obs.num_qubits)
-        assert shape[1] == obs.num_qubits
-    else:
-        # assert shape == (shots,)
-        assert len(shape) == 1
+    if isinstance(shots, int):
+        if obs.primitive is compbasis_p:
+            assert shape == (shots, obs.num_qubits)
+        else:
+            assert shape == (shots,)
 
     return core.DShapedArray(shape, jax.numpy.dtype("float64"))
 
@@ -1702,28 +1674,26 @@ def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
 ):
     # Note: result shape of sample op is (shots, number_of_qubits)
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     f64_type = ir.F64Type.get()
+    i64_type = ir.IntegerType.get_signless(64, ctx)
 
-    if shots_is_static(shots):
-        result_shape = (get_static_shots_literal_value(shots), shape[1])
-        assert result_shape == shape
-        i64_type = ir.IntegerType.get_signless(64, ctx)
-        shots = TensorExtractOp(i64_type, shots, []).result
+    if isinstance(shots, int):
+        result_type = ir.RankedTensorType.get(shape, f64_type)
+        return SampleOp(result_type, obs, static_shots=shots).results
 
     else:
         # TODO: use actual dynamic shape tensor type API
         # Somehow this magic number means dynamically sized dimensions in jax
         result_shape = (-9223372036854775808, shape[1])
-
-    result_type = ir.RankedTensorType.get(result_shape, f64_type)
-
-    return SampleOp(result_type, obs, shots).results
+        shots = TensorExtractOp(i64_type, shots, []).result
+        result_type = ir.RankedTensorType.get(result_shape, f64_type)
+        return SampleOp(result_type, obs, shots=shots).results
 
 
 #
