@@ -281,14 +281,13 @@ module @foo {
     # assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
 
 
-'''
 def test_new_countsop_still_good_with_backend():
     import pennylane as qml
 
     from catalyst.debug import replace_ir
 
     @catalyst.qjit
-    def workflow(shots):
+    def workflow():
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
@@ -299,54 +298,56 @@ def test_new_countsop_still_good_with_backend():
 
         return circuit()
 
-    new_ir = """
-    module @workflow {
-      func.func public @jit_workflow(%arg0: tensor<i64>) -> tensor<?x1xi64> attributes {llvm.emit_c_interface} {
-        %0 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>
-        return %0 : tensor<?x1xi64>
-      }
-      module attributes {transform.with_named_sequence} {
-        transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-          transform.yield
-        }
-      }
-      module @module_circuit {
-        //func.func public @circuit() -> tensor<10x1xi64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-        func.func public @circuit(%shots: tensor<i64>) -> tensor<?x1xi64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-          %c10_i64 = tensor.extract %shots[] : tensor<i64> // newline
-          quantum.device["/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 2, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-          //quantum.device["/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': %c10_i64, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-          %c = stablehlo.constant dense<1> : tensor<i64>
-          %0 = quantum.alloc( 1) : !quantum.reg
-          %c_0 = stablehlo.constant dense<0> : tensor<i64>
-          %extracted = tensor.extract %c_0[] : tensor<i64>
-          %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
-          %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-          %2 = quantum.compbasis %out_qubits : !quantum.obs
-          //%c10_i64 = arith.constant 10 : i64
-          %3 = quantum.sample %2 %c10_i64 : tensor<?x1xf64>
-          %4 = stablehlo.convert %3 : (tensor<?x1xf64>) -> tensor<?x1xi64>
-          %c_1 = stablehlo.constant dense<0> : tensor<i64>
-          %extracted_2 = tensor.extract %c_1[] : tensor<i64>
-          %5 = quantum.insert %0[%extracted_2], %out_qubits : !quantum.reg, !quantum.bit
-          quantum.dealloc %5 : !quantum.reg
-          quantum.device_release
-          return %4 : tensor<?x1xi64>
-        }
-      }
-      func.func @setup() {
-        quantum.init
-        return
-      }
-      func.func @teardown() {
-        quantum.finalize
-        return
-      }
-    }"""
+    new_ir = """module @workflow {
+  func.func public @jit_workflow() -> (tensor<2xi64>, tensor<2xi64>) attributes {llvm.emit_c_interface} {
+    %1:2 = catalyst.launch_kernel @module_circuit::@circuit() : () -> (tensor<2xi64>, tensor<2xi64>)
+    return %1#0, %1#1 : tensor<2xi64>, tensor<2xi64>
+  }
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
+      transform.yield
+    }
+  }
+  module @module_circuit {
+    func.func public @circuit() -> (tensor<2xi64>, tensor<2xi64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 10, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+      %c = stablehlo.constant dense<1> : tensor<i64>
+      %0 = quantum.alloc( 1) : !quantum.reg
+      %c_0 = stablehlo.constant dense<0> : tensor<i64>
+      %extracted = tensor.extract %c_0[] : tensor<i64>
+      %cst = stablehlo.constant dense<15.70000e-01> : tensor<f64>
+      %extracted_1 = tensor.extract %cst[] : tensor<f64>
+      %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
+      %out_qubits = quantum.custom "RX"(%extracted_1) %1 : !quantum.bit
+      %4 = quantum.compbasis %out_qubits : !quantum.obs
+      %c_2 = stablehlo.constant dense<10> : tensor<i64>
+      %extracted_3 = tensor.extract %c_2[] : tensor<i64>
+      %c_4000 = stablehlo.constant dense<4000> : tensor<i64>
+      %extracted_c4000 = tensor.extract %c_4000[] : tensor<i64>
+      %eigvals, %counts = quantum.counts %4 %extracted_c4000 : tensor<2xf64>, tensor<2xi64>
+      %5 = stablehlo.convert %eigvals : (tensor<2xf64>) -> tensor<2xi64>
+      %c_4 = stablehlo.constant dense<0> : tensor<i64>
+      %extracted_5 = tensor.extract %c_4[] : tensor<i64>
+      %6 = quantum.insert %0[%extracted_5], %out_qubits : !quantum.reg, !quantum.bit
+      quantum.dealloc %6 : !quantum.reg
+      quantum.device_release
+      return %5, %counts : tensor<2xi64>, tensor<2xi64>
+    }
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
+}"""
     replace_ir(workflow, "mlir", new_ir)
-    res = workflow(7)
+    res = workflow()
     print("after: ", res)
-    #assert len(res) == 4
+    assert res[1][0] + res[1][1] == 4000
+
 
 """
 >> pytest test_measurement_primitives.py -k new_sample -s
@@ -357,7 +358,6 @@ def test_new_countsop_still_good_with_backend():
 
 
 """
-'''
 
 
 def test_expval():
