@@ -33,6 +33,8 @@ from io import TextIOWrapper
 from operator import is_not
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
+from catalyst.utils.exceptions import CompileError
+
 # pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
