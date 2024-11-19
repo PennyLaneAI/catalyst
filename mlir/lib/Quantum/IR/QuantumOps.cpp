@@ -228,7 +228,6 @@ LogicalResult HermitianOp::verify()
 
 LogicalResult SampleOp::verify()
 {
-
     std::optional<size_t> numQubits = 0;
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
