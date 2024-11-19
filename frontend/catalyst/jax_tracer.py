@@ -745,6 +745,10 @@ def trace_observables(
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
+    elif isinstance(obs, qml.ops.LinearCombination):
+        coeffs, observables = obs.terms()
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in observables]
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
