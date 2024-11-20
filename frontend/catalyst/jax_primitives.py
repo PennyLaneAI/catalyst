@@ -1107,20 +1107,23 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # qdevice
 #
 @qdevice_p.def_impl
-def _qdevice_def_impl(ctx, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
+def _qdevice_def_impl(ctx, shots, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
+
+    shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     DeviceInitOp(
-        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs)
+        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs),
+        shots=shots_value
     )
 
     return ()

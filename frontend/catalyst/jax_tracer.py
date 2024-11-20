@@ -1194,9 +1194,10 @@ def trace_quantum_function(
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
                 qdevice_p.bind(
+                    device.shots.total_shots,
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
-                    rtd_kwargs=str(device.backend_kwargs),
+                    rtd_kwargs=str(device.backend_kwargs)
                 )
                 qreg_in = qalloc_p.bind(len(device.wires))
 
