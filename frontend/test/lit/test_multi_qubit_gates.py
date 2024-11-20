@@ -78,6 +78,7 @@ def circuit(x: float):
 print(circuit.mlir)
 """
 
+
 # CHECK-LABEL: public @jit_isingZZ_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
