@@ -21,7 +21,6 @@ from numpy.testing import assert_allclose
 
 from catalyst import grad, qjit
 
-
 try:
     qml.device("braket.local.qubit", backend="default", wires=1)
 except (qml.DeviceError, ImportError):
