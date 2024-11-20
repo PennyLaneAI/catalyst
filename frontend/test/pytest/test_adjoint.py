@@ -747,9 +747,9 @@ class TestInitialization:
         assert op.hyperparameters["base"] is base
         assert op.name == "Adjoint(Sum)"
 
-        assert op.num_params == 2
-        assert qml.math.allclose(op.parameters, [2.0, 1.0])
-        assert qml.math.allclose(op.data, [2.0, 1.0])
+        assert op.num_params == 1
+        assert qml.math.allclose(op.parameters, [2.0])
+        assert qml.math.allclose(op.data, [2.0])
 
         assert op.wires == qml.wires.Wires([0, 1, "b"])
 
