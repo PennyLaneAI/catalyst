@@ -25,10 +25,6 @@
 #include "DynamicLibraryLoader.hpp"
 #include "Exception.hpp"
 
-#ifdef INITIALIZE_PYTHON
-#include <pybind11/embed.h>
-#endif
-
 namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
@@ -108,12 +104,6 @@ struct BraketRunner : public OpenQasmRunner {
                                   size_t shots, const std::string &kwargs = "") const
         -> std::string override
     {
-#ifdef INITIALIZE_PYTHON
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-        }
-#endif
-
         DynamicLibraryLoader libLoader(OPENQASM_PY);
 
         using func_ptr_t = char *(*)(const char *, const char *, size_t, const char *);
@@ -129,12 +119,6 @@ struct BraketRunner : public OpenQasmRunner {
                              size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<double> override
     {
-#ifdef INITIALIZE_PYTHON
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-        }
-#endif
-
         DynamicLibraryLoader libLoader(OPENQASM_PY);
 
         using probsImpl_t =
@@ -151,12 +135,6 @@ struct BraketRunner : public OpenQasmRunner {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t> override
     {
-#ifdef INITIALIZE_PYTHON
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-        }
-#endif
-
         DynamicLibraryLoader libLoader(OPENQASM_PY);
 
         using samplesImpl_t =
@@ -172,12 +150,6 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Expval(const std::string &circuit, const std::string &device, size_t shots,
                               const std::string &kwargs = "") const -> double override
     {
-#ifdef INITIALIZE_PYTHON
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-        }
-#endif
-
         DynamicLibraryLoader libLoader(OPENQASM_PY);
 
         using expvalImpl_t = double (*)(const char *, const char *, size_t, const char *);
@@ -189,12 +161,6 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Var(const std::string &circuit, const std::string &device, size_t shots,
                            const std::string &kwargs = "") const -> double override
     {
-#ifdef INITIALIZE_PYTHON
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-        }
-#endif
-
         DynamicLibraryLoader libLoader(OPENQASM_PY);
 
         using varImpl_t = double (*)(const char *, const char *, size_t, const char *);
