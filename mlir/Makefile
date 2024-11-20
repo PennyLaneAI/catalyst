@@ -123,7 +123,13 @@ enzyme:
 
 .PHONY: standalone-plugin
 standalone-plugin:
-	cmake -B standalone/build -G Ninja standalone -DMLIR_DIR=$(MLIR_DIR) -DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) -DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin
+	cmake -B standalone/build -G Ninja \
+		-DMLIR_DIR=$(MLIR_DIR) \
+		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
+		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		standalone
 	cmake --build standalone/build --target check-standalone
 
 .PHONY: dialects
