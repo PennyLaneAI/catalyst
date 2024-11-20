@@ -574,8 +574,6 @@ A useful tool for debugging quantum algorithms is the ability to draw them. Curr
 :func:`@qjit <~.qjit>` compiled QNodes can be used as input to
 :func:`qml.draw <pennylane.draw>`, with the following caveats:
 
-- :func:`qml.draw <pennylane.draw>` call must occur outside the :func:`@qjit <.qjit>`
-
 - The ``qml.draw()`` function will only accept plain QNodes as input, *or* QNodes that have been qjit-compiled. It will not accept arbitrary hybrid functions (that may contain QNodes).
 
 - The :func:`catalyst.measure` function is not supported in drawn QNodes
