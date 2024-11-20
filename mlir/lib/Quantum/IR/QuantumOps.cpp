@@ -229,6 +229,11 @@ LogicalResult HermitianOp::verify()
 LogicalResult SampleOp::verify()
 {
     std::optional<size_t> numQubits = 0;
+
+    if (hasDynamicShots() && getStaticShots().has_value()){
+        return emitOpError("static and dynamic shots cannot be simultaneously specified");
+    }
+
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
@@ -261,6 +266,11 @@ LogicalResult SampleOp::verify()
 LogicalResult CountsOp::verify()
 {
     std::optional<size_t> numQubits = 0;
+
+    if (hasDynamicShots() && getStaticShots().has_value()){
+        return emitOpError("static and dynamic shots cannot be simultaneously specified");
+    }
+
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
