@@ -229,11 +229,11 @@ LogicalResult HermitianOp::verify()
 LogicalResult SampleOp::verify()
 {
     std::optional<size_t> numQubits = 0;
-
+/*
     if (hasDynamicShots() && getStaticShots().has_value()) {
         return emitOpError("static and dynamic shots cannot be simultaneously specified");
     }
-
+*/
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
@@ -241,7 +241,7 @@ LogicalResult SampleOp::verify()
     if (!((bool)getSamples() ^ (bool)getInData())) {
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
-
+/*
     if (!hasDynamicShots()) {
         Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
         int64_t static_shots = getStaticShots().value();
@@ -259,7 +259,7 @@ LogicalResult SampleOp::verify()
                 "return tensor must have 1D static shape equal to (number of shots)");
         }
     }
-
+*/
     return success();
 }
 

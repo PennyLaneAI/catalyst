@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -76,7 +77,19 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Location loc = op.getLoc();
 
         // SampleOp's result shape is (shots, num_qubits)
-        // shots might be dynamic, in which case we need to memref alloc from the shots SSA value
+        // shots is a SSA argument to the device, so we need to memref alloc from the shots SSA value
+        auto parentFunc = op->getParentOfType<func::FuncOp>();
+        SmallVector<DeviceInitOp> DeviceInitOpPool;
+        parentFunc->walk([&](DeviceInitOp deviceInitOp){DeviceInitOpPool.push_back(deviceInitOp);});
+        assert(DeviceInitOpPool.size() == 1 && "quantum.sample operation is only valid inside a function with exactly one shot-ful device init operation");
+
+        auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                             DeviceInitOpPool[0].getShots());
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange({shots}));
+        rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
+                                  op->getAttrs());
+        /*
         if (op.hasDynamicShots()) {
             auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
 
@@ -104,6 +117,7 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
             bufferedSampleOp->setAttr("operandSegmentSizes",
                                       rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         }
+        */
         return success();
     }
 };

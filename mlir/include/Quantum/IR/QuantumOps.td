@@ -730,7 +730,7 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 }
 
-def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
+def SampleOp : Measurement_Op<"sample"> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
@@ -763,14 +763,12 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
     let arguments = (ins
         ObservableType:$obs,
-        Optional<I64>:$shots,
         Optional<
            AnyTypeOf<[
             MemRefRankOf<[F64], [1]>,
             MemRefRankOf<[F64], [2]>
            ]>
-        >:$in_data,
-        OptionalAttr<I64Attr>:$static_shots
+        >:$in_data
     );
 
     let results = (outs
@@ -783,16 +781,12 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? ( `shots` $shots^)? attr-dict ( `:` type($samples)^ )?
+        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
     }];
 
     let extraClassDeclaration = [{
         bool isBufferized() {
             return getResultTypes().empty();
-        }
-
-        bool hasDynamicShots() {
-            return getShots() != nullptr;
         }
     }];
 
