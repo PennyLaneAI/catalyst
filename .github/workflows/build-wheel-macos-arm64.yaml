@@ -344,15 +344,8 @@ jobs:
 
     - name: Build Standalone Plugin
       run: |
-        cmake -B standalone/build -G Ninja \
-            -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-            -DLLVM_EXTERNAL_LIT=$GITHUB_WORKSPACE/llvm-build/bin/llvm-lit \
-            -DCATALYST_TOOLS_DIR=$GITHUB_WORKSPACE/quantum-build \
-            -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-            -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-            standalone
-
-        cmake --build standalone/build --target check-standalone
+        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        make standalone-plugin
         mv standalone/build/lib/StandalonePlugin.* quantum-build/lib/
 
     - name: Build wheel
