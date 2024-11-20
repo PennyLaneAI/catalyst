@@ -24,19 +24,24 @@ running -apply-transform-sequence.
 
 # pylint: disable=line-too-long
 
+import os
+import pathlib
 import platform
 import shutil
 
 import pennylane as qml
 from lit_util_printers import print_jaxpr
+from pennylane.devices import NullQubit
 
 from catalyst import qjit
 from catalyst.debug import get_compilation_stage
-from catalyst.device import get_device_capabilities
 from catalyst.utils.runtime_environment import get_lib_path
 
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
-def flush_peephole_opted_mlir_to_iostream(QJIT):
+
+def flush_peephole_opted_mlir_to_iostream(func):
     """
     The QJIT compiler does not offer a direct interface to access an intermediate mlir in the pipeline.
     The `QJIT.mlir` is the mlir before any passes are run, i.e. the "0_<qnode_name>.mlir".
@@ -44,45 +49,27 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
     to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
-    print(get_compilation_stage(QJIT, "QuantumCompilationPass"))
-    shutil.rmtree(QJIT.__name__)
+    print(get_compilation_stage(func, "QuantumCompilationPass"))
+    shutil.rmtree(func.__name__)
 
 
-def get_custom_device_without(num_wires):
-    """Generate a custom device without gates in discards."""
+class CustomDevice(NullQubit):
+    """Custom Gate Set Device"""
 
-    class CustomDevice(qml.devices.Device):
-        """Custom Gate Set Device"""
+    name = "oqd.cloud"
 
-        name = "oqd.cloud"
+    config = CONFIG_CUSTOM_DEVICE
 
-        lightning_device = qml.device("lightning.qubit", wires=0)
-
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
-            lightning_capabilities = get_device_capabilities(self.lightning_device)
-            self.qjit_capabilities = lightning_capabilities
-
-        def apply(self, operations, **kwargs):
-            """Unused"""
-            raise RuntimeError("Only C/C++ interface is defined")
-
-        @staticmethod
-        def get_c_interface():
-            """Returns a tuple consisting of the device name, and
-            the location to the shared object with the C/C++ device implementation.
-            """
-            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-            lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
-            )
-            return "NullQubit", lib_path
-
-        def execute(self, circuits, execution_config):
-            """Execution."""
-            return circuits, execution_config
-
-    return CustomDevice(wires=num_wires)
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+        )
+        return "NullQubit", lib_path
 
 
 def test_decomposition_lowering():
@@ -91,7 +78,7 @@ def test_decomposition_lowering():
     """
 
     @qjit(keep_intermediate=True)
-    @qml.qnode(get_custom_device_without(2))
+    @qml.qnode(CustomDevice(2))
     def test_decomposition_lowering_workflow(x):
         qml.RX(x, wires=[0])
         qml.Hadamard(wires=[1])
