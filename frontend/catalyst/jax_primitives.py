@@ -1717,7 +1717,7 @@ def _counts_abstract_eval(obs, shots, shape):
 
 
 def _counts_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: ir.Value, shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
 ):
     # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
     # where N = 2**number_of_qubits
@@ -1726,12 +1726,15 @@ def _counts_lowering(
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_value = TensorExtractOp(i64_type, shots, []).result
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs, shots_value).results
+    if isinstance(shots, int):
+        return CountsOp(eigvals_type, counts_type, obs, static_shots=shots).results
+    else:
+        shots_value = TensorExtractOp(i64_type, shots, []).result
+        return CountsOp(eigvals_type, counts_type, obs, shots=shots_value).results
 
 
 #

@@ -40,7 +40,6 @@ def test_sample():
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
-    breakpoint()
     assert (
         jaxpr
         == """
@@ -84,7 +83,6 @@ def test_sample_dynamic_shape():
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
-    breakpoint()
     assert (
         jaxpr
         == """
@@ -204,17 +202,16 @@ def test_counts():
 
     def f():
         obs = compbasis_p.bind()
-        return counts_p.bind(obs, 5, shape=(1,))
+        return counts_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
-
     assert (
         jaxpr
         == """
 { lambda ; . let
     a:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
-    b:f64[1] c:i64[1] = counts[shape=(1,)] a 5
+    b:f64[1] c:i64[1] = counts[shape=(1,) shots=5] a
   in (b, c) }
 """
     )
@@ -225,10 +222,8 @@ def test_counts():
 module @foo {
   func.func public @jit_foo() -> (tensor<1xf64>, tensor<1xi64>) {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
-    %c = stablehlo.constant dense<5> : tensor<i64>
-    %1 = "tensor.extract"(%c) : (tensor<i64>) -> i64
-    %2:2 = "quantum.counts"(%0, %1) : (!quantum.obs, i64) -> (tensor<1xf64>, tensor<1xi64>)
-    return %2#0, %2#1 : tensor<1xf64>, tensor<1xi64>
+    %1:2 = "quantum.counts"(%0) {operandSegmentSizes = array<i32: 1, 0, 0, 0>, static_shots = 5 : i64} : (!quantum.obs) -> (tensor<1xf64>, tensor<1xi64>)
+    return %1#0, %1#1 : tensor<1xf64>, tensor<1xi64>
   }
 }
 """
@@ -250,7 +245,6 @@ def test_counts_dynamic_shape():
 
     jaxpr = jax.make_jaxpr(f)(5)
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
-
     assert (
         jaxpr
         == """
@@ -268,11 +262,10 @@ module @foo {
   func.func public @jit_foo(%arg0: tensor<i64>) -> (tensor<1xf64>, tensor<1xi64>) {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
     %1 = "tensor.extract"(%arg0) : (tensor<i64>) -> i64
-    %2:2 = "quantum.counts"(%0, %1) : (!quantum.obs, i64) -> (tensor<1xf64>, tensor<1xi64>)
+    %2:2 = "quantum.counts"(%0, %1) {operandSegmentSizes = array<i32: 1, 1, 0, 0>} : (!quantum.obs, i64) -> (tensor<1xf64>, tensor<1xi64>)
     return %2#0, %2#1 : tensor<1xf64>, tensor<1xi64>
   }
 }
-
 """
     )
 
@@ -288,7 +281,7 @@ def test_new_countsop_still_good_with_backend():
     from catalyst.debug import replace_ir
 
     @catalyst.qjit
-    def workflow():
+    def workflow(shots):
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
@@ -300,8 +293,8 @@ def test_new_countsop_still_good_with_backend():
         return circuit()
 
     new_ir = """module @workflow {
-  func.func public @jit_workflow() -> (tensor<2xi64>, tensor<2xi64>) attributes {llvm.emit_c_interface} {
-    %1:2 = catalyst.launch_kernel @module_circuit::@circuit() : () -> (tensor<2xi64>, tensor<2xi64>)
+  func.func public @jit_workflow(%arg0: tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>) attributes {llvm.emit_c_interface} {
+    %1:2 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>)
     return %1#0, %1#1 : tensor<2xi64>, tensor<2xi64>
   }
   module attributes {transform.with_named_sequence} {
@@ -310,7 +303,7 @@ def test_new_countsop_still_good_with_backend():
     }
   }
   module @module_circuit {
-    func.func public @circuit() -> (tensor<2xi64>, tensor<2xi64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    func.func public @circuit(%arg0: tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
       quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 10, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
       %c = stablehlo.constant dense<1> : tensor<i64>
       %0 = quantum.alloc( 1) : !quantum.reg
@@ -323,9 +316,8 @@ def test_new_countsop_still_good_with_backend():
       %4 = quantum.compbasis %out_qubits : !quantum.obs
       %c_2 = stablehlo.constant dense<10> : tensor<i64>
       %extracted_3 = tensor.extract %c_2[] : tensor<i64>
-      %c_4000 = stablehlo.constant dense<4000> : tensor<i64>
-      %extracted_c4000 = tensor.extract %c_4000[] : tensor<i64>
-      %eigvals, %counts = quantum.counts %4 %extracted_c4000 : tensor<2xf64>, tensor<2xi64>
+      %dyn_shots = tensor.extract %arg0[] : tensor<i64>
+      %eigvals, %counts = quantum.counts %4 shots %dyn_shots : tensor<2xf64>, tensor<2xi64>
       %5 = stablehlo.convert %eigvals : (tensor<2xf64>) -> tensor<2xi64>
       %c_4 = stablehlo.constant dense<0> : tensor<i64>
       %extracted_5 = tensor.extract %c_4[] : tensor<i64>
@@ -345,7 +337,7 @@ def test_new_countsop_still_good_with_backend():
   }
 }"""
     replace_ir(workflow, "mlir", new_ir)
-    res = workflow()
+    res = workflow(4000)
     print("after: ", res)
     assert res[1][0] + res[1][1] == 4000
 
