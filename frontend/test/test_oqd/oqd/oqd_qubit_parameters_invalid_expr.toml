@@ -1,0 +1,67 @@
+oqd_config_schema = "v0.1"
+
+# Ions
+# ----
+
+[ions.Yb171]
+mass = 171
+charge = +1
+position = [0, 0, 0]
+
+levels.downstate.principal = 6
+levels.downstate.spin = 0.5
+levels.downstate.orbital = 0
+levels.downstate.nuclear = 0.5
+levels.downstate.spin_orbital = 0.5
+levels.downstate.spin_orbital_nuclear = 0
+levels.downstate.spin_orbital_nuclear_magnetization = 0
+levels.downstate.energy = 0
+
+levels.upstate.principal = 6
+levels.upstate.spin = 0.5
+levels.upstate.orbital = 0
+levels.upstate.nuclear = 0.5
+levels.upstate.spin_orbital = 0.5
+levels.upstate.spin_orbital_nuclear = 1
+levels.upstate.spin_orbital_nuclear_magnetization = 0
+levels.upstate.energy = "1 + math.sin('a') + math.cos"  # Invalid arithmetic expression
+
+levels.estate.principal = 5
+levels.estate.spin = 0.5
+levels.estate.orbital = 1
+levels.estate.nuclear = 0.5
+levels.estate.spin_orbital = 0.5
+levels.estate.spin_orbital_nuclear = 0
+levels.estate.spin_orbital_nuclear_magnetization = 0
+levels.estate.energy = "1 + math.sin('a') + math.cos"  # Invalid arithmetic expression
+
+[ions.Yb171.transitions.downstate_upstate]
+level1 = "downstate"
+level2 = "upstate"
+einsteinA = ""
+
+[ions.Yb171.transitions.downstate_estate]
+level1 = "downstate"
+level2 = "estate"
+einsteinA = ""
+
+[ions.Yb171.transitions.estate_upstate]
+level1 = "estate"
+level2 = "upstate"
+einsteinA = ""
+
+
+# Phonons
+# -------
+
+[phonons.COM_x]
+energy = "2 * math.pi * 5e6"
+eigenvector = [1, 0, 0]
+
+[phonons.COM_y]
+energy = "2 * math.pi * 5e6"
+eigenvector = [0, 1, 0]
+
+[phonons.COM_z]
+energy = "2 * math.pi * 1e6"
+eigenvector = [0, 0, 1]

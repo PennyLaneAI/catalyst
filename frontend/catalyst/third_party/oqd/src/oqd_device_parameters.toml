@@ -1,0 +1,744 @@
+# OQD Device Parameters
+# ~~~~~~~~~~~~~~~~~~~~~
+#
+# This file contains the parameters that specify the properties of an Open Quantum Design (OQD)
+# trapped-ion experiment workflow.
+
+
+oqd_config_schema = "v0.1"
+
+[parameters.N_load]
+description = "Number of ions"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = "1"
+unit = ""
+
+[parameters.w_ablation]
+description = "Ablation laser frequency"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = "532"
+unit = "nm"
+
+[parameters.t_ablation]
+description = "Ablation laser pulse duration"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = "1"
+unit = "ns"
+
+[parameters.I_ablation]
+description = "Ablation laser intensity"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = "0.57"
+unit = "J/cm^2"
+
+[parameters.rate_ablation]
+description = "Ablation laser pulse rate"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.N_ablation]
+description = "Ablation laser # of pulses"
+stage = "Loading"
+process = "Ablation"
+equation = "rate_ablation * t_ablation"
+value = ""
+unit = ""
+
+[parameters."w_ionization^1"]
+description = "Ionization laser 1 frequency"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = "554"
+unit = "nm"
+
+[parameters."t_ionization^1"]
+description = "Ionization laser 1 pulse duration"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."I_ionization^1"]
+description = "Ionization laser 1 intensity"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."w_ionization^2"]
+description = "Ionization laser 2 frequency"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = "390"
+unit = "nm"
+
+[parameters."t_ionization^2"]
+description = "Ionization laser 2 pulse duration"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."I_ionization^2"]
+description = "Ionization laser 2 intensity"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.x_target]
+description = "Target x position"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.y_target]
+description = "Target y position"
+stage = "Loading"
+process = "Ablation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.N_trap]
+description = "Number of ions"
+stage = "Trapping"
+process = "Ion characteristics"
+equation = ""
+value = "1"
+unit = ""
+
+[parameters.m]
+description = "Ion mass"
+stage = "Trapping"
+process = "Ion characteristics"
+equation = ""
+value = "133"
+unit = "AMU"
+
+[parameters.q]
+description = "Ion charge"
+stage = "Trapping"
+process = "Ion characteristics"
+equation = ""
+value = "+e"
+unit = ""
+
+[parameters.w_x]
+description = "Radial frequency, x"
+stage = "Trapping"
+process = "Ion characteristics"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.w_y]
+description = "Radial frequency, y"
+stage = "Trapping"
+process = "Ion characteristics"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.w_z]
+description = "Axial frequency"
+stage = "Trapping"
+process = "Ion characteristics"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.V_RFT]
+description = "RF trapping voltage"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = "250"
+unit = "V"
+
+[parameters.V_RFC]
+description = "RF confinement voltage"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = "250"
+unit = "V"
+
+[parameters.Omega_RF]
+description = "RF signal frequency"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = "36"
+unit = "MHz"
+
+[parameters."V_DC^X"]
+description = "DC electrode voltage (x X electrodes)"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = "94"
+unit = "channels"
+
+[parameters.micromotion_x]
+description = "Micromotion in x"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.micromotion_y]
+description = "Micromotion in y"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.micromotion_z]
+description = "Micromotion in z"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.theta]
+description = "Principal axes rotation, theta"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.phi]
+description = "Principal axes rotation, phi"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.position_N]
+description = "Ion equilibrium position(s)"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."mode_x^N"]
+description = "Radial motional mode(s), x"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."mode_y^N"]
+description = "Radial motional mode(s), y"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."mode_z^N"]
+description = "Axial motional mode(s)"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO]
+description = "Engineered voltage fluctuations"
+stage = "Trapping"
+process = "Electric Potential"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.n]
+description = "Phonon cooling target"
+stage = "Trapping"
+process = "Cooling"
+equation = ""
+value = "Doppler limit"
+unit = ""
+
+[parameters.n_doppler]
+description = "Doppler limit"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = "Doppler limit"
+unit = ""
+
+[parameters.w_doppler]
+description = "Doppler cooling laser frequency"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = "493 nm - 7.506 GHz, 493 nm + 4.259 GHz"
+unit = ""
+
+[parameters.sigma_doppler]
+description = "Doppler cooling laser polarization(s)"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_doppler_saturation]
+description = "Doppler cooling laser saturation intensity"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_doppler]
+description = "Doppler cooling laser intensity"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = "<< I_Doppler_saturation"
+unit = ""
+
+[parameters.w_doppler_sideband_1]
+description = "Doppler cooling laser sideband 1 frequency modulation"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.P_doppler_1]
+description = "Doppler cooling laser sideband 1 power"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.w_doppler_sideband_2]
+description = "Doppler cooling laser sideband 2 frequency modulation"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.P_doppler_2]
+description = "Doppler cooling laser sideband 2 power"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.w_doppler_repump]
+description = "Doppler cooling repump laser frequency"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = "650 nm - 1.840 GHz, 650 nm - 0.903 GHz"
+unit = ""
+
+[parameters.sigma_doppler_repump]
+description = "Doppler cooling repump laser polarization(s)"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_Doppler_saturation_repump]
+description = "Doppler cooling repump laser saturation intensity"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_Doppler_repump]
+description = "Doppler cooling repump laser intensity"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.P_Dopper_sideband]
+description = "Doppler cooling repump sideband power"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.t_Doppler]
+description = "Doppler cooling time duration"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters."Delta_Doppler^?"]
+description = "Detuning(s)?"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_45]
+description = "Narrow linewidth cooling laser frequency"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_46]
+description = "Narrow linewidth cooling laser polarization"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_47]
+description = "Narrow linewidth cooling laser power"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_48]
+description = "Narrow linewidth cooling laser saturation intensity"
+stage = "Trapping"
+process = "Cooling (Doppler)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.n_rsc]
+description = "RSB cooling limit"
+stage = "Trapping"
+process = "Cooling (Resolved sideband)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_RSBC]
+description = "RSB cooling laser frequency"
+stage = "Trapping"
+process = "Cooling (Resolved sideband)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.sigma_RSBC]
+description = "RSB cooling laser polarization(s)"
+stage = "Trapping"
+process = "Cooling (Resolved sideband)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_RSBC_saturation]
+description = "RSB cooling laser saturation intensity"
+stage = "Trapping"
+process = "Cooling (Resolved sideband)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_RSBC]
+description = "RSB cooling laser intensity"
+stage = "Trapping"
+process = "Cooling (Resolved sideband)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_54]
+description = "TODO"
+stage = "Trapping"
+process = "Cooling (EIT)"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_preparation]
+description = "Optical pumping laser frequency"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = "493"
+unit = "nm"
+
+[parameters.sigma_opt_pump]
+description = "Optical pumping laser polarization(s)"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_opt_pump_saturation]
+description = "Optical pumping laser saturation intensity"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_opt_pump]
+description = "Optical pumping laser intensity"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_59]
+description = "Optical pumping laser sideband frequency"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_60]
+description = "Optical pumping laser sideband power"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_RSB_repump]
+description = "Optical pumping repump laser frequency"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = "650"
+unit = "nm"
+
+[parameters.I_RSB_repump_saturation]
+description = "Optical pumping  repump laser saturation intensity"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.I_RSB_repump]
+description = "Optical pumping  repump laser intensity"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_64]
+description = "Optical pumping repump laser sideband frequency"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_65]
+description = "Optical pumping repumplaser sideband power"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.TODO_66]
+description = "Detuning(s)?"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.t_RSBC]
+description = "Optical pumping time duration"
+stage = "Initialization"
+process = "State Preparation"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_q]
+description = "Qubit Carrier Frequency"
+stage = "Experiment"
+process = "X Gate"
+equation = "2*pi*(12.6 GHz)"
+value = ""
+unit = ""
+
+[parameters.omega_e]
+description = "Excited State Frequency"
+stage = "Experiment"
+process = "X Gate"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_A]
+description = "Raman Frequency A"
+stage = "Experiment"
+process = "X Gate"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_B]
+description = "Raman Frequency B"
+stage = "Experiment"
+process = "X Gate"
+equation = "omega_e + delta - omega_q"
+value = ""
+unit = ""
+
+[parameters.Delta]
+description = "Raman Detuning"
+stage = "Experiment"
+process = "X Gate"
+equation = "omega_e - omega_a"
+value = ""
+unit = ""
+
+[parameters.Omega_A]
+description = ""
+stage = "Experiment"
+process = "X Gate"
+equation = "Omega_A = Omega_B"
+value = ""
+unit = ""
+
+[parameters.Omega_B]
+description = ""
+stage = "Experiment"
+process = "X Gate"
+equation = "Omega_A = Omega_B"
+value = ""
+unit = ""
+
+[parameters.Omega]
+description = "Rabi Frequency"
+stage = "Experiment"
+process = "X Gate"
+equation = "(omega_a*Omega_B)/(2*Delta)"
+value = ""
+unit = ""
+
+[parameters.gate_phi]
+description = "Gate Phase"
+stage = "Experiment"
+process = "X Gate"
+equation = "TODO"
+value = "0"
+unit = "rad"
+
+[parameters.phi_a]
+description = "Laser A phase"
+stage = "Experiment"
+process = "X Gate"
+equation = "phi_a = phi_b =0"
+value = ""
+unit = ""
+
+[parameters.phi_b]
+description = "Laser B phase"
+stage = "Experiment"
+process = "X Gate"
+equation = "phi_a = phi_b =0"
+value = ""
+unit = ""
+
+[parameters.t_gate]
+description = "Gate Duration"
+stage = "Experiment"
+process = "X Gate"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.H]
+description = "Hamiltonian"
+stage = "Experiment"
+process = "X Gate"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_measurement]
+description = "Measurement laser frequency"
+stage = "Detection"
+process = "Measurement"
+equation = ""
+value = "493"
+unit = "nm"
+
+[parameters.I_measurement]
+description = "Measurement laser saturation"
+stage = "Detection"
+process = "Measurement"
+equation = "I_saturation"
+value = ""
+unit = ""
+
+[parameters.t_measurement]
+description = "Measurement duration"
+stage = "Detection"
+process = "Measurement"
+equation = ""
+value = ""
+unit = ""
+
+[parameters.omega_repump]
+description = "Measurement repump frequency"
+stage = "Detection"
+process = "Measurement"
+equation = ""
+value = "650"
+unit = "nm"
+
+[parameters.I_repump]
+description = "Measurement repump Intensity"
+stage = "Detection"
+process = "Measurement"
+equation = ""
+value = "Doppler limit"
+unit = ""

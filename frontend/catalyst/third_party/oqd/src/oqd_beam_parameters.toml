@@ -1,0 +1,11 @@
+# OQD Beam Parameters
+# ~~~~~~~~~~~~~~~~~~~
+
+oqd_config_schema = "v0.1"
+
+[beam]
+transition = "downstate_upstate"
+rabi = "2 * math.pi * 1e6"
+detuning = 0
+polarization = nan
+wavevector = nan

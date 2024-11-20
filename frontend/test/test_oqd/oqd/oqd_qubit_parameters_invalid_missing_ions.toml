@@ -1,0 +1,22 @@
+oqd_config_schema = "v0.1"
+
+# Ions
+# ----
+
+# This section intentionally left blank
+
+
+# Phonons
+# -------
+
+[phonons.COM_x]
+energy = "2 * math.pi * 5e6"
+eigenvector = [1, 0, 0]
+
+[phonons.COM_y]
+energy = "2 * math.pi * 5e6"
+eigenvector = [0, 1, 0]
+
+[phonons.COM_z]
+energy = "2 * math.pi * 1e6"
+eigenvector = [0, 0, 1]
