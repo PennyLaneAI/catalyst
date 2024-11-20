@@ -719,7 +719,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Type qirSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                         {LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                         IntegerType::get(ctx, 64), IntegerType::get(ctx, 64)},
+                                         IntegerType::get(ctx, 64)},
                                         /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -741,6 +741,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         SmallVector<Value> args = {structPtr};
 
         if constexpr (std::is_same_v<T, SampleOp>) {
+            /*
             if (op.hasDynamicShots()) {
                 args.push_back(cast<SampleOpAdaptor>(adaptor).getShots());
             }
@@ -748,9 +749,11 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
                 Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getStaticShotsAttr());
                 args.push_back(numShots);
             }
+            */
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
+            /*
             if (op.hasDynamicShots()) {
                 args.push_back(cast<CountsOpAdaptor>(adaptor).getShots());
             }
@@ -758,6 +761,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
                 Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getStaticShotsAttr());
                 args.push_back(numShots);
             }
+            */
             auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
             auto bStruct =
                 rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
