@@ -289,6 +289,14 @@ class Compiler:
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
         if not self.options.lower_to_llvm:
             cmd += ["--tool", "opt"]
+        if self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            for plugin in plugins:
+                cmd += ["--load-pass-plugin", str(plugin)]
+        if self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            for plugin in plugins:
+                cmd += ["--load-dialect-plugin", str(plugin)]
         if self.options.keep_intermediate:
             cmd += ["--keep-intermediate"]
         # The async tests are not included as part of coverage.
