@@ -64,13 +64,13 @@ def circuit():
 print(circuit.mlir)
 
 """
-# COM CHECK-LABEL: public @jit_circuit
+# COM: CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("braket.local.qubit", wires=2, shots=100))
 def circuit(x: float):
-    # COM CHECK: {{%.+}} = quantum.custom "ISWAP"() {{.+}} : !quantum.bit, !quantum.bit
+    # COM: CHECK: {{%.+}} = quantum.custom "ISWAP"() {{.+}} : !quantum.bit, !quantum.bit
     qml.ISWAP(wires=[0, 1])
-    # COM CHECK: {{%.+}} = quantum.custom "PSWAP"({{%.+}}) {{.+}} : !quantum.bit, !quantum.bit
+    # COM: CHECK: {{%.+}} = quantum.custom "PSWAP"({{%.+}}) {{.+}} : !quantum.bit, !quantum.bit
     qml.PSWAP(x, wires=[0, 1])
     return qml.probs()
 
