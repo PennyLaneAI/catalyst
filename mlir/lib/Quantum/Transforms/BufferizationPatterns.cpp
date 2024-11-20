@@ -81,7 +81,8 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         auto parentFunc = op->getParentOfType<func::FuncOp>();
         SmallVector<DeviceInitOp> DeviceInitOpPool;
         parentFunc->walk([&](DeviceInitOp deviceInitOp){DeviceInitOpPool.push_back(deviceInitOp);});
-        assert(DeviceInitOpPool.size() == 1 && "quantum.sample operation is only valid inside a function with exactly one shot-ful device init operation");
+        assert(DeviceInitOpPool.size() == 1 &&
+            "quantum.sample operation is only valid when either inside a function with exactly one shot-ful device init operation, or have allocated memref as input");
 
         auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
                                                              DeviceInitOpPool[0].getShots());
