@@ -8,6 +8,9 @@
   Frontend no longer uses pybind11 to connect to the compiler. Instead, it uses subprocess instead.
   [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
 
+  As a result of this, we now pass the MLIR module as MLIR bytecode instead of the textual form.
+  [(#1311)](https://github.com/PennyLaneAI/catalyst/pull/1311)
+
 * Replace pybind11 with nanobind for C++/Python bindings in the frontend.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
 

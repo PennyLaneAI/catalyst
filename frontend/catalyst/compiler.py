@@ -334,11 +334,14 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
+        data = ir if type(ir) != str else ir.encode("utf-8")
+        suffix = ".bc" if type(ir) != str else ".mlir"
+
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".mlir", dir=str(workspace), delete=False
+            mode="w+b", suffix=suffix, dir=str(workspace), delete=False
         ) as tmp_infile:
             tmp_infile_name = tmp_infile.name
-            tmp_infile.write(ir)
+            tmp_infile.write(data)
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
         output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
@@ -390,9 +393,7 @@ class Compiler:
         """
 
         return self.run_from_ir(
-            mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
-            ),
+            mlir_module.operation.get_asm(binary=True, assume_verified=True),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,
             **kwargs,
