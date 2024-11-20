@@ -311,7 +311,7 @@ class ExecutionContext final {
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
-                                         std::string_view rtd_kwargs)
+                                         std::string_view rtd_kwargs, int64_t shots)
         -> const std::shared_ptr<RTDevice> &
     {
         std::lock_guard<std::mutex> lock(pool_mu);
@@ -331,6 +331,7 @@ class ExecutionContext final {
 
         // Add a new device
         device->setDeviceStatus(RTDeviceStatus::Active);
+        device->getQuantumDevicePtr()->SetDeviceShots(shots);
         if (this->seed != nullptr) {
             device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
         }
@@ -344,11 +345,11 @@ class ExecutionContext final {
 
     [[nodiscard]] auto getOrCreateDevice(const std::string &rtd_lib,
                                          const std::string &rtd_name = {},
-                                         const std::string &rtd_kwargs = {})
+                                         const std::string &rtd_kwargs = {}, int64_t shots = 0)
         -> const std::shared_ptr<RTDevice> &
     {
         return getOrCreateDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
-                                 std::string_view{rtd_kwargs});
+                                 std::string_view{rtd_kwargs}, shots);
     }
 
     [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> &
