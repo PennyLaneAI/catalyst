@@ -748,7 +748,13 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
-            args.push_back(cast<CountsOpAdaptor>(adaptor).getShots());
+            if (op.hasDynamicShots()) {
+                args.push_back(cast<CountsOpAdaptor>(adaptor).getShots());
+            }
+            else {
+                Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getStaticShotsAttr());
+                args.push_back(numShots);
+            }
             auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
             auto bStruct =
                 rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
