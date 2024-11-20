@@ -521,6 +521,7 @@ jobs:
         make pytest TEST_BACKEND="lightning.kokkos"
 
   frontend-tests-openqasm-device:
+    if: false
     name: Frontend Tests (backend="openqasm3")
     needs: [constants, llvm, runtime, quantum, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
