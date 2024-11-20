@@ -179,12 +179,11 @@ func.func @tensorobs(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit)
 // -----
 
 func.func @sample1(%q : !quantum.bit) {
-    %obs = quantum.namedobs %q[Identity] : !quantum.obs
+    %obs = quantum.compbasis %q : !quantum.obs
+    %alloc = memref.alloc() : memref<1000xf64>
 
-    %samples = quantum.sample %obs { static_shots=1000 } : tensor<1000xf64>
-
-    // expected-error@+1 {{return tensor must have 1D static shape equal to (number of shots)}}
-    %err = quantum.sample %obs { static_shots=1000 } : tensor<1xf64>
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.sample %obs in (%alloc : memref<1000xf64>) : tensor<1000xf64>
 
     return
 }
@@ -194,66 +193,8 @@ func.func @sample1(%q : !quantum.bit) {
 func.func @sample2(%q : !quantum.bit) {
     %obs = quantum.compbasis %q : !quantum.obs
 
-    %samples = quantum.sample %obs { static_shots=1000 } : tensor<1000x1xf64>
-
-    // expected-error@+1 {{return tensor must have 2D static shape equal to (number of shots, number of qubits in observable)}}
-    %err = quantum.sample %obs { static_shots=1000 } : tensor<1000xf64>
-
-    return
-}
-
-// -----
-
-func.func @sample3(%q : !quantum.bit) {
-    %obs = quantum.compbasis %q : !quantum.obs
-
-    %alloc0 = memref.alloc() : memref<1000xf64>
-
-    %alloc1 = memref.alloc() : memref<1000x1xf64>
-    quantum.sample %obs in(%alloc1 : memref<1000x1xf64>) { static_shots = 1000 }
-
-    // expected-error@+1 {{return tensor must have 2D static shape equal to (number of shots, number of qubits in observable)}}
-    quantum.sample %obs in(%alloc0 : memref<1000xf64>) { static_shots = 1000 }
-
-    return
-}
-
-// -----
-
-func.func @sample4(%q : !quantum.bit) {
-    %obs = quantum.compbasis %q : !quantum.obs
-
-    %alloc = memref.alloc() : memref<1000xf64>
-    %samples = quantum.sample %obs { static_shots=1000 } : tensor<1000x1xf64>
-
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.sample %obs in (%alloc : memref<1000xf64>) { static_shots=1000 } : tensor<1000xf64>
-
-    return
-}
-
-// -----
-
-func.func @sample5(%q : !quantum.bit) {
-    %obs = quantum.compbasis %q : !quantum.obs
-
-    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.sample %obs { static_shots=1000 }
-
-    return
-}
-
-
-// -----
-
-func.func @sample6(%q0 : !quantum.bit, %q1 : !quantum.bit, %dyn_shots : i64) {
-    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-
-    %samples_good_static = quantum.sample %obs {static_shots=1000} : tensor<1000x2xf64>
-    %samples_good_dynamic = quantum.sample %obs shots %dyn_shots : tensor<?x2xf64>
-
-    // expected-error@+1 {{static and dynamic shots cannot be simultaneously specified}}
-    %samples = quantum.sample %obs shots %dyn_shots {static_shots=1000} : tensor<1000x2xf64>
+    quantum.sample %obs
 
     return
 }
