@@ -247,9 +247,9 @@ MLIR Plugins
 These plugins are shared objects that include dialects and passes written by third parties.
 This means that you can write dialects and passes that can be used with ``catalyst-cli`` and ``quantum-opt``.
 
-How can you write your own plugins for ``catalyst-cli`` and ``quantum-opt``?
-Luckily, the `LLVM repository includes a very simple plugin as an example <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone/standalone-plugin>`_.
-And we, have made it simple to just run ``make standalone-plugin`` and the standalone plugin will be built in the root directory of the Catalyst project.
+As an example, the `LLVM repository includes a very simple plugin <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone/standalone-plugin>`_.
+To build it, simply run ``make standalone-plugin`` and the standalone plugin
+will be built in the root directory of the Catalyst project.
 
 With this, you can now run your own passes by using the following flags:
 
