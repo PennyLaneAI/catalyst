@@ -83,13 +83,14 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let summary = "Initialize a quantum device.";
 
     let arguments = (ins
+        Optional<I64>:$shots,
         StrAttr:$lib,
         StrAttr:$name,
         StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      `[` $lib `,` $name `,` $kwargs `]` attr-dict
+      `[` $lib `,` $name `,` $kwargs `]` ( `shots` $shots^)? attr-dict
     }];
 }
 

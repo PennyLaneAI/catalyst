@@ -205,12 +205,15 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         StringRef qirName = "__catalyst__rt__device_init"; // (int8_t *, int8_t *, int8_t *) -> void
 
         Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type int64Type = IntegerType::get(rewriter.getContext(), 64);
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
-                                                         /* rtd_kwargs = */ charPtrType});
+                                                         /* rtd_kwargs = */ charPtrType,
+                                                         /* shots = */ int64Type});
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
+        Value shots = op.getShots();
         auto rtd_lib = op.getLib().str();
         auto rtd_name = op.getName().str();
         auto rtd_kwargs = op.getKwargs().str();
@@ -222,7 +225,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         auto rtd_kwargs_gs = getGlobalString(
             loc, rewriter, rtd_kwargs, StringRef(rtd_kwargs.c_str(), rtd_kwargs.length() + 1), mod);
 
-        SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
+        SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs, shots};
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 

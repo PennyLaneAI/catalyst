@@ -44,7 +44,7 @@ func.func @finalize() {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64)
 
 // CHECK-LABEL: @device
 func.func @device() {
@@ -54,14 +54,16 @@ func.func @device() {
     // CHECKL llvm.mlir.global internal constant @lightning.kokkos("lightning.kokkos\00") {addr_space = 0 : i32}
     // CHECKL llvm.mlir.global internal constant @"{shots: 1000}"("{shots: 1000}\00") {addr_space = 0 : i32}
 
+    // CHECK: [[shots:%.+]] = llvm.mlir.constant(1000 : i64) : i64
     // CHECK: [[d0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
     // CHECK: [[d1:%.+]] = llvm.getelementptr inbounds [[d0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
     // CHECK: [[bo:%.+]] = llvm.mlir.addressof @lightning.qubit : !llvm.ptr
     // CHECK: [[b1:%.+]] = llvm.getelementptr inbounds [[bo]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<16 x i8>
     // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{shots: 0}" : !llvm.ptr
     // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<11 x i8>
-    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
-    quantum.device ["rtd_lightning.so", "lightning.qubit", "{shots: 0}"]
+    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+    %shots = llvm.mlir.constant(1000 : i64) : i64
+    quantum.device ["rtd_lightning.so", "lightning.qubit", "{shots: 0}"] shots %shots
 
     // CHECK: [[e0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
     // CHECK: [[e1:%.+]] = llvm.getelementptr inbounds [[e0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
@@ -69,9 +71,9 @@ func.func @device() {
     // CHECK: [[e3:%.+]] = llvm.getelementptr inbounds [[e2]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
     // CHECK: [[e4:%.+]] = llvm.mlir.addressof @"{shots: 1000}" : !llvm.ptr
     // CHECK: [[e5:%.+]] = llvm.getelementptr inbounds [[e4]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<14 x i8>
-    // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
 
-    quantum.device ["rtd_lightning.so", "lightning.kokkos", "{shots: 1000}"]
+    quantum.device ["rtd_lightning.so", "lightning.kokkos", "{shots: 1000}"] shots %shots
 
     return
 }
