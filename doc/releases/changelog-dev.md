@@ -35,6 +35,9 @@
   linking against Python shared libraries after decoupling Python from the Runtime C-API.
   [(#1305)](https://github.com/PennyLaneAI/catalyst/pull/1305)
 
+* Improves the readability of conditional passes in pipelines
+  [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
