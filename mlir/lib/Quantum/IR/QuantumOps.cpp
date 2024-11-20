@@ -230,7 +230,7 @@ LogicalResult SampleOp::verify()
 {
     std::optional<size_t> numQubits = 0;
 
-    if (hasDynamicShots() && getStaticShots().has_value()){
+    if (hasDynamicShots() && getStaticShots().has_value()) {
         return emitOpError("static and dynamic shots cannot be simultaneously specified");
     }
 
@@ -267,7 +267,7 @@ LogicalResult CountsOp::verify()
 {
     std::optional<size_t> numQubits = 0;
 
-    if (hasDynamicShots() && getStaticShots().has_value()){
+    if (hasDynamicShots() && getStaticShots().has_value()) {
         return emitOpError("static and dynamic shots cannot be simultaneously specified");
     }
 
