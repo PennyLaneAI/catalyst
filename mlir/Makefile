@@ -123,7 +123,7 @@ enzyme:
 
 .PHONY: standalone-plugin
 standalone-plugin:
-	cp -r $(MK_DIR)/mlir/llvm-project/mlir/examples/standalone standalone
+	[ -f $(MK_DIR) standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone standalone
 	@if patch --dry-run -p1 -N standalone $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
 		patch -p1 standalone $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
