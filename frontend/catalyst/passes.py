@@ -335,7 +335,7 @@ def apply_pass(pass_name, *flags, **valued_options):
         for option_name, val in valued_options.items():
             options += ["{option_name}={val}"]
 
-        options += [f"func-name={funcname}" + f"_{pass_name}" + uniquer]
+        # options += [f"func-name={funcname}" + f"_{pass_name}" + uniquer]
         options = ",".join(options)
 
         def wrapper(*args, **kwargs):
@@ -345,7 +345,7 @@ def apply_pass(pass_name, *flags, **valued_options):
 
         fn_clone = copy.copy(fn)
         fn_clone.func = wrapper
-        fn_clone.__name__ = funcname + f"_{pass_name}" + uniquer
+        # fn_clone.__name__ = funcname + f"_{pass_name}" + uniquer
 
         return fn_clone
 
