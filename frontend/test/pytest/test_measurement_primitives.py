@@ -36,16 +36,18 @@ def test_sample():
 
     def f():
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots=5, shape=(5, 0))
+        return sample_p.bind(obs, shape=(5, 0))
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
+    print(jaxpr)
+    print(mlir)
     assert (
         jaxpr
         == """
 { lambda ; . let
     a:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
-    b:f64[5,0] = sample[shape=(5, 0) shots=5] a
+    b:f64[-9223372036854775808,0] = sample[shape=(5, 0)] a
   in (b,) }
 """
     )
@@ -54,10 +56,10 @@ def test_sample():
         mlir
         == """
 module @foo {
-  func.func public @jit_foo() -> tensor<5x0xf64> {
+  func.func public @jit_foo() -> tensor<?x0xf64> {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
-    %1 = "quantum.sample"(%0) {operandSegmentSizes = array<i32: 1, 0, 0>, static_shots = 5 : i64} : (!quantum.obs) -> tensor<5x0xf64>
-    return %1 : tensor<5x0xf64>
+    %1 = "quantum.sample"(%0) : (!quantum.obs) -> tensor<?x0xf64>
+    return %1 : tensor<?x0xf64>
   }
 }
 """
@@ -79,20 +81,22 @@ def test_sample_dynamic_shape():
         # proper arguments, and kwargs are treated as primitive's `params`
         # Proper primitive arguments are propagated as jaxpr variables,
         # whereas primitive params are tracers.
-        return sample_p.bind(obs, x, shape=(x, 0))
+        return sample_p.bind(obs, shape=(x, 0))
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
+    print(jaxpr)
+    print(mlir)
     assert (
         jaxpr
         == """
 { lambda ; a:i64[]. let
     b:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
-    c:i64[] = add a 1
-    d:f64[c,0] = sample[
+    _:i64[] = add a 1
+    c:f64[-9223372036854775808,0] = sample[
       shape=(Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>, 0)
-    ] b c
-  in (c, d) }
+    ] b
+  in (c,) }
 """
     )
 
@@ -100,13 +104,12 @@ def test_sample_dynamic_shape():
         mlir
         == """
 module @foo {
-  func.func public @jit_foo(%arg0: tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>) {
+  func.func public @jit_foo(%arg0: tensor<i64>) -> tensor<?x0xf64> {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
     %c = stablehlo.constant dense<1> : tensor<i64>
     %1 = stablehlo.add %arg0, %c : tensor<i64>
-    %2 = "tensor.extract"(%1) : (tensor<i64>) -> i64
-    %3 = "quantum.sample"(%0, %2) {operandSegmentSizes = array<i32: 1, 1, 0>} : (!quantum.obs, i64) -> tensor<?x0xf64>
-    return %1, %3 : tensor<i64>, tensor<?x0xf64>
+    %2 = "quantum.sample"(%0) : (!quantum.obs) -> tensor<?x0xf64>
+    return %2 : tensor<?x0xf64>
   }
 }
 """
@@ -141,14 +144,10 @@ module @workflow {
     %0 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>
     return %0 : tensor<?x1xi64>
   }
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-      transform.yield
-    }
-  }
   module @module_circuit {
     func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 10, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+      %shots = tensor.extract %arg0[] : tensor<i64>
+      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 10, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"] shots %shots
       %c = stablehlo.constant dense<1> : tensor<i64>
       %0 = quantum.alloc( 1) : !quantum.reg
       %c_0 = stablehlo.constant dense<0> : tensor<i64>
@@ -158,8 +157,7 @@ module @workflow {
       %extracted_1 = tensor.extract %cst[] : tensor<f64>
       %out_qubits = quantum.custom "RX"(%extracted_1) %1 : !quantum.bit
       %2 = quantum.compbasis %out_qubits : !quantum.obs
-      %extracted_3 = tensor.extract %arg0[] : tensor<i64>
-      %3 = quantum.sample %2 shots %extracted_3 : tensor<?x1xf64>
+      %3 = quantum.sample %2 : tensor<?x1xf64>
       %4 = stablehlo.convert %3 : (tensor<?x1xf64>) -> tensor<?x1xi64>
       %c_4 = stablehlo.constant dense<0> : tensor<i64>
       %extracted_5 = tensor.extract %c_4[] : tensor<i64>

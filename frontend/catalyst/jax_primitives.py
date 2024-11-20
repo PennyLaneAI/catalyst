@@ -1657,44 +1657,41 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # sample measurement
 #
 @sample_p.def_abstract_eval
-def _sample_abstract_eval(obs, shots, shape):
+def _sample_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)
 
-    if isinstance(shots, int):
-        if obs.primitive is compbasis_p:
-            assert shape == (shots, obs.num_qubits)
-        else:
-            assert shape == (shots,)
+    if obs.primitive is compbasis_p:
+        assert shape[1] == obs.num_qubits
+    else:
+        assert len(shape) == 1
 
+    # Convert all shots to dynamic
+    #result_shape = (-9223372036854775808, shape[1])
     return core.DShapedArray(shape, jax.numpy.dtype("float64"))
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
+def _sample_def_impl(ctx, obs, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple
 ):
     # Note: result shape of sample op is (shots, number_of_qubits)
+    # shots will always be dynamic in IR, and will be retrived from device in runtime
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     f64_type = ir.F64Type.get()
     i64_type = ir.IntegerType.get_signless(64, ctx)
 
-    if isinstance(shots, int):
-        result_type = ir.RankedTensorType.get(shape, f64_type)
-        return SampleOp(result_type, obs, static_shots=shots).results
+    # TODO: use actual dynamic shape tensor type API
+    # Somehow this magic number means dynamically sized dimensions in jax
+    result_shape = (-9223372036854775808, shape[1])
+    result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    else:
-        # TODO: use actual dynamic shape tensor type API
-        # Somehow this magic number means dynamically sized dimensions in jax
-        result_shape = (-9223372036854775808, shape[1])
-        shots = TensorExtractOp(i64_type, shots, []).result
-        result_type = ir.RankedTensorType.get(result_shape, f64_type)
-        return SampleOp(result_type, obs, shots=shots).results
+    return SampleOp(result_type, obs).results
 
 
 #
