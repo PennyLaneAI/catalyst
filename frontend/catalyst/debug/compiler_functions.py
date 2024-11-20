@@ -99,7 +99,7 @@ def get_compilation_stage(fn, stage):
 
 @debug_logger
 def get_compilation_stages_groups(options):
-    """Returns a list of tupes. The tuples correspond to the name
+    """Returns a list of tuples. The tuples correspond to the name
     of the compilation stage and the list of passes within that stage.
     """
     return options.get_stages()
