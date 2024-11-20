@@ -1,0 +1,27 @@
+diff -r mlir/llvm-project/mlir/examples/standalone/README.md mlir/standalone/README.md
+1c1,12
+< # An out-of-tree MLIR dialect
+---
+> # Notice
+> 
+> This directory is a copy of the [standalone directory found in the LLVM repository,](https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone)
+> taken from the LLVM project: https://github.com/llvm/llvm-project
+> 
+> Small alterations were made to the tests for Catalyst.
+> The LLVM project has the following license:
+> 
+> The LLVM Project is under the Apache License v2.0 with LLVM Exceptions.
+> 
+> 
+> ## An out-of-tree MLIR dialect
+Only in mlir/standalone/: build
+diff -r mlir/llvm-project/mlir/examples/standalone/test/lit.cfg.py mlir/standalone/test/lit.cfg.py
+54c54
+< tool_dirs = [config.standalone_tools_dir, config.llvm_tools_dir]
+---
+> tool_dirs = [config.standalone_tools_dir, config.llvm_tools_dir, config.catalyst_tools_dir]
+56a57
+>     "catalyst-cli",
+diff -r mlir/llvm-project/mlir/examples/standalone/test/lit.site.cfg.py.in mlir/standalone/test/lit.site.cfg.py.in
+3a4
+> config.catalyst_tools_dir = lit_config.substitute("@CATALYST_TOOLS_DIR@")
