@@ -14,6 +14,7 @@ ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
 TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
@@ -120,6 +121,11 @@ enzyme:
 
 	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
 
+.PHONY: standalone-plugin
+standalone-plugin:
+	cmake -B standalone/build -G Ninja standalone -DMLIR_DIR=$(MLIR_DIR) -DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) -DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin
+	cmake --build standalone/build --target check-standalone
+
 .PHONY: dialects
 dialects:
 
@@ -153,8 +159,8 @@ test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-mhlo
-clean: clean-dialects clean-llvm clean-mhlo clean-enzyme
+.PHONY: clean clean-dialects clean-enzyme clean-mhlo clean-plugin
+clean: clean-dialects clean-llvm clean-mhlo clean-enzyme clean-plugin
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
@@ -171,6 +177,10 @@ clean-mhlo:
 clean-enzyme:
 	@echo "clean enzyme build files"
 	rm -rf $(ENZYME_BUILD_DIR)
+
+clean-plugin:
+	@echo "clean plugin"
+	rm -rf standalone/build
 
 .PHONY: format
 format:
