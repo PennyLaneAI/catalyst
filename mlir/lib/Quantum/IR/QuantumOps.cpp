@@ -237,19 +237,21 @@ LogicalResult SampleOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    if (!hasDynamicShots()){
+    if (!hasDynamicShots()) {
         Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
         int64_t static_shots = getStaticShots().value();
         if (getObs().getDefiningOp<ComputationalBasisOp>() &&
             failed(verifyTensorResult(toVerify, static_shots, numQubits.value()))) {
-            // In the computational basis, Pennylane adds a second dimension for the number of qubits.
+            // In the computational basis, Pennylane adds a second dimension for the number of
+            // qubits.
             return emitOpError("return tensor must have 2D static shape equal to "
                                "(number of shots, number of qubits in observable)");
         }
         else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
                  failed(verifyTensorResult(toVerify, static_shots))) {
             // For any given observables, Pennylane always returns a 1D tensor.
-            return emitOpError("return tensor must have 1D static shape equal to (number of shots)");
+            return emitOpError(
+                "return tensor must have 1D static shape equal to (number of shots)");
         }
     }
 
