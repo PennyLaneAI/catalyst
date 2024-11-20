@@ -64,7 +64,6 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import (
     AbstractQreg,
-    apply_registered_pass_p,
     compbasis_p,
     counts_p,
     expval_p,
@@ -89,6 +88,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.passes import add_mlir_quantum_decomposition
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -1131,7 +1131,7 @@ def trace_quantum_function(
         out_tree: PyTree shapen of the result
     """
     # Add the decomposition passes with the transform dialect
-    _add_mlir_quantum_decomposition(f, device)
+    add_mlir_quantum_decomposition(f, device)
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
@@ -1242,12 +1242,3 @@ def trace_quantum_function(
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree, return_values_tree
-
-
-def _add_mlir_quantum_decomposition(f, device):
-    # TODO: make this non related to the name of the device
-    if device.original_device.name == "oqd.cloud":
-        apply_registered_pass_p.bind(
-            pass_name="ions-decomposition",
-            options=f"func-name={f.__name__}",
-        )
