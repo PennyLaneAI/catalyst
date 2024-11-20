@@ -435,6 +435,7 @@ def _inject_transform_named_sequence():
 
 
 def add_mlir_quantum_decomposition(f, device):
+    """When called it adds the MLIR decomposition pass thanks to the transform dialect."""
     # TODO: make this non related to the name of the device
     if device.original_device.name == "oqd.cloud":
         apply_registered_pass_p.bind(
