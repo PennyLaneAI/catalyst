@@ -64,6 +64,11 @@ def circuit():
 print(circuit.mlir)
 
 """
+# TODO: The only reason we are using the braket.local.qubit device here
+# is because this test was developed before having support for custom devices.
+# We should replace instead create a custom device that has support for ISWAP
+# and PSWAP (which I think are unsupported in lightning.qubit and hence why they
+# would be decomposed.
 # COM: CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("braket.local.qubit", wires=2, shots=100))
