@@ -292,6 +292,8 @@ assert_p.multiple_results = True
 apply_registered_pass_p = core.Primitive("apply_registered_pass")
 transform_named_sequence_p = core.Primitive("transform_named_sequence")
 transform_named_sequence_p.multiple_results = True
+transform_named_sequence2_p = core.Primitive("transform_named_sequence2")
+transform_named_sequence2_p.multiple_results = True
 set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
@@ -427,14 +429,63 @@ def get_named_sequence_in_module(mod):
 #
 # transform_named_sequence
 #
+
+@transform_named_sequence2_p.def_abstract_eval
+def _transform_named_sequence2_p_abstract_eval(*args):
+    return ()
+
 @transform_named_sequence_p.def_abstract_eval
 def _transform_named_sequence_p_abstract_eval(*args):
     return ()
 
+@transform_named_sequence2_p.def_impl
+def _transform_named_sequence_p_def_impl(*args): # pragma: no cover
+    raise NotImplementedError()
 
 @transform_named_sequence_p.def_impl
 def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
     raise NotImplementedError()
+
+def _transform_named_sequence_lowering2(jax_ctx: mlir.LoweringRuleContext, *args):
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
+    module = jax_ctx.module_context.module
+
+    # We wish to generate the transformer module, and place it in the top-level module
+    # The transformer module must be marked with the "transform.with_named_sequence" attribute
+    # The transformer module has a single block, and the block contains the
+    # "transform.named_sequence @__transform_main" operation
+
+    with ir.InsertionPoint(module.body):
+        transformer_module = ModuleOp()
+        with_named_sequence_attr = ir.UnitAttr.get(jax_ctx.module_context.context)
+        transformer_module.operation.attributes["transform.with_named_sequence"] = (
+            with_named_sequence_attr
+        )
+        bb_transformer = transformer_module.body
+
+    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
+    functype_attr = ir.TypeAttr.get(functype)
+
+    # Insert the transform.named_sequence op into the transformer module
+    # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
+    with ir.InsertionPoint(bb_transformer):
+        named_sequence_op = NamedSequenceOp(
+            sym_name="__transform_main",
+            function_type=functype_attr,
+        )
+
+        # transform.named_sequence op is the "main function" of the transform dialect
+        # and thus needs an entry block (which also should be its only block)
+        # The argument of the block is the payload module
+        bb_named_sequence = ir.Block.create_at_start(
+            named_sequence_op.body, arg_types=[transform_mod_type]
+        )
+
+        # The transform.named_sequence needs a terminator called "transform.yield"
+        with ir.InsertionPoint(bb_named_sequence):
+            transform_yield_op = TransformYieldOp(operands_=[])  # pylint: disable=unused-variable
+
+    return named_sequence_op.results
 
 
 def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
@@ -518,8 +569,8 @@ def _apply_registered_pass_lowering(
     # jax_ctx.module_context.module holds a reference to @inner
     #
     # This means that it's parent is @root.
-    parent_module = module.parent
-    for op in reversed(parent_module.regions[0].blocks[0].operations):
+    #parent_module = module.parent
+    for op in reversed(module.regions[0].blocks[0].operations):
         # Look for the module @transform that holds the transformation schedule
         # TODO: Find a better way to search for the module with the transform schedule.
         if op.operation.name == "builtin.module":
@@ -2387,6 +2438,7 @@ CUSTOM_LOWERING_RULES = (
     (value_and_grad_p, _value_and_grad_lowering),
     (apply_registered_pass_p, _apply_registered_pass_lowering),
     (transform_named_sequence_p, _transform_named_sequence_lowering),
+    (transform_named_sequence2_p, _transform_named_sequence_lowering2),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),
