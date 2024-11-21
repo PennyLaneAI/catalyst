@@ -32,4 +32,4 @@ venv
 .cache
 
 # Standalone-plugin example
-standalone/build
+mlir/standalone

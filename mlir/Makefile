@@ -124,7 +124,7 @@ enzyme:
 .PHONY: standalone-plugin
 standalone-plugin:
 	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
-	@if patch -p0 --dry-run < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
+	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
 	cmake -B standalone/build -G Ninja \

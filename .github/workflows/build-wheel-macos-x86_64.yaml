@@ -336,9 +336,8 @@ jobs:
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
-        LLVM_EXTERNAL_LIT="$(pwd)/llvm-build/bin/llvm-lit" \
         make standalone-plugin
-        mv standalone/build/lib/StandalonePlugin.* quantum-build/lib/
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
 
     - name: Build wheel
       run: |

@@ -378,9 +378,8 @@ jobs:
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
-        LLVM_EXTERNAL_LIT="$(pwd)/llvm-build/bin/llvm-lit" \
         make standalone-plugin
-        mv standalone/build/lib/StandalonePlugin.so quantum-build/lib/
+        mv mlir/standalone/build/lib/StandalonePlugin.so quantum-build/lib/
 
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v4
