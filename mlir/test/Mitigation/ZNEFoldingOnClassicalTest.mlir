@@ -16,7 +16,8 @@
 
 
 func.func @circuit1(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    %shots = arith.constant 0 : i64
+    quantum.device ["rtd_lightning.so", "LightningQubit", "{}"] shots %shots
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -43,7 +44,8 @@ func.func @circuit1(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 
 
 func.func @circuit2(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    %shots = arith.constant 0 : i64
+    quantum.device ["rtd_lightning.so", "LightningQubit", "{}"] shots %shots
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -105,7 +107,8 @@ func.func @qjitZne(%arg0: tensor<3xf64>) -> tensor<5xf64> {
 // -----
 
 func.func @circuit1(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    %shots = arith.constant 0 : i64
+    quantum.device ["rtd_lightning.so", "LightningQubit", "{}"] shots %shots
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -132,7 +135,8 @@ func.func @circuit1(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 
 
 func.func @circuit2(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    %shots = arith.constant 0 : i64
+    quantum.device ["rtd_lightning.so", "LightningQubit", "{}"] shots %shots
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -210,7 +214,8 @@ func.func @qjitZne(%arg0: tensor<3xf64>, %arg1: f64) -> tensor<5xf64> {
 // -----
 
 func.func @circuit1(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+    %shots = arith.constant 0 : i64
+    quantum.device ["rtd_lightning.so", "LightningQubit", "{}"] shots %shots
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index

@@ -230,7 +230,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
-                                StringAttr lib, StringAttr name, StringAttr kwargs,
+                                Operation *shots, StringAttr lib, StringAttr name, StringAttr kwargs,
                                 int64_t numberQubits, FunctionType fnFoldedType,
                                 SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
                                 func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
@@ -247,10 +247,10 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
     Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
-    // TODO: fix ZNE device init
-    TypedAttr shotsAttr = rewriter.getI64IntegerAttr(1000);
-    Value shots = rewriter.create<arith::ConstantOp>(loc, shotsAttr);
-    rewriter.create<quantum::DeviceInitOp>(loc, shots, lib, name, kwargs);
+    // TODO: clone all dependencies for the shots SSA value
+    Operation *shotsLocal = shots->clone();
+    rewriter.insert(shotsLocal);
+    rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
 
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
@@ -384,6 +384,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Get the device
     quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
 
+    Operation *shots = deviceInitOp.getShots().getDefiningOp();
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getNameAttr();
     StringAttr kwargs = deviceInitOp.getKwargsAttr();
@@ -421,7 +422,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
         func::FuncOp fnWithMeasurementsOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
 
-        return globalFolding(loc, rewriter, fnFoldedName, lib, name, kwargs, numberQubits,
+        return globalFolding(loc, rewriter, fnFoldedName, shots, lib, name, kwargs, numberQubits,
                              fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
                              fnWithoutMeasurementsOp, fnWithMeasurementsOp);
     }
