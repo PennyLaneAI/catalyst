@@ -121,20 +121,22 @@ def test_pipeline_lowering_keep_original():
     def test_pipeline_lowering_keep_original_workflow(x):
         return f(x), f_pipeline(x)
 
-    # CHECK: transform_named_sequence
     # CHECK: call_jaxpr=
-    # CHECK-NOT: _:AbstractTransformMod() = apply_registered_pass[
+    # CHECK: transform_named_sequence2
     # CHECK: call_jaxpr=
+    # CHECK: transform_named_sequence2
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=f_transformed0
     # CHECK:   pass_name=remove-chained-self-inverse
-    # CHECK: ]
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   options=func-name=f_transformed0
     # CHECK:   pass_name=merge-rotations
     # CHECK: ]
     print_jaxpr(test_pipeline_lowering_keep_original_workflow, 1.2)
 
+    # COM: This is the one that is unchanged
+    # CHECK: transform.named_sequence @__transform_main
+    # COM: This is the one that is changed
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}} {options = "func-name=f_transformed0"}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=f_transformed0"}
