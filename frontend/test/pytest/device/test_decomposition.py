@@ -15,8 +15,8 @@
 """Unit test module for catalyst/device/decomposition.py"""
 
 import os
-import platform
 import pathlib
+import platform
 
 import numpy as np
 import pennylane as qml
