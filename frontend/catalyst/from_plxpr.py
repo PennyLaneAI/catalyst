@@ -28,7 +28,7 @@ from pennylane.capture import (
     qnode_prim,
 )
 
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import extract_backend_info, get_device_capabilities, get_device_shots
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -240,7 +240,8 @@ class QFuncPlxprInterpreter:
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
-        qdevice_p.bind(**_get_device_kwargs(self._device))
+        device_shots = 0 if get_device_shots(self._device) is None else get_device_shots(self._device)
+        qdevice_p.bind(device_shots, **_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
