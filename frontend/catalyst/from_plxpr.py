@@ -229,6 +229,7 @@ class QFuncPlxprInterpreter:
 
     def __init__(self, device):
         self._device = device
+        self.device_shots = 0 if get_device_shots(self._device) is None else get_device_shots(self._device)
         self.qreg = None
         self.env = {}
         self.wire_map = {}
@@ -240,8 +241,7 @@ class QFuncPlxprInterpreter:
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
-        device_shots = 0 if get_device_shots(self._device) is None else get_device_shots(self._device)
-        qdevice_p.bind(device_shots, **_get_device_kwargs(self._device))
+        qdevice_p.bind(self.device_shots, **_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
@@ -352,7 +352,17 @@ class QFuncPlxprInterpreter:
         )[0]
 
         primitive = measurement_map[eqn.primitive.name]
-        mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+
+        # TODO: as we are in the process of migrating to dynamic measurement primitive shapes,
+        # we will gradually get rid of the shape argument for these primitives
+        # While we are in the migrating process, we need to handle them explicitly one by one
+        if primitive is sample_p:
+            mval = (primitive.bind(obs, shots=self.device_shots, num_qubits=shaped_array.shape[1])
+                        if isinstance(self.device_shots, int)
+                        else primitive.bind(obs, self.device_shots, num_qubits=shaped_array.shape[1])
+                    )
+        else:
+            mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if shaped_array.dtype != mval.dtype:

@@ -233,7 +233,7 @@ module @foo {
     # assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
 
 
-#@pytest.mark.xfail(reason="[WIP] Convert to lit test")
+@pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_counts_dynamic_shape():
     """Test that the counts primitive can be captured by jaxpr."""
 
