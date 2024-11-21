@@ -1193,8 +1193,12 @@ def trace_quantum_function(
                 # We just need to ensure there is a tape cut in between each.
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
+
+                # TODO: device shots is now always a concrete integer or None
+                # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
+                device_shots = 0 if get_device_shots(device) is None else get_device_shots(device)
                 qdevice_p.bind(
-                    device.shots.total_shots,  # we allow dynamic shots in general
+                    device_shots,
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),
