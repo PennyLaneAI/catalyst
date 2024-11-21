@@ -74,9 +74,9 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
         const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
     {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
-        device_shots = device_kwargs.contains("shots")
-                           ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
-                           : 0;
+        //device_shots = device_kwargs.contains("shots")
+        //                   ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
+        //                   : 0;
 
         if (device_kwargs.contains("device_type")) {
             if (device_kwargs["device_type"] == "braket.aws.qubit") {
