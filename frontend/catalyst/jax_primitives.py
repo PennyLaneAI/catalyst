@@ -430,21 +430,26 @@ def get_named_sequence_in_module(mod):
 # transform_named_sequence
 #
 
+
 @transform_named_sequence2_p.def_abstract_eval
 def _transform_named_sequence2_p_abstract_eval(*args):
     return ()
+
 
 @transform_named_sequence_p.def_abstract_eval
 def _transform_named_sequence_p_abstract_eval(*args):
     return ()
 
+
 @transform_named_sequence2_p.def_impl
-def _transform_named_sequence_p_def_impl(*args): # pragma: no cover
+def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
     raise NotImplementedError()
+
 
 @transform_named_sequence_p.def_impl
 def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
     raise NotImplementedError()
+
 
 def _transform_named_sequence_lowering2(jax_ctx: mlir.LoweringRuleContext, *args):
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
@@ -569,7 +574,7 @@ def _apply_registered_pass_lowering(
     # jax_ctx.module_context.module holds a reference to @inner
     #
     # This means that it's parent is @root.
-    #parent_module = module.parent
+    # parent_module = module.parent
     for op in reversed(module.regions[0].blocks[0].operations):
         # Look for the module @transform that holds the transformation schedule
         # TODO: Find a better way to search for the module with the transform schedule.

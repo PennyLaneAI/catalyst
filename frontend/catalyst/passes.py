@@ -313,9 +313,9 @@ def cancel_inverses(fn=None):
 
     return fn_clone
 
+
 def apply_pass(pass_name, *flags, **valued_options):
-    """
-    """
+    """ """
 
     def decorator(fn):
 
@@ -340,7 +340,7 @@ def apply_pass(pass_name, *flags, **valued_options):
 
         def wrapper(*args, **kwargs):
             if EvaluationContext.is_tracing():
-                apply_registered_pass_p.bind(pass_name=pass_name, options = options)
+                apply_registered_pass_p.bind(pass_name=pass_name, options=options)
             return wrapped_qnode_function(*args, **kwargs)
 
         fn_clone = copy.copy(fn)
@@ -350,7 +350,6 @@ def apply_pass(pass_name, *flags, **valued_options):
         return fn_clone
 
     return decorator
-
 
 
 def merge_rotations(fn=None):

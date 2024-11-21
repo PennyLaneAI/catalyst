@@ -1130,6 +1130,7 @@ def trace_quantum_function(
         out_tree: PyTree shapen of the result
     """
     from catalyst.jax_primitives import transform_named_sequence2_p
+
     transform_named_sequence2_p.bind()
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing

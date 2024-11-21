@@ -62,8 +62,7 @@ module @workflow {
 // CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
 
 // CHECK-LABEL: g
-// CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-// CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+// CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
 
 // -----
 
