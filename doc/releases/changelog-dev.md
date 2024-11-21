@@ -69,12 +69,16 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix bug introduced in 0.8 that breaks nested invocations of `qml.adjoint` and `qml.ctrl`.
+  [(#1301)](https://github.com/PennyLaneAI/catalyst/issues/1301)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Astral Cai,
 Joey Carter,
+David Ittah,
 Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 William Maxwell
