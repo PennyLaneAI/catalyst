@@ -21,7 +21,7 @@ import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from jax import numpy as jnp
 
-from catalyst import qjit, CompileError
+from catalyst import CompileError, qjit
 from catalyst.device import get_device_capabilities
 from catalyst.utils.runtime_environment import get_lib_path
 
