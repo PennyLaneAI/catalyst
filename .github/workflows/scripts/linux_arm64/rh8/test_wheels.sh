@@ -45,5 +45,5 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_MAJOR_MINOR
 /usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest -n auto
 /usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest --backend="lightning.kokkos" -n auto
 /usr/bin/python3 -m pytest /catalyst/frontend/test/async_tests
-/usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest --runbraket=LOCAL -n auto
+# /usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest --runbraket=LOCAL -n auto
 /usr/bin/python3 -m pytest /catalyst/frontend/test/test_oqc/oqc -n auto

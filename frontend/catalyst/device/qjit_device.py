@@ -104,12 +104,10 @@ RUNTIME_OBSERVABLES = [
     "PauliZ",
     "Hadamard",
     "Hermitian",
-    "Hamiltonian",
     "LinearCombination",
     "Prod",
     "SProd",
     "Sum",
-    "Tensor",
 ]
 
 # The runtime interface does not care about specific gate properties, so set them all to True.
@@ -382,9 +380,7 @@ class QJITDevice(qml.devices.Device):
         if isinstance(self.original_device, SoftwareQQPP):
             return measurement_program
 
-        supports_sum_observables = any(
-            obs in self.capabilities.native_obs for obs in ("Sum", "Hamiltonian")
-        )
+        supports_sum_observables = "Sum" in self.capabilities.native_obs
 
         if self.capabilities.non_commuting_observables_flag is False:
             measurement_program.add_transform(split_non_commuting)

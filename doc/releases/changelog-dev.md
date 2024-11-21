@@ -41,6 +41,10 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Handling for the legacy operator arithmetic (the `Hamiltonian` and `Tensor` classes in PennyLane) 
+  is removed.
+  [(#1308)](https://github.com/PennyLaneAI/catalyst/pull/1308)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Internal changes ⚙️</h3>
