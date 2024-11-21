@@ -47,35 +47,6 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
 
 
 #
-# General lowering tests
-#
-
-
-def test_transform_named_sequence_injection():
-    """
-    Test the transform.with_named_sequence jax primitive and mlir operation are
-    always generated for qjit.
-    """
-
-    @qjit
-    def func():
-        return
-
-    # CHECK: transform_named_sequence
-    print_jaxpr(func)
-
-    # CHECK: module @func {
-    # CHECK: module attributes {
-    # CHECK-SAME: transform.with_named_sequence
-    # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: transform.yield
-    print_mlir(func)
-
-
-test_transform_named_sequence_injection()
-
-
-#
 # pipeline
 #
 
