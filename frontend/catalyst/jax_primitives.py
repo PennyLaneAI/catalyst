@@ -1116,14 +1116,18 @@ def _qdevice_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_lowering(
+    jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     DeviceInitOp(
-        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs),
-        shots=shots_value
+        ir.StringAttr.get(rtd_lib),
+        ir.StringAttr.get(rtd_name),
+        ir.StringAttr.get(rtd_kwargs),
+        shots=shots_value,
     )
 
     return ()
@@ -1657,26 +1661,25 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # sample measurement
 #
 @sample_p.def_abstract_eval
-def _sample_abstract_eval(obs, shape):
+def _sample_abstract_eval(obs, shots, num_qubits):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape[1] == obs.num_qubits
-    else:
-        assert len(shape) == 1
+        # assert shape[1] == obs.num_qubits
+        assert num_qubits == obs.num_qubits
+    # else:
+    #    assert len(shape) == 1
 
-    # Convert all shots to dynamic
-    #result_shape = (-9223372036854775808, shape[1])
-    return core.DShapedArray(shape, jax.numpy.dtype("float64"))
+    return core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shape):  # pragma: no cover
+def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _sample_lowering(
-    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
 ):
     # Note: result shape of sample op is (shots, number_of_qubits)
     # shots will always be dynamic in IR, and will be retrived from device in runtime
@@ -1688,7 +1691,10 @@ def _sample_lowering(
 
     # TODO: use actual dynamic shape tensor type API
     # Somehow this magic number means dynamically sized dimensions in jax
-    result_shape = (-9223372036854775808, shape[1])
+    # breakpoint()
+    result_shape = (
+        (shots, num_qubits) if isinstance(shots, int) else (-9223372036854775808, num_qubits)
+    )
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
     return SampleOp(result_type, obs).results

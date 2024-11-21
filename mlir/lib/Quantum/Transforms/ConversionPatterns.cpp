@@ -716,11 +716,10 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
 
-        Type qirSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                        {LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                         IntegerType::get(ctx, 64)},
-                                        /*isVarArg=*/true);
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 

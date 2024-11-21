@@ -876,7 +876,11 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = sample_p.bind(obs_tracers, shape=shape)
+                    result = (
+                        sample_p.bind(obs_tracers, shots=shots, num_qubits=nqubits)
+                        if isinstance(shots, int)
+                        else sample_p.bind(obs_tracers, shots, num_qubits=nqubits)
+                    )
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
@@ -1190,10 +1194,10 @@ def trace_quantum_function(
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
                 qdevice_p.bind(
-                    device.shots.total_shots,
+                    device.shots.total_shots,  # we allow dynamic shots in general
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
-                    rtd_kwargs=str(device.backend_kwargs)
+                    rtd_kwargs=str(device.backend_kwargs),
                 )
                 qreg_in = qalloc_p.bind(len(device.wires))
 

@@ -239,7 +239,8 @@ void __catalyst__rt__finalize()
     CTX.reset(nullptr);
 }
 
-static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs, int64_t shots)
+static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
+                                             int64_t shots)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -258,7 +259,8 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     return 0;
 }
 
-void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs, int64_t shots)
+void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
+                                 int64_t shots)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
                  rtd_name, rtd_kwargs, shots);
@@ -959,8 +961,7 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
     }
 }
 
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result,
-                             int64_t numQubits, ...)
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQubits, ...)
 {
     int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);

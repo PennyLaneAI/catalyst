@@ -36,7 +36,7 @@ def test_sample():
 
     def f():
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shape=(5, 0))
+        return sample_p.bind(obs, shots=5, num_qubits=0)
 
     jaxpr = jax.make_jaxpr(f)().jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
@@ -47,7 +47,7 @@ def test_sample():
         == """
 { lambda ; . let
     a:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
-    b:f64[-9223372036854775808,0] = sample[shape=(5, 0)] a
+    b:f64[5,0] = sample[num_qubits=0 shots=5] a
   in (b,) }
 """
     )
@@ -56,10 +56,10 @@ def test_sample():
         mlir
         == """
 module @foo {
-  func.func public @jit_foo() -> tensor<?x0xf64> {
+  func.func public @jit_foo() -> tensor<5x0xf64> {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
-    %1 = "quantum.sample"(%0) : (!quantum.obs) -> tensor<?x0xf64>
-    return %1 : tensor<?x0xf64>
+    %1 = "quantum.sample"(%0) : (!quantum.obs) -> tensor<5x0xf64>
+    return %1 : tensor<5x0xf64>
   }
 }
 """
@@ -81,7 +81,7 @@ def test_sample_dynamic_shape():
         # proper arguments, and kwargs are treated as primitive's `params`
         # Proper primitive arguments are propagated as jaxpr variables,
         # whereas primitive params are tracers.
-        return sample_p.bind(obs, shape=(x, 0))
+        return sample_p.bind(obs, x, num_qubits=0)
 
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
@@ -92,11 +92,9 @@ def test_sample_dynamic_shape():
         == """
 { lambda ; a:i64[]. let
     b:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
-    _:i64[] = add a 1
-    c:f64[-9223372036854775808,0] = sample[
-      shape=(Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>, 0)
-    ] b
-  in (c,) }
+    c:i64[] = add a 1
+    d:f64[ShapedArray(int64[], weak_type=True),0] = sample[num_qubits=0] b c
+  in (d,) }
 """
     )
 

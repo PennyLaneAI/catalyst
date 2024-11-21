@@ -77,17 +77,27 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Location loc = op.getLoc();
 
         // SampleOp's result shape is (shots, num_qubits)
-        // shots is a SSA argument to the device, so we need to memref alloc from the shots SSA value
-        auto parentFunc = op->getParentOfType<func::FuncOp>();
-        SmallVector<DeviceInitOp> DeviceInitOpPool;
-        parentFunc->walk([&](DeviceInitOp deviceInitOp){DeviceInitOpPool.push_back(deviceInitOp);});
-        assert(DeviceInitOpPool.size() == 1 &&
-            "quantum.sample operation is only valid when either inside a function with exactly one shot-ful device init operation, or have allocated memref as input");
+        // shots is a SSA argument to the device and can potentially be dynamic
+        // so we need to memref alloc from the shots SSA value
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        SmallVector<Value> allocSizes;
 
-        auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                             DeviceInitOpPool[0].getShots());
+        if (shape[0] == ShapedType::kDynamic) {
+            auto parentFunc = op->getParentOfType<func::FuncOp>();
+            SmallVector<DeviceInitOp> DeviceInitOpPool;
+            parentFunc->walk(
+                [&](DeviceInitOp deviceInitOp) { DeviceInitOpPool.push_back(deviceInitOp); });
+            assert(DeviceInitOpPool.size() == 1 &&
+                   "quantum.sample operation is only valid when either inside a function with "
+                   "exactly one shot-ful device init operation, or have allocated memref as input");
 
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, ValueRange({shots}));
+            auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                         DeviceInitOpPool[0].getShots());
+
+            allocSizes.push_back(shots);
+        }
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
                                   op->getAttrs());
         /*

@@ -46,6 +46,10 @@ func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
     // CHECK: quantum.sample {{.*}} in([[alloc]] : memref<?x2xf64>)
     %samples = quantum.sample %obs : tensor<?x2xf64>
 
+    // CHECK: [[alloc_static:%.+]] = memref.alloc() : memref<10x2xf64>
+    // CHECK: quantum.sample {{.*}} in([[alloc_static]] : memref<10x2xf64>)
+    %samples_static = quantum.sample %obs : tensor<10x2xf64>
+
     func.return
 }
 

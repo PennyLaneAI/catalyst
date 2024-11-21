@@ -247,7 +247,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
     Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
-    //TODO: fix ZNE device init
+    // TODO: fix ZNE device init
     TypedAttr shotsAttr = rewriter.getI64IntegerAttr(1000);
     Value shots = rewriter.create<arith::ConstantOp>(loc, shotsAttr);
     rewriter.create<quantum::DeviceInitOp>(loc, shots, lib, name, kwargs);
