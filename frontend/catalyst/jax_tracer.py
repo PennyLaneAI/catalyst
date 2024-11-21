@@ -85,6 +85,7 @@ from catalyst.jax_primitives import (
     set_state_p,
     state_p,
     tensorobs_p,
+    transform_named_sequence_p,
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
@@ -1129,9 +1130,8 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-    from catalyst.jax_primitives import transform_named_sequence2_p
 
-    transform_named_sequence2_p.bind()
+    transform_named_sequence_p.bind()
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)

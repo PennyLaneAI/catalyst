@@ -68,7 +68,7 @@ from catalyst.jax_primitives import (
     sample_p,
     state_p,
     tensorobs_p,
-    transform_named_sequence2_p,
+    transform_named_sequence_p,
     var_p,
     vjp_p,
     while_p,
@@ -745,7 +745,7 @@ INST_IMPL = {
     qdealloc_p: ignore_impl,
     qdevice_p: ignore_impl,
     qalloc_p: ignore_impl,
-    transform_named_sequence2_p: ignore_impl,
+    transform_named_sequence_p: ignore_impl,
     # These are unimplemented at the moment.
     zne_p: unimplemented_impl,
     qunitary_p: unimplemented_impl,
