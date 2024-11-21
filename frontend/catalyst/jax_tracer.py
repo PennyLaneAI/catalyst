@@ -645,9 +645,17 @@ def trace_quantum_operations(
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp):
-            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+            return bind_native_operation(
+                qrp,
+                op.base,
+                controlled_wires + op.control_wires,
+                controlled_values + op.control_values,
+                adjoint,
+            )
         elif isinstance(op, Adjoint):
-            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
+            return bind_native_operation(
+                qrp, op.base, controlled_wires, controlled_values, not adjoint
+            )
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -743,15 +751,13 @@ def trace_observables(
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
-    elif isinstance(obs, qml.operation.Tensor):
-        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.obs]
-        obs_tracers = tensorobs_p.bind(*nested_obs)
-    elif isinstance(obs, qml.Hamiltonian):
-        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
-        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
+    elif isinstance(obs, qml.ops.LinearCombination):
+        coeffs, observables = obs.terms()
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in observables]
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
