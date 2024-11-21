@@ -51,7 +51,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=()):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
     for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
         assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == len(jaxpr2.eqns)
+    assert len(jaxpr1.eqns) == (len(jaxpr2.eqns))
 
     for i, (eqn1, eqn2) in enumerate(zip(jaxpr1.eqns, jaxpr2.eqns)):
         if i not in skip_eqns:
@@ -216,7 +216,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_globalphase(self):
@@ -242,7 +242,7 @@ class TestCatalystCompareJaxpr:
 
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_expval(self):
@@ -270,7 +270,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -302,7 +302,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -341,7 +341,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(phi)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         # confused by the weak_types error here
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
@@ -376,7 +376,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -408,7 +408,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -450,7 +450,7 @@ class TestCatalystCompareJaxpr:
         qjit_obj(x, y, z)
         catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -495,14 +495,14 @@ class TestHybridPrograms:
         qjit_obj(0.5)
 
         call_jaxpr_pl = converted.eqns[1].params["call_jaxpr"]
-        call_jaxpr_c = qjit_obj.jaxpr.eqns[2].params["call_jaxpr"]
+        call_jaxpr_c = qjit_obj.jaxpr.eqns[1].params["call_jaxpr"]
 
         # qubit extraction and classical equations in a slightly different order
         # thus cant check specific equations and have to discard comparing counts
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=(4, 5, 6))
-        compare_eqns(call_jaxpr_pl.eqns[4], call_jaxpr_c.eqns[5])
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=(5, 6, 7))
         compare_eqns(call_jaxpr_pl.eqns[5], call_jaxpr_c.eqns[6])
-        compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4])
+        compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[7])
+        compare_eqns(call_jaxpr_pl.eqns[7], call_jaxpr_c.eqns[5])
 
     def test_multiple_qnodes(self):
         """Test that a workflow with multiple qnodes can be converted."""

@@ -48,6 +48,7 @@ from catalyst.jax_primitives import (
     qunitary_p,
     sample_p,
     state_p,
+    transform_named_sequence2_p,
     var_p,
 )
 
@@ -240,6 +241,7 @@ class QFuncPlxprInterpreter:
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
+        transform_named_sequence2_p.bind()
         qdevice_p.bind(**_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
