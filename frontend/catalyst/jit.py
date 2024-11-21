@@ -666,7 +666,7 @@ class QJIT(CatalystCallable):
             results with a transform_named_sequence primitive at the beginning of the
             jaxpr. It is never executed or used anywhere, except being traced here.
             """
-            _inject_transform_named_sequence()
+            #_inject_transform_named_sequence()
             return self.user_function(*args, **kwargs)
 
         if self.compile_options.experimental_capture:
