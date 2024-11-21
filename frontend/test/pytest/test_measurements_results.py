@@ -21,7 +21,7 @@ import pytest
 from conftest import CONFIG_CUSTOM_DEVICE
 from jax import numpy as jnp
 
-from catalyst import qjit
+from catalyst import qjit, CompileError
 from catalyst.device import get_device_capabilities
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -1045,8 +1045,8 @@ class TestDensityMatrixMP:
     def test_error(self):
         """Test that tracing density matrix produces an error"""
 
-        err_msg = "Measurement .* is not implemented"
-        with pytest.raises(NotImplementedError, match=err_msg):
+        err_msg = "DensityMatrixMP is not a supported measurement process"
+        with pytest.raises(CompileError, match=err_msg):
 
             @qml.qjit
             @qml.qnode(CustomDevice(wires=1))
