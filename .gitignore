@@ -30,6 +30,3 @@ venv
 
 # Cache files
 .cache
-
-# Standalone-plugin example
-standalone/build

@@ -21,8 +21,7 @@ set(LIBS
     ${ALL_MHLO_PASSES}
 )
 
-add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)
+add_llvm_executable(quantum-opt quantum-opt.cpp)
 target_link_libraries(quantum-opt PRIVATE ${LIBS})
 llvm_update_compile_flags(quantum-opt)
 mlir_check_all_link_libraries(quantum-opt)
-export_executable_symbols_for_plugins(quantum-opt)
