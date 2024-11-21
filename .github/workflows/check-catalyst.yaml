@@ -414,8 +414,6 @@ jobs:
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
         make frontend
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane-lightning@toml-updates
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -497,8 +495,6 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@device-api-cap
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane-lightning@toml-updates
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build

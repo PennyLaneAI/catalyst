@@ -316,8 +316,7 @@ does not have, include them in a separate section:
 
 Additionally, any runtime parameters to be passed to the ``QuantumDevice`` upon initialization
 should be specified in a dictionary class property ``device_kwargs`` that links keyword arguments
-of the ``QuantumDevice`` constructor to attributes of the ``qml.device.Device`` implementation.
-For example:
+of the ``QuantumDevice`` constructor to variables. For example:
 
 .. code-block:: python
 
