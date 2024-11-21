@@ -27,6 +27,7 @@ from pennylane.capture import (
     enabled,
     qnode_prim,
 )
+from pennylane.capture import PlxprInterpreter
 
 from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
@@ -154,95 +155,53 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(from_plxpr_interpreter, plxpr.jaxpr, plxpr.consts))
+    return jax.make_jaxpr(partial(WorkflowInterpreter.eval, plxpr.jaxpr, plxpr.consts))
 
 
-# docstring link too long
-# pylint: disable=line-too-long
-def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
-    """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
+class WorkflowInterpreter(PlxprInterpreter):
+    pass
 
-    See the documentation on
-    `Writing custom interpreters in JAX <https://jax.readthedocs.io/en/latest/notebooks/Writing_custom_interpreters_in_Jax.html>`_
-    for a walkthrough on the general architecture and behavior of this function.
-
-    Given that ``catalyst.jax_primitives.quantum_kernel_p`` does not define a concrete implementation, this
-    function will fail outside of an abstract evaluation call.
-
-    """
-    env = {invar: arg for arg, invar in zip(args, jaxpr.invars)}
-
-    for const, constvar in zip(consts, jaxpr.constvars):
-        env[constvar] = const
-
-    # Loop through equations and evaluate primitives using `bind`
-    for eqn in jaxpr.eqns:
-        # Read inputs to equation from environment
-        invals = [_read(invar, env) for invar in eqn.invars]
-        if eqn.primitive == qnode_prim:
-            if eqn.params["device"].shots != eqn.params["shots"]:
-                raise NotImplementedError("catalyst does not yet support dynamic shots")
-
-            f = partial(
-                QFuncPlxprInterpreter(eqn.params["device"]).convert,
-                eqn.params["qfunc_jaxpr"],
-                n_consts=eqn.params["n_consts"],
-            )
-            # quantum_kernel_p is a CallPrimitive, so interpreter passed as first arg
-            # wrap_init turns the function into a WrappedFun, which can store
-            # transformations
-            outvals = quantum_kernel_p.bind(wrap_init(f), *invals, qnode=eqn.params["qnode"])
-        else:
-            outvals = eqn.primitive.bind(*invals, **eqn.params)
-        # Primitives may return multiple outputs or not
-        if not eqn.primitive.multiple_results:
-            outvals = [outvals]
-        # Write the results of the primitive into the environment
-        for outvar, outval in zip(eqn.outvars, outvals):
-            env[outvar] = outval
-    return [env[outvar] for outvar in jaxpr.outvars]
+@WorkflowInterpreter.register_primitive(qnode_prim)
+def _(self, *args, qnode, shots, device, qnode, qfunc_jaxpr, n_consts, batch_dims=None):
+    if device.shots != shots:
+        raise NotImplementedError("catalyst does not yet support dynamic shots")
+    f = partial(
+        QFuncPlxprInterpreter(device).eval,
+        qfunc_jaxpr,
+        n_consts=n_consts
+    )
+    return quantum_kernel_p.bind(wrap_init(f), *args, qnode=qnode)
 
 
-class QFuncPlxprInterpreter:
+class QFuncPlxprInterpreter(PlxprInterpreter):
     """This dataclass stores the mutable variables modified
     over the course of interpreting the plxpr as catalxpr."""
 
-    qreg: AbstractQreg
-    """The current quantum register."""
-
-    env: dict
-    """A dictionary mapping variables to values."""
-
-    wire_map: dict
-    """A map from wire values to ``AbstractQbit`` instances.
-
-    If a value is not present in this dictionary, it needs to be extracted
-    from the ``qreg`` property.
-    """
-
-    op_math_cache: dict
-    """A cache of operations that will be consumed by later operations.
-    This is a map from the ``AbstractOperator`` variables to the corresponding
-    equation. The equation will need to be interpreted when the abstract
-    operator is consumed.
-    """
-
     def __init__(self, device):
         self._device = device
-        self.qreg = None
-        self.env = {}
-        self.wire_map = {}
-        self.op_math_cache = {}
+        self.stateref = None
+        super().__init__()
+
+    def __getattr__(self, key):
+        if key in {"qreg", "wire_map"}:
+            if self.stateref is None:
+                raise AttributeError("execution not yet initialized.")
+            return self.stateref[key]
+        return super().__getattr__(key)
+
+    def __setattr__(self, __name: str, __value) -> None:
+        if __name in {"qreg", "wire_map"}:
+            if self.stateref is None:
+                raise AttributeError("execution not yet initialized")
+            self.stateref[__name] = __value
+        else:
+            super().__setattr__(__name, __value)
 
     def setup(self):
-        """Perform any customized setup and processing before processing the plxpr.
-
-        For conversion to catalyst, this allocates the device, extracts a register, and
-        resets the wire map.
-        """
-        qdevice_p.bind(**_get_device_kwargs(self._device))
-        self.qreg = qalloc_p.bind(len(self._device.wires))
-        self.wire_map = {}
+        if self.stateref is None:
+            qdevice_p.bind(**_get_device_kwargs(self._device))
+            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)),
+                            "wire_map": {}}
 
     def cleanup(self):
         """Perform any final steps after processing the plxpr.
@@ -253,10 +212,8 @@ class QFuncPlxprInterpreter:
         for orig_wire, wire in self.wire_map.items():
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
         qdealloc_p.bind(self.qreg)
+        self.stateref = None
 
-    def read(self, var):
-        """Extract the value corresponding to a variable."""
-        return var.val if type(var) is jax.core.Literal else self.env[var]
 
     def _get_wire(self, wire_value) -> AbstractQbit:
         """Get the ``AbstractQbit`` corresponding to a wire value."""
@@ -357,36 +314,6 @@ class QFuncPlxprInterpreter:
         if shaped_array.dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, shaped_array.dtype)
         return mval
-
-    def convert(self, jaxpr: jax.core.Jaxpr, *args, n_consts=0) -> list:
-        """Interpret plxpr as catalxpr."""
-
-        consts = args[:n_consts]
-        args = args[n_consts:]
-        self.setup()
-
-        self.op_math_cache = {}
-        self.env = {invar: arg for arg, invar in zip(args, jaxpr.invars)}
-        for const, constvar in zip(consts, jaxpr.constvars):
-            self.env[constvar] = const
-
-        for eqn in jaxpr.eqns:
-            if isinstance(eqn.outvars[0].aval, AbstractOperator):
-                self.interpret_operator_eqn(eqn)
-            elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-                outval = self.interpret_measurement_eqn(eqn)
-                self.env[eqn.outvars[0]] = outval
-            else:
-                invals = [self.read(invar) for invar in eqn.invars]
-                outvals = eqn.primitive.bind(*invals, **eqn.params)
-                if not eqn.primitive.multiple_results:
-                    outvals = [outvals]
-                for outvar, outval in zip(eqn.outvars, outvals):
-                    self.env[outvar] = outval
-
-        self.cleanup()
-        # Read the final result of the Jaxpr from the environment
-        return [self.read(outvar) for outvar in jaxpr.outvars]
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
