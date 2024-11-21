@@ -14,7 +14,9 @@
 
 """Unit test module for catalyst/device/decomposition.py"""
 
+import os
 import platform
+import pathlib
 
 import numpy as np
 import pennylane as qml
@@ -25,7 +27,8 @@ from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decomposer
 
-from ..conftest import CONFIG_CUSTOM_DEVICE
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../../custom_device/custom_device.toml")
 
 
 class TestGateAliases:
