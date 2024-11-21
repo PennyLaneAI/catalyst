@@ -4,17 +4,18 @@
 
 <h3>Improvements 🛠</h3>
 
-* Catalyst now uses the new compiler API to compile quantum code from the python frontend.
-  Frontend no longer uses pybind11 to connect to the compiler. Instead, it uses subprocess instead.
-  [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
-
-* Replace pybind11 with nanobind for C++/Python bindings in the frontend.
+* Replace pybind11 with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
+  [(#1293)](https://github.com/PennyLaneAI/catalyst/pull/1293)
 
   Nanobind has been developed as a natural successor to the pybind11 library and offers a number of
   [advantages](https://nanobind.readthedocs.io/en/latest/why.html#major-additions), in particular,
   its ability to target Python's [stable ABI interface](https://docs.python.org/3/c-api/stable.html)
   starting with Python 3.12.
+
+* Catalyst now uses the new compiler API to compile quantum code from the python frontend.
+  Frontend no longer uses pybind11 to connect to the compiler. Instead, it uses subprocess instead.
+  [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
 
 * Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"} to
   the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to
@@ -35,10 +36,17 @@
   linking against Python shared libraries after decoupling Python from the Runtime C-API.
   [(#1305)](https://github.com/PennyLaneAI/catalyst/pull/1305)
 
+* Improves the readability of conditional passes in pipelines
+  [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
+
 <h3>Breaking changes 💔</h3>
 
 * The `toml` module has been migrated to PennyLane with an updated schema for declaring device capabilities. All TOML files of custom devices should now be updated to use the new schema.
   [(#1275)](https://github.com/PennyLaneAI/catalyst/pull/1275)
+
+* Handling for the legacy operator arithmetic (the `Hamiltonian` and `Tensor` classes in PennyLane) 
+  is removed.
+  [(#1308)](https://github.com/PennyLaneAI/catalyst/pull/1308)
 
 <h3>Deprecations 👋</h3>
 

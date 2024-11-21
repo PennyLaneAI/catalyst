@@ -76,6 +76,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy!=2.0.0",
+    "scipy<1.14",
     "diastatic-malt>=2.15.2",
 ]
 

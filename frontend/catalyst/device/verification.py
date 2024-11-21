@@ -31,15 +31,8 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.measurements.shots import Shots
-from pennylane.operation import Operation, StatePrepBase, Tensor
-from pennylane.ops import (
-    Adjoint,
-    CompositeOp,
-    Controlled,
-    ControlledOp,
-    Hamiltonian,
-    SymbolicOp,
-)
+from pennylane.operation import Operation, StatePrepBase
+from pennylane.ops import Adjoint, CompositeOp, Controlled, ControlledOp, SymbolicOp
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
@@ -86,22 +79,14 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     both that the overall observable is supported, and that its component
     parts are supported."""
 
-    # TODO: remove this because `Tensor` is getting removed.
-    if isinstance(obs, Tensor):
-        for o in obs.obs:
-            _verify_observable(o, _obs_checker)
-        return
-
     _obs_checker(obs)
 
     if isinstance(obs, CompositeOp):
         for o in obs.operands:
             _verify_observable(o, _obs_checker)
 
-    # TODO: remove this because `Hamiltonian` is getting removed.
-    elif isinstance(obs, Hamiltonian):
-        for o in obs.ops:
-            _verify_observable(o, _obs_checker)
+    elif isinstance(obs, SymbolicOp):
+        _verify_observable(obs.base, _obs_checker)
 
     elif isinstance(obs, SymbolicOp):
         _verify_observable(obs.base, _obs_checker)
@@ -258,10 +243,7 @@ def validate_observables_parameter_shift(tape: QuantumTape):
 
     for m in tape.measurements:
         if m.obs:
-            if isinstance(m.obs, Tensor):
-                _ = [_obs_checker(o) for o in m.obs.obs]
-            else:
-                _obs_checker(m.obs)
+            _obs_checker(m.obs)
 
     return (tape,), lambda x: x[0]
 

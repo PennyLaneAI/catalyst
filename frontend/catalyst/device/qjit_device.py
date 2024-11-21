@@ -100,7 +100,6 @@ RUNTIME_OBSERVABLES = [
     "Prod",
     "SProd",
     "Sum",
-    "Tensor",
 ]
 
 RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]

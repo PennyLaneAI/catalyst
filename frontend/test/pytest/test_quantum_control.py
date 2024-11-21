@@ -565,14 +565,6 @@ class OpWithDecomposition(Operation):
         ]
 
 
-@pytest.fixture(scope="function")
-def use_legacy_opmath():
-    """Helper method for legacy opmath."""
-
-    with qml.operation.disable_new_opmath_cm() as cm:
-        yield cm
-
-
 class TestControlledInit:
     """Test the initialization process and standard properties."""
 
@@ -943,33 +935,6 @@ class TestControlledMiscMethods:
         assert op.has_generator is False
 
     def test_generator(self):
-        """Test that the generator is a tensor product of projectors and the base's generator."""
-
-        base = qml.RZ(-0.123, wires="a")
-        control_values = [0, 1]
-        op = C_ctrl(base, ("b", "c"), control_values=control_values)
-
-        base_gen, base_gen_coeff = qml.generator(base, format="prefactor")
-        gen_tensor, gen_coeff = qml.generator(op, format="prefactor")
-
-        assert base_gen_coeff == gen_coeff
-
-        for wire, val in zip(op.control_wires, control_values):
-            ob = list(op for op in gen_tensor.operands if op.wires == qml.wires.Wires(wire))
-            assert len(ob) == 1
-            assert ob[0].data == ([val],)
-
-        ob = list(op for op in gen_tensor.operands if op.wires == base.wires)
-        assert len(ob) == 1
-        assert ob[0].__class__ is base_gen.__class__
-
-        expected = qml.exp(op.generator(), 1j * op.data[0])
-        assert qml.math.allclose(
-            expected.matrix(wire_order=["a", "b", "c"]), op.matrix(wire_order=["a", "b", "c"])
-        )
-
-    @pytest.mark.usefixtures("use_legacy_opmath")
-    def test_generator_legacy_opmath(self):
         """Test that the generator is a tensor product of projectors and the base's generator."""
 
         base = qml.RZ(-0.123, wires="a")

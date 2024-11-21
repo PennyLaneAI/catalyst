@@ -22,6 +22,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <pybind11/embed.h>
+
 using namespace Catalyst::Runtime::Device;
 using BType = OpenQasm::BuilderType;
 
@@ -58,20 +60,111 @@ TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
                                         "Not implemented method"));
 }
 
-TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
+TEST_CASE("Test BraketRunner", "[openqasm]")
 {
     OpenQasm::BraketBuilder builder{};
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
 
-    builder.Gate("Hadamard", {}, {}, {0}, false);
+    builder.Gate("RX", {0.5}, {}, {0}, false);
+    builder.Gate("Hadamard", {}, {}, {1}, false);
     builder.Gate("CNOT", {}, {}, {0, 1}, false);
+    builder.Gate("PauliY", {}, {}, {0}, false);
 
     auto &&circuit = builder.toOpenQasm();
 
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     OpenQasm::BraketRunner runner{};
-    auto &&results = runner.runCircuit(circuit, "default", 100);
-    CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
+
+    SECTION("Test BraketRunner::runCircuit()")
+    {
+        auto &&results = runner.runCircuit(circuit, "default", 100);
+        CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
+    }
+
+    SECTION("Test BraketRunner::Probs()")
+    {
+        auto &&probs = runner.Probs(circuit, "default", 100, 2);
+        CHECK(probs.size() == 4); // For a 2-qubit system
+        CHECK((probs[0] >= 0.0 && probs[0] <= 1.0));
+        CHECK((probs[1] >= 0.0 && probs[1] <= 1.0));
+        CHECK((probs[2] >= 0.0 && probs[2] <= 1.0));
+        CHECK((probs[3] >= 0.0 && probs[3] <= 1.0));
+    }
+
+    SECTION("Test BraketRunner::Sample()")
+    {
+        auto &&samples = runner.Sample(circuit, "default", 100, 2);
+        CHECK(samples.size() == 200); // Expecting 100 * 2 = 200 samples
+        for (const auto &sample : samples) {
+            REQUIRE(
+                (sample == 0 || sample == 1)); // Each sample should be 0 or 1 for a 2-qubit state
+        }
+    }
+}
+
+TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
+{
+    OpenQasm::BraketBuilder builder{};
+
+    builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
+
+    builder.Gate("RX", {0.5}, {}, {0}, false);
+    builder.Gate("Hadamard", {}, {}, {1}, false);
+    builder.Gate("CNOT", {}, {}, {0, 1}, false);
+
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
+    OpenQasm::BraketRunner runner{};
+
+    SECTION("Test BraketRunner::Expval()")
+    {
+        // Compute expectation value of PauliY operator on qubit 0
+        auto &&circuit_expval =
+            builder.toOpenQasmWithCustomInstructions("#pragma braket result expectation y(q[0])");
+
+        auto &&expval = runner.Expval(circuit_expval, "default", 100);
+        CHECK((expval >= -1.0 && expval <= 1.0));
+    }
+
+    SECTION("Test BraketRunner::Expval() with no measurement process")
+    {
+        // Cannot compute expectation value if no measurement process is defined
+        auto &&circuit_expval = builder.toOpenQasmWithCustomInstructions("");
+
+        REQUIRE_THROWS_WITH(runner.Expval(circuit_expval, "default", 100),
+                            Catch::Contains("Unable to compute expectation value"));
+    }
+
+    SECTION("Test BraketRunner::Var()")
+    {
+        // Compute variance of PauliY operator on qubit 0
+        auto &&circuit_var =
+            builder.toOpenQasmWithCustomInstructions("#pragma braket result variance y(q[0])");
+
+        auto &&var = runner.Var(circuit_var, "default", 100);
+        CHECK((var >= 0.0 && var <= 1.0));
+    }
+
+    SECTION("Test BraketRunner::Var() with no measurement process")
+    {
+        // Cannot compute variance if no measurement process is defined
+        auto &&circuit_var = builder.toOpenQasmWithCustomInstructions("");
+
+        REQUIRE_THROWS_WITH(runner.Var(circuit_var, "default", 100),
+                            Catch::Contains("Unable to compute variance"));
+    }
 }
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
