@@ -1723,7 +1723,7 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return core.DShapedArray(shape, jax.numpy.dtype("float64")), core.DShapedArray(
+    return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
         shape, jax.numpy.dtype("int64")
     )
 

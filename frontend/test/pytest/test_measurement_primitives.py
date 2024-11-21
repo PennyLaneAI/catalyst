@@ -202,6 +202,8 @@ def test_counts():
 
     jaxpr = jax.make_jaxpr(f)()
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(), "foo")[0]
+    print(jaxpr)
+    print(mlir)
     assert (
         jaxpr
         == """
@@ -231,7 +233,7 @@ module @foo {
     # assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
 
 
-@pytest.mark.xfail(reason="[WIP] Convert to lit test")
+#@pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_counts_dynamic_shape():
     """Test that the counts primitive can be captured by jaxpr."""
 
@@ -241,6 +243,8 @@ def test_counts_dynamic_shape():
 
     jaxpr = jax.make_jaxpr(f)(5)
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
+    print(jaxpr)
+    print(mlir)
     assert (
         jaxpr
         == """
