@@ -319,7 +319,7 @@ class QJITDevice(qml.devices.Device):
         # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
         #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
         if hasattr(original_device, "_to_matrix_ops"):
-            _to_matrix_ops = (getattr(original_device, "_to_matrix_ops"),)
+            _to_matrix_ops = getattr(original_device, "_to_matrix_ops")
             setattr(original_device_capabilities, "to_matrix_ops", _to_matrix_ops)
             if _to_matrix_ops and "QubitUnitary" not in original_device_capabilities.operations:
                 raise CompileError(
