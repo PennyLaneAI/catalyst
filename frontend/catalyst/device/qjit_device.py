@@ -184,9 +184,9 @@ def extract_backend_info(
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
-    if hasattr(device, "shots"):
-        shots = get_device_shots(device) or 0
-        device_kwargs["shots"] = shots
+    #if hasattr(device, "shots"):
+    #    shots = get_device_shots(device) or 0
+    #    device_kwargs["shots"] = shots
 
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
