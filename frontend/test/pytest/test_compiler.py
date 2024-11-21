@@ -30,7 +30,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.debug import instrumentation
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
@@ -226,9 +226,12 @@ class TestCompilerState:
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
+        options = CompileOptions()
+        pipelines = options.get_stages()
+
         @qjit(
             keep_intermediate=True,
-            pipelines=[("EmptyPipeline1", [])] + DEFAULT_PIPELINES + [("EmptyPipeline2", [])],
+            pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
         )
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():

@@ -98,6 +98,14 @@ def get_compilation_stage(fn, stage):
 
 
 @debug_logger
+def get_compilation_stages_groups(options):
+    """Returns a list of tuples. The tuples correspond to the name
+    of the compilation stage and the list of passes within that stage.
+    """
+    return options.get_stages()
+
+
+@debug_logger
 def get_cmain(fn, *args):
     """Return a C program that calls a jitted function with the provided arguments.
 

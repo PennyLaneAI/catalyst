@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <pybind11/eval.h>
-#include <pybind11/pybind11.h>
-#include <string.h>
+#include <cstring>
+#include <string>
+#include <vector>
 
-std::string program = R"(
+#include <nanobind/eval.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
+
+const std::string program = R"(
 import numpy as np
 from braket.aws import AwsDevice
 from braket.devices import LocalSimulator
@@ -27,8 +31,8 @@ def py_sanitize_device(user_submitted_device):
         return LocalSimulator(user_submitted_device)
     elif "arn:aws:braket" in user_submitted_device:
         return AwsDevice(user_submitted_device)
-    
-    msg = "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'" 
+
+    msg = "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
     raise ValueError(msg)
 
 def py_sanitize_kwargs(user_submitted_kwargs):
@@ -47,20 +51,27 @@ def py_run_circuit(circuit, braket_device, kwargs, shots):
     if not kwargs:
         result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
     else:
-        result = device.run(OpenQasmProgram(source=circuit), shots=int(shots), s3_desination_folder=tuple(kwargs)).result()
+        result = device.run(OpenQasmProgram(source=circuit), shots=int(shots), s3_destination_folder=tuple(kwargs)).result()
     return result
-    
 
 def py_var(circuit, braket_device, kwargs, shots):
-    return py_run_circuit(circuit, braket_device, kwargs, shots).values
+    values = py_run_circuit(circuit, braket_device, kwargs, shots).values
+    if not values:
+        raise RuntimeError(
+            "Unable to compute variance; no measurement process was specified")
+    return values
 
 def py_expval(circuit, braket_device, kwargs, shots):
-    return py_run_circuit(circuit, braket_device, kwargs, shots).values
-    
+    values = py_run_circuit(circuit, braket_device, kwargs, shots).values
+    if not values:
+        raise RuntimeError(
+            "Unable to compute expectation value; no measurement process was specified")
+    return values
+
 def py_samples(circuit, braket_device, kwargs, shots):
     result = py_run_circuit(circuit, braket_device, kwargs, shots)
     return np.array(result.measurements).flatten()
-    
+
 def py_probs(circuit, braket_device, kwargs, shots, num_qubits):
     result = py_run_circuit(circuit, braket_device, kwargs, shots)
     probs_dict = {int(s, 2): p for s, p in result.measurement_probabilities.items()}
@@ -73,43 +84,44 @@ def py_get_results(circuit, braket_device, kwargs, shots):
     return str(py_run_circuit(circuit, braket_device, kwargs, shots))
 )";
 
-extern "C" PYBIND11_EXPORT double var(const char *_circuit, const char *_device, size_t shots,
-                                      const char *_kwargs)
+extern "C" NB_EXPORT double var(const char *_circuit, const char *_device, size_t shots,
+                                const char *_kwargs)
 {
-    namespace py = pybind11;
-    py::gil_scoped_acquire lock;
+    namespace nb = nanobind;
+    nb::gil_scoped_acquire lock;
 
     std::string circuit(_circuit);
     std::string device(_device);
     std::string kwargs(_kwargs);
 
-    py::exec(program, py::globals(), py::globals());
-    return py::globals()["py_var"](circuit, device, kwargs, shots)
-        .attr("__getitem__")(0)
-        .cast<double>();
+    // Evaluate in scope of main module
+    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+    nb::exec(nb::str(program.c_str()), scope);
+    return nb::cast<double>(scope["py_var"](circuit, device, kwargs, shots).attr("__getitem__")(0));
 }
 
-extern "C" PYBIND11_EXPORT double expval(const char *_circuit, const char *_device, size_t shots,
-                                         const char *_kwargs)
+extern "C" NB_EXPORT double expval(const char *_circuit, const char *_device, size_t shots,
+                                   const char *_kwargs)
 {
-    namespace py = pybind11;
-    py::gil_scoped_acquire lock;
+    namespace nb = nanobind;
+    nb::gil_scoped_acquire lock;
 
     std::string circuit(_circuit);
     std::string device(_device);
     std::string kwargs(_kwargs);
 
-    py::exec(program, py::globals(), py::globals());
-    return py::globals()["py_expval"](circuit, device, kwargs, shots)
-        .attr("__getitem__")(0)
-        .cast<double>();
+    // Evaluate in scope of main module
+    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+    nb::exec(nb::str(program.c_str()), scope);
+    return nb::cast<double>(
+        scope["py_expval"](circuit, device, kwargs, shots).attr("__getitem__")(0));
 }
 
-extern "C" PYBIND11_EXPORT void samples(const char *_circuit, const char *_device, size_t shots,
-                                        size_t num_qubits, const char *_kwargs, void *_vector)
+extern "C" NB_EXPORT void samples(const char *_circuit, const char *_device, size_t shots,
+                                  size_t num_qubits, const char *_kwargs, void *_vector)
 {
-    namespace py = pybind11;
-    py::gil_scoped_acquire lock;
+    namespace nb = nanobind;
+    nb::gil_scoped_acquire lock;
 
     std::string circuit(_circuit);
     std::string device(_device);
@@ -117,22 +129,24 @@ extern "C" PYBIND11_EXPORT void samples(const char *_circuit, const char *_devic
 
     std::vector<size_t> *samples = reinterpret_cast<std::vector<size_t> *>(_vector);
 
-    py::exec(program, py::globals(), py::globals());
-    auto results = py::globals()["py_samples"](circuit, device, kwargs, shots);
+    // Evaluate in scope of main module
+    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+    nb::exec(nb::str(program.c_str()), scope);
+    auto results = scope["py_samples"](circuit, device, kwargs, shots);
 
     samples->reserve(shots * num_qubits);
-    for (py::handle item : results) {
-        samples->push_back(item.cast<size_t>());
+    for (nb::handle item : results) {
+        samples->push_back(nb::cast<size_t>(item));
     }
 
     return;
 }
 
-extern "C" PYBIND11_EXPORT void probs(const char *_circuit, const char *_device, size_t shots,
-                                      size_t num_qubits, const char *_kwargs, void *_vector)
+extern "C" NB_EXPORT void probs(const char *_circuit, const char *_device, size_t shots,
+                                size_t num_qubits, const char *_kwargs, void *_vector)
 {
-    namespace py = pybind11;
-    py::gil_scoped_acquire lock;
+    namespace nb = nanobind;
+    nb::gil_scoped_acquire lock;
 
     std::string circuit(_circuit);
     std::string device(_device);
@@ -140,33 +154,36 @@ extern "C" PYBIND11_EXPORT void probs(const char *_circuit, const char *_device,
 
     std::vector<double> *probs = reinterpret_cast<std::vector<double> *>(_vector);
 
-    py::exec(program, py::globals(), py::globals());
-    auto results = py::globals()["py_probs"](circuit, device, kwargs, shots, num_qubits);
+    // Evaluate in scope of main module
+    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+    nb::exec(nb::str(program.c_str()), scope);
+    auto results = scope["py_probs"](circuit, device, kwargs, shots, num_qubits);
 
     probs->reserve(std::pow(2, num_qubits));
-    for (py::handle item : results) {
-        probs->push_back(item.cast<double>());
+    for (nb::handle item : results) {
+        probs->push_back(nb::cast<double>(item));
     }
 
     return;
 }
 
-extern "C" PYBIND11_EXPORT char *runCircuit(const char *_circuit, const char *_device, size_t shots,
-                                            const char *_kwargs)
+extern "C" NB_EXPORT char *runCircuit(const char *_circuit, const char *_device, size_t shots,
+                                      const char *_kwargs)
 {
-    namespace py = pybind11;
-    py::gil_scoped_acquire lock;
+    namespace nb = nanobind;
+    nb::gil_scoped_acquire lock;
 
     std::string circuit(_circuit);
     std::string device(_device);
     std::string kwargs(_kwargs);
 
-    py::exec(program, py::globals(), py::globals());
-    auto retval =
-        py::globals()["py_get_results"](circuit, device, kwargs, shots).cast<std::string>();
-    char *retptr = (char *)malloc(sizeof(char *) * retval.size() + 1);
-    memcpy(retptr, retval.c_str(), sizeof(char *) * retval.size());
+    // Evaluate in scope of main module
+    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+    nb::exec(nb::str(program.c_str()), scope);
+    auto retval = nb::cast<std::string>(scope["py_get_results"](circuit, device, kwargs, shots));
+    char *retptr = static_cast<char *>(malloc(sizeof(char *) * retval.size() + 1));
+    std::memcpy(retptr, retval.c_str(), sizeof(char *) * retval.size());
     return retptr;
 }
 
-PYBIND11_MODULE(openqasm_python_module, m) { m.doc() = "openqasm"; }
+NB_MODULE(openqasm_python_module, m) { m.doc() = "openqasm"; }
