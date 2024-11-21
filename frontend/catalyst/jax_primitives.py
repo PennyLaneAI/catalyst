@@ -1122,11 +1122,11 @@ def _qdevice_lowering(
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    #breakpoint()
+    # breakpoint()
     # Device shots of None gets traced into -1
-    #if shots.owner.name == "stablehlo.constant" and shots.owner.attributes["value"].get_splat_value().value == 0:
+    # if shots.owner.name == "stablehlo.constant" and shots.owner.attributes["value"].get_splat_value().value == 0:
     #    shots_value = None
-    #else:
+    # else:
     #    shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     DeviceInitOp(

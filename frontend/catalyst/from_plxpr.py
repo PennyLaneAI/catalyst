@@ -28,7 +28,11 @@ from pennylane.capture import (
     qnode_prim,
 )
 
-from catalyst.device import extract_backend_info, get_device_capabilities, get_device_shots
+from catalyst.device import (
+    extract_backend_info,
+    get_device_capabilities,
+    get_device_shots,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -229,7 +233,9 @@ class QFuncPlxprInterpreter:
 
     def __init__(self, device):
         self._device = device
-        self.device_shots = 0 if get_device_shots(self._device) is None else get_device_shots(self._device)
+        self.device_shots = (
+            0 if get_device_shots(self._device) is None else get_device_shots(self._device)
+        )
         self.qreg = None
         self.env = {}
         self.wire_map = {}
@@ -357,12 +363,15 @@ class QFuncPlxprInterpreter:
         # we will gradually get rid of the shape argument for these primitives
         # While we are in the migrating process, we need to handle them explicitly one by one
         if primitive is sample_p:
-            mval = (primitive.bind(obs, shots=self.device_shots, num_qubits=shaped_array.shape[1])
-                        if isinstance(self.device_shots, int)
-                        else primitive.bind(obs, self.device_shots, num_qubits=shaped_array.shape[1])
-                    )
+            mval = (
+                primitive.bind(obs, shots=self.device_shots, num_qubits=shaped_array.shape[1])
+                if isinstance(self.device_shots, int)
+                else primitive.bind(obs, self.device_shots, num_qubits=shaped_array.shape[1])
+            )
         else:
-            mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+            mval = primitive.bind(
+                obs, shape=shaped_array.shape, shots=self._device.shots.total_shots
+            )
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if shaped_array.dtype != mval.dtype:

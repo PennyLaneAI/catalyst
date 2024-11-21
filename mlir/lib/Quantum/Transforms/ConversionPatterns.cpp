@@ -214,7 +214,9 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         Value shots = op.getShots();
-        assert(shots && "DeviceInitOp expects a shots value. Please provide zero if exact results are wanted.");
+        assert(
+            shots &&
+            "DeviceInitOp expects a shots value. Please provide zero if exact results are wanted.");
         auto rtd_lib = op.getLib().str();
         auto rtd_name = op.getName().str();
         auto rtd_kwargs = op.getKwargs().str();

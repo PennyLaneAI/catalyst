@@ -181,8 +181,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 
     SECTION("Braket SV1")
     {
-        auto device =
-            OpenQasmDevice("{device_type : braket.local.qubit, backend : default}");
+        auto device = OpenQasmDevice("{device_type : braket.local.qubit, backend : default}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -260,8 +259,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
           "[openqasm]")
 {
     constexpr size_t shots{1000};
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        "{device_type : braket.local.qubit, backend : default}");
+    std::unique_ptr<OpenQasmDevice> device =
+        std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(shots);
 
     constexpr size_t n{2};
@@ -396,8 +395,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
     constexpr size_t shots{1000};
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        "{device_type : braket.local.qubit, backend : default}");
+    std::unique_ptr<OpenQasmDevice> device =
+        std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(shots);
 
     constexpr size_t n{5};
@@ -574,8 +573,8 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
 
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        "{device_type : braket.local.qubit, backend : default}");
+    std::unique_ptr<OpenQasmDevice> device =
+        std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
 
     constexpr size_t n{2};
@@ -621,8 +620,8 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 
 TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        "{device_type : braket.local.qubit, backend : default}");
+    std::unique_ptr<OpenQasmDevice> device =
+        std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
 
     constexpr size_t n{2};

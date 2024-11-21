@@ -230,8 +230,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
-                                Operation *shots, StringAttr lib, StringAttr name, StringAttr kwargs,
-                                int64_t numberQubits, FunctionType fnFoldedType,
+                                Operation *shots, StringAttr lib, StringAttr name,
+                                StringAttr kwargs, int64_t numberQubits, FunctionType fnFoldedType,
                                 SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
                                 func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
                                 func::FuncOp fnWithMeasurementsOp)
