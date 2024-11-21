@@ -197,7 +197,7 @@ def extract_backend_info(
             )
 
     for k, v in getattr(device, "device_kwargs", {}).items():
-        if k in device_kwargs:
+        if k not in device_kwargs:
             device_kwargs[k] = v
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
