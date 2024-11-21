@@ -738,18 +738,15 @@ class TestMeasurementTransforms:
         # dev1 supports non-commuting observables and sum observables - no splitting
         qjit_dev1 = QJITDevice(dev)
         assert "Sum" in qjit_dev1.capabilities.native_obs
-        assert "Hamiltonian" in qjit_dev1.capabilities.native_obs
         assert qjit_dev1.capabilities.non_commuting_observables_flag is True
 
         # dev2 supports non-commuting observables but NOT sums - split_to_single_terms
         qjit_dev2 = QJITDevice(dev)
         del qjit_dev2.capabilities.native_obs["Sum"]
-        del qjit_dev2.capabilities.native_obs["Hamiltonian"]
 
         # dev3 supports does not support non-commuting observables OR sums - split_non_commuting
         qjit_dev3 = QJITDevice(dev)
         del qjit_dev3.capabilities.native_obs["Sum"]
-        del qjit_dev3.capabilities.native_obs["Hamiltonian"]
         qjit_dev3.capabilities.non_commuting_observables_flag = False
 
         # dev4 supports sums but NOT non-commuting observables - split_non_commuting
@@ -854,7 +851,6 @@ class TestMeasurementTransforms:
 
         # mock TOML file output to indicate non-commuting observables are NOT supported
         del config["operators"]["observables"]["Sum"]
-        del config["operators"]["observables"]["Hamiltonian"]
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
             jitted_circuit = qml.qjit(unjitted_circuit)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2

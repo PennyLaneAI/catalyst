@@ -88,12 +88,6 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
-def IonsDecompositionPass : Pass<"ions-decomposition"> {
-    let summary = "Decompose the gates to the set {RX, RY, MS}";
-
-    let constructor = "catalyst::createIonsDecompositionPass()";
-}
-
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
@@ -107,6 +101,13 @@ def QuantumCircuitTransformationPass: QuantumCircuitTransformationPassBase {
            "std::string", /*default=*/"\"\"",
            "The name of the function (or qnode) to run the quantum circuit transformation pass on.">,
     ];
+}
+
+def IonsDecompositionPass : Pass<"ions-decomposition"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
+
+    let constructor = "catalyst::createIonsDecompositionPass()";
+    let options = QuantumCircuitTransformationPass.options;
 }
 
 def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {

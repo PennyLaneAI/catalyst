@@ -1,4 +1,6 @@
 PYTHON?=$(shell which python3)
+PYTHON_PREFIX:=$(shell $(PYTHON) -c "import sys; print(sys.prefix)")
+PYTHON_VERSION:=$(shell $(PYTHON) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
@@ -52,6 +54,8 @@ configure:
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-DPython_ROOT_DIR=$(PYTHON_PREFIX) \
+		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
 

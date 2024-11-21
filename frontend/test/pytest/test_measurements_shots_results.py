@@ -438,7 +438,7 @@ class TestVar:
             # TODO: only raises with the new API, Kokkos should also raise an error.
             with pytest.raises(
                 TypeError,
-                match=r"VarianceMP\(Hamiltonian\/Sum\) cannot be computed with samples",
+                match=r"VarianceMP\(Sum\) cannot be computed with samples.",
             ):
                 circuit(0.432, 0.123, -0.543)
 

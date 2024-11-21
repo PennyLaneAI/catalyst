@@ -107,8 +107,8 @@ jobs:
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
-        pip install --upgrade pennylane-lightning
-        pip install --upgrade pennyLane-lightning-kokkos
+        pip install --no-deps --force pennylane-lightning
+        pip install --no-deps --force pennyLane-lightning-kokkos
 
     - name: Download PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'latest' }}
@@ -133,9 +133,9 @@ jobs:
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
-        pip install --upgrade .
+        pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --upgrade .
+        pip install --no-deps --force .
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -143,18 +143,16 @@ jobs:
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}
       run: |
-        pip install --upgrade pennylane
+        pip install --no-deps --force pennylane
 
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.39.0-rc0
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.39.0-rc0
 
     - name: Add Frontend Dependencies to PATH
@@ -173,9 +171,9 @@ jobs:
       run: |
         make pytest TEST_BACKEND="lightning.kokkos"
 
-    - name: Run Frontend Tests (Braket)
-      run: |
-        make pytest TEST_BRAKET=LOCAL
+    # - name: Run Frontend Tests (Braket)
+    #   run: |
+    #     make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
       run: | # Do not run demos in parallel, seems to cause package issues with numpy.

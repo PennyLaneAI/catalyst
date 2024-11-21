@@ -119,7 +119,6 @@ OBSERVABLES = [
     "Hermitian",
     "Identity",
     "Projector",
-    "Hamiltonian",
     "SparseHamiltonian",
     "Sum",
     "SProd",
