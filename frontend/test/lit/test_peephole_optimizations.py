@@ -600,6 +600,8 @@ def test_merge_rotations_tracing_and_lowering():
     # CHECK: module @test_merge_rotations_tracing_and_lowering_workflow
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=f_merge_rotations0"}
+    # CHECK-NEXT: transform.yield
+    # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=g_merge_rotations1"}
     # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}} {options = "func-name=h_merge_rotations"}
     # CHECK-NEXT: transform.yield
