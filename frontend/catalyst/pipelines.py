@@ -31,7 +31,6 @@ from dataclasses import dataclass
 from functools import partial
 from io import TextIOWrapper
 from operator import is_not
-from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
@@ -75,8 +74,6 @@ class CompileOptions:
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
             Default is None.
-        pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
-        dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
     """
 
     verbose: Optional[bool] = False
@@ -96,8 +93,6 @@ class CompileOptions:
     seed: Optional[int] = None
     experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
-    pass_plugins: Optional[List[Path]] = None
-    dialect_plugins: Optional[List[Path]] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded
