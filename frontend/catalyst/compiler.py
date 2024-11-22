@@ -116,28 +116,33 @@ class LinkerDriver:
 
         # Discover the LAPACK library provided by scipy & add link against it.
         # Doing this here ensures we will always have the correct library name.
-        lib_name = "openblas"
-        package_name = "scipy_openblas32"
-        path_within_package = "lib"
-        file_extension = ".so" if platform.system() == "Linux" else ".dylib"
+        if platform.system() == "Linux":
+            lib_name = "openblas"
+            package_name = "scipy"
+            path_within_package = "../lib"
+            file_extension = ".so"
 
-        package_spec = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(package_spec.origin)
-        lapack_lib_path = path.join(package_directory, path_within_package)
+            package_spec = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(package_spec.origin)
+            lapack_lib_path = path.join(package_directory, path_within_package)
 
-        search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that scipy-openblas32 is installed and available via pip."
-            )
+            search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+            search_result = glob.glob(search_pattern)
+            if not search_result:
+                raise CompileError(
+                    f'Unable to find OpenBLAS library at "{search_pattern}". '
+                    "Please ensure that scipy is installed and available via pip."
+                )
 
-        lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
-        lib_path_flags += [
-            f"-Wl,-rpath,{lapack_lib_path}",
-            f"-L{lapack_lib_path}",
-        ]
+            lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
+            lib_path_flags += [
+                f"-Wl,-rpath,{lapack_lib_path}",
+                f"-L{lapack_lib_path}",
+            ]
+
+        elif platform.system() == "Darwin":  # pragma: nocover
+            # use our own build of LAPACKe to interface with Accelerate
+            lapack_lib_name = "lapacke.3"
 
         system_flags = []
         if platform.system() == "Linux":

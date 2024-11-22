@@ -94,6 +94,11 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
+	git clone https://github.com/lepus2589/accelerate-lapacke.git frontend/build/accelerate-lapacke || true
+	cmake -B frontend/build/ -S frontend/build/accelerate-lapacke --preset accelerate-lapacke32
+	cmake --build frontend/build/
+	cp -L frontend/build/_deps/reference-lapack-build/lib/liblapacke.dylib frontend/catalyst/utils/liblapacke.3.dylib
+
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
