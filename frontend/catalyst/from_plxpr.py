@@ -200,7 +200,6 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         qdealloc_p.bind(self.qreg)
         self.stateref = None
 
-
     def get_wire(self, wire_value) -> AbstractQbit:
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
