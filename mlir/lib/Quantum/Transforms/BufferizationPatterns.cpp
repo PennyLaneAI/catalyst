@@ -100,35 +100,7 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
                                   op->getAttrs());
-        /*
-        if (op.hasDynamicShots()) {
-            auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
 
-            SmallVector<Value> allocSizes;
-            if (shape[0] == ShapedType::kDynamic) {
-                auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                             adaptor.getShots());
-                allocSizes.push_back(shots);
-            }
-
-            Value allocVal =
-                rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
-            auto bufferedSampleOp = rewriter.create<SampleOp>(
-                loc, TypeRange{}, ValueRange{adaptor.getObs(), adaptor.getShots(), allocVal},
-                op->getAttrs());
-            bufferedSampleOp->setAttr("operandSegmentSizes",
-                                      rewriter.getDenseI32ArrayAttr({1, 1, 1}));
-        }
-        else {
-            // static shots are kept as an plain I64 literal attribute,
-            // thus is covered by the overall op->getAttrs()
-            Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-            auto bufferedSampleOp = rewriter.create<SampleOp>(
-                loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal}, op->getAttrs());
-            bufferedSampleOp->setAttr("operandSegmentSizes",
-                                      rewriter.getDenseI32ArrayAttr({1, 0, 1}));
-        }
-        */
         return success();
     }
 };
@@ -177,22 +149,8 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
         Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
-        if (op.hasDynamicShots()) {
-            auto bufferedCountsOp =
-                rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(),
-                                          adaptor.getShots(), allocVal0, allocVal1, nullptr);
-            // Operands: (obs, shots, memref1, memref2)
-            bufferedCountsOp->setAttr("operandSegmentSizes",
-                                      rewriter.getDenseI32ArrayAttr({1, 1, 1, 1}));
-        }
-        else {
-            auto bufferedCountsOp =
-                rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), nullptr,
-                                          allocVal0, allocVal1, adaptor.getStaticShotsAttr());
-            // Operands: (obs, memref1, memref2)
-            bufferedCountsOp->setAttr("operandSegmentSizes",
-                                      rewriter.getDenseI32ArrayAttr({1, 1, 1}));
-        }
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), allocVal0, allocVal1);
+
         return success();
     }
 };

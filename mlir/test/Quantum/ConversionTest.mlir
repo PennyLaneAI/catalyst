@@ -440,11 +440,10 @@ func.func @sample(%q : !quantum.bit, %dyn_shots: i64) {
 // CHECK: llvm.func @__catalyst__qis__Counts(!llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @counts
-func.func @counts(%q : !quantum.bit, %dyn_shots: i64) {
+func.func @counts(%q : !quantum.bit) {
 
     %o1 = quantum.compbasis %q : !quantum.obs
     %o2 = quantum.compbasis %q, %q : !quantum.obs
-    %odyn = quantum.compbasis %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
@@ -452,7 +451,7 @@ func.func @counts(%q : !quantum.bit, %dyn_shots: i64) {
     // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c1]], %arg0)
     %in_eigvals1 = memref.alloc() : memref<2xf64>
     %in_counts1 = memref.alloc() : memref<2xi64>
-    quantum.counts %o1 in(%in_eigvals1 : memref<2xf64>, %in_counts1 : memref<2xi64>) {static_shots = 1000 : i64}
+    quantum.counts %o1 in(%in_eigvals1 : memref<2xf64>, %in_counts1 : memref<2xi64>)
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
@@ -460,15 +459,7 @@ func.func @counts(%q : !quantum.bit, %dyn_shots: i64) {
     // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c2]], %arg0, %arg0)
     %in_eigvals2 = memref.alloc() : memref<4xf64>
     %in_counts2 = memref.alloc() : memref<4xi64>
-    quantum.counts %o2 in(%in_eigvals2 : memref<4xf64>, %in_counts2 : memref<4xi64>) {static_shots = 2000 : i64}
-
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
-    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
-    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c1]], %arg0)
-    %dyn_in_eigvals = memref.alloc() : memref<2xf64>
-    %dyn_in_counts = memref.alloc() : memref<2xi64>
-    quantum.counts %odyn in(%dyn_in_eigvals : memref<2xf64>, %dyn_in_counts : memref<2xi64>) shots %dyn_shots
+    quantum.counts %o2 in(%in_eigvals2 : memref<4xf64>, %in_counts2 : memref<4xi64>)
 
     return
 }

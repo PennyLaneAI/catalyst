@@ -827,10 +827,8 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicR
 
     let arguments = (ins
         ObservableType:$obs,
-        Optional<I64>:$shots,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
-        Optional<MemRefRankOf<[I64], [1]>>:$in_counts,
-        OptionalAttr<I64Attr>:$static_shots
+        Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
 
     let results = (outs
@@ -840,17 +838,13 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicR
 
     let assemblyFormat = [{
         $obs
-        ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )? ( `shots` $shots^)?
+        ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
         attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
 
     let extraClassDeclaration = [{
         bool isBufferized() {
             return getResultTypes().empty();
-        }
-
-        bool hasDynamicShots() {
-            return getShots() != nullptr;
         }
     }];
 

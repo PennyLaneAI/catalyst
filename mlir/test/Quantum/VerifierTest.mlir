@@ -204,10 +204,10 @@ func.func @sample2(%q : !quantum.bit) {
 func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
-    %counts:2 = quantum.counts %obs { static_shots=1000 } : tensor<2xf64>, tensor<2xi64>
+    %counts:2 = quantum.counts %obs : tensor<2xf64>, tensor<2xi64>
 
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
-    %err:2 = quantum.counts %obs { static_shots=1000 } : tensor<4xf64>, tensor<4xi64>
+    %err:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
 
     return
 }
@@ -217,10 +217,10 @@ func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 func.func @counts2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
-    %counts:2 = quantum.counts %obs { static_shots=1000 } : tensor<4xf64>, tensor<4xi64>
+    %counts:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
 
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
-    %err:2 = quantum.counts %obs { static_shots=1000 } : tensor<2xf64>, tensor<2xi64>
+    %err:2 = quantum.counts %obs : tensor<2xf64>, tensor<2xi64>
 
     return
 }
@@ -235,10 +235,10 @@ func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
     %in_eigvals_2 = memref.alloc() : memref<2xf64>
     %in_counts_2 = memref.alloc() : memref<2xi64>
-    quantum.counts %obs in(%in_eigvals_2 : memref<2xf64>, %in_counts_2 : memref<2xi64>) { static_shots=1000 }
+    quantum.counts %obs in(%in_eigvals_2 : memref<2xf64>, %in_counts_2 : memref<2xi64>)
 
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
-    quantum.counts %obs in(%in_eigvals_1 : memref<4xf64>, %in_counts_1 : memref<4xi64>) { static_shots=1000 }
+    quantum.counts %obs in(%in_eigvals_1 : memref<4xf64>, %in_counts_1 : memref<4xi64>)
 
     return
 }
@@ -249,7 +249,7 @@ func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.counts %obs { static_shots=1000 }
+    quantum.counts %obs
 
     return
 }
@@ -262,21 +262,7 @@ func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %in_eigvals = memref.alloc() : memref<2xf64>
     %in_counts = memref.alloc() : memref<2xi64>
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { static_shots=1000 } : tensor<2xf64>, tensor<2xi64>
-
-    return
-}
-
-// -----
-
-func.func @counts6(%q0 : !quantum.bit, %q1 : !quantum.bit, %dyn_shots : i64) {
-    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-
-    %samples_good_static:2 = quantum.counts %obs {static_shots=2} : tensor<4xf64>, tensor<4xi64>
-    %samples_good_dynamic:2 = quantum.counts %obs shots %dyn_shots : tensor<4xf64>, tensor<4xi64>
-
-    // expected-error@+1 {{static and dynamic shots cannot be simultaneously specified}}
-    %samples_bad:2 = quantum.counts %obs shots %dyn_shots {static_shots=2} : tensor<4xf64>, tensor<4xi64>
+    quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) : tensor<2xf64>, tensor<2xi64>
 
     return
 }
