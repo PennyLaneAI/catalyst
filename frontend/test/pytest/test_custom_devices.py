@@ -21,7 +21,7 @@ from conftest import CONFIG_CUSTOM_DEVICE
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import QJITDevice, extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
 
 RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
@@ -185,11 +185,4 @@ def test_error_raised_no_unitary_support_for_matrix_ops():
         CompileError,
         match="The device that specifies to_matrix_ops must support QubitUnitary.",
     ):
-
-        @qjit
-        @qml.qnode(CustomDevice(wires=2, shots=2048))
-        def circuit():
-            qml.X(0)
-            return qml.expval(qml.PauliZ(0))
-
-        circuit()
+        QJITDevice(CustomDevice(wires=2, shots=2048))
