@@ -121,22 +121,24 @@ class LinkerDriver:
         path_within_package = "lib"
         file_extension = ".so" if platform.system() == "Linux" else ".dylib"
 
-        package_spec = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(package_spec.origin)
-        lapack_lib_path = path.join(package_directory, path_within_package)
+        # package_spec = importlib.util.find_spec(package_name)
+        # package_directory = path.dirname(package_spec.origin)
+        # lapack_lib_path = path.join(package_directory, path_within_package)
 
-        search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that scipy-openblas32 is installed and available via pip."
-            )
+        # search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+        # search_result = glob.glob(search_pattern)
+        # if not search_result:
+        #     raise CompileError(
+        #         f'Unable to find OpenBLAS library at "{search_pattern}". '
+        #         "Please ensure that scipy-openblas32 is installed and available via pip."
+        #     )
 
-        lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
+        # lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
         lib_path_flags += [
-            f"-Wl,-rpath,{lapack_lib_path}",
-            f"-L{lapack_lib_path}",
+            # f"-Wl,-rpath,{lapack_lib_path}",
+            # f"-L{lapack_lib_path}",
+            # "-lcblas",
+            # "Accelerate",
         ]
 
         system_flags = []
@@ -164,7 +166,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            f"-l{lapack_lib_name}",  # required for custom_calls lib
+            # f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
