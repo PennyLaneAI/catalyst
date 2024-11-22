@@ -163,6 +163,7 @@ def test_error_raised_no_unitary_support_for_matrix_ops():
 
         def __init__(self, wires, shots=None, **kwargs):
             del self.capabilities.operations["QubitUnitary"]
+            assert not self.capabilities.supports_operation("QubitUnitary")
             super().__init__(wires=wires, shots=shots)
 
         @staticmethod

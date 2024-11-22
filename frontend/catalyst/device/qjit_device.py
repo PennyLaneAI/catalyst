@@ -314,24 +314,24 @@ class QJITDevice(qml.devices.Device):
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         # Capability loading
-        original_device_capabilities = get_device_capabilities(original_device)
+        device_capabilities = get_device_capabilities(original_device)
 
         # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
         #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
         if hasattr(original_device, "_to_matrix_ops"):
             _to_matrix_ops = getattr(original_device, "_to_matrix_ops")
-            setattr(original_device_capabilities, "to_matrix_ops", _to_matrix_ops)
-            if _to_matrix_ops and "QubitUnitary" not in original_device_capabilities.operations:
+            setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+            if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
                 raise CompileError(
                     "The device that specifies to_matrix_ops must support QubitUnitary."
                 )
 
-        backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
+        backend = QJITDevice.extract_backend_info(original_device, device_capabilities)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
-        self.capabilities = get_qjit_device_capabilities(original_device_capabilities)
+        self.capabilities = get_qjit_device_capabilities(device_capabilities)
 
     @debug_logger
     def preprocess(
