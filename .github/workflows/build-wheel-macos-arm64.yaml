@@ -150,7 +150,7 @@ jobs:
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -182,7 +182,7 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -201,7 +201,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build enzyme-build --target EnzymeStatic-19
 
@@ -341,6 +341,13 @@ jobs:
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm
 
         cmake --build quantum-build --target check-dialects catalyst-cli
+
+    - name: Build Standalone Plugin
+      run: |
+        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        make standalone-plugin
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
 
     - name: Build wheel
       run: |

@@ -19,6 +19,7 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml')
+MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -249,6 +250,10 @@ endif
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
+
+.PHONY: standalone-plugin
+standalone-plugin:
+	$(MAKE) -C mlir standalone-plugin
 
 .PHONY: format
 format:

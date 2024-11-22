@@ -77,7 +77,9 @@ requirements = [
     f"jaxlib=={jax_version}",
     "tomlkit; python_version < '3.11'",
     "numpy!=2.0.0",
-    "scipy<1.14",
+    # rpath linking on macos is only available starting in 0.3.27.63
+    # 0.3.28 suffers from precision issues on macos
+    "scipy-openblas32>=0.3.27.63,<0.3.28",
     "diastatic-malt>=2.15.2",
 ]
 
