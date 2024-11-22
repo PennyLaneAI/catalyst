@@ -1690,7 +1690,6 @@ def _sample_lowering(
 
     # TODO: use actual dynamic shape tensor type API
     # Somehow this magic number means dynamically sized dimensions in jax
-    # breakpoint()
     result_shape = (
         (shots, num_qubits) if isinstance(shots, int) else (-9223372036854775808, num_qubits)
     )
