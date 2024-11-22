@@ -19,9 +19,9 @@ from typing import Callable
 
 import jax
 from jax.extend.linear_util import wrap_init
+
+import pennylane as qml
 from pennylane.capture import (
-    AbstractMeasurement,
-    AbstractOperator,
     disable,
     enable,
     enabled,
@@ -200,8 +200,10 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def setup(self):
         if self.stateref is None:
             qdevice_p.bind(**_get_device_kwargs(self._device))
-            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)),
-                            "wire_map": {}}
+            self.stateref = {
+                "qreg": qalloc_p.bind(len(self._device.wires)),
+                "wire_map": {}
+            }
 
     def cleanup(self):
         """Perform any final steps after processing the plxpr.
@@ -224,8 +226,10 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def interpret_operator_eqn(self, eqn: jax.core.JaxprEqn) -> None:
         """Interpret a plxpr equation describing an operation as a catalxpr equation."""
         if not isinstance(eqn.outvars[0], jax.core.DropVar):
-            self.op_math_cache[eqn.outvars[0]] = eqn
-            return
+            invals = (self.read(invar) for invar in eqn.invars)
+            with qml.QueuingManager.stop_recording():
+                op = eqn.primitive.impl(*invals, **eqn.params)
+            return self.interpret_operation(op)
 
         if "n_wires" not in eqn.params:
             raise NotImplementedError(
@@ -314,6 +318,13 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         if shaped_array.dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, shaped_array.dtype)
         return mval
+
+
+@QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
+def _(self, *invals, n_wires):
+    wires = [self._get_wire(w) for w in invals[1:]]
+
+    return qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
