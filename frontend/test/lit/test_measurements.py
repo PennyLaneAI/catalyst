@@ -142,7 +142,7 @@ def counts3(x: float, y: float):
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.counts [[obs]] {static_shots = 1000 : i64} : tensor<4xf64>, tensor<4xi64>
+    # CHECK: quantum.counts [[obs]] : tensor<4xf64>, tensor<4xi64>
     return qml.counts()
 
 

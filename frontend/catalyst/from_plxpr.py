@@ -38,6 +38,7 @@ from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
     compbasis_p,
+    counts_p,
     expval_p,
     gphase_p,
     namedobs_p,
@@ -365,6 +366,12 @@ class QFuncPlxprInterpreter:
                 primitive.bind(obs, shots=self.device_shots, num_qubits=shaped_array.shape[1])
                 if isinstance(self.device_shots, int)
                 else primitive.bind(obs, self.device_shots, num_qubits=shaped_array.shape[1])
+            )
+        elif primitive is counts_p:
+            mval = (
+                primitive.bind(obs, shots=self.device_shots, shape=shaped_array.shape)
+                if isinstance(self.device_shots, int)
+                else primitive.bind(obs, self.device_shots, shape=shaped_array.shape)
             )
         else:
             mval = primitive.bind(
