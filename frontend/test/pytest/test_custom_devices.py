@@ -144,3 +144,51 @@ def test_custom_device_no_c_interface():
         @qml.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
+
+
+def test_error_raised_no_unitary_support_for_matrix_ops():
+    """Tests that an error is raised when a device specifies _to_matrix_ops but does not support
+    the QubitUnitary operation"""
+
+    class CustomDevice(qml.devices.Device):
+        """Custom device for testing."""
+
+        name = "custom.device"
+        config_filepath = CONFIG_CUSTOM_DEVICE
+
+        _to_matrix_ops = {
+            "DiagonalQubitUnitary": qml.devices.capabilities.OperatorProperties(),
+            "BlockEncode": qml.devices.capabilities.OperatorProperties(),
+        }
+
+        def __init__(self, wires, shots=None, **kwargs):
+            del self.capabilities.operations["QubitUnitary"]
+            super().__init__(wires=wires, shots=shots)
+
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
+
+        def execute(self, circuits, execution_config):
+            """Execution."""
+            return (0,)
+
+    with pytest.raises(
+        CompileError,
+        match="The device that specifies to_matrix_ops must support QubitUnitary.",
+    ):
+
+        @qjit
+        @qml.qnode(CustomDevice(wires=2, shots=2048))
+        def circuit():
+            qml.X(0)
+            return qml.expval(qml.PauliZ(0))
+
+        circuit()
