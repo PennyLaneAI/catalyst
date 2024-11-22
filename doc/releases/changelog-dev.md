@@ -16,9 +16,9 @@
 * Catalyst now uses the new compiler API to compile quantum code from the python frontend.
   Frontend no longer uses pybind11 to connect to the compiler. Instead, it uses subprocess instead.
   [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
-
-* Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"} to
-  the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to
+ 
+* Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"}
+  to the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to
   `quantum-opt --ions-decomposition`.
   [(#1226)](https://github.com/PennyLaneAI/catalyst/pull/1226)
 
@@ -55,6 +55,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Catalyst no longer depends on or pins the `scipy` package, instead OpenBLAS is sourced directly
+  from [`scipy-openblas32`](https://pypi.org/project/scipy-openblas32/).
+  [(#1322)](https://github.com/PennyLaneAI/catalyst/pull/1322)
+
 * The `QuantumExtension` module (previously implemented with pybind11) has been removed. This module
   was not included in the distributed wheels and has been deprecated to align with our adoption of
   Python's stable ABI, which pybind11 does not support.
@@ -65,9 +69,14 @@
   [(#1307)](https://github.com/PennyLaneAI/catalyst/pull/1307)
   [(#1312)](https://github.com/PennyLaneAI/catalyst/pull/1312)
 
+* `catalyst-cli` and `quantum-opt` are compiled with `default` visibility, which allows for MLIR plugins to work.
+  [(#1287)](https://github.com/PennyLaneAI/catalyst/pull/1287)
+
 <h3>Documentation 📝</h3>
 
-* A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an empty pass that prints hello world. The code of the tutorial is at [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
+* A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
+  empty pass that prints hello world. The code of the tutorial is at
+  [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
 
 <h3>Bug fixes 🐛</h3>
