@@ -13,13 +13,18 @@
 # limitations under the License.
 """Test for the device API.
 """
+import platform
+
 import pennylane as qml
 import pytest
+from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import NullQubit
 
+import catalyst
 from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.utils.runtime_environment import get_lib_path
 
 # pylint:disable = protected-access,attribute-defined-outside-init
 
@@ -120,6 +125,51 @@ def test_qjit_device_measurements(shots, mocker):
     circuit()
 
     assert spy.spy_return.measurement_processes == expected_measurements
+
+
+def test_error_raised_no_unitary_support_for_matrix_ops():
+    """Tests that an error is raised when a device specifies _to_matrix_ops but does not support
+    the QubitUnitary operation"""
+
+    class CustomDevice(qml.devices.Device):
+        """Custom device for testing."""
+
+        config_filepath = CONFIG_CUSTOM_DEVICE
+
+        _to_matrix_ops = {
+            "DiagonalQubitUnitary": qml.devices.capabilities.OperatorProperties(),
+            "BlockEncode": qml.devices.capabilities.OperatorProperties(),
+        }
+
+        def __init__(self, wires, shots=None, **kwargs):
+            self.capabilities.operations.pop("QubitUnitary")
+            super().__init__(wires=wires, shots=shots)
+
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
+
+        def execute(self, circuits, execution_config):
+            """Execution."""
+            return (0,)
+
+    with pytest.raises(
+        catalyst.CompileError,
+        match="The device that specifies to_matrix_ops must support QubitUnitary.",
+    ):
+
+        @qjit
+        @qml.qnode(CustomDevice(wires=2, shots=2048))
+        def circuit():
+            qml.X(0)
+            return qml.expval(qml.PauliZ(0))
 
 
 def test_simple_circuit():

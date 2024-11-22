@@ -88,9 +88,6 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     elif isinstance(obs, SymbolicOp):
         _verify_observable(obs.base, _obs_checker)
 
-    elif isinstance(obs, SymbolicOp):
-        _verify_observable(obs.base, _obs_checker)
-
 
 EMPTY_PROPERTIES = OperatorProperties()
 

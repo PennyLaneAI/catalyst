@@ -151,7 +151,7 @@ def extract_backend_info(
 
     dname = device.name
     if isinstance(device, qml.devices.LegacyDeviceFacade):
-        dname = device.target_device.short_name
+        dname = device.target_device.short_name  # pragma: no cover
 
     device_name = ""
     device_lpath = ""
