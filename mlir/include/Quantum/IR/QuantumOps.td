@@ -793,7 +793,7 @@ def SampleOp : Measurement_Op<"sample"> {
     let hasVerifier = 1;
 }
 
-def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, SameVariadicResultSize]> {
+def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicResultSize]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues

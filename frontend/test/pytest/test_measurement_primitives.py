@@ -220,7 +220,7 @@ def test_counts():
 module @foo {
   func.func public @jit_foo() -> (tensor<1xf64>, tensor<1xi64>) {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
-    %1:2 = "quantum.counts"(%0) {operandSegmentSizes = array<i32: 1, 0, 0, 0>, static_shots = 5 : i64} : (!quantum.obs) -> (tensor<1xf64>, tensor<1xi64>)
+    %1:2 = "quantum.counts"(%0) : (!quantum.obs) -> (tensor<1xf64>, tensor<1xi64>)
     return %1#0, %1#1 : tensor<1xf64>, tensor<1xi64>
   }
 }
@@ -261,9 +261,8 @@ def test_counts_dynamic_shape():
 module @foo {
   func.func public @jit_foo(%arg0: tensor<i64>) -> (tensor<1xf64>, tensor<1xi64>) {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
-    %1 = "tensor.extract"(%arg0) : (tensor<i64>) -> i64
-    %2:2 = "quantum.counts"(%0, %1) {operandSegmentSizes = array<i32: 1, 1, 0, 0>} : (!quantum.obs, i64) -> (tensor<1xf64>, tensor<1xi64>)
-    return %2#0, %2#1 : tensor<1xf64>, tensor<1xi64>
+    %1:2 = "quantum.counts"(%0) : (!quantum.obs) -> (tensor<1xf64>, tensor<1xi64>)
+    return %1#0, %1#1 : tensor<1xf64>, tensor<1xi64>
   }
 }
 """
@@ -297,14 +296,10 @@ def test_new_countsop_still_good_with_backend():
     %1:2 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>)
     return %1#0, %1#1 : tensor<2xi64>, tensor<2xi64>
   }
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-      transform.yield
-    }
-  }
   module @module_circuit {
     func.func public @circuit(%arg0: tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 10, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+      %shots = tensor.extract %arg0[] : tensor<i64>
+      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"] shots %shots
       %c = stablehlo.constant dense<1> : tensor<i64>
       %0 = quantum.alloc( 1) : !quantum.reg
       %c_0 = stablehlo.constant dense<0> : tensor<i64>
@@ -317,7 +312,7 @@ def test_new_countsop_still_good_with_backend():
       %c_2 = stablehlo.constant dense<10> : tensor<i64>
       %extracted_3 = tensor.extract %c_2[] : tensor<i64>
       %dyn_shots = tensor.extract %arg0[] : tensor<i64>
-      %eigvals, %counts = quantum.counts %4 shots %dyn_shots : tensor<2xf64>, tensor<2xi64>
+      %eigvals, %counts = quantum.counts %4 : tensor<2xf64>, tensor<2xi64>
       %5 = stablehlo.convert %eigvals : (tensor<2xf64>) -> tensor<2xi64>
       %c_4 = stablehlo.constant dense<0> : tensor<i64>
       %extracted_5 = tensor.extract %c_4[] : tensor<i64>

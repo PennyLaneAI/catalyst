@@ -1741,11 +1741,7 @@ def _counts_lowering(
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    if isinstance(shots, int):
-        return CountsOp(eigvals_type, counts_type, obs, static_shots=shots).results
-    else:
-        shots_value = TensorExtractOp(i64_type, shots, []).result
-        return CountsOp(eigvals_type, counts_type, obs, shots=shots_value).results
+    return CountsOp(eigvals_type, counts_type, obs).results
 
 
 #
