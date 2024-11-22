@@ -52,30 +52,14 @@ from catalyst.jax_primitives import (
     var_p,
 )
 
+
 measurement_map = {
-    "sample_wires": sample_p,
-    "expval_obs": expval_p,
-    "var_obs": var_p,
-    "probs_wires": probs_p,
-    "state_wires": state_p,
+    qml.measurements.SampleMP: sample_p,
+    qml.measurements.ExpectationMP: expval_p,
+    qml.measurements.VarianceMP: var_p,
+    qml.measurements.ProbabilityMP: probs_p,
+    qml.measurements.StateMP: state_p,
 }
-
-
-def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
-    shapes = []
-    if not shots:
-        shots = [None]
-
-    for s in shots:
-        for m in measurements:
-            shape, dtype = m.abstract_eval(shots=s, num_device_wires=num_device_wires)
-            shapes.append(jax.core.ShapedArray(shape, dtype))
-    return shapes
-
-
-# pylint: disable=unidiomatic-typecheck
-def _read(var, env: dict):
-    return var.val if type(var) is jax.core.Literal else env[var]
 
 
 def _get_device_kwargs(device) -> dict:
@@ -162,7 +146,7 @@ class WorkflowInterpreter(PlxprInterpreter):
     pass
 
 @WorkflowInterpreter.register_primitive(qnode_prim)
-def _(self, *args, qnode, shots, device, qnode, qfunc_jaxpr, n_consts, batch_dims=None):
+def _(self, *args, qnode, shots, device, qnode_kwargs, qfunc_jaxpr, n_consts, batch_dims=None):
     if device.shots != shots:
         raise NotImplementedError("catalyst does not yet support dynamic shots")
     f = partial(
@@ -217,114 +201,73 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         self.stateref = None
 
 
-    def _get_wire(self, wire_value) -> AbstractQbit:
+    def get_wire(self, wire_value) -> AbstractQbit:
         """Get the ``AbstractQbit`` corresponding to a wire value."""
         if wire_value in self.wire_map:
             return self.wire_map[wire_value]
         return qextract_p.bind(self.qreg, wire_value)
 
-    def interpret_operator_eqn(self, eqn: jax.core.JaxprEqn) -> None:
-        """Interpret a plxpr equation describing an operation as a catalxpr equation."""
-        if not isinstance(eqn.outvars[0], jax.core.DropVar):
-            invals = (self.read(invar) for invar in eqn.invars)
-            with qml.QueuingManager.stop_recording():
-                op = eqn.primitive.impl(*invals, **eqn.params)
-            return self.interpret_operation(op)
-
-        if "n_wires" not in eqn.params:
-            raise NotImplementedError(
-                f"Operator {eqn.primitive.name} not yet supported for catalyst conversion."
-            )
-        n_wires = eqn.params["n_wires"]
-        if n_wires == 0:
-            wires = []
-            wire_values = []
-            invals = [self.read(invar) for invar in eqn.invars]
-        else:
-            wire_values = [self.read(w) for w in eqn.invars[-n_wires:]]
-            wires = [self._get_wire(w) for w in wire_values]
-            invals = [self.read(invar) for invar in eqn.invars[:-n_wires]]
-
-        kwargs = {
-            "qubits_len": eqn.params["n_wires"],
-            "ctrl_len": 0,
-            "adjoint": False,
-        }
-
-        if eqn.primitive.name == "QubitUnitary":
-            outvals = qunitary_p.bind(*invals, *wires, **kwargs)
-        elif eqn.primitive.name == "GlobalPhase":
-            outvals = gphase_p.bind(*invals, ctrl_len=0, adjoint=False)
-        else:
-            outvals = qinst_p.bind(
-                *wires,
-                *invals,
-                op=eqn.primitive.name,
-                params_len=len(eqn.invars) - eqn.params["n_wires"],
-                **kwargs,
-            )
-
-        for wire_values, new_wire in zip(wire_values, outvals):
+    def interpret_operation(self, op, is_adjoint=False):
+        in_qubits = [self.get_wires(w) for w in op.wires]
+        out_qubits = qinst_p.bind(
+            *in_qubits,
+            *op.data,
+            op=op.name,
+            params_len=len(op.data),
+            qubits_len=len(op.wires),
+            adjoint=is_adjoint,
+        )
+        for wire_values, new_wire in zip(op.wires, out_qubits):
             self.wire_map[wire_values] = new_wire
 
-    def _obs(self, eqn: jax.core.JaxprEqn):
+    def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
-        obs_eqn = self.op_math_cache[eqn.invars[0]]
-        if "n_wires" not in obs_eqn.params:
-            raise NotImplementedError(
-                f"from_plxpr can not yet interpret observables of type {obs_eqn.primitive}"
-            )
+        wires = [self.get_wire(w) for w in obs.wires]
+        return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
 
-        n_wires = obs_eqn.params["n_wires"]
-        wires = [self._get_wire(self.read(w)) for w in obs_eqn.invars[-n_wires:]]
-        invals = [self.read(invar) for invar in obs_eqn.invars[:-n_wires]]
-        return namedobs_p.bind(*wires, *invals, kind=obs_eqn.primitive.name)
-
-    def _compbasis_obs(self, eqn: jax.core.JaxprEqn):
+    def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
-        if eqn.invars:
-            w_vals = [self.read(w_var) for w_var in eqn.invars]
+        wires = wires or self._device.wires  # broadcast across all wires
+        qubits = [self.get_wire(w) for w in wires]
+        return compbasis_p.bind(*qubits)
+
+
+    def interpret_measurement(self, measurement):
+        if type(measurement) not in measurement_map:
+            raise NotImplementedError
+
+        if measurement.obs:
+            obs = self._obs(measurement.obs)
         else:
-            w_vals = self._device.wires  # broadcast across all wires
-        wires = [self._get_wire(w) for w in w_vals]
-        return compbasis_p.bind(*wires)
+            obs = self._compbasis_obs(*measurement.wires)
 
-    def interpret_measurement_eqn(self, eqn: jax.core.JaxprEqn):
-        """Interpret a measurement equation as a catalyst equation."""
-        if eqn.primitive.name not in measurement_map:
-            raise NotImplementedError(
-                f"measurement {eqn.primitive.name} not yet supported for conversion."
-            )
-        if eqn.params.get("has_eigvals", False):
-            raise NotImplementedError(
-                "from_plxpr does not yet support measurements with eigenvalues."
-            )
-
-        if "_wires" in eqn.primitive.name:
-            obs = self._compbasis_obs(eqn)
-        else:
-            obs = self._obs(eqn)
-        # mcm based measurements wont be in measurement map yet
-        # so we can assume observable based
-
-        shaped_array = _get_shapes_for(
-            eqn.outvars[0].aval, shots=self._device.shots, num_device_wires=len(self._device.wires)
-        )[0]
-
-        primitive = measurement_map[eqn.primitive.name]
-        mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+        shape, dtype = measurement._abstract_eval(n_wires=len(measurement.wires),
+            shots=self.device.shots.total_shots,
+            device_wires=len(self._device.wires))
+    
+        prim = measurement_map[type(measurement)]
+        mval = prim.bind(obs, shape=shape, shots=self._device.shots.total_shots)
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
-        if shaped_array.dtype != mval.dtype:
-            return jax.lax.convert_element_type(mval, shaped_array.dtype)
+        if dtype != mval.dtype: 
+            return jax.lax.convert_element_type(mval, dtype)
         return mval
 
 
+@QFuncPlxprInterpreter.register_primitive(qml.ops.Adjoint._primitive)
+def _(self, op):
+    self.interpret_operation(op.base, is_adjoint=True)
+
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def _(self, *invals, n_wires):
-    wires = [self._get_wire(w) for w in invals[1:]]
+    wires = [self.get_wire(w) for w in invals[1:]]
+    outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+    for wire_values, new_wire in zip(invals[1:], outvals):
+        self.wire_map[wire_values] = new_wire
 
-    return qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+@QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
+def _(self, phase, *wires, n_wires):
+    gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
