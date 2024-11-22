@@ -1206,7 +1206,7 @@ def trace_quantum_function(
 
                 # TODO: device shots is now always a concrete integer or None
                 # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
-                device_shots = 0 if get_device_shots(device) is None else get_device_shots(device)
+                device_shots = get_device_shots(device) or 0
                 qdevice_p.bind(
                     device_shots,
                     rtd_lib=device.backend_lib,

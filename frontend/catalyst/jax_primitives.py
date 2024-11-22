@@ -1688,7 +1688,6 @@ def _sample_lowering(
     jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
 ):
     # Note: result shape of sample op is (shots, number_of_qubits)
-    # shots will always be dynamic in IR, and will be retrived from device in runtime
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 

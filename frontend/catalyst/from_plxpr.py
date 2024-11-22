@@ -233,9 +233,7 @@ class QFuncPlxprInterpreter:
 
     def __init__(self, device):
         self._device = device
-        self.device_shots = (
-            0 if get_device_shots(self._device) is None else get_device_shots(self._device)
-        )
+        self.device_shots = get_device_shots(self._device) or 0
         self.qreg = None
         self.env = {}
         self.wire_map = {}
