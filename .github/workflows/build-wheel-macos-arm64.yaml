@@ -349,6 +349,14 @@ jobs:
         make standalone-plugin
         mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
 
+    - name: Build LAPACKE interface
+      run: |
+        # On GH images, gfortran is only available as a specific version.
+        export FC=gfortran-14
+        git clone https://github.com/lepus2589/accelerate-lapacke.git accelerate-lapacke || true
+        cmake -B $GITHUB_WORKSPACE/lapacke-build -S accelerate-lapacke --preset accelerate-lapacke32
+        cmake --build $GITHUB_WORKSPACE/lapacke-build
+
     - name: Build wheel
       run: |
         PYTHON=python${{ matrix.python_version }} \
@@ -358,6 +366,7 @@ jobs:
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        LP_BUILD_DIR=$GITHUB_WORKSPACE/lapacke-build \
         make wheel
 
     - name: Repair wheel using delocate-wheel
