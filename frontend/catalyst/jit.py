@@ -481,9 +481,10 @@ class QJIT(CatalystCallable):
         self.jaxed_function = None
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
-        self.mlir = None  # string form (historic presence)
+        self._mlir = None  # string form (historic presence)
         self.mlir_module = None
-        self.qir = None
+        self._qir = None
+        self.qir_file = None
         self.out_type = None
         self.overwrite_ir = None
 
@@ -513,6 +514,21 @@ class QJIT(CatalystCallable):
             self.aot_compile()
 
         super().__init__("user_function")
+
+    @property
+    def mlir(self):
+        if not self._mlir and self.mlir_module:
+            _, mlir_file = self.canonicalize(self.mlir_module)
+            with open(mlir_file, "r", encoding="utf-8") as f:
+                self._mlir = f.read()
+        return self._mlir
+
+    @property
+    def qir(self):
+        if not self._qir and self.qir_file:
+            with open(self.qir_file, "r", encoding="utf-8") as f:
+                self._qir = f.read()
+        return self._qir
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -555,10 +571,10 @@ class QJIT(CatalystCallable):
                 )
 
         if self.compile_options.target in ("mlir", "binary"):
-            self.mlir_module, self.mlir = self.generate_ir()
+            self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
-            self.compiled_function, self.qir = self.compile()
+            self.compiled_function, self.qir_file = self.compile()
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
@@ -599,8 +615,8 @@ class QJIT(CatalystCallable):
                     args, **kwargs
                 )
 
-            self.mlir_module, self.mlir = self.generate_ir()
-            self.compiled_function, self.qir = self.compile()
+            self.mlir_module = self.generate_ir()
+            self.compiled_function, self.qir_file = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -696,7 +712,20 @@ class QJIT(CatalystCallable):
         PipelineNameUniquer.reset()
         return jaxpr, out_type, treedef, dynamic_sig
 
-    @instrument(size_from=0, has_finegrained=True)
+    @debug_logger
+    def canonicalize(self, mlir_module):
+        """Canonicalize the mlir_module"""
+
+        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
+        options = copy.deepcopy(self.compile_options)
+        options.pipelines = [("0_canonicalize", ["canonicalize"])]
+        options.lower_to_llvm = False
+        canonicalizer = Compiler(options)
+
+        # TODO: the in-memory and textual form are different after this, consider unification
+        return canonicalizer.run(mlir_module, self.workspace)
+
+    @instrument(has_finegrained=True)
     @debug_logger
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
@@ -710,18 +739,8 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        canonicalizer = Compiler(options)
+        return mlir_module
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(mlir_module, self.workspace)
-
-        return mlir_module, mlir_string
-
-    @instrument(size_from=1, has_finegrained=True)
     @debug_logger
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
@@ -746,19 +765,19 @@ class QJIT(CatalystCallable):
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir = self.compiler.run_from_ir(
+            shared_object, llvm_ir_file = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+            shared_object, llvm_ir_file = self.compiler.run(self.mlir_module, self.workspace)
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
 
-        return compiled_fn, llvm_ir
+        return compiled_fn, llvm_ir_file
 
     @instrument(has_finegrained=True)
     @debug_logger
