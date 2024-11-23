@@ -89,6 +89,7 @@ def qjit(
     seed=None,
     experimental_capture=False,
     circuit_transform_pipeline=None,
+    print_instructions=False
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -155,6 +156,7 @@ def qjit(
             dictionaries of valid keyword arguments and values for the specific pass.
             The order of keys in this dictionary will determine the pass pipeline.
             If not specified, the default pass pipeline will be applied.
+        print_instructions (Optional[bool]): If set to True, instructions are printed when executing in the null device.
 
     Returns:
         QJIT object.
@@ -432,11 +434,12 @@ def qjit(
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
+    kwargs.pop("print_instructions")
 
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
-    return QJIT(fn, CompileOptions(**kwargs))
+    return QJIT(fn, CompileOptions(**kwargs), print_instructions)
 
 
 ## IMPL ##
@@ -454,6 +457,7 @@ class QJIT(CatalystCallable):
     Args:
         fn (Callable): the quantum or classical function to compile
         compile_options (CompileOptions): compilation options to use
+        print_instructions (Optional[bool]): if set to True, instructions are printed when executing in the null device.
 
     :ivar original_function: This attribute stores `fn`, the quantum or classical function
                              object to compile, as is, without any modifications
@@ -464,7 +468,7 @@ class QJIT(CatalystCallable):
     """
 
     @debug_logger_init
-    def __init__(self, fn, compile_options):
+    def __init__(self, fn, compile_options, print_instructions=False):
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
@@ -512,6 +516,8 @@ class QJIT(CatalystCallable):
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
 
+        # flag for printing instructions in the null device
+        self.print_instructions = print_instructions
         super().__init__("user_function")
 
     @debug_logger
@@ -677,6 +683,7 @@ class QJIT(CatalystCallable):
             return QFunc.__call__(
                 qnode,
                 pass_pipeline=self.compile_options.circuit_transform_pipeline,
+                print_instructions=self.print_instructions,
                 *args,
                 **dict(params, **kwargs),
             )

@@ -121,8 +121,10 @@ class QFunc:
             if mcm_config.mcm_method == "one-shot":
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
-
-        qjit_device = QJITDevice(self.device)
+        
+        # retrieve flag of whether or not to print instructions (in case we execute the pre-compiled program in the null device)
+        print_instructions = kwargs.pop("print_instructions", False)
+        qjit_device = QJITDevice(self.device, print_instructions)
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
