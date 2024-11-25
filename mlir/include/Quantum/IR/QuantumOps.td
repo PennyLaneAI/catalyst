@@ -735,9 +735,9 @@ def SampleOp : Measurement_Op<"sample"> {
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
         from an observable on the current quantum state.
-        The first SSA argument is an observable that must be defined by an operation in the local scope.
-        Given the nature of the operation, another SSA
-        argument specifying the shot number, i.e. the number of samples to draw, must also be specified.
+        The only SSA argument is an observable that must be defined by an operation in the local scope.
+        from an observable on the current quantum state.
+        The number of samples to draw is determined by the device shots argument in the device initialization operation in the local scope.
 
 
         Note that the return value type depends on the type of observable provided. Computational
@@ -747,14 +747,14 @@ def SampleOp : Measurement_Op<"sample"> {
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
         {
+            quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"] shots %shots
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %shots = arith.constant 1000 : i64
-            %samples = quantum.samples %obs1 %shots : tensor<1000xf64>
+            %samples = quantum.samples %obs1 : tensor<?xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 %shots : tensor<1000x2xf64>
+            %samples2 = quantum.samples %obs2 : tensor<?x2xf64>
 
             func.return
         }
@@ -799,9 +799,9 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
         from an observable on the current quantum state and counting the frequency of each
         eigenvalue.
-        The first SSA argument is an observable that must be defined by an operation in the local scope.
-        Given the nature of the operation, another SSA
-        argument specifying the shot number, i.e. the number of samples to draw, must also be specified.
+        The only SSA argument is an observable that must be defined by an operation in the local scope.
+        from an observable on the current quantum state.
+        The number of samples to draw is determined by the device shots argument in the device initialization operation in the local scope.
 
         Note that the "counts dictionary" is returned as two separate arrays of the same length, one
         array for the eigenvalues, and one for count of each eigenvalue. When operating in the
@@ -811,14 +811,14 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
         {
+            quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"] shots %shots
             %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-            %shots = arith.constant 1000 : i64
-            %counts = quantum.counts %obs %shots : tensor<4xf64>, tensor<4xi64>
+            %counts = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %counts2 = quantum.counts %obs2 %shots : tensor<2xf64>, tensor<2xi64>
+            %counts2 = quantum.counts %obs2 : tensor<2xf64>, tensor<2xi64>
 
             func.return
         }
