@@ -197,7 +197,7 @@ def extract_backend_info(
             )
 
     for k, v in getattr(device, "device_kwargs", {}).items():
-        if k not in device_kwargs:
+        if k not in device_kwargs:  # pragma: no branch
             device_kwargs[k] = v
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
@@ -259,7 +259,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         )
 
     # Optionally enable runtime-powered adjoint of quantum gates (inversions)
-    if any(ng.invertible for ng in target_capabilities.operations.values()):
+    if any(ng.invertible for ng in target_capabilities.operations.values()):  # pragma: no branch
         qjit_capabilities.operations.update(
             {
                 "HybridAdjoint": OperatorProperties(
