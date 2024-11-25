@@ -286,6 +286,8 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
+        # On GH images, gfortran is only available as a specific version.
+        export FC=gfortran-14
         # Segfaults in computing Lightning's adjoint-jacobian when building with OMP
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \

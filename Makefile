@@ -13,7 +13,6 @@ DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
-LP_BUILD_DIR ?= $(MK_DIR)/frontend/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
@@ -86,7 +85,7 @@ help:
 all: runtime oqc mlir frontend
 catalyst: runtime dialects frontend
 
-.PHONY: frontend lapacke
+.PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
@@ -94,12 +93,6 @@ frontend:
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
-
-lapacke:
-   	git clone https://github.com/lepus2589/accelerate-lapacke.git .accelerate-lapacke || true
-	cmake -B $(LP_BUILD_DIR) -S .accelerate-lapacke --preset accelerate-lapacke32
-	cmake --build $(LP_BUILD_DIR)
-	cp -L $(LP_BUILD_DIR)/_deps/reference-lapack-build/lib/liblapacke.dylib frontend/catalyst/utils/liblapacke.3.dylib
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
@@ -181,6 +174,7 @@ wheel:
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/catalyst_callback_registry.so $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/openqasm_python_module.so $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/liblapacke.* $(MK_DIR)/frontend/catalyst/lib || true  # optional
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
@@ -188,7 +182,6 @@ wheel:
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
-	cp $(COPY_FLAGS) $(LP_BUILD_DIR)/_deps/reference-lapack-build/lib/liblapacke.dylib $(MK_DIR)/frontend/catalyst/lib/liblapacke.3.dylib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects

@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.26)
 
 project(catalyst_runtime)
 include(FetchContent)
+include(ExternalProject)
 
 set(CMAKE_CXX_STANDARD  20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -111,3 +112,16 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(tests)
+
+if(APPLE)
+    ExternalProject_Add(lapacke-accelerate
+        GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
+        GIT_TAG master
+        PREFIX _lapacke-accelerate
+        CMAKE_ARGS "--preset accelerate-lapacke32"
+                   "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
+        INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
+        COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
+    )
+    add_dependencies(rt_capi lapacke-accelerate)  # automatically build when the runtime is built
+endif()
