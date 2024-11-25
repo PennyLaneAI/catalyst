@@ -1688,10 +1688,10 @@ def _sample_lowering(
     f64_type = ir.F64Type.get()
     i64_type = ir.IntegerType.get_signless(64, ctx)
 
-    # TODO: use actual dynamic shape tensor type API
-    # Somehow this magic number means dynamically sized dimensions in jax
     result_shape = (
-        (shots, num_qubits) if isinstance(shots, int) else (-9223372036854775808, num_qubits)
+        (shots, num_qubits)
+        if isinstance(shots, int)
+        else (ir.ShapedType.get_dynamic_size(), num_qubits)
     )
     result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
