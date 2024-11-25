@@ -213,10 +213,6 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
                                                          /* shots = */ int64Type});
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        Value shots = op.getShots();
-        assert(
-            shots &&
-            "DeviceInitOp expects a shots value. Please provide zero if exact results are wanted.");
         auto rtd_lib = op.getLib().str();
         auto rtd_name = op.getName().str();
         auto rtd_kwargs = op.getKwargs().str();
@@ -228,7 +224,16 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         auto rtd_kwargs_gs = getGlobalString(
             loc, rewriter, rtd_kwargs, StringRef(rtd_kwargs.c_str(), rtd_kwargs.length() + 1), mod);
 
-        SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs, shots};
+        SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
+
+        Value shots = op.getShots();
+        if (!shots) {
+            auto zeroShots = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+            operands.push_back(zeroShots);
+        }
+        else {
+            operands.push_back(shots);
+        }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 
