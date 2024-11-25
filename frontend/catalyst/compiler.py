@@ -119,7 +119,7 @@ class LinkerDriver:
         if platform.system() == "Linux":
             lib_name = "openblas"
             package_name = "scipy"
-            path_within_package = "../lib"
+            path_within_package = "../scipy.libs/"
             file_extension = ".so"
 
             package_spec = importlib.util.find_spec(package_name)
