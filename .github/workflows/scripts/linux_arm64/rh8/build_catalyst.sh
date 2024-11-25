@@ -17,7 +17,7 @@ export PYTHON_ALTERNATIVE_VERSION=$5
 dnf update -y
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION}
 if [ "$PYTHON_VERSION" != "3.10" ]; then
-    dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
+    dnf install -y ${PYTHON_PACKAGE}
 fi
 dnf clean all -y
 
@@ -35,23 +35,20 @@ export PYTHON=/usr/bin/python3
 export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
 
 # Install python dependencies
-/usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
+/usr/bin/python3 -m pip install pennylane nanobind pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1'
 
 # Build Catalyst runtime
 cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
     -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+    -DPython_ROOT_DIR=$(/usr/bin/python3 -c "import sys; print(sys.prefix)") \
+    -DPYTHON_VERSION_TO_FIND=${PYTHON_VERSION} \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
     -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
-    -DLIGHTNING_GIT_TAG=latest_release \
-    -DENABLE_LAPACK=OFF \
-    -DENABLE_WARNINGS=OFF \
-    -DENABLE_OPENQASM=ON \
-    -DENABLE_OPENMP=OFF \
-    -DLQ_ENABLE_KERNEL_OMP=OFF
-cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
+    -DENABLE_OPENQASM=ON
+cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
@@ -70,16 +67,16 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DMHLO_BINARY_DIR=/catalyst/mhlo-build/bin \
     -DEnzyme_DIR=/catalyst/enzyme-build \
     -DENZYME_SRC_DIR=/catalyst/mlir/Enzyme \
-    -DLLVM_ENABLE_ZLIB=OFF \
-    -DLLVM_ENABLE_ZSTD=FORCE_ON \
+    -DLLVM_ENABLE_ZLIB=FORCE_ON \
+    -DLLVM_ENABLE_ZSTD=OFF \
     -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
-cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
+cmake --build quantum-build --target check-dialects catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
-cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
-cp /catalyst/runtime-build/lib/*/*/*/*/openqasm_python_module.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
+cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.so /catalyst/runtime-build/lib
+cp /catalyst/runtime-build/lib/*/*/*/*/openqasm_python_module.so /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/
 
 # Build wheels
@@ -89,6 +86,8 @@ export DIALECTS_BUILD_DIR=/catalyst/quantum-build
 export RT_BUILD_DIR=/catalyst/runtime-build
 export OQC_BUILD_DIR=/catalyst/oqc-build
 export ENZYME_BUILD_DIR=/catalyst/enzyme-build
+export PYTHON=/usr/bin/python3
+make standalone-plugin
 make wheel
 
 # Exclude libopenblas as we rely on the openblas/lapack library shipped by scipy

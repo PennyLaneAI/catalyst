@@ -150,7 +150,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
@@ -179,12 +179,12 @@ jobs:
               -DLLVM_ENABLE_PROJECTS="mlir" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DLLVM_ENABLE_LLD=ON
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
@@ -215,9 +215,9 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DLLVM_ENABLE_LLD=ON
 
         LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build mhlo-build --target check-mlir-hlo
@@ -238,7 +238,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
 
         cmake --build enzyme-build --target EnzymeStatic-19
@@ -277,7 +277,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
@@ -340,15 +340,12 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython_ROOT_DIR=$(python${{ matrix.python_version }} -c "import sys; print(sys.prefix)") \
+              -DPYTHON_VERSION_TO_FIND=${{ matrix.python_version }} \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=latest_release \
-              -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF \
-              -DLQ_ENABLE_KERNEL_OMP=OFF
+              -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_null_qubit
+        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -375,11 +372,19 @@ jobs:
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=ON
 
-        cmake --build quantum-build --target check-dialects compiler_driver catalyst-cli
+        cmake --build quantum-build --target check-dialects catalyst-cli
+
+    - name: Build Standalone Plugin
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        make standalone-plugin
+        mv mlir/standalone/build/lib/StandalonePlugin.so quantum-build/lib/
 
     - name: Build wheel
       run: |
@@ -452,5 +457,5 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto

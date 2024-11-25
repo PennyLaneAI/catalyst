@@ -14,18 +14,19 @@ ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
 TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
+LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
-SYMBOL_VISIBILITY := hidden
+SYMBOL_VISIBILITY := default
 else
 DEFAULT_ENABLE_LLD := ON
-SYMBOL_VISIBILITY := protected
+SYMBOL_VISIBILITY := default
 endif
 
 ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
-ENABLE_ZLIB?=OFF
-ENABLE_ZSTD?=ON
+ENABLE_ZLIB?=ON
+ENABLE_ZSTD?=OFF
 
 ifeq ($(ENABLE_ASAN), ON)
 USE_SANITIZER_NAMES="Address"
@@ -120,10 +121,25 @@ enzyme:
 
 	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
 
+.PHONY: standalone-plugin
+standalone-plugin:
+	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
+	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
+		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
+	fi
+	cmake -B standalone/build -G Ninja \
+		-DMLIR_DIR=$(MLIR_DIR) \
+		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
+		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		standalone
+	cmake --build standalone/build --target check-standalone
+
 .PHONY: dialects
 dialects:
 
-	@echo "build quantum-lsp compiler_driver and dialects"
+	@echo "build quantum-lsp and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
@@ -146,15 +162,15 @@ dialects:
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver catalyst-cli
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli
 
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean clean-dialects clean-enzyme clean-mhlo
-clean: clean-dialects clean-llvm clean-mhlo clean-enzyme
+.PHONY: clean clean-dialects clean-enzyme clean-mhlo clean-plugin
+clean: clean-dialects clean-llvm clean-mhlo clean-enzyme clean-plugin
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
@@ -171,6 +187,10 @@ clean-mhlo:
 clean-enzyme:
 	@echo "clean enzyme build files"
 	rm -rf $(ENZYME_BUILD_DIR)
+
+clean-plugin:
+	@echo "clean plugin"
+	rm -rf standalone/build
 
 .PHONY: format
 format:

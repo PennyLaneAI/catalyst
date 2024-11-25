@@ -103,6 +103,13 @@ def QuantumCircuitTransformationPass: QuantumCircuitTransformationPassBase {
     ];
 }
 
+def IonsDecompositionPass : Pass<"ions-decomposition"> {
+    let summary = "Decompose the gates to the set {RX, RY, MS}";
+
+    let constructor = "catalyst::createIonsDecompositionPass()";
+    let options = QuantumCircuitTransformationPass.options;
+}
+
 def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 

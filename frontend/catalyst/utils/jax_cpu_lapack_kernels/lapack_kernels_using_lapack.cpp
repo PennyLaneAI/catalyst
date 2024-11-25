@@ -41,120 +41,120 @@
 
 extern "C" {
 
-jax::RealTrsm<float>::FnType cblas_strsm;
-jax::RealTrsm<double>::FnType cblas_dtrsm;
-jax::ComplexTrsm<std::complex<float>>::FnType cblas_ctrsm;
-jax::ComplexTrsm<std::complex<double>>::FnType cblas_ztrsm;
+jax::RealTrsm<float>::FnType scipy_cblas_strsm;
+jax::RealTrsm<double>::FnType scipy_cblas_dtrsm;
+jax::ComplexTrsm<std::complex<float>>::FnType scipy_cblas_ctrsm;
+jax::ComplexTrsm<std::complex<double>>::FnType scipy_cblas_ztrsm;
 
-jax::Getrf<float>::FnType LAPACKE_sgetrf;
-jax::Getrf<double>::FnType LAPACKE_dgetrf;
-jax::Getrf<std::complex<float>>::FnType LAPACKE_cgetrf;
-jax::Getrf<std::complex<double>>::FnType LAPACKE_zgetrf;
+jax::Getrf<float>::FnType scipy_LAPACKE_sgetrf;
+jax::Getrf<double>::FnType scipy_LAPACKE_dgetrf;
+jax::Getrf<std::complex<float>>::FnType scipy_LAPACKE_cgetrf;
+jax::Getrf<std::complex<double>>::FnType scipy_LAPACKE_zgetrf;
 
-jax::Geqrf<float>::FnType LAPACKE_sgeqrf;
-jax::Geqrf<double>::FnType LAPACKE_dgeqrf;
-jax::Geqrf<std::complex<float>>::FnType LAPACKE_cgeqrf;
-jax::Geqrf<std::complex<double>>::FnType LAPACKE_zgeqrf;
+jax::Geqrf<float>::FnType scipy_LAPACKE_sgeqrf;
+jax::Geqrf<double>::FnType scipy_LAPACKE_dgeqrf;
+jax::Geqrf<std::complex<float>>::FnType scipy_LAPACKE_cgeqrf;
+jax::Geqrf<std::complex<double>>::FnType scipy_LAPACKE_zgeqrf;
 
-jax::Orgqr<float>::FnType LAPACKE_sorgqr;
-jax::Orgqr<double>::FnType LAPACKE_dorgqr;
-jax::Orgqr<std::complex<float>>::FnType LAPACKE_cungqr;
-jax::Orgqr<std::complex<double>>::FnType LAPACKE_zungqr;
+jax::Orgqr<float>::FnType scipy_LAPACKE_sorgqr;
+jax::Orgqr<double>::FnType scipy_LAPACKE_dorgqr;
+jax::Orgqr<std::complex<float>>::FnType scipy_LAPACKE_cungqr;
+jax::Orgqr<std::complex<double>>::FnType scipy_LAPACKE_zungqr;
 
-jax::Potrf<float>::FnType LAPACKE_spotrf;
-jax::Potrf<double>::FnType LAPACKE_dpotrf;
-jax::Potrf<std::complex<float>>::FnType LAPACKE_cpotrf;
-jax::Potrf<std::complex<double>>::FnType LAPACKE_zpotrf;
+jax::Potrf<float>::FnType scipy_LAPACKE_spotrf;
+jax::Potrf<double>::FnType scipy_LAPACKE_dpotrf;
+jax::Potrf<std::complex<float>>::FnType scipy_LAPACKE_cpotrf;
+jax::Potrf<std::complex<double>>::FnType scipy_LAPACKE_zpotrf;
 
-jax::RealGesdd<float>::FnType LAPACKE_sgesdd;
-jax::RealGesdd<double>::FnType LAPACKE_dgesdd;
-jax::ComplexGesdd<std::complex<float>>::FnType LAPACKE_cgesdd;
-jax::ComplexGesdd<std::complex<double>>::FnType LAPACKE_zgesdd;
+jax::RealGesdd<float>::FnType scipy_LAPACKE_sgesdd;
+jax::RealGesdd<double>::FnType scipy_LAPACKE_dgesdd;
+jax::ComplexGesdd<std::complex<float>>::FnType scipy_LAPACKE_cgesdd;
+jax::ComplexGesdd<std::complex<double>>::FnType scipy_LAPACKE_zgesdd;
 
-jax::RealSyevd<float>::FnType LAPACKE_ssyevd;
-jax::RealSyevd<double>::FnType LAPACKE_dsyevd;
-jax::ComplexHeevd<std::complex<float>>::FnType LAPACKE_cheevd;
-jax::ComplexHeevd<std::complex<double>>::FnType LAPACKE_zheevd;
+jax::RealSyevd<float>::FnType scipy_LAPACKE_ssyevd;
+jax::RealSyevd<double>::FnType scipy_LAPACKE_dsyevd;
+jax::ComplexHeevd<std::complex<float>>::FnType scipy_LAPACKE_cheevd;
+jax::ComplexHeevd<std::complex<double>>::FnType scipy_LAPACKE_zheevd;
 
-jax::RealGeev<float>::FnType LAPACKE_sgeev;
-jax::RealGeev<double>::FnType LAPACKE_dgeev;
-jax::ComplexGeev<std::complex<float>>::FnType LAPACKE_cgeev;
-jax::ComplexGeev<std::complex<double>>::FnType LAPACKE_zgeev;
+jax::RealGeev<float>::FnType scipy_LAPACKE_sgeev;
+jax::RealGeev<double>::FnType scipy_LAPACKE_dgeev;
+jax::ComplexGeev<std::complex<float>>::FnType scipy_LAPACKE_cgeev;
+jax::ComplexGeev<std::complex<double>>::FnType scipy_LAPACKE_zgeev;
 
-jax::RealGees<float>::FnType LAPACKE_sgees;
-jax::RealGees<double>::FnType LAPACKE_dgees;
-jax::ComplexGees<std::complex<float>>::FnType LAPACKE_cgees;
-jax::ComplexGees<std::complex<double>>::FnType LAPACKE_zgees;
+jax::RealGees<float>::FnType scipy_LAPACKE_sgees;
+jax::RealGees<double>::FnType scipy_LAPACKE_dgees;
+jax::ComplexGees<std::complex<float>>::FnType scipy_LAPACKE_cgees;
+jax::ComplexGees<std::complex<double>>::FnType scipy_LAPACKE_zgees;
 
-jax::Gehrd<float>::FnType LAPACKE_sgehrd;
-jax::Gehrd<double>::FnType LAPACKE_dgehrd;
-jax::Gehrd<std::complex<float>>::FnType LAPACKE_cgehrd;
-jax::Gehrd<std::complex<double>>::FnType LAPACKE_zgehrd;
+jax::Gehrd<float>::FnType scipy_LAPACKE_sgehrd;
+jax::Gehrd<double>::FnType scipy_LAPACKE_dgehrd;
+jax::Gehrd<std::complex<float>>::FnType scipy_LAPACKE_cgehrd;
+jax::Gehrd<std::complex<double>>::FnType scipy_LAPACKE_zgehrd;
 
-jax::Sytrd<float>::FnType LAPACKE_ssytrd;
-jax::Sytrd<double>::FnType LAPACKE_dsytrd;
-jax::Sytrd<std::complex<float>>::FnType LAPACKE_chetrd;
-jax::Sytrd<std::complex<double>>::FnType LAPACKE_zhetrd;
+jax::Sytrd<float>::FnType scipy_LAPACKE_ssytrd;
+jax::Sytrd<double>::FnType scipy_LAPACKE_dsytrd;
+jax::Sytrd<std::complex<float>>::FnType scipy_LAPACKE_chetrd;
+jax::Sytrd<std::complex<double>>::FnType scipy_LAPACKE_zhetrd;
 
 } // extern "C"
 
 namespace jax {
 
 static auto init = []() -> int {
-    RealTrsm<float>::fn = cblas_strsm;
-    RealTrsm<double>::fn = cblas_dtrsm;
-    ComplexTrsm<std::complex<float>>::fn = cblas_ctrsm;
-    ComplexTrsm<std::complex<double>>::fn = cblas_ztrsm;
+    RealTrsm<float>::fn = scipy_cblas_strsm;
+    RealTrsm<double>::fn = scipy_cblas_dtrsm;
+    ComplexTrsm<std::complex<float>>::fn = scipy_cblas_ctrsm;
+    ComplexTrsm<std::complex<double>>::fn = scipy_cblas_ztrsm;
 
-    Getrf<float>::fn = LAPACKE_sgetrf;
-    Getrf<double>::fn = LAPACKE_dgetrf;
-    Getrf<std::complex<float>>::fn = LAPACKE_cgetrf;
-    Getrf<std::complex<double>>::fn = LAPACKE_zgetrf;
+    Getrf<float>::fn = scipy_LAPACKE_sgetrf;
+    Getrf<double>::fn = scipy_LAPACKE_dgetrf;
+    Getrf<std::complex<float>>::fn = scipy_LAPACKE_cgetrf;
+    Getrf<std::complex<double>>::fn = scipy_LAPACKE_zgetrf;
 
-    Geqrf<float>::fn = LAPACKE_sgeqrf;
-    Geqrf<double>::fn = LAPACKE_dgeqrf;
-    Geqrf<std::complex<float>>::fn = LAPACKE_cgeqrf;
-    Geqrf<std::complex<double>>::fn = LAPACKE_zgeqrf;
+    Geqrf<float>::fn = scipy_LAPACKE_sgeqrf;
+    Geqrf<double>::fn = scipy_LAPACKE_dgeqrf;
+    Geqrf<std::complex<float>>::fn = scipy_LAPACKE_cgeqrf;
+    Geqrf<std::complex<double>>::fn = scipy_LAPACKE_zgeqrf;
 
-    Orgqr<float>::fn = LAPACKE_sorgqr;
-    Orgqr<double>::fn = LAPACKE_dorgqr;
-    Orgqr<std::complex<float>>::fn = LAPACKE_cungqr;
-    Orgqr<std::complex<double>>::fn = LAPACKE_zungqr;
+    Orgqr<float>::fn = scipy_LAPACKE_sorgqr;
+    Orgqr<double>::fn = scipy_LAPACKE_dorgqr;
+    Orgqr<std::complex<float>>::fn = scipy_LAPACKE_cungqr;
+    Orgqr<std::complex<double>>::fn = scipy_LAPACKE_zungqr;
 
-    Potrf<float>::fn = LAPACKE_spotrf;
-    Potrf<double>::fn = LAPACKE_dpotrf;
-    Potrf<std::complex<float>>::fn = LAPACKE_cpotrf;
-    Potrf<std::complex<double>>::fn = LAPACKE_zpotrf;
+    Potrf<float>::fn = scipy_LAPACKE_spotrf;
+    Potrf<double>::fn = scipy_LAPACKE_dpotrf;
+    Potrf<std::complex<float>>::fn = scipy_LAPACKE_cpotrf;
+    Potrf<std::complex<double>>::fn = scipy_LAPACKE_zpotrf;
 
-    RealGesdd<float>::fn = LAPACKE_sgesdd;
-    RealGesdd<double>::fn = LAPACKE_dgesdd;
-    ComplexGesdd<std::complex<float>>::fn = LAPACKE_cgesdd;
-    ComplexGesdd<std::complex<double>>::fn = LAPACKE_zgesdd;
+    RealGesdd<float>::fn = scipy_LAPACKE_sgesdd;
+    RealGesdd<double>::fn = scipy_LAPACKE_dgesdd;
+    ComplexGesdd<std::complex<float>>::fn = scipy_LAPACKE_cgesdd;
+    ComplexGesdd<std::complex<double>>::fn = scipy_LAPACKE_zgesdd;
 
-    RealSyevd<float>::fn = LAPACKE_ssyevd;
-    RealSyevd<double>::fn = LAPACKE_dsyevd;
-    ComplexHeevd<std::complex<float>>::fn = LAPACKE_cheevd;
-    ComplexHeevd<std::complex<double>>::fn = LAPACKE_zheevd;
+    RealSyevd<float>::fn = scipy_LAPACKE_ssyevd;
+    RealSyevd<double>::fn = scipy_LAPACKE_dsyevd;
+    ComplexHeevd<std::complex<float>>::fn = scipy_LAPACKE_cheevd;
+    ComplexHeevd<std::complex<double>>::fn = scipy_LAPACKE_zheevd;
 
-    RealGeev<float>::fn = LAPACKE_sgeev;
-    RealGeev<double>::fn = LAPACKE_dgeev;
-    ComplexGeev<std::complex<float>>::fn = LAPACKE_cgeev;
-    ComplexGeev<std::complex<double>>::fn = LAPACKE_zgeev;
+    RealGeev<float>::fn = scipy_LAPACKE_sgeev;
+    RealGeev<double>::fn = scipy_LAPACKE_dgeev;
+    ComplexGeev<std::complex<float>>::fn = scipy_LAPACKE_cgeev;
+    ComplexGeev<std::complex<double>>::fn = scipy_LAPACKE_zgeev;
 
-    RealGees<float>::fn = LAPACKE_sgees;
-    RealGees<double>::fn = LAPACKE_dgees;
-    ComplexGees<std::complex<float>>::fn = LAPACKE_cgees;
-    ComplexGees<std::complex<double>>::fn = LAPACKE_zgees;
+    RealGees<float>::fn = scipy_LAPACKE_sgees;
+    RealGees<double>::fn = scipy_LAPACKE_dgees;
+    ComplexGees<std::complex<float>>::fn = scipy_LAPACKE_cgees;
+    ComplexGees<std::complex<double>>::fn = scipy_LAPACKE_zgees;
 
-    Gehrd<float>::fn = LAPACKE_sgehrd;
-    Gehrd<double>::fn = LAPACKE_dgehrd;
-    Gehrd<std::complex<float>>::fn = LAPACKE_cgehrd;
-    Gehrd<std::complex<double>>::fn = LAPACKE_zgehrd;
+    Gehrd<float>::fn = scipy_LAPACKE_sgehrd;
+    Gehrd<double>::fn = scipy_LAPACKE_dgehrd;
+    Gehrd<std::complex<float>>::fn = scipy_LAPACKE_cgehrd;
+    Gehrd<std::complex<double>>::fn = scipy_LAPACKE_zgehrd;
 
-    Sytrd<float>::fn = LAPACKE_ssytrd;
-    Sytrd<double>::fn = LAPACKE_dsytrd;
-    Sytrd<std::complex<float>>::fn = LAPACKE_chetrd;
-    Sytrd<std::complex<double>>::fn = LAPACKE_zhetrd;
+    Sytrd<float>::fn = scipy_LAPACKE_ssytrd;
+    Sytrd<double>::fn = scipy_LAPACKE_dsytrd;
+    Sytrd<std::complex<float>>::fn = scipy_LAPACKE_chetrd;
+    Sytrd<std::complex<double>>::fn = scipy_LAPACKE_zhetrd;
 
     return 0;
 }();
