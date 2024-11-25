@@ -1686,7 +1686,6 @@ def _sample_lowering(
     ctx.allow_unregistered_dialects = True
 
     f64_type = ir.F64Type.get()
-    i64_type = ir.IntegerType.get_signless(64, ctx)
 
     result_shape = (
         (shots, num_qubits)
