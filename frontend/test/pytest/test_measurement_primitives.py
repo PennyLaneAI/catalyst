@@ -14,10 +14,14 @@
 """
 This file contains a couple of tests for the capture of measurement primitives into jaxpr.
 """
+import shutil
+
 import jax
+import pennylane as qml
 import pytest
 
 import catalyst
+from catalyst.debug import get_compilation_stage, replace_ir
 from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
@@ -119,24 +123,48 @@ module @foo {
 
 
 def test_new_sampleop_still_good_with_backend():
-    import pennylane as qml
+    """Test that a `sample` program with dynamic shots can be executed correctly."""
 
-    from catalyst.debug import replace_ir
-
-    @catalyst.qjit
-    def workflow(shots):
+    @catalyst.qjit(keep_intermediate=True)
+    def workflow_dyn_sample(shots):
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
         @qml.qnode(device)
         def circuit():
-            qml.RX(0.1, 0)
-            # return qml.expval(qml.PauliZ(wires=0))
+            qml.RX(1.5, 0)
             return qml.sample()
 
         return circuit()
 
-    new_ir = """
+    workflow_dyn_sample(10)
+    old_ir = get_compilation_stage(workflow_dyn_sample, "mlir")
+
+    new_ir = old_ir.replace(
+        "catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<10x1xi64>",
+        "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>",
+    )
+    new_ir = new_ir.replace(
+        "func.func public @circuit() -> tensor<10x1xi64>",
+        "func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64>",
+    )
+    new_ir = new_ir.replace(
+        "quantum.device[",
+        """%shots = tensor.extract %arg0[] : tensor<i64>
+      quantum.device[""",
+    )
+    new_ir = new_ir.replace("] shots %extracted", "] shots %shots")
+    new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
+
+    replace_ir(workflow_dyn_sample, "mlir", new_ir)
+    res = workflow_dyn_sample(37)
+    assert len(res) == 37
+
+    shutil.rmtree("workflow_dyn_sample")
+    shutil.rmtree("workflow_dyn_sample_1")
+
+    # Save for WIP. Remove when work is done.
+    _new_ir = """
 module @workflow {
   func.func public @jit_workflow(%arg0: tensor<i64>) -> tensor<?x1xi64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>
@@ -174,21 +202,6 @@ module @workflow {
     return
   }
 }
-"""
-    replace_ir(workflow, "mlir", new_ir)
-    res = workflow(4)
-    print("after: ", res)
-    assert len(res) == 4
-
-
-"""
->> pytest test_measurement_primitives.py -k new_sample -s
-    test_measurement_primitives.py after:  [[1]
- [0]
- [1]
- [0]]
-
-
 """
 
 
@@ -275,23 +288,46 @@ module @foo {
 
 
 def test_new_countsop_still_good_with_backend():
-    import pennylane as qml
+    """Test that a `counts` program with dynamic shots can be executed correctly."""
 
-    from catalyst.debug import replace_ir
-
-    @catalyst.qjit
-    def workflow(shots):
+    @catalyst.qjit(keep_intermediate=True)
+    def workflow_dyn_counts(shots):
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
         @qml.qnode(device)
         def circuit():
-            qml.RX(0.1, 0)
+            qml.RX(1.5, 0)
             return qml.counts()
 
         return circuit()
 
-    new_ir = """module @workflow {
+    workflow_dyn_counts(10)
+    old_ir = get_compilation_stage(workflow_dyn_counts, "mlir")
+    new_ir = old_ir.replace(
+        "catalyst.launch_kernel @module_circuit::@circuit() : () ->",
+        "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) ->",
+    )
+    new_ir = new_ir.replace(
+        "func.func public @circuit() ->", "func.func public @circuit(%arg0: tensor<i64>) ->"
+    )
+    new_ir = new_ir.replace(
+        "quantum.device[",
+        """%shots = tensor.extract %arg0[] : tensor<i64>
+      quantum.device[""",
+    )
+    new_ir = new_ir.replace("] shots %extracted", "] shots %shots")
+
+    replace_ir(workflow_dyn_counts, "mlir", new_ir)
+    res = workflow_dyn_counts(4000)
+    print("after: ", res)
+    assert res[1][0] + res[1][1] == 4000
+
+    shutil.rmtree("workflow_dyn_counts")
+    shutil.rmtree("workflow_dyn_counts_1")
+
+    # Save for WIP. Remove when work is done.
+    _new_ir = """module @workflow {
   func.func public @jit_workflow(%arg0: tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>) attributes {llvm.emit_c_interface} {
     %1:2 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>)
     return %1#0, %1#1 : tensor<2xi64>, tensor<2xi64>
@@ -331,21 +367,6 @@ def test_new_countsop_still_good_with_backend():
     return
   }
 }"""
-    replace_ir(workflow, "mlir", new_ir)
-    res = workflow(4000)
-    print("after: ", res)
-    assert res[1][0] + res[1][1] == 4000
-
-
-"""
->> pytest test_measurement_primitives.py -k new_sample -s
-    test_measurement_primitives.py after:  [[1]
- [0]
- [1]
- [0]]
-
-
-"""
 
 
 def test_expval():
