@@ -22,6 +22,7 @@ import inspect
 import logging
 import os
 import warnings
+from inspect import getsourcefile, getsourcelines
 
 import jax
 import jax.numpy as jnp
@@ -79,6 +80,7 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
+    enable_debug_info=False,
     verbose=False,
     logfile=None,
     pipelines=None,
@@ -116,6 +118,8 @@ def qjit(
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
+        enable_debug_info (bool): If set to ``True``, debug information is included in the
+            generated MLIR.
         verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -705,7 +709,17 @@ class QJIT(CatalystCallable):
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
 
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+        source_file = getsourcefile(self.user_function.func)
+        source_code = getsourcelines(self.user_function.func)[0]
+        source_line = getsourcelines(self.user_function.func)[1]
+        func_loc = None
+        for i, s in enumerate(source_code):
+            if self.__name__ in s:
+                position = s.find(self.__name__)
+                func_loc = (source_file, source_line + i, position)
+                break
+
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, func_loc)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
