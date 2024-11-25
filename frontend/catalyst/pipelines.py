@@ -298,7 +298,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "register-inactive-callback",
     ]
     if options.enable_debug_info:
-        convert_to_llvm.append("ensure-debug-info-on-llvm-func")
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 
