@@ -427,7 +427,7 @@ class QJITDevice(qml.devices.Device):
         elif not self.capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
             # ToDo: this branch should become unnecessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
-            if not split_non_commuting in measurement_program:
+            if not split_non_commuting in measurement_program:  # pragma: no branch
                 measurement_program.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
@@ -470,6 +470,7 @@ class QJITDevice(qml.devices.Device):
         raise RuntimeError("QJIT devices cannot execute tapes.")
 
 
+# pragam: no cover
 def filter_out_modifiers(operations):
     """Remove Adjoint/Control from operations.
 
