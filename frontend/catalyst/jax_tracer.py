@@ -17,17 +17,25 @@ This module contains functions tracing and lowering JAX code to MLIR.
 """
 
 import logging
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
-from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementProcess,
+    ProbabilityMP,
+    StateMP,
+    VarianceMP,
+)
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -856,23 +864,19 @@ def trace_quantum_measurements(
         if isinstance(o, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+            if device.shots.num_copies > 1 and not isinstance(o, qml.measurements.SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not supported a shot-vector. "
+                    f"Measurement {type(o).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
 
-            if isinstance(device, qml.devices.LegacyDevice):
-                m_wires = o.wires if o.wires else range(device.num_wires)
-            else:
-                m_wires = o.wires if o.wires else range(len(device.wires))
+            m_wires = o.wires if o.wires else range(len(device.wires))
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
-            if o.return_type.value == "sample":
-                results = []  # list of results per copy
+            if isinstance(o, qml.measurements.SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
@@ -901,15 +905,15 @@ def trace_quantum_measurements(
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif o.return_type.value == "expval":
+            elif type(o) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
-            elif o.return_type.value == "var":
+            elif type(o) is VarianceMP:
                 out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
-            elif o.return_type.value == "probs":
+            elif type(o) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif o.return_type.value == "counts":
+            elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -931,7 +935,7 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
+            elif type(o) is StateMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
