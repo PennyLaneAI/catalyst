@@ -1,52 +1,67 @@
-schema = 2
+schema = 3
 
-[operators.gates.native]
+# The set of all gate types supported at the runtime execution interface of the
+# device, i.e., what is supported by the `execute` method of the Device API.
+# The gate definition has the following format:
+#
+#   GATE = { properties = [ PROPS ], conditions = [ CONDS ] }
+#
+# where PROPS and CONS are zero or more comma separated quoted strings.
+#
+# PROPS: zero or more comma-separated quoted strings:
+#        - "controllable": if a controlled version of this gate is supported.
+#        - "invertible": if the adjoint of this operation is supported.
+#        - "differentiable": if device gradient is supported for this gate.
+# CONDS: zero or more comma-separated quoted strings:
+#        - "analytic" or "finiteshots": if this operation is only supported in
+#          either analytic execution or with shots, respectively.
+#        - "terms-commute": if this composite operator is only supported
+#          given that its terms commute. Only relevant for Prod, SProd, Sum,
+#          LinearCombination, and Hamiltonian.
+#
+[operators.gates]
 
-QubitUnitary = { properties = [ "invertible", "controllable", "differentiable" ]  }
-PauliX = { properties = [ "controllable", "invertible", "differentiable" ] }
-PauliY = { properties = [ "controllable", "invertible", "differentiable" ] }
-PauliZ = { properties = [ "controllable", "invertible", "differentiable" ] }
-MultiRZ = { properties = [ "controllable", "invertible", "differentiable"  ] }
-Hadamard = { properties = [ "controllable", "invertible", "differentiable" ] }
-S = { properties = [ "controllable", "invertible", "differentiable" ] }
-T = { properties = [ "controllable", "invertible", "differentiable" ] }
-CNOT = { properties = [ "invertible", "differentiable" ] }
-SWAP = { properties = [ "controllable", "invertible", "differentiable" ] }
-CSWAP = { properties = [ "invertible", "differentiable" ] }
-Toffoli = { properties = [ "invertible", "differentiable" ] }
-CY = { properties = [ "invertible", "differentiable" ] }
-CZ = { properties = [ "invertible", "differentiable" ] }
-PhaseShift = { properties = [ "controllable", "invertible", "differentiable" ] }
-ControlledPhaseShift = { properties = [ "invertible", "differentiable" ] }
-RX = { properties = [ "controllable", "invertible", "differentiable" ] }
-RY = { properties = [ "controllable", "invertible", "differentiable" ] }
-RZ = { properties = [ "controllable", "invertible", "differentiable" ] }
-Rot = { properties = [ "controllable", "invertible", "differentiable" ] }
-CRX = { properties = [ "invertible", "differentiable" ] }
-CRY = { properties = [ "invertible", "differentiable" ] }
-CRZ = { properties = [ "invertible", "differentiable" ] }
-CRot = { properties = [ "invertible" ] }
-Identity = { properties = [ "invertible", "differentiable" ] }
-IsingXX = { properties = [ "controllable", "invertible", "differentiable" ] }
-IsingYY = { properties = [ "controllable", "invertible", "differentiable" ] }
-IsingZZ = { properties = [ "controllable", "invertible", "differentiable" ] }
-IsingXY = { properties = [ "controllable", "invertible", "differentiable" ] }
-GlobalPhase = { properties = [ "controllable", "invertible", "differentiable" ] }
-BlockEncode = { properties = [ "invertible", "differentiable" ] }
-SingleExcitation = { properties = [ "invertible", "controllable", "differentiable"] }
-SingleExcitationPlus = { properties = [ "invertible", "controllable", "differentiable"] }
-SingleExcitationMinus = { properties = [ "invertible", "controllable", "differentiable"] }
-DoubleExcitation = { properties = [ "invertible", "controllable", "differentiable"] }
-DoubleExcitationPlus = { properties = [ "invertible", "controllable", "differentiable"] }
-DoubleExcitationMinus = { properties = [ "invertible", "controllable", "differentiable"] }
+QubitUnitary            = { properties = [ "controllable", "invertible", "differentiable" ] }
+PauliX                  = { properties = [ "controllable", "invertible", "differentiable" ] }
+PauliY                  = { properties = [ "controllable", "invertible", "differentiable" ] }
+PauliZ                  = { properties = [ "controllable", "invertible", "differentiable" ] }
+MultiRZ                 = { properties = [ "controllable", "invertible", "differentiable" ] }
+Hadamard                = { properties = [ "controllable", "invertible", "differentiable" ] }
+S                       = { properties = [ "controllable", "invertible", "differentiable" ] }
+T                       = { properties = [ "controllable", "invertible", "differentiable" ] }
+CNOT                    = { properties = [                 "invertible", "differentiable" ] }
+SWAP                    = { properties = [ "controllable", "invertible", "differentiable" ] }
+CSWAP                   = { properties = [                 "invertible", "differentiable" ] }
+Toffoli                 = { properties = [                 "invertible", "differentiable" ] }
+CY                      = { properties = [                 "invertible", "differentiable" ] }
+CZ                      = { properties = [                 "invertible", "differentiable" ] }
+PhaseShift              = { properties = [ "controllable", "invertible", "differentiable" ] }
+ControlledPhaseShift    = { properties = [                 "invertible", "differentiable" ] }
+RX                      = { properties = [ "controllable", "invertible", "differentiable" ] }
+RY                      = { properties = [ "controllable", "invertible", "differentiable" ] }
+RZ                      = { properties = [ "controllable", "invertible", "differentiable" ] }
+Rot                     = { properties = [ "controllable", "invertible", "differentiable" ] }
+CRX                     = { properties = [                 "invertible", "differentiable" ] }
+CRY                     = { properties = [                 "invertible", "differentiable" ] }
+CRZ                     = { properties = [                 "invertible", "differentiable" ] }
+CRot                    = { properties = [                 "invertible"                   ] }
+Identity                = { properties = [                 "invertible", "differentiable" ] }
+IsingXX                 = { properties = [ "controllable", "invertible", "differentiable" ] }
+IsingYY                 = { properties = [ "controllable", "invertible", "differentiable" ] }
+IsingZZ                 = { properties = [ "controllable", "invertible", "differentiable" ] }
+IsingXY                 = { properties = [ "controllable", "invertible", "differentiable" ] }
+GlobalPhase             = { properties = [ "controllable", "invertible", "differentiable" ] }
+BlockEncode             = { properties = [                 "invertible", "differentiable" ] }
+SingleExcitation        = { properties = [ "controllable", "invertible", "differentiable" ] }
+SingleExcitationPlus    = { properties = [ "controllable", "invertible", "differentiable" ] }
+SingleExcitationMinus   = { properties = [ "controllable", "invertible", "differentiable" ] }
+DoubleExcitation        = { properties = [ "controllable", "invertible", "differentiable" ] }
+DoubleExcitationPlus    = { properties = [ "controllable", "invertible", "differentiable" ] }
+DoubleExcitationMinus   = { properties = [ "controllable", "invertible", "differentiable" ] }
 
-[operators.gates.decomp]
+# Operations supported by the execution in Python but not directly supported by the backend
+[pennylane.operators.gates]
 
-# Operators that should be decomposed according to the algorithm used
-# by PennyLane's device API.
-# Optional, since gates not listed in this list will typically be decomposed by
-# default, but can be useful to express a deviation from this device's regular
-# strategy in PennyLane.
 SX = {}
 ISWAP = {}
 PSWAP = {}
@@ -61,38 +76,32 @@ QubitSum = {}
 OrbitalRotation = {}
 QFT = {}
 ECR = {}
-
-# Gates which should be translated to QubitUnitary
-[operators.gates.matrix]
-
 DiagonalQubitUnitary = {}
-
 
 # Observables supported by the device
 [operators.observables]
 
-PauliX = { properties = [ "differentiable" ] }
-PauliY = { properties = [ "differentiable" ] }
-PauliZ = { properties = [ "differentiable" ] }
-Hadamard = { properties = [ "differentiable" ] }
-Hermitian = { properties = [ "differentiable" ] }
-Identity = { properties = [ "differentiable" ] }
-Projector = {}
-SparseHamiltonian = { properties = [ "differentiable" ] }
-Hamiltonian = { properties = [ "differentiable" ] }
-Sum = { properties = [ "differentiable" ] }
-SProd = { properties = [ "differentiable" ] }
-Prod = { properties = [ "differentiable" ] }
-Exp = { properties = [ "differentiable" ] }
+PauliX              = { properties = ["differentiable"] }
+PauliY              = { properties = ["differentiable"] }
+PauliZ              = { properties = ["differentiable"] }
+Hadamard            = { properties = ["differentiable"] }
+Hermitian           = { properties = ["differentiable"] }
+Identity            = { properties = ["differentiable"] }
+SparseHamiltonian   = { properties = ["differentiable"] }
+Sum                 = { properties = ["differentiable"] }
+SProd               = { properties = ["differentiable"] }
+Prod                = { properties = ["differentiable"] }
+Exp                 = { properties = ["differentiable"] }
+Projector           = {}
 
 [measurement_processes]
 
-Expval = {}
-Var = {}
-Probs = {}
-State = { condition = [ "analytic" ] }
-Sample = { condition = [ "finiteshots" ] }
-Counts = { condition = [ "finiteshots" ] }
+ExpectationMP = { }
+VarianceMP = { }
+ProbabilityMP = { }
+StateMP = { conditions = ["analytic"] }
+SampleMP = { conditions = ["finiteshots"] }
+CountsMP = { conditions = ["finiteshots"] }
 
 [compilation]
 
@@ -100,17 +109,11 @@ Counts = { condition = [ "finiteshots" ] }
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
-# If the device supports mid circuit measurements natively
-mid_circuit_measurement = true
-# This field is currently unchecked but it is reserved for the purpose of
+# If the device supports mid-circuit measurements natively
+supported_mcm_methods = [ "one-shot" ]
+# This field is currently unchecked, but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
-
 # whether the device can support non-commuting measurements together
 # in a single execution
 non_commuting_observables = true
-
-[options]
-
-option1 = "_option1"
-option2 = "_option2"

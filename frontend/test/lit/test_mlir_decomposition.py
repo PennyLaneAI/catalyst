@@ -58,7 +58,7 @@ class CustomDevice(NullQubit):
 
     name = "oqd.cloud"
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
 
     @staticmethod
     def get_c_interface():

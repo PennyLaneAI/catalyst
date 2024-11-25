@@ -36,7 +36,7 @@ CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device
 class CustomDevice(Device):
     """A custom device that does nothing."""
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
