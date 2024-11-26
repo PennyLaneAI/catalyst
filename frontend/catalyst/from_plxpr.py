@@ -234,7 +234,6 @@ class QFuncPlxprInterpreter:
 
     def __init__(self, device):
         self._device = device
-        self.device_shots = get_device_shots(self._device) or 0
         self.qreg = None
         self.env = {}
         self.wire_map = {}
@@ -246,7 +245,7 @@ class QFuncPlxprInterpreter:
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
-        qdevice_p.bind(self.device_shots, **_get_device_kwargs(self._device))
+        qdevice_p.bind(get_device_shots(self._device) or 0, **_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
@@ -357,21 +356,22 @@ class QFuncPlxprInterpreter:
         )[0]
 
         primitive = measurement_map[eqn.primitive.name]
+        device_shots = get_device_shots(self._device) or 0
 
         # TODO: as we are in the process of migrating to dynamic measurement primitive shapes,
         # we will gradually get rid of the shape argument for these primitives
         # While we are in the migrating process, we need to handle them explicitly one by one
         if primitive is sample_p:
             mval = (
-                primitive.bind(obs, shots=self.device_shots, num_qubits=shaped_array.shape[1])
-                if isinstance(self.device_shots, int)
-                else primitive.bind(obs, self.device_shots, num_qubits=shaped_array.shape[1])
+                primitive.bind(obs, shots=device_shots, num_qubits=shaped_array.shape[1])
+                if isinstance(device_shots, int)
+                else primitive.bind(obs, device_shots, num_qubits=shaped_array.shape[1])
             )
         elif primitive is counts_p:
             mval = (
-                primitive.bind(obs, shots=self.device_shots, shape=shaped_array.shape)
-                if isinstance(self.device_shots, int)
-                else primitive.bind(obs, self.device_shots, shape=shaped_array.shape)
+                primitive.bind(obs, shots=device_shots, shape=shaped_array.shape)
+                if isinstance(device_shots, int)
+                else primitive.bind(obs, device_shots, shape=shaped_array.shape)
             )
         else:
             mval = primitive.bind(
