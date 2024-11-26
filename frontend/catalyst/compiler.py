@@ -290,6 +290,8 @@ class Compiler:
             cmd += ["--verbose"]
         if self.options.checkpoint_stage:
             cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+        if self.options.enable_debug_info:
+            cmd += ["--enable-debug-info"]
 
         pipeline_str = ""
         for pipeline in self.options.get_pipelines():
@@ -386,7 +388,7 @@ class Compiler:
                 binary=False,
                 print_generic_op_form=False,
                 assume_verified=True,
-                enable_debug_info=True,
+                enable_debug_info=self.options.enable_debug_info,
             ),
             str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,
