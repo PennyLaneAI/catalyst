@@ -34,10 +34,32 @@ using namespace catalyst::ion;
 #include "Ion/IR/IonOps.cpp.inc"
 
 //===----------------------------------------------------------------------===//
+// Ion op builders.
+//===----------------------------------------------------------------------===//
+
+void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, ValueRange inQubits,
+                               BodyBuilderFn bodyBuilder)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    result.addOperands(inQubits);
+    for (Value v : inQubits)
+        result.addTypes(v.getType());
+
+    Region *bodyRegion = result.addRegion();
+    Block *bodyBlock = builder.createBlock(bodyRegion);
+    for (Value v : inQubits)
+        bodyBlock->addArgument(v.getType(), v.getLoc());
+
+    builder.setInsertionPointToStart(bodyBlock);
+    bodyBuilder(builder, result.location, bodyBlock->getArgument(0),
+                bodyBlock->getArguments().drop_front());
+}
+
+//===----------------------------------------------------------------------===//
 // Ion op canonicalizers.
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // Ion op verifiers.
 //===----------------------------------------------------------------------===//
-

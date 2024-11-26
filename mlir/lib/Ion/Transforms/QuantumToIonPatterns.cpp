@@ -32,6 +32,12 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     mlir::LogicalResult matchAndRewrite(CustomOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
+        // Fix PP
+        // Check all attributes/values
+        // RX case: PP(P1, P2)
+        // RY case: PP(P1, P2)
+        // MS case: PP(P1, P2, P3, P4, P5, P6)
+        // Else fail
         return success();
     }
 };
