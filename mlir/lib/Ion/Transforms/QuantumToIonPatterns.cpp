@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#include "mlir/IR/PatternMatch.h"
+#include "Ion/IR/IonOps.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "mlir/IR/PatternMatch.h"
 
 #include "Ion/Transforms/Patterns.h"
-
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include <iostream>
 
 using namespace mlir;
 using namespace catalyst::ion;
@@ -29,22 +31,64 @@ namespace ion {
 struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(CustomOp op,
-                                        mlir::PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        // D: Add PP Builder
-        // Create test with RX(0) RY(1) MS(0,1)
-        // Custom builder for device with ions
-        // Optional value on device: value.get(), apply formula, give to operation
-        // RX case: PP(P1, P2)
-        // RY case: PP(P1, P2)
-        // MS case: PP(P1, P2, P3, P4, P5, P6)
+        // TODO: Assumption 1 Ion are in the same funcop as the operations
+        // RX case -> PP(P1, P2)
+        if (op.getGateName() == "RX") {
+            auto qnode = op->getParentOfType<func::FuncOp>();
+            ion::IonOp ion;
+            qnode.walk([&](ion::IonOp op) {
+                ion = op;
+                return WalkResult::interrupt();
+            });
+            auto transition0 = cast<TransitionAttr>(ion.getTransitionsAttr()[0]);
+            // auto level0 = transition0.getLevel_0();
+            // auto level1 = transition0.getLevel_1();
+
+            auto rabi = ion.getCalibration().getRabi();
+            auto detuning = ion.getCalibration().getDetuning();
+            auto phase = ion.getCalibration().getPhase();
+            auto polarization =
+                ion.getPo
+                    // TODO: get mathematical formula and apply them to create values
+                    mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(op.getLoc(), rabi);
+            mlir::Value detuningValue = rewriter.create<arith::ConstantOp>(op.getLoc(), detuning);
+            mlir::Value phaseValue = rewriter.create<arith::ConstantOp>(op.getLoc(), phase);
+
+            auto loc = op.getLoc();
+            auto qubits = op.getOutQubits();
+            auto ctx = op.getContext();
+
+            Value ppOp = rewriter
+                             .create<ion::ParallelProtocolOp>(
+                                 loc, qubits,
+                                 [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+                                     //  BeamAttr::get(ctx, transition0, rabi, detuning, phase);
+                                     //  rewriter.create<ion::PulseOp>(loc, qubits.front());
+                                     //  rewriter.create<ion::PulseOp>(loc, qubits.front());
+                                     builder.create<ion::YieldOp>(loc, qubits);
+                                 })
+                             .getResult(0);
+            ppOp.dump();
+            // Create PP
+            // Create P1
+            // Create P2
+            // PP replace RXF
+            return failure();
+        }
+        // RY case -> PP(P1, P2)
+        else if (op.getGateName() == "RY") {
+            return failure();
+        }
+        // MS case -> PP(P1, P2, P3, P4, P5, P6)
+        else if (op.getGateName() == "MS") {
+            return failure();
+        }
         // Else fail
-        // Pulses Memory effect?
-        return success();
+        return failure();
     }
 };
-
 
 void populateQuantumToIonPatterns(RewritePatternSet &patterns)
 {

@@ -46,6 +46,28 @@ class Ion_Attr<string name, string attrMnemonic, list<Trait> traits = []>
   let mnemonic = attrMnemonic;
 }
 
+def CalibrationAttr : Ion_Attr<"Calibration", "calibration"> {
+  let summary = "A class to represent calibration data with a mathematical formula.";
+  // TODO: add mathematical formula
+  let parameters = (ins
+    "mlir::FloatAttr":$rabi,
+    "mlir::FloatAttr":$detuning,
+    "mlir::FloatAttr":$phase
+  );
+
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins     
+    "mlir::FloatAttr":$rabi,
+    "mlir::FloatAttr":$detuning,
+    "mlir::FloatAttr":$phase), [{
+      return $_get(rabi.getContext(), rabi, detuning, phase);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
 def LevelAttr : Ion_Attr<"Level", "level"> {
   let summary = "A class to represent an atomic level.";
 
@@ -149,7 +171,8 @@ def IonOp : Ion_Op<"ion"> {
     Builtin_FloatAttr:$charge,
     AnyIntElementsAttr: $position,
     LevelArrayAttr: $levels,
-    TransitionArrayAttr: $transitions
+    TransitionArrayAttr: $transitions,
+    CalibrationAttr: $calibration
   );
 
   let results = (outs
@@ -189,13 +212,13 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
     let builders = [
       OpBuilder<(ins
         CArg<"mlir::ValueRange", "std::nullopt">:$in_qubits,
-        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>",
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>",
             "nullptr">)>
     ];
 
     let extraClassDeclaration = [{
       using BodyBuilderFn =
-          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>;
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>;
 
     }];
 

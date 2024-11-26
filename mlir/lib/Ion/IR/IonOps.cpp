@@ -52,8 +52,7 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
         bodyBlock->addArgument(v.getType(), v.getLoc());
 
     builder.setInsertionPointToStart(bodyBlock);
-    bodyBuilder(builder, result.location, bodyBlock->getArgument(0),
-                bodyBlock->getArguments().drop_front());
+    bodyBuilder(builder, result.location, bodyBlock->getArgument(0));
 }
 
 //===----------------------------------------------------------------------===//
