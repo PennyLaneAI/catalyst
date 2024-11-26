@@ -41,6 +41,12 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `toml` module has been migrated to PennyLane with an updated schema for declaring device 
+  capabilities. Devices with TOML files using `schema = 2` will not be compatible with the latest 
+  Catalyst. See [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html) 
+  for updated instructions on integrating your device with Catalyst and PennyLane
+  [(#1275)](https://github.com/PennyLaneAI/catalyst/pull/1275)
+
 * Handling for the legacy operator arithmetic (the `Hamiltonian` and `Tensor` classes in PennyLane)
   is removed.
   [(#1308)](https://github.com/PennyLaneAI/catalyst/pull/1308)
@@ -83,6 +89,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Astral Cai,
 Joey Carter,
 David Ittah,
 Erick Ochoa Lopez,
