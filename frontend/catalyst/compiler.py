@@ -121,7 +121,7 @@ class LinkerDriver:
         path_within_package = "lib"
         file_extension = ".so" if platform.system() == "Linux" else ".dylib"
 
-        if platform.system() == "Darwin" and platform.architecture() == "arm64":
+        if platform.system() == "Darwin" and platform.machine() == "arm64":
             # use our own build of LAPACKe to interface with Accelerate
             lapack_lib_name = "lapacke.3"
         else:
