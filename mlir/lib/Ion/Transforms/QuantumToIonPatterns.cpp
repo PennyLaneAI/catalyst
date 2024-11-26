@@ -32,12 +32,15 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     mlir::LogicalResult matchAndRewrite(CustomOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        // Fix PP
-        // Check all attributes/values
+        // D: Add PP Builder
+        // Create test with RX(0) RY(1) MS(0,1)
+        // Custom builder for device with ions
+        // Optional value on device: value.get(), apply formula, give to operation
         // RX case: PP(P1, P2)
         // RY case: PP(P1, P2)
         // MS case: PP(P1, P2, P3, P4, P5, P6)
         // Else fail
+        // Pulses Memory effect?
         return success();
     }
 };
