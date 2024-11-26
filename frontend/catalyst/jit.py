@@ -633,6 +633,24 @@ class QJIT(CatalystCallable):
 
         return processed_fn
 
+    @instrument
+    @debug_logger
+    def get_func_loc(self):
+        """Find the location of the user function."""
+        func = self.original_function
+        while isinstance(func, qml.QNode) and hasattr(func, "func"):
+            func = func.func
+        source_file = getsourcefile(func)
+        source_code = getsourcelines(func)[0]
+        source_line = getsourcelines(func)[1]
+        func_loc = None
+        for i, s in enumerate(source_code):
+            if self.__name__ in s:
+                position = s.find(self.__name__)
+                func_loc = (source_file, source_line + i, position)
+                break
+        return func_loc
+
     @instrument(size_from=0)
     @debug_logger
     def capture(self, args, **kwargs):
@@ -709,17 +727,7 @@ class QJIT(CatalystCallable):
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
 
-        source_file = getsourcefile(self.user_function.func)
-        source_code = getsourcelines(self.user_function.func)[0]
-        source_line = getsourcelines(self.user_function.func)[1]
-        func_loc = None
-        for i, s in enumerate(source_code):
-            if self.__name__ in s:
-                position = s.find(self.__name__)
-                func_loc = (source_file, source_line + i, position)
-                break
-
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, func_loc)
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, self.get_func_loc())
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
