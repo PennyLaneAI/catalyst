@@ -35,7 +35,7 @@ from catalyst.jax_tracer import lower_jaxpr_to_mlir
 
 
 @pytest.mark.xfail(reason="[WIP] Convert to lit test")
-def test_sample():
+def test_sample_static():
     """Test that the sample primitive can be captured into jaxpr."""
 
     def f():
@@ -97,8 +97,8 @@ def test_sample_dynamic_shape():
 { lambda ; a:i64[]. let
     b:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
     c:i64[] = add a 1
-    d:f64[ShapedArray(int64[], weak_type=True),0] = sample[num_qubits=0] b c
-  in (d,) }
+    d:f64[c,0] = sample[num_qubits=0] b c
+  in (c, d) }
 """
     )
 
@@ -106,12 +106,12 @@ def test_sample_dynamic_shape():
         mlir
         == """
 module @foo {
-  func.func public @jit_foo(%arg0: tensor<i64>) -> tensor<?x0xf64> {
+  func.func public @jit_foo(%arg0: tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>) {
     %0 = "quantum.compbasis"() : () -> !quantum.obs
     %c = stablehlo.constant dense<1> : tensor<i64>
     %1 = stablehlo.add %arg0, %c : tensor<i64>
     %2 = "quantum.sample"(%0) : (!quantum.obs) -> tensor<?x0xf64>
-    return %2 : tensor<?x0xf64>
+    return %1, %2 : tensor<i64>, tensor<?x0xf64>
   }
 }
 """

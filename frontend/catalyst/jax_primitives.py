@@ -26,6 +26,7 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
@@ -1660,17 +1661,35 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 #
 # sample measurement
 #
-@sample_p.def_abstract_eval
-def _sample_abstract_eval(obs, shots, num_qubits):
-    assert isinstance(obs, AbstractObs)
-
+def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     if obs.primitive is compbasis_p:
         # assert shape[1] == obs.num_qubits
         assert num_qubits == obs.num_qubits
     # else:
     #    assert len(shape) == 1
 
-    return core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
+    out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
+    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
+
+    if isinstance(shots, int):
+        invars = [jaxpr_trace.getvar(obs)]
+        params = {"shots": shots, "num_qubits": num_qubits}
+    else:
+        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(shots)]
+        params = {"num_qubits": num_qubits}
+
+    eqn = pe.new_jaxpr_eqn(
+        invars,
+        [jaxpr_trace.makevar(out_tracer)],
+        sample_p,
+        params,
+        jax.core.no_effects,
+    )
+    jaxpr_trace.frame.add_eqn(eqn)
+    return out_tracer
+
+
+pe.custom_staging_rules[sample_p] = sample_staging_rule
 
 
 @sample_p.def_impl
@@ -1686,7 +1705,6 @@ def _sample_lowering(
     ctx.allow_unregistered_dialects = True
 
     f64_type = ir.F64Type.get()
-
     result_shape = (
         (shots, num_qubits)
         if isinstance(shots, int)
