@@ -170,8 +170,7 @@ class LinesCount {
 
         std::string modStrBef;
         llvm::raw_string_ostream rawStrBef{modStrBef};
-        AsmState state(op, OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
-        op->print(rawStrBef, state);
+        op->print(rawStrBef);
 
         dump(modStrBef, name);
     }
@@ -349,7 +348,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
-        llvmModule->print(rawStringOstream, nullptr, false, true);
+        llvmModule->print(rawStringOstream, nullptr, false, options.emitDebugInfo);
         auto outFile = output.nextPipelineDumpFilename("CoroOpt", ".ll");
         dumpToFile(options, outFile, tmp);
     }
@@ -401,7 +400,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
-        llvmModule->print(rawStringOstream, nullptr, false, true);
+        llvmModule->print(rawStringOstream, nullptr, false, options.emitDebugInfo);
         auto outFile = output.nextPipelineDumpFilename("O2Opt", ".ll");
         dumpToFile(options, outFile, tmp);
     }
@@ -449,7 +448,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
-        llvmModule->print(rawStringOstream, nullptr, false, true);
+        llvmModule->print(rawStringOstream, nullptr, false, options.emitDebugInfo);
         auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
         dumpToFile(options, outFile, tmp);
     }
@@ -542,7 +541,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     if (options.keepIntermediate && options.checkpointStage.empty()) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
-        AsmState state(moduleOp, OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
+        AsmState state(moduleOp, OpPrintingFlags()
+                                     .enableDebugInfo(options.emitDebugInfo, options.emitDebugInfo)
+                                     .printValueUsers());
         moduleOp->print(s, state);
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
                    tmp);
@@ -593,8 +594,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
             AsmState state(moduleOp,
-                           OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
-            moduleOp->print(s, OpPrintingFlags().enableDebugInfo());
+                           OpPrintingFlags()
+                               .enableDebugInfo(options.emitDebugInfo, options.emitDebugInfo)
+                               .printValueUsers());
+            moduleOp->print(s, state);
             dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
         }
     }
@@ -696,8 +699,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outIR.clear();
         AsmState state(*mlirModule,
-                       OpPrintingFlags().enableDebugInfo(true, true).printValueUsers());
-        mlirModule->print(outIRStream, OpPrintingFlags().enableDebugInfo());
+                       OpPrintingFlags()
+                           .enableDebugInfo(options.emitDebugInfo, options.emitDebugInfo)
+                           .printValueUsers());
+        mlirModule->print(outIRStream, state);
         optTiming.stop();
     }
 
@@ -717,7 +722,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (options.keepIntermediate) {
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
-            llvmModule->print(rawStringOstream, nullptr, false, true);
+            llvmModule->print(rawStringOstream, nullptr, false, options.emitDebugInfo);
             auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
             dumpToFile(options, outFile, tmp);
         }
@@ -778,7 +783,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
         output.outIR.clear();
-        llvmModule->print(outIRStream, nullptr, false, true);
+        llvmModule->print(outIRStream, nullptr, false, options.emitDebugInfo);
 
         if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
                                 std::move(llvmModule), targetMachine, options.getObjectFile()))) {
@@ -865,6 +870,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     cl::opt<bool> KeepIntermediate(
         "keep-intermediate", cl::desc("Keep intermediate files"), cl::init(false),
         cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }));
+    cl::opt<bool> EnableDebugInfo("enable-debug-info", cl::desc("Enable debug info"),
+                                  cl::init(false));
     cl::opt<bool> AsyncQNodes("async-qnodes", cl::desc("Enable asynchronous QNodes"),
                               cl::init(false));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false));
@@ -918,6 +925,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .moduleName = ModuleName,
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
+                            .emitDebugInfo = EnableDebugInfo,
                             .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),

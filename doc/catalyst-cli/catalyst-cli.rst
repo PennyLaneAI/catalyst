@@ -145,6 +145,11 @@ given pass.
 
 Print (to stderr) the pipeline(s) that will be run.
 
+``--enable-debug-info[=<true|false>]``
+"""""""""""""""""""""""""""""""""""""""""""
+
+Emit debug info into the intermediate IR files.
+
 Examples
 ^^^^^^^^
 
