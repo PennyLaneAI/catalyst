@@ -119,9 +119,9 @@ class LinkerDriver:
         lib_name = "openblas"
         package_name = "scipy_openblas32"
         path_within_package = "lib"
-        file_extension = ".so" if platform.system() == "Linux" else ".dylib"
+        file_extension = ".so" if platform.system() == "Linux" else ".dylib"  # pragma: no branch
 
-        if platform.system() == "Darwin" and platform.machine() == "arm64":
+        if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
             # use our own build of LAPACKe to interface with Accelerate
             lapack_lib_name = "lapacke.3"
         else:
@@ -131,7 +131,7 @@ class LinkerDriver:
 
             search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
             search_result = glob.glob(search_pattern)
-            if not search_result:
+            if not search_result:  # pragma: nocover
                 raise CompileError(
                     f'Unable to find OpenBLAS library at "{search_pattern}". '
                     "Please ensure that scipy is installed and available via pip."

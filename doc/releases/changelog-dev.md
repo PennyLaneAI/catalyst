@@ -16,7 +16,7 @@
 * Catalyst now uses the new compiler API to compile quantum code from the python frontend.
   Frontend no longer uses pybind11 to connect to the compiler. Instead, it uses subprocess instead.
   [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
- 
+
 * Add a MLIR decomposition for the gate set {"T", "S", "Z", "Hadamard", "RZ", "PhaseShift", "CNOT"}
   to the gate set {RX, RY, MS}. It is useful for trapped ion devices. It can be used thanks to
   `quantum-opt --ions-decomposition`.
@@ -41,7 +41,7 @@
 
 <h3>Breaking changes 💔</h3>
 
-* Handling for the legacy operator arithmetic (the `Hamiltonian` and `Tensor` classes in PennyLane) 
+* Handling for the legacy operator arithmetic (the `Hamiltonian` and `Tensor` classes in PennyLane)
   is removed.
   [(#1308)](https://github.com/PennyLaneAI/catalyst/pull/1308)
 
@@ -50,8 +50,9 @@
 <h3>Internal changes ⚙️</h3>
 
 * Catalyst no longer depends on or pins the `scipy` package, instead OpenBLAS is sourced directly
-  from [`scipy-openblas32`](https://pypi.org/project/scipy-openblas32/).
+  from [`scipy-openblas32`](https://pypi.org/project/scipy-openblas32/) or Accelerate is used.
   [(#1322)](https://github.com/PennyLaneAI/catalyst/pull/1322)
+  [(#1328)](https://github.com/PennyLaneAI/catalyst/pull/1328)
 
 * The `QuantumExtension` module (previously implemented with pybind11) has been removed. This module
   was not included in the distributed wheels and has been deprecated to align with our adoption of
