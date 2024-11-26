@@ -137,7 +137,13 @@ def custom_lower_jaxpr_to_module(
         lowering_parameters=lowering_params,
     )
     ctx.context.allow_unregistered_dialects = True
-    with ctx.context, ir.Location.file(func_loc[0], func_loc[1], func_loc[2], ctx.context):
+
+    if func_loc and len(func_loc) == 3:
+        loc = ir.Location.file(func_loc[0], func_loc[1], func_loc[2], ctx.context)
+    else:
+        loc = ir.Location.unknown(ctx.context)
+
+    with ctx.context, loc:
         # register_dialect()
         # Remove module name characters that XLA would alter. This ensures that
         # XLA computation preserves the module name.
