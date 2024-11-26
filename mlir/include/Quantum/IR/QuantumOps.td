@@ -85,20 +85,12 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let arguments = (ins
         StrAttr:$lib,
         StrAttr:$name,
-        StrAttr:$kwargs,
-        Optional<AnyType>:$ion
+        StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      `[` $lib `,` $name `,` $kwargs `]` (`<` $ion^ `:` type($ion) `>`)?  attr-dict
+      `[` $lib `,` $name `,` $kwargs `]` attr-dict
     }];
-
-  let builders = [
-    OpBuilder<(ins "::mlir::StringAttr":$lib, "::mlir::StringAttr":$name,
-                   "::mlir::StringAttr":$kwargs), [{
-      build($_builder, $_state, lib, name, kwargs, {});
-    }]>,
-  ];
 
 }
 
