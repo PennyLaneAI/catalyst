@@ -31,6 +31,7 @@ from malt.impl.api import PyToPy
 import catalyst
 from catalyst.autograph import ag_primitives, operator_update
 from catalyst.utils.exceptions import AutoGraphError
+from catalyst.utils.patching import Patcher
 
 
 class CatalystTransformer(PyToPy):
@@ -132,12 +133,19 @@ class CatalystTransformer(PyToPy):
         return node
 
 
-def run_autograph(fn):
+def run_autograph(fn, allowlist=None):
     """Decorator that converts the given function into graph form."""
+
+    if allowlist is None:
+        allowlist = ag_primitives.module_allowlist
 
     user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
 
-    new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
+    with Patcher(
+        (ag_primitives, "module_allowlist", allowlist),
+    ):
+        new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
+
     new_fn.ag_module = module
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
