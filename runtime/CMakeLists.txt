@@ -113,7 +113,7 @@ endif()
 add_subdirectory(lib)
 add_subdirectory(tests)
 
-if(APPLE)
+if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
         GIT_TAG master

@@ -35,12 +35,12 @@
 
 #include "lapack_kernels.hpp"
 
-// On Linux LAPACK/BLAS symbols are now prefixed with scipy_ when using scipy>=1.14 or
-// scipy-openblas32, whereas this is not the case for the reference implementation used on mac.
-#ifdef __linux__
-#define SYM_PREFIX scipy_
-#elif __APPLE__
+// With SciPy OpenBLAS, symbols are now prefixed with scipy_ when using scipy>=1.14 or
+// scipy-openblas32, whereas this is not the case for the reference implementation used on M1 mac.
+#if defined(__APPLE__) && defined(__arm64__)
 #define SYM_PREFIX
+#else
+#define SYM_PREFIX scipy_
 #endif
 
 // No idea why 3 layers are required here.

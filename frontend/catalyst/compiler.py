@@ -116,12 +116,15 @@ class LinkerDriver:
 
         # Discover the LAPACK library provided by scipy & add link against it.
         # Doing this here ensures we will always have the correct library name.
-        if platform.system() == "Linux":
-            lib_name = "openblas"
-            package_name = "scipy_openblas32"
-            path_within_package = "lib"
-            file_extension = ".so"
+        lib_name = "openblas"
+        package_name = "scipy_openblas32"
+        path_within_package = "lib"
+        file_extension = ".so" if platform.system() == "Linux" else ".dylib"
 
+        if platform.system() == "Darwin" and platform.architecture() == "arm64":
+            # use our own build of LAPACKe to interface with Accelerate
+            lapack_lib_name = "lapacke.3"
+        else:
             package_spec = importlib.util.find_spec(package_name)
             package_directory = path.dirname(package_spec.origin)
             lapack_lib_path = path.join(package_directory, path_within_package)
@@ -134,15 +137,8 @@ class LinkerDriver:
                     "Please ensure that scipy is installed and available via pip."
                 )
 
+            lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
             lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
-            lib_path_flags += [
-                f"-Wl,-rpath,{lapack_lib_path}",
-                f"-L{lapack_lib_path}",
-            ]
-
-        elif platform.system() == "Darwin":  # pragma: nocover
-            # use our own build of LAPACKe to interface with Accelerate
-            lapack_lib_name = "lapacke.3"
 
         system_flags = []
         if platform.system() == "Linux":
@@ -150,7 +146,8 @@ class LinkerDriver:
             # RPATH influences search paths globally while RUNPATH only works for
             # a single file, but not its dependencies.
             system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            assert platform.system() == "Darwin", f"Unsupported OS {platform.system()}"
             system_flags += ["-Wl,-arch_errors_fatal"]
 
         # The exception handling mechanism requires linking against
