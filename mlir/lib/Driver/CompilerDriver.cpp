@@ -541,9 +541,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     if (options.keepIntermediate && options.checkpointStage.empty()) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
-        AsmState state(moduleOp, OpPrintingFlags()
-                                     .enableDebugInfo(options.emitDebugInfo, options.emitDebugInfo)
-                                     .printValueUsers());
+        OpPrintingFlags printFlags = OpPrintingFlags();
+        if (options.emitDebugInfo) {
+            printFlags.enableDebugInfo(true, true);
+            printFlags.printValueUsers();
+        }
+        AsmState state(moduleOp, printFlags);
         moduleOp->print(s, state);
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
                    tmp);
@@ -593,10 +596,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (options.keepIntermediate && options.checkpointStage.empty()) {
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
-            AsmState state(moduleOp,
-                           OpPrintingFlags()
-                               .enableDebugInfo(options.emitDebugInfo, options.emitDebugInfo)
-                               .printValueUsers());
+            OpPrintingFlags printFlags = OpPrintingFlags();
+            if (options.emitDebugInfo) {
+                printFlags.enableDebugInfo(true, true);
+                printFlags.printValueUsers();
+            }
+            AsmState state(moduleOp, printFlags);
             moduleOp->print(s, state);
             dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
         }
@@ -698,10 +703,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         output.outIR.clear();
-        AsmState state(*mlirModule,
-                       OpPrintingFlags()
-                           .enableDebugInfo(options.emitDebugInfo, options.emitDebugInfo)
-                           .printValueUsers());
+        OpPrintingFlags printFlags = OpPrintingFlags();
+        if (options.emitDebugInfo) {
+            printFlags.enableDebugInfo(true, true);
+            printFlags.printValueUsers();
+        }
+        AsmState state(*mlirModule, printFlags);
         mlirModule->print(outIRStream, state);
         optTiming.stop();
     }

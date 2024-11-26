@@ -46,6 +46,8 @@ weights = np.random.random(size=shape)
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 # CHECK-NEXT: [DIAGNOSTICS] Running capture{{\s*}}
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
+# CHECK-NEXT: [DIAGNOSTICS] Running get_func_loc
+# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}}
 # CHECK-NEXT: [DIAGNOSTICS] Running generate_ir
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # CHECK-NEXT: [DIAGNOSTICS] Running compile
@@ -63,13 +65,13 @@ with instrumentation(circuit.__name__, filename=None, detailed=False):
 # CHECK-NEXT: [DIAGNOSTICS] > Total capture
 # COM: Do not check detailed output from the first call to the compiler, e.g. 0_Canonicalize,
 # COM: as we may want to remove that in the future.
-# CHECK:      [DIAGNOSTICS] > Total generate_ir
+# CHECK-NEXT: [DIAGNOSTICS] > Total get_func_loc
 # CHECK-NEXT: [DIAGNOSTICS] Running parseMLIRSource
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
-# CHECK-NEXT: [DIAGNOSTICS] Running {{[a-zA-Z]+}}Pass
+# CHECK:      [DIAGNOSTICS] > Total generate_ir
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # COM: Check for "compile" exactly, otherwise we could match things like "compileObjFile".
-# CHECK:      [DIAGNOSTICS] > Total compile{{ }}
+# CHECK-NEXT:      [DIAGNOSTICS] > Total compile{{ }}
 # CHECK-NEXT: [DIAGNOSTICS] Running device_init
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 # CHECK-NEXT: [DIAGNOSTICS] Running qubit_allocate_array
