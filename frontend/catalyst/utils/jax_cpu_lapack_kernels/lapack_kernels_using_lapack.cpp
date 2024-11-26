@@ -43,9 +43,10 @@
 #define SYM_PREFIX scipy_
 #endif
 
-// No idea why 3 layers are required here.
-#define CONCAT2(X, Y) X##Y
-#define CONCAT(X, Y) CONCAT2(X, Y)
+// The CONCAT macro and its helper CONCAT_ are required here since macro arguments are not expanded
+// around a ## preprocessing token. See http://port70.net/%7Ensz/c/c11/n1570.html#6.10.3.1.
+#define CONCAT_(X, Y) X##Y
+#define CONCAT(X, Y) CONCAT_(X, Y)
 #define GET_SYMBOL(X) CONCAT(SYM_PREFIX, X)
 
 // From a Python binary, JAX obtains its LAPACK/BLAS kernels from Scipy, but
