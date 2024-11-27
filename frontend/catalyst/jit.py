@@ -502,11 +502,7 @@ class QJIT(CatalystCallable):
         )
         self.patched_module_allowlist = include_convertlist + ag_primitives.module_allowlist
 
-        # Pre-compile with the patched conversion rules
-        with Patcher(
-            (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-        ):
-            self.user_function = self.pre_compilation()
+        self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
@@ -546,13 +542,9 @@ class QJIT(CatalystCallable):
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "binary"):
-            # Capture with the patched conversion rules
-            with Patcher(
-                (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-            ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    self.user_sig or ()
-                )
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                self.user_sig or ()
+            )
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()
@@ -591,13 +583,7 @@ class QJIT(CatalystCallable):
             if self.compiled_function and self.compiled_function.shared_object:
                 self.compiled_function.shared_object.close()
 
-            # Capture with the patched conversion rules
-            with Patcher(
-                (ag_primitives, "module_allowlist", self.patched_module_allowlist),
-            ):
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    args, **kwargs
-                )
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -622,12 +608,10 @@ class QJIT(CatalystCallable):
     @debug_logger
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
-        processed_fn = self.original_function
-
         if self.compile_options.autograph:
-            processed_fn = run_autograph(self.original_function)
+            return run_autograph(self.original_function, self.patched_module_allowlist)
 
-        return processed_fn
+        return self.original_function
 
     @instrument(size_from=0)
     @debug_logger

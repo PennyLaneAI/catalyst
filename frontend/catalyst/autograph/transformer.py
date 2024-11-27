@@ -21,6 +21,7 @@ Python control flow and other imperative expressions rather than the functional 
 by Catalyst.
 """
 import copy
+import functools
 import inspect
 from contextlib import ContextDecorator
 
@@ -31,6 +32,7 @@ from malt.impl.api import PyToPy
 import catalyst
 from catalyst.autograph import ag_primitives, operator_update
 from catalyst.utils.exceptions import AutoGraphError
+from catalyst.utils.patching import Patcher
 
 
 class CatalystTransformer(PyToPy):
@@ -132,17 +134,26 @@ class CatalystTransformer(PyToPy):
         return node
 
 
-def run_autograph(fn):
+def run_autograph(fn, allowlist=None):
     """Decorator that converts the given function into graph form."""
 
-    user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
+    if allowlist is None:
+        allowlist = ag_primitives.module_allowlist
 
+    user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
     new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
     new_fn.ag_module = module
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
 
-    return new_fn
+    @functools.wraps(new_fn)
+    def wrapper(*args, **kwargs):
+        with Patcher(
+            (ag_primitives, "module_allowlist", allowlist),
+        ):
+            return new_fn(*args, **kwargs)
+
+    return wrapper
 
 
 def autograph_source(fn):

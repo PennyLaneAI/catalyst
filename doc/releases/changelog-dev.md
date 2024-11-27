@@ -73,6 +73,9 @@
 * `catalyst-cli` and `quantum-opt` are compiled with `default` visibility, which allows for MLIR plugins to work.
   [(#1287)](https://github.com/PennyLaneAI/catalyst/pull/1287)
 
+* Sink patching of autograph's allowlist.
+  [(#1332)](https://github.com/PennyLaneAI/catalyst/pull/1332)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
