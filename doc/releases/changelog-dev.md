@@ -41,15 +41,24 @@
 
 <h3>Breaking changes 💔</h3>
 
-* The `toml` module has been migrated to PennyLane with an updated schema for declaring device 
-  capabilities. Devices with TOML files using `schema = 2` will not be compatible with the latest 
-  Catalyst. See [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html) 
+* The `toml` module has been migrated to PennyLane with an updated schema for declaring device
+  capabilities. Devices with TOML files using `schema = 2` will not be compatible with the latest
+  Catalyst. See [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html)
   for updated instructions on integrating your device with Catalyst and PennyLane
   [(#1275)](https://github.com/PennyLaneAI/catalyst/pull/1275)
 
 * Handling for the legacy operator arithmetic (the `Hamiltonian` and `Tensor` classes in PennyLane)
   is removed.
   [(#1308)](https://github.com/PennyLaneAI/catalyst/pull/1308)
+
+<h3>Bug fixes 🐛</h3>
+
+* Fix bug introduced in 0.8 that breaks nested invocations of `qml.adjoint` and `qml.ctrl`.
+  [(#1301)](https://github.com/PennyLaneAI/catalyst/issues/1301)
+
+* Fix a bug in `debug.compile_executable` which would generate incorrect stride information for
+  array arguments of the function, in particular when non-64bit datatypes are used.
+  [(#1338)](https://github.com/PennyLaneAI/catalyst/pull/1338)
 
 <h3>Deprecations 👋</h3>
 
@@ -83,11 +92,6 @@
   empty pass that prints hello world. The code of the tutorial is at
   [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
-
-<h3>Bug fixes 🐛</h3>
-
-* Fix bug introduced in 0.8 that breaks nested invocations of `qml.adjoint` and `qml.ctrl`.
-  [(#1301)](https://github.com/PennyLaneAI/catalyst/issues/1301)
 
 <h3>Contributors ✍️</h3>
 
