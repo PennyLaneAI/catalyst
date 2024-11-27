@@ -75,6 +75,7 @@
 
 * Sink patching of autograph's allowlist.
   [(#1332)](https://github.com/PennyLaneAI/catalyst/pull/1332)
+  [(#1337)](https://github.com/PennyLaneAI/catalyst/pull/1337)
 
 <h3>Documentation 📝</h3>
 

@@ -28,10 +28,9 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
-from malt.core import config as ag_config
 
 import catalyst
-from catalyst.autograph import ag_primitives, run_autograph
+from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
@@ -496,12 +495,6 @@ class QJIT(CatalystCallable):
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
 
-        # Patch the conversion rules by adding the included modules before the block list
-        include_convertlist = tuple(
-            ag_config.Convert(rule) for rule in self.compile_options.autograph_include
-        )
-        self.patched_module_allowlist = include_convertlist + ag_primitives.module_allowlist
-
         self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
@@ -609,7 +602,7 @@ class QJIT(CatalystCallable):
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         if self.compile_options.autograph:
-            return run_autograph(self.original_function, self.patched_module_allowlist)
+            return run_autograph(self.original_function, *self.compile_options.autograph_include)
 
         return self.original_function
 
