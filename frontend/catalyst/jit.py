@@ -30,7 +30,7 @@ from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
-from catalyst.autograph import ag_primitives, run_autograph
+from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
