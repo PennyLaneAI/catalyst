@@ -149,11 +149,10 @@ def test_new_sampleop_still_good_with_backend():
         "func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64>",
     )
     new_ir = new_ir.replace(
-        "quantum.device[",
+        "quantum.device shots(%extracted) [",
         """%shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device[""",
+      quantum.device shots(%shots) [""",
     )
-    new_ir = new_ir.replace("] shots %extracted", "] shots %shots")
     new_ir = new_ir.replace("tensor<10x1x", "tensor<?x1x")
 
     replace_ir(workflow_dyn_sample, "mlir", new_ir)
@@ -312,11 +311,10 @@ def test_new_countsop_still_good_with_backend():
         "func.func public @circuit() ->", "func.func public @circuit(%arg0: tensor<i64>) ->"
     )
     new_ir = new_ir.replace(
-        "quantum.device[",
+        "quantum.device shots(%extracted) [",
         """%shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device[""",
+      quantum.device shots(%shots) [""",
     )
-    new_ir = new_ir.replace("] shots %extracted", "] shots %shots")
 
     replace_ir(workflow_dyn_counts, "mlir", new_ir)
     res = workflow_dyn_counts(4000)
