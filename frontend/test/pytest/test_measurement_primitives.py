@@ -31,7 +31,9 @@ from catalyst.jax_primitives import (
     state_p,
     var_p,
 )
+from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.jax_tracer import lower_jaxpr_to_mlir
+from catalyst.tracing.contexts import EvaluationContext
 
 
 @pytest.mark.xfail(reason="[WIP] Convert to lit test")
@@ -74,10 +76,36 @@ module @foo {
     # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
 
-@pytest.mark.xfail(reason="[WIP] Convert to lit test")
+#@pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_sample_dynamic_shape():
     """Test that the sample primitive with dynamic shape can be captured into jaxpr."""
 
+    @catalyst.qjit
+    def _test():
+        mode, ctx = EvaluationContext.get_evaluation_mode()
+
+        def f(shots):
+            obs = compbasis_p.bind()
+            x = shots + 1
+            # Note that in `primitive.bind(args, kwargs)`, args are treated as jaxpr primitive's
+            # proper arguments, and kwargs are treated as primitive's `params`
+            # Proper primitive arguments are propagated as jaxpr variables,
+            # whereas primitive params are tracers.
+            return sample_p.bind(obs, x, num_qubits=0)
+
+        with EvaluationContext.frame_tracing_context(ctx) as trace:
+            new_shots = trace.new_arg(jax.core.ShapedArray(shape=[], dtype=jax.numpy.dtype("int64")))
+            res = f(new_shots)
+
+            jaxpr, _, _ = trace_to_jaxpr(trace, [new_shots], [res])
+            breakpoint()
+
+        return
+
+    r = _test()
+    #assert r == 3
+
+    '''
     def f(shots):
         obs = compbasis_p.bind()
         x = shots + 1
@@ -87,6 +115,7 @@ def test_sample_dynamic_shape():
         # whereas primitive params are tracers.
         return sample_p.bind(obs, x, num_qubits=0)
 
+    breakpoint()
     jaxpr = jax.make_jaxpr(f)(5).jaxpr
     mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
     print(jaxpr)
@@ -120,7 +149,7 @@ module @foo {
     # assert jaxpr.eqns[1].primitive == sample_p
     # assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
     # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
-
+    '''
 
 def test_new_sampleop_still_good_with_backend():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
