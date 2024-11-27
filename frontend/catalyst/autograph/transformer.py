@@ -21,6 +21,7 @@ Python control flow and other imperative expressions rather than the functional 
 by Catalyst.
 """
 import copy
+import functools
 import inspect
 from contextlib import ContextDecorator
 
@@ -140,17 +141,19 @@ def run_autograph(fn, allowlist=None):
         allowlist = ag_primitives.module_allowlist
 
     user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
-
-    with Patcher(
-        (ag_primitives, "module_allowlist", allowlist),
-    ):
-        new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
-
+    new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
     new_fn.ag_module = module
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
 
-    return new_fn
+    @functools.wraps(new_fn)
+    def wrapper(*args, **kwargs):
+        with Patcher(
+            (ag_primitives, "module_allowlist", allowlist),
+        ):
+            return new_fn(*args, **kwargs)
+
+    return wrapper
 
 
 def autograph_source(fn):
