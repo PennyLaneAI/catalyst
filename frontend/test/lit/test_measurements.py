@@ -69,7 +69,7 @@ except CompileError:
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
-# CHECK: quantum.device[{{.+}}] shots [[shots]]
+# CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -133,7 +133,7 @@ except:
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
-# CHECK: quantum.device[{{.+}}] shots [[shots]]
+# CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
