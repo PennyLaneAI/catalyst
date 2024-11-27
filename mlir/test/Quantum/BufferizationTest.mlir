@@ -37,8 +37,8 @@ func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
 // -----
 
 func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
-    // CHECK: quantum.device{{.*}} shots [[shots:%.+]]
-    quantum.device ["", "", ""] shots %dyn_shots
+    // CHECK: quantum.device shots([[shots:%.+]]) {{.*}}
+    quantum.device shots(%dyn_shots) ["", "", ""]
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     // CHECK: [[idx:%.+]] = index.casts [[shots]] : i64 to index

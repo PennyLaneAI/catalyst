@@ -63,7 +63,7 @@ func.func @device() {
     // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<25 x i8>
     // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
     %shots = llvm.mlir.constant(1000 : i64) : i64
-    quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"] shots %shots
+    quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
 
     // CHECK: [[e0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
     // CHECK: [[e1:%.+]] = llvm.getelementptr inbounds [[e0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
@@ -73,7 +73,7 @@ func.func @device() {
     // CHECK: [[e5:%.+]] = llvm.getelementptr inbounds [[e4]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<37 x i8>
     // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
 
-    quantum.device ["rtd_lightning.so", "lightning.kokkos", "{my_other_attr: my_other_attr_value}"] shots %shots
+    quantum.device shots(%shots) ["rtd_lightning.so", "lightning.kokkos", "{my_other_attr: my_other_attr_value}"]
 
     // CHECK: [[d0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
     // CHECK: [[d1:%.+]] = llvm.getelementptr inbounds [[d0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
