@@ -26,7 +26,7 @@ import inspect
 from contextlib import ContextDecorator
 
 import pennylane as qml
-from malt.core import ag_ctx, converter
+from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
 
 import catalyst
@@ -134,11 +134,11 @@ class CatalystTransformer(PyToPy):
         return node
 
 
-def run_autograph(fn, allowlist=None):
+def run_autograph(fn, *modules):
     """Decorator that converts the given function into graph form."""
 
-    if allowlist is None:
-        allowlist = ag_primitives.module_allowlist
+    allowed_modules = tuple(config.Convert(module) for module in modules)
+    allowed_modules += ag_primitives.module_allowlist
 
     user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
     new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
@@ -149,7 +149,7 @@ def run_autograph(fn, allowlist=None):
     @functools.wraps(new_fn)
     def wrapper(*args, **kwargs):
         with Patcher(
-            (ag_primitives, "module_allowlist", allowlist),
+            (ag_primitives, "module_allowlist", allowed_modules),
         ):
             return new_fn(*args, **kwargs)
 
