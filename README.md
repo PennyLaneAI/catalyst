@@ -73,7 +73,7 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 ## Installation
 
-Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) platforms, 
+Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) platforms,
 and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.10 and
 higher. To install it, simply run the following ``pip`` command:
 
@@ -81,7 +81,7 @@ higher. To install it, simply run the following ``pip`` command:
 pip install pennylane-catalyst
 ```
 
-Pre-built packages for Windows are not yet available, and comptability with Windows 
+Pre-built packages for Windows are not yet available, and comptability with Windows
 is untested and cannot be guaranteed. If you are using one of these platforms, please
 try out our Docker and Dev Container images described in the [documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#dev-containers)
 or click this button:
@@ -159,9 +159,24 @@ If you are doing research using Catalyst, please cite our paper:
   author = {David Ittah and Ali Asadi and Erick Ochoa Lopez and Sergei Mironov and Samuel Banning and Romain Moyard and Mai Jacob Peng and Josh Izaac},
   title = {Catalyst: a Python JIT compiler for auto-differentiable hybrid quantum programs},
   journal = {Journal of Open Source Software}
-} 
+}
 ```
 
 ## License
 
 Catalyst is **free** and **open source**, released under the Apache License, Version 2.0.
+
+## Acknowledgements
+
+Catalyst makes use of the following libraries and tools, which are under their own respective
+licenses:
+
+- [JAX](https://github.com/jax-ml/jax)
+- [TensorFlow](https://github.com/tensorflow/tensorflow)
+- [OpenXLA](https://github.com/openxla/xla)
+- [LLVM/MLIR](https://github.com/llvm/llvm-project)
+- [EnzymeAD](https://github.com/EnzymeAD/Enzyme)
+- [pybind11](https://github.com/pybind/pybind11)
+- [nanobind](https://github.com/wjakob/nanobind)
+- [accelerate-lapacke](https://github.com/lepus2589/accelerate-lapacke)
+- [LAPACK](https://github.com/Reference-LAPACK/lapack)
