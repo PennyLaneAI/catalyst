@@ -46,28 +46,6 @@ class Ion_Attr<string name, string attrMnemonic, list<Trait> traits = []>
   let mnemonic = attrMnemonic;
 }
 
-def CalibrationAttr : Ion_Attr<"Calibration", "calibration"> {
-  let summary = "A class to represent calibration data with a mathematical formula.";
-  // TODO: add mathematical formula
-  let parameters = (ins
-    "mlir::FloatAttr":$rabi,
-    "mlir::FloatAttr":$detuning,
-    "mlir::FloatAttr":$phase
-  );
-
-
-  let builders = [
-    AttrBuilderWithInferredContext<(ins     
-    "mlir::FloatAttr":$rabi,
-    "mlir::FloatAttr":$detuning,
-    "mlir::FloatAttr":$phase), [{
-      return $_get(rabi.getContext(), rabi, detuning, phase);
-    }]>
-  ];
-
-  let assemblyFormat = "`<` struct(params) `>`";
-}
-
 def LevelAttr : Ion_Attr<"Level", "level"> {
   let summary = "A class to represent an atomic level.";
 
@@ -158,6 +136,11 @@ def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr,
   let constBuilderCall = ?;
 }
 
+def BeamArrayAttr : TypedArrayAttrBase<BeamAttr,
+                         BeamAttr.summary # " array"> {
+  let constBuilderCall = ?;
+}
+
 //===----------------------------------------------------------------------===//
 // Ion dialect operations.
 //===----------------------------------------------------------------------===//
@@ -172,7 +155,7 @@ def IonOp : Ion_Op<"ion"> {
     AnyIntElementsAttr: $position,
     LevelArrayAttr: $levels,
     TransitionArrayAttr: $transitions,
-    CalibrationAttr: $calibration
+    BeamArrayAttr: $beams
   );
 
   let results = (outs

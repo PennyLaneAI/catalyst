@@ -42,35 +42,30 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                 ion = op;
                 return WalkResult::interrupt();
             });
-            auto transition0 = cast<TransitionAttr>(ion.getTransitionsAttr()[0]);
-            // auto level0 = transition0.getLevel_0();
-            // auto level1 = transition0.getLevel_1();
+            // std::cout << "::::::::::::::::::::::HELLO" << std::endl;
+            // // Get the qubit number
+            // auto inQubit = op.getInQubits().front();
+            // auto extract = inQubit.getParentOfType<quantum::ExtractOp>();
+            // std::cout << "::::::::::::::::::::::HELLO" << std::endl;
+            // extract.dump();
+            // std::cout << "::::::::::::::::::::::HELLO" << std::endl;
+            // std::cout << index.value() << std::endl;
+            
+            // auto loc = op.getLoc();
+            // auto qubits = op.getOutQubits();
+            // auto ctx = op.getContext();
 
-            auto rabi = ion.getCalibration().getRabi();
-            auto detuning = ion.getCalibration().getDetuning();
-            auto phase = ion.getCalibration().getPhase();
-            auto polarization =
-                ion.getPo
-                    // TODO: get mathematical formula and apply them to create values
-                    mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(op.getLoc(), rabi);
-            mlir::Value detuningValue = rewriter.create<arith::ConstantOp>(op.getLoc(), detuning);
-            mlir::Value phaseValue = rewriter.create<arith::ConstantOp>(op.getLoc(), phase);
-
-            auto loc = op.getLoc();
-            auto qubits = op.getOutQubits();
-            auto ctx = op.getContext();
-
-            Value ppOp = rewriter
-                             .create<ion::ParallelProtocolOp>(
-                                 loc, qubits,
-                                 [&](OpBuilder &builder, Location loc, ValueRange qubits) {
-                                     //  BeamAttr::get(ctx, transition0, rabi, detuning, phase);
-                                     //  rewriter.create<ion::PulseOp>(loc, qubits.front());
-                                     //  rewriter.create<ion::PulseOp>(loc, qubits.front());
-                                     builder.create<ion::YieldOp>(loc, qubits);
-                                 })
-                             .getResult(0);
-            ppOp.dump();
+            // Value ppOp = rewriter
+            //                  .create<ion::ParallelProtocolOp>(
+            //                      loc, qubits,
+            //                      [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+            //                          //  BeamAttr::get(ctx, transition0, rabi, detuning, phase);
+            //                          //  rewriter.create<ion::PulseOp>(loc, qubits.front());
+            //                          //  rewriter.create<ion::PulseOp>(loc, qubits.front());
+            //                          builder.create<ion::YieldOp>(loc, qubits);
+            //                      })
+            //                  .getResult(0);
+            // ppOp.dump();
             // Create PP
             // Create P1
             // Create P2
