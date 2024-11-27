@@ -90,7 +90,7 @@ def DeviceInitOp : Quantum_Op<"device"> {
     );
 
     let assemblyFormat = [{
-      `[` $lib `,` $name `,` $kwargs `]` ( `shots` $shots^)? attr-dict
+      (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
     }];
 }
 
@@ -749,7 +749,7 @@ def SampleOp : Measurement_Op<"sample"> {
         ```mlir
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
         {
-            quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"] shots %shots
+            quantum.device shots (%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
             %samples = quantum.samples %obs1 : tensor<?xf64>
 
@@ -813,7 +813,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
         ```mlir
         func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
         {
-            quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"] shots %shots
+            quantum.device shots (%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs = quantum.compbasis %q0, %q1 : !quantum.obs
             %counts = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
 
