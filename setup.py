@@ -75,9 +75,8 @@ requirements = [
     kokkos_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "tomlkit; python_version < '3.11'",
     "numpy!=2.0.0",
-    "scipy<1.14",
+    "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
 ]
 

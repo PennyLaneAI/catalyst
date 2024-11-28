@@ -48,6 +48,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     # Cache external project sources
     # Hopefully these can be shared with the main check-catalyst action since we don't run this
     # build in a container.
@@ -150,7 +155,7 @@ jobs:
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -182,7 +187,7 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -201,7 +206,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build enzyme-build --target EnzymeStatic-19
 
@@ -226,6 +231,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
     - name: Install Dependencies (System)
       run: |
@@ -296,6 +306,8 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
+        # On GH images, gfortran is only available as a specific version.
+        export FC=gfortran-14
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
@@ -342,6 +354,13 @@ jobs:
 
         cmake --build quantum-build --target check-dialects catalyst-cli
 
+    - name: Build Standalone Plugin
+      run: |
+        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        make standalone-plugin
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
+
     - name: Build wheel
       run: |
         PYTHON=python${{ matrix.python_version }} \
@@ -379,6 +398,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4

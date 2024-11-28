@@ -65,7 +65,6 @@ jobs:
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           make oqc
 
-
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -81,7 +80,7 @@ jobs:
           name: oqc-build-${{ matrix.compiler }}
           path: |
             oqc-build/*.so
-            oqc-build/*.toml
+            oqc-build/backend/*.toml
           retention-days: 1
 
   llvm:
@@ -373,6 +372,16 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
 
+    - name: Build Standalone Plugin
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
+        make standalone-plugin
+        mv mlir/standalone/build/lib/StandalonePlugin.so quantum-build/lib/
+
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -380,6 +389,7 @@ jobs:
         path: |
           quantum-build/bin
           quantum-build/python_packages/*
+          quantum-build/lib/StandalonePlugin.so
         retention-days: 1
 
     - name: Cache CCache on main branch
@@ -434,6 +444,12 @@ jobs:
       with:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
+    
+    - name: Download OQC-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: oqc-build-${{ matrix.compiler }}
+        path: oqc-build
 
     - name: Add Frontend Dependencies to PATH
       run: |
@@ -441,6 +457,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
 
