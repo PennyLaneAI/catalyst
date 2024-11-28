@@ -427,8 +427,6 @@ def get_named_sequence_in_module(mod):
 #
 # transform_named_sequence
 #
-
-
 @transform_named_sequence_p.def_abstract_eval
 def _transform_named_sequence_p_abstract_eval(*args):
     return ()
@@ -498,18 +496,14 @@ def _apply_registered_pass_lowering(
     jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
 ):
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
-    module = jax_ctx.module_context.module
+    inner = jax_ctx.module_context.module
     named_sequence_op = None
-    # module is a nested module
-    # parent_module is the root module
-    # E.g.,
-    #
-    # ```mlir/pseudocode
+
+    # ```mlir
     # module @root {
     #   module @inner {
-    #     func.func @qnode
-    #   }
-    #   module @transform {
+    #     func.func @qnode { }
+    #     module @transform { }
     #   }
     # }
     # ```
@@ -517,11 +511,7 @@ def _apply_registered_pass_lowering(
     # When this function is executed we are likely
     # somewhere around func.func @qnode.
     #
-    # jax_ctx.module_context.module holds a reference to @inner
-    #
-    # This means that it's parent is @root.
-    # parent_module = module.parent
-    for op in reversed(module.regions[0].blocks[0].operations):
+    for op in reversed(inner.regions[0].blocks[0].operations):
         # Look for the module @transform that holds the transformation schedule
         # TODO: Find a better way to search for the module with the transform schedule.
         if op.operation.name == "builtin.module":
