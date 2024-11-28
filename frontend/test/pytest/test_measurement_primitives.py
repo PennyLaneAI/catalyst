@@ -22,6 +22,7 @@ import pytest
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
+from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
@@ -31,7 +32,6 @@ from catalyst.jax_primitives import (
     state_p,
     var_p,
 )
-from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.jax_tracer import lower_jaxpr_to_mlir
 from catalyst.tracing.contexts import EvaluationContext
 
@@ -76,71 +76,102 @@ module @foo {
     # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
 
 
-#@pytest.mark.xfail(reason="[WIP] Convert to lit test")
+@pytest.mark.xfail(reason="[WIP] Convert to lit test")
 def test_sample_dynamic_shape():
     """Test that the sample primitive with dynamic shape can be captured into jaxpr."""
 
     @catalyst.qjit
-    def _test():
-        mode, ctx = EvaluationContext.get_evaluation_mode()
-
-        def f(shots):
-            obs = compbasis_p.bind()
-            x = shots + 1
-            # Note that in `primitive.bind(args, kwargs)`, args are treated as jaxpr primitive's
-            # proper arguments, and kwargs are treated as primitive's `params`
-            # Proper primitive arguments are propagated as jaxpr variables,
-            # whereas primitive params are tracers.
-            return sample_p.bind(obs, x, num_qubits=0)
-
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
-            new_shots = trace.new_arg(jax.core.ShapedArray(shape=[], dtype=jax.numpy.dtype("int64")))
-            res = f(new_shots)
-
-            jaxpr, _, _ = trace_to_jaxpr(trace, [new_shots], [res])
-            breakpoint()
-
-        return
-
-    r = _test()
-    #assert r == 3
-
-    '''
-    def f(shots):
+    @qml.qnode(
+        qml.device("null.qubit", wires=1)
+    )  # SampleOp is only legal if there is a device in the same scope
+    def f(shots: int):
         obs = compbasis_p.bind()
         x = shots + 1
         # Note that in `primitive.bind(args, kwargs)`, args are treated as jaxpr primitive's
         # proper arguments, and kwargs are treated as primitive's `params`
         # Proper primitive arguments are propagated as jaxpr variables,
         # whereas primitive params are tracers.
-        return sample_p.bind(obs, x, num_qubits=0)
+        _ = sample_p.bind(obs, x, num_qubits=0)
+        innocent_vector = jax.numpy.zeros((x, 0))
+        return _ + innocent_vector
 
-    breakpoint()
-    jaxpr = jax.make_jaxpr(f)(5).jaxpr
-    mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
-    print(jaxpr)
-    print(mlir)
+    print(f.jaxpr)
+    print(f.mlir)
+    # breakpoint()
+
+    # jaxpr_cat = catalyst.jax_extras.tracing.make_jaxpr2(f)(5)
+    # breakpoint()
+    # jaxpr = jax.make_jaxpr(f)(5).jaxpr
+    # breakpoint()
+    # mlir = lower_jaxpr_to_mlir(jax.make_jaxpr(f)(5), "foo")[0]
+    # print(jaxpr)
+    # print(mlir)
     assert (
         jaxpr
         == """
 { lambda ; a:i64[]. let
-    b:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
-    c:i64[] = add a 1
-    d:f64[c,0] = sample[num_qubits=0] b c
-  in (c, d) }
+    transform_named_sequence
+    b:i64[] c:f64[b,0] = quantum_kernel[
+      call_jaxpr={ lambda ; d:i64[]. let
+          e:AbstractObs(num_qubits=0,primitive=compbasis) = compbasis
+          f:i64[] = add d 1
+          g:f64[f,0] = sample[num_qubits=0] e f
+          h:f64[f,0] = broadcast_in_dim[broadcast_dimensions=() shape=(None, 0)] 0.0
+            f
+          i:f64[f,0] = add g h
+          qdevice[
+            rtd_kwargs={}
+            rtd_lib=/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_null_qubit.so
+            rtd_name=NullQubit
+          ] 0
+          j:AbstractQreg() = qalloc 1
+          qdealloc j
+        in (f, i) }
+      qnode=<QNode: device='<null.qubit device (wires=1) at 0x73ac93dcbfa0>', interface='auto', diff_method='best'>
+    ] a
+  in (c,) }
 """
     )
 
     assert (
         mlir
         == """
-module @foo {
-  func.func public @jit_foo(%arg0: tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>) {
-    %0 = "quantum.compbasis"() : () -> !quantum.obs
-    %c = stablehlo.constant dense<1> : tensor<i64>
-    %1 = stablehlo.add %arg0, %c : tensor<i64>
-    %2 = "quantum.sample"(%0) : (!quantum.obs) -> tensor<?x0xf64>
-    return %1, %2 : tensor<i64>, tensor<?x0xf64>
+module @f {
+  func.func public @jit_f(%arg0: tensor<i64>) -> tensor<?x0xf64> attributes {llvm.emit_c_interface} {
+    %0:2 = catalyst.launch_kernel @module_f::@f(%arg0) : (tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>)
+    return %0#1 : tensor<?x0xf64>
+  }
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
+      transform.yield
+    }
+  }
+  module @module_f {
+    func.func public @f(%arg0: tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+      %c0_i64 = arith.constant 0 : i64
+      %c = stablehlo.constant dense<0> : tensor<1xi32>
+      %cst = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+      %c_0 = stablehlo.constant dense<1> : tensor<i64>
+      %0 = quantum.compbasis  : !quantum.obs
+      %1 = stablehlo.add %arg0, %c_0 : tensor<i64>
+      %2 = quantum.sample %0 : tensor<?x0xf64>
+      %3 = stablehlo.convert %1 : (tensor<i64>) -> tensor<i32>
+      %4 = stablehlo.reshape %3 : (tensor<i32>) -> tensor<1xi32>
+      %5 = stablehlo.concatenate %4, %c, dim = 0 : (tensor<1xi32>, tensor<1xi32>) -> tensor<2xi32>
+      %6 = stablehlo.dynamic_broadcast_in_dim %cst, %5, dims = [] : (tensor<f64>, tensor<2xi32>) -> tensor<?x0xf64>
+      %7 = stablehlo.add %2, %6 : tensor<?x0xf64>
+      quantum.device shots(%c0_i64) ["/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_null_qubit.so", "NullQubit", "{}"]
+      quantum.device_release
+      return %1, %7 : tensor<i64>, tensor<?x0xf64>
+    }
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
   }
 }
 """
@@ -149,7 +180,7 @@ module @foo {
     # assert jaxpr.eqns[1].primitive == sample_p
     # assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
     # assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
-    '''
+
 
 def test_new_sampleop_still_good_with_backend():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
