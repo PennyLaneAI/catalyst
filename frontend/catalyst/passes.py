@@ -170,7 +170,6 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
                         opt += " " + str(option) + "=" + str(option_value)
                     apply_registered_pass_p.bind(
                         pass_name=pass_names[API_name],
-                        options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
                     )
             return wrapped_qnode_function(*args, **kwrags)
 
@@ -303,7 +302,6 @@ def cancel_inverses(fn=None):
         if EvaluationContext.is_tracing():
             apply_registered_pass_p.bind(
                 pass_name="remove-chained-self-inverse",
-                options=f"func-name={funcname}" + "_cancel_inverses" + uniquer,
             )
         return wrapped_qnode_function(*args, **kwrags)
 
@@ -386,7 +384,6 @@ def merge_rotations(fn=None):
         if EvaluationContext.is_tracing():
             apply_registered_pass_p.bind(
                 pass_name="merge-rotations",
-                options=f"func-name={funcname}" + "_merge_rotations" + uniquer,
             )
         return wrapped_qnode_function(*args, **kwrags)
 
@@ -440,5 +437,4 @@ def add_mlir_quantum_decomposition(f, device):
     if device.original_device.name == "oqd.cloud":
         apply_registered_pass_p.bind(
             pass_name="ions-decomposition",
-            options=f"func-name={f.__name__}",
         )

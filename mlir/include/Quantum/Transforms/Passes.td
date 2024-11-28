@@ -95,33 +95,22 @@ class QuantumCircuitTransformationPassBase {
     list<Option> options = [];
 }
 
-def QuantumCircuitTransformationPass: QuantumCircuitTransformationPassBase {
-    let options = [
-    Option<"FuncNameOpt", "func-name",
-           "std::string", /*default=*/"\"\"",
-           "The name of the function (or qnode) to run the quantum circuit transformation pass on.">,
-    ];
-}
-
 def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
 
     let constructor = "catalyst::createIonsDecompositionPass()";
-    let options = QuantumCircuitTransformationPass.options;
 }
 
 def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
-    let options = QuantumCircuitTransformationPass.options;
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
     let constructor = "catalyst::createMergeRotationsPass()";
-    let options = QuantumCircuitTransformationPass.options;
 }
 
 // ----- Quantum circuit transformation passes end ----- //
