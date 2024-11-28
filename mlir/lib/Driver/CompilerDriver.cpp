@@ -756,30 +756,31 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
 
-        TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
-        if (options.asyncQnodes &&
-            failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
+        if (options.asyncQnodes) {
+            TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
+            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                 options, llvmModule, output))) {
-            return failure();
+                return failure();
+            }
             catalyst::utils::LinesCount::Module(*llvmModule.get());
+            coroLLVMPassesTiming.stop();
         }
-        coroLLVMPassesTiming.stop();
 
         if (enzymeRun) {
             TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
-                catalyst::utils::LinesCount::Module(*llvmModule.get());
             }
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
             o2PassesTiming.stop();
 
             TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
-                catalyst::utils::LinesCount::Module(*llvmModule.get());
             }
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
             enzymePassesTiming.stop();
         }
 
