@@ -38,7 +38,7 @@ from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import PipelineNameUniquer, _inject_transform_named_sequence
+from catalyst.passes import PipelineNameUniquer
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
