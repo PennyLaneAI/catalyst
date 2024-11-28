@@ -759,7 +759,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (options.asyncQnodes) {
             TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
             if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
-                                options, llvmModule, output))) {
+                                    options, llvmModule, output))) {
                 return failure();
             }
             catalyst::utils::LinesCount::Module(*llvmModule.get());
