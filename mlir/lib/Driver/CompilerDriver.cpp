@@ -472,7 +472,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
                                  TimingScope &timing)
 {
     auto beforePassCallback = [&](Pass *pass, Operation *op) {
-        if (!timer.is_active()) {
+        if (options.verbosity >= Verbosity::Debug && !timer.is_active()) {
             timer.start();
         }
     };
@@ -481,8 +481,11 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
     // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
         auto pipelineName = pass->getName();
-        timer.dump(pipelineName.str(), /*add_endl */ false);
-        catalyst::utils::LinesCount::Operation(op);
+        if (options.verbosity >= Verbosity::Debug) {
+            timer.dump(pipelineName.str(), /*add_endl */ false);
+            catalyst::utils::LinesCount::Operation(op);
+        }
+
         if (options.keepIntermediate >= SaveTemps::AfterPass) {
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
@@ -534,6 +537,29 @@ LogicalResult configurePipeline(PassManager &pm, const CompilerOptions &options,
     return success();
 }
 
+LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, CompilerOutput &output,
+                          Pipeline &pipeline, bool clHasManualPipeline, ModuleOp moduleOp)
+{
+    if (!shouldRunStage(options, output, pipeline.getName()) || pipeline.getPasses().size() == 0) {
+        return success();
+    }
+    if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
+        llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
+        return failure();
+    }
+    if (failed(pm.run(moduleOp))) {
+        llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
+        return failure();
+    }
+    if (options.keepIntermediate && options.checkpointStage.empty()) {
+        std::string tmp;
+        llvm::raw_string_ostream s{tmp};
+        s << moduleOp;
+        dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
+    }
+    return success();
+}
+
 LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
                           CompilerOutput &output, TimingScope &timing)
 
@@ -575,24 +601,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     std::vector<Pipeline> UserPipeline =
         clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
     for (auto &pipeline : UserPipeline) {
-        if (!shouldRunStage(options, output, pipeline.getName()) ||
-            pipeline.getPasses().size() == 0) {
-            continue;
-        }
-        if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
-            llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
+        if (failed(catalyst::utils::Timer::timer(runPipeline, pipeline.getName(),
+                                                 /* add_endl */ false, pm, options, output,
+                                                 pipeline, clHasManualPipeline, moduleOp))) {
             return failure();
         }
-
-        if (failed(pm.run(moduleOp)))
-            return failure();
-
-        if (options.keepIntermediate && options.checkpointStage.empty()) {
-            std::string tmp;
-            llvm::raw_string_ostream s{tmp};
-            s << moduleOp;
-            dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
-        }
+        catalyst::utils::LinesCount::ModuleOp(moduleOp);
     }
     return success();
 }
@@ -742,13 +756,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
 
-        catalyst::utils::LinesCount::Module(*llvmModule.get());
-
         TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
         if (options.asyncQnodes &&
             failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                 options, llvmModule, output))) {
             return failure();
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
         coroLLVMPassesTiming.stop();
 
@@ -757,17 +770,17 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
+                catalyst::utils::LinesCount::Module(*llvmModule.get());
             }
             o2PassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
 
             TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
+                catalyst::utils::LinesCount::Module(*llvmModule.get());
             }
             enzymePassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
