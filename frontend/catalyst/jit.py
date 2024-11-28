@@ -439,7 +439,7 @@ def qjit(
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
-    return QJIT(fn, CompileOptions(**kwargs), print_instructions)
+    return QJIT(fn, CompileOptions(**kwargs), print_instructions=print_instructions)
 
 
 ## IMPL ##
@@ -469,6 +469,9 @@ class QJIT(CatalystCallable):
 
     @debug_logger_init
     def __init__(self, fn, compile_options, print_instructions=False):
+        # flag for printing instructions in the null device
+        self.print_instructions = print_instructions
+        
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
@@ -516,8 +519,6 @@ class QJIT(CatalystCallable):
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
 
-        # flag for printing instructions in the null device
-        self.print_instructions = print_instructions
         super().__init__("user_function")
 
     @debug_logger
