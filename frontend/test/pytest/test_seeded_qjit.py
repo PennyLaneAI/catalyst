@@ -216,7 +216,8 @@ def test_seeded_expval(seed, shots, backend):
 
     if backend not in ["lightning.qubit", "lightning.kokkos", "lightning.gpu"]:
         pytest.skip(
-            "Expval seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
+            "Expval seeding is only supported on lightning.qubit, lightning.kokkos"
+            "and lightning.gpu"
         )
 
     dev = qml.device(backend, wires=2, shots=shots)
