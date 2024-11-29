@@ -762,8 +762,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                                     options, llvmModule, output))) {
                 return failure();
             }
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
             coroLLVMPassesTiming.stop();
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
         if (enzymeRun) {
@@ -772,16 +772,16 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                                     options, llvmModule, output))) {
                 return failure();
             }
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
             o2PassesTiming.stop();
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
 
             TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return failure();
             }
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
             enzymePassesTiming.stop();
+            catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
         TimingScope outputTiming = llcTiming.nest("compileObject");
