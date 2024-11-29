@@ -119,25 +119,26 @@ class LinkerDriver:
         lib_name = "openblas"
         package_name = "scipy_openblas32"
         path_within_package = "lib"
-        file_extension = ".so" if platform.system() == "Linux" else ".dylib"
+        file_extension = ".so" if platform.system() == "Linux" else ".dylib"  # pragma: no branch
 
-        package_spec = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(package_spec.origin)
-        lapack_lib_path = path.join(package_directory, path_within_package)
+        if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
+            # use our own build of LAPACKe to interface with Accelerate
+            lapack_lib_name = "lapacke.3"
+        else:
+            package_spec = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(package_spec.origin)
+            lapack_lib_path = path.join(package_directory, path_within_package)
 
-        search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that scipy-openblas32 is installed and available via pip."
-            )
+            search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+            search_result = glob.glob(search_pattern)
+            if not search_result:  # pragma: nocover
+                raise CompileError(
+                    f'Unable to find OpenBLAS library at "{search_pattern}". '
+                    "Please ensure that scipy is installed and available via pip."
+                )
 
-        lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
-        lib_path_flags += [
-            f"-Wl,-rpath,{lapack_lib_path}",
-            f"-L{lapack_lib_path}",
-        ]
+            lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
+            lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
 
         system_flags = []
         if platform.system() == "Linux":
@@ -145,7 +146,8 @@ class LinkerDriver:
             # RPATH influences search paths globally while RUNPATH only works for
             # a single file, but not its dependencies.
             system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            assert platform.system() == "Darwin", f"Unsupported OS {platform.system()}"
             system_flags += ["-Wl,-arch_errors_fatal"]
 
         # The exception handling mechanism requires linking against

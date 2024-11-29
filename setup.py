@@ -76,9 +76,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy!=2.0.0",
-    # rpath linking on macos is only available starting in 0.3.27.63
-    # 0.3.28 suffers from precision issues on macos
-    "scipy-openblas32>=0.3.27.63,<0.3.28",
+    "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
 ]
 
