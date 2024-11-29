@@ -95,16 +95,6 @@ TEST_CASE("registers correctly a new observable", "[InstructionStrBuilder]")
     CHECK(str_builder.get_obs_str(5) == "0.1*PauliX(0) -0.2*Hermitian([1, 0, 0, 1], wires=[0])");
 }
 
-// TEST_CASE("string building for Sample() and PartialSample()", "[InstructionStrBuilder]") {
-//     InstructionStrBuilder str_builder;
-//     std::vector<std::complex<double>> v(2);
-//     DataView<std::vector<std::complex<double>>, 2> view({v, v}, 0, {2, 2}, {1,1});
-
-//     CHECK(str_builder.get_samples_str("Sample", view, 100) == "Sample([0, 0], shots=100)");
-//     CHECK(str_builder.get_samples_str("PartialSample", view, 100, {0}) == "PartialSample([0, 0],
-//     wires=[0], shots=100)");
-// }
-
 TEST_CASE("string building for Counts() and PartialCounts()", "[InstructionStrBuilder]")
 {
     InstructionStrBuilder str_builder;
