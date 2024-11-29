@@ -1,3 +1,3 @@
-project(catalyst_frontend)
+project(catalyst_frontend_main)
 
 add_subdirectory(utils)

@@ -1,10 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
-project(catalyst LANGUAGES CXX C)
+project(catalyst_mlir LANGUAGES CXX C)
 
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+set(CMAKE_BUILD_TYPE Release)
+
+add_subdirectory(llvm-project/llvm)
+list(APPEND CMAKE_MODULE_PATH 
+    "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/cmake/modules" 
+    "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/mlir/cmake/modules")
+message("${CMAKE_MODULE_PATH}")
+message("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+set(MHLO_BUILD_EMBEDDED ON)
+
+add_subdirectory(mlir-hlo)
 
 find_package(MLIR REQUIRED CONFIG)
 find_package(MHLO REQUIRED CONFIG)
