@@ -1,3 +1,4 @@
+project(catalyst_frontend_utils)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -44,3 +45,13 @@ target_include_directories(wrapper PRIVATE ${NUMPY_INCLUDE_DIR})
 # Use suffix ".so" rather than ".abi3.so" for library file using Stable ABI
 # This is necessary for compatibility with setuptools build extensions
 set_target_properties(wrapper PROPERTIES SUFFIX ".so")
+
+
+add_subdirectory(jax_cpu_lapack_kernels)
+
+add_library(custom_calls SHARED
+    ${PROJECT_SOURCE_DIR}/libcustom_calls.cpp
+)
+target_link_libraries(custom_calls PRIVATE catalyst_lapack_kernels)
+#target_include_directories(custom_calls PRIVATE ${NUMPY_INCLUDE_DIR})
+
