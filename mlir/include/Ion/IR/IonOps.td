@@ -174,6 +174,15 @@ def IonOp : Ion_Op<"ion"> {
   }];
 }
 
+// def SystemOp : Ion_Op<"system"> {
+//   let summary = "A class to represent a system (ions + phonons).";
+
+//   let arguments = (ins
+//     Variadic<IonType>: $ions,
+//     PhononArrayAttr: $phonons
+//   );
+// }
+
 def PulseOp : Ion_Op<"pulse"> {
     let summary = "Represent a pulse (a laser beam and some time).";
 
