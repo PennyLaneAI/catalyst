@@ -66,15 +66,16 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
     });
     auto qubitIndex = walkBackQubitSSA(op, 0);
     if (qubitIndex.has_value()) {
-        // TODO: double check the assumption of 2*n_qubits beams attr.
-        // Here we assume that they are 2*n_qubits beam for 1 qubit gate each pair is (transition
-        // 0->e
-        // and transition 1->e)
+        // Set the optional transition index now
         auto qubitIndexValue = qubitIndex.value();
-        auto beam0toE = ionSystem.getBeams1()[qubitIndexValue];
-        BeamAttr beam0toEAttr = cast<BeamAttr>(beam0toE);
-        auto beam1toE = ionSystem.getBeams1()[qubitIndexValue + 1];
-        BeamAttr beam1toEAttr = cast<BeamAttr>(beam1toE);
+        auto beam = ionSystem.getBeams1()[qubitIndexValue];
+        BeamAttr beamAttr = cast<BeamAttr>(beam);
+        auto beam0toEAttr =
+            BeamAttr::get(op.getContext(), rewriter.getI64IntegerAttr(0), beamAttr.getRabi(), beamAttr.getDetuning(),
+                          beamAttr.getPolarization(), beamAttr.getWavevector());
+        auto beam1toEAttr =
+            BeamAttr::get(op.getContext(), rewriter.getI64IntegerAttr(1), beamAttr.getRabi(), beamAttr.getDetuning(),
+                          beamAttr.getPolarization(), beamAttr.getWavevector());
 
         // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
         // in the database) Potentially Rabi and Detuning become SSA values and not attributes.
@@ -156,7 +157,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
 
             // TODO: Pull the math formula from database and apply it in MLIR
             // Rabi and phase becomes SSA values and not attributes.
-
             auto loc = op.getLoc();
             auto qubits = op.getInQubits();
 
@@ -167,6 +167,65 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
                     auto time = op.getParams().front();
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
+
+                    // TODO: look at the formula in Ion dialect document (each beamAttr is
+                    // different) see below. Pulse1(
+                    //     transition=Transition(level1=0,level2=e),
+                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     detuning=float from calibration db,
+                    //     phase=0,
+                    //     polarization=Int array from from calibration db,
+                    //     wavevector=Int array from from calibration db,
+                    //     target=qubit0
+                    //     time=rabi/ms_angle (double check the formula)
+                    // )
+                    // Pulse2(
+                    //     transition=Transition(level1=1,level2=e),
+                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu
+                    //     (from database), phase=0, polarization=Int array from from calibration
+                    //     db, wavevector=-Int array from from calibration db, target=qubit0
+                    //     time=rabi/ms_angle (double check the formula)
+                    // )
+                    // Pulse3(
+                    //     transition=Transition(level1=1,level2=e),
+                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) - omega_0 - mu(from database)
+                    //     phase=0,
+                    //     polarization=Int array from from calibration db,
+                    //     wavevector=-Int array from from calibration db,
+                    //     target=qubit0
+                    //     time=rabi/ms_angle (double check the formula)
+                    // )
+                    // Pulse4(
+                    //     transition=Transition(level1=0,level2=e),
+                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     detuning=float from calibration db,
+                    //     phase=0,
+                    //     polarization=Int array from from calibration db,
+                    //     wavevector=Int array from from calibration db,
+                    //     target=qubit1
+                    //     time=rabi/ms_angle (double check the formula)
+                    // )
+                    // Pulse5(
+                    //     transition=Transition(level1=1,level2=e),
+                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu
+                    //     (from database), phase=0, polarization=Int array from from calibration
+                    //     db, wavevector=-Int array from from calibration db, target=qubit1
+                    //     time=rabi/ms_angle (double check the formula)
+                    // )
+                    // Pulse6(
+                    //     transition=Transition(level1=1,level2=e),
+                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) - omega_0 (COMx phonon frequency) - mu(from
+                    //     database) phase=0, polarization=Int array from from calibration db,
+                    //     wavevector=-Int array from from calibration db,
+                    //     target=qubit1
+                    //     time=rabi/ms_angle (double check the formula)
+                    // )
+                    // )
+
                     builder.create<ion::PulseOp>(loc, time, qubit0, beamAttr, phase0Attr);
                     builder.create<ion::PulseOp>(loc, time, qubit0, beamAttr, phase0Attr);
                     builder.create<ion::PulseOp>(loc, time, qubit0, beamAttr, phase0Attr);

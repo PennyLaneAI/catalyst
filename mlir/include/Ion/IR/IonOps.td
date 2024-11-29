@@ -114,7 +114,7 @@ def BeamAttr : Ion_Attr<"Beam", "beam"> {
   let summary = "A class to represent a laser beam.";
 
   let parameters = (ins
-    "TransitionAttr":$transition,
+    OptionalParameter<"mlir::IntegerAttr">:$transition_index,
     "mlir::FloatAttr":$rabi,
     "mlir::FloatAttr":$detuning,
     "mlir::DenseIntElementsAttr": $polarization,

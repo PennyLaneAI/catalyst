@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s | FileCheck %s
+// RUN: quantum-opt %s
 
 func.func @example_pulse(%arg0: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     ion.pulse(%arg0: f64) %1 {beam=#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
+        transition_index = 0,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
@@ -33,13 +33,13 @@ func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
     %2 = ion.parallelprotocol(%1): !quantum.bit {
         ^bb0(%arg1: !quantum.bit):
         ion.pulse(%arg0: f64) %arg1 {beam=#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
+        transition_index = 1,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
         wavevector=dense<[0, 1]>: tensor<2xi64>>, phase=0.0}
         ion.pulse(%arg0: f64) %arg1 {beam=#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
+        transition_index = 0,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
@@ -56,13 +56,13 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !q
     %3:2 = ion.parallelprotocol(%1, %2): !quantum.bit, !quantum.bit {
         ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
         ion.pulse(%arg0: f64) %arg1 {beam=#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
+        transition_index = 2,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
         wavevector=dense<[0, 1]>: tensor<2xi64>>, phase=0.0}
         ion.pulse(%arg0: f64) %arg2 {beam=#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
+        transition_index = 1,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
@@ -82,23 +82,19 @@ func.func @example_ion() -> !ion.ion {
     levels=[#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>], 
     transitions=[#ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,#ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>]}: !ion.ion
     ion.system(%0) {beams1=[#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
         wavevector=dense<[0, 1]>: tensor<2xi64>>,#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
         wavevector=dense<[0, 1]>: tensor<2xi64>> ],
         beams2=[#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
         wavevector=dense<[0, 1]>: tensor<2xi64>>,#ion.beam<
-        transition = #ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,
         rabi=10.10,
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
