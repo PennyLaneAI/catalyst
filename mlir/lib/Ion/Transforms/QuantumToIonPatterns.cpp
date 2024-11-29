@@ -66,17 +66,18 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
     });
     auto qubitIndex = walkBackQubitSSA(op, 0);
     if (qubitIndex.has_value()) {
+        // TODO: double check the assumption of 2*n_qubits beams attr.
         // Here we assume that they are 2*n_qubits beam for 1 qubit gate each pair is (transition
         // 0->e
         // and transition 1->e)
         auto qubitIndexValue = qubitIndex.value();
-        auto beam0toE = ion.getBeams()[qubitIndexValue];
+        auto beam0toE = ion.getBeams1()[qubitIndexValue];
         BeamAttr beam0toEAttr = cast<BeamAttr>(beam0toE);
-        auto beam1toE = ion.getBeams()[qubitIndexValue + 1];
+        auto beam1toE = ion.getBeams1()[qubitIndexValue + 1];
         BeamAttr beam1toEAttr = cast<BeamAttr>(beam1toE);
 
-        // TODO: Pull the math formula from database and apply it in MLIR
-        // Rabi and phase becomes values and not attributes.
+        // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
+        // in the database) Potentially Rabi and Detuning become SSA values and not attributes.
 
         auto loc = op.getLoc();
         auto qubits = op.getInQubits();
@@ -101,41 +102,91 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
     }
 };
 
-// void MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
-// {
-//     auto qnode = op->getParentOfType<func::FuncOp>();
-//     ion::IonOp ion;
-//     qnode.walk([&](ion::IonOp op) {
-//         ion = op;
-//         return WalkResult::interrupt();
-//     });
-//     auto qubitIndex = walkBackQubitSSA(op, 0);
-//     auto beam = ion.getBeams2Qubit()[qubitIndex];
-//     BeamAttr beamAttr = cast<BeamAttr>(beam);
+mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    auto qnode = op->getParentOfType<func::FuncOp>();
+    ion::IonOp ion;
+    qnode.walk([&](ion::IonOp op) {
+        ion = op;
+        return WalkResult::interrupt();
+    });
+    auto qubitIndex0 = walkBackQubitSSA(op, 0);
+    auto qubitIndex1 = walkBackQubitSSA(op, 1);
+    if (qubitIndex0.has_value() && qubitIndex1.has_value()) {
+        // TODO: double check the nex assumption, there is (n**2, 2) = n**2(n**2-1)/2 two qubits
+        // interaction lasers and same number of phonons. interaction.
 
-//     // TODO: Pull the math formula from database and apply it in MLIR
-//     // Rabi and phase becomes SSA values and not attributes.
+        quantum::AllocOp allocOp;
+        qnode.walk([&](quantum::AllocOp op) {
+            allocOp = op;
+            return WalkResult::interrupt();
+        });
+        auto qubitIndex0Value = qubitIndex0.value();
+        auto qubitIndex1Value = qubitIndex1.value();
+        auto nQubits = allocOp.getNqubitsAttr();
+        if (nQubits.has_value()) {
+            // Triangular indices: (a, b) -> n(n-1)/2
+            // e.g.
+            // (0, 1) -> 0
+            // (0, 2) -> 1
+            // (0, 3) -> 2
+            // (0, 4) -> 3
+            // (1, 2) -> 4
+            // (1, 3) -> 5
+            // (1, 4) -> 6
+            // (2, 3) -> 7
+            // (2, 4) -> 8
+            // (3, 4) -> 9
+            // Symmetric
+            if (qubitIndex0Value > qubitIndex1Value) {
+                std::swap(qubitIndex0Value, qubitIndex1Value);
+            };
+            auto indexInteraction = (qubitIndex0Value * (nQubits.value() - 1) -
+                                     qubitIndex0Value * (qubitIndex0Value + 1)) /
+                                        2 +
+                                    (qubitIndex1Value - qubitIndex0Value - 1);
 
-//     auto loc = op.getLoc();
-//     auto qubits = op.getInQubits();
+            auto beam = ion.getBeams2()[indexInteraction];
+            auto phonon = ion.getPhonons()[indexInteraction];
 
-//     auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
-//         loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
-//             mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
-//             // TODO: Add the relationship between angle and time
-//             auto time = op.getParams().front();
-//             auto qubit0 = qubits.front();
-//             auto qubit1 = qubits.back();
-//             builder.create<ion::PulseOp>(loc, time, qubit0, beam0Attr, phase0Attr);
-//             builder.create<ion::PulseOp>(loc, time, qubit0, beam1Attr, phase0Attr);
-//             builder.create<ion::PulseOp>(loc, time, qubit0, beam2Attr, phase0Attr);
-//             builder.create<ion::PulseOp>(loc, time, qubit1, beam3Attr, phase0Attr);
-//             builder.create<ion::PulseOp>(loc, time, qubit1, beam4Attr, phase0Attr);
-//             builder.create<ion::PulseOp>(loc, time, qubit1, beam5Attr, phase0Attr);
-//             builder.create<ion::YieldOp>(loc);
-//         });
-//     rewriter.replaceOp(op, ppOp);
-// };
+            BeamAttr beamAttr = cast<BeamAttr>(beam);
+            PhononAttr phononAttr = cast<PhononAttr>(phonon);
+            // TODO: Manipulate the beam to create the 6 correct beams.
+
+            // TODO: Pull the math formula from database and apply it in MLIR
+            // Rabi and phase becomes SSA values and not attributes.
+
+            auto loc = op.getLoc();
+            auto qubits = op.getInQubits();
+
+            auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
+                loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+                    mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
+                    // TODO: Add the relationship between angle and time
+                    auto time = op.getParams().front();
+                    auto qubit0 = qubits.front();
+                    auto qubit1 = qubits.back();
+                    builder.create<ion::PulseOp>(loc, time, qubit0, beamAttr, phase0Attr);
+                    builder.create<ion::PulseOp>(loc, time, qubit0, beamAttr, phase0Attr);
+                    builder.create<ion::PulseOp>(loc, time, qubit0, beamAttr, phase0Attr);
+                    builder.create<ion::PulseOp>(loc, time, qubit1, beamAttr, phase0Attr);
+                    builder.create<ion::PulseOp>(loc, time, qubit1, beamAttr, phase0Attr);
+                    builder.create<ion::PulseOp>(loc, time, qubit1, beamAttr, phase0Attr);
+                    builder.create<ion::YieldOp>(loc);
+                });
+            rewriter.replaceOp(op, ppOp);
+        }
+        else {
+            op.emitError()
+                << "Impossible to determine the number of qubits because the value is dynamic";
+            return failure();
+        }
+    }
+    else {
+        op.emitError() << "Impossible to determine the original qubit because the value is dynamic";
+        return failure();
+    }
+};
 
 struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
@@ -155,8 +206,8 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         }
         // MS case -> PP(P1, P2, P3, P4, P5, P6)
         else if (op.getGateName() == "MS") {
-            // MSGateToPulse(op, rewriter);
-            return success();
+            auto result = MSGateToPulse(op, rewriter);
+            return result;
         }
         return failure();
     }

@@ -141,6 +141,11 @@ def BeamArrayAttr : TypedArrayAttrBase<BeamAttr,
   let constBuilderCall = ?;
 }
 
+def PhononArrayAttr : TypedArrayAttrBase<PhononAttr,
+                         PhononAttr.summary # " array"> {
+  let constBuilderCall = ?;
+}
+
 //===----------------------------------------------------------------------===//
 // Ion dialect operations.
 //===----------------------------------------------------------------------===//
@@ -155,7 +160,9 @@ def IonOp : Ion_Op<"ion"> {
     AnyIntElementsAttr: $position,
     LevelArrayAttr: $levels,
     TransitionArrayAttr: $transitions,
-    BeamArrayAttr: $beams
+    BeamArrayAttr: $beams1,
+    BeamArrayAttr: $beams2,
+    PhononArrayAttr: $phonons
   );
 
   let results = (outs
