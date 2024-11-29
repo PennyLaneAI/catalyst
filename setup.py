@@ -268,11 +268,23 @@ class CustomBuildExtMacos(UnifiedBuildExt):
             check=False,
         )
 
+
+# Compile the library of custom calls in the frontend
+if system_platform == "Linux":
+    cmdclass = {"build_ext": CustomBuildExtLinux}
+
+elif system_platform == "Darwin":
+    variables = sysconfig.get_config_vars()
+    # Here we need to switch the deault to MacOs dynamic lib
+    variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
+    if sysconfig.get_config_var("LDCXXSHARED"):
+        variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
+    cmdclass = {"build_ext": CustomBuildExtMacos}
+
 project_root_dir = os.path.abspath(os.path.dirname(__file__))
 frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
-    #custom_calls_extension,
     CMakeExtension("catalyst.utils.libcustom_calls", sourcedir=frontend_dir),
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
 ]
@@ -300,6 +312,6 @@ setup(
     package_dir={"": "frontend"},
     include_package_data=True,
     ext_modules=ext_modules,
-    #cmdclass=cmdclass,
+    # cmdclass=cmdclass,
     **description,
 )
