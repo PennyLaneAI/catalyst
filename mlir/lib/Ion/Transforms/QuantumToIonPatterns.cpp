@@ -144,6 +144,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
             if (qubitIndex0Value > qubitIndex1Value) {
                 std::swap(qubitIndex0Value, qubitIndex1Value);
             };
+            // TODO: double check this formula
             auto indexInteraction = (qubitIndex0Value * (nQubits.value() - 1) -
                                      qubitIndex0Value * (qubitIndex0Value + 1)) /
                                         2 +
