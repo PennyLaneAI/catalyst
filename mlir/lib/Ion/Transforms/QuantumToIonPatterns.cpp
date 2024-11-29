@@ -59,9 +59,9 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                                         double phase2)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
-    ion::IonOp ion;
-    qnode.walk([&](ion::IonOp op) {
-        ion = op;
+    ion::SystemOp ionSystem;
+    qnode.walk([&](ion::SystemOp op) {
+        ionSystem = op;
         return WalkResult::interrupt();
     });
     auto qubitIndex = walkBackQubitSSA(op, 0);
@@ -71,9 +71,9 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         // 0->e
         // and transition 1->e)
         auto qubitIndexValue = qubitIndex.value();
-        auto beam0toE = ion.getBeams1()[qubitIndexValue];
+        auto beam0toE = ionSystem.getBeams1()[qubitIndexValue];
         BeamAttr beam0toEAttr = cast<BeamAttr>(beam0toE);
-        auto beam1toE = ion.getBeams1()[qubitIndexValue + 1];
+        auto beam1toE = ionSystem.getBeams1()[qubitIndexValue + 1];
         BeamAttr beam1toEAttr = cast<BeamAttr>(beam1toE);
 
         // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
@@ -105,9 +105,9 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
-    ion::IonOp ion;
-    qnode.walk([&](ion::IonOp op) {
-        ion = op;
+    ion::SystemOp ionSystem;
+    qnode.walk([&](ion::SystemOp op) {
+        ionSystem = op;
         return WalkResult::interrupt();
     });
     auto qubitIndex0 = walkBackQubitSSA(op, 0);
@@ -146,12 +146,13 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
                                         2 +
                                     (qubitIndex1Value - qubitIndex0Value - 1);
 
-            auto beam = ion.getBeams2()[indexInteraction];
-            auto phonon = ion.getPhonons()[indexInteraction];
+            auto beam = ionSystem.getBeams2()[indexInteraction];
+            // TODO: assumption is that each ion has 3 phonons (x, y, z)
+            auto phonon = ionSystem.getPhonons()[indexInteraction];
 
             BeamAttr beamAttr = cast<BeamAttr>(beam);
             PhononAttr phononAttr = cast<PhononAttr>(phonon);
-            // TODO: Manipulate the beam to create the 6 correct beams.
+            // TODO: Manipulate the beam attr to create the 6 correct beams.
 
             // TODO: Pull the math formula from database and apply it in MLIR
             // Rabi and phase becomes SSA values and not attributes.

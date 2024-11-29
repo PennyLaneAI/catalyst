@@ -159,10 +159,7 @@ def IonOp : Ion_Op<"ion"> {
     Builtin_FloatAttr:$charge,
     AnyIntElementsAttr: $position,
     LevelArrayAttr: $levels,
-    TransitionArrayAttr: $transitions,
-    BeamArrayAttr: $beams1,
-    BeamArrayAttr: $beams2,
-    PhononArrayAttr: $phonons
+    TransitionArrayAttr: $transitions
   );
 
   let results = (outs
@@ -174,14 +171,20 @@ def IonOp : Ion_Op<"ion"> {
   }];
 }
 
-// def SystemOp : Ion_Op<"system"> {
-//   let summary = "A class to represent a system (ions + phonons).";
+def SystemOp : Ion_Op<"system"> {
+  let summary = "A class to represent a system (ions + phonons).";
 
-//   let arguments = (ins
-//     Variadic<IonType>: $ions,
-//     PhononArrayAttr: $phonons
-//   );
-// }
+  let arguments = (ins
+    Variadic<IonType>: $ions,
+    BeamArrayAttr: $beams1,
+    BeamArrayAttr: $beams2,
+    PhononArrayAttr: $phonons
+  );
+
+    let assemblyFormat = [{
+        `(` $ions `)` attr-dict
+    }];
+}
 
 def PulseOp : Ion_Op<"pulse"> {
     let summary = "Represent a pulse (a laser beam and some time).";
