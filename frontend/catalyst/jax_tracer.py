@@ -1144,7 +1144,7 @@ def trace_quantum_function(
 
     transform_named_sequence_p.bind()
     # Add the decomposition passes with the transform dialect
-    _add_mlir_quantum_decomposition(f, device)
+    _add_mlir_quantum_decomposition(device)
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing

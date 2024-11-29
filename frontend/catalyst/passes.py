@@ -419,19 +419,7 @@ def _API_name_to_pass_name():
     return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotations"}
 
 
-def _inject_transform_named_sequence():
-    """
-    Inject a transform_named_sequence jax primitive.
-
-    This must be called when preprocessing the traced function in QJIT.capture(),
-    since to invoke -apply-transform-sequence, a transform_named_sequence primitive
-    must be in the jaxpr.
-    """
-
-    transform_named_sequence_p.bind()
-
-
-def _add_mlir_quantum_decomposition(f, device):
+def _add_mlir_quantum_decomposition(device):
     """When called it adds the MLIR decomposition pass thanks to the transform dialect."""
     # TODO: make this non related to the name of the device
     if device.original_device.name == "oqd.cloud":
