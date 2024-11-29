@@ -16,11 +16,11 @@
 
 #include <algorithm> // generate_n
 #include <complex>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <random>
 #include <vector>
-#include <iostream>
 
 #include "DataView.hpp"
 #include "InstructionStrBuilder.hpp"
@@ -42,8 +42,10 @@ namespace Catalyst::Runtime::Devices {
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.
  */
 struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
-    NullQubit(const std::string &kwargs = "{}") { 
-        std::unordered_map<std::string, std::string> device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+    NullQubit(const std::string &kwargs = "{}")
+    {
+        std::unordered_map<std::string, std::string> device_kwargs =
+            Catalyst::Runtime::parse_kwargs(kwargs);
         print_instructions = device_kwargs["print_instructions"] == "True" ? 1 : 0;
     }
     ~NullQubit() = default; // LCOV_EXCL_LINE
@@ -61,7 +63,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto AllocateQubit() -> QubitIdType
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("AllocateQubit", "") << std::endl;
+            std::cout << instruction_str_builder.get_simple_op_str("AllocateQubit", "")
+                      << std::endl;
         }
 
         num_qubits_++; // next_id
@@ -76,12 +79,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @return `std::vector<QubitIdType>`
      */
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
-    {   
+    {
         bool prev_print_instructions = print_instructions;
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("AllocateQubits", num_qubits) << std::endl;
+            std::cout << instruction_str_builder.get_simple_op_str("AllocateQubits", num_qubits)
+                      << std::endl;
         }
-        print_instructions = false; // set to false so we do not print instructions for each call to AllocateQubit() below.
+        print_instructions = false; // set to false so we do not print instructions for each call to
+                                    // AllocateQubit() below.
 
         if (!num_qubits) {
             return {};
@@ -114,7 +119,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void ReleaseAllQubits()
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("ReleaseAllQubits", "") << std::endl;
+            std::cout << instruction_str_builder.get_simple_op_str("ReleaseAllQubits", "")
+                      << std::endl;
         }
 
         num_qubits_ = 0;
@@ -215,7 +221,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<bool> &controlled_values = {})
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_named_op_str(name, params, wires, inverse, controlled_wires, controlled_values) << std::endl;
+            std::cout << instruction_str_builder.get_named_op_str(
+                             name, params, wires, inverse, controlled_wires, controlled_values)
+                      << std::endl;
         }
     }
 
@@ -229,7 +237,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                          const std::vector<bool> &controlled_values = {})
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_matrix_op_str(matrix, wires, inverse, controlled_wires, controlled_values) << std::endl;
+            std::cout << instruction_str_builder.get_matrix_op_str(
+                             matrix, wires, inverse, controlled_wires, controlled_values)
+                      << std::endl;
         }
     }
 
@@ -242,7 +252,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto Observable(ObsId obs_id, const std::vector<std::complex<double>> &matrix,
                     const std::vector<QubitIdType> &wires) -> ObsIdType
     {
-        return instruction_str_builder.create_obs_str(obs_id, matrix, wires); 
+        return instruction_str_builder.create_obs_str(obs_id, matrix, wires);
     }
 
     /**
@@ -250,7 +260,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    auto TensorObservable(const std::vector<ObsIdType> &obs_keys) -> ObsIdType {
+    auto TensorObservable(const std::vector<ObsIdType> &obs_keys) -> ObsIdType
+    {
         return instruction_str_builder.create_tensor_obs_str(obs_keys);
     }
 
@@ -259,8 +270,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    auto HamiltonianObservable(const std::vector<double> &matrix, const std::vector<ObsIdType> &obs_keys)
-        -> ObsIdType
+    auto HamiltonianObservable(const std::vector<double> &matrix,
+                               const std::vector<ObsIdType> &obs_keys) -> ObsIdType
     {
         return instruction_str_builder.create_hamiltonian_obs_str(matrix, obs_keys);
     }
@@ -270,11 +281,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `double` The expected value
      */
-    auto Expval(ObsIdType o) -> double {
+    auto Expval(ObsIdType o) -> double
+    {
         if (print_instructions) {
             std::cout << instruction_str_builder.get_simple_op_str("Expval", o) << std::endl;
         }
-        return 0.0; 
+        return 0.0;
     }
 
     /**
@@ -282,17 +294,19 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return `double` The variance
      */
-    auto Var(ObsIdType o) -> double { 
+    auto Var(ObsIdType o) -> double
+    {
         if (print_instructions) {
             std::cout << instruction_str_builder.get_simple_op_str("Var", o) << std::endl;
         }
-        return 0.0; 
+        return 0.0;
     }
 
     /**
      * @brief Doesn't Get the state-vector of a device.
      */
-    void State(DataView<std::complex<double>, 1> &state) {
+    void State(DataView<std::complex<double>, 1> &state)
+    {
         if (print_instructions) {
             std::cout << instruction_str_builder.get_simple_op_str("State", state) << std::endl;
         }
@@ -301,7 +315,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Doesn't Compute the probabilities of each computational basis state.
      */
-    void Probs(DataView<double, 1> &probs) {
+    void Probs(DataView<double, 1> &probs)
+    {
         if (print_instructions) {
             std::cout << instruction_str_builder.get_simple_op_str("Probs", probs) << std::endl;
         }
@@ -310,9 +325,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Doesn't Compute the probabilities for a subset of the full system.
      */
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) {
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
+    {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("PartialProbs", probs) << std::endl;
+            std::cout << instruction_str_builder.get_simple_op_str("PartialProbs", probs)
+                      << std::endl;
         }
     }
 
@@ -320,9 +337,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Doesn't Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      */
-    void Sample(DataView<double, 2> &samples, size_t shots) {
+    void Sample(DataView<double, 2> &samples, size_t shots)
+    {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_samples_str("Sample", samples, shots) << std::endl;
+            std::cout << instruction_str_builder.get_samples_str("Sample", samples, shots)
+                      << std::endl;
         }
     }
 
@@ -334,20 +353,25 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      */
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires, size_t shots) {
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
+                       size_t shots)
+    {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_samples_str("PartialSample", samples, shots, wires) << std::endl;
+            std::cout << instruction_str_builder.get_samples_str("PartialSample", samples, shots,
+                                                                 wires)
+                      << std::endl;
         }
-
     }
 
     /**
      * @brief Doesn't Sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
      */
-    void Counts(DataView<double, 1> &eigen_vals, DataView<int64_t, 1> &counts, size_t shots) {
+    void Counts(DataView<double, 1> &eigen_vals, DataView<int64_t, 1> &counts, size_t shots)
+    {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_counts_str("Counts", eigen_vals, counts, shots) << std::endl;
+            std::cout << instruction_str_builder.get_counts_str("Counts", eigen_vals, counts, shots)
+                      << std::endl;
         }
     }
 
@@ -359,7 +383,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                        const std::vector<QubitIdType> &wires, size_t shots)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_counts_str("PartialCounts", eigen_vals, counts, shots, wires) << std::endl;
+            std::cout << instruction_str_builder.get_counts_str("PartialCounts", eigen_vals, counts,
+                                                                shots, wires)
+                      << std::endl;
         }
     }
 

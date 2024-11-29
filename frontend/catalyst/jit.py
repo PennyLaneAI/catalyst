@@ -471,7 +471,7 @@ class QJIT(CatalystCallable):
     def __init__(self, fn, compile_options, print_instructions=False):
         # flag for printing instructions in the null device
         self.print_instructions = print_instructions
-        
+
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
