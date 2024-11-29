@@ -105,11 +105,8 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         # Update the qnode with peephole pipeline
-        if "pass_pipeline" in kwargs.keys():
-            pass_pipeline = kwargs["pass_pipeline"]
-            if not hasattr(self, "_peephole_transformed"):
-                self = pipeline(pass_pipeline=pass_pipeline)(self)
-            kwargs.pop("pass_pipeline")
+        pipeline = kwargs.get("pass_pipeline", [])
+        kwargs.pop("pass_pipeline", None)
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
@@ -150,7 +147,7 @@ class QFunc:
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
-        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, qnode=self)
+        res_flat = quantum_kernel_p.bind(flattened_fun, *args_flat, qnode=self, pipeline=pipeline)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
