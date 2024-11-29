@@ -526,9 +526,6 @@ def make_jaxpr2(
             f, out_tree_promise = flatten_fun(f, in_tree)
             f = annotate(f, in_type)
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
-            for i, jaxpr_outvar_type in enumerate(out_type):
-                if not jaxpr_outvar_type[1]:
-                    del jaxpr.outvars[i]
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()
 

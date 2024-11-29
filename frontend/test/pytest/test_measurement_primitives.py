@@ -87,13 +87,8 @@ def test_sample_dynamic_shape():
     def f(shots: int):
         obs = compbasis_p.bind()
         x = shots + 1
-        # Note that in `primitive.bind(args, kwargs)`, args are treated as jaxpr primitive's
-        # proper arguments, and kwargs are treated as primitive's `params`
-        # Proper primitive arguments are propagated as jaxpr variables,
-        # whereas primitive params are tracers.
-        _ = sample_p.bind(obs, x, num_qubits=0)
-        innocent_vector = jax.numpy.zeros((x, 0))
-        return _ + innocent_vector
+        sample = sample_p.bind(obs, x, num_qubits=0)
+        return sample + jax.numpy.zeros((x, 0))
 
     print(f.jaxpr)
     print(f.mlir)
@@ -127,9 +122,9 @@ def test_sample_dynamic_shape():
           j:AbstractQreg() = qalloc 1
           qdealloc j
         in (f, i) }
-      qnode=<QNode: device='<null.qubit device (wires=1) at 0x73ac93dcbfa0>', interface='auto', diff_method='best'>
+      qnode=<QNode: device='<null.qubit device (wires=1) at 0x74a42d0abeb0>', interface='auto', diff_method='best'>
     ] a
-  in (c,) }
+  in (b, c) }
 """
     )
 
@@ -137,9 +132,9 @@ def test_sample_dynamic_shape():
         mlir
         == """
 module @f {
-  func.func public @jit_f(%arg0: tensor<i64>) -> tensor<?x0xf64> attributes {llvm.emit_c_interface} {
+  func.func public @jit_f(%arg0: tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>) attributes {llvm.emit_c_interface} {
     %0:2 = catalyst.launch_kernel @module_f::@f(%arg0) : (tensor<i64>) -> (tensor<i64>, tensor<?x0xf64>)
-    return %0#1 : tensor<?x0xf64>
+    return %0#0, %0#1 : tensor<i64>, tensor<?x0xf64>
   }
   module attributes {transform.with_named_sequence} {
     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
