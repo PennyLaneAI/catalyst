@@ -171,9 +171,10 @@ def PulseOp : Ion_Op<"pulse"> {
     let summary = "Represent a pulse (a laser beam and some time).";
 
     let arguments = (ins
-        BeamAttr: $beam,
         AnyFloat: $time,
-        QubitType: $in_qubit
+        QubitType: $in_qubit,
+        BeamAttr: $beam,
+        Builtin_FloatAttr: $phase
     );
 
     let assemblyFormat = [{

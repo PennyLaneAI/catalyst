@@ -37,6 +37,8 @@ func.func @example_ion(%arg0: f64) -> !quantum.bit {
     %1 = quantum.alloc( 1) : !quantum.reg
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
-    return %3: !quantum.bit
+    %4 = quantum.custom "RY"(%arg0) %3 : !quantum.bit
+    %5 = quantum.custom "RX"(%arg0) %4 : !quantum.bit
+    return %5: !quantum.bit
 }
 
