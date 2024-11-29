@@ -93,7 +93,7 @@ namespace Catalyst::Runtime {
             oss << "]";
             return oss.str();
         }
-        
+
         public:
             InstructionStrBuilder() = default;
             ~InstructionStrBuilder() = default;
@@ -246,9 +246,16 @@ namespace Catalyst::Runtime {
 
                 for (auto i = 0; i < coeffs.size(); i++) {
                     if (i > 0) {
-                        oss << " + ";
+                        if (coeffs[i] > 0) {
+                            oss << " + ";
+                        }else if(coeffs[i] < 0) {
+                            oss << " ";
+                        }
+                        
                     }
-                    oss << coeffs[i] << "*" << obs_id_type_to_str[obs_keys[i]];
+
+                    if (coeffs[i] != 0)
+                        oss << coeffs[i] << "*" << obs_id_type_to_str[obs_keys[i]];
                 }
 
                 ObsIdType new_id = obs_id_type_to_str.size();
