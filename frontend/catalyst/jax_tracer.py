@@ -93,7 +93,6 @@ from catalyst.jax_primitives import (
     set_state_p,
     state_p,
     tensorobs_p,
-    transform_named_sequence_p,
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
@@ -1142,7 +1141,6 @@ def trace_quantum_function(
         out_tree: PyTree shapen of the result
     """
 
-    transform_named_sequence_p.bind()
     # Add the decomposition passes with the transform dialect
     _add_mlir_quantum_decomposition(device)
 

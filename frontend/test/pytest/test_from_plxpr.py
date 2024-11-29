@@ -500,10 +500,10 @@ class TestHybridPrograms:
 
         # qubit extraction and classical equations in a slightly different order
         # thus cant check specific equations and have to discard comparing counts
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=(5, 6, 7))
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, skip_eqns=(4, 5, 6))
+        compare_eqns(call_jaxpr_pl.eqns[4], call_jaxpr_c.eqns[5])
         compare_eqns(call_jaxpr_pl.eqns[5], call_jaxpr_c.eqns[6])
-        compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[7])
-        compare_eqns(call_jaxpr_pl.eqns[7], call_jaxpr_c.eqns[5])
+        compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4])
 
     def test_multiple_qnodes(self):
         """Test that a workflow with multiple qnodes can be converted."""

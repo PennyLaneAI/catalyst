@@ -85,7 +85,6 @@ def test_decomposition_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=ions-decomposition
     # CHECK: ]

@@ -69,7 +69,6 @@ def test_pipeline_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
@@ -120,9 +119,7 @@ def test_pipeline_lowering_keep_original():
         return f(x), f_pipeline(x)
 
     # CHECK: call_jaxpr=
-    # CHECK: transform_named_sequence
     # CHECK: call_jaxpr=
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
@@ -185,7 +182,6 @@ def test_pipeline_lowering_global():
 
         return g(1.2), h(1.2)
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
@@ -260,7 +256,6 @@ def test_pipeline_lowering_globloc_override():
 
         return g(1.2), h(1.2)
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
@@ -341,7 +336,6 @@ def test_cancel_inverses_tracing_and_lowering():
         _h = h(xx)
         return _f, _g, _h
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
@@ -384,7 +378,6 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
         _f = f(xx)
         return _f
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=remove-chained-self-inverse
     # CHECK: ]
@@ -568,7 +561,6 @@ def test_merge_rotations_tracing_and_lowering():
         _h = h(xx)
         return _f, _g, _h
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
     # CHECK:   pass_name=merge-rotations
     # CHECK: ]
