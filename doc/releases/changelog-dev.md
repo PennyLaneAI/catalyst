@@ -39,14 +39,6 @@
 * Improves the readability of conditional passes in pipelines
   [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
 
-* Measurement primitives now support dynamic shape at the frontend,
-  although at the PennyLane side, the corresponding operations still lack such support.
-
-  To support this, the measurement operations now take in shots as a proper argument
-  instead of an integer attribute with a literal integer value.
-  [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
-  [(#1310)](https://github.com/PennyLaneAI/catalyst/pull/1310)
-
 <h3>Breaking changes 💔</h3>
 
 * The `toml` module has been migrated to PennyLane with an updated schema for declaring device
@@ -93,6 +85,14 @@
 * Sink patching of autograph's allowlist.
   [(#1332)](https://github.com/PennyLaneAI/catalyst/pull/1332)
   [(#1337)](https://github.com/PennyLaneAI/catalyst/pull/1337)
+
+* The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst,
+  although at the PennyLane side, the device shots still is constrained to a static integer literal.
+
+  To support this, the measurement operations now take in shots as a proper argument
+  instead of an integer attribute with a literal integer value.
+  [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
+  [(#1310)](https://github.com/PennyLaneAI/catalyst/pull/1310)
 
 <h3>Documentation 📝</h3>
 
