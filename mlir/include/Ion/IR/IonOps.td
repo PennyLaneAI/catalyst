@@ -114,7 +114,7 @@ def BeamAttr : Ion_Attr<"Beam", "beam"> {
   let summary = "A class to represent a laser beam.";
 
   let parameters = (ins
-    "TransitionAttr":$transition,
+    OptionalParameter<"mlir::IntegerAttr">:$transition_index,
     "mlir::FloatAttr":$rabi,
     "mlir::FloatAttr":$detuning,
     "mlir::DenseIntElementsAttr": $polarization,
@@ -133,6 +133,16 @@ def LevelArrayAttr : TypedArrayAttrBase<LevelAttr,
 
 def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr,
                          TransitionAttr.summary # " array"> {
+  let constBuilderCall = ?;
+}
+
+def BeamArrayAttr : TypedArrayAttrBase<BeamAttr,
+                         BeamAttr.summary # " array"> {
+  let constBuilderCall = ?;
+}
+
+def PhononArrayAttr : TypedArrayAttrBase<PhononAttr,
+                         PhononAttr.summary # " array"> {
   let constBuilderCall = ?;
 }
 
@@ -161,13 +171,29 @@ def IonOp : Ion_Op<"ion"> {
   }];
 }
 
+def SystemOp : Ion_Op<"system"> {
+  let summary = "A class to represent a system (ions + phonons).";
+
+  let arguments = (ins
+    Variadic<IonType>: $ions,
+    BeamArrayAttr: $beams1,
+    BeamArrayAttr: $beams2,
+    PhononArrayAttr: $phonons
+  );
+
+    let assemblyFormat = [{
+        `(` $ions `)` attr-dict
+    }];
+}
+
 def PulseOp : Ion_Op<"pulse"> {
     let summary = "Represent a pulse (a laser beam and some time).";
 
     let arguments = (ins
-        BeamAttr: $beam,
         AnyFloat: $time,
-        QubitType: $in_qubit
+        QubitType: $in_qubit,
+        BeamAttr: $beam,
+        Builtin_FloatAttr: $phase
     );
 
     let assemblyFormat = [{
@@ -189,13 +215,13 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
     let builders = [
       OpBuilder<(ins
         CArg<"mlir::ValueRange", "std::nullopt">:$in_qubits,
-        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>",
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>",
             "nullptr">)>
     ];
 
     let extraClassDeclaration = [{
       using BodyBuilderFn =
-          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>;
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>;
 
     }];
 
