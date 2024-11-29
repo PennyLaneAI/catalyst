@@ -1662,7 +1662,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 # sample measurement
 #
 def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
-    '''
+    """
     The result shape of `sample_p` is (shots, num_qubits).
 
     In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
@@ -1677,7 +1677,7 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     the tracer to the output shape. This will now correctly produce
 
     e:f64[c,1] = sample[num_qubits=1] d c
-    '''
+    """
     if obs.primitive is compbasis_p:
         # assert shape[1] == obs.num_qubits
         assert num_qubits == obs.num_qubits

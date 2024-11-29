@@ -19,11 +19,7 @@ import numpy as np
 import pennylane as qml
 
 from catalyst import CompileError, qjit
-from catalyst.jax_primitives import (
-    compbasis_p,
-    counts_p,
-    sample_p
-)
+from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
@@ -101,6 +97,7 @@ def test_sample_static():
     obs = compbasis_p.bind()
     return sample_p.bind(obs, shots=5, num_qubits=0)
 
+
 # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
 # CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<5x0xf64>
 # CHECK: return [[sample]] : tensor<5x0xf64>
@@ -120,6 +117,7 @@ def test_sample_dynamic(shots: int):
     sample = sample_p.bind(obs, x, num_qubits=0)
     return sample + jax.numpy.zeros((x, 0))
 
+
 # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
 # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
 # CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
@@ -128,7 +126,6 @@ def test_sample_dynamic(shots: int):
 # CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
 # CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
 print(test_sample_dynamic.mlir)
-
 
 
 # TODO: NOTE:
@@ -194,6 +191,34 @@ def counts3(x: float, y: float):
 
 
 print(counts3.mlir)
+
+
+# CHECK-LABEL: public @jit_test_counts_static(
+@qjit
+def test_counts_static():
+    """Test that the counts primitive can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return counts_p.bind(obs, shots=5, shape=(1,))
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+print(test_counts_static.mlir)
+
+
+# CHECK-LABEL: public @jit_test_counts_dynamic(
+@qjit
+def test_counts_dynamic(shots: int):
+    """Test that the counts primitive with dynamic shape can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return counts_p.bind(obs, shots, shape=(1,))
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+print(test_counts_dynamic.mlir)
 
 
 # CHECK-LABEL: public @expval1(
