@@ -328,7 +328,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("PartialProbs", probs)
+            std::cout << instruction_str_builder.get_simple_op_str("PartialProbs", probs, wires)
                       << std::endl;
         }
     }

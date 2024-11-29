@@ -130,10 +130,14 @@ class InstructionStrBuilder {
      * PartialProbs()
      */
     template <typename T, size_t R>
-    string get_simple_op_str(const string &name, DataView<T, R> &dataview)
+    string get_simple_op_str(const string &name, DataView<T, R> &dataview, const std::vector<QubitIdType> &wires={})
     {
         ostringstream oss;
-        oss << name << "(" << get_dataview_str(dataview) << ")";
+        oss << name << "(" << get_dataview_str(dataview); 
+        if (wires.size() > 0) {
+            oss << ", wires=" << vector_to_string(wires);
+        }
+        oss << ")";
         return oss.str();
     }
 
@@ -168,7 +172,7 @@ class InstructionStrBuilder {
 
         // if inverse is false, we will not print its value
         if (inverse)
-            values_to_print.push_back("inverse=True");
+            values_to_print.push_back("inverse=true");
 
         if (controlled_wires.size() > 0)
             values_to_print.push_back("control=" + vector_to_string(controlled_wires));
@@ -191,7 +195,7 @@ class InstructionStrBuilder {
      * @brief This method is used to get the string representation of MatrixOperation()
      */
     string get_matrix_op_str(const std::vector<std::complex<double>> &matrix,
-                             const std::vector<QubitIdType> &wires, bool inverse,
+                             const std::vector<QubitIdType> &wires, bool inverse=false,
                              const std::vector<QubitIdType> &controlled_wires = {},
                              const std::vector<bool> &controlled_values = {},
                              const string &name = "MatrixOperation")
@@ -203,10 +207,11 @@ class InstructionStrBuilder {
 
         values_to_print.emplace_back(vector_to_string(matrix));
 
-        values_to_print.emplace_back("wires=" + vector_to_string(wires));
+        if (wires.size() > 0)
+            values_to_print.emplace_back("wires=" + vector_to_string(wires));
 
         if (inverse)
-            values_to_print.push_back("inverse=True");
+            values_to_print.push_back("inverse=true");
 
         if (controlled_wires.size() > 0)
             values_to_print.push_back("control=" + vector_to_string(controlled_wires));
@@ -285,8 +290,9 @@ class InstructionStrBuilder {
 
         ostringstream oss;
 
+        bool is_first = true;
         for (auto i = 0; i < coeffs.size(); i++) {
-            if (i > 0) {
+            if (!is_first) {
                 if (coeffs[i] > 0) {
                     oss << " + ";
                 }
@@ -295,8 +301,10 @@ class InstructionStrBuilder {
                 }
             }
 
-            if (coeffs[i] != 0)
+            if (coeffs[i] != 0) {
                 oss << coeffs[i] << "*" << obs_id_type_to_str[obs_keys[i]];
+                is_first = false;
+            }   
         }
 
         ObsIdType new_id = obs_id_type_to_str.size();
