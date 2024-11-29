@@ -14,10 +14,16 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+import jax
 import numpy as np
 import pennylane as qml
 
 from catalyst import CompileError, qjit
+from catalyst.jax_primitives import (
+    compbasis_p,
+    counts_p,
+    sample_p
+)
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
@@ -83,6 +89,47 @@ def sample3(x: float, y: float):
 
 
 print(sample3.mlir)
+
+
+# CHECK-LABEL: public @test_sample_static(
+@qjit
+@qml.qnode(
+    qml.device("null.qubit", wires=1)
+)  # SampleOp is only legal if there is a device in the same scope
+def test_sample_static():
+    """Test that the sample primitive can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return sample_p.bind(obs, shots=5, num_qubits=0)
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<5x0xf64>
+# CHECK: return [[sample]] : tensor<5x0xf64>
+print(test_sample_static.mlir)
+
+
+# TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
+# CHECK-LABEL: public @test_sample_dynamic(
+@qjit
+@qml.qnode(
+    qml.device("null.qubit", wires=1)
+)  # SampleOp is only legal if there is a device in the same scope
+def test_sample_dynamic(shots: int):
+    """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    x = shots + 1
+    sample = sample_p.bind(obs, x, num_qubits=0)
+    return sample + jax.numpy.zeros((x, 0))
+
+# CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<?x0xf64>
+# CHECK: [[zeroVec:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?x0xf64>
+# CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
+# CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
+print(test_sample_dynamic.mlir)
+
+
 
 # TODO: NOTE:
 # The tests below used to pass before the compiler driver (in the case of counts2) and device
