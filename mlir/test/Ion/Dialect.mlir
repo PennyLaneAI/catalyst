@@ -14,6 +14,8 @@
 
 // RUN: quantum-opt %s
 
+// TODO: Add Filecheck above
+
 func.func @example_pulse(%arg0: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
