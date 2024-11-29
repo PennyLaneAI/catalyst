@@ -54,6 +54,46 @@ namespace Catalyst::Runtime {
                 return oss.str();
             }
 
+            /**
+             * @brief Takes as input a vector and returns its string representation. If with_brackets=True, the square brackets will be included to enclose the vector. E.g. 
+             * - vector_to_string([0,1,2], false) returns "0, 1, 2"
+             * - vector_to_string([0,1,2], true) returns "[0, 1, 2]"
+             */
+            template <typename T> string vector_to_string(const vector<T>& v, const bool &with_brackets = true) {
+                ostringstream oss;
+                if (with_brackets) oss << "[";
+
+                for (size_t i = 0; i < v.size(); i++) {
+                    if (i > 0) {
+                        oss << ", ";
+                    }
+                    oss << element_to_str(v[i]);
+                }
+                if (with_brackets) oss << "]";
+
+                return oss.str();
+            }
+
+        /**
+         * @brief Builds the string representation of DataView
+         */
+        template <typename T, size_t R>
+        string get_dataview_str(DataView<T, R> &dataview) {
+            ostringstream oss;
+            bool is_first = true; // boolean to help determine where to put commas
+
+            oss << "[";
+            for (auto it = dataview.begin();  it != dataview.end(); it++) {
+                if (!is_first) {
+                    oss << ", "; // if is not the first element then we add a comma to separate the elements
+                }
+                oss << element_to_str(*it);
+                is_first = false;
+            }
+            oss << "]";
+            return oss.str();
+        }
+        
         public:
             InstructionStrBuilder() = default;
             ~InstructionStrBuilder() = default;
@@ -83,26 +123,6 @@ namespace Catalyst::Runtime {
             string get_simple_op_str(const string &name, DataView<T, R> &dataview) {
                 ostringstream oss;
                 oss << name << "(" << get_dataview_str(dataview) << ")";
-                return oss.str();
-            }
-
-            /**
-             * @brief Takes as input a vector and returns its string representation. If with_brackets=True, the square brackets will be included to enclose the vector. E.g. 
-             * - vector_to_string([0,1,2], false) returns "0, 1, 2"
-             * - vector_to_string([0,1,2], true) returns "[0, 1, 2]"
-             */
-            template <typename T> string vector_to_string(const vector<T>& v, const bool &with_brackets = true) {
-                ostringstream oss;
-                if (with_brackets) oss << "[";
-
-                for (size_t i = 0; i < v.size(); i++) {
-                    if (i > 0) {
-                        oss << ", ";
-                    }
-                    oss << element_to_str(v[i]);
-                }
-                if (with_brackets) oss << "]";
-
                 return oss.str();
             }
 
@@ -241,26 +261,6 @@ namespace Catalyst::Runtime {
              */
             string get_obs_str(const ObsIdType &o) {
                 return obs_id_type_to_str.at(o);
-            }
-
-            /**
-             * @brief Builds the string representation of DataView
-             */
-            template <typename T, size_t R>
-            string get_dataview_str(DataView<T, R> &dataview) {
-                ostringstream oss;
-                bool is_first = true; // boolean to help determine where to put commas
-
-                oss << "[";
-                for (auto it = dataview.begin();  it != dataview.end(); it++) {
-                    if (!is_first) {
-                        oss << ", "; // if is not the first element then we add a comma to separate the elements
-                    }
-                    oss << element_to_str(*it);
-                    is_first = false;
-                }
-                oss << "]";
-                return oss.str();
             }
 
             /**
