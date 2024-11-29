@@ -41,7 +41,7 @@ func.func @example_ion(%arg0: f64) -> !quantum.bit {
         detuning=11.11,
         polarization=dense<[0, 1]>: tensor<2xi64>,
         wavevector=dense<[0, 1]>: tensor<2xi64>> ],
-        phonons=[#ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>]}
+        phonons=[#ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>]}
     %1 = quantum.alloc( 1) : !quantum.reg
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
