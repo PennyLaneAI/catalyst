@@ -19,20 +19,20 @@ TEST_CASE("string building is correct for instructions that require a parameter 
     InstructionStrBuilder str_builder;
     auto id = str_builder.create_obs_str(ObsId::PauliX, {}, {0});
 
-    CHECK(str_builder.get_simple_op_str("Expval", id) == "Expval(PauliX(0))");
-    CHECK(str_builder.get_simple_op_str("Var", id) == "Var(PauliX(0))");
+    CHECK(str_builder.get_op_with_obs_str("Expval", id) == "Expval(PauliX(0))");
+    CHECK(str_builder.get_op_with_obs_str("Var", id) == "Var(PauliX(0))");
 }
 
 TEST_CASE("string building is correct for instructions that require a parameter of type DataView",
           "[InstructionStrBuilder]")
 {
     InstructionStrBuilder str_builder;
-    std::vector<std::complex<double>> state(2);
-    DataView<std::complex<double>, 1> view(state);
+    std::vector<double> state(2);
+    DataView<double, 1> view(state);
 
-    CHECK(str_builder.get_simple_op_str("Probs", view) == "Probs([0, 0])");
-    CHECK(str_builder.get_simple_op_str("PartialProbs", view, {0}) ==
-          "PartialProbs([0, 0], wires=[0])");
+    CHECK(str_builder.get_op_with_view_str("Probs", view) == "Probs([0.000000, 0.000000])");
+    CHECK(str_builder.get_op_with_view_str("PartialProbs", view, {0}) ==
+          "PartialProbs([0.000000, 0.000000], wires=[0])");
 }
 
 TEST_CASE("string building is correct for NamedOperation", "[InstructionStrBuilder]")

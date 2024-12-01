@@ -296,7 +296,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto Expval(ObsIdType o) -> double
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("Expval", o) << std::endl;
+            std::cout << instruction_str_builder.get_op_with_obs_str("Expval", o) << std::endl;
         }
         return 0.0;
     }
@@ -309,7 +309,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto Var(ObsIdType o) -> double
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("Var", o) << std::endl;
+            std::cout << instruction_str_builder.get_op_with_obs_str("Var", o) << std::endl;
         }
         return 0.0;
     }
@@ -330,7 +330,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void Probs(DataView<double, 1> &probs)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("Probs", probs) << std::endl;
+            std::cout << instruction_str_builder.get_op_with_view_str("Probs", probs) << std::endl;
         }
     }
 
@@ -340,7 +340,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("PartialProbs", probs, wires)
+            std::cout << instruction_str_builder.get_op_with_view_str("PartialProbs", probs, wires)
                       << std::endl;
         }
     }

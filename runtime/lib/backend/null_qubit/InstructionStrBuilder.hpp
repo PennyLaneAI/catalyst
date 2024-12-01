@@ -111,7 +111,7 @@ class InstructionStrBuilder {
 
     /**
      * @brief This method is used to build a string representation of AllocateQubit(),
-     * AllocateQubits(), ReleaseQubit(), ReleaseAllQubits(), Measure()
+     * AllocateQubits(), ReleaseQubit(), ReleaseAllQubits(), State(), Measure()
      */
     template <typename T> string get_simple_op_str(const string &name, const T &param)
     {
@@ -123,7 +123,7 @@ class InstructionStrBuilder {
     /**
      * @brief This method is used to build a string representation of Expval() and Var()
      */
-    string get_simple_op_str(const string &name, const ObsIdType &o)
+    string get_op_with_obs_str(const string &name, const ObsIdType &o)
     {
         ostringstream oss;
         oss << name << "(" << get_obs_str(o) << ")";
@@ -131,11 +131,10 @@ class InstructionStrBuilder {
     }
 
     /**
-     * @brief This method is used to build a string representation of State(), Probs(),
+     * @brief This method is used to build a string representation of Probs(),
      * PartialProbs()
      */
-    template <typename T, size_t R>
-    string get_simple_op_str(const string &name, DataView<T, R> &dataview,
+    string get_op_with_view_str(const string &name, DataView<double, 1> &dataview,
                              const std::vector<QubitIdType> &wires = {})
     {
         ostringstream oss;
@@ -295,7 +294,7 @@ class InstructionStrBuilder {
         bool is_first = true;
         for (auto i = 0; i < coeffs.size(); i++) {
             if (!is_first) {
-                
+
                 // handle the addition of the terms 
                 if (coeffs[i] > 0) {
                     oss << " + " << coeffs[i];
