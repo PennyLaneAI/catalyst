@@ -122,7 +122,8 @@ class QFunc:
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
                 return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
-        # retrieve flag of whether or not to print instructions (in case we execute the pre-compiled program in the null device)
+        # retrieve the flag to print instructions, used for executing 
+        # pre-compiled programs in a null device.
         print_instructions = kwargs.pop("print_instructions", False)
         qjit_device = QJITDevice(self.device, print_instructions)
 
