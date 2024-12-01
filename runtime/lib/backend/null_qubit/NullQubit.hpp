@@ -251,7 +251,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     auto Observable(ObsId obs_id, const std::vector<std::complex<double>> &matrix,
                     const std::vector<QubitIdType> &wires) -> ObsIdType
-    {   
+    {
         if (print_instructions) {
             return instruction_str_builder.create_obs_str(obs_id, matrix, wires);
         }
@@ -265,7 +265,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @return `ObsIdType` Index of the constructed observable
      */
     auto TensorObservable(const std::vector<ObsIdType> &obs_keys) -> ObsIdType
-    {   
+    {
         if (print_instructions) {
             return instruction_str_builder.create_tensor_obs_str(obs_keys);
         }
@@ -284,7 +284,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         if (print_instructions) {
             return instruction_str_builder.create_hamiltonian_obs_str(matrix, obs_keys);
         }
-        
+
         return 0;
     }
 

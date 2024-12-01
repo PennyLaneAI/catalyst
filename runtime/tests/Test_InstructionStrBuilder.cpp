@@ -55,11 +55,13 @@ TEST_CASE("string building is correct for NamedOperation", "[InstructionStrBuild
 TEST_CASE("string building is correct for MatrixOperation", "[InstructionStrBuilder]")
 {
     InstructionStrBuilder str_builder;
-    std::vector<std::complex<double>> v = {std::complex<double>(0.707, -0.707), std::complex<double>(0.0),
-                                           std::complex<double>(0.0), std::complex<double>(1.0)};
+    std::vector<std::complex<double>> v = {std::complex<double>(0.707, -0.707),
+                                           std::complex<double>(0.0), std::complex<double>(0.0),
+                                           std::complex<double>(1.0)};
 
     CHECK(str_builder.get_matrix_op_str(v, {}) == "MatrixOperation([0.707 - 0.707i, 0, 0, 1])");
-    CHECK(str_builder.get_matrix_op_str(v, {0}) == "MatrixOperation([0.707 - 0.707i, 0, 0, 1], wires=[0])");
+    CHECK(str_builder.get_matrix_op_str(v, {0}) ==
+          "MatrixOperation([0.707 - 0.707i, 0, 0, 1], wires=[0])");
     CHECK(str_builder.get_matrix_op_str(v, {0}, true) ==
           "MatrixOperation([0.707 - 0.707i, 0, 0, 1], wires=[0], inverse=true)");
     CHECK(str_builder.get_matrix_op_str(v, {1}, false, {0}) ==

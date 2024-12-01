@@ -156,7 +156,7 @@ def qjit(
             dictionaries of valid keyword arguments and values for the specific pass.
             The order of keys in this dictionary will determine the pass pipeline.
             If not specified, the default pass pipeline will be applied.
-        print_instructions (Optional[bool]): 
+        print_instructions (Optional[bool]):
             If set to True, instructions are printed when executing in the null device.
 
     Returns:
@@ -458,7 +458,7 @@ class QJIT(CatalystCallable):
     Args:
         fn (Callable): the quantum or classical function to compile
         compile_options (CompileOptions): compilation options to use
-        print_instructions (Optional[bool]): If True, prints instructions 
+        print_instructions (Optional[bool]): If True, prints instructions
             when executing in a null device.
 
     :ivar original_function: This attribute stores `fn`, the quantum or classical function

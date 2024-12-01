@@ -23,8 +23,8 @@ static const unordered_map<ObsId, string> obs_id_to_str = {
  * InstructionStrBuilder
  *
  * @brief This class is used by the null device (NullQubit.hpp) whenever the flag to print
- * instructions (print_instructions) is set to true. It is in charge of building string representations
- * of the operations invoked in the aforementioned device interface.
+ * instructions (print_instructions) is set to true. It is in charge of building string
+ * representations of the operations invoked in the aforementioned device interface.
  */
 
 class InstructionStrBuilder {
@@ -50,11 +50,11 @@ class InstructionStrBuilder {
             // to keep printing output as short as possible, we only print the imaginary part
             // whenever is different from zero;
             if (c.imag() > 0) {
-                oss << " + " << c.imag() << "i";    
-            } else {
-                oss << " - " << -1*c.imag() << "i";    
+                oss << " + " << c.imag() << "i";
             }
-            
+            else {
+                oss << " - " << -1 * c.imag() << "i";
+            }
         }
         return oss.str();
     }
@@ -135,7 +135,7 @@ class InstructionStrBuilder {
      * PartialProbs()
      */
     string get_op_with_view_str(const string &name, DataView<double, 1> &dataview,
-                             const std::vector<QubitIdType> &wires = {})
+                                const std::vector<QubitIdType> &wires = {})
     {
         ostringstream oss;
         oss << name << "(" << get_dataview_str(dataview);
@@ -152,7 +152,8 @@ class InstructionStrBuilder {
     string get_named_op_str(const std::string &name, const std::vector<double> &params,
                             const std::vector<QubitIdType> &wires, bool inverse = false,
                             const std::vector<QubitIdType> &controlled_wires = {},
-                            const std::vector<bool> &controlled_values = {}, const bool &explicit_wires=true)
+                            const std::vector<bool> &controlled_values = {},
+                            const bool &explicit_wires = true)
     {
         ostringstream oss;
         vector<string> values_to_print; // Store the string representation of the parameters passed
@@ -165,10 +166,10 @@ class InstructionStrBuilder {
         if (wires.size() > 0) {
             if (explicit_wires) {
                 values_to_print.push_back("wires=" + vector_to_string(wires, true));
-            } else {
+            }
+            else {
                 values_to_print.push_back(vector_to_string(wires, false));
             }
-            
         }
 
         // if inverse is false, we will not print its value
@@ -248,7 +249,8 @@ class InstructionStrBuilder {
         else {
             auto it = obs_id_to_str.find(obs_id);
             if (it != obs_id_to_str.end()) {
-                obs_id_type_to_str.emplace(new_id, get_named_op_str(it->second, {}, wires, false, {}, {}, false));
+                obs_id_type_to_str.emplace(
+                    new_id, get_named_op_str(it->second, {}, wires, false, {}, {}, false));
             }
             else {
                 RT_FAIL(
@@ -295,17 +297,20 @@ class InstructionStrBuilder {
         for (auto i = 0; i < coeffs.size(); i++) {
             if (!is_first) {
 
-                // handle the addition of the terms 
+                // handle the addition of the terms
                 if (coeffs[i] > 0) {
                     oss << " + " << coeffs[i];
                 }
                 else if (coeffs[i] < 0) {
-                    oss << " - " << -1*coeffs[i]; // a negative sign is manually added so we multiply the coefficient by -1
+                    oss << " - " << -1 * coeffs[i]; // a negative sign is manually added so we
+                                                    // multiply the coefficient by -1
                 }
             }
 
             if (coeffs[i] != 0) {
-                if (is_first) oss << coeffs[i]; // if is the first element then this coefficient is not yet added to the string
+                if (is_first)
+                    oss << coeffs[i]; // if is the first element then this coefficient is not yet
+                                      // added to the string
                 oss << "*" << obs_id_type_to_str[obs_keys[i]];
                 is_first = false;
             }

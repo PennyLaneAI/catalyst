@@ -307,7 +307,7 @@ class QJITDevice(qml.devices.Device):
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
-        
+
         # include 'print_instructions' as a keyword argument for the device constructor.
         self.backend_kwargs["print_instructions"] = print_instructions
 
