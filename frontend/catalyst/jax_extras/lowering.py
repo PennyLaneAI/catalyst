@@ -52,7 +52,7 @@ logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def jaxpr_to_mlir(func_name, jaxpr):
+def jaxpr_to_mlir(func_name, jaxpr, func_loc=None):
     """Lower a Jaxpr into an MLIR module.
 
     Args:
@@ -80,6 +80,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
             platform="cpu",
             axis_context=axis_context,
             name_stack=name_stack,
+            func_loc=func_loc,
         )
 
     return module, context
@@ -98,6 +99,7 @@ def custom_lower_jaxpr_to_module(
     replicated_args=None,
     arg_shardings=None,
     result_shardings=None,
+    func_loc=None,
 ):
     """Lowers a top-level jaxpr to an MHLO module.
 
@@ -135,7 +137,13 @@ def custom_lower_jaxpr_to_module(
         lowering_parameters=lowering_params,
     )
     ctx.context.allow_unregistered_dialects = True
-    with ctx.context, ir.Location.unknown(ctx.context):
+
+    if func_loc and len(func_loc) == 3:
+        loc = ir.Location.file(func_loc[0], func_loc[1], func_loc[2], ctx.context)
+    else:
+        loc = ir.Location.unknown(ctx.context)
+
+    with ctx.context, loc:
         # register_dialect()
         # Remove module name characters that XLA would alter. This ensures that
         # XLA computation preserves the module name.

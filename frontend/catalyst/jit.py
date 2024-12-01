@@ -22,6 +22,7 @@ import inspect
 import logging
 import os
 import warnings
+from types import FunctionType
 
 import jax
 import jax.numpy as jnp
@@ -78,6 +79,7 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
+    enable_debug_info=False,
     verbose=False,
     logfile=None,
     pipelines=None,
@@ -115,6 +117,8 @@ def qjit(
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
+        enable_debug_info (bool): If set to ``True``, debug information is included in the
+            generated MLIR.
         verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -606,6 +610,24 @@ class QJIT(CatalystCallable):
 
         return self.original_function
 
+    @instrument
+    @debug_logger
+    def get_func_loc(self):
+        """Find the location of the user function."""
+        func = inspect.unwrap(self.original_function)
+
+        if not isinstance(func, FunctionType):
+            return None
+
+        source_file = inspect.getsourcefile(func)
+        source_lines, start_line = inspect.getsourcelines(func)
+        for i, line in enumerate(source_lines):
+            position = line.find(func.__name__)
+            if position != -1:  # Function name found in this line
+                return (source_file, start_line + i, position)
+
+        return None
+
     @instrument(size_from=0)
     @debug_logger
     def capture(self, args, **kwargs):
@@ -682,7 +704,7 @@ class QJIT(CatalystCallable):
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
 
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__, self.get_func_loc())
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)

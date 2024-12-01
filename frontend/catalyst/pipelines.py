@@ -48,6 +48,8 @@ class CompileOptions:
             Default is ``sys.stderr``
         keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
             Default is ``False``
+        enable_debug_info (Optional[bool]): flag indicating whether to enable debug info.
+            Default is ``False``
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
@@ -80,6 +82,7 @@ class CompileOptions:
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
+    enable_debug_info: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
@@ -294,6 +297,8 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "gep-inbounds",
         "register-inactive-callback",
     ]
+    if options.enable_debug_info:
+        convert_to_llvm.append("ensure-debug-info-scope-on-llvm-func")
     return list(filter(partial(is_not, None), convert_to_llvm))
 
 

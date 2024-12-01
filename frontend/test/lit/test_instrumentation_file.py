@@ -58,6 +58,9 @@ weights = np.random.random(size=shape)
 # CHECK-NEXT:       walltime: {{[0-9\.]+}}
 # CHECK-NEXT:       cputime: {{[0-9\.]+}}
 # CHECK-NEXT:       programsize: {{[0-9]+}}
+# CHECK-NEXT:   - get_func_loc:
+# CHECK-NEXT:       walltime: {{[0-9\.]+}}
+# CHECK-NEXT:       cputime: {{[0-9\.]+}}
 # CHECK-NEXT:   - compile:
 # CHECK-NEXT:       walltime: {{[0-9\.]+}}
 # CHECK-NEXT:       cputime: {{[0-9\.]+}}
@@ -82,6 +85,7 @@ with open(filename, mode="r", encoding="UTF-8") as f:
 # CHECK:        - pre_compilation:
 # CHECK:        - capture:
 # CHECK:        - generate_ir:
+# CHECK:        - get_func_loc:
 # CHECK:        - compile:
 # CHECK:        - run:
 

@@ -244,6 +244,22 @@ class TestPrintStage:
 
         func.workspace.cleanup()
 
+    def test_debug_info(self, capsys):
+        """Test that the IR can be printed after the HLO lowering pipeline."""
+
+        @qjit(keep_intermediate=True, enable_debug_info=True)
+        def func():
+            return 0
+
+        print(get_compilation_stage(func, "MLIRToLLVMDialect"))
+        print(get_compilation_stage(func, "llvm_ir"))
+
+        out, _ = capsys.readouterr()
+        assert "#loc" in out
+        assert "!DISubprogram" in out
+
+        func.workspace.cleanup()
+
     def test_invalid_object(self):
         """Test the function on a non-QJIT object."""
 

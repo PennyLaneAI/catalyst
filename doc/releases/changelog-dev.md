@@ -39,6 +39,9 @@
 * Improves the readability of conditional passes in pipelines
   [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
 
+* Catalyst now has a qjit option to enable debug info.
+  [(#1331)](https://github.com/PennyLaneAI/catalyst/pull/1331)
+
 <h3>Breaking changes 💔</h3>
 
 * The `toml` module has been migrated to PennyLane with an updated schema for declaring device
