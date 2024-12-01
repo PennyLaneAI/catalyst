@@ -23,8 +23,8 @@ static const unordered_map<ObsId, string> obs_id_to_str = {
  * InstructionStrBuilder
  *
  * @brief This class is used by the null device (NullQubit.hpp) whenever the flag to print
- * instructions (print_instructions) is set to true. It is in charge of building string repretations
- * the operations invoked in the aformentioned device interface.
+ * instructions (print_instructions) is set to true. It is in charge of building string representations
+ * of the operations invoked in the aforementioned device interface.
  */
 
 class InstructionStrBuilder {
