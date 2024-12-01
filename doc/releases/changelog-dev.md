@@ -1,6 +1,7 @@
 # Release 0.10.0-dev (development release)
 
 <h3>New features since last release</h3>
+
 * The PennyLane plugin now has the option to print out instructions in the null device
   [(#1316)](https://github.com/PennyLaneAI/catalyst/pull/1346)
 
