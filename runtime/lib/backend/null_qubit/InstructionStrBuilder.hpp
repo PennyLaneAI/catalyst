@@ -49,7 +49,12 @@ class InstructionStrBuilder {
         if (c.imag() != 0) {
             // to keep printing output as short as possible, we only print the imaginary part
             // whenever is different from zero;
-            oss << " + " << c.imag() << "i";
+            if (c.imag() > 0) {
+                oss << " + " << c.imag() << "i";    
+            } else {
+                oss << " - " << -1*c.imag() << "i";    
+            }
+            
         }
         return oss.str();
     }
