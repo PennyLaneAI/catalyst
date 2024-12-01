@@ -148,7 +148,7 @@ class InstructionStrBuilder {
     string get_named_op_str(const std::string &name, const std::vector<double> &params,
                             const std::vector<QubitIdType> &wires, bool inverse = false,
                             const std::vector<QubitIdType> &controlled_wires = {},
-                            const std::vector<bool> &controlled_values = {})
+                            const std::vector<bool> &controlled_values = {}, const bool &explicit_wires=true)
     {
         ostringstream oss;
         vector<string> values_to_print; // Store the string representation of the parameters passed
@@ -159,16 +159,12 @@ class InstructionStrBuilder {
             values_to_print.push_back(std::to_string(p));
 
         if (wires.size() > 0) {
-            if (params.size()) {
-                // when an operation corresponds to a parametric gate, explicity specify the wires
-                // as a single vector. E.g Rx(3.14, wires=[0])
+            if (explicit_wires) {
                 values_to_print.push_back("wires=" + vector_to_string(wires, true));
-            }
-            else {
-                // Otherwise, we do not represent it as a vector but rather as a list separated with
-                // commas. E.g. CX(0,1)
+            } else {
                 values_to_print.push_back(vector_to_string(wires, false));
             }
+            
         }
 
         // if inverse is false, we will not print its value
@@ -248,7 +244,7 @@ class InstructionStrBuilder {
         else {
             auto it = obs_id_to_str.find(obs_id);
             if (it != obs_id_to_str.end()) {
-                obs_id_type_to_str.emplace(new_id, get_named_op_str(it->second, {}, wires));
+                obs_id_type_to_str.emplace(new_id, get_named_op_str(it->second, {}, wires, false, {}, {}, false));
             }
             else {
                 RT_FAIL(

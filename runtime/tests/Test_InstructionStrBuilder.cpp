@@ -43,13 +43,13 @@ TEST_CASE("string building is correct for NamedOperation", "[InstructionStrBuild
           "NamedOperation(3.140000, 0.705000)");
     CHECK(str_builder.get_named_op_str("NamedOperation", {3.14, 0.705}, {0}) ==
           "NamedOperation(3.140000, 0.705000, wires=[0])");
-    CHECK(str_builder.get_named_op_str("NamedOperation", {}, {0}) == "NamedOperation(0)");
+    CHECK(str_builder.get_named_op_str("NamedOperation", {}, {0}) == "NamedOperation(wires=[0])");
     CHECK(str_builder.get_named_op_str("NamedOperation", {}, {0}, true) ==
-          "NamedOperation(0, inverse=true)");
+          "NamedOperation(wires=[0], inverse=true)");
     CHECK(str_builder.get_named_op_str("NamedOperation", {}, {1}, false, {0}) ==
-          "NamedOperation(1, control=[0])");
+          "NamedOperation(wires=[1], control=[0])");
     CHECK(str_builder.get_named_op_str("NamedOperation", {}, {1}, false, {0}, {true}) ==
-          "NamedOperation(1, control=[0], control_value=[1])");
+          "NamedOperation(wires=[1], control=[0], control_value=[1])");
 }
 
 TEST_CASE("string building is correct for MatrixOperation", "[InstructionStrBuilder]")
