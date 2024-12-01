@@ -92,7 +92,7 @@ TEST_CASE("registers correctly a new observable", "[InstructionStrBuilder]")
     CHECK(str_builder.get_obs_str(4) == "0.2*Hermitian([1, 0, 0, 1], wires=[0])");
 
     CHECK(str_builder.create_hamiltonian_obs_str({0.1, -0.2}, {0, 1}) == 5);
-    CHECK(str_builder.get_obs_str(5) == "0.1*PauliX(0) -0.2*Hermitian([1, 0, 0, 1], wires=[0])");
+    CHECK(str_builder.get_obs_str(5) == "0.1*PauliX(0) - 0.2*Hermitian([1, 0, 0, 1], wires=[0])");
 }
 
 TEST_CASE("string building for Counts() and PartialCounts()", "[InstructionStrBuilder]")

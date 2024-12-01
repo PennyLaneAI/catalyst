@@ -295,16 +295,19 @@ class InstructionStrBuilder {
         bool is_first = true;
         for (auto i = 0; i < coeffs.size(); i++) {
             if (!is_first) {
+                
+                // handle the addition of the terms 
                 if (coeffs[i] > 0) {
-                    oss << " + ";
+                    oss << " + " << coeffs[i];
                 }
                 else if (coeffs[i] < 0) {
-                    oss << " ";
+                    oss << " - " << -1*coeffs[i]; // a negative sign is manually added so we multiply the coefficient by -1
                 }
             }
 
             if (coeffs[i] != 0) {
-                oss << coeffs[i] << "*" << obs_id_type_to_str[obs_keys[i]];
+                if (is_first) oss << coeffs[i]; // if is the first element then this coefficient is not yet added to the string
+                oss << "*" << obs_id_type_to_str[obs_keys[i]];
                 is_first = false;
             }
         }
