@@ -51,8 +51,7 @@ class InstructionStrBuilder {
             // whenever is different from zero;
             if (c.imag() > 0) {
                 oss << " + " << c.imag() << "i";
-            }
-            else {
+            } else {
                 oss << " - " << -1 * c.imag() << "i";
             }
         }
