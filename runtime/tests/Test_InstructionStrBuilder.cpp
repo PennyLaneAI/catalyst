@@ -1,7 +1,7 @@
 #include "InstructionStrBuilder.hpp"
 #include "TestUtils.hpp"
 
-TEST_CASE("string building is correct for instructions that require one parameter",
+TEST_CASE("string building is correct for instructions that require up to one parameter ",
           "[InstructionStrBuilder]")
 {
     InstructionStrBuilder str_builder;
@@ -9,6 +9,7 @@ TEST_CASE("string building is correct for instructions that require one paramete
     CHECK(str_builder.get_simple_op_str("AllocateQubits", 5) == "AllocateQubits(5)");
     CHECK(str_builder.get_simple_op_str("ReleaseQubit", "") == "ReleaseQubit()");
     CHECK(str_builder.get_simple_op_str("ReleaseAllQubits", "") == "ReleaseAllQubits()");
+    CHECK(str_builder.get_simple_op_str("State", "") == "State()");
     CHECK(str_builder.get_simple_op_str("Measure", 0) == "Measure(0)");
 }
 
@@ -29,7 +30,6 @@ TEST_CASE("string building is correct for instructions that require a parameter 
     std::vector<std::complex<double>> state(2);
     DataView<std::complex<double>, 1> view(state);
 
-    CHECK(str_builder.get_simple_op_str("State", view) == "State([0, 0])");
     CHECK(str_builder.get_simple_op_str("Probs", view) == "Probs([0, 0])");
     CHECK(str_builder.get_simple_op_str("PartialProbs", view, {0}) ==
           "PartialProbs([0, 0], wires=[0])");

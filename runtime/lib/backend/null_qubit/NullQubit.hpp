@@ -308,7 +308,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void State(DataView<std::complex<double>, 1> &state)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_simple_op_str("State", state) << std::endl;
+            std::cout << instruction_str_builder.get_simple_op_str("State", "") << std::endl;
         }
     }
 
