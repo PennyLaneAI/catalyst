@@ -332,8 +332,9 @@ class QJITDevice(qml.devices.Device):
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
 
-        # include 'print_instructions' as a keyword argument for the device constructor.
-        self.backend_kwargs["print_instructions"] = print_instructions
+        if original_device.name == "null.qubit":
+            # include 'print_instructions' as a keyword argument for the device constructor.
+            self.backend_kwargs["print_instructions"] = print_instructions
 
         self.capabilities = get_qjit_device_capabilities(device_capabilities)
 

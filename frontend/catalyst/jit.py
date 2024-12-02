@@ -644,10 +644,13 @@ class QJIT(CatalystCallable):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
+
+            if qnode.device.name == "null.qubit":
+                kwargs["print_instructions"] = self.print_instructions
+
             return QFunc.__call__(
                 qnode,
                 pass_pipeline=self.compile_options.circuit_transform_pipeline,
-                print_instructions=self.print_instructions,
                 *args,
                 **dict(params, **kwargs),
             )
