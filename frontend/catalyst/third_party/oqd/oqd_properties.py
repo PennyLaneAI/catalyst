@@ -21,7 +21,6 @@ trapped-ion quantum computer device and the methods for loading them from their 
 and configuration files.
 """
 
-import math  # pylint: disable=unused-import; required since eval() assumes math module is imported
 import os
 import sys
 from collections.abc import Collection
@@ -29,6 +28,8 @@ from dataclasses import dataclass, field
 from numbers import Number
 from os import PathLike
 from typing import Union, Collection
+
+from .safe_eval import safe_eval
 
 if sys.version_info >= (3, 11):
     import tomllib as toml  # pragma: no cover
@@ -284,7 +285,7 @@ def _parse_value_or_expression_as_float(input: Union[Number, str]):
 
     elif isinstance(input, str):
         try:
-            result = float(eval(input))
+            result = float(safe_eval(input))
         except Exception as e:
             raise ValueError(f"Invalid expression: '{input}'") from e
 

@@ -17,5 +17,6 @@ This submodule contains classes for the OQD device and its properties.
 
 # from .oqd_device import OQDDevice
 from .oqd_properties import OQDDeviceProperties, OQDQubitParameters
+from . import safe_eval
 
 # __all__ = ["OQDDevice", "OQDDeviceProperties"]
