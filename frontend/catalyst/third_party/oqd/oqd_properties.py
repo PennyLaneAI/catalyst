@@ -22,10 +22,12 @@ and configuration files.
 """
 
 import math  # pylint: disable=unused-import; required since eval() assumes math module is imported
+import os
 import sys
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from numbers import Number
+from os import PathLike
 from typing import Union, Collection
 
 if sys.version_info >= (3, 11):
@@ -74,13 +76,13 @@ class OQDDeviceProperties:
     parameters: dict[str, OQDDeviceParameter] = field(default_factory=dict)
 
     @classmethod
-    def from_toml_file(cls, file_path: str):
+    def from_toml_file(cls, filepath: str):
         """Loads an OQDDeviceProperties object from a TOML file.
 
         Args:
-            file_path (str): The path to the TOML file.
+            filepath (str): The path to the TOML file.
         """
-        document = cls._load_toml_file(file_path)
+        document = cls._load_toml_file(filepath)
         properties = cls._parse_toml_document(document)
         return properties
 
@@ -183,22 +185,26 @@ class OQDQubitParameters:
     phonon_parameters: dict[str, OQDPhononParameters]
 
     @classmethod
-    def from_toml_file(
+    def from_toml(
         cls,
-        fpath: str,
+        filepath_or_buffer: Union[str, PathLike],
         ion_species_filter: Union[str, Collection[str]] = None,
         phonon_mode_filter: Union[str, Collection[str]] = None,
     ) -> "OQDQubitParameters":
-        """Loads an OQDQubitParameters object from a TOML file.
+        """Loads an OQDQubitParameters object from a TOML file or string.
 
         Args:
-            fpath: The path to the TOML file.
+            filepath_or_buffer: The path to the TOML file or a TOML document string.
             ion_species_filter (optional): A list of ion species to include in the
                 OQDQubitParameters object. If None, all ion species are included.
             phonon_mode_filter (optional): A list of phonon modes to include in the
                 OQDQubitParameters object. If None, all phonon modes are included.
         """
-        document = _load_toml_file(fpath)
+        if os.path.isfile(filepath_or_buffer):
+            document = _load_toml_from_file(filepath_or_buffer)
+        else:
+            document = _load_toml_from_string(filepath_or_buffer)
+
         _check_oqd_config_schema(document)
         cls._check_required_keys(document)
 
@@ -239,10 +245,15 @@ class OQDQubitParameters:
         ), "TOML document for OQD qubit parameters must contain key 'phonons'"
 
 
-def _load_toml_file(file_path: str) -> dict:
+def _load_toml_from_file(filepath: PathLike) -> dict:
     """Loads a TOML file and returns the parsed dict."""
-    with open(file_path, "rb") as f:
+    with open(filepath, "rb") as f:
         return toml.load(f)
+
+
+def _load_toml_from_string(contents: str) -> dict:
+    """Loads a TOML string and returns the parsed dict."""
+    return toml.loads(contents)
 
 
 # def _parse_toml_document(document: dict):
