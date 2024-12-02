@@ -128,4 +128,4 @@ def safe_eval(expr: str) -> float:
         parsed_expr = ast.parse(expr, mode="eval")
         return _eval(parsed_expr.body)
     except Exception as e:
-        raise ValueError(f"Invalid expression: {e}")
+        raise ValueError(f"Invalid expression: '{expr}'") from e
