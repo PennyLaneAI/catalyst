@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the safe_eval function.
+"""Tests for the safe_eval module.
 """
 
 import math
@@ -155,8 +155,9 @@ class TestSafeEval:
             safe_eval("1 + math.sin")
 
         with pytest.raises(ValueError, match="Invalid expression"):
-            program = "for i in [1, 2, 3]:" "    print(i)"
-            safe_eval(program)
+            # `eval("os.listdir('/')")` is valid (assuming the os module is accessible), but the
+            # equivalent `safe_eval` call is not.
+            safe_eval("os.listdir('/')")
 
 
 if __name__ == "__main__":
