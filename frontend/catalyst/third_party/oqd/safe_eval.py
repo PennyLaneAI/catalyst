@@ -67,50 +67,62 @@ def safe_eval(expr: str) -> float:
             return _eval(node.body)
 
         elif isinstance(node, ast.BinOp):  # Binary operations (e.g., 1 + 2)
-            left = _eval(node.left)
-            right = _eval(node.right)
-            op_type = type(node.op)
-            if op_type in OPERATORS:
-                return OPERATORS[op_type](left, right)
-            else:
-                raise ValueError(f"Unsupported operator: {op_type}")
+            return _eval_binop(node)
 
         elif isinstance(node, ast.UnaryOp):  # Unary operations (e.g., -1)
-            operand = _eval(node.operand)
-            op_type = type(node.op)
-            if op_type in OPERATORS:
-                return OPERATORS[op_type](operand)
-            else:
-                raise ValueError(f"Unsupported unary operator: {op_type}")
+            return _eval_unaryop(node)
 
         elif isinstance(node, ast.Call):  # Function calls (e.g., math.sin(0.5))
-            if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
-                module = node.func.value.id
-                func = node.func.attr
-                if module == "math" and hasattr(math, func):
-                    args = [_eval(arg) for arg in node.args]
-                    return getattr(math, func)(*args)
-                else:
-                    raise ValueError(f"Unsupported function: {module}.{func}")
-            else:
-                raise ValueError("Unsupported function call structure")
+            return _eval_call(node)
 
         elif isinstance(node, ast.Attribute):  # Accessing attributes (e.g., math.pi)
-            if isinstance(node.value, ast.Name):
-                module = node.value.id
-                attr = node.attr
-                if module == "math" and hasattr(math, attr):
-                    return getattr(math, attr)
-                else:
-                    raise ValueError(f"Unsupported attribute: {module}.{attr}")
-            else:
-                raise ValueError("Unsupported attribute structure")
+            return _eval_attr(node)
 
         elif isinstance(node, ast.Constant):  # Python 3.8+ literal
             return node.value
 
         else:
             raise ValueError(f"Unsupported expression type: {type(node)}")
+
+    def _eval_binop(node):
+        left = _eval(node.left)
+        right = _eval(node.right)
+        op_type = type(node.op)
+        if op_type in OPERATORS:
+            return OPERATORS[op_type](left, right)
+        else:
+            raise ValueError(f"Unsupported operator: {op_type}")
+
+    def _eval_unaryop(node):
+        operand = _eval(node.operand)
+        op_type = type(node.op)
+        if op_type in OPERATORS:
+            return OPERATORS[op_type](operand)
+        else:
+            raise ValueError(f"Unsupported unary operator: {op_type}")
+
+    def _eval_call(node):
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            module = node.func.value.id
+            func = node.func.attr
+            if module == "math" and hasattr(math, func):
+                args = [_eval(arg) for arg in node.args]
+                return getattr(math, func)(*args)
+            else:
+                raise ValueError(f"Unsupported function: {module}.{func}")
+        else:
+            raise ValueError("Unsupported function call structure")
+
+    def _eval_attr(node):
+        if isinstance(node.value, ast.Name):
+            module = node.value.id
+            attr = node.attr
+            if module == "math" and hasattr(math, attr):
+                return getattr(math, attr)
+            else:
+                raise ValueError(f"Unsupported attribute: {module}.{attr}")
+        else:
+            raise ValueError("Unsupported attribute structure")
 
     try:
         parsed_expr = ast.parse(expr, mode="eval")
