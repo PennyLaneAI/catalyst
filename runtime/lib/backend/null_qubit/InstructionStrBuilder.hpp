@@ -25,7 +25,6 @@ static const unordered_map<ObsId, string> obs_id_to_str = {
  * instructions (print_instructions) is set to true. It is in charge of building string
  * representations of the operations invoked in the aforementioned device interface.
  */
-
 class InstructionStrBuilder {
   private:
     unordered_map<ObsIdType, string>
