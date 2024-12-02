@@ -41,6 +41,14 @@ import pennylane as qml
 from catalyst.jax_extras import make_jaxpr2
 from catalyst.tracing.contexts import EvaluationContext
 
+import sys
+if sys.version_info < (3, 10):
+    from importlib_metadata import entry_points
+else:
+    from importlib.metadata import entry_points
+
+discovered_plugins = entry_points(group='catalyst.passes.plugins')
+
 
 class Pass:
 
@@ -54,6 +62,11 @@ class Pass:
         valued_options = ",".join(f"{k}={v}" for k, v in self.valued_options.items())
         all_options = ",".join((options, valued_options))
         return self.name + f"{all_options}"
+
+class PassPlugin(Pass):
+    def __init__(self, path, name, *options, **valued_options):
+        self.path = path
+        return super().__init__(name, *options, **valued_options)
 
 
 def pipeline(pass_pipeline=None):
@@ -189,7 +202,7 @@ def cancel_inverses(qnode=None, *pass_args, **pass_opts):
 
 
 def apply_pass(pass_name, *flags, **valued_options):
-    """ """
+    """Apply pass"""
 
     def decorator(qnode):
 
@@ -209,6 +222,10 @@ def apply_pass(pass_name, *flags, **valued_options):
 
     return decorator
 
+def pass_plugin(plugin, pass_name, *opts, **valued_options):
+    """Apply pass"""
+    # TODO: Register the plugin with the compiler...?
+    return apply_pass(pass_name, *opts, **valued_options)
 
 def merge_rotations(qnode=None):
     """
