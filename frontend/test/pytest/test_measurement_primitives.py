@@ -53,6 +53,7 @@ def test_dynamic_sample_backend_functionality():
 
     workflow_dyn_sample(10)
     old_ir = get_compilation_stage(workflow_dyn_sample, "mlir")
+    workflow_dyn_sample.workspace.cleanup()
 
     new_ir = old_ir.replace(
         "catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<10x1xi64>",
@@ -73,8 +74,7 @@ def test_dynamic_sample_backend_functionality():
     res = workflow_dyn_sample(37)
     assert len(res) == 37
 
-    shutil.rmtree("workflow_dyn_sample")
-    shutil.rmtree("workflow_dyn_sample_1")
+    workflow_dyn_sample.workspace.cleanup()
 
     # Save for WIP. Remove when work is done.
     _new_ir = """
@@ -135,6 +135,8 @@ def test_dynamic_counts_backend_functionality():
 
     workflow_dyn_counts(10)
     old_ir = get_compilation_stage(workflow_dyn_counts, "mlir")
+    workflow_dyn_counts.workspace.cleanup()
+
     new_ir = old_ir.replace(
         "catalyst.launch_kernel @module_circuit::@circuit() : () ->",
         "catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) ->",
@@ -153,8 +155,7 @@ def test_dynamic_counts_backend_functionality():
     print("after: ", res)
     assert res[1][0] + res[1][1] == 4000
 
-    shutil.rmtree("workflow_dyn_counts")
-    shutil.rmtree("workflow_dyn_counts_1")
+    workflow_dyn_counts.workspace.cleanup()
 
     # Save for WIP. Remove when work is done.
     _new_ir = """module @workflow {
