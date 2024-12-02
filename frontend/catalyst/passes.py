@@ -49,10 +49,23 @@ class Pass:
         self.options = options
         self.valued_options = valued_options
 
+    def __repr__(self):
+        options = ",".join(str(opt) for opt in self.options)
+        valued_options = ",".join(f"{k}={v}" for k, v in self.valued_options.items())
+        all_options = ",".join((options, valued_options))
+        return self.name + f"{all_options}"
 
-def pipeline(pass_pipeline):
+
+def pipeline(pass_pipeline=None):
+
+    if pass_pipeline is None:
+        pass_pipeline = []
 
     def decorator(qnode):
+
+        if not isinstance(qnode, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
         def qnode_call(*args, **kwargs):
             pipeline = kwargs.get("pass_pipeline", pass_pipeline)
             kwargs["pass_pipeline"] = pipeline

@@ -19,7 +19,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import pipeline, qjit
-from catalyst.passes import cancel_inverses, merge_rotations
+from catalyst.passes import Pass, cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
@@ -151,10 +151,10 @@ def test_pipeline_functionality(theta, backend):
     Test that the @pipeline decorator does not change functionality
     when all the passes in the pipeline does not change functionality.
     """
-    my_pipeline = {
-        "cancel_inverses": {},
-        "merge_rotations": {},
-    }
+    my_pipeline = [
+        Pass("remove-chained-self-inverse"),
+        Pass("merge-rotations"),
+    ]
 
     @qjit
     def workflow():

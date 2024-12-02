@@ -501,10 +501,10 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
 def get_or_create_funcop(ctx, callable_, call_jaxpr):
     """Get funcOp from cache, or create it from scratch"""
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get((callable_, tuple([]))):
         return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
+    ctx.module_context.cached_primitive_lowerings[(callable_, tuple([]))] = func_op
     return func_op
 
 
@@ -627,11 +627,20 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline):
     Returns:
       FuncOp
     """
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
+    if func_op := ctx.module_context.cached_primitive_lowerings.get((callable_, tuple(pipeline))):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
     ctx.module_context.cached_primitive_lowerings[(callable_, tuple(pipeline))] = func_op
     return func_op
+
+
+def get_cached_qnode(ctx, callable_, pipeline):
+    return ctx.module_context.cached_primitive_lowerings[(callable_, tuple(pipeline))]
+
+
+def get_cached_qnode_from_eqn(ctx, callable_, eqn):
+    pipeline = eqn.params.get("pipeline") if eqn.params.get("pipeline") else []
+    return ctx.module_context.cached_primitive_lowerings[(callable_, tuple(pipeline))]
 
 
 def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline):
@@ -716,6 +725,7 @@ def _get_call_jaxpr(jaxpr):
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
+
 def get_func_or_quantum_kernel(jaxpr):
     for eqn in jaxpr.eqns:
         primitive = eqn.primitive
@@ -748,7 +758,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call = get_func_or_quantum_kernel(jaxpr)
     lower_callable(ctx, fn, func_call)
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached_qnode_from_eqn(ctx, fn, func_call)
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -826,7 +836,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     lower_callable(ctx, fn, func_call)
 
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached_qnode_from_eqn(ctx, fn, func_call)
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
         val_result_types,
@@ -881,7 +891,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached_qnode_from_eqn(ctx, fn, func_call)
     symbol_ref = get_symbolref(ctx, func_op)
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
@@ -933,7 +943,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     lower_callable(ctx, fn, func_call)
 
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached_qnode_from_eqn(ctx, fn, func_call)
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
         func_result_types,
@@ -986,7 +996,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     func_call = get_func_or_quantum_kernel(jaxpr)
 
     lower_callable(ctx, fn, func_call)
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached_qnode_from_eqn(ctx, fn, func_call)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)

@@ -191,7 +191,12 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
             # quantum_kernel_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
             # transformations
-            outvals = quantum_kernel_p.bind(wrap_init(f), *invals, qnode=eqn.params["qnode"], pipeline=eqn.params.get("pipeline"))
+            outvals = quantum_kernel_p.bind(
+                wrap_init(f),
+                *invals,
+                qnode=eqn.params["qnode"],
+                pipeline=eqn.params.get("pipeline"),
+            )
         else:
             outvals = eqn.primitive.bind(*invals, **eqn.params)
         # Primitives may return multiple outputs or not
