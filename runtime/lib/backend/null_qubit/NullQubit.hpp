@@ -330,7 +330,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void Probs(DataView<double, 1> &probs)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_op_with_view_str("Probs", probs) << std::endl;
+            std::cout << instruction_str_builder.get_simple_op_str("Probs", "") << std::endl;
         }
     }
 
@@ -340,7 +340,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_op_with_view_str("PartialProbs", probs, wires)
+            std::cout << instruction_str_builder.get_named_op_str("PartialProbs", {}, wires)
                       << std::endl;
         }
     }
@@ -352,7 +352,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void Sample(DataView<double, 2> &samples, size_t shots)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_samples_str("Sample", samples, shots)
+            std::cout << instruction_str_builder.get_distribution_op_str("Sample", shots)
                       << std::endl;
         }
     }
@@ -369,8 +369,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                        size_t shots)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_samples_str("PartialSample", samples, shots,
-                                                                 wires)
+            std::cout << instruction_str_builder.get_distribution_op_str("PartialSample", shots,
+                                                                         wires)
                       << std::endl;
         }
     }
@@ -382,7 +382,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void Counts(DataView<double, 1> &eigen_vals, DataView<int64_t, 1> &counts, size_t shots)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_counts_str("Counts", eigen_vals, counts, shots)
+            std::cout << instruction_str_builder.get_distribution_op_str("Counts", shots)
                       << std::endl;
         }
     }
@@ -395,8 +395,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                        const std::vector<QubitIdType> &wires, size_t shots)
     {
         if (print_instructions) {
-            std::cout << instruction_str_builder.get_counts_str("PartialCounts", eigen_vals, counts,
-                                                                shots, wires)
+            std::cout << instruction_str_builder.get_distribution_op_str("PartialCounts", shots,
+                                                                         wires)
                       << std::endl;
         }
     }

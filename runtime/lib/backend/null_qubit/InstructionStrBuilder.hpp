@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <complex>
@@ -51,7 +50,8 @@ class InstructionStrBuilder {
             // whenever is different from zero;
             if (c.imag() > 0) {
                 oss << " + " << c.imag() << "i";
-            } else {
+            }
+            else {
                 oss << " - " << -1 * c.imag() << "i";
             }
         }
@@ -83,34 +83,13 @@ class InstructionStrBuilder {
         return oss.str();
     }
 
-    /**
-     * @brief Builds the string representation of DataView
-     */
-    template <typename T, size_t R> string get_dataview_str(DataView<T, R> &dataview)
-    {
-        ostringstream oss;
-        bool is_first = true; // boolean to help determine where to put commas
-
-        oss << "[";
-        for (auto it = dataview.begin(); it != dataview.end(); it++) {
-            if (!is_first) {
-                oss << ", "; // if is not the first element then we add a comma to separate the
-                             // elements
-            }
-            oss << element_to_str(*it);
-            is_first = false;
-        }
-        oss << "]";
-        return oss.str();
-    }
-
   public:
     InstructionStrBuilder() = default;
     ~InstructionStrBuilder() = default;
 
     /**
      * @brief This method is used to build a string representation of AllocateQubit(),
-     * AllocateQubits(), ReleaseQubit(), ReleaseAllQubits(), State(), Measure()
+     * AllocateQubits(), ReleaseQubit(), ReleaseAllQubits(), State(), Probs(), Measure()
      */
     template <typename T> string get_simple_op_str(const string &name, const T &param)
     {
@@ -130,23 +109,8 @@ class InstructionStrBuilder {
     }
 
     /**
-     * @brief This method is used to build a string representation of Probs(),
+     * @brief This method is used to get the string representation of NamedOperation(),
      * PartialProbs()
-     */
-    string get_op_with_view_str(const string &name, DataView<double, 1> &dataview,
-                                const std::vector<QubitIdType> &wires = {})
-    {
-        ostringstream oss;
-        oss << name << "(" << get_dataview_str(dataview);
-        if (wires.size() > 0) {
-            oss << ", wires=" << vector_to_string(wires);
-        }
-        oss << ")";
-        return oss.str();
-    }
-
-    /**
-     * @brief This method is used to get the string representation of NamedOperation()
      */
     string get_named_op_str(const std::string &name, const std::vector<double> &params,
                             const std::vector<QubitIdType> &wires, bool inverse = false,
@@ -326,54 +290,21 @@ class InstructionStrBuilder {
     string get_obs_str(const ObsIdType &o) { return obs_id_type_to_str.at(o); }
 
     /**
-     * @brief This method is used to get the string representation of Sample() and PartialSample()
+     * @brief This method is used to get the string representation of Sample(), PartialSample(),
+     * Counts() and PartialCounts().
      */
-    string get_samples_str(const string &name, DataView<double, 2> &samples, const size_t &shots,
-                           const vector<QubitIdType> &wires = {})
+    string get_distribution_op_str(const string &name, const size_t &shots,
+                                   const vector<QubitIdType> &wires = {})
     {
-        ostringstream oss;
-        bool is_first = true;
-        oss << name << "(" << get_dataview_str(samples);
-
-        if (wires.size() > 0) {
-            oss << ", wires=" << vector_to_string(wires);
-        }
-
-        oss << ", shots=" << shots << ")";
-
-        return oss.str();
-    }
-
-    /**
-     * @brief This method is used to get the string representation of Counts() and PartialCounts().
-     */
-    string get_counts_str(const string &name, DataView<double, 1> &vals,
-                          DataView<int64_t, 1> &counts, const size_t &shots,
-                          const vector<QubitIdType> &wires = {})
-    {
-        RT_FAIL_IF(vals.size() != counts.size(), "number of eigenvalues does not matches counts");
-
         ostringstream oss;
         bool is_first = true;
         oss << name << "(";
-        oss << "[";
-        auto it1 = vals.begin();
-        auto it2 = counts.begin();
-        for (; it1 != vals.end(); it1++, it2++) {
-            if (!is_first) {
-                oss << ", ";
-            }
-            // here we build a substring that represents a pair (eigenval, count)
-            oss << "(" << element_to_str(*it1) << ", " << element_to_str(*it2) << ")";
-            is_first = false;
-        }
-        oss << "]"; //
+
+        oss << "shots=" << shots;
 
         if (wires.size() > 0) {
             oss << ", wires=" << vector_to_string(wires);
         }
-
-        oss << ", shots=" << shots;
 
         oss << ")";
 

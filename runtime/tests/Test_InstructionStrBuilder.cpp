@@ -10,6 +10,7 @@ TEST_CASE("string building is correct for instructions that require up to one pa
     CHECK(str_builder.get_simple_op_str("ReleaseQubit", "") == "ReleaseQubit()");
     CHECK(str_builder.get_simple_op_str("ReleaseAllQubits", "") == "ReleaseAllQubits()");
     CHECK(str_builder.get_simple_op_str("State", "") == "State()");
+    CHECK(str_builder.get_simple_op_str("Probs", "") == "Probs()");
     CHECK(str_builder.get_simple_op_str("Measure", 0) == "Measure(0)");
 }
 
@@ -21,18 +22,6 @@ TEST_CASE("string building is correct for instructions that require a parameter 
 
     CHECK(str_builder.get_op_with_obs_str("Expval", id) == "Expval(PauliX(0))");
     CHECK(str_builder.get_op_with_obs_str("Var", id) == "Var(PauliX(0))");
-}
-
-TEST_CASE("string building is correct for instructions that require a parameter of type DataView",
-          "[InstructionStrBuilder]")
-{
-    InstructionStrBuilder str_builder;
-    std::vector<double> state(2);
-    DataView<double, 1> view(state);
-
-    CHECK(str_builder.get_op_with_view_str("Probs", view) == "Probs([0.000000, 0.000000])");
-    CHECK(str_builder.get_op_with_view_str("PartialProbs", view, {0}) ==
-          "PartialProbs([0.000000, 0.000000], wires=[0])");
 }
 
 TEST_CASE("string building is correct for NamedOperation", "[InstructionStrBuilder]")
@@ -50,6 +39,7 @@ TEST_CASE("string building is correct for NamedOperation", "[InstructionStrBuild
           "NamedOperation(wires=[1], control=[0])");
     CHECK(str_builder.get_named_op_str("NamedOperation", {}, {1}, false, {0}, {true}) ==
           "NamedOperation(wires=[1], control=[0], control_value=[1])");
+    CHECK(str_builder.get_named_op_str("PartialProbs", {}, {0}) == "PartialProbs(wires=[0])");
 }
 
 TEST_CASE("string building is correct for MatrixOperation", "[InstructionStrBuilder]")
@@ -100,14 +90,7 @@ TEST_CASE("registers correctly a new observable", "[InstructionStrBuilder]")
 TEST_CASE("string building for Counts() and PartialCounts()", "[InstructionStrBuilder]")
 {
     InstructionStrBuilder str_builder;
-    std::vector<double> state(2);
-    DataView<double, 1> state_view(state);
-
-    std::vector<int64_t> counts(2);
-    DataView<int64_t, 1> counts_view(counts);
-
-    CHECK(str_builder.get_counts_str("Counts", state_view, counts_view, 100) ==
-          "Counts([(0.000000, 0), (0.000000, 0)], shots=100)");
-    CHECK(str_builder.get_counts_str("PartialCounts", state_view, counts_view, 100, {0}) ==
-          "PartialCounts([(0.000000, 0), (0.000000, 0)], wires=[0], shots=100)");
+    CHECK(str_builder.get_distribution_op_str("Counts", 100) == "Counts(shots=100)");
+    CHECK(str_builder.get_distribution_op_str("PartialCounts", 100, {0}) ==
+          "PartialCounts(shots=100, wires=[0])");
 }
