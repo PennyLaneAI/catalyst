@@ -145,8 +145,7 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
         fn_original_name = fn.__name__
         wrapped_qnode_function = fn.func
         fn_clone = copy.copy(fn)
-        uniquer = str(_rename_to_unique())
-        fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
+        fn_clone.__name__ = fn_original_name + "_transformed"
 
         pass_names = _API_name_to_pass_name()
 
@@ -296,7 +295,6 @@ def cancel_inverses(fn=None):
 
     funcname = fn.__name__
     wrapped_qnode_function = fn.func
-    uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
         if EvaluationContext.is_tracing():
@@ -307,7 +305,7 @@ def cancel_inverses(fn=None):
 
     fn_clone = copy.copy(fn)
     fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_cancel_inverses" + uniquer
+    fn_clone.__name__ = funcname + "_cancel_inverses"
 
     return fn_clone
 
@@ -378,7 +376,6 @@ def merge_rotations(fn=None):
 
     funcname = fn.__name__
     wrapped_qnode_function = fn.func
-    uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
         if EvaluationContext.is_tracing():
@@ -389,30 +386,9 @@ def merge_rotations(fn=None):
 
     fn_clone = copy.copy(fn)
     fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_merge_rotations" + uniquer
+    fn_clone.__name__ = funcname + "_merge_rotations"
 
     return fn_clone
-
-
-## IMPL and helpers ##
-# pylint: disable=missing-function-docstring
-class _PipelineNameUniquer:
-    def __init__(self, i):
-        self.i = i
-
-    def get(self):
-        self.i += 1
-        return self.i
-
-    def reset(self):
-        self.i = -1
-
-
-PipelineNameUniquer = _PipelineNameUniquer(-1)
-
-
-def _rename_to_unique():
-    return PipelineNameUniquer.get()
 
 
 def _API_name_to_pass_name():
