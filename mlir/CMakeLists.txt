@@ -23,10 +23,10 @@ find_program(CCACHE_PATH ccache /usr/local/bin
 
 # Enable address sanitizer during build
 option(ENABLE_ASAN OFF)
-if(${ENABLE_ASAN})
-  set(USE_SANITIZER_NAMES "Address")
-  set(USE_SANITIZER_FLAGS "-fsanitize=address")
-endif
+if( ENABLE_ASAN )
+  set(USE_SANITIZER_NAMES "Address" CACHE STRING)
+  set(USE_SANITIZER_FLAGS "-fsanitize=address" CACHE STRING)
+endif()
 
 # Get system type
 if(UNIX AND NOT APPLE)
@@ -36,9 +36,9 @@ endif()
 # Define linker based on system type
 if(APPLE)
   set(ENABLE_LLD OFF)
-else
+else()
   set(ENABLE_LLD ON)
-endif
+endif()
 
 # Define build-specific options
 set(SYMBOL_VISIBILITY "default")
@@ -85,6 +85,7 @@ execute_process(
                             -DLLVM_ENABLE_ZLIB={ENABLE_ZLIB}
                             -DLLVM_ENABLE_ZSTD=${ENABLE_ZSTD}
                             -DCMAKE_CXX_VISIBILITY_PRESET=${SYMBOL_VISIBILITY}
+                            -DLLVM_INSTALL_UTILS=ON
                             -G Ninja
                             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
@@ -99,8 +100,7 @@ execute_process(
 # When updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 
 # is passing and remove filter
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env LIT_FILTER_OUT="Bytecode"
-    --build ${CATALYST_MLIR_BUILD_DIR} --target check-mlir llvm-symbolizer
+    COMMAND bash -c "LIT_FILTER_OUT=Bytecode ${CMAKE_COMMAND} --build ${CATALYST_MLIR_BUILD_DIR} --target check-mlir llvm-symbolizer"
 )
 
 #####################################################################
@@ -108,17 +108,19 @@ execute_process(
 #####################################################################
 
 list(APPEND CMAKE_MODULE_PATH 
-    "${CATALYST_MLIR_INSTALL_DIR}/lib/cmake"
-    "${CATALYST_MLIR_INSTALL_DIR}/lib/cmake/mlir"
-    "${CATALYST_MLIR_INSTALL_DIR}/lib/cmake/llvm")
+    "${CATALYST_PKG_INSTALL_DIR}/lib/cmake"
+    "${CATALYST_PKG_INSTALL_DIR}/lib/cmake/mlir"
+    "${CATALYST_PKG_INSTALL_DIR}/lib/cmake/llvm")
 list(APPEND CMAKE_PREFIX_PATH 
-    "${CATALYST_MLIR_INSTALL_DIR}/lib/cmake"
-    "${CATALYST_MLIR_INSTALL_DIR}/lib/cmake/mlir"
-    "${CATALYST_MLIR_INSTALL_DIR}/lib/cmake/llvm")
+    "${CATALYST_PKG_INSTALL_DIR}"
+    "${CATALYST_PKG_INSTALL_DIR}/lib/cmake"
+    "${CATALYST_PKG_INSTALL_DIR}/lib/cmake/mlir"
+    "${CATALYST_PKG_INSTALL_DIR}/lib/cmake/llvm")
 
 
-find_package(LLVM REQUIRED CONFIG)
-find_package(MLIR REQUIRED CONFIG)
+find_package(LLVM REQUIRED)
+find_package(MLIR REQUIRED)
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
@@ -143,7 +145,7 @@ execute_process(
                             -S ${MHLO_SRC_DIR}
                             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                             -DLLVM_ENABLE_ASSERTIONS=ON
-                            -DMLIR_DIR=${CATALYST_MLIR_INSTALL_DIR}/lib/cmake/mlir
+                            -DMLIR_DIR=${CATALYST_PKG_INSTALL_DIR}/lib/cmake/mlir
                             -DCMAKE_C_COMPILER_LAUNCHER=${CCACHE_PATH}
                             -DCMAKE_CXX_COMPILER_LAUNCHER=${CCACHE_PATH}
                             -DPython3_EXECUTABLE=${Python_EXECUTABLE}
@@ -154,10 +156,10 @@ execute_process(
                             -DLLVM_ENABLE_ZLIB=${ENABLE_ZLIB}
                             -DLLVM_ENABLE_ZSTD=${ENABLE_ZSTD}
                             -DCMAKE_CXX_VISIBILITY_PRESET=${SYMBOL_VISIBILITY}
-
+                            -DLLVM_EXTERNAL_LIT=${CATALYST_MLIR_BUILD_DIR}/bin/llvm-lit
 )
 
-# Build the MLIR binaries and libraries
+# Build the MHLO binaries and libraries
 execute_process(
     COMMAND ${CMAKE_COMMAND} --build ${CATALYST_MHLO_BUILD_DIR} --verbose
 )
@@ -167,79 +169,90 @@ execute_process(
 )
 
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env LIT_FILTER_OUT="chlo_legalize_to_mhlo"
-    --build ${CATALYST_MHLO_BUILD_DIR} --target check-mlir-hlo
+    COMMAND bash -c "LIT_FILTER_OUT=chlo_legalize_to_mhlo ${CMAKE_COMMAND} --build ${CATALYST_MHLO_BUILD_DIR} --target check-mlir-hlo"
 )
+
+# Ensure config and modules are available for later import
+list(APPEND CMAKE_MODULE_PATH
+    "${CATALYST_MHLO_BUILD_DIR}/lib/cmake"
+    "${CATALYST_MHLO_BUILD_DIR}/lib/cmake/mlir-hlo")
+list(APPEND CMAKE_PREFIX_PATH
+    "${CATALYST_MHLO_BUILD_DIR}/lib/cmake"
+    "${CATALYST_MHLO_BUILD_DIR}/lib/cmake/mlir-hlo")
 
 #####################################################################
 # 4. Build Enzyme project
 #####################################################################
 
-set(ENZYME_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/Enzyme/enzyme")
+set(CATALYST_ENZYME_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/BuildEnzyme" CACHE PATH "Path to build directory for Enzyme project")
+set(ENZYME_SRC_DIR "${PROJECT_SOURCE_DIR}/Enzyme/enzyme")
 
-# Configure the MLIR-HLO project
+# Configure the Enzyme project
 execute_process(
     COMMAND ${CMAKE_COMMAND} -G Ninja
-                            -B${CATALYST_MHLO_BUILD_DIR} 
-                            -S ${MHLO_SRC_DIR}
+                            -B${CATALYST_ENZYME_BUILD_DIR} 
+                            -S ${ENZYME_SRC_DIR}
                             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                            -DLLVM_ENABLE_ASSERTIONS=ON
-                            -DMLIR_DIR=${CATALYST_MLIR_INSTALL_DIR}/lib/cmake/mlir
+                            -DENZYME_STATIC_LIB=ON
+                            -DLLVM_DIR=${CATALYST_PKG_INSTALL_DIR}/lib/cmake/llvm
                             -DCMAKE_C_COMPILER_LAUNCHER=${CCACHE_PATH}
                             -DCMAKE_CXX_COMPILER_LAUNCHER=${CCACHE_PATH}
-                            -DPython3_EXECUTABLE=${Python_EXECUTABLE}
                             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                             -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                             -DCMAKE_EXE_LINKER_FLAGS=${USE_SANITIZER_FLAGS}
                             -DLLVM_ENABLE_LLD=${ENABLE_LLD}
-                            -DLLVM_ENABLE_ZLIB=${ENABLE_ZLIB}
-                            -DLLVM_ENABLE_ZSTD=${ENABLE_ZSTD}
                             -DCMAKE_CXX_VISIBILITY_PRESET=${SYMBOL_VISIBILITY}
-
+                            -DCMAKE_POLICY_DEFAULT_CMP0116=NEW
+                            -DCMAKE_INSTALL_PREFIX=${CATALYST_PKG_INSTALL_DIR}
 )
 
-# Build the MLIR binaries and libraries
+# Build the Enzyme binaries and libraries
 execute_process(
-    COMMAND ${CMAKE_COMMAND} --build ${CATALYST_MHLO_BUILD_DIR} --verbose
+    COMMAND ${CMAKE_COMMAND} --build ${CATALYST_ENZYME_BUILD_DIR} --verbose
 )
 # Install the built tooling into the given directory
 execute_process(
-    COMMAND ${CMAKE_COMMAND} --install ${CATALYST_MHLO_BUILD_DIR} --prefix ${CATALYST_PKG_INSTALL_DIR}
+    COMMAND ${CMAKE_COMMAND} --install ${CATALYST_ENZYME_BUILD_DIR} --prefix ${CATALYST_PKG_INSTALL_DIR}
 )
 
+
+#####################################################################
+# 5. Build standalone plugin
+#####################################################################
+
+set(CATALYST_STANDALONE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/BuildSP" CACHE PATH "Path to build directory for standalone MLIR plugin")
+set(CATALYST_STANDALONE_SRC_DIR "${PROJECT_SOURCE_DIR}/llvm-project/mlir/examples/standalone" CACHE PATH "Path to source directory for standalone MLIR plugin")
+
+# Configure the standalone project
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env LIT_FILTER_OUT="chlo_legalize_to_mhlo"
-    --build ${CATALYST_MHLO_BUILD_DIR} --target check-mlir-hlo
+    COMMAND ${CMAKE_COMMAND} -G Ninja
+                            -B${CATALYST_STANDALONE_BUILD_DIR} 
+                            -S ${CATALYST_STANDALONE_SRC_DIR}
+                            -DMLIR_DIR=${CATALYST_PKG_INSTALL_DIR}/lib/cmake/mlir
+                            -DLLVM_EXTERNAL_LIT=${CATALYST_MLIR_BUILD_DIR}/bin/llvm-lit
+                            -DPython3_EXECUTABLE=${Python_EXECUTABLE}
+                            -DPython3_NumPy_INCLUDE_DIRS=${Python_NumPy_INCLUDE_DIRS}
+                            -DCATALYST_TOOLS_DIR=${CATALYST_PKG_INSTALL_DIR}/bin
+)
+# Build the standalone module
+execute_process(
+    COMMAND ${CMAKE_COMMAND} --build ${CATALYST_STANDALONE_BUILD_DIR} --target check-standalone
 )
 
-
 #####################################################################
-# X. Add required modules for building our extensions and passes
+# 6. Build the supported dialects
 #####################################################################
 
+# Find the built packages from earlier
+find_package(LLVM REQUIRED CONFIG)
+find_package(MLIR REQUIRED CONFIG)
+find_package(MHLO REQUIRED CONFIG)
+
+# Set required modules for compilation
 include(AddLLVM REQUIRED)
 include(TableGen REQUIRED)
 include(AddMLIR REQUIRED)
 include(HandleLLVMOptions REQUIRED)
-
-find_package(LLVM REQUIRED CONFIG)
-find_package(MLIR REQUIRED CONFIG)
-
-
-
-if (NOT DEFINED MLIR_DIR)
-  message(FATAL_ERROR "MLIR_DIR is not configured but it is required. "
-    "Set the cmake option MLIR_DIR, e.g.,\n"
-    "    cmake -DMLIR_DIR=/path/to/llvm-project/build/lib/cmake/mlir ..\n"
-    )
-endif()
-
-#llvm_map_components_to_libnames(llvm_libs support core mlir)
-add_subdirectory(mlir-hlo)
-
-message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
@@ -254,34 +267,6 @@ if(LLVM_USE_SANITIZER)
     add_link_options(-fsanitize=address)
   endif()
 endif()
-
-
-#######################################################################
-
-# Configure and build MLIR HLO project
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -B${CMAKE_CURRENT_BINARY_DIR}/BuildMHLO 
-                             ${CMAKE_SOURCE_DIR}/llvm-project/llvm
-                            -DLLVM_TARGETS_TO_BUILD=X86
-                            -DLLVM_ENABLE_PROJECTS=mlir
-                            -DCMAKE_BUILD_TYPE=Release
-                            -DCMAKE_CXX_COMPILER_LAUNCHER=${CCACHE_PATH}
-                            -G Ninja
-                            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR}/BuildMLIR --verbose
-)
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --install ${CMAKE_CURRENT_BINARY_DIR}/BuildMLIR --prefix ${CMAKE_CURRENT_BINARY_DIR}/InstallMLIR
-)
-
-
-#######################################################################
-
-set(MHLO_EXTERNAL_PROJECT_BUILD 0)
-
-find_package(MHLO REQUIRED CONFIG)
 
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
