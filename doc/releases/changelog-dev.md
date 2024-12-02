@@ -39,6 +39,9 @@
 * Improves the readability of conditional passes in pipelines
   [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
 
+* Cleans up the output of compiler instrumentation.
+  [(#1343)](https://github.com/PennyLaneAI/catalyst/pull/1343)
+
 <h3>Breaking changes 💔</h3>
 
 * The `toml` module has been migrated to PennyLane with an updated schema for declaring device
@@ -85,6 +88,11 @@
 * Sink patching of autograph's allowlist.
   [(#1332)](https://github.com/PennyLaneAI/catalyst/pull/1332)
   [(#1337)](https://github.com/PennyLaneAI/catalyst/pull/1337)
+
+* Each qnode now has its own transformation schedule.
+  Instead of relying on the name of the qnode, each qnode now has a transformation module,
+  which denotes the transformation schedule, embedded in its MLIR representation.
+  [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
 
 <h3>Documentation 📝</h3>
 
