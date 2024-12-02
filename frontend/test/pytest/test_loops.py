@@ -33,7 +33,6 @@ class TestLoopToJaxpr:
         expected = dedent(
             """
             { lambda ; a:f64[]. let
-                transform_named_sequence 
                 b:i64[] c:f64[] = while_loop[
                   body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
                   body_nconsts=0
@@ -62,7 +61,6 @@ class TestLoopToJaxpr:
         expected = dedent(
             """
             { lambda ; a:f64[] b:i64[]. let
-                transform_named_sequence 
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
                   body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let

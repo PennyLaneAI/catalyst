@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --ions-decomposition="func-name=test_ions_decomposition"  --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --ions-decomposition --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_ions_decomposition(%arg0: f64) -> !quantum.bit {
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
