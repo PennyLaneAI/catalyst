@@ -48,6 +48,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     # Cache external project sources
     # Hopefully these can be shared with the main check-catalyst action since we don't run this
     # build in a container.
@@ -227,6 +232,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     - name: Install Dependencies (System)
       run: |
         brew install libomp
@@ -296,6 +306,8 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
+        # On GH images, gfortran is only available as a specific version.
+        export FC=gfortran-14
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
@@ -345,6 +357,7 @@ jobs:
     - name: Build Standalone Plugin
       run: |
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         make standalone-plugin
         mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
 
@@ -385,6 +398,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4

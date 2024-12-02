@@ -64,7 +64,7 @@ def test_multiple_tape_transforms():
 
     # CHECK: circuit_twotapes
     # CHECK: call_jaxpr={ lambda ;
-    # CHECK-NEXT: qdevice[
+    # CHECK: qdevice[
     # CHECK: ]
     # CHECK: qdealloc
     # CHECK-NEXT: qdevice[

@@ -20,6 +20,7 @@ with the compiler and device.
 from typing import Any, Callable, Sequence, Union
 
 from pennylane import transform
+from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.measurements import (
     ExpectationMP,
     MutualInfoMP,
@@ -38,7 +39,6 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.toml import OperationProperties
 
 
 def _verify_nested(
@@ -84,11 +84,12 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     if isinstance(obs, CompositeOp):
         for o in obs.operands:
             _verify_observable(o, _obs_checker)
+
     elif isinstance(obs, SymbolicOp):
         _verify_observable(obs.base, _obs_checker)
 
 
-EMPTY_PROPERTIES = OperationProperties(False, False, False)
+EMPTY_PROPERTIES = OperatorProperties()
 
 
 @transform
@@ -113,7 +114,8 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         DifferentiableCompileError: gradient-related error
         CompileError: compilation error
     """
-    op_support = qjit_device.capabilities.native_ops
+
+    supported_ops = qjit_device.capabilities.operations
 
     def _paramshift_op_checker(op):
         if not isinstance(op, HybridOp):
@@ -131,7 +133,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             op_name = op.base.name
         else:
             op_name = op.name
-        if not op_support.get(op_name, EMPTY_PROPERTIES).differentiable:
+        if not supported_ops.get(op_name, EMPTY_PROPERTIES).differentiable:
             raise DifferentiableCompileError(
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
@@ -154,7 +156,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_control:
             return isinstance(op, HybridCtrl)
 
-        if not op_support.get(op.name, EMPTY_PROPERTIES).controllable:
+        if not supported_ops.get(op.name, EMPTY_PROPERTIES).controllable:
             raise CompileError(
                 f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
             )
@@ -179,7 +181,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_inverse:
             return isinstance(op, HybridAdjoint)
 
-        if not op_support.get(op.name, EMPTY_PROPERTIES).invertible:
+        if not supported_ops.get(op.name, EMPTY_PROPERTIES).invertible:
             raise CompileError(
                 f"{op.name} is not invertible on '{qjit_device.original_device.name}' device"
             )
@@ -196,9 +198,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             pass
         # Don't check StatePrep since StatePrep is not in the list of device capabilities.
         # It is only valid when the TOML file has the initial_state_prep_flag.
-        elif isinstance(op, StatePrepBase) and qjit_device.capabilities.initial_state_prep_flag:
+        elif isinstance(op, StatePrepBase) and qjit_device.capabilities.initial_state_prep:
             pass
-        elif not op.name in op_support:
+        elif not op.name in supported_ops:
             raise CompileError(
                 f"{op.name} is not supported on '{qjit_device.original_device.name}' device"
             )
@@ -248,7 +250,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     """Validate that the observables on the tape support adjoint differentiation"""
 
     def _obs_checker(obs):
-        if not qjit_device.capabilities.native_obs.get(obs.name, EMPTY_PROPERTIES).differentiable:
+        if not qjit_device.capabilities.observables.get(obs.name, EMPTY_PROPERTIES).differentiable:
             raise DifferentiableCompileError(
                 f"{obs.name} is non-differentiable on "
                 f"'{qjit_device.original_device.name}' device"
@@ -263,14 +265,14 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 @transform
 def validate_measurements(
-    tape: QuantumTape, capabilities: dict, name: str, shots: Union[int, Shots]
+    tape: QuantumTape, capabilities: DeviceCapabilities, name: str, shots: Union[int, Shots]
 ) -> (Sequence[QuantumTape], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
     from the TOML file.
 
     Args:
         tape (QuantumTape or QNode or Callable): a quantum circuit.
-        capabilities (dict): specifies the capabilities of the qjitted device
+        capabilities (DeviceCapabilities): specifies the capabilities of the qjitted device
         name: the name of the device to use in error messages
         shots: the shots on the device to use in error messages
 
@@ -284,7 +286,7 @@ def validate_measurements(
     """
 
     def _obs_checker(obs):
-        if not obs.name in capabilities.native_obs:
+        if not obs.name in capabilities.observables:
             raise CompileError(
                 f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
             )
@@ -309,10 +311,10 @@ def validate_measurements(
                 f"Sample-based measurements like {m} cannot work with shots=None. "
                 "Please specify a finite number of shots."
             )
-        mp_name = m.return_type.value if m.return_type else type(m).__name__
-        if not mp_name.title() in capabilities.measurement_processes:
+        mp_name = type(m).__name__
+        if not mp_name in capabilities.measurement_processes:
             raise CompileError(
-                f"{type(m)} is not a supported measurement process on '{name}' with Catalyst"
+                f"{mp_name} is not a supported measurement process on '{name}' with Catalyst"
             )
 
     return (tape,), lambda x: x[0]

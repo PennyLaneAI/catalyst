@@ -38,7 +38,7 @@ from typing import Optional
 
 import pennylane as qml
 
-from catalyst.jax_primitives import apply_registered_pass_p, transform_named_sequence_p
+from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.tracing.contexts import EvaluationContext
 
 
@@ -145,8 +145,7 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
         fn_original_name = fn.__name__
         wrapped_qnode_function = fn.func
         fn_clone = copy.copy(fn)
-        uniquer = str(_rename_to_unique())
-        fn_clone.__name__ = fn_original_name + "_transformed" + uniquer
+        fn_clone.__name__ = fn_original_name + "_transformed"
 
         pass_names = _API_name_to_pass_name()
 
@@ -170,7 +169,6 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
                         opt += " " + str(option) + "=" + str(option_value)
                     apply_registered_pass_p.bind(
                         pass_name=pass_names[API_name],
-                        options=f"func-name={fn_original_name}" + "_transformed" + uniquer + opt,
                     )
             return wrapped_qnode_function(*args, **kwrags)
 
@@ -297,19 +295,17 @@ def cancel_inverses(fn=None):
 
     funcname = fn.__name__
     wrapped_qnode_function = fn.func
-    uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
         if EvaluationContext.is_tracing():
             apply_registered_pass_p.bind(
                 pass_name="remove-chained-self-inverse",
-                options=f"func-name={funcname}" + "_cancel_inverses" + uniquer,
             )
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone = copy.copy(fn)
     fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_cancel_inverses" + uniquer
+    fn_clone.__name__ = funcname + "_cancel_inverses"
 
     return fn_clone
 
@@ -380,65 +376,29 @@ def merge_rotations(fn=None):
 
     funcname = fn.__name__
     wrapped_qnode_function = fn.func
-    uniquer = str(_rename_to_unique())
 
     def wrapper(*args, **kwrags):
         if EvaluationContext.is_tracing():
             apply_registered_pass_p.bind(
                 pass_name="merge-rotations",
-                options=f"func-name={funcname}" + "_merge_rotations" + uniquer,
             )
         return wrapped_qnode_function(*args, **kwrags)
 
     fn_clone = copy.copy(fn)
     fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_merge_rotations" + uniquer
+    fn_clone.__name__ = funcname + "_merge_rotations"
 
     return fn_clone
-
-
-## IMPL and helpers ##
-# pylint: disable=missing-function-docstring
-class _PipelineNameUniquer:
-    def __init__(self, i):
-        self.i = i
-
-    def get(self):
-        self.i += 1
-        return self.i
-
-    def reset(self):
-        self.i = -1
-
-
-PipelineNameUniquer = _PipelineNameUniquer(-1)
-
-
-def _rename_to_unique():
-    return PipelineNameUniquer.get()
 
 
 def _API_name_to_pass_name():
     return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotations"}
 
 
-def _inject_transform_named_sequence():
-    """
-    Inject a transform_named_sequence jax primitive.
-
-    This must be called when preprocessing the traced function in QJIT.capture(),
-    since to invoke -apply-transform-sequence, a transform_named_sequence primitive
-    must be in the jaxpr.
-    """
-
-    transform_named_sequence_p.bind()
-
-
-def add_mlir_quantum_decomposition(f, device):
+def _add_mlir_quantum_decomposition(device):
     """When called it adds the MLIR decomposition pass thanks to the transform dialect."""
     # TODO: make this non related to the name of the device
     if device.original_device.name == "oqd.cloud":
         apply_registered_pass_p.bind(
             pass_name="ions-decomposition",
-            options=f"func-name={f.__name__}",
         )

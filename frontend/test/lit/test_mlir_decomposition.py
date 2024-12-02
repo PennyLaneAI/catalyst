@@ -58,7 +58,7 @@ class CustomDevice(NullQubit):
 
     name = "oqd.cloud"
 
-    config = CONFIG_CUSTOM_DEVICE
+    config_filepath = CONFIG_CUSTOM_DEVICE
 
     @staticmethod
     def get_c_interface():
@@ -85,9 +85,7 @@ def test_decomposition_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: transform_named_sequence
     # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   options=func-name=test_decomposition_lowering_workflow
     # CHECK:   pass_name=ions-decomposition
     # CHECK: ]
     print_jaxpr(test_decomposition_lowering_workflow, 1.2)

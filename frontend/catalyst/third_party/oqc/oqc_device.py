@@ -36,7 +36,7 @@ class OQCDevice(Device):
     """The OQC device allows to access the hardware devices from OQC using
     Catalyst."""
 
-    config = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/backend" + "/oqc.toml"
+    config_filepath = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/backend" + "/oqc.toml"
 
     @staticmethod
     def get_c_interface():
