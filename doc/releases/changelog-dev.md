@@ -89,6 +89,11 @@
   [(#1332)](https://github.com/PennyLaneAI/catalyst/pull/1332)
   [(#1337)](https://github.com/PennyLaneAI/catalyst/pull/1337)
 
+* Each qnode now has its own transformation schedule.
+  Instead of relying on the name of the qnode, each qnode now has a transformation module,
+  which denotes the transformation schedule, embedded in its MLIR representation.
+  [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an

@@ -290,8 +290,6 @@ value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
 apply_registered_pass_p = core.Primitive("apply_registered_pass")
-transform_named_sequence_p = core.Primitive("transform_named_sequence")
-transform_named_sequence_p.multiple_results = True
 set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
@@ -424,20 +422,7 @@ def get_named_sequence_in_module(mod):
     return None
 
 
-#
-# transform_named_sequence
-#
-@transform_named_sequence_p.def_abstract_eval
-def _transform_named_sequence_p_abstract_eval(*args):
-    return ()
-
-
-@transform_named_sequence_p.def_impl
-def _transform_named_sequence_p_def_impl(*args):  # pragma: no cover
-    raise NotImplementedError()
-
-
-def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, *args):
+def _transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext):
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
 
@@ -496,18 +481,14 @@ def _apply_registered_pass_lowering(
     jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
 ):
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
-    module = jax_ctx.module_context.module
+    inner = jax_ctx.module_context.module
     named_sequence_op = None
-    # module is a nested module
-    # parent_module is the root module
-    # E.g.,
-    #
-    # ```mlir/pseudocode
+
+    # ```mlir
     # module @root {
     #   module @inner {
-    #     func.func @qnode
-    #   }
-    #   module @transform {
+    #     func.func @qnode { }
+    #     module @transform { }
     #   }
     # }
     # ```
@@ -515,11 +496,7 @@ def _apply_registered_pass_lowering(
     # When this function is executed we are likely
     # somewhere around func.func @qnode.
     #
-    # jax_ctx.module_context.module holds a reference to @inner
-    #
-    # This means that it's parent is @root.
-    parent_module = module.parent
-    for op in reversed(parent_module.regions[0].blocks[0].operations):
+    for op in reversed(inner.regions[0].blocks[0].operations):
         # Look for the module @transform that holds the transformation schedule
         # TODO: Find a better way to search for the module with the transform schedule.
         if op.operation.name == "builtin.module":
@@ -712,6 +689,7 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
     name = "module_" + callable_.__name__
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        _transform_named_sequence_lowering(ctx)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
         func_op.sym_visibility = ir.StringAttr.get("public")
@@ -2386,7 +2364,6 @@ CUSTOM_LOWERING_RULES = (
     (python_callback_p, _python_callback_lowering),
     (value_and_grad_p, _value_and_grad_lowering),
     (apply_registered_pass_p, _apply_registered_pass_lowering),
-    (transform_named_sequence_p, _transform_named_sequence_lowering),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),
