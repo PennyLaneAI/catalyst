@@ -55,6 +55,13 @@ class OQDDeviceParameter:
         unit: The unit associated with the parameter value, if applicable.
     """
 
+    # TODO: Some parameters, mainly laser frequencies, are expressed as the sum of a nominal
+    # wavelength and a frequency offset, e.g. '493 nm - 7.506 GHz', which is equal to 493.0061 nm.
+    # We need to be able to support this.
+    # Furthermore, some parameters may either have one value or have two simultaneous values, e.g.
+    # 'Doppler cooling laser frequency', which has values '493 nm - 7.506 GHz' and
+    # '493 nm + 4.259 GHz'. We need to be able to support this as well.
+
     description: str = ""
     stage: str = ""
     process: str = ""
@@ -67,11 +74,12 @@ class OQDDeviceParameter:
 class OQDDeviceProperties:
     """A class to represent the properties of an OQD device.
 
-    The properties of the device include [TODO: hardware specification, experimental
-    parameters, etc.]
+    The properties of the device include hardware specification, parameters relating to the
+    experimental apparatus, and generally any other parameters needed by the compiler. Physical
+    constants, such as the energy levels of the ion(s) being uses, are handled separately.
 
     Attributes:
-        parameters: A dictionary of device parameters.
+        parameters: A dictionary of OQD device parameters.
     """
 
     parameters: dict[str, OQDDeviceParameter] = field(default_factory=dict)
@@ -81,7 +89,7 @@ class OQDDeviceProperties:
         """Loads an OQDDeviceProperties object from a TOML file.
 
         Args:
-            filepath (str): The path to the TOML file.
+            filepath: The path to the TOML file.
         """
         document = cls._load_toml_file(filepath)
         properties = cls._parse_toml_document(document)
@@ -90,8 +98,9 @@ class OQDDeviceProperties:
 
 @dataclass
 class OQDIonLevelParameters:
-    """A class to represent ... for an OQD trapped-ion experiment workflow."""
+    """A class to represent ion energy levels for an OQD trapped-ion experiment workflow."""
 
+    # pylint: disable=too-many-instance-attributes
     name: str
     principal: float
     spin: float
@@ -104,6 +113,16 @@ class OQDIonLevelParameters:
 
     @classmethod
     def from_dict(cls, name: str, params: dict) -> "OQDIonLevelParameters":
+        """Creates an OQDIonLevelParameters object from a dictionary.
+
+        Args:
+            name: The name of the level, e.g. 'downstate', 'upstate', 'estate', etc.
+            params: A dictionary containing the level parameters, including the relevant quantum
+                numbers and the level energy, typically as parsed from a TOML document.
+
+        Returns:
+            OQDIonLevelParameters: The OQDIonLevelParameters object.
+        """
         return cls(
             name=name,
             principal=params["principal"],
@@ -119,7 +138,8 @@ class OQDIonLevelParameters:
 
 @dataclass
 class OQDIonTransitionParameters:
-    """A class to represent ... for an OQD trapped-ion experiment workflow."""
+    """A class to represent a specific transition between ion energy levels for an OQD trapped-ion
+    experiment workflow."""
 
     name: str
     level1: str
@@ -128,6 +148,17 @@ class OQDIonTransitionParameters:
 
     @classmethod
     def from_dict(cls, name: str, params: dict) -> "OQDIonTransitionParameters":
+        """Creates an OQDIonTransitionParameters object from a dictionary.
+
+        Args:
+            name: The name of the transition as '<level1>_<level2>', e.g. 'downstate_upstate',
+                'upstate_downstate', etc.
+            params: A dictionary containing the transition parameters, typically as parsed from a
+                TOML document.
+
+        Returns:
+            OQDIonTransitionParameters: The OQDIonTransitionParameters object.
+        """
         return cls(
             name=name,
             level1=params["level1"],
@@ -138,7 +169,7 @@ class OQDIonTransitionParameters:
 
 @dataclass
 class OQDIonParameters:
-    """A class to represent ... for an OQD trapped-ion experiment workflow."""
+    """A class to represent an ion used in an OQD trapped-ion experiment workflow."""
 
     mass: float
     charge: int
@@ -148,6 +179,15 @@ class OQDIonParameters:
 
     @classmethod
     def from_dict(cls, params: dict) -> "OQDIonParameters":
+        """Creates an OQDIonParameters object from a dictionary.
+
+        Args:
+            params: A dictionary containing the ion parameters, typically as parsed from a TOML
+                document.
+
+        Returns:
+            OQDIonParameters: The OQDIonParameters object.
+        """
         return cls(
             mass=params["mass"],
             charge=params["charge"],
@@ -165,13 +205,22 @@ class OQDIonParameters:
 
 @dataclass
 class OQDPhononParameters:
-    """A class to represent ... for an OQD trapped-ion experiment workflow."""
+    """A class to represent a phonon mode for an OQD trapped-ion experiment workflow."""
 
     energy: Union[float, str]
     eigenvector: list[int]
 
     @classmethod
     def from_dict(cls, params: dict) -> "OQDPhononParameters":
+        """Creates an OQDPhononParameters object from a dictionary.
+
+        Args:
+            params: A dictionary containing the phonon mode parameters, typically as parsed from a
+                TOML document.
+
+        Returns:
+            OQDPhononParameters: The OQDPhononParameters object.
+        """
         return cls(
             energy=_parse_value_or_expression_as_float(params["energy"]),
             eigenvector=params["eigenvector"],
@@ -180,7 +229,7 @@ class OQDPhononParameters:
 
 @dataclass
 class OQDQubitParameters:
-    """A class to represent ... for an OQD trapped-ion experiment workflow."""
+    """A class to represent the qubit parameters for an OQD trapped-ion experiment workflow."""
 
     ion_parameters: dict[str, OQDIonParameters]
     phonon_parameters: dict[str, OQDPhononParameters]
@@ -266,12 +315,12 @@ def _load_toml_from_string(contents: str) -> dict:
 #     return OQDDeviceProperties(parameters=document["parameters"])
 
 
-def _parse_value_or_expression_as_float(input: Union[Number, str]):
+def _parse_value_or_expression_as_float(input_: Union[Number, str]):
     """Parses a numeric value, or an expression that can be evaluated to a numeric value, and return
     as a float.
 
     Args:
-        x (Union[Number, str]): The numeric value or expression to be evaluated.
+        input_: The numeric value or expression to be evaluated.
 
     Returns:
         float: The original value, or the evaluated expression, as a float.
@@ -280,19 +329,19 @@ def _parse_value_or_expression_as_float(input: Union[Number, str]):
         ValueError: If the expression is invalid.
         TypeError: If the input is not a number or string.
     """
-    if isinstance(input, Number):
-        return float(input)
+    if isinstance(input_, Number):
+        return float(input_)
 
-    elif isinstance(input, str):
+    elif isinstance(input_, str):
         try:
-            result = float(safe_eval(input))
+            result = float(safe_eval(input_))
         except Exception as e:
-            raise ValueError(f"Invalid expression: '{input}'") from e
+            raise ValueError(f"Invalid expression: '{input_}'") from e
 
         return result
 
     else:
-        raise TypeError(f"Expected a number or string, but got {type(input)}")
+        raise TypeError(f"Expected a number or string, but got {type(input_)}")
 
 
 def _check_oqd_config_schema(document: dict):
@@ -307,7 +356,7 @@ def _check_oqd_config_schema(document: dict):
     )
 
 
-def _string_or_collection_of_strings_to_set(input: Union[str, Collection[str]]) -> set[str]:
+def _string_or_collection_of_strings_to_set(input_: Union[str, Collection[str]]) -> set[str]:
     """Converts a string or a collection of strings to a set of strings.
 
     Args:
@@ -319,12 +368,14 @@ def _string_or_collection_of_strings_to_set(input: Union[str, Collection[str]]) 
     Returns:
         set[str]: The set of strings.
     """
-    if isinstance(input, str):
-        return {input}
-    elif isinstance(input, Collection):
+    if isinstance(input_, str):
+        return {input_}
+
+    elif isinstance(input_, Collection):
         assert all(
-            isinstance(item, str) for item in input
+            isinstance(item, str) for item in input_
         ), "All items in collection must be strings"
-        return set(input)
+        return set(input_)
+
     else:
         raise TypeError("Input must be a string or a collection of strings.")
