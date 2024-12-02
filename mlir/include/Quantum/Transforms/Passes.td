@@ -91,10 +91,6 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
-class QuantumCircuitTransformationPassBase {
-    list<Option> options = [];
-}
-
 def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
 
