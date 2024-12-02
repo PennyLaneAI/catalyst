@@ -303,44 +303,27 @@ def cancel_inverses(qnode=None):
 
     return wrapper
 
+
 def apply_pass(pass_name, *flags, **valued_options):
-    """
-    """
+    """ """
 
-    def decorator(fn):
+    def decorator(qnode):
 
-        if not isinstance(fn, qml.QNode):
+        if not isinstance(qnode, qml.QNode):
             # Technically, this apply pass is general enough that it can apply to
             # classical functions too. However, since we lack the current infrastructure
             # to denote a function, let's limit it to qnodes
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-        funcname = fn.__name__
-        wrapped_qnode_function = fn.func
-        uniquer = str(_rename_to_unique())
+        def qnode_call(*args, **kwargs):
+            pipeline = kwargs.get("pass_pipeline", [])
+            pipeline.append(Pass(pass_name))
+            kwargs["pass_pipeline"] = pipeline
+            return qnode(*args, **kwargs)
 
-        options = []
-        for flag in flags:
-            options += ["{flag}"]
-        for option_name, val in valued_options.items():
-            options += ["{option_name}={val}"]
-
-        options += [f"func-name={funcname}" + f"_{pass_name}" + uniquer]
-        options = ",".join(options)
-
-        def wrapper(*args, **kwargs):
-            if EvaluationContext.is_tracing():
-                apply_registered_pass_p.bind(pass_name=pass_name, options = options)
-            return wrapped_qnode_function(*args, **kwargs)
-
-        fn_clone = copy.copy(fn)
-        fn_clone.func = wrapper
-        fn_clone.__name__ = funcname + f"_{pass_name}" + uniquer
-
-        return fn_clone
+        return qnode_call
 
     return decorator
-
 
 
 def merge_rotations(qnode=None):
