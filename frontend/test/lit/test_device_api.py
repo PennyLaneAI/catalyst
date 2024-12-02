@@ -71,7 +71,7 @@ def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
     # CHECK: [[shots:%.+]] = arith.constant 2048 : i64
-    # CHECK:    quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
+    # CHECK: quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -97,7 +97,7 @@ def test_preprocess():
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
     # CHECK: [[shots:%.+]] = arith.constant 2048 : i64
-    # CHECK:    quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
+    # CHECK: quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
