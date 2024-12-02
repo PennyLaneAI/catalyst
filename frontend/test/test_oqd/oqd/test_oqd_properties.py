@@ -30,6 +30,8 @@ OQD_TEST_DIR = FRONTEND_ROOT_PATH / "test/test_oqd/oqd/"
 
 @pytest.mark.xfail(reason="OQDDeviceProperties is not yet implemented")
 class TestOQDDeviceProperties:
+    """Test suite for the OQDDeviceProperties class."""
+
     def test_from_toml_file(self):
         """
         Tests that the OQDDeviceProperties.from_toml_file method can load the device properties from
@@ -42,6 +44,8 @@ class TestOQDDeviceProperties:
 
 
 class TestOQDQubitParameters:
+    """Test suite for the OQDQubitParameters class."""
+
     def test_from_toml_production(self):
         """
         Tests that the OQDQubitParameters.from_toml method can load the qubit parameters from the
@@ -107,6 +111,8 @@ class TestOQDQubitParameters:
 
 
 class TestOQDQubitParametersInvalid:
+    """Test suite for the OQDQubitParameters class given invalid TOML input."""
+
     def test_from_toml_invalid_missing_schema(self):
         """
         Tests that the OQDQubitParameters.from_toml method raises an error if the TOML file is
