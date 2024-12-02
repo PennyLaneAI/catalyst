@@ -20,20 +20,14 @@ import pennylane as qml
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
-from catalyst.jax_primitives import (
-    compbasis_p,
-    expval_p,
-    probs_p,
-    state_p,
-    var_p,
-)
+from catalyst.jax_primitives import compbasis_p, expval_p, probs_p, state_p, var_p
 
 
 def test_dynamic_sample_backend_functionality():
     """Test that a `sample` program with dynamic shots can be executed correctly."""
 
     @catalyst.qjit(keep_intermediate=True)
-    def workflow_dyn_sample(shots):
+    def workflow_dyn_sample(shots):  # pylint: disable=unused-argument
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
@@ -115,7 +109,7 @@ def test_dynamic_counts_backend_functionality():
     """Test that a `counts` program with dynamic shots can be executed correctly."""
 
     @catalyst.qjit(keep_intermediate=True)
-    def workflow_dyn_counts(shots):
+    def workflow_dyn_counts(shots):  # pylint: disable=unused-argument
         # qml.device still needs concrete shots
         device = qml.device("lightning.qubit", wires=1, shots=10)
 
