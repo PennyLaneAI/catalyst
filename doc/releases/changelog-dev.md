@@ -90,7 +90,7 @@
   although at the PennyLane side, the device shots still is constrained to a static integer literal.
 
   To support this, `SampleOp` and `CountsOp` in mlir no longer carry the shots attribute, since integer attributes are tied to literal values and must be static.
-  `DeviceInitOp` now takes in an optional SSA argument for shots, which sample and counts operations will retrieve when converting to runtime CAPI calls.
+  `DeviceInitOp` now takes in an optional SSA argument for shots, and the device init runtime CAPI will take in this shots as an argument and set it as the device shots. The sample and counts runtime CAPI functions no longer take in the shots argument and will retrieve shots from the device.
 
   [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
   [(#1310)](https://github.com/PennyLaneAI/catalyst/pull/1310)
