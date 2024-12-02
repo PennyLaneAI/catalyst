@@ -114,7 +114,7 @@ The essential steps are:
         pip install cmake ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
-        brew install libomp ccache
+        brew install libomp ccache gfortran
 
         # Add ccache drop-in compiler replacements to the PATH
         export PATH=/usr/local/opt/ccache/libexec:$PATH
@@ -156,7 +156,9 @@ installed and available on the path (depending on the platform):
 
 - The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker
   (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended), and
-  `OpenMP <https://www.openmp.org/>`_.
+  `OpenMP <https://www.openmp.org/>`_. Additionaly, the
+  `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_ compiler is
+  required on ARM macOS systems.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
   `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
@@ -208,7 +210,7 @@ They can be installed via:
 
         xcode-select --install
         pip install cmake ninja
-        brew install libomp ccache
+        brew install libomp ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 
