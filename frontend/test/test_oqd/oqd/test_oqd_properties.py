@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for parsing and loading the configuration files for an Open Quantum Design (OQD)
+trapped-ion quantum computer device.
+"""
+
 # pylint: disable=import-outside-toplevel
 
 import math
