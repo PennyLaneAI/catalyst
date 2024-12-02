@@ -89,8 +89,9 @@
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst,
   although at the PennyLane side, the device shots still is constrained to a static integer literal.
 
-  To support this, the measurement operations now take in shots as a proper argument
-  instead of an integer attribute with a literal integer value.
+  To support this, `SampleOp` and `CountsOp` in mlir no longer carry the shots attribute, since integer attributes are tied to literal values and must be static.
+  `DeviceInitOp` now takes in an optional SSA argument for shots, which sample and counts operations will retrieve when converting to runtime CAPI calls.
+
   [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
   [(#1310)](https://github.com/PennyLaneAI/catalyst/pull/1310)
 
