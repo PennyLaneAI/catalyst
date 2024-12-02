@@ -17,22 +17,16 @@ This file contains a couple of tests for the capture of measurement primitives i
 
 import jax
 import pennylane as qml
-import pytest
 
 import catalyst
 from catalyst.debug import get_compilation_stage, replace_ir
-from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.jax_primitives import (
     compbasis_p,
-    counts_p,
     expval_p,
     probs_p,
-    sample_p,
     state_p,
     var_p,
 )
-from catalyst.jax_tracer import lower_jaxpr_to_mlir
-from catalyst.tracing.contexts import EvaluationContext
 
 
 def test_dynamic_sample_backend_functionality():
