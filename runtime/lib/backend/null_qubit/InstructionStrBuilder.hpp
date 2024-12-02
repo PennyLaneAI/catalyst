@@ -42,18 +42,34 @@ class InstructionStrBuilder {
     template <typename T> string element_to_str(const complex<T> &c)
     {
         ostringstream oss;
-        oss << c.real();
+        if (c.real() == 0 && c.imag() == 0) {
+            oss << 0;
+            return oss.str();
+        }
+
+        bool is_first = true; // keep track in which term we are so we can add '+' or '-'
+                              // appropriately
+
+        // to keep printing output as short as possible, we only print non-zero coefficients
+        if (c.real() != 0) {
+            oss << c.real();
+            is_first = false;
+        }
 
         if (c.imag() != 0) {
-            // to keep printing output as short as possible, we only print the imaginary part
-            // whenever is different from zero;
-            if (c.imag() > 0) {
-                oss << " + " << c.imag() << "i";
+            if (!is_first) {
+                if (c.imag() > 0) {
+                    oss << " + " << c.imag() << "i";
+                }
+                else {
+                    oss << " - " << -1 * c.imag() << "i";
+                }
             }
             else {
-                oss << " - " << -1 * c.imag() << "i";
+                oss << c.imag() << "i";
             }
         }
+
         return oss.str();
     }
 
