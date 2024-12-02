@@ -52,7 +52,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=()):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
     for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
         assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == (len(jaxpr2.eqns))
+    assert len(jaxpr1.eqns) == len(jaxpr2.eqns)
 
     for i, (eqn1, eqn2) in enumerate(zip(jaxpr1.eqns, jaxpr2.eqns)):
         if i not in skip_eqns:
@@ -495,8 +495,8 @@ class TestHybridPrograms:
         qjit_obj = qml.qjit(workflow)
         qjit_obj(0.5)
 
-        call_jaxpr_pl = converted.eqns[1].params["call_jaxpr"]
-        call_jaxpr_c = qjit_obj.jaxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_pl = _get_call_jaxpr(converted)
+        call_jaxpr_c = _get_call_jaxpr(qjit_obj.jaxpr)
 
         # qubit extraction and classical equations in a slightly different order
         # thus cant check specific equations and have to discard comparing counts
