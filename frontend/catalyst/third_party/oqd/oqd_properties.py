@@ -62,12 +62,25 @@ class OQDDeviceParameter:
     # 'Doppler cooling laser frequency', which has values '493 nm - 7.506 GHz' and
     # '493 nm + 4.259 GHz'. We need to be able to support this as well.
 
+    name: str
     description: str = ""
     stage: str = ""
     process: str = ""
     equation: str = ""
     value: Union[int, float] = None
     unit: str = ""
+
+    @classmethod
+    def from_dict(cls, name: str, level: dict):
+        return cls(
+            name=name,
+            description=level["description"],
+            stage=level["stage"],
+            process=level["process"],
+            equation=level["equation"],
+            value=level["value"],
+            unit=level["unit"],
+        )
 
 
 @dataclass
@@ -85,15 +98,43 @@ class OQDDeviceProperties:
     parameters: dict[str, OQDDeviceParameter] = field(default_factory=dict)
 
     @classmethod
-    def from_toml_file(cls, filepath: str):
-        """Loads an OQDDeviceProperties object from a TOML file.
+    def from_toml(cls, filepath_or_buffer: Union[str, PathLike]):
+        """Loads an OQDDeviceProperties object from a TOML file or string.
 
         Args:
-            filepath: The path to the TOML file.
+            filepath_or_buffer: The path to the TOML file or a TOML document string.
         """
-        document = cls._load_toml_file(filepath)
+        try:
+            if os.path.isfile(filepath_or_buffer):
+                document = _load_toml_from_file(filepath_or_buffer)
+            else:
+                document = _load_toml_from_string(filepath_or_buffer)
+
+        except Exception as e:
+            raise ValueError(
+                "Failed to load TOML document when creating OQDDeviceProperties"
+            ) from e
+
         properties = cls._parse_toml_document(document)
         return properties
+
+    @classmethod
+    def _parse_toml_document(cls, document: dict):
+        """Parses a TOML document and returns an OQDDeviceProperties object."""
+        _check_oqd_config_schema(document)
+        cls._check_required_keys(document)
+        return cls(
+            parameters={
+                name: OQDDeviceParameter.from_dict(name, level)
+                for name, level in document["parameters"].items()
+            }
+        )
+
+    @staticmethod
+    def _check_required_keys(document: dict):
+        assert (
+            "parameters" in document
+        ), "TOML document for OQD device parameters must contain key 'parameters'"
 
 
 @dataclass
@@ -250,10 +291,14 @@ class OQDQubitParameters:
             phonon_mode_filter (optional): A list of phonon modes to include in the
                 OQDQubitParameters object. If None, all phonon modes are included.
         """
-        if os.path.isfile(filepath_or_buffer):
-            document = _load_toml_from_file(filepath_or_buffer)
-        else:
-            document = _load_toml_from_string(filepath_or_buffer)
+        try:
+            if os.path.isfile(filepath_or_buffer):
+                document = _load_toml_from_file(filepath_or_buffer)
+            else:
+                document = _load_toml_from_string(filepath_or_buffer)
+
+        except Exception as e:
+            raise ValueError("Failed to load TOML document when creating OQDQubitParameters") from e
 
         _check_oqd_config_schema(document)
         cls._check_required_keys(document)

@@ -29,19 +29,69 @@ OQD_SRC_DIR = FRONTEND_ROOT_PATH / "catalyst/third_party/oqd/src/"
 OQD_TEST_DIR = FRONTEND_ROOT_PATH / "test/test_oqd/oqd/"
 
 
-@pytest.mark.xfail(reason="OQDDeviceProperties is not yet implemented")
 class TestOQDDeviceProperties:
     """Test suite for the OQDDeviceProperties class."""
 
-    def test_from_toml_file(self):
+    def test_from_toml_production(self):
         """
-        Tests that the OQDDeviceProperties.from_toml_file method can load the device properties from
-        a valid TOML file.
+        Tests that the OQDDeviceProperties.from_toml method can load the device properties from the
+        oqd_device_parameters.toml file used in production.
         """
         from catalyst.third_party.oqd import OQDDeviceProperties
 
-        properties = OQDDeviceProperties.from_toml_file(OQD_SRC_DIR / "oqd_device_properties.toml")
+        properties = OQDDeviceProperties.from_toml(OQD_SRC_DIR / "oqd_device_parameters.toml")
         assert properties.parameters
+
+    def test_from_toml_string(self):
+        """
+        Tests that the OQDDeviceProperties.from_toml method can load the device properties from a
+        TOML document string.
+        """
+        from catalyst.third_party.oqd import OQDDeviceProperties
+
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.1"
+
+            #  Parameters
+            [parameters.N_load]
+            description = "Number of ions"
+            stage = "Loading"
+            process = "Ablation"
+            equation = ""
+            value = 1
+            unit = ""
+
+            [parameters.w_ablation]
+            description = "Ablation laser frequency"
+            stage = "Loading"
+            process = "Ablation"
+            equation = ""
+            value = 532
+            unit = "nm"
+            """
+        )
+
+        properties = OQDDeviceProperties.from_toml(toml_document)
+        assert properties.parameters
+
+        assert properties.parameters["N_load"]
+        assert properties.parameters["N_load"].name == "N_load"
+        assert properties.parameters["N_load"].description == "Number of ions"
+        assert properties.parameters["N_load"].stage == "Loading"
+        assert properties.parameters["N_load"].process == "Ablation"
+        assert properties.parameters["N_load"].equation == ""
+        assert properties.parameters["N_load"].value == 1
+        assert properties.parameters["N_load"].unit == ""
+
+        assert properties.parameters["w_ablation"]
+        assert properties.parameters["w_ablation"].name == "w_ablation"
+        assert properties.parameters["w_ablation"].description == "Ablation laser frequency"
+        assert properties.parameters["w_ablation"].stage == "Loading"
+        assert properties.parameters["w_ablation"].process == "Ablation"
+        assert properties.parameters["w_ablation"].equation == ""
+        assert properties.parameters["w_ablation"].value == 532
+        assert properties.parameters["w_ablation"].unit == "nm"
 
 
 class TestOQDQubitParameters:
