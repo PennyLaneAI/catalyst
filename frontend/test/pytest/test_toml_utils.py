@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the safe_eval module.
+"""Tests for the toml_utils module.
 """
 
 import math
 
 import pytest
 
-from catalyst.third_party.oqd.safe_eval import safe_eval
+from catalyst.utils.toml_utils import safe_eval
 
 
 class TestSafeEval:

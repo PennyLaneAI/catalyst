@@ -13,14 +13,10 @@
 # limitations under the License.
 
 """
-Safe Expression Evaluation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+TOML Utilities
+~~~~~~~~~~~~~~
 
-This module provides a lightweight tool, `safe_eval`, for evaluating mathematical expressions. The
-usage of `safe_eval` should be preferred wherever possible over Python's builtin `eval()` function,
-whose ability to perform arbitrary code execution of a user's input makes it inherently unsafe.
-The functionality of `safe_eval` is deliberately limited to basic mathematical operations to prevent
-malicious code, intentional or not, from being evaluated.
+A collection of utility functions for working with TOML configuration files.
 """
 
 import ast
@@ -44,6 +40,11 @@ def safe_eval(expr: str) -> float:
     Safely evaluate a mathematical expression.
 
     Mathematical constants and functions from the math module are supported.
+
+    The usage of `safe_eval` should be preferred wherever possible over Python's builtin `eval()`
+    function, whose ability to perform arbitrary code execution of a user's input makes it
+    inherently unsafe. The functionality of `safe_eval` is deliberately limited to basic
+    mathematical operations to prevent malicious code, intentional or not, from being evaluated.
 
     Parameters:
         expr (str): The arithmetic expression to evaluate.

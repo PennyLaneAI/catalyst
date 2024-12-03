@@ -29,7 +29,7 @@ from numbers import Number
 from os import PathLike
 from typing import Union, Collection
 
-from .safe_eval import safe_eval
+from catalyst.utils.toml_utils import safe_eval
 
 if sys.version_info >= (3, 11):
     import tomllib as toml  # pragma: no cover
