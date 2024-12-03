@@ -71,15 +71,25 @@ class OQDDeviceParameter:
     unit: str = ""
 
     @classmethod
-    def from_dict(cls, name: str, level: dict):
+    def from_dict(cls, name: str, params: dict) -> "OQDDeviceParameter":
+        """Creates an OQDDeviceParameter object from a dictionary.
+
+        Args:
+            name: The name of the device parameter.
+            params: A dictionary containing the device parameter parameters, typically as parsed
+                from a TOML document.
+
+        Returns:
+            OQDDeviceParameter: The OQDDeviceParameter object.
+        """
         return cls(
             name=name,
-            description=level["description"],
-            stage=level["stage"],
-            process=level["process"],
-            equation=level["equation"],
-            value=level["value"],
-            unit=level["unit"],
+            description=params["description"],
+            stage=params["stage"],
+            process=params["process"],
+            equation=params["equation"],
+            value=params["value"],
+            unit=params["unit"],
         )
 
 
