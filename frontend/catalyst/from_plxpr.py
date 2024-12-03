@@ -368,7 +368,7 @@ class QFuncPlxprInterpreter:
             )
         elif primitive is counts_p:
             mval = bind_dynamic_shot_measurement_primitives(
-                counts_P, device_shots, obs, shape=shaped_array.shape
+                counts_p, device_shots, obs, shape=shaped_array.shape
             )
         else:
             mval = primitive.bind(
