@@ -41,14 +41,12 @@ import pennylane as qml
 from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.tracing.contexts import EvaluationContext
 
-
 ## API ##
 # pylint: disable=line-too-long
 def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
 
     Args:
-        fn (QNode): The QNode to run the pass pipeline on.
         pass_pipeline (dict[str, dict[str, str]]): A dictionary that specifies the pass pipeline order, and optionally
             arguments for each pass in the pipeline. Keys of this dictionary should correspond to names of passes
             found in the `catalyst.passes <https://docs.pennylane.ai/projects/catalyst/en/stable/code
@@ -58,7 +56,7 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
             If not specified, the default pass pipeline will be applied.
 
     Returns:
-        ~.QNode:
+        callable : A decorator that can be applied to a qnode.
 
     For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
 
@@ -150,18 +148,6 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
         pass_names = _API_name_to_pass_name()
 
         def wrapper(*args, **kwrags):
-            # TODO: we should not match pass targets by function name.
-            # The quantum scope work will likely put each qnode into a module
-            # instead of a `func.func ... attributes {qnode}`.
-            # When that is in place, the qnode's module can have a proper attribute
-            # (as opposed to discardable) that records its transform schedule, i.e.
-            #    module_with_transform @name_of_module {
-            #      // transform schedule
-            #    } {
-            #      // contents of the module
-            #    }
-            # This eliminates the need for matching target functions by name.
-
             if EvaluationContext.is_tracing():
                 for API_name, pass_options in pass_pipeline.items():
                     opt = ""
