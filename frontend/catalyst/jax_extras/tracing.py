@@ -966,6 +966,6 @@ def bind_dynamic_shot_measurement_primitives(primitive, shots, *args, **kwargs):
     if isinstance(shots, int):
         kwargs["shots"] = shots
     else:
-        args.append(shots)
+        args += (shots,)
 
     return primitive.bind(*args, **kwargs)
