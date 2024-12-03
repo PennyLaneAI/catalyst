@@ -34,6 +34,7 @@ from catalyst.device import (
     get_device_shots,
 )
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.tracing import bind_dynamic_shot_measurement_primitives
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -362,16 +363,12 @@ class QFuncPlxprInterpreter:
         # we will gradually get rid of the shape argument for these primitives
         # While we are in the migrating process, we need to handle them explicitly one by one
         if primitive is sample_p:
-            mval = (
-                primitive.bind(obs, shots=device_shots, num_qubits=shaped_array.shape[1])
-                if isinstance(device_shots, int)
-                else primitive.bind(obs, device_shots, num_qubits=shaped_array.shape[1])
+            mval = bind_dynamic_shot_measurement_primitives(
+                sample_p, device_shots, obs, num_qubits=shaped_array.shape[1]
             )
         elif primitive is counts_p:
-            mval = (
-                primitive.bind(obs, shots=device_shots, shape=shaped_array.shape)
-                if isinstance(device_shots, int)
-                else primitive.bind(obs, device_shots, shape=shaped_array.shape)
+            mval = bind_dynamic_shot_measurement_primitives(
+                counts_P, device_shots, obs, shape=shaped_array.shape
             )
         else:
             mval = primitive.bind(

@@ -960,3 +960,12 @@ class DynshapePrimitive(JaxprPrimitive):
         eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()
+
+
+def bind_dynamic_shot_measurement_primitives(primitive, shots, *args, **kwargs):
+    if isinstance(shots, int):
+        kwargs["shots"] = shots
+    else:
+        args.append(shots)
+
+    return primitive.bind(*args, **kwargs)
