@@ -41,9 +41,10 @@ import pennylane as qml
 from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.tracing.contexts import EvaluationContext
 
+
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
+def pipeline(pass_pipeline: dict[str, dict[str, str]]):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
 
     Args:

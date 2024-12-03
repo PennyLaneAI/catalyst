@@ -189,12 +189,6 @@ def test_cancel_inverses_bad_usages():
             TypeError,
             match="A QNode is expected, got the classical function",
         ):
-            pipeline()(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
             cancel_inverses(classical_func)
 
         with pytest.raises(
