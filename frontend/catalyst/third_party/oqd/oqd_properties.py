@@ -361,15 +361,6 @@ def _load_toml_from_string(contents: str) -> dict:
     return toml.loads(contents)
 
 
-# def _parse_toml_document(document: dict):
-#     """Parses a TOML document into a OQDDeviceProperties object."""
-
-#     schema = int(document["schema"])
-#     assert schema in SUPPORTED_SCHEMAS, f"Unsupported TOML config schema {schema}"
-
-#     return OQDDeviceProperties(parameters=document["parameters"])
-
-
 def _parse_value_or_expression_as_float(input_: Union[Number, str]):
     """Parses a numeric value, or an expression that can be evaluated to a numeric value, and return
     as a float.
