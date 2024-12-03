@@ -1657,10 +1657,7 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     e:f64[c,1] = sample[num_qubits=1] d c
     """
     if obs.primitive is compbasis_p:
-        # assert shape[1] == obs.num_qubits
         assert num_qubits == obs.num_qubits
-    # else:
-    #    assert len(shape) == 1
 
     out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
     out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
