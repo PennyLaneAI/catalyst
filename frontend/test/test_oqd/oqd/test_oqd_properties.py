@@ -29,25 +29,25 @@ OQD_SRC_DIR = FRONTEND_ROOT_PATH / "catalyst/third_party/oqd/src/"
 OQD_TEST_DIR = FRONTEND_ROOT_PATH / "test/test_oqd/oqd/"
 
 
-class TestOQDDeviceProperties:
-    """Test suite for the OQDDeviceProperties class."""
+class TestOQDDeviceDatabase:
+    """Test suite for the OQDDeviceDatabase class."""
 
     def test_from_toml_production(self):
         """
-        Tests that the OQDDeviceProperties.from_toml method can load the device properties from the
+        Tests that the OQDDeviceDatabase.from_toml method can load the device properties from the
         oqd_device_parameters.toml file used in production.
         """
-        from catalyst.third_party.oqd import OQDDeviceProperties
+        from catalyst.third_party.oqd import OQDDeviceDatabase
 
-        properties = OQDDeviceProperties.from_toml(OQD_SRC_DIR / "oqd_device_parameters.toml")
-        assert properties.parameters
+        device_database = OQDDeviceDatabase.from_toml(OQD_SRC_DIR / "oqd_device_parameters.toml")
+        assert device_database.parameters
 
     def test_from_toml_string(self):
         """
-        Tests that the OQDDeviceProperties.from_toml method can load the device properties from a
+        Tests that the OQDDeviceDatabase.from_toml method can load the device properties from a
         TOML document string.
         """
-        from catalyst.third_party.oqd import OQDDeviceProperties
+        from catalyst.third_party.oqd import OQDDeviceDatabase
 
         toml_document = textwrap.dedent(
             """\
@@ -72,7 +72,7 @@ class TestOQDDeviceProperties:
             """
         )
 
-        properties = OQDDeviceProperties.from_toml(toml_document)
+        properties = OQDDeviceDatabase.from_toml(toml_document)
         assert properties.parameters
 
         assert properties.parameters["N_load"]
@@ -94,36 +94,36 @@ class TestOQDDeviceProperties:
         assert properties.parameters["w_ablation"].unit == "nm"
 
 
-class TestOQDQubitParameters:
-    """Test suite for the OQDQubitParameters class."""
+class TestOQDQubitDatabase:
+    """Test suite for the OQDQubitDatabase class."""
 
     def test_from_toml_production(self):
         """
-        Tests that the OQDQubitParameters.from_toml method can load the qubit parameters from the
+        Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from the
         oqd_qubit_parameters.toml file used in production.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
-        qubit_parameters = OQDQubitParameters.from_toml(OQD_SRC_DIR / "oqd_qubit_parameters.toml")
-        assert qubit_parameters
-        assert qubit_parameters.ion_parameters
-        assert qubit_parameters.phonon_parameters
+        qubit_database = OQDQubitDatabase.from_toml(OQD_SRC_DIR / "oqd_qubit_parameters.toml")
+        assert qubit_database
+        assert qubit_database.ion_parameters
+        assert qubit_database.phonon_parameters
 
     def test_from_toml(self):
         """
-        Tests that the OQDQubitParameters.from_toml method can load the qubit parameters from a
+        Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a
         sample oqd_qubit_parameters.toml file.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
-        qubit_parameters = OQDQubitParameters.from_toml(OQD_TEST_DIR / "oqd_qubit_parameters.toml")
-        assert qubit_parameters
+        qubit_database = OQDQubitDatabase.from_toml(OQD_TEST_DIR / "oqd_qubit_parameters.toml")
+        assert qubit_database
 
         # Check ion parameters
-        assert qubit_parameters.ion_parameters
-        assert qubit_parameters.ion_parameters["Yb171"]
+        assert qubit_database.ion_parameters
+        assert qubit_database.ion_parameters["Yb171"]
 
-        ion_params_yb171 = qubit_parameters.ion_parameters["Yb171"]
+        ion_params_yb171 = qubit_database.ion_parameters["Yb171"]
         assert ion_params_yb171.mass == 171
         assert ion_params_yb171.charge == +1
         assert ion_params_yb171.position == [0, 0, 0]
@@ -151,25 +151,25 @@ class TestOQDQubitParameters:
         assert ion_params_yb171.transitions["estate_upstate"].level2 == "upstate"
 
         # Check phonon parameters
-        assert qubit_parameters.phonon_parameters
-        assert math.isclose(qubit_parameters.phonon_parameters["COM_x"].energy, 2 * math.pi * 5e6)
-        assert math.isclose(qubit_parameters.phonon_parameters["COM_y"].energy, 2 * math.pi * 5e6)
-        assert math.isclose(qubit_parameters.phonon_parameters["COM_z"].energy, 2 * math.pi * 1e6)
+        assert qubit_database.phonon_parameters
+        assert math.isclose(qubit_database.phonon_parameters["COM_x"].energy, 2 * math.pi * 5e6)
+        assert math.isclose(qubit_database.phonon_parameters["COM_y"].energy, 2 * math.pi * 5e6)
+        assert math.isclose(qubit_database.phonon_parameters["COM_z"].energy, 2 * math.pi * 1e6)
 
-        assert qubit_parameters.phonon_parameters["COM_x"].eigenvector == [1, 0, 0]
-        assert qubit_parameters.phonon_parameters["COM_y"].eigenvector == [0, 1, 0]
-        assert qubit_parameters.phonon_parameters["COM_z"].eigenvector == [0, 0, 1]
+        assert qubit_database.phonon_parameters["COM_x"].eigenvector == [1, 0, 0]
+        assert qubit_database.phonon_parameters["COM_y"].eigenvector == [0, 1, 0]
+        assert qubit_database.phonon_parameters["COM_z"].eigenvector == [0, 0, 1]
 
 
-class TestOQDQubitParametersInvalid:
-    """Test suite for the OQDQubitParameters class given invalid TOML input."""
+class TestOQDQubitDatabaseInvalid:
+    """Test suite for the OQDQubitDatabase class given invalid TOML input."""
 
     def test_from_toml_invalid_missing_schema(self):
         """
-        Tests that the OQDQubitParameters.from_toml method raises an error if the TOML file is
+        Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the schema key.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
         toml_document = textwrap.dedent(
             """\
@@ -180,14 +180,14 @@ class TestOQDQubitParametersInvalid:
         with pytest.raises(
             AssertionError, match="TOML document must contain key 'oqd_config_schema'"
         ):
-            OQDQubitParameters.from_toml(toml_document)
+            OQDQubitDatabase.from_toml(toml_document)
 
     def test_from_toml_invalid_schema(self):
         """
-        Tests that the OQDQubitParameters.from_toml method raises an error if the TOML file contains
+        Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file contains
         an invalid schema.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
         toml_document = textwrap.dedent(
             """\
@@ -196,14 +196,14 @@ class TestOQDQubitParametersInvalid:
         )
 
         with pytest.raises(AssertionError, match="Unsupported OQD TOML config schema"):
-            OQDQubitParameters.from_toml(toml_document)
+            OQDQubitDatabase.from_toml(toml_document)
 
     def test_from_toml_invalid_missing_ions(self):
         """
-        Tests that the OQDQubitParameters.from_toml method raises an error if the TOML file is
+        Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the 'ions' key.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
         toml_document = textwrap.dedent(
             """\
@@ -222,14 +222,14 @@ class TestOQDQubitParametersInvalid:
         with pytest.raises(
             AssertionError, match="TOML document for OQD qubit parameters must contain key 'ions'"
         ):
-            OQDQubitParameters.from_toml(toml_document)
+            OQDQubitDatabase.from_toml(toml_document)
 
     def test_from_toml_invalid_missing_phonons(self):
         """
-        Tests that the OQDQubitParameters.from_toml method raises an error if the TOML file is
+        Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the 'phonons' key.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
         toml_document = textwrap.dedent(
             """\
@@ -250,14 +250,14 @@ class TestOQDQubitParametersInvalid:
             AssertionError,
             match="TOML document for OQD qubit parameters must contain key 'phonons'",
         ):
-            OQDQubitParameters.from_toml(toml_document)
+            OQDQubitDatabase.from_toml(toml_document)
 
     def test_from_toml_invalid_expr(self):
         """
-        Tests that the OQDQubitParameters.from_toml method raises an error if the TOML file contains
+        Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file contains
         an invalid arithmetic expression.
         """
-        from catalyst.third_party.oqd import OQDQubitParameters
+        from catalyst.third_party.oqd import OQDQubitDatabase
 
         toml_document = textwrap.dedent(
             """\
@@ -304,7 +304,106 @@ class TestOQDQubitParametersInvalid:
         )
 
         with pytest.raises(ValueError, match="Invalid expression:"):
-            OQDQubitParameters.from_toml(toml_document)
+            OQDQubitDatabase.from_toml(toml_document)
+
+
+class TestOQDBeamDatabase:
+    """Tests for the OQDBeamDatabase class."""
+
+    def test_from_toml_production(self):
+        """
+        Tests that the OQDBeamDatabase.from_toml method can load the beam parameters from the
+        oqd_beam_parameters.toml file used in production.
+        """
+        from catalyst.third_party.oqd import OQDBeamDatabase
+
+        beam_database = OQDBeamDatabase.from_toml(OQD_SRC_DIR / "oqd_beam_parameters.toml")
+        assert beam_database.beam_parameters
+
+    def test_from_toml(self):
+        """
+        Tests that the OQDBeamDatabase.from_toml method can load the beam parameters from a
+        sample oqd_beam_parameters.toml file.
+        """
+        from catalyst.third_party.oqd import OQDBeamDatabase
+
+        beam_database = OQDBeamDatabase.from_toml(OQD_TEST_DIR / "oqd_beam_parameters.toml")
+        assert beam_database.beam_parameters
+
+        assert beam_database.beam_parameters["downstate_upstate"]
+        assert beam_database.beam_parameters["downstate_upstate"].transition == "downstate_upstate"
+        assert math.isclose(
+            beam_database.beam_parameters["downstate_upstate"].rabi, 2 * math.pi * 1e6
+        )
+        assert beam_database.beam_parameters["downstate_upstate"].detuning == 0
+        assert beam_database.beam_parameters["downstate_upstate"].phase == 0
+        assert math.isnan(beam_database.beam_parameters["downstate_upstate"].polarization)
+        assert math.isnan(beam_database.beam_parameters["downstate_upstate"].wavevector)
+
+        assert beam_database.beam_parameters["downstate_estate"]
+        assert beam_database.beam_parameters["downstate_estate"].transition == "downstate_estate"
+        assert math.isclose(
+            beam_database.beam_parameters["downstate_estate"].rabi, 2 * math.pi * 1e6
+        )
+        assert beam_database.beam_parameters["downstate_estate"].detuning == 0
+        assert beam_database.beam_parameters["downstate_estate"].phase == 0
+        assert math.isnan(beam_database.beam_parameters["downstate_estate"].polarization)
+        assert math.isnan(beam_database.beam_parameters["downstate_estate"].wavevector)
+
+    def test_from_toml_invalid_missing_schema(self):
+        """
+        Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
+        missing the schema key.
+        """
+        from catalyst.third_party.oqd import OQDBeamDatabase
+
+        toml_document = textwrap.dedent(
+            """\
+            # Empty TOML document
+            """
+        )
+
+        with pytest.raises(
+            AssertionError, match="TOML document must contain key 'oqd_config_schema'"
+        ):
+            OQDBeamDatabase.from_toml(toml_document)
+
+    def test_from_toml_invalid_schema(self):
+        """
+        Tests that the OQDBeamDatabase.from_toml method raises an error if the TOML file contains
+        an invalid schema.
+        """
+        from catalyst.third_party.oqd import OQDBeamDatabase
+
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.0"  # This is an invalid schema
+            """
+        )
+
+        with pytest.raises(AssertionError, match="Unsupported OQD TOML config schema"):
+            OQDBeamDatabase.from_toml(toml_document)
+
+    def test_from_toml_invalid_beams(self):
+        """
+        Tests that the OQDBeamDatabase.from_toml method raises an error if the TOML file is
+        missing the 'beams' key.
+        """
+        from catalyst.third_party.oqd import OQDBeamDatabase
+
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.1"
+
+            # --- Beams --- #
+            # This section intentionally left blank
+            """
+        )
+
+        with pytest.raises(
+            AssertionError, match="TOML document for OQD beam parameters must contain key 'beams'"
+        ):
+            OQDBeamDatabase.from_toml(toml_document)
 
 
 if __name__ == "__main__":

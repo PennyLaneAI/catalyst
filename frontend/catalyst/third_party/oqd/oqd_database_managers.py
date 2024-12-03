@@ -94,8 +94,8 @@ class OQDDeviceParameter:
 
 
 @dataclass
-class OQDDeviceProperties:
-    """A class to represent the properties of an OQD device.
+class OQDDeviceDatabase:
+    """A database class to represent the properties of an OQD device.
 
     The properties of the device include hardware specification, parameters relating to the
     experimental apparatus, and generally any other parameters needed by the compiler. Physical
@@ -279,8 +279,8 @@ class OQDPhononParameters:
 
 
 @dataclass
-class OQDQubitParameters:
-    """A class to represent the qubit parameters for an OQD trapped-ion experiment workflow."""
+class OQDQubitDatabase:
+    """A database class to represent the qubit parameters for an OQD trapped-ion experiment workflow."""
 
     ion_parameters: dict[str, OQDIonParameters]
     phonon_parameters: dict[str, OQDPhononParameters]
@@ -291,15 +291,15 @@ class OQDQubitParameters:
         filepath_or_buffer: Union[str, PathLike],
         ion_species_filter: Union[str, Collection[str]] = None,
         phonon_mode_filter: Union[str, Collection[str]] = None,
-    ) -> "OQDQubitParameters":
-        """Loads an OQDQubitParameters object from a TOML file or string.
+    ) -> "OQDQubitDatabase":
+        """Loads an OQDQubitDatabase object from a TOML file or string.
 
         Args:
             filepath_or_buffer: The path to the TOML file or a TOML document string.
             ion_species_filter (optional): A list of ion species to include in the
-                OQDQubitParameters object. If None, all ion species are included.
+                OQDQubitDatabase object. If None, all ion species are included.
             phonon_mode_filter (optional): A list of phonon modes to include in the
-                OQDQubitParameters object. If None, all phonon modes are included.
+                OQDQubitDatabase object. If None, all phonon modes are included.
         """
         try:
             if os.path.isfile(filepath_or_buffer):
@@ -308,7 +308,7 @@ class OQDQubitParameters:
                 document = _load_toml_from_string(filepath_or_buffer)
 
         except Exception as e:
-            raise ValueError("Failed to load TOML document when creating OQDQubitParameters") from e
+            raise ValueError("Failed to load TOML document when creating OQDQubitDatabase") from e
 
         _check_oqd_config_schema(document)
         cls._check_required_keys(document)
@@ -348,6 +348,75 @@ class OQDQubitParameters:
         assert (
             "phonons" in document
         ), "TOML document for OQD qubit parameters must contain key 'phonons'"
+
+
+@dataclass
+class OQDBeamParameters:
+    """A class to represent the beam parameters for an OQD trapped-ion experiment workflow."""
+
+    transition: str
+    rabi: Union[float, str]
+    detuning: float
+    phase: float
+    polarization: float
+    wavevector: float
+
+    @classmethod
+    def from_dict(cls, params: dict) -> "OQDBeamParameters":
+        """Creates an OQDBeamParameters object from a dictionary.
+
+        Args:
+            params: A dictionary containing the beam parameters, typically as parsed from a TOML
+                document.
+
+        Returns:
+            OQDBeamParameters: The OQDBeamParameters object.
+        """
+        return cls(
+            transition=params["transition"],
+            rabi=_parse_value_or_expression_as_float(params["rabi"]),
+            detuning=_parse_value_or_expression_as_float(params["detuning"]),
+            phase=_parse_value_or_expression_as_float(params["phase"]),
+            polarization=_parse_value_or_expression_as_float(params["polarization"]),
+            wavevector=params["wavevector"],
+        )
+
+
+@dataclass
+class OQDBeamDatabase:
+    """A database class to represent the beam parameters for an OQD trapped-ion experiment workflow."""
+
+    beam_parameters: dict[str, OQDBeamParameters]
+
+    @classmethod
+    def from_toml(cls, filepath_or_buffer: Union[str, PathLike]):
+        """Loads an OQDBeamDatabase object from a TOML file or string.
+
+        Args:
+            filepath_or_buffer: The path to the TOML file or a TOML document string.
+        """
+        try:
+            if os.path.isfile(filepath_or_buffer):
+                document = _load_toml_from_file(filepath_or_buffer)
+            else:
+                document = _load_toml_from_string(filepath_or_buffer)
+
+        except Exception as e:
+            raise ValueError("Failed to load TOML document when creating OQDBeamDatabase") from e
+
+        _check_oqd_config_schema(document)
+        cls._check_required_keys(document)
+
+        return cls(
+            beam_parameters={
+                beam: OQDBeamParameters.from_dict(document["beams"][beam])
+                for beam in document["beams"]
+            }
+        )
+
+    @staticmethod
+    def _check_required_keys(document: dict):
+        assert "beams" in document, "TOML document for OQD beam parameters must contain key 'beams'"
 
 
 def _load_toml_from_file(filepath: PathLike) -> dict:
