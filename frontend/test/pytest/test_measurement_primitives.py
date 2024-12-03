@@ -63,47 +63,6 @@ def test_dynamic_sample_backend_functionality():
 
     workflow_dyn_sample.workspace.cleanup()
 
-    # Save for WIP. Remove when work is done.
-    _new_ir = """
-module @workflow {
-  func.func public @jit_workflow(%arg0: tensor<i64>) -> tensor<?x1xi64> attributes {llvm.emit_c_interface} {
-    %0 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> tensor<?x1xi64>
-    return %0 : tensor<?x1xi64>
-  }
-  module @module_circuit {
-    func.func public @circuit(%arg0: tensor<i64>) -> tensor<?x1xi64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-      %shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 10, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"] shots %shots
-      %c = stablehlo.constant dense<1> : tensor<i64>
-      %0 = quantum.alloc( 1) : !quantum.reg
-      %c_0 = stablehlo.constant dense<0> : tensor<i64>
-      %extracted = tensor.extract %c_0[] : tensor<i64>
-      %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
-      %cst = stablehlo.constant dense<1.500000e+00> : tensor<f64>
-      %extracted_1 = tensor.extract %cst[] : tensor<f64>
-      %out_qubits = quantum.custom "RX"(%extracted_1) %1 : !quantum.bit
-      %2 = quantum.compbasis %out_qubits : !quantum.obs
-      %3 = quantum.sample %2 : tensor<?x1xf64>
-      %4 = stablehlo.convert %3 : (tensor<?x1xf64>) -> tensor<?x1xi64>
-      %c_4 = stablehlo.constant dense<0> : tensor<i64>
-      %extracted_5 = tensor.extract %c_4[] : tensor<i64>
-      %5 = quantum.insert %0[%extracted_5], %out_qubits : !quantum.reg, !quantum.bit
-      quantum.dealloc %5 : !quantum.reg
-      quantum.device_release
-      return %4 : tensor<?x1xi64>
-    }
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
-}
-"""
-
 
 def test_dynamic_counts_backend_functionality():
     """Test that a `counts` program with dynamic shots can be executed correctly."""
@@ -143,48 +102,6 @@ def test_dynamic_counts_backend_functionality():
     assert res[1][0] + res[1][1] == 4000
 
     workflow_dyn_counts.workspace.cleanup()
-
-    # Save for WIP. Remove when work is done.
-    _new_ir = """module @workflow {
-  func.func public @jit_workflow(%arg0: tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>) attributes {llvm.emit_c_interface} {
-    %1:2 = catalyst.launch_kernel @module_circuit::@circuit(%arg0) : (tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>)
-    return %1#0, %1#1 : tensor<2xi64>, tensor<2xi64>
-  }
-  module @module_circuit {
-    func.func public @circuit(%arg0: tensor<i64>) -> (tensor<2xi64>, tensor<2xi64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-      %shots = tensor.extract %arg0[] : tensor<i64>
-      quantum.device["/home/paul.wang/.local/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"] shots %shots
-      %c = stablehlo.constant dense<1> : tensor<i64>
-      %0 = quantum.alloc( 1) : !quantum.reg
-      %c_0 = stablehlo.constant dense<0> : tensor<i64>
-      %extracted = tensor.extract %c_0[] : tensor<i64>
-      %cst = stablehlo.constant dense<15.70000e-01> : tensor<f64>
-      %extracted_1 = tensor.extract %cst[] : tensor<f64>
-      %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
-      %out_qubits = quantum.custom "RX"(%extracted_1) %1 : !quantum.bit
-      %4 = quantum.compbasis %out_qubits : !quantum.obs
-      %c_2 = stablehlo.constant dense<10> : tensor<i64>
-      %extracted_3 = tensor.extract %c_2[] : tensor<i64>
-      %dyn_shots = tensor.extract %arg0[] : tensor<i64>
-      %eigvals, %counts = quantum.counts %4 : tensor<2xf64>, tensor<2xi64>
-      %5 = stablehlo.convert %eigvals : (tensor<2xf64>) -> tensor<2xi64>
-      %c_4 = stablehlo.constant dense<0> : tensor<i64>
-      %extracted_5 = tensor.extract %c_4[] : tensor<i64>
-      %6 = quantum.insert %0[%extracted_5], %out_qubits : !quantum.reg, !quantum.bit
-      quantum.dealloc %6 : !quantum.reg
-      quantum.device_release
-      return %5, %counts : tensor<2xi64>, tensor<2xi64>
-    }
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
-}"""
 
 
 def test_expval():
