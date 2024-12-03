@@ -1,6 +1,3 @@
-# OQD Beam Parameters
-# ~~~~~~~~~~~~~~~~~~~
-
 oqd_config_schema = "v0.1"
 
 [beams.downstate_upstate]

@@ -1,9 +1,8 @@
 # OQD Device Parameters
 # ~~~~~~~~~~~~~~~~~~~~~
 #
-# This file contains the parameters that specify the properties of an Open Quantum Design (OQD)
-# trapped-ion experiment workflow.
-
+# A database containing parameters relating to the hardware and experiment workflow used in an Open
+# Quantum Design (OQD) trapped-ion quantum computer device.
 
 oqd_config_schema = "v0.1"
 

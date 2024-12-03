@@ -1,11 +1,12 @@
 # OQD Qubit Parameters
 # ~~~~~~~~~~~~~~~~~~~~
 #
-# TODO: Write docs
+# A database containing parameters relating to the qubit(s) used in an Open Quantum Design (OQD)
+# trapped-ion quantum computer device.
 
 oqd_config_schema = "v0.1"
 
-# ----- Is this needed? --------------------------------------------------------
+# ----- TODO: Is this needed? --------------------------------------------------
 # [ion.Yb_171_II]
 # level.q0_m0 = "0"
 # level.q1_m0 = "12.643e9"
