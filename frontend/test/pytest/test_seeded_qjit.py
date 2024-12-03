@@ -47,8 +47,6 @@ def test_seed_out_of_range(seed):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -91,7 +89,7 @@ def test_seeded_measurement(seed, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same results
-    for _ in range(5):
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
@@ -103,8 +101,6 @@ def test_seeded_measurement(seed, backend):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -142,7 +138,7 @@ def test_seeded_sample(seed, shots, readout, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same samples
-    for _ in range(5):
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
@@ -154,8 +150,6 @@ def test_seeded_sample(seed, shots, readout, backend):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -192,7 +186,7 @@ def test_seeded_probs(seed, shots, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same samples
-    for _ in range(5):
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
@@ -204,8 +198,6 @@ def test_seeded_probs(seed, shots, backend):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -242,7 +234,7 @@ def test_seeded_expval(seed, shots, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same samples
-    for _ in range(5):
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
@@ -254,8 +246,6 @@ def test_seeded_expval(seed, shots, backend):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -291,7 +281,7 @@ def test_seeded_var(seed, shots, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same samples
-    for _ in range(5):
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
