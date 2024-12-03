@@ -20,6 +20,7 @@ trapped-ion quantum computer device.
 
 import math
 import pathlib
+import textwrap
 
 import pytest
 
@@ -120,9 +121,11 @@ class TestOQDQubitParametersInvalid:
         """
         from catalyst.third_party.oqd import OQDQubitParameters
 
-        toml_document = """
-        # Empty TOML document
-        """
+        toml_document = textwrap.dedent(
+            """\
+            # Empty TOML document
+            """
+        )
 
         with pytest.raises(
             AssertionError, match="TOML document must contain key 'oqd_config_schema'"
@@ -136,9 +139,11 @@ class TestOQDQubitParametersInvalid:
         """
         from catalyst.third_party.oqd import OQDQubitParameters
 
-        toml_document = """
-        oqd_config_schema = "v0.0"  # This is an invalid schema
-        """
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.0"  # This is an invalid schema
+            """
+        )
 
         with pytest.raises(AssertionError, match="Unsupported OQD TOML config schema"):
             OQDQubitParameters.from_toml(toml_document)
@@ -150,17 +155,19 @@ class TestOQDQubitParametersInvalid:
         """
         from catalyst.third_party.oqd import OQDQubitParameters
 
-        toml_document = """
-        oqd_config_schema = "v0.1"
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.1"
 
-        # --- Ions --- #
-        # This section intentionally left blank
+            # --- Ions --- #
+            # This section intentionally left blank
 
-        # --- Phonons --- #
-        [phonons.COM_x]
-        energy = "2 * math.pi * 5e6"
-        eigenvector = [1, 0, 0]
-        """
+            # --- Phonons --- #
+            [phonons.COM_x]
+            energy = "2 * math.pi * 5e6"
+            eigenvector = [1, 0, 0]
+            """
+        )
 
         with pytest.raises(
             AssertionError, match="TOML document for OQD qubit parameters must contain key 'ions'"
@@ -174,18 +181,20 @@ class TestOQDQubitParametersInvalid:
         """
         from catalyst.third_party.oqd import OQDQubitParameters
 
-        toml_document = """
-        oqd_config_schema = "v0.1"
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.1"
 
-        # --- Ions --- #
-        [ions.Yb171]
-        mass = 171
-        charge = +1
-        position = [0, 0, 0]
+            # --- Ions --- #
+            [ions.Yb171]
+            mass = 171
+            charge = +1
+            position = [0, 0, 0]
 
-        # --- Phonons --- #
-        # This section intentionally left blank
-        """
+            # --- Phonons --- #
+            # This section intentionally left blank
+            """
+        )
 
         with pytest.raises(
             AssertionError,
@@ -200,47 +209,49 @@ class TestOQDQubitParametersInvalid:
         """
         from catalyst.third_party.oqd import OQDQubitParameters
 
-        toml_document = """
-        oqd_config_schema = "v0.1"
+        toml_document = textwrap.dedent(
+            """\
+            oqd_config_schema = "v0.1"
 
-        # --- Ions --- #
-        [ions.Yb171]
-        mass = 171
-        charge = +1
-        position = [0, 0, 0]
+            # --- Ions --- #
+            [ions.Yb171]
+            mass = 171
+            charge = +1
+            position = [0, 0, 0]
 
-        levels.downstate.principal = 6
-        levels.downstate.spin = 0.5
-        levels.downstate.orbital = 0
-        levels.downstate.nuclear = 0.5
-        levels.downstate.spin_orbital = 0.5
-        levels.downstate.spin_orbital_nuclear = 0
-        levels.downstate.spin_orbital_nuclear_magnetization = 0
-        levels.downstate.energy = 0
+            levels.downstate.principal = 6
+            levels.downstate.spin = 0.5
+            levels.downstate.orbital = 0
+            levels.downstate.nuclear = 0.5
+            levels.downstate.spin_orbital = 0.5
+            levels.downstate.spin_orbital_nuclear = 0
+            levels.downstate.spin_orbital_nuclear_magnetization = 0
+            levels.downstate.energy = 0
 
-        levels.upstate.principal = 6
-        levels.upstate.spin = 0.5
-        levels.upstate.orbital = 0
-        levels.upstate.nuclear = 0.5
-        levels.upstate.spin_orbital = 0.5
-        levels.upstate.spin_orbital_nuclear = 1
-        levels.upstate.spin_orbital_nuclear_magnetization = 0
-        levels.upstate.energy = "1 + math.sin('a') + math.cos"  # Invalid arithmetic expression
+            levels.upstate.principal = 6
+            levels.upstate.spin = 0.5
+            levels.upstate.orbital = 0
+            levels.upstate.nuclear = 0.5
+            levels.upstate.spin_orbital = 0.5
+            levels.upstate.spin_orbital_nuclear = 1
+            levels.upstate.spin_orbital_nuclear_magnetization = 0
+            levels.upstate.energy = "1 + math.sin('a') + math.cos"  # Invalid arithmetic expression
 
-        levels.estate.principal = 5
-        levels.estate.spin = 0.5
-        levels.estate.orbital = 1
-        levels.estate.nuclear = 0.5
-        levels.estate.spin_orbital = 0.5
-        levels.estate.spin_orbital_nuclear = 0
-        levels.estate.spin_orbital_nuclear_magnetization = 0
-        levels.estate.energy = "1 + math.sin('a') + math.cos"  # Invalid arithmetic expression
+            levels.estate.principal = 5
+            levels.estate.spin = 0.5
+            levels.estate.orbital = 1
+            levels.estate.nuclear = 0.5
+            levels.estate.spin_orbital = 0.5
+            levels.estate.spin_orbital_nuclear = 0
+            levels.estate.spin_orbital_nuclear_magnetization = 0
+            levels.estate.energy = "1 + math.sin('a') + math.cos"  # Invalid arithmetic expression
 
-        # --- Phonons --- #
-        [phonons.COM_x]
-        energy = "2 * math.pi * 5e6"
-        eigenvector = [1, 0, 0]
-        """
+            # --- Phonons --- #
+            [phonons.COM_x]
+            energy = "2 * math.pi * 5e6"
+            eigenvector = [1, 0, 0]
+            """
+        )
 
         with pytest.raises(ValueError, match="Invalid expression:"):
             OQDQubitParameters.from_toml(toml_document)
