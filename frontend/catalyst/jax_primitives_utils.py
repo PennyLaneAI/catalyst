@@ -26,14 +26,25 @@ from mlir_quantum.dialects._transform_ops_gen import NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 
-def get_cached(ctx, key):
-    """Looks for key in the cache"""
-    return ctx.module_context.cached_primitive_lowerings.get(key)
+def lower_callable(ctx, callable_, call_jaxpr):
+    """Lowers _callable to MLIR.
 
+    If callable_ is a qnode, then we will first create a module, then
+    create a FuncOp corresponding to call_jaxpr. Otherwise, a FuncOp
+    will be created in the current module. This function might
+    add more than one FuncOps. This depends on the contents of call_jaxpr.
 
-def cache(ctx, key, val):
-    """Caches value in cache with key"""
-    ctx.module_context.cached_primitive_lowerings[key] = val
+    Args:
+      ctx: LoweringRuleContext
+      callable_: python function
+      call_jaxpr: jaxpr representing callable_
+    Returns:
+      FuncOp
+    """
+    if not isinstance(callable_, qml.QNode):
+        return get_or_create_funcop(ctx, callable_, call_jaxpr)
+
+    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr)
 
 
 def get_or_create_funcop(ctx, callable_, call_jaxpr):
@@ -42,6 +53,33 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr):
         return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
     cache(ctx, callable_, func_op)
+    return func_op
+
+
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
+    """Lower callable to either a FuncOp"""
+    if isinstance(call_jaxpr, core.Jaxpr):
+        call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
+
+    kwargs = {}
+    kwargs["ctx"] = ctx.module_context
+    kwargs["name"] = callable_.__name__
+    kwargs["jaxpr"] = call_jaxpr
+    kwargs["effects"] = []
+    kwargs["name_stack"] = ctx.name_stack
+    func_op = mlir.lower_jaxpr_to_fun(**kwargs)
+
+    if isinstance(callable_, qml.QNode):
+        func_op.attributes["qnode"] = ir.UnitAttr.get()
+        # "best", the default option in PennyLane, chooses backprop on the device
+        # if supported and parameter-shift otherwise. Emulating the same behaviour
+        # would require generating code to query the device.
+        # For simplicity, Catalyst instead defaults to parameter-shift.
+        diff_method = (
+            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
+        )
+        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+
     return func_op
 
 
@@ -60,6 +98,43 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr)
     cache(ctx, callable_, func_op)
     return func_op
+
+
+def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
+    """Lowers callable_ to MLIR.
+
+    Will create ModuleOp and then lower the callable_ to a
+    FuncOp inside the ModuleOp. The ModuleOp may have more
+    than one FuncOp. This depends on the contents of call_jaxpr.
+
+    Args:
+      ctx: LoweringRuleContext
+      callable_: qml.Qnode
+      call_jaxpr: jaxpr representing callable_
+    Returns:
+      FuncOp
+    """
+    assert isinstance(callable_, qml.QNode), "This function expects qnodes"
+
+    name = "module_" + callable_.__name__
+    # pylint: disable-next=no-member
+    with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        transform_named_sequence_lowering(ctx)
+        ctx.module_context.ip = ip
+        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
+        func_op.sym_visibility = ir.StringAttr.get("public")
+
+    return func_op
+
+
+def get_cached(ctx, key):
+    """Looks for key in the cache"""
+    return ctx.module_context.cached_primitive_lowerings.get(key)
+
+
+def cache(ctx, key, val):
+    """Caches value in cache with key"""
+    ctx.module_context.cached_primitive_lowerings[key] = val
 
 
 def get_symbolref(ctx, func_op):
@@ -98,54 +173,6 @@ def create_module_op(ctx, name):
     return module
 
 
-def lower_callable(ctx, callable_, call_jaxpr):
-    """Lowers _callable to MLIR.
-
-    If callable_ is a qnode, then we will first create a module, then
-    create a FuncOp corresponding to call_jaxpr. Otherwise, a FuncOp
-    will be created in the current module. This function might
-    add more than one FuncOps. This depends on the contents of call_jaxpr.
-
-    Args:
-      ctx: LoweringRuleContext
-      callable_: python function
-      call_jaxpr: jaxpr representing callable_
-    Returns:
-      FuncOp
-    """
-    if not isinstance(callable_, qml.QNode):
-        return get_or_create_funcop(ctx, callable_, call_jaxpr)
-
-    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr)
-
-
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
-    """Lower callable to either a FuncOp"""
-    if isinstance(call_jaxpr, core.Jaxpr):
-        call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
-
-    kwargs = {}
-    kwargs["ctx"] = ctx.module_context
-    kwargs["name"] = callable_.__name__
-    kwargs["jaxpr"] = call_jaxpr
-    kwargs["effects"] = []
-    kwargs["name_stack"] = ctx.name_stack
-    func_op = mlir.lower_jaxpr_to_fun(**kwargs)
-
-    if isinstance(callable_, qml.QNode):
-        func_op.attributes["qnode"] = ir.UnitAttr.get()
-        # "best", the default option in PennyLane, chooses backprop on the device
-        # if supported and parameter-shift otherwise. Emulating the same behaviour
-        # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = (
-            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
-        )
-        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
-
-    return func_op
-
-
 class NestedModule:
     """Context manager for the nested module"""
 
@@ -162,33 +189,6 @@ class NestedModule:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.ctx.module_context = self.old_module_context
-
-
-def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
-    """Lowers callable_ to MLIR.
-
-    Will create ModuleOp and then lower the callable_ to a
-    FuncOp inside the ModuleOp. The ModuleOp may have more
-    than one FuncOp. This depends on the contents of call_jaxpr.
-
-    Args:
-      ctx: LoweringRuleContext
-      callable_: qml.Qnode
-      call_jaxpr: jaxpr representing callable_
-    Returns:
-      FuncOp
-    """
-    assert isinstance(callable_, qml.QNode), "This function expects qnodes"
-
-    name = "module_" + callable_.__name__
-    # pylint: disable-next=no-member
-    with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        transform_named_sequence_lowering(ctx)
-        ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
-        func_op.sym_visibility = ir.StringAttr.get("public")
-
-    return func_op
 
 
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext):
