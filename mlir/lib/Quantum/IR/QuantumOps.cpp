@@ -49,7 +49,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
             return success();
         }
         else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
+            auto params = op.getDynParams();
             SmallVector<Value> paramsNeg;
             for (auto param : params) {
                 auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
@@ -58,7 +58,8 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
 
             rewriter.replaceOpWithNewOp<CustomOp>(
                 op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues(),
+                nullptr);
 
             return success();
         }
@@ -74,7 +75,7 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
 
         rewriter.replaceOpWithNewOp<MultiRZOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
-            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues(), nullptr);
 
         return success();
     };

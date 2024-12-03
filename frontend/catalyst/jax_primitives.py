@@ -1298,7 +1298,13 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+    static_params=None,
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -1325,12 +1331,13 @@ def _qinst_lowering(
     params_len=0,
     ctrl_len=0,
     adjoint=False,
+    static_params=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    dyn_params = qubits_or_params[qubits_len : qubits_len + params_len]
     ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
     ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
 
@@ -1339,8 +1346,8 @@ def _qinst_lowering(
         assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
         assert ir.OpaqueType(qubit.type).data == "bit"
 
-    float_params = []
-    for p in params:
+    float_dyn_params = []
+    for p in dyn_params:
         p = safe_cast_to_f64(p, op)
         p = extract_scalar(p, op)
 
@@ -1348,20 +1355,22 @@ def _qinst_lowering(
             p.type
         ), "Only scalar double parameters are allowed for quantum gates!"
 
-        float_params.append(p)
+        float_dyn_params.append(p)
 
     ctrl_values_i1 = []
     for v in ctrl_values:
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
+    params_attr = ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
     if name_str == "MultiRZ":
-        assert len(float_params) == 1, "MultiRZ takes one float parameter"
-        float_param = float_params[0]
+        assert len(float_dyn_params) <= 1, "MultiRZ takes at most one dynamic float parameter"
+        float_param = None if len(float_dyn_params) == 0 else float_dyn_params[0]
         return MultiRZOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1370,17 +1379,19 @@ def _qinst_lowering(
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
+            static_params=params_attr,
         ).results
 
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-        params=float_params,
+        dyn_params=float_dyn_params,
         in_qubits=qubits,
         gate_name=name_attr,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
         adjoint=adjoint,
+        static_params=params_attr,
     ).results
 
 

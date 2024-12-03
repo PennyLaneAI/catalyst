@@ -363,12 +363,13 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let arguments = (ins
-        Variadic<F64>:$params,
+        Variadic<F64>:$dyn_params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
@@ -377,12 +378,12 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        $gate_name `(` $dyn_params `)` ($static_params^)? $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
-            return getParams();
+            return getDynParams();
         }
     }];
     let hasCanonicalizeMethod = 1;
@@ -435,11 +436,12 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let arguments = (ins
-        F64:$theta,
+        Optional<F64>:$theta,
         Variadic<QubitType>:$in_qubits,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
@@ -448,7 +450,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta `)` ($static_params^)? $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

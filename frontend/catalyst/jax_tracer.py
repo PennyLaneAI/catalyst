@@ -650,7 +650,9 @@ def trace_quantum_operations(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
+    def bind_native_operation(
+        qrp, op, controlled_wires, controlled_values, adjoint=False, static=False
+    ):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp):
@@ -660,10 +662,11 @@ def trace_quantum_operations(
                 controlled_wires + op.control_wires,
                 controlled_values + op.control_values,
                 adjoint,
+                static,
             )
         elif isinstance(op, Adjoint):
             return bind_native_operation(
-                qrp, op.base, controlled_wires, controlled_values, not adjoint
+                qrp, op.base, controlled_wires, controlled_values, not adjoint, static
             )
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
@@ -691,13 +694,23 @@ def trace_quantum_operations(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
+            dyn_params = []
+            static_params = []
+            for p in op.parameters:
+                if isinstance(p, DynamicJaxprTracer):
+                    dyn_params.append(p)
+                elif static:
+                    static_params.append(p)
+                else:
+                    dyn_params.append(p)
             qubits2 = qinst_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                *[*qubits, *dyn_params, *controlled_qubits, *controlled_values],
                 op=op.name,
                 qubits_len=len(qubits),
-                params_len=len(op.parameters),
+                params_len=len(dyn_params),
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
+                static_params=static_params,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -724,7 +737,7 @@ def trace_quantum_operations(
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
         else:
-            qrp2 = bind_native_operation(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [], False, False)
 
         assert qrp2 is not None
         qrp = qrp2
