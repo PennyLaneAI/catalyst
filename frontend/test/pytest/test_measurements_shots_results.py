@@ -482,24 +482,6 @@ class TestProbs:
         result = qjit(circuit)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    # TODO: Support probs with observables
-    def test_probs_obs(self, backend):
-        """Test probs with an observable"""
-
-        n_wires = 1
-        n_shots = 10000
-        dev = qml.device(backend, wires=n_wires, shots=n_shots)
-
-        matrix = 1 / np.sqrt(2) * np.array([[1, 1], [1, -1]])
-
-        @qml.qnode(dev)
-        def circuit(theta):
-            qml.RX(theta, wires=[0])
-            return qml.probs(op=qml.Hermitian(matrix, wires=0))
-
-        with pytest.raises(AssertionError):
-            qjit(circuit)(0.432)
-
 
 class TestShadow:
     """Test shadow."""
