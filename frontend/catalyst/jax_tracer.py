@@ -17,17 +17,25 @@ This module contains functions tracing and lowering JAX code to MLIR.
 """
 
 import logging
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
-from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementProcess,
+    ProbabilityMP,
+    StateMP,
+    VarianceMP,
+)
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -88,6 +96,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.passes import _add_mlir_quantum_decomposition
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -644,9 +653,17 @@ def trace_quantum_operations(
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp):
-            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+            return bind_native_operation(
+                qrp,
+                op.base,
+                controlled_wires + op.control_wires,
+                controlled_values + op.control_values,
+                adjoint,
+            )
         elif isinstance(op, Adjoint):
-            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
+            return bind_native_operation(
+                qrp, op.base, controlled_wires, controlled_values, not adjoint
+            )
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -742,15 +759,13 @@ def trace_observables(
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
-    elif isinstance(obs, qml.operation.Tensor):
-        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.obs]
-        obs_tracers = tensorobs_p.bind(*nested_obs)
-    elif isinstance(obs, qml.Hamiltonian):
-        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
-        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
+    elif isinstance(obs, qml.ops.LinearCombination):
+        coeffs, observables = obs.terms()
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in observables]
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
@@ -849,23 +864,19 @@ def trace_quantum_measurements(
         if isinstance(o, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+            if device.shots.num_copies > 1 and not isinstance(o, qml.measurements.SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not supported a shot-vector. "
+                    f"Measurement {type(o).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
 
-            if isinstance(device, qml.devices.LegacyDevice):
-                m_wires = o.wires if o.wires else range(device.num_wires)
-            else:
-                m_wires = o.wires if o.wires else range(len(device.wires))
+            m_wires = o.wires if o.wires else range(len(device.wires))
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
-            if o.return_type.value == "sample":
-                results = []  # list of results per copy
+            if isinstance(o, qml.measurements.SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
@@ -894,15 +905,15 @@ def trace_quantum_measurements(
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif o.return_type.value == "expval":
+            elif type(o) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
-            elif o.return_type.value == "var":
+            elif type(o) is VarianceMP:
                 out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
-            elif o.return_type.value == "probs":
+            elif type(o) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif o.return_type.value == "counts":
+            elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
@@ -924,7 +935,7 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
+            elif type(o) is StateMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
@@ -1129,6 +1140,10 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
+
+    # Add the decomposition passes with the transform dialect
+    _add_mlir_quantum_decomposition(device)
+
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)

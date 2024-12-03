@@ -2,7 +2,8 @@ Catalyst Command Line Interface
 ===============================
 
 Catalyst includes a standalone command-line-interface compiler tool ``catalyst-cli`` that
-quantum-compiles MLIR input files into an object file, independent of the Catalyst Python frontend.
+compiles quantum programs written in our MLIR dialects into an object file,
+independent of the Catalyst Python frontend.
 
 This compiler tool combines three stages of compilation:
 
@@ -238,3 +239,22 @@ optimized MLIR.
 For a list of transformation passes currently available in Catalyst, see the
 :ref:`catalyst-s-transformation-library` documentation. The available passes are also listed in the
 ``catalyst-cli --help`` message.
+
+MLIR Plugins
+============
+
+``mlir-opt``-like tools are able to take plugins as inputs.
+These plugins are shared objects that include dialects and passes written by third parties.
+This means that you can write dialects and passes that can be used with ``catalyst-cli`` and ``quantum-opt``.
+
+As an example, the `LLVM repository includes a very simple plugin <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone/standalone-plugin>`_.
+To build it, simply run ``make standalone-plugin`` and the standalone plugin
+will be built in the root directory of the Catalyst project.
+
+With this, you can now run your own passes by using the following flags:
+
+``catalyst-cli --load-dialect-plugin=$YOUR_PLUGIN --load-pass-plugin=$YOUR_PLUGIN $YOUR_PASS_NAME file.mlir``
+
+Concretely for the example plugin, you can use the following command:
+
+``catalyst-cli --tool=opt --load-pass-plugin=standalone/build/lib/StandalonePlugin.so --load-dialect-plugin=standalone/build/lib/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' a.mlir``

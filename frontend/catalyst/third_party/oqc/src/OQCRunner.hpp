@@ -22,10 +22,6 @@
 #include "DynamicLibraryLoader.hpp"
 #include "Exception.hpp"
 
-#ifdef INITIALIZE_PYTHON
-#include <pybind11/embed.h>
-#endif
-
 namespace Catalyst::Runtime::Device {
 
 /**
@@ -115,12 +111,6 @@ struct OQCRunner : public OQCRunnerBase {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-#ifdef INITIALIZE_PYTHON
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-        }
-#endif
-
         DynamicLibraryLoader libLoader(OQC_PY);
 
         using countsImpl_t =

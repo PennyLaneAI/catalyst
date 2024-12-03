@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt --ions-decomposition --split-input-file -verify-diagnostics %s | FileCheck %s
 
-func.func @test_non_param_1q(%arg0: f64) -> !quantum.bit {
+func.func @test_ions_decomposition(%arg0: f64) -> !quantum.bit {
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[PIO4:%.+]] = arith.constant 0.78539816339744828 : f64
     // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
@@ -38,7 +38,7 @@ func.func @test_non_param_1q(%arg0: f64) -> !quantum.bit {
 
 // -----
 
-func.func @test_s_dagger(%arg0: f64) -> !quantum.bit {
+func.func @test_ions_decomposition(%arg0: f64) -> !quantum.bit {
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
@@ -59,7 +59,7 @@ func.func @test_s_dagger(%arg0: f64) -> !quantum.bit {
 
 // -----
 
-func.func @test_t_dagger(%arg0: f64) -> !quantum.bit {
+func.func @test_ions_decomposition(%arg0: f64) -> !quantum.bit {
     // CHECK: [[PIO4:%.+]] = arith.constant 0.78539816339744828 : f64
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[MPIO4:%.+]] = arith.constant -0.78539816339744828 : f64
@@ -81,7 +81,7 @@ func.func @test_t_dagger(%arg0: f64) -> !quantum.bit {
 }
 
 // -----
-func.func @test_param_1q(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
+func.func @test_ions_decomposition(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
@@ -104,7 +104,7 @@ func.func @test_param_1q(%arg0: f64, %arg1: f64, %arg2: f64) -> !quantum.bit {
 
 // -----
 
-func.func @test_CNOT(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
+func.func @test_ions_decomposition(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
     // CHECK: [[MPIO2:%.+]] = arith.constant -1.5707963267948966 : f64
     // CHECK: [[PIO2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg

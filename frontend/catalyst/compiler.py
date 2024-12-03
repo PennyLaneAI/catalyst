@@ -25,18 +25,11 @@ import subprocess
 import sys
 import tempfile
 import warnings
-from copy import deepcopy
-from dataclasses import dataclass
-from io import TextIOWrapper
 from os import path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import (
-    DEFAULT_ASYNC_PIPELINES,
-    DEFAULT_PIPELINES,
-    QUANTUM_COMPILATION_PASS,
-)
+from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_bin_path, get_lib_path
@@ -47,118 +40,6 @@ logger.addHandler(logging.NullHandler())
 package_root = os.path.dirname(__file__)
 
 DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
-
-
-# pylint: disable=too-many-instance-attributes
-@dataclass
-class CompileOptions:
-    """Generic compilation options, for which reasonable default values exist.
-
-    Args:
-        verbose (Optional[bool]): flag indicating whether to enable verbose output.
-            Default is ``False``
-        logfile (Optional[TextIOWrapper]): the logfile to write output to.
-            Default is ``sys.stderr``
-        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
-            Default is ``False``
-        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
-            tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
-            to a list of MLIR passes.
-        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
-            be enabled.
-        autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
-        for autograph conversion.
-        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
-            of QNodes support is to be enabled.
-        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
-            the main compilation pipeline is complete. Default is ``True``.
-        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
-            Default is ``None``.
-        static_argnames (Optional[Union[str, Iterable[str]]]): names of static arguments.
-            Default is ``None``.
-        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
-        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
-        seed (Optional[int]) : the seed for random operations in a qjit call.
-            Default is None.
-        experimental_capture (bool): If set to ``True``,
-            use PennyLane's experimental program capture capabilities
-            to capture the function for compilation.
-        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
-            A dictionary that specifies the quantum circuit transformation pass pipeline order,
-            and optionally arguments for each pass in the pipeline.
-            Default is None.
-    """
-
-    verbose: Optional[bool] = False
-    logfile: Optional[TextIOWrapper] = sys.stderr
-    target: Optional[str] = "binary"
-    keep_intermediate: Optional[bool] = False
-    pipelines: Optional[List[Any]] = None
-    autograph: Optional[bool] = False
-    autograph_include: Optional[Iterable[str]] = ()
-    async_qnodes: Optional[bool] = False
-    static_argnums: Optional[Union[int, Iterable[int]]] = None
-    static_argnames: Optional[Union[str, Iterable[str]]] = None
-    abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    lower_to_llvm: Optional[bool] = True
-    checkpoint_stage: Optional[str] = ""
-    disable_assertions: Optional[bool] = False
-    seed: Optional[int] = None
-    experimental_capture: Optional[bool] = False
-    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
-
-    def __post_init__(self):
-        # Check that async runs must not be seeded
-        if self.async_qnodes and self.seed != None:
-            raise CompileError(
-                """
-                Seeding has no effect on asyncronous qnodes,
-                as the execution order of parallel runs is not guaranteed.
-                As such, seeding an asynchronous run is not supported.
-                """
-            )
-
-        # Check that seed is 32-bit unsigned int
-        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
-            raise ValueError(
-                """
-                Seed must be an unsigned 32-bit integer!
-                """
-            )
-
-        # Make the format of static_argnums easier to handle.
-        static_argnums = self.static_argnums
-        if static_argnums is None:
-            self.static_argnums = ()
-        elif isinstance(static_argnums, int):
-            self.static_argnums = (static_argnums,)
-        elif isinstance(static_argnums, Iterable):
-            self.static_argnums = tuple(static_argnums)
-
-    def __deepcopy__(self, memo):
-        """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
-        copied directly"""
-        return CompileOptions(
-            **{
-                k: (deepcopy(v) if k != "logfile" else self.logfile)
-                for k, v in self.__dict__.items()
-                if k != "logfile"
-            }
-        )
-
-    def get_pipelines(self) -> List[Tuple[str, List[str]]]:
-        """Get effective pipelines"""
-        if self.pipelines:
-            return self.pipelines
-        elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-        if self.disable_assertions:
-            if "disable-assertion" not in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].append("disable-assertion")
-        else:
-            if "disable-assertion" in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].remove("disable-assertion")
-        return DEFAULT_PIPELINES
 
 
 @debug_logger
@@ -235,36 +116,29 @@ class LinkerDriver:
 
         # Discover the LAPACK library provided by scipy & add link against it.
         # Doing this here ensures we will always have the correct library name.
+        lib_name = "openblas"
+        package_name = "scipy_openblas32"
+        path_within_package = "lib"
+        file_extension = ".so" if platform.system() == "Linux" else ".dylib"  # pragma: no branch
 
-        if platform.system() == "Linux":
-            file_path_within_package = "../scipy.libs/"
-            file_extension = ".so"
-        else:  # pragma: nocover
-            msg = "Attempting to use catalyst on an unsupported system"
-            assert platform.system() == "Darwin", msg
-            file_path_within_package = ".dylibs/"
-            file_extension = ".dylib"
+        if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
+            # use our own build of LAPACKe to interface with Accelerate
+            lapack_lib_name = "lapacke.3"
+        else:
+            package_spec = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(package_spec.origin)
+            lapack_lib_path = path.join(package_directory, path_within_package)
 
-        package_name = "scipy"
-        scipy_package = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(scipy_package.origin)
-        scipy_lib_path = path.join(package_directory, file_path_within_package)
+            search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+            search_result = glob.glob(search_pattern)
+            if not search_result:  # pragma: nocover
+                raise CompileError(
+                    f'Unable to find OpenBLAS library at "{search_pattern}". '
+                    "Please ensure that scipy is installed and available via pip."
+                )
 
-        file_prefix = "libopenblas"
-        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that SciPy is installed and available via pip."
-            )
-        openblas_so_file = search_result[0]
-        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
-
-        lib_path_flags += [
-            f"-Wl,-rpath,{scipy_lib_path}",
-            f"-L{scipy_lib_path}",
-        ]
+            lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
+            lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
 
         system_flags = []
         if platform.system() == "Linux":
@@ -272,7 +146,8 @@ class LinkerDriver:
             # RPATH influences search paths globally while RUNPATH only works for
             # a single file, but not its dependencies.
             system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            assert platform.system() == "Darwin", f"Unsupported OS {platform.system()}"
             system_flags += ["-Wl,-arch_errors_fatal"]
 
         # The exception handling mechanism requires linking against
@@ -291,7 +166,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            f"-l{openblas_lib_name}",  # required for custom_calls lib
+            f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
