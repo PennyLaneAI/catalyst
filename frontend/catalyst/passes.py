@@ -34,17 +34,20 @@ individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
-from typing import Optional
+from typing import Optional, TypeAlias
 
 import pennylane as qml
 
 from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.tracing.contexts import EvaluationContext
 
+PipelineDict: TypeAlias = dict[str, dict[str, str]]
+
 
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(pass_pipeline: dict[str, dict[str, str]]):
+@functools.singledispatch
+def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
 
     Args:
@@ -137,10 +140,6 @@ def pipeline(pass_pipeline: dict[str, dict[str, str]]):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
 
-        if pass_pipeline is None:
-            # TODO: design a default peephole pipeline
-            return fn
-
         fn_original_name = fn.__name__
         wrapped_qnode_function = fn.func
         fn_clone = copy.copy(fn)
@@ -165,6 +164,10 @@ def pipeline(pass_pipeline: dict[str, dict[str, str]]):
         return fn_clone
 
     return _decorator
+
+
+@pipeline.register
+def pipeline_list(pass_pipeline: list): ...
 
 
 def cancel_inverses(fn=None):

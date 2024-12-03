@@ -112,7 +112,7 @@ def test_pipeline_lowering_keep_original():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    f_pipeline = pipeline(pass_pipeline=my_pipeline)(f)
+    f_pipeline = pipeline(my_pipeline)(f)
 
     @qjit(keep_intermediate=True)
     def test_pipeline_lowering_keep_original_workflow(x):
@@ -246,7 +246,7 @@ def test_pipeline_lowering_globloc_override():
             qml.Hadamard(wires=[1])
             return qml.expval(qml.PauliY(wires=0))
 
-        @pipeline(pass_pipeline=local_pipeline)
+        @pipeline(local_pipeline)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def h(x):
             qml.RX(x, wires=[0])

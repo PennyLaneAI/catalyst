@@ -105,11 +105,10 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         # Update the qnode with peephole pipeline
-        if "pass_pipeline" in kwargs.keys():
-            pass_pipeline = kwargs["pass_pipeline"]
-            if not hasattr(self, "_peephole_transformed"):
-                self = pipeline(pass_pipeline=pass_pipeline)(self)
-            kwargs.pop("pass_pipeline")
+        pass_pipeline = kwargs.pop("pass_pipeline", None)
+
+        if pass_pipeline and not hasattr(self, "_peephole_transformed"):
+            self = pipeline(pass_pipeline)(self)
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
