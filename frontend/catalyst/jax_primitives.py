@@ -103,7 +103,9 @@ from catalyst.jax_extras import (
     while_loop_expansion_strategy,
 )
 from catalyst.jax_primitives_utils import (
+    cache,
     create_call_op,
+    get_cached,
     get_or_create_funcop,
     get_or_create_qnode_funcop,
     get_symbolref,
@@ -334,8 +336,7 @@ def _python_callback_lowering(
     fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
     fn_ty_attr = ir.TypeAttr.get(fn_ty)
     cache_key = (callback_id, *params_ty, *results_ty)
-    if cache_key in jax_ctx.module_context.cached_primitive_lowerings:
-        callbackOp = jax_ctx.module_context.cached_primitive_lowerings[cache_key]
+    if callbackOp := get_cached(jax_ctx, cache_key):
         symbol = callbackOp.sym_name.value
         symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
         return CallbackCallOp(results_ty, symbol_attr, args).results
@@ -347,7 +348,8 @@ def _python_callback_lowering(
         # TODO: Name mangling for callbacks
         name = callback.__name__
         callbackOp = CallbackOp(f"callback_{name}_{callback_id}", *attrs)
-    jax_ctx.module_context.cached_primitive_lowerings[cache_key] = callbackOp
+
+    cache(jax_ctx, cache_key, callbackOp)
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
     retval = CallbackCallOp(results_ty, symbol_attr, args).results
@@ -626,7 +628,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
     lower_callable(ctx, fn, func_call_jaxpr)
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached(ctx, fn)
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -703,7 +705,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     lower_callable(ctx, fn, func_call_jaxpr)
 
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
         val_result_types,
@@ -757,7 +759,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
@@ -808,7 +810,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     lower_callable(ctx, fn, func_call_jaxpr)
 
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
         func_result_types,
@@ -861,7 +863,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
 
     lower_callable(ctx, fn, func_call_jaxpr)
-    func_op = ctx.module_context.cached_primitive_lowerings[fn]
+    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)

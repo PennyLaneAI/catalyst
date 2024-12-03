@@ -26,12 +26,22 @@ from mlir_quantum.dialects._transform_ops_gen import NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 
+def get_cached(ctx, key):
+    """Looks for key in the cache"""
+    return ctx.module_context.cached_primitive_lowerings.get(key)
+
+
+def cache(ctx, key, val):
+    """Caches value in cache with key"""
+    ctx.module_context.cached_primitive_lowerings[key] = val
+
+
 def get_or_create_funcop(ctx, callable_, call_jaxpr):
     """Get funcOp from cache, or create it from scratch"""
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
+    if func_op := get_cached(ctx, callable_):
         return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
+    cache(ctx, callable_, func_op)
     return func_op
 
 
@@ -45,10 +55,10 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
     Returns:
       FuncOp
     """
-    if func_op := ctx.module_context.cached_primitive_lowerings.get(callable_):
+    if func_op := get_cached(ctx, callable_):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr)
-    ctx.module_context.cached_primitive_lowerings[callable_] = func_op
+    cache(ctx, callable_, func_op)
     return func_op
 
 
