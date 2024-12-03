@@ -20,6 +20,7 @@ import pennylane as qml
 
 from catalyst import CompileError, qjit
 from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
+from catalyst.jax_extras.tracing import bind_dynamic_shot_measurement_primitives
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
@@ -95,7 +96,7 @@ print(sample3.mlir)
 def test_sample_static():
     """Test that the sample primitive can be correctly compiled to mlir."""
     obs = compbasis_p.bind()
-    return sample_p.bind(obs, shots=5, num_qubits=0)
+    return bind_dynamic_shot_measurement_primitives(sample_p, 5, obs, num_qubits=0)
 
 
 # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
@@ -114,7 +115,7 @@ def test_sample_dynamic(shots: int):
     """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
     obs = compbasis_p.bind()
     x = shots + 1
-    sample = sample_p.bind(obs, x, num_qubits=0)
+    sample = bind_dynamic_shot_measurement_primitives(sample_p, x, obs, num_qubits=0)
     return sample + jax.numpy.zeros((x, 0))
 
 
@@ -198,7 +199,7 @@ print(counts3.mlir)
 def test_counts_static():
     """Test that the counts primitive can be correctly compiled to mlir."""
     obs = compbasis_p.bind()
-    return counts_p.bind(obs, shots=5, shape=(1,))
+    return bind_dynamic_shot_measurement_primitives(counts_p, 5, obs, shape=(1,))
 
 
 # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
@@ -212,7 +213,7 @@ print(test_counts_static.mlir)
 def test_counts_dynamic(shots: int):
     """Test that the counts primitive with dynamic shape can be correctly compiled to mlir."""
     obs = compbasis_p.bind()
-    return counts_p.bind(obs, shots, shape=(1,))
+    return bind_dynamic_shot_measurement_primitives(counts_p, shots, obs, shape=(1,))
 
 
 # CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
