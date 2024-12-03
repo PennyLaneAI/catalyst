@@ -1,4 +1,4 @@
-PYTHON ?= $(shell which python)
+PYTHON ?= $(shell which python3)
 C_COMPILER ?= $(shell which clang)
 CXX_COMPILER ?= $(shell which clang++)
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
@@ -243,7 +243,6 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
-	$(ASAN_COMMAND) $(PYTHON) -m pip install scipy
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)
