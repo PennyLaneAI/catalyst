@@ -625,6 +625,7 @@ def trace_quantum_operations(
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
     mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
+    static_compile: bool = False,
 ) -> QRegPromise:
     """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
     Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
@@ -636,6 +637,8 @@ def trace_quantum_operations(
         qreg: JAX tracer for quantum register in its initial state.
         ctx: JAX tracing context object.
         trace: JAX frame to emit the Jaxpr equations into.
+        mcm_config: Mid-circuit measurement configuration.
+        static_compile: whether to compile the quantum operations statically.
 
     Returns:
         qrp: QRegPromise object holding the JAX tracer representing the quantum register into its
@@ -651,7 +654,7 @@ def trace_quantum_operations(
     #       the equations to restore their correct order.
 
     def bind_native_operation(
-        qrp, op, controlled_wires, controlled_values, adjoint=False, static=False
+        qrp, op, controlled_wires, controlled_values, adjoint=False, static_compile=False
     ):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
@@ -662,11 +665,11 @@ def trace_quantum_operations(
                 controlled_wires + op.control_wires,
                 controlled_values + op.control_values,
                 adjoint,
-                static,
+                static_compile,
             )
         elif isinstance(op, Adjoint):
             return bind_native_operation(
-                qrp, op.base, controlled_wires, controlled_values, not adjoint, static
+                qrp, op.base, controlled_wires, controlled_values, not adjoint, static_compile
             )
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
@@ -699,7 +702,7 @@ def trace_quantum_operations(
             for p in op.parameters:
                 if isinstance(p, DynamicJaxprTracer):
                     dyn_params.append(p)
-                elif static:
+                elif static_compile:
                     static_params.append(p)
                 else:
                     dyn_params.append(p)
@@ -737,7 +740,7 @@ def trace_quantum_operations(
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
         else:
-            qrp2 = bind_native_operation(qrp, op, [], [], False, False)
+            qrp2 = bind_native_operation(qrp, op, [], [], False, static_compile)
 
         assert qrp2 is not None
         qrp = qrp2
@@ -1136,7 +1139,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums
+    f: Callable, device: QubitDevice, args, kwargs, qnode, static_argnums, static_compile=False
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -1152,6 +1155,8 @@ def trace_quantum_function(
         args: Positional arguments to pass to ``f``
         kwargs: Keyword arguments to pass to ``f``
         qnode: The quantum node to be traced, it contains user transforms.
+        static_argnums: indices of static arguments.
+        static_compile: whether to compile the quantum operations statically.
 
     Returns:
         closed_jaxpr: JAXPR expression of the function ``f``.
@@ -1242,7 +1247,9 @@ def trace_quantum_function(
                     trees = return_values_tree
 
                 mcm_config = qnode.execute_kwargs["mcm_config"]
-                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                qrp_out = trace_quantum_operations(
+                    tape, device, qreg_in, ctx, trace, mcm_config, static_compile
+                )
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 

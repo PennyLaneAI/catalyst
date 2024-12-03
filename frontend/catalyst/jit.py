@@ -82,6 +82,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     static_argnames=None,
+    static_compile=False,
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
@@ -126,6 +127,7 @@ def qjit(
             positions of static arguments.
         static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
             names of static arguments.
+        static_compile(bool): If set to ``True``, the function will be compiled statically.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -623,6 +625,7 @@ class QJIT(CatalystCallable):
         verify_static_argnums(args, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
+        static_compile = self.compile_options.static_compile
 
         dynamic_args = filter_static_args(args, static_argnums)
         dynamic_sig = get_abstract_signature(dynamic_args)
@@ -636,6 +639,7 @@ class QJIT(CatalystCallable):
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
+            params["static_compile"] = kwargs.pop("static_compile", static_compile)
             params["_out_tree_expected"] = []
             return QFunc.__call__(
                 qnode,
