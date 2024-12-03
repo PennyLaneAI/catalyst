@@ -627,8 +627,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
-    lower_callable(ctx, fn, func_call_jaxpr)
-    func_op = get_cached(ctx, fn)
+    func_op = lower_callable(ctx, fn, func_call_jaxpr)
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -703,9 +702,8 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_callable(ctx, fn, func_call_jaxpr)
 
-    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
         val_result_types,
@@ -754,12 +752,11 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_callable(ctx, fn, func_call_jaxpr)
 
     assert (
         len(flat_output_types) % 2 == 0
     ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
-    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
@@ -808,9 +805,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_callable(ctx, fn, func_call_jaxpr)
 
-    func_op = get_cached(ctx, fn)
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
         func_result_types,
@@ -862,8 +858,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     """
     func_call_jaxpr = _get_call_jaxpr(jaxpr)
 
-    lower_callable(ctx, fn, func_call_jaxpr)
-    func_op = get_cached(ctx, fn)
+    func_op = lower_callable(ctx, fn, func_call_jaxpr)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
