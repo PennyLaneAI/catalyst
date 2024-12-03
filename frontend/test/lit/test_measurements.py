@@ -19,8 +19,8 @@ import numpy as np
 import pennylane as qml
 
 from catalyst import CompileError, qjit
-from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 from catalyst.jax_extras.tracing import bind_dynamic_shot_measurement_primitives
+from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
