@@ -1655,6 +1655,13 @@ def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
     the tracer to the output shape. This will now correctly produce
 
     e:f64[c,1] = sample[num_qubits=1] d c
+
+    This works because when jax processes a primitive during making jaxprs, the default
+    is to only look at the abstract avals of the primitive. Providing a custom staging rule
+    circumvents the above default logic.
+
+    See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
+    https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
     """
     if obs.primitive is compbasis_p:
         assert num_qubits == obs.num_qubits
