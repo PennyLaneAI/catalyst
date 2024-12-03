@@ -106,8 +106,6 @@ from catalyst.jax_primitives_utils import (
     cache,
     create_call_op,
     get_cached,
-    get_or_create_funcop,
-    get_or_create_qnode_funcop,
     get_symbolref,
     lower_callable,
 )
@@ -362,8 +360,8 @@ def _python_callback_lowering(
     rev = custom_grad._bwd
     fwd_jaxpr = custom_grad._fwd_jaxpr
     rev_jaxpr = custom_grad._bwd_jaxpr
-    mlir_fwd = get_or_create_funcop(jax_ctx, fwd, fwd_jaxpr)
-    mlir_rev = get_or_create_funcop(jax_ctx, rev, rev_jaxpr)
+    mlir_fwd = lower_callable(jax_ctx, fwd, fwd_jaxpr)
+    mlir_rev = lower_callable(jax_ctx, rev, rev_jaxpr)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
 
     argc = len(args)
@@ -536,7 +534,7 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
     """
 
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
-    func_op = get_or_create_qnode_funcop(ctx, qnode, call_jaxpr)
+    func_op = lower_callable(ctx, qnode, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
@@ -558,7 +556,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
-    func_op = get_or_create_funcop(ctx, fn, call_jaxpr)
+    func_op = lower_callable(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
