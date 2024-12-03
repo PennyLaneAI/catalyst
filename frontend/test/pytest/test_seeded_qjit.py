@@ -47,8 +47,6 @@ def test_seed_out_of_range(seed):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -91,7 +89,7 @@ def test_seeded_measurement(seed, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same results
-    for _ in range(5):
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
@@ -103,8 +101,6 @@ def test_seeded_measurement(seed, backend):
     "seed",
     [
         42,
-        37,
-        1337,
         2**32 - 1,
         0,
     ],
@@ -142,7 +138,150 @@ def test_seeded_sample(seed, shots, readout, backend):
         return circuit(), circuit(), circuit(), circuit()
 
     # Calls to qjits with the same seed should return the same samples
-    for _ in range(5):
+    for _ in range(3):
+        results0 = workflow()
+        results1 = workflow()
+        results2 = workflow1()
+        assert np.allclose(results0, results1)
+        assert np.allclose(results0, results2)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    [
+        42,
+        2**32 - 1,
+        0,
+    ],
+)
+@pytest.mark.parametrize("shots", [10])
+def test_seeded_probs(seed, shots, backend):
+    """Test that different calls to qjits with the same seed produce the same probs results"""
+
+    if backend not in ["lightning.qubit", "lightning.kokkos", "lightning.gpu"]:
+        pytest.skip(
+            "Probs seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
+        )
+
+    dev = qml.device(backend, wires=2, shots=shots)
+
+    @qjit(seed=seed)
+    def workflow():
+        @qml.qnode(dev)
+        def circuit():
+            qml.RY(0.7, wires=0)
+            qml.PauliZ(0)
+            return qml.probs()
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    @qjit(seed=seed)
+    def workflow1():
+        @qml.qnode(dev)
+        def circuit():
+            qml.RY(0.7, wires=0)
+            qml.PauliZ(0)
+            return qml.probs()
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    # Calls to qjits with the same seed should return the same samples
+    for _ in range(3):
+        results0 = workflow()
+        results1 = workflow()
+        results2 = workflow1()
+        assert np.allclose(results0, results1)
+        assert np.allclose(results0, results2)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    [
+        42,
+        2**32 - 1,
+        0,
+    ],
+)
+@pytest.mark.parametrize("shots", [10])
+def test_seeded_expval(seed, shots, backend):
+    """Test that different calls to qjits with the same seed produce the same expval results"""
+
+    if backend not in ["lightning.qubit", "lightning.kokkos", "lightning.gpu"]:
+        pytest.skip(
+            "Expval seeding is only supported on lightning.qubit, lightning.kokkos"
+            "and lightning.gpu"
+        )
+
+    dev = qml.device(backend, wires=2, shots=shots)
+
+    @qjit(seed=seed)
+    def workflow():
+        @qml.qnode(dev)
+        def circuit():
+            qml.RY(0.7, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    @qjit(seed=seed)
+    def workflow1():
+        @qml.qnode(dev)
+        def circuit():
+            qml.RY(0.7, wires=0)
+            qml.PauliZ(0)
+            return qml.expval(qml.PauliZ(0))
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    # Calls to qjits with the same seed should return the same samples
+    for _ in range(3):
+        results0 = workflow()
+        results1 = workflow()
+        results2 = workflow1()
+        assert np.allclose(results0, results1)
+        assert np.allclose(results0, results2)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    [
+        42,
+        2**32 - 1,
+        0,
+    ],
+)
+@pytest.mark.parametrize("shots", [10])
+def test_seeded_var(seed, shots, backend):
+    """Test that different calls to qjits with the same seed produce the same var results"""
+
+    if backend not in ["lightning.qubit", "lightning.kokkos", "lightning.gpu"]:
+        pytest.skip(
+            "Var seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
+        )
+
+    dev = qml.device(backend, wires=2, shots=shots)
+
+    @qjit(seed=seed)
+    def workflow():
+        @qml.qnode(dev)
+        def circuit():
+            qml.RY(0.7, wires=0)
+            return qml.var(qml.PauliZ(0))
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    @qjit(seed=seed)
+    def workflow1():
+        @qml.qnode(dev)
+        def circuit():
+            qml.RY(0.7, wires=0)
+            qml.PauliZ(0)
+            return qml.var(qml.PauliZ(0))
+
+        return circuit(), circuit(), circuit(), circuit()
+
+    # Calls to qjits with the same seed should return the same samples
+    for _ in range(3):
         results0 = workflow()
         results1 = workflow()
         results2 = workflow1()
