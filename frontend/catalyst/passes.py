@@ -387,10 +387,15 @@ def _API_name_to_pass_name():
     return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotations"}
 
 
-def _add_mlir_quantum_decomposition(device):
-    """When called it adds the MLIR decomposition pass thanks to the transform dialect."""
-    # TODO: make this non related to the name of the device
-    if device.original_device.name == "oqd.cloud":
+def ions_decomposition(qnode=None):
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+    @functools.wraps(qnode)
+    def wrapper(*args, **kwrags):
         pass_pipeline = kwrags.pop("pass_pipeline", tuple())
         pass_pipeline += (Pass("ions-decomposition"),)
         kwrags["pass_pipeline"] = pass_pipeline
+        return qnode(*args, **kwrags)
+
+    return wrapper

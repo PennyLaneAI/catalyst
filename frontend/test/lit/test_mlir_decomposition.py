@@ -33,6 +33,7 @@ import pennylane as qml
 from lit_util_printers import print_jaxpr
 from pennylane.devices import NullQubit
 
+import catalyst
 from catalyst import qjit
 from catalyst.debug import get_compilation_stage
 from catalyst.utils.runtime_environment import get_lib_path
@@ -78,6 +79,7 @@ def test_decomposition_lowering():
     """
 
     @qjit(keep_intermediate=True)
+    @catalyst.passes.ions_decomposition
     @qml.qnode(CustomDevice(2))
     def test_decomposition_lowering_workflow(x):
         qml.RX(x, wires=[0])
