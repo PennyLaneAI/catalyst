@@ -519,11 +519,11 @@ def _apply_registered_pass_lowering(
 
 
 @quantum_kernel_p.def_impl
-def _quantum_kernel_def_impl(*args, call_jaxpr, qnode):  # pragma: no cover
+def _quantum_kernel_def_impl(*args, call_jaxpr, qnode, pipeline=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
+def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
     """Lower's qnodes to moduleOp
 
     Args:
@@ -534,9 +534,11 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode):
     Returns:
       List[mlir.Value] corresponding
     """
-
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
-    func_op = lower_callable(ctx, qnode, call_jaxpr)
+    if pipeline is None:
+        pipeline = tuple()
+
+    func_op = lower_callable(ctx, qnode, call_jaxpr, pipeline)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 

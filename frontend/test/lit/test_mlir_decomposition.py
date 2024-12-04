@@ -85,9 +85,6 @@ def test_decomposition_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   pass_name=ions-decomposition
-    # CHECK: ]
     print_jaxpr(test_decomposition_lowering_workflow, 1.2)
     # CHECK: quantum.custom "RX"
     # CHECK-NOT: quantum.custom "Hadamard"

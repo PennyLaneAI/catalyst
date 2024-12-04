@@ -23,7 +23,11 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
-from mlir_quantum.dialects._transform_ops_gen import NamedSequenceOp, YieldOp
+from mlir_quantum.dialects._transform_ops_gen import (
+    ApplyRegisteredPassOp,
+    NamedSequenceOp,
+    YieldOp,
+)
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 
@@ -48,10 +52,11 @@ def lower_jaxpr(ctx, jaxpr):
     callable_ = equation.params.get("fn")
     if callable_ is None:
         callable_ = equation.params.get("qnode")
-    return lower_callable(ctx, callable_, call_jaxpr)
+    pipeline = equation.params.get("pipeline")
+    return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline)
 
 
-def lower_callable(ctx, callable_, call_jaxpr):
+def lower_callable(ctx, callable_, call_jaxpr, pipeline=None):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -66,18 +71,22 @@ def lower_callable(ctx, callable_, call_jaxpr):
     Returns:
       FuncOp
     """
+    if pipeline is None:
+        pipeline = tuple()
+
     if not isinstance(callable_, qml.QNode):
-        return get_or_create_funcop(ctx, callable_, call_jaxpr)
+        return get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline)
 
-    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr)
+    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline)
 
 
-def get_or_create_funcop(ctx, callable_, call_jaxpr):
+def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline):
     """Get funcOp from cache, or create it from scratch"""
-    if func_op := get_cached(ctx, callable_):
+    key = (callable_, *pipeline)
+    if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
-    cache(ctx, callable_, func_op)
+    cache(ctx, key, func_op)
     return func_op
 
 
@@ -112,7 +121,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     return func_op
 
 
-def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
+def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline):
     """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
 
     Args:
@@ -122,14 +131,15 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr):
     Returns:
       FuncOp
     """
-    if func_op := get_cached(ctx, callable_):
+    key = (callable_, *pipeline)
+    if func_op := get_cached(ctx, key):
         return func_op
-    func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr)
-    cache(ctx, callable_, func_op)
+    func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
+    cache(ctx, key, func_op)
     return func_op
 
 
-def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
+def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline):
     """Lowers callable_ to MLIR.
 
     Will create ModuleOp and then lower the callable_ to a
@@ -148,9 +158,9 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr):
     name = "module_" + callable_.__name__
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        transform_named_sequence_lowering(ctx)
+        transform_named_sequence_lowering(ctx, pipeline)
         ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr)
+        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline)
         func_op.sym_visibility = ir.StringAttr.get("public")
 
     return func_op
@@ -220,7 +230,7 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext):
+def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
 
@@ -257,6 +267,12 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext):
 
         # The transform.named_sequence needs a terminator called "transform.yield"
         with ir.InsertionPoint(bb_named_sequence):
+            target = bb_named_sequence.arguments[0]
+            for _pass in pipeline:
+                apply_registered_pass_op = ApplyRegisteredPassOp(
+                    result=transform_mod_type, target=target, pass_name=_pass.name
+                )
+                target = apply_registered_pass_op.result
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable
 
     return named_sequence_op.results
