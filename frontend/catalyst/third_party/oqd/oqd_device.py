@@ -33,7 +33,7 @@ class OQDDevice(Device):
 
     config_filepath = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/backend" + "/oqd.toml"
 
-    def __init__(self, wires, backend, shots=1024, **kwargs):
+    def __init__(self, wires, backend, shots=1, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
         super().__init__(wires=wires, shots=shots, **kwargs)
