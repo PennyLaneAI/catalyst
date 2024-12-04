@@ -26,6 +26,7 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
+from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
@@ -1085,20 +1086,27 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 # qdevice
 #
 @qdevice_p.def_impl
-def _qdevice_def_impl(ctx, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
+def _qdevice_def_impl(ctx, shots, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_abstract_eval(shots, rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_kwargs):
+def _qdevice_lowering(
+    jax_ctx: mlir.LoweringRuleContext, shots: ir.Value, rtd_lib, rtd_name, rtd_kwargs
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
+
+    shots_value = TensorExtractOp(ir.IntegerType.get_signless(64, ctx), shots, []).result
     DeviceInitOp(
-        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs)
+        ir.StringAttr.get(rtd_lib),
+        ir.StringAttr.get(rtd_name),
+        ir.StringAttr.get(rtd_kwargs),
+        shots=shots_value,
     )
 
     return ()
@@ -1631,33 +1639,78 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 #
 # sample measurement
 #
-@sample_p.def_abstract_eval
-def _sample_abstract_eval(obs, shots, shape):
-    assert isinstance(obs, AbstractObs)
+def sample_staging_rule(jaxpr_trace, obs, shots, num_qubits):
+    """
+    The result shape of `sample_p` is (shots, num_qubits).
 
+    In jax, the default `def_abstract_eval` method for binding primitives keeps the abstract aval in
+    the dynamic shape dimension, instead of the SSA value for the shape, i.e.
+
+    c:i64[] = ...
+    d:AbstractObs = ...
+    e:f64[ShapedArray(int64[], weak_type=True),1] = sample[num_qubits=1] d c
+
+    To ensure that the result DShapedArray is actually constructed with the tracer value,
+    we need to provide a custom staging rule for the primitive, where we manually link
+    the tracer to the output shape. This will now correctly produce
+
+    e:f64[c,1] = sample[num_qubits=1] d c
+
+    This works because when jax processes a primitive during making jaxprs, the default
+    is to only look at the abstract avals of the primitive. Providing a custom staging rule
+    circumvents the above default logic.
+
+    See jax._src.interpreters.partial_eval.process_primitive and default_process_primitive,
+    https://github.com/jax-ml/jax/blob/a54319ec1886ed920d50cacf10e147a743888464/jax/_src/interpreters/partial_eval.py#L1881C7-L1881C24
+    """
     if obs.primitive is compbasis_p:
-        assert shape == (shots, obs.num_qubits)
-    else:
-        assert shape == (shots,)
+        assert num_qubits == obs.num_qubits
 
-    return core.ShapedArray(shape, jax.numpy.float64)
+    out_shape = core.DShapedArray((shots, num_qubits), jax.numpy.dtype("float64"))
+    out_tracer = pe.DynamicJaxprTracer(jaxpr_trace, out_shape)
+
+    if isinstance(shots, int):
+        invars = [jaxpr_trace.getvar(obs)]
+        params = {"shots": shots, "num_qubits": num_qubits}
+    else:
+        invars = [jaxpr_trace.getvar(obs), jaxpr_trace.getvar(shots)]
+        params = {"num_qubits": num_qubits}
+
+    eqn = pe.new_jaxpr_eqn(
+        invars,
+        [jaxpr_trace.makevar(out_tracer)],
+        sample_p,
+        params,
+        jax.core.no_effects,
+    )
+    jaxpr_trace.frame.add_eqn(eqn)
+    return out_tracer
+
+
+pe.custom_staging_rules[sample_p] = sample_staging_rule
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
+def _sample_def_impl(ctx, obs, shots, num_qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _sample_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], num_qubits: int
+):
+    # Note: result shape of sample op is (shots, number_of_qubits)
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
-    result_type = ir.RankedTensorType.get(shape, f64_type)
+    result_shape = (
+        (shots, num_qubits)
+        if isinstance(shots, int)
+        else (ir.ShapedType.get_dynamic_size(), num_qubits)
+    )
+    result_type = ir.RankedTensorType.get(result_shape, f64_type)
 
-    return SampleOp(result_type, obs, shots_attr).results
+    return SampleOp(result_type, obs).results
 
 
 #
@@ -1677,20 +1730,26 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
+    return core.ShapedArray(shape, jax.numpy.dtype("float64")), core.ShapedArray(
+        shape, jax.numpy.dtype("int64")
+    )
 
 
-def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _counts_lowering(
+    jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: Union[int, ir.Value], shape: tuple
+):
+    # Note: result shape of counts op is (tensor<Nxf64>, tensor<Nxi64>)
+    # where N = 2**number_of_qubits
+    # This means even with dynamic shots, result shape is still static.
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
     counts_type = ir.RankedTensorType.get(shape, i64_type)
 
-    return CountsOp(eigvals_type, counts_type, obs, shots_attr).results
+    return CountsOp(eigvals_type, counts_type, obs).results
 
 
 #

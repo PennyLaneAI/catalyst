@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=line-too-long
+
 """Test for the device API.
 """
 import os
@@ -70,7 +72,8 @@ class CustomDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
+    # CHECK:   [[shots:%.+]] = arith.constant 2048 : i64
+    # CHECK:   quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -95,7 +98,8 @@ def test_preprocess():
     using the new device API.
     TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
+    # CHECK:   [[shots:%.+]] = arith.constant 2048 : i64
+    # CHECK:   quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{'shots': 2048}"]
     dev = CustomDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")

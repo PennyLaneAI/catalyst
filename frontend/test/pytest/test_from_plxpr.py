@@ -413,6 +413,39 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
+    @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
+    def test_counts(self):
+        """Test comparison and execution of a jaxpr returning counts."""
+
+        dev = qml.device("lightning.qubit", wires=2, shots=50)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.X(0)
+            return qml.counts()
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
+        qml.capture.disable()
+
+        converted = from_plxpr(plxpr)()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)()
+        assert len(catalyst_res) == 1
+        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
+        assert qml.math.allclose(catalyst_res[0], expected)
+
+        qjit_obj = qml.qjit(circuit)
+        qjit_obj()
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
     def test_multiple_measurements(self):
         """Test that we can convert a circuit with multiple measurement returns."""
 
