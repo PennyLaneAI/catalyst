@@ -26,10 +26,10 @@ from jax._src.lib.mlir import ir
 from jax.interpreters.mlir import ir_constant, make_ir_context
 
 from catalyst.jax_primitives import (
-    get_call_jaxpr,
     _qextract_lowering,
     _qinsert_lowering,
     extract_scalar,
+    get_call_jaxpr,
     safe_cast_to_f64,
 )
 

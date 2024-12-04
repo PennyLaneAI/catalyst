@@ -15,6 +15,7 @@
 primitives to MLIR"""
 
 import copy
+import functools
 
 import pennylane as qml
 from jax._src import core, util
@@ -32,6 +33,22 @@ def get_call_jaxpr(jaxpr):
         if eqn.params.get("call_jaxpr"):
             return eqn.params["call_jaxpr"]
     raise AssertionError("No call_jaxpr found in the JAXPR.")
+
+
+def get_call_equation(jaxpr):
+    for eqn in jaxpr.eqns:
+        if eqn.params.get("call_jaxpr"):
+            return eqn
+    raise AssertionError("No call_jaxpr found in the JAXPR.")
+
+
+def lower_jaxpr(ctx, jaxpr):
+    equation = get_call_equation(jaxpr)
+    call_jaxpr = equation.params["call_jaxpr"]
+    callable_ = equation.params.get("fn")
+    if callable_ is None:
+        callable_ = equation.params.get("qnode")
+    return lower_callable(ctx, callable_, call_jaxpr)
 
 
 def lower_callable(ctx, callable_, call_jaxpr):
@@ -71,7 +88,11 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
     kwargs = {}
     kwargs["ctx"] = ctx.module_context
-    kwargs["name"] = callable_.__name__
+    if not isinstance(callable_, functools.partial):
+        name = callable_.__name__
+    else:
+        name = callable_.func.__name__ + ".partial"
+    kwargs["name"] = name
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
     kwargs["name_stack"] = ctx.name_stack

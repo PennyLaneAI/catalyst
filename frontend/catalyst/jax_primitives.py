@@ -109,6 +109,7 @@ from catalyst.jax_primitives_utils import (
     get_call_jaxpr,
     get_symbolref,
     lower_callable,
+    lower_jaxpr,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -616,8 +617,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_call_jaxpr = get_call_jaxpr(jaxpr)
-    func_op = lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -692,7 +692,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
     symbol_ref = get_symbolref(ctx, func_op)
     return ValueAndGradOp(
@@ -742,7 +742,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
-    func_op = lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
     assert (
         len(flat_output_types) % 2 == 0
@@ -795,7 +795,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
-    func_op = lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
 
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
@@ -846,9 +846,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         jaxpr: the jaxpr representation of the circuit
         fn: the function to be mitigated
     """
-    func_call_jaxpr = get_call_jaxpr(jaxpr)
-
-    func_op = lower_callable(ctx, fn, func_call_jaxpr)
+    func_op = lower_jaxpr(ctx, jaxpr)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
