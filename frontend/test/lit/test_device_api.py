@@ -14,6 +14,8 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=line-too-long
+
 """Test for the device API.
 """
 import os
