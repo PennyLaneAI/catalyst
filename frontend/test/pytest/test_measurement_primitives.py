@@ -15,6 +15,8 @@
 This file contains a couple of tests for the capture of measurement primitives into jaxpr.
 """
 
+# pylint: disable=line-too-long
+
 import jax
 import pennylane as qml
 
