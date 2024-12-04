@@ -47,7 +47,6 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp
 from mlir_quantum.dialects.catalyst import (
     AssertionOp,
     CallbackCallOp,
@@ -200,18 +199,6 @@ def _obs_lowering(aval):
 
 
 #
-# Transform Module Type
-#
-class AbstractTransformMod(AbstractValue):
-    """Abstract transform module type."""
-
-
-def _transform_mod_lowering(aval):
-    assert isinstance(aval, AbstractTransformMod)
-    return (ir.OpaqueType.get("transform", 'op<"builtin.module">'),)
-
-
-#
 # registration
 #
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
@@ -222,9 +209,6 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
-
-core.raise_to_shaped_mappings[AbstractTransformMod] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractTransformMod] = _transform_mod_lowering
 
 
 class Folding(Enum):
@@ -293,7 +277,6 @@ value_and_grad_p = core.Primitive("value_and_grad")
 value_and_grad_p.multiple_results = True
 assert_p = core.Primitive("assert")
 assert_p.multiple_results = True
-apply_registered_pass_p = core.Primitive("apply_registered_pass")
 set_state_p = jax.core.Primitive("state_prep")
 set_state_p.multiple_results = True
 set_basis_state_p = jax.core.Primitive("set_basis_state")
@@ -415,109 +398,8 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 
 
 #
-# transform dialect lowering
-#
-
-
-def get_named_sequence_in_module(mod):
-    for op in mod.body.operations:
-        if op.operation.name == "transform.named_sequence":
-            return op.operation
-    return None
-
-
-#
-# apply_registered_pass
-#
-@apply_registered_pass_p.def_abstract_eval
-def _apply_registered_pass_abstract_eval(*args, pass_name, options=None):
-    return AbstractTransformMod()
-
-
-@apply_registered_pass_p.def_impl
-def _apply_registered_pass_def_impl(*args, pass_name, options=None):  # pragma: no cover
-    raise NotImplementedError()
-
-
-def _apply_registered_pass_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *args, pass_name, options=None
-):
-    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
-    inner = jax_ctx.module_context.module
-    named_sequence_op = None
-
-    # ```mlir
-    # module @root {
-    #   module @inner {
-    #     func.func @qnode { }
-    #     module @transform { }
-    #   }
-    # }
-    # ```
-    #
-    # When this function is executed we are likely
-    # somewhere around func.func @qnode.
-    #
-    for op in reversed(inner.regions[0].blocks[0].operations):
-        # Look for the module @transform that holds the transformation schedule
-        # TODO: Find a better way to search for the module with the transform schedule.
-        if op.operation.name == "builtin.module":
-            named_sequence_op = get_named_sequence_in_module(op)
-            if named_sequence_op:
-                break
-    assert (
-        named_sequence_op is not None
-    ), """
-            transform.apply_registered_pass must be placed in a transform.named_sequence,
-            but none exist in the module.
-            """
-
-    # If there already is a apply_registered_pass,
-    # insert after the last pass in the existing pass sequence.
-    # Note that ir.InsertionPoint(op) sets the insertion point to immediately BEFORE the op
-    named_sequence_op_block = named_sequence_op.regions[0].blocks[0]
-    first_op_in_block = named_sequence_op_block.operations[0].operation
-
-    assert first_op_in_block.name in (
-        "transform.apply_registered_pass",
-        "transform.yield",
-    ), """
-            Unexpected operation in transform.named_sequence!
-            Only transform.apply_registered_pass and transform.yield are allowed.
-        """
-
-    if first_op_in_block.name == "transform.apply_registered_pass":
-        _ = len(named_sequence_op_block.operations)
-        yield_op = named_sequence_op_block.operations[_ - 1].operation
-        current_last_pass = named_sequence_op_block.operations[_ - 2].operation
-        with ir.InsertionPoint(yield_op):
-            apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_mod_type,
-                target=current_last_pass.result,
-                pass_name=pass_name,
-                options=options,
-            )
-
-    # otherwise it's the first pass, i.e. only a yield op is in the block
-    # so insert right before the yield op
-    else:
-        ip = named_sequence_op.regions[0].blocks[0]
-        with ir.InsertionPoint(ip.operations[len(ip.operations) - 1]):
-            apply_registered_pass_op = ApplyRegisteredPassOp(
-                result=transform_mod_type,
-                target=ip.arguments[0],
-                pass_name=pass_name,
-                options=options,
-            )
-
-    return apply_registered_pass_op.results
-
-
-#
 # module
 #
-
-
 @quantum_kernel_p.def_impl
 def _quantum_kernel_def_impl(*args, call_jaxpr, qnode, pipeline=None):  # pragma: no cover
     raise NotImplementedError()
@@ -2157,7 +2039,6 @@ CUSTOM_LOWERING_RULES = (
     (assert_p, _assert_lowering),
     (python_callback_p, _python_callback_lowering),
     (value_and_grad_p, _value_and_grad_lowering),
-    (apply_registered_pass_p, _apply_registered_pass_lowering),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),
     (sin_p, _sin_lowering2),

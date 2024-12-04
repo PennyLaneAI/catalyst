@@ -38,7 +38,6 @@ from typing import Optional, TypeAlias
 
 import pennylane as qml
 
-from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.tracing.contexts import EvaluationContext
 
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
