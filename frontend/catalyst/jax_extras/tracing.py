@@ -962,10 +962,30 @@ class DynshapePrimitive(JaxprPrimitive):
         return out_tracers if self.multiple_results else out_tracers.pop()
 
 
-def bind_dynamic_shot_measurement_primitives(primitive, shots, *args, **kwargs):
-    if isinstance(shots, int):
-        kwargs["shots"] = shots
-    else:
-        args += (shots,)
+def bind_flexible_primitive(primitive, flexible_args: dict[str, Any], *dyn_args, **static_args):
+    """
+    Calls the primitive.bind() method with dyn_args being positional arguments to the bind,
+    and static_args being keyword arguments.
 
-    return primitive.bind(*args, **kwargs)
+    The flexible_args is a dictionary containing the flexible arguments.
+    These are the arguments that can either be static or dynamic. This method
+    will bind a flexible argument as static only if it is an integer, float, or boolean
+    literal. In the static case, the binded primitive's param name is the flexible arg's key,
+    and the jaxpr param value is the flexible arg's value.
+
+    If a flexible argument is received as a tracer, it will be binded dynamically with
+    the flexible arg's value.
+
+    This ensures that in the jaxpr, dynamic args become SSA arguments to the primitive,
+    and static args become literal-valued parameters of the jaxpr.
+    """
+
+    static_literal_pool = (int, float, bool)
+
+    for flex_arg_name, flex_arg_value in flexible_args.items():
+        if type(flex_arg_value) in static_literal_pool:
+            static_args |= {flex_arg_name: flex_arg_value}
+        else:
+            dyn_args += (flex_arg_value,)
+
+    return primitive.bind(*dyn_args, **static_args)

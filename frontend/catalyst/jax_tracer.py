@@ -70,7 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
-from catalyst.jax_extras.tracing import bind_dynamic_shot_measurement_primitives
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -888,8 +888,8 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = bind_dynamic_shot_measurement_primitives(
-                        sample_p, shots, obs_tracers, num_qubits=nqubits
+                    result = bind_flexible_primitive(
+                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
                     )
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
@@ -923,8 +923,8 @@ def trace_quantum_measurements(
                         "Please specify a finite number of shots."
                     )
                 shape = (2**nqubits,) if using_compbasis else (2,)
-                results = bind_dynamic_shot_measurement_primitives(
-                    counts_p, shots, obs_tracers, shape=shape
+                results = bind_flexible_primitive(
+                    counts_p, {"shots": shots}, obs_tracers, shape=shape
                 )
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
