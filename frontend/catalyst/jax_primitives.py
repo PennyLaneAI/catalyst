@@ -15,7 +15,6 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-import copy
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -42,7 +41,6 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
-from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp

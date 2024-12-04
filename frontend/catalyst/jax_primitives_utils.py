@@ -40,6 +40,7 @@ def get_call_jaxpr(jaxpr):
 
 
 def get_call_equation(jaxpr):
+    """Extracts the equation which has a call_jaxpr."""
     for eqn in jaxpr.eqns:
         if eqn.params.get("call_jaxpr"):
             return eqn
@@ -47,6 +48,7 @@ def get_call_equation(jaxpr):
 
 
 def lower_jaxpr(ctx, jaxpr):
+    """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p"""
     equation = get_call_equation(jaxpr)
     call_jaxpr = equation.params["call_jaxpr"]
     callable_ = equation.params.get("fn")
@@ -231,6 +233,9 @@ class NestedModule:
 
 
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
+    """Generate a transform module embedded in the current module and schedule
+    the transformations in pipeline"""
+
     transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
 

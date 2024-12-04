@@ -34,7 +34,7 @@ individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
-from typing import Optional, TypeAlias
+from typing import TypeAlias
 
 import pennylane as qml
 
@@ -56,13 +56,15 @@ class Pass:
 
 
 def dictionary_to_tuple_of_passes(pass_pipeline: PipelineDict):
+    """Convert dictionary of passes into tuple of passes"""
+
     if type(pass_pipeline) != dict:
         return pass_pipeline
 
     passes = tuple()
     pass_names = _API_name_to_pass_name()
     for API_name, pass_options in pass_pipeline.items():
-        name = pass_name = pass_names[API_name]
+        name = pass_names[API_name]
         passes += (Pass(name, **pass_options),)
     return passes
 
