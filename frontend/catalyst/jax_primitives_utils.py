@@ -26,6 +26,14 @@ from mlir_quantum.dialects._transform_ops_gen import NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 
 
+def get_call_jaxpr(jaxpr):
+    """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
+    for eqn in jaxpr.eqns:
+        if eqn.params.get("call_jaxpr"):
+            return eqn.params["call_jaxpr"]
+    raise AssertionError("No call_jaxpr found in the JAXPR.")
+
+
 def lower_callable(ctx, callable_, call_jaxpr):
     """Lowers _callable to MLIR.
 

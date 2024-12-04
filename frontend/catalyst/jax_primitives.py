@@ -106,6 +106,7 @@ from catalyst.jax_primitives_utils import (
     cache,
     create_call_op,
     get_cached,
+    get_call_jaxpr,
     get_symbolref,
     lower_callable,
 )
@@ -593,15 +594,6 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     return tuple(transformed_signature.get_results())
 
 
-def _get_call_jaxpr(jaxpr):
-    """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
-    for eqn in jaxpr.eqns:
-        primitive = eqn.primitive
-        if primitive in {func_p, quantum_kernel_p}:
-            return eqn.params["call_jaxpr"]
-    raise AssertionError("No call_jaxpr found in the JAXPR.")
-
-
 def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     """Lowering function to gradient.
     Args:
@@ -624,7 +616,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnums = [num + offset for num in argnums]
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_op = lower_callable(ctx, fn, func_call_jaxpr)
 
     symbol_ref = get_symbolref(ctx, func_op)
@@ -695,7 +687,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         constants.append(constantVals)
 
     consts_and_args = constants + args
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
@@ -746,7 +738,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
@@ -797,7 +789,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
     cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
@@ -854,7 +846,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         jaxpr: the jaxpr representation of the circuit
         fn: the function to be mitigated
     """
-    func_call_jaxpr = _get_call_jaxpr(jaxpr)
+    func_call_jaxpr = get_call_jaxpr(jaxpr)
 
     func_op = lower_callable(ctx, fn, func_call_jaxpr)
     symbol_ref = get_symbolref(ctx, func_op)
