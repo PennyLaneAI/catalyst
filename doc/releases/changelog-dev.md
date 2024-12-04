@@ -94,6 +94,9 @@
   which denotes the transformation schedule, embedded in its MLIR representation.
   [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
 
+* Replace Python C-API calls with Stable ABI calls.
+  [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
