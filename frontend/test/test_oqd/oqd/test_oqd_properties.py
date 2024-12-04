@@ -93,6 +93,16 @@ class TestOQDDeviceDatabase:
         assert properties.parameters["w_ablation"].value == 532
         assert properties.parameters["w_ablation"].unit == "nm"
 
+    def test_from_toml_invalid(self):
+        """
+        Tests that the OQDDeviceDatabase.from_toml method raises a ValueError when the TOML document
+        is invalid.
+        """
+        from catalyst.third_party.oqd import OQDDeviceDatabase
+
+        with pytest.raises(ValueError, match="Failed to load TOML document"):
+            OQDDeviceDatabase.from_toml("Invalid TOML document")
+
 
 class TestOQDQubitDatabase:
     """Test suite for the OQDQubitDatabase class."""
@@ -111,8 +121,8 @@ class TestOQDQubitDatabase:
 
     def test_from_toml(self):
         """
-        Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a
-        sample oqd_qubit_parameters.toml file.
+        Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a sample
+        oqd_qubit_parameters.toml file.
         """
         from catalyst.third_party.oqd import OQDQubitDatabase
 
@@ -160,9 +170,69 @@ class TestOQDQubitDatabase:
         assert qubit_database.phonon_parameters["COM_y"].eigenvector == [0, 1, 0]
         assert qubit_database.phonon_parameters["COM_z"].eigenvector == [0, 0, 1]
 
+    def test_from_toml_with_ion_filter(self):
+        """
+        Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a sample
+        oqd_qubit_parameters.toml file and filter the ions by name.
+        """
+        from catalyst.third_party.oqd import OQDQubitDatabase
+
+        # Select params only for ion Yb171
+        qubit_database_yb171 = OQDQubitDatabase.from_toml(
+            OQD_TEST_DIR / "oqd_qubit_parameters.toml", ion_species_filter="Yb171"
+        )
+        assert qubit_database_yb171.ion_parameters.keys() == {"Yb171"}
+
+        # Select params only for ion Yb171, but input as list[str]
+        qubit_database_yb171 = OQDQubitDatabase.from_toml(
+            OQD_TEST_DIR / "oqd_qubit_parameters.toml", ion_species_filter=["Yb171"]
+        )
+        assert qubit_database_yb171.ion_parameters.keys() == {"Yb171"}
+
+        # Selecting params for ion that does not exist should result in empty dict
+        qubit_database_invalid = OQDQubitDatabase.from_toml(
+            OQD_TEST_DIR / "oqd_qubit_parameters.toml", ion_species_filter=["none"]
+        )
+        assert not qubit_database_invalid.ion_parameters
+
+        # Incorrect filter type should raise TypeError
+        with pytest.raises(TypeError, match="Input must be a string or a collection of strings"):
+            OQDQubitDatabase.from_toml(
+                OQD_TEST_DIR / "oqd_qubit_parameters.toml", ion_species_filter=1
+            )
+
+    def test_from_toml_with_phonon_filter(self):
+        """
+        Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a sample
+        oqd_qubit_parameters.toml file and filter the phonon modes by name.
+        """
+        from catalyst.third_party.oqd import OQDQubitDatabase
+
+        # Select params only for phonon mode COM_x
+        qubit_database_comx = OQDQubitDatabase.from_toml(
+            OQD_TEST_DIR / "oqd_qubit_parameters.toml", phonon_mode_filter=["COM_x"]
+        )
+        assert qubit_database_comx.phonon_parameters.keys() == {"COM_x"}
+
+        # Selecting params for phonon mode that does not exist should result in empty dict
+        qubit_database_invalid = OQDQubitDatabase.from_toml(
+            OQD_TEST_DIR / "oqd_qubit_parameters.toml", phonon_mode_filter=["none"]
+        )
+        assert not qubit_database_invalid.phonon_parameters
+
 
 class TestOQDQubitDatabaseInvalid:
     """Test suite for the OQDQubitDatabase class given invalid TOML input."""
+
+    def test_from_toml_invalid(self):
+        """
+        Tests that the OQDQubitDatabase.from_toml method raises a ValueError when the TOML document
+        is invalid.
+        """
+        from catalyst.third_party.oqd import OQDQubitDatabase
+
+        with pytest.raises(ValueError, match="Failed to load TOML document"):
+            OQDQubitDatabase.from_toml("Invalid TOML document")
 
     def test_from_toml_invalid_missing_schema(self):
         """
@@ -349,6 +419,16 @@ class TestOQDBeamDatabase:
         assert beam_database.beam_parameters["downstate_estate"].phase == 0
         assert math.isnan(beam_database.beam_parameters["downstate_estate"].polarization)
         assert math.isnan(beam_database.beam_parameters["downstate_estate"].wavevector)
+
+    def test_from_toml_invalid(self):
+        """
+        Tests that the OQDBeamDatabase.from_toml method raises a ValueError when the TOML document
+        is invalid.
+        """
+        from catalyst.third_party.oqd import OQDBeamDatabase
+
+        with pytest.raises(ValueError, match="Failed to load TOML document"):
+            OQDBeamDatabase.from_toml("Invalid TOML document")
 
     def test_from_toml_invalid_missing_schema(self):
         """
