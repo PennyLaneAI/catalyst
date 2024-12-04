@@ -64,10 +64,7 @@ def safe_eval(expr: str) -> float:
     """
 
     def _eval(node):
-        if isinstance(node, ast.Expression):
-            return _eval(node.body)
-
-        elif isinstance(node, ast.BinOp):  # Binary operations (e.g., 1 + 2)
+        if isinstance(node, ast.BinOp):  # Binary operations (e.g., 1 + 2)
             return _eval_binop(node)
 
         elif isinstance(node, ast.UnaryOp):  # Unary operations (e.g., -1)

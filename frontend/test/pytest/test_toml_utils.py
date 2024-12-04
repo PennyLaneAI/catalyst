@@ -152,12 +152,77 @@ class TestSafeEval:
             safe_eval("1 + x")
 
         with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("~1")
+
+        with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("1 + math.pii")
+
+        with pytest.raises(ValueError, match="Invalid expression"):
             safe_eval("1 + math.sin")
 
+        with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("1 + math.sinn(2)")
+
+        with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("1 + (3).real")
+
+    # The following operations are not supported, but we may want to add support in the future:
+    @pytest.mark.xfail(reason="safe_eval does not support the modulo operator")
+    def test_safe_eval_modulo(self):
+        """Test safe_eval on expressions containing modulo operations."""
+        assert safe_eval("2 % 2") == 0
+
+    @pytest.mark.xfail(reason="safe_eval does not support the floor-division operator")
+    def test_safe_eval_floor_division(self):
+        """Test safe_eval on expressions containing floor-division operations."""
+        assert safe_eval("4 // 2") == 2
+
+    @pytest.mark.xfail(reason="safe_eval does not support the left bit-shift operator")
+    def test_safe_eval_left_bit_shift(self):
+        """Test safe_eval on expressions containing left bit-shift operations."""
+        assert safe_eval("8 << 1") == 16
+
+    @pytest.mark.xfail(reason="safe_eval does not support the right bit-shift operator")
+    def test_safe_eval_left_bit_shift(self):
+        """Test safe_eval on expressions containing right bit-shift operations."""
+        assert safe_eval("8 >> 1") == 4
+
+    @pytest.mark.xfail(reason="safe_eval does not support the bitwise-and operator")
+    def test_safe_eval_bitwise_and(self):
+        """Test safe_eval on expressions containing bitwise-and operations."""
+        assert safe_eval("8 & 1") == 0
+
+    @pytest.mark.xfail(reason="safe_eval does not support the bitwise-or operator")
+    def test_safe_eval_bitwise_or(self):
+        """Test safe_eval on expressions containing bitwise-or operations."""
+        assert safe_eval("8 | 1") == 9
+
+    @pytest.mark.xfail(reason="safe_eval does not support the bitwise-xor operator")
+    def test_safe_eval_bitwise_xor(self):
+        """Test safe_eval on expressions containing bitwise-xor operations."""
+        assert safe_eval("8 ^ 9") == 1
+
+    @pytest.mark.xfail(reason="safe_eval does not support the invert operator")
+    def test_safe_eval_invert(self):
+        """Test safe_eval on expressions containing invert operations."""
+        assert safe_eval("~1") == -2
+
+    # The following operations should never be supported by safe_eval:
+    def test_safe_eval_unsupported_operations(self):
+        """Test that safe_eval raises a ValueError on valid expressions that contain unsupported operations."""
         with pytest.raises(ValueError, match="Invalid expression"):
             # `eval("os.listdir('/')")` is valid (assuming the os module is accessible), but the
             # equivalent `safe_eval` call is not.
             safe_eval("os.listdir('/')")
+
+        with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("sys.version")
+
+        with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("x = 42")
+
+        with pytest.raises(ValueError, match="Invalid expression"):
+            safe_eval("print(42)")
 
 
 if __name__ == "__main__":
