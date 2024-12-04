@@ -183,7 +183,7 @@ class TestSafeEval:
         assert safe_eval("8 << 1") == 16
 
     @pytest.mark.xfail(reason="safe_eval does not support the right bit-shift operator")
-    def test_safe_eval_left_bit_shift(self):
+    def test_safe_eval_right_bit_shift(self):
         """Test safe_eval on expressions containing right bit-shift operations."""
         assert safe_eval("8 >> 1") == 4
 
@@ -209,7 +209,9 @@ class TestSafeEval:
 
     # The following operations should never be supported by safe_eval:
     def test_safe_eval_unsupported_operations(self):
-        """Test that safe_eval raises a ValueError on valid expressions that contain unsupported operations."""
+        """Test that safe_eval raises a ValueError on valid expressions that contain unsupported
+        operations.
+        """
         with pytest.raises(ValueError, match="Invalid expression"):
             # `eval("os.listdir('/')")` is valid (assuming the os module is accessible), but the
             # equivalent `safe_eval` call is not.
