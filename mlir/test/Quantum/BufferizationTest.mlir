@@ -18,18 +18,38 @@
 // Measurements //
 //////////////////
 
-func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) -> (tensor<4xf64>, tensor<4xi64>) {
+func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-    %samples:2 = quantum.counts %obs {shots=2} : tensor<4xf64>, tensor<4xi64>
-    func.return %samples#0, %samples#1 : tensor<4xf64>, tensor<4xi64>
+
+    // CHECK: [[eigval_alloc:%.+]] = memref.alloc() : memref<4xf64>
+    // CHECK: [[counts_alloc:%.+]] = memref.alloc() : memref<4xi64>
+    // CHECK: quantum.counts {{.*}} in([[eigval_alloc]] : memref<4xf64>, [[counts_alloc]] : memref<4xi64>)
+    %samples:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
+
+    // CHECK: [[dyn_eigval_alloc:%.+]] = memref.alloc() : memref<4xf64>
+    // CHECK: [[dyn_counts_alloc:%.+]] = memref.alloc() : memref<4xi64>
+    // CHECK: quantum.counts {{.*}} in([[dyn_eigval_alloc]] : memref<4xf64>, [[dyn_counts_alloc]] : memref<4xi64>)
+    %dyn_samples:2 = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
+
+    func.return
 }
 
 // -----
 
-func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit) {
+func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit, %dyn_shots: i64) {
+    // CHECK: quantum.device shots([[shots:%.+]]) ["", "", ""]
+    quantum.device shots(%dyn_shots) ["", "", ""]
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-    // CHECK: quantum.sample {{.*}} : memref<1000x2xf64>
-    %samples = quantum.sample %obs {shots=1000} : tensor<1000x2xf64>
+
+    // CHECK: [[idx:%.+]] = index.casts [[shots]] : i64 to index
+    // CHECK: [[alloc:%.+]] = memref.alloc([[idx]]) : memref<?x2xf64>
+    // CHECK: quantum.sample {{.*}} in([[alloc]] : memref<?x2xf64>)
+    %samples = quantum.sample %obs : tensor<?x2xf64>
+
+    // CHECK: [[alloc_static:%.+]] = memref.alloc() : memref<10x2xf64>
+    // CHECK: quantum.sample {{.*}} in([[alloc_static]] : memref<10x2xf64>)
+    %samples_static = quantum.sample %obs : tensor<10x2xf64>
+
     func.return
 }
 
