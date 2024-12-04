@@ -100,7 +100,6 @@ def test_dynamic_counts_backend_functionality():
 
     replace_ir(workflow_dyn_counts, "mlir", new_ir)
     res = workflow_dyn_counts(4000)
-    print("after: ", res)
     assert res[1][0] + res[1][1] == 4000
 
     workflow_dyn_counts.workspace.cleanup()
