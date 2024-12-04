@@ -94,6 +94,9 @@
   which denotes the transformation schedule, embedded in its MLIR representation.
   [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
 
+* Replace Python C-API calls with Stable ABI calls.
+  [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
+
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst,
   although at the PennyLane side, the device shots still is constrained to a static integer literal.
 
