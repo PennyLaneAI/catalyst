@@ -166,10 +166,6 @@ def pipeline(pass_pipeline: PipelineDict):
     return _decorator
 
 
-@pipeline.register
-def pipeline_list(pass_pipeline: list): ...
-
-
 def cancel_inverses(fn=None):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
