@@ -157,10 +157,7 @@ def pipeline(pass_pipeline: PipelineDict):
     will always take precedence over global pass pipelines.
     """
 
-    def _decorator(qnode=None, **kwargs):
-        if qnode is None:
-            return functools.partial(pipeline, **kwargs)
-
+    def _decorator(qnode=None):
         if not isinstance(qnode, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
@@ -168,12 +165,12 @@ def pipeline(pass_pipeline: PipelineDict):
         clone.__name__ += "_transformed"
 
         @functools.wraps(clone)
-        def wrapper(*args, **kwrags):
+        def wrapper(*args, **kwargs):
             if EvaluationContext.is_tracing():
-                passes = kwrags.pop("pass_pipeline", tuple())
+                passes = kwargs.pop("pass_pipeline", tuple())
                 passes += dictionary_to_tuple_of_passes(pass_pipeline)
-                kwrags["pass_pipeline"] = passes
-            return clone(*args, **kwrags)
+                kwargs["pass_pipeline"] = passes
+            return clone(*args, **kwargs)
 
         return wrapper
 
@@ -297,11 +294,11 @@ def cancel_inverses(qnode=None):
     clone.__name__ += "_cancel_inverses"
 
     @functools.wraps(clone)
-    def wrapper(*args, **kwrags):
-        pass_pipeline = kwrags.pop("pass_pipeline", tuple())
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
         pass_pipeline += (Pass("remove-chained-self-inverse"),)
-        kwrags["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwrags)
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
 
     return wrapper
 
@@ -374,11 +371,11 @@ def merge_rotations(qnode=None):
     clone.__name__ += "_merge_rotations"
 
     @functools.wraps(clone)
-    def wrapper(*args, **kwrags):
-        pass_pipeline = kwrags.pop("pass_pipeline", tuple())
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
         pass_pipeline += (Pass("merge-rotations"),)
-        kwrags["pass_pipeline"] = pass_pipeline
-        return clone(*args, **kwrags)
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
 
     return wrapper
 
@@ -388,14 +385,16 @@ def _API_name_to_pass_name():
 
 
 def ions_decomposition(qnode=None):
+    """Apply decomposition pass at the MLIR level"""
+
     if not isinstance(qnode, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
     @functools.wraps(qnode)
-    def wrapper(*args, **kwrags):
-        pass_pipeline = kwrags.pop("pass_pipeline", tuple())
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
         pass_pipeline += (Pass("ions-decomposition"),)
-        kwrags["pass_pipeline"] = pass_pipeline
-        return qnode(*args, **kwrags)
+        kwargs["pass_pipeline"] = pass_pipeline
+        return qnode(*args, **kwargs)
 
     return wrapper
