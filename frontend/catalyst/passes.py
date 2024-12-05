@@ -305,7 +305,7 @@ def cancel_inverses(qnode=None):
 
 
 def apply_pass(pass_name, *flags, **valued_options):
-    """ """
+    """Applies a single pass to the qnode"""
 
     def decorator(qnode):
 
@@ -313,12 +313,12 @@ def apply_pass(pass_name, *flags, **valued_options):
             # Technically, this apply pass is general enough that it can apply to
             # classical functions too. However, since we lack the current infrastructure
             # to denote a function, let's limit it to qnodes
-            raise TypeError(f"A QNode is expected, got the classical function {fn}")
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
         def qnode_call(*args, **kwargs):
-            pipeline = kwargs.get("pass_pipeline", [])
-            pipeline.append(Pass(pass_name))
-            kwargs["pass_pipeline"] = pipeline
+            pass_pipeline = kwargs.get("pass_pipeline", [])
+            pass_pipeline.append(Pass(pass_name, *flags, **valued_options))
+            kwargs["pass_pipeline"] = pass_pipeline
             return qnode(*args, **kwargs)
 
         return qnode_call
