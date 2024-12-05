@@ -16,13 +16,21 @@
 trapped-ion quantum computer device.
 """
 
-# pylint: disable=import-outside-toplevel
-
 import math
 import pathlib
 import textwrap
 
 import pytest
+
+from catalyst.third_party.oqd import (
+    OQDBeamDatabase,
+    OQDDeviceDatabase,
+    OQDQubitDatabase,
+)
+from catalyst.third_party.oqd.oqd_database_managers import (
+    _parse_value_or_expression_as_float,
+    _string_or_collection_of_strings_to_set,
+)
 
 FRONTEND_ROOT_PATH = pathlib.Path(__file__).parent.parent.parent.parent
 OQD_SRC_DIR = FRONTEND_ROOT_PATH / "catalyst/third_party/oqd/src/"
@@ -37,8 +45,6 @@ class TestOQDDeviceDatabase:
         Tests that the OQDDeviceDatabase.from_toml method can load the device properties from the
         oqd_device_parameters.toml file used in production.
         """
-        from catalyst.third_party.oqd import OQDDeviceDatabase
-
         device_database = OQDDeviceDatabase.from_toml(OQD_SRC_DIR / "oqd_device_parameters.toml")
         assert device_database.parameters
 
@@ -47,8 +53,6 @@ class TestOQDDeviceDatabase:
         Tests that the OQDDeviceDatabase.from_toml method can load the device properties from a
         TOML document string.
         """
-        from catalyst.third_party.oqd import OQDDeviceDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.1"
@@ -98,8 +102,6 @@ class TestOQDDeviceDatabase:
         Tests that the OQDDeviceDatabase.from_toml method raises a ValueError when the TOML document
         is invalid.
         """
-        from catalyst.third_party.oqd import OQDDeviceDatabase
-
         with pytest.raises(ValueError, match="Failed to load TOML document"):
             OQDDeviceDatabase.from_toml("Invalid TOML document")
 
@@ -112,8 +114,6 @@ class TestOQDQubitDatabase:
         Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from the
         oqd_qubit_parameters.toml file used in production.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         qubit_database = OQDQubitDatabase.from_toml(OQD_SRC_DIR / "oqd_qubit_parameters.toml")
         assert qubit_database
         assert qubit_database.ion_parameters
@@ -124,8 +124,6 @@ class TestOQDQubitDatabase:
         Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a sample
         oqd_qubit_parameters.toml file.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         qubit_database = OQDQubitDatabase.from_toml(OQD_TEST_DIR / "oqd_qubit_parameters.toml")
         assert qubit_database
 
@@ -175,8 +173,6 @@ class TestOQDQubitDatabase:
         Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a sample
         oqd_qubit_parameters.toml file and filter the ions by name.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         # Select params only for ion Yb171
         qubit_database_yb171 = OQDQubitDatabase.from_toml(
             OQD_TEST_DIR / "oqd_qubit_parameters.toml", ion_species_filter="Yb171"
@@ -206,8 +202,6 @@ class TestOQDQubitDatabase:
         Tests that the OQDQubitDatabase.from_toml method can load the qubit parameters from a sample
         oqd_qubit_parameters.toml file and filter the phonon modes by name.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         # Select params only for phonon mode COM_x
         qubit_database_comx = OQDQubitDatabase.from_toml(
             OQD_TEST_DIR / "oqd_qubit_parameters.toml", phonon_mode_filter=["COM_x"]
@@ -229,8 +223,6 @@ class TestOQDQubitDatabaseInvalid:
         Tests that the OQDQubitDatabase.from_toml method raises a ValueError when the TOML document
         is invalid.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         with pytest.raises(ValueError, match="Failed to load TOML document"):
             OQDQubitDatabase.from_toml("Invalid TOML document")
 
@@ -239,8 +231,6 @@ class TestOQDQubitDatabaseInvalid:
         Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the schema key.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         toml_document = textwrap.dedent(
             """\
             # Empty TOML document
@@ -257,8 +247,6 @@ class TestOQDQubitDatabaseInvalid:
         Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file contains
         an invalid schema.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.0"  # This is an invalid schema
@@ -273,8 +261,6 @@ class TestOQDQubitDatabaseInvalid:
         Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the 'ions' key.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.1"
@@ -299,8 +285,6 @@ class TestOQDQubitDatabaseInvalid:
         Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the 'phonons' key.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.1"
@@ -327,8 +311,6 @@ class TestOQDQubitDatabaseInvalid:
         Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file contains
         an invalid arithmetic expression.
         """
-        from catalyst.third_party.oqd import OQDQubitDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.1"
@@ -385,8 +367,6 @@ class TestOQDBeamDatabase:
         Tests that the OQDBeamDatabase.from_toml method can load the beam parameters from the
         oqd_beam_parameters.toml file used in production.
         """
-        from catalyst.third_party.oqd import OQDBeamDatabase
-
         beam_database = OQDBeamDatabase.from_toml(OQD_SRC_DIR / "oqd_beam_parameters.toml")
         assert beam_database.beam_parameters
 
@@ -395,8 +375,6 @@ class TestOQDBeamDatabase:
         Tests that the OQDBeamDatabase.from_toml method can load the beam parameters from a
         sample oqd_beam_parameters.toml file.
         """
-        from catalyst.third_party.oqd import OQDBeamDatabase
-
         beam_database = OQDBeamDatabase.from_toml(OQD_TEST_DIR / "oqd_beam_parameters.toml")
         assert beam_database.beam_parameters
 
@@ -425,8 +403,6 @@ class TestOQDBeamDatabase:
         Tests that the OQDBeamDatabase.from_toml method raises a ValueError when the TOML document
         is invalid.
         """
-        from catalyst.third_party.oqd import OQDBeamDatabase
-
         with pytest.raises(ValueError, match="Failed to load TOML document"):
             OQDBeamDatabase.from_toml("Invalid TOML document")
 
@@ -435,8 +411,6 @@ class TestOQDBeamDatabase:
         Tests that the OQDQubitDatabase.from_toml method raises an error if the TOML file is
         missing the schema key.
         """
-        from catalyst.third_party.oqd import OQDBeamDatabase
-
         toml_document = textwrap.dedent(
             """\
             # Empty TOML document
@@ -453,8 +427,6 @@ class TestOQDBeamDatabase:
         Tests that the OQDBeamDatabase.from_toml method raises an error if the TOML file contains
         an invalid schema.
         """
-        from catalyst.third_party.oqd import OQDBeamDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.0"  # This is an invalid schema
@@ -469,8 +441,6 @@ class TestOQDBeamDatabase:
         Tests that the OQDBeamDatabase.from_toml method raises an error if the TOML file is
         missing the 'beams' key.
         """
-        from catalyst.third_party.oqd import OQDBeamDatabase
-
         toml_document = textwrap.dedent(
             """\
             oqd_config_schema = "v0.1"
@@ -495,10 +465,6 @@ class TestOQDDatabaseManagerUtils:
         """
         Tests that the _parse_value_or_expression_as_float function works as expected.
         """
-        from catalyst.third_party.oqd.oqd_database_managers import (
-            _parse_value_or_expression_as_float,
-        )
-
         assert _parse_value_or_expression_as_float(1.0) == 1.0
         assert _parse_value_or_expression_as_float(1) == 1.0
         assert math.isnan(_parse_value_or_expression_as_float(math.nan))
@@ -518,10 +484,6 @@ class TestOQDDatabaseManagerUtils:
         """
         Tests that the _string_or_collection_of_strings_to_set function works as expected.
         """
-        from catalyst.third_party.oqd.oqd_database_managers import (
-            _string_or_collection_of_strings_to_set,
-        )
-
         assert _string_or_collection_of_strings_to_set("a") == {"a"}
         assert _string_or_collection_of_strings_to_set(["a", "b", "c"]) == {"a", "b", "c"}
 
