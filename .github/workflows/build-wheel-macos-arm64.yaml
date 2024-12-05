@@ -419,13 +419,29 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock scipy-openblas32
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
 
     - name: Install PennyLane Plugins
       run: |
-        python${{ matrix.python_version }} -c "import scipy_openblas32; print(scipy_openblas32.get_lib_dir())"
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
+
+      
+    - name: Add path to scipy-openblas32 to DYLD_LIBRARY_PATH
+      run: |
+          # Run the Python command to get the library path dynamically
+          LIBRARY_PATH=$(python${{ matrix.python_version }} -c "import scipy_openblas32; print(scipy_openblas32.get_lib_dir())")
+          
+          # Export the DYLD_LIBRARY_PATH using the dynamically obtained path
+          echo "Setting DYLD_LIBRARY_PATH to $LIBRARY_PATH"
+          export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$LIBRARY_PATH"
+          
+          # Set it in the environment for subsequent steps
+          echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+          
+          # Optional: Output the value for debugging
+          echo "DYLD_LIBRARY_PATH is now: $DYLD_LIBRARY_PATH"
+      shell: bash  # Use bash to export environment variables
 
     - name: Install OQC client
       run: |
