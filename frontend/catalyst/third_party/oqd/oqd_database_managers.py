@@ -493,4 +493,4 @@ def _string_or_collection_of_strings_to_set(input_: Union[str, Collection[str]])
         return set(input_)
 
     else:
-        raise TypeError("Input must be a string or a collection of strings.")
+        raise TypeError(f"Expected a string or a collection of strings, but got {type(input_)}")

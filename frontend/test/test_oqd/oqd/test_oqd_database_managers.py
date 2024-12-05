@@ -196,7 +196,7 @@ class TestOQDQubitDatabase:
         assert not qubit_database_invalid.ion_parameters
 
         # Incorrect filter type should raise TypeError
-        with pytest.raises(TypeError, match="Input must be a string or a collection of strings"):
+        with pytest.raises(TypeError, match="Expected a string or a collection of strings"):
             OQDQubitDatabase.from_toml(
                 OQD_TEST_DIR / "oqd_qubit_parameters.toml", ion_species_filter=1
             )
@@ -484,6 +484,52 @@ class TestOQDBeamDatabase:
             AssertionError, match="TOML document for OQD beam parameters must contain key 'beams'"
         ):
             OQDBeamDatabase.from_toml(toml_document)
+
+
+class TestOQDDatabaseManagerUtils:
+    """
+    Tests for the miscellaneous utility functions in the oqd_database_managers module.
+    """
+
+    def test_parse_value_or_expression_as_float(self):
+        """
+        Tests that the _parse_value_or_expression_as_float function works as expected.
+        """
+        from catalyst.third_party.oqd.oqd_database_managers import (
+            _parse_value_or_expression_as_float,
+        )
+
+        assert _parse_value_or_expression_as_float(1.0) == 1.0
+        assert _parse_value_or_expression_as_float(1) == 1.0
+        assert math.isnan(_parse_value_or_expression_as_float(math.nan))
+        assert _parse_value_or_expression_as_float("1.0") == 1.0
+        assert _parse_value_or_expression_as_float("1") == 1.0
+
+        with pytest.raises(ValueError, match="Invalid expression"):
+            _parse_value_or_expression_as_float("invalid")
+
+        with pytest.raises(TypeError, match="Expected a number or string"):
+            _parse_value_or_expression_as_float(None)
+
+        with pytest.raises(TypeError, match="Expected a number or string"):
+            _parse_value_or_expression_as_float([1, 2, 3])
+
+    def test_string_or_collection_of_strings_to_set(self):
+        """
+        Tests that the _string_or_collection_of_strings_to_set function works as expected.
+        """
+        from catalyst.third_party.oqd.oqd_database_managers import (
+            _string_or_collection_of_strings_to_set,
+        )
+
+        assert _string_or_collection_of_strings_to_set("a") == {"a"}
+        assert _string_or_collection_of_strings_to_set(["a", "b", "c"]) == {"a", "b", "c"}
+
+        with pytest.raises(TypeError, match="Expected a string or a collection of strings"):
+            _string_or_collection_of_strings_to_set(1)
+
+        with pytest.raises(AssertionError, match="All items in collection must be strings"):
+            _string_or_collection_of_strings_to_set([1, 2, 3])
 
 
 if __name__ == "__main__":
