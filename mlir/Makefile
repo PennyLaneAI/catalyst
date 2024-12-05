@@ -135,6 +135,7 @@ standalone-plugin:
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		standalone
 	cmake --build standalone/build --target check-standalone
+	cp standalone/build/lib/StandalonePlugin.so $(DIALECTS_BUILD_DIR)
 
 .PHONY: dialects
 dialects:

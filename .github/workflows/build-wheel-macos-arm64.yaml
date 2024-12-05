@@ -359,7 +359,7 @@ jobs:
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         make standalone-plugin
-        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/
 
     - name: Build wheel
       run: |
