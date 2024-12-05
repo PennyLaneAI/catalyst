@@ -21,20 +21,14 @@ trapped-ion quantum computer device and the methods for loading them from their 
 and configuration files.
 """
 
-import os
-import sys
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from numbers import Number
 from os import PathLike
 from typing import Union, Collection
 
-from catalyst.utils.toml_utils import safe_eval
+from catalyst.utils.toml_utils import load_toml, safe_eval
 
-if sys.version_info >= (3, 11):
-    import tomllib as toml  # pragma: no cover
-else:
-    import tomli as toml
 
 SUPPORTED_SCHEMAS = ["v0.1"]
 
@@ -115,10 +109,7 @@ class OQDDeviceDatabase:
             filepath_or_buffer: The path to the TOML file or a TOML document string.
         """
         try:
-            if os.path.isfile(filepath_or_buffer):
-                document = _load_toml_from_file(filepath_or_buffer)
-            else:
-                document = _load_toml_from_string(filepath_or_buffer)
+            document = load_toml(filepath_or_buffer)
 
         except Exception as e:
             raise ValueError(
@@ -302,10 +293,7 @@ class OQDQubitDatabase:
                 OQDQubitDatabase object. If None, all phonon modes are included.
         """
         try:
-            if os.path.isfile(filepath_or_buffer):
-                document = _load_toml_from_file(filepath_or_buffer)
-            else:
-                document = _load_toml_from_string(filepath_or_buffer)
+            document = load_toml(filepath_or_buffer)
 
         except Exception as e:
             raise ValueError("Failed to load TOML document when creating OQDQubitDatabase") from e
@@ -396,10 +384,7 @@ class OQDBeamDatabase:
             filepath_or_buffer: The path to the TOML file or a TOML document string.
         """
         try:
-            if os.path.isfile(filepath_or_buffer):
-                document = _load_toml_from_file(filepath_or_buffer)
-            else:
-                document = _load_toml_from_string(filepath_or_buffer)
+            document = load_toml(filepath_or_buffer)
 
         except Exception as e:
             raise ValueError("Failed to load TOML document when creating OQDBeamDatabase") from e
@@ -417,17 +402,6 @@ class OQDBeamDatabase:
     @staticmethod
     def _check_required_keys(document: dict):
         assert "beams" in document, "TOML document for OQD beam parameters must contain key 'beams'"
-
-
-def _load_toml_from_file(filepath: PathLike) -> dict:
-    """Loads a TOML file and returns the parsed dict."""
-    with open(filepath, "rb") as f:
-        return toml.load(f)
-
-
-def _load_toml_from_string(contents: str) -> dict:
-    """Loads a TOML string and returns the parsed dict."""
-    return toml.loads(contents)
 
 
 def _parse_value_or_expression_as_float(input_: Union[Number, str]):

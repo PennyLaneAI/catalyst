@@ -20,10 +20,64 @@ A collection of utility functions for working with TOML configuration files.
 """
 
 import ast
+import io
 import math
 import operator
+import os
+import sys
+from os import PathLike
+from pathlib import Path
+from typing import Union
 
-# Supported operators and their corresponding functions
+if sys.version_info >= (3, 11):
+    import tomllib as toml  # pragma: no cover
+else:
+    import tomli as toml  # pragma: no cover
+
+
+# Alias for supported TOML input types
+TomlInput = Union[str, io.StringIO, os.PathLike]
+
+
+def load_toml(filepath_or_buffer: TomlInput) -> dict:
+    """Loads a TOML document from a file or string and returns the parsed dict.
+
+    Args:
+        filepath_or_buffer: The path to the TOML file or a TOML document string.
+
+    Returns:
+        dict: The parsed TOML document.
+
+    Raises:
+        TypeError: If the input type is not supported.
+    """
+    if isinstance(filepath_or_buffer, io.StringIO):
+        document = _load_toml_from_string(filepath_or_buffer.getvalue())
+
+    elif isinstance(filepath_or_buffer, (str, Path)) and os.path.isfile(filepath_or_buffer):
+        document = _load_toml_from_file(filepath_or_buffer)  # pragma: no cover
+
+    elif isinstance(filepath_or_buffer, str):
+        document = _load_toml_from_string(filepath_or_buffer)
+
+    else:
+        raise TypeError("Input must be a string, io.StringIO, or a path-like object.")
+
+    return document
+
+
+def _load_toml_from_string(contents: str) -> dict:
+    """Loads a TOML string and returns the parsed dict."""
+    return toml.loads(contents)
+
+
+def _load_toml_from_file(filepath: PathLike) -> dict:
+    """Loads a TOML file and returns the parsed dict."""
+    with open(filepath, "rb") as f:  # pragma: no cover
+        return toml.load(f)
+
+
+# Supported safe_eval operators and their corresponding functions
 OPERATORS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,

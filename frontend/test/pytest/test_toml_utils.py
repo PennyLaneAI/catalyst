@@ -15,11 +15,36 @@
 """Tests for the toml_utils module.
 """
 
+import io
 import math
 
 import pytest
 
-from catalyst.utils.toml_utils import safe_eval
+from catalyst.utils.toml_utils import load_toml, safe_eval
+
+
+class TestLoadToml:
+    """Test suite for the load_toml function.
+
+    Note that we do not test loading TOML documents from files to avoid extraneous TOML test files
+    and disk read operations.
+    """
+
+    def test_load_toml_from_StringIO(self):
+        """Test load_toml on a valid TOML document loaded as a StringIO."""
+        with io.StringIO("[test]\nkey = 1") as f:
+            assert load_toml(f) == {"test": {"key": 1}}
+
+    def test_load_toml_from_string(self):
+        """Test load_toml on a valid TOML document string."""
+        assert load_toml("[test]\nkey = 1") == {"test": {"key": 1}}
+
+    def test_load_toml_invalid(self):
+        """Test load_toml on an invalid TOML file input."""
+        with pytest.raises(
+            TypeError, match="Input must be a string, io.StringIO, or a path-like object."
+        ):
+            load_toml(1)
 
 
 class TestSafeEval:
