@@ -62,11 +62,7 @@ APIs, like the Compiler and options.
 
 from pathlib import Path
 
-import jax
-import pennylane as qml
-
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.passes import apply_pass
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.runtime_environment import get_bin_path
 
@@ -96,7 +92,5 @@ options = CompileOptions(
 )
 workspace = WorkspaceManager.get_or_create_workspace("test", None)
 custom_compiler = Compiler(options)
-_, mlir_string = custom_compiler.run_from_ir(
-    mlir_module, "test", workspace
-)
+_, mlir_string = custom_compiler.run_from_ir(mlir_module, "test", workspace)
 print(mlir_string)
