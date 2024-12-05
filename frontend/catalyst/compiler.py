@@ -139,7 +139,7 @@ class LinkerDriver:
         lapack_libs = [lapack_lib_name]
         if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
             # use our own build of LAPACKe to interface with Accelerate
-            lapack_libs += ["lapacke.3"]    
+            lapack_libs += ["lapacke.3"]
 
         system_flags = []
         if platform.system() == "Linux":
