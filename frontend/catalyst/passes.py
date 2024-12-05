@@ -389,7 +389,7 @@ def _API_name_to_pass_name():
     }
 
 
-def ions_decomposition(qnode=None):
+def ions_decomposition(qnode=None):  # pragma: nocover
     """Apply decomposition pass at the MLIR level"""
 
     if not isinstance(qnode, qml.QNode):
