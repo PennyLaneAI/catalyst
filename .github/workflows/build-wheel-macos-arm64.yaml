@@ -399,10 +399,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Install Python 3.10
+    - name: Install Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
@@ -419,7 +419,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock scipy-openblas32
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
 
     - name: Install PennyLane Plugins
       run: |
