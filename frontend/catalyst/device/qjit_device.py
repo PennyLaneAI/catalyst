@@ -303,7 +303,7 @@ class QJITDevice(qml.devices.Device):
         return extract_backend_info(device, capabilities)
 
     @debug_logger_init
-    def __init__(self, original_device):
+    def __init__(self, original_device, print_instructions=False):
         self.original_device = original_device
 
         for key, value in original_device.__dict__.items():
@@ -331,6 +331,11 @@ class QJITDevice(qml.devices.Device):
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
+
+        if original_device.name == "null.qubit":
+            # include 'print_instructions' as a keyword argument for the device constructor.
+            self.backend_kwargs["print_instructions"] = print_instructions
+
         self.capabilities = get_qjit_device_capabilities(device_capabilities)
 
     @debug_logger
