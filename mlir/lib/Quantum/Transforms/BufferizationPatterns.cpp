@@ -13,7 +13,11 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -71,9 +75,32 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = cast<MemRefType>(getTypeConverter()->convertType(tensorType));
         Location loc = op.getLoc();
-        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+
+        // SampleOp's result shape is (shots, num_qubits)
+        // shots is a SSA argument to the device and can potentially be dynamic
+        // so we need to memref alloc from the shots SSA value
+        auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
+        SmallVector<Value> allocSizes;
+
+        if (shape[0] == ShapedType::kDynamic) {
+            auto parentFunc = op->getParentOfType<func::FuncOp>();
+            SmallVector<DeviceInitOp> DeviceInitOpPool;
+            parentFunc->walk(
+                [&](DeviceInitOp deviceInitOp) { DeviceInitOpPool.push_back(deviceInitOp); });
+            assert(DeviceInitOpPool.size() == 1 &&
+                   "quantum.sample operation is only valid when either inside a function with "
+                   "exactly one shot-ful device init operation, or have allocated memref as input");
+
+            auto shots = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
+                                                         DeviceInitOpPool[0].getShots());
+
+            allocSizes.push_back(shots);
+        }
+
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType, allocSizes);
         rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
                                   op->getAttrs());
+
         return success();
     }
 };
@@ -122,8 +149,8 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
         Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
-        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), allocVal0, allocVal1,
-                                  adaptor.getShotsAttr());
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), allocVal0, allocVal1);
+
         return success();
     }
 };

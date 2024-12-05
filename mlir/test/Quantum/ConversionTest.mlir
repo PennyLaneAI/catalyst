@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --finalize-memref-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --convert-index-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
 
 ////////////////////////
 // Runtime Management //
@@ -44,34 +44,46 @@ func.func @finalize() {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64)
 
 // CHECK-LABEL: @device
 func.func @device() {
     // CHECKL llvm.mlir.global internal constant @lightning.qubit("lightning.qubit\00") {addr_space = 0 : i32}
     // CHECKL llvm.mlir.global internal constant @rtd_lightning.so("rtd_lightning.so\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @"{shots: 0}"("{shots: 0}\00") {addr_space = 0 : i32}
+    // CHECKL llvm.mlir.global internal constant @"{my_attr: my_attr_value}"("{my_attr: my_attr_value}\00") {addr_space = 0 : i32}
     // CHECKL llvm.mlir.global internal constant @lightning.kokkos("lightning.kokkos\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @"{shots: 1000}"("{shots: 1000}\00") {addr_space = 0 : i32}
+    // CHECKL llvm.mlir.global internal constant @"{my_other_attr: my_other_attr_value}"("{my_other_attr: my_other_attr_value}\00") {addr_space = 0 : i32}
 
+    // CHECK: [[shots:%.+]] = llvm.mlir.constant(1000 : i64) : i64
     // CHECK: [[d0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
     // CHECK: [[d1:%.+]] = llvm.getelementptr inbounds [[d0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
     // CHECK: [[bo:%.+]] = llvm.mlir.addressof @lightning.qubit : !llvm.ptr
     // CHECK: [[b1:%.+]] = llvm.getelementptr inbounds [[bo]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<16 x i8>
-    // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{shots: 0}" : !llvm.ptr
-    // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<11 x i8>
-    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
-    quantum.device ["rtd_lightning.so", "lightning.qubit", "{shots: 0}"]
+    // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{my_attr: my_attr_value}" : !llvm.ptr
+    // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<25 x i8>
+    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+    %shots = llvm.mlir.constant(1000 : i64) : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
 
     // CHECK: [[e0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
     // CHECK: [[e1:%.+]] = llvm.getelementptr inbounds [[e0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
     // CHECK: [[e2:%.+]] = llvm.mlir.addressof @lightning.kokkos : !llvm.ptr
     // CHECK: [[e3:%.+]] = llvm.getelementptr inbounds [[e2]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
-    // CHECK: [[e4:%.+]] = llvm.mlir.addressof @"{shots: 1000}" : !llvm.ptr
-    // CHECK: [[e5:%.+]] = llvm.getelementptr inbounds [[e4]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<14 x i8>
-    // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: [[e4:%.+]] = llvm.mlir.addressof @"{my_other_attr: my_other_attr_value}" : !llvm.ptr
+    // CHECK: [[e5:%.+]] = llvm.getelementptr inbounds [[e4]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<37 x i8>
+    // CHECK: llvm.call @__catalyst__rt__device_init([[e1]], [[e3]], [[e5]], [[shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
 
-    quantum.device ["rtd_lightning.so", "lightning.kokkos", "{shots: 1000}"]
+    quantum.device shots(%shots) ["rtd_lightning.so", "lightning.kokkos", "{my_other_attr: my_other_attr_value}"]
+
+    // CHECK: [[d0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
+    // CHECK: [[d1:%.+]] = llvm.getelementptr inbounds [[d0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<17 x i8>
+    // CHECK: [[bo:%.+]] = llvm.mlir.addressof @lightning.qubit : !llvm.ptr
+    // CHECK: [[b1:%.+]] = llvm.getelementptr inbounds [[bo]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<16 x i8>
+    // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{my_noshots_attr: my_noshots_attr_value}" : !llvm.ptr
+    // CHECK: [[d4:%.+]] = llvm.getelementptr inbounds [[d3]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<41 x i8>
+    // CHECK: [[zero_shots:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: llvm.call @__catalyst__rt__device_init([[d1]], [[b1]], [[d4]], [[zero_shots]]) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+    quantum.device ["rtd_lightning.so", "lightning.qubit", "{my_noshots_attr: my_noshots_attr_value}"]
 
     return
 }
@@ -406,35 +418,36 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__Sample(!llvm.ptr, i64, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__Sample(!llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @sample
-func.func @sample(%q : !quantum.bit) {
+func.func @sample(%q : !quantum.bit, %dyn_shots: i64) {
 
     %o1 = quantum.compbasis %q : !quantum.obs
     %o2 = quantum.compbasis %q, %q : !quantum.obs
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
-    // CHECK-DAG: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
-    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c1000]], [[c1]], %arg0)
-    %alloc1 = memref.alloc() : memref<1000x1xf64>
-    quantum.sample %o1 in(%alloc1 : memref<1000x1xf64>) {shots = 1000 : i64}
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c1]], %arg0)
+    %idx1 = index.casts %dyn_shots : i64 to index
+    %dyn_alloc1 = memref.alloc(%idx1) : memref<?x1xf64>
+    quantum.sample %o1 in(%dyn_alloc1 : memref<?x1xf64>)
+
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
-    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
-    %alloc2 = memref.alloc() : memref<2000x2xf64>
-    quantum.sample %o2 in(%alloc2 : memref<2000x2xf64>) {shots = 2000 : i64}
+    // CHECK: llvm.call @__catalyst__qis__Sample([[ptr]], [[c2]], %arg0, %arg0)
+    %idx2 = index.casts %dyn_shots : i64 to index
+    %dyn_alloc2 = memref.alloc(%idx2) : memref<?x2xf64>
+    quantum.sample %o2 in(%dyn_alloc2 : memref<?x2xf64>)
 
     return
 }
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__Counts(!llvm.ptr, i64, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__Counts(!llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @counts
 func.func @counts(%q : !quantum.bit) {
@@ -444,20 +457,19 @@ func.func @counts(%q : !quantum.bit) {
 
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK-DAG: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
-    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c1000]], [[c1]], %arg0)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c1]], %arg0)
     %in_eigvals1 = memref.alloc() : memref<2xf64>
     %in_counts1 = memref.alloc() : memref<2xi64>
-    quantum.counts %o1 in(%in_eigvals1 : memref<2xf64>, %in_counts1 : memref<2xi64>) {shots = 1000 : i64}
+    quantum.counts %o1 in(%in_eigvals1 : memref<2xf64>, %in_counts1 : memref<2xi64>)
+
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
+    // CHECK: llvm.call @__catalyst__qis__Counts([[ptr]], [[c2]], %arg0, %arg0)
     %in_eigvals2 = memref.alloc() : memref<4xf64>
     %in_counts2 = memref.alloc() : memref<4xi64>
-    quantum.counts %o2 in(%in_eigvals2 : memref<4xf64>, %in_counts2 : memref<4xi64>) {shots = 2000 : i64}
+    quantum.counts %o2 in(%in_eigvals2 : memref<4xf64>, %in_counts2 : memref<4xi64>)
 
     return
 }

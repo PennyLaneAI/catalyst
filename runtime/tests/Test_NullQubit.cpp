@@ -35,7 +35,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__initialize(nullptr);
 
     char rtd_name[11] = "null.qubit";
-    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr);
+    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr, 0);
 
     __catalyst__rt__device_release();
 
@@ -142,10 +142,10 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
           "[CoreQIS]")
 {
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
-        std::array<std::string, 3>{"null.qubit", "null_qubit", "{shots: 0}"};
+        std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str());
+                                (int8_t *)rtd_kwargs.c_str(), 1000);
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
@@ -166,7 +166,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
 
     double *buffer = new double[shots * n];
     MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
-    __catalyst__qis__Sample(&result, shots, 1, ctrls[0]);
+    __catalyst__qis__Sample(&result, 1, ctrls[0]);
 
     CHECK(shots == 1000);
 
@@ -276,10 +276,10 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
     __catalyst__rt__initialize(nullptr);
 
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
-        std::array<std::string, 3>{"null.qubit", "null_qubit", "{shots: 0}"};
+        std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
 
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                (int8_t *)rtd_kwargs.c_str());
+                                (int8_t *)rtd_kwargs.c_str(), 0);
 
     QUBIT *q0 = __catalyst__rt__qubit_allocate();
     QUBIT *q1 = __catalyst__rt__qubit_allocate();

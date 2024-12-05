@@ -44,6 +44,19 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
+
+  To support this, `SampleOp` and `CountsOp` in mlir no longer carry the shots attribute, since integer attributes are tied to literal values and must be static.
+
+  `DeviceInitOp` now takes in an optional SSA argument for shots, and the device init runtime CAPI will take in this SSA shots value as an argument and set it as the device shots.
+  The sample and counts runtime CAPI functions no longer take in the shots argument and will retrieve shots from the device.
+
+  Correspondingly, the device C++ interface should no longer parse the `DeviceInitOp`'s attributes dictionary for the shots.
+  For now we still keep the shots as an attribute so device implementors can have time to migrate, but we will remove shots from the attribute dictionary in the next release.
+
+  [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
+  [(#1310)](https://github.com/PennyLaneAI/catalyst/pull/1310)
+
 * The `toml` module has been migrated to PennyLane with an updated schema for declaring device
   capabilities. Devices with TOML files using `schema = 2` will not be compatible with the latest
   Catalyst. See [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html)
@@ -93,6 +106,9 @@
   Instead of relying on the name of the qnode, each qnode now has a transformation module,
   which denotes the transformation schedule, embedded in its MLIR representation.
   [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
+
+* Replace Python C-API calls with Stable ABI calls.
+  [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
 
 <h3>Documentation 📝</h3>
 
