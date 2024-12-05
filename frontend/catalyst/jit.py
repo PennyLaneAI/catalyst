@@ -637,9 +637,11 @@ class QJIT(CatalystCallable):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
+            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
+            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
+            params["pass_pipeline"] = pass_pipeline
             return QFunc.__call__(
                 qnode,
-                pass_pipeline=self.compile_options.circuit_transform_pipeline,
                 *args,
                 **dict(params, **kwargs),
             )
