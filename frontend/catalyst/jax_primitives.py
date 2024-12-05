@@ -1301,8 +1301,8 @@ def _qinst_abstract_eval(
     *qubits_or_params,
     op=None,
     qubits_len=0,
-    params_len=0,
     ctrl_len=0,
+    ctrl_value_len=0,
     adjoint=False,
     static_params=None,
 ):
@@ -1328,8 +1328,8 @@ def _qinst_lowering(
     *qubits_or_params,
     op=None,
     qubits_len=0,
-    params_len=0,
     ctrl_len=0,
+    ctrl_value_len=0,
     adjoint=False,
     static_params=None,
 ):
@@ -1337,9 +1337,9 @@ def _qinst_lowering(
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    dyn_params = qubits_or_params[qubits_len : qubits_len + params_len]
-    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
-    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + ctrl_len : qubits_len + ctrl_len + ctrl_value_len]
+    dyn_params = qubits_or_params[qubits_len + ctrl_len + ctrl_value_len :]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -1362,7 +1362,11 @@ def _qinst_lowering(
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
-    params_attr = ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+    params_attr = (
+        None
+        if not static_params
+        else ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+    )
 
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
