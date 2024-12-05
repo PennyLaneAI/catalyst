@@ -110,11 +110,11 @@ def test_expval():
 
     def f():
         obs = compbasis_p.bind()
-        return expval_p.bind(obs, shots=5, shape=(1,))
+        return expval_p.bind(obs, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == expval_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,)}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
 
 
