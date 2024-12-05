@@ -419,10 +419,11 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock scipy-openblas32
 
     - name: Install PennyLane Plugins
       run: |
+        python${{ matrix.python_version }} -c "import scipy_openblas32; print(scipy_openblas32.get_lib_dir())"
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
