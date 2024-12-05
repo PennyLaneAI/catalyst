@@ -15,7 +15,6 @@
 This submodule contains classes for the OQD device and its properties.
 """
 
-# from .oqd_device import OQDDevice
 from .oqd_database_managers import OQDDeviceDatabase, OQDQubitDatabase, OQDBeamDatabase
 
 __all__ = ["OQDDeviceDatabase", "OQDQubitDatabase", "OQDBeamDatabase"]
