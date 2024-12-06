@@ -17,11 +17,12 @@ from pathlib import Path
 
 import pennylane as qml
 
-from catalyst.utils.runtime_environment import get_bin_path
 from catalyst.passes import apply_pass
+from catalyst.utils.runtime_environment import get_bin_path
 
 plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../StandalonePlugin.so"
 plugin = Path(plugin_path)
+
 
 def test_standalone_plugin():
     """Generate MLIR for the standalone plugin. Do not execute code.
@@ -32,7 +33,6 @@ def test_standalone_plugin():
     @qml.qnode(qml.device("lightning.qubit", wires=0))
     def qnode():
         return qml.state()
-
 
     @qml.qjit(pass_plugins=[plugin], dialect_plugins=[plugin], target="mlir")
     def module():
