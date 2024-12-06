@@ -80,4 +80,3 @@ def test_standalone_entry_point():
     # It would be nice if we were able to combine lit tests with
     # pytest
     assert "standalone-switch-bar-foo" in module.mlir
-    print(module.mlir)
