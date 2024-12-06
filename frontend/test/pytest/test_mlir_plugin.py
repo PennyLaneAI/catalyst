@@ -25,7 +25,7 @@ import pennylane as qml
 from catalyst.passes import apply_pass, apply_pass_plugin
 from catalyst.utils.runtime_environment import get_bin_path
 
-ext = ".so" if platform.system() == "Linux" else ".dylib"
+ext = "so" if platform.system() == "Linux" else "dylib"
 plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
 plugin = Path(plugin_path)
 
