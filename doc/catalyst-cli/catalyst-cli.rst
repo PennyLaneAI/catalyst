@@ -241,7 +241,7 @@ For a list of transformation passes currently available in Catalyst, see the
 ``catalyst-cli --help`` message.
 
 MLIR Plugins
-============
+------------
 
 ``mlir-opt``-like tools are able to take plugins as inputs.
 These plugins are shared objects that include dialects and passes written by third parties.

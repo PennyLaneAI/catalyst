@@ -37,7 +37,6 @@ from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import PipelineNameUniquer, _inject_transform_named_sequence
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -141,7 +140,9 @@ def qjit(
             ``lightning.gpu``. The default value is None, which means no seeding is performed,
             and all processes are random. A seed is expected to be an unsigned 32-bit integer.
             Currently, the following measurement processes are seeded: :func:`~.measure`,
-            :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`.
+            :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`,
+            :func:`qml.probs() <pennylane.probs>`, :func:`qml.expval() <pennylane.expval>`,
+            :func:`qml.var() <pennylane.var>`.
         experimental_capture (bool): If set to ``True``, the qjit decorator
             will use PennyLane's experimental program capture capabilities
             to capture the decorated function for compilation.
@@ -627,33 +628,20 @@ class QJIT(CatalystCallable):
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
-        def fn_with_transform_named_sequence(*args, **kwargs):
-            """
-            This function behaves exactly like the user function being jitted,
-            taking in the same arguments and producing the same results, except
-            it injects a transform_named_sequence jax primitive at the beginning
-            of the jaxpr when being traced.
-
-            Note that we do not overwrite self.original_function and self.user_function;
-            this fn_with_transform_named_sequence is ONLY used here to produce tracing
-            results with a transform_named_sequence primitive at the beginning of the
-            jaxpr. It is never executed or used anywhere, except being traced here.
-            """
-            _inject_transform_named_sequence()
-            return self.user_function(*args, **kwargs)
-
         if self.compile_options.experimental_capture:
             return trace_from_pennylane(
-                fn_with_transform_named_sequence, static_argnums, abstracted_axes, full_sig, kwargs
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
             )
 
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
+            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
+            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
+            params["pass_pipeline"] = pass_pipeline
             return QFunc.__call__(
                 qnode,
-                pass_pipeline=self.compile_options.circuit_transform_pipeline,
                 *args,
                 **dict(params, **kwargs),
             )
@@ -663,14 +651,13 @@ class QJIT(CatalystCallable):
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef = trace_to_jaxpr(
-                fn_with_transform_named_sequence,
+                self.user_function,
                 static_argnums,
                 abstracted_axes,
                 full_sig,
                 kwargs,
             )
 
-        PipelineNameUniquer.reset()
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)

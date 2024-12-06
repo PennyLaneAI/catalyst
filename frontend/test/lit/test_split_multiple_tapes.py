@@ -64,7 +64,7 @@ def test_multiple_tape_transforms():
 
     # CHECK: circuit_twotapes
     # CHECK: call_jaxpr={ lambda ;
-    # CHECK-NEXT: qdevice[
+    # CHECK: qdevice[
     # CHECK: ]
     # CHECK: qdealloc
     # CHECK-NEXT: qdevice[
@@ -74,10 +74,10 @@ def test_multiple_tape_transforms():
     print_jaxpr(circuit_twotapes, [0.1, 0.2])
 
     # CHECK: circuit_twotapes
-    # CHECK: quantum.device[
+    # CHECK: quantum.device
     # CHECK: quantum.dealloc
     # CHECK-NEXT: quantum.device_release
-    # CHECK-NEXT: quantum.device[
+    # CHECK-NEXT: quantum.device
     # CHECK: quantum.dealloc
     # CHECK-NEXT: quantum.device_release
     # CHECK-NEXT: {{%.+}} = stablehlo.add {{%.+}}, {{%.+}} : tensor<f64>

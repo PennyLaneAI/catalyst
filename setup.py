@@ -243,6 +243,7 @@ ext_modules = [
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
 ]
 
+options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
 # the following entry points:
@@ -268,4 +269,5 @@ setup(
     ext_modules=ext_modules,
     cmdclass={"build_ext": CMakeBuild},
     **description,
+    options=options,
 )

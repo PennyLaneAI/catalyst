@@ -397,7 +397,7 @@ module @circuit_one_tape {
 
 // CHECK: module @circuit_one_tape {
 // CHECK-NEXT:  func.func private @circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-// CHECK-NEXT:    quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+// CHECK-NEXT:    quantum.device ["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
 // CHECK-NEXT:    %0 = quantum.alloc( 1) : !quantum.reg
 // CHECK-NEXT:    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 // CHECK-NEXT:    %extracted = tensor.extract %arg0[] : tensor<f64>

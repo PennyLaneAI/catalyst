@@ -159,7 +159,7 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # Split multiple tapes enforces that invariant.
         "split-multiple-tapes",
         # Run the transform sequence defined in the MLIR module
-        "apply-transform-sequence",
+        "builtin.module(apply-transform-sequence)",
         # Nested modules are something that will be used in the future
         # for making device specific transformations.
         # Since at the moment, nothing in the runtime is using them

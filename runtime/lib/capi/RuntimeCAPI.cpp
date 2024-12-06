@@ -239,7 +239,8 @@ void __catalyst__rt__finalize()
     CTX.reset(nullptr);
 }
 
-static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
+static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
+                                             int64_t shots)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -252,16 +253,18 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
     RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
+    getQuantumDevicePtr()->SetDeviceShots(shots);
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
     return 0;
 }
 
-void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
+void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
+                                 int64_t shots)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs);
+                 rtd_name, rtd_kwargs, shots);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -933,8 +936,9 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 }
 
-void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
+void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 {
+    int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
@@ -958,9 +962,9 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t n
     }
 }
 
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots,
-                             int64_t numQubits, ...)
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQubits, ...)
 {
+    int64_t shots = getQuantumDevicePtr()->GetDeviceShots();
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
     MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
