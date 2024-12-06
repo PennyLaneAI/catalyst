@@ -104,7 +104,6 @@ struct OQDRunnerBase {
  * The OQD circuit runner to execute a circuit on OQD devices.
  */
 struct OQDRunner : public OQDRunnerBase {
-
     [[nodiscard]] auto Counts(const std::string &circuit, const std::string &device, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
