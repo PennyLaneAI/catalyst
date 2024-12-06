@@ -380,7 +380,8 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
         make standalone-plugin
-        mv mlir/standalone/build/lib/StandalonePlugin.so "$(pwd)/quantum-build"
+        mkdir -p $(pwd)/quantum-build/lib
+        mv mlir/standalone/build/lib/StandalonePlugin.so "$(pwd)/quantum-build/lib"
 
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v4
@@ -389,7 +390,7 @@ jobs:
         path: |
           quantum-build/bin
           quantum-build/python_packages/*
-          quantum-build/StandalonePlugin.so
+          quantum-build/lib/StandalonePlugin.so
         retention-days: 1
 
     - name: Cache CCache on main branch

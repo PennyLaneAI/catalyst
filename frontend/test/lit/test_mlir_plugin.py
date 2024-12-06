@@ -84,7 +84,7 @@ module @module {
 }
 """
 
-plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../StandalonePlugin.so"
+plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../lib/StandalonePlugin.so"
 plugin = Path(plugin_path)
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
 options = CompileOptions(
