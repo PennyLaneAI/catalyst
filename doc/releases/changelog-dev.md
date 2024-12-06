@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Lightning runtime shot-measurement support for Hermitian observables.
+  [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
+
 * Replace pybind11 with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
   [(#1293)](https://github.com/PennyLaneAI/catalyst/pull/1293)
@@ -145,5 +148,6 @@ Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
+Shuli Shu,
 Raul Torres,
 Paul Haochen Wang.
