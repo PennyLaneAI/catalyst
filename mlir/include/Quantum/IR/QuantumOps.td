@@ -856,9 +856,9 @@ def ExpvalOp : Measurement_Op<"expval"> {
     let description = [{
         The `quantum.expval` operation represents the measurement process of computing the
         expectation value of an observable on the current quantum state. While this quantity can
-        be computed analytically on simulators, an optional attribute specifiying the shot number,
-        i.e. the number of samples to draw, can be specified for hardware execution or shot noise
-        simulation.
+        be computed analytically on simulators, for hardware execution or shot noise
+        simulation, the shots attached to the device
+        in the local scope is used.
         The only SSA argument is an observable that must be defined by an operation in the local
         scope.
 
@@ -892,9 +892,9 @@ def VarianceOp : Measurement_Op<"var"> {
     let summary = "Compute the variance of the given observable for the current state";
     let description = [{
         The `quantum.var` operation represents the measurement process of computing the variance of
-        an observable on the current quantum state. While this quantity can be computed analytically
-        on simulators, an optional attribute specifiying the shot number, i.e. the number of samples
-        to draw, can be specified for hardware execution or shot noise simulation.
+        an observable on the current quantum state. While this quantity can be computed analytically on simulators, for hardware execution or shot noise
+        simulation, the shots attached to the device
+        in the local scope is used.
         The only SSA argument is an observable that must be defined by an operation in the local
         scope.
 
@@ -912,8 +912,7 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs,
-        OptionalAttr<I64Attr>:$shots
+        ObservableType:$obs
     );
 
     let results = (outs

@@ -910,7 +910,7 @@ def trace_quantum_measurements(
             elif type(o) is ExpectationMP:
                 out_classical_tracers.append(expval_p.bind(obs_tracers))
             elif type(o) is VarianceMP:
-                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
+                out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(o) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)

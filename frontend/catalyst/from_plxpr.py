@@ -370,7 +370,7 @@ class QFuncPlxprInterpreter:
             mval = bind_flexible_primitive(
                 counts_p, {"shots": device_shots}, obs, shape=shaped_array.shape
             )
-        elif primitive is expval_p:
+        elif primitive in (expval_p, var_p):
             mval = expval_p.bind(obs, shape=shaped_array.shape)
         else:
             mval = primitive.bind(

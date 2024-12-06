@@ -1460,17 +1460,17 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=Non
 # var measurement
 #
 @var_p.def_abstract_eval
-def _var_abstract_eval(obs, shots, shape=None):
+def _var_abstract_eval(obs, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @var_p.def_impl
-def _var_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
+def _var_def_impl(ctx, obs, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
+def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1478,11 +1478,9 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, 
     assert ir.OpaqueType(obs.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(obs.type).data == "obs"
 
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    shots_attr = ir.IntegerAttr.get(i64_type, shots) if shots is not None else None
     result_type = ir.F64Type.get()
 
-    mres = VarianceOp(result_type, obs, shots=shots_attr).result
+    mres = VarianceOp(result_type, obs).result
     result_from_elements_op = ir.RankedTensorType.get((), result_type)
     from_elements_op = FromElementsOp(result_from_elements_op, mres)
     return from_elements_op.results
