@@ -113,7 +113,7 @@
 * The `apply_registered_pass_p` primitive is removed. The API for scheduling passes
   to run using the transform dialect has been refactored. In particular,
   passes are appended to a tuple as they are being registered and they will
-  be run in ordered. If there are no local passes, the global `pass_pipeline` is
+  be run in order. If there are no local passes, the global `pass_pipeline` is
   scheduled. Furthermore, this commit also reworks the caching mechanism for
   primitives, which is important as qnodes and functions are primitives and
   now that we can apply passes to them, they are distinct based on which
