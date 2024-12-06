@@ -188,10 +188,14 @@ class EvaluationContext:
 
     @classmethod
     def add_plugin(cls, plugin):
+        """Add an MLIR plugin to the set of MLIR plugins encountered in the
+        program"""
         cls._mlir_plugins.add(plugin)
 
     @classmethod
     def get_plugins(cls):
+        """Get and reset all plugins encountered during the trace of the
+        program"""
         retval = cls._mlir_plugins
         cls._mlir_plugins = set()
         return retval
