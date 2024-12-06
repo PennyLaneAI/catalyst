@@ -223,6 +223,28 @@ execute_process(
 set(CATALYST_STANDALONE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/BuildSP" CACHE PATH "Path to build directory for standalone MLIR plugin")
 set(CATALYST_STANDALONE_SRC_DIR "${PROJECT_SOURCE_DIR}/llvm-project/mlir/examples/standalone" CACHE PATH "Path to source directory for standalone MLIR plugin")
 
+
+set(STANDALONE_PATCH_TARGET "${MHLO_DIR}/mhlo/transforms/CMakeLists.txt")
+set(STANDALONE_PATCH_SRC "${PROJECT_SOURCE_DIR}/patches/test-plugin-with-catalyst.patch")
+
+# Conditionally apply patch if it is applicable
+execute_process(COMMAND bash -c "if [ patch --dry-run -p1 -N ${MHLO_PATCH_TARGET} ${MHLO_PATCH_SRC} > /dev/null 2>&1 ]; then patch -p1 ${MHLO_PATCH_TARGET} ${MHLO_PATCH_SRC}; fi"
+)
+
+option(USE_FETCH_CONTENT OFF)
+if(USE_FETCH_CONTENT)
+  include(FetchContent)
+
+  FetchContent_Declare(
+    standalone
+    SOURCE_DIR ${CATALYST_STANDALONE_SRC_DIR}
+  )
+  FetchContent_MakeAvailable(standalone)
+
+  add_custom_target(dummy)
+  add_dependencies(dummy check-standalone)
+endif()
+
 # Configure the standalone project
 execute_process(
     COMMAND ${CMAKE_COMMAND} -G Ninja
@@ -253,6 +275,13 @@ include(AddLLVM REQUIRED)
 include(TableGen REQUIRED)
 include(AddMLIR REQUIRED)
 include(HandleLLVMOptions REQUIRED)
+
+
+
+# Set build-configuration options for the dialect compilation
+option(LLVM_ENABLE_ASSERTIONS ON)
+option(QUANTUM_ENABLE_BINDINGS_PYTHON ON)
+set(Enzyme_DIR ${CATALYST_PKG_INSTALL_DIR})
 
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
@@ -321,3 +350,6 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
   add_subdirectory(python)
 endif()
+
+add_custom_target(dummy_inc)
+add_dependencies(dummy_inc quantum-lsp-server catalyst-cli)
