@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include "Ion/IR/IonInterfaces.h"
 
-#include "mlir/CAPI/Registration.h"
+using namespace mlir;
+// using namespace catalyst::ion;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//===----------------------------------------------------------------------===//
+// Ion interface definitions.
+//===----------------------------------------------------------------------===//
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Ion, ion);
-
-#ifdef __cplusplus
-}
-#endif
+#include "Ion/IR/IonInterfaces.cpp.inc"

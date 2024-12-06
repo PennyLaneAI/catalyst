@@ -92,6 +92,7 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let assemblyFormat = [{
       (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
     }];
+
 }
 
 def DeviceReleaseOp : Quantum_Op<"device_release"> {
