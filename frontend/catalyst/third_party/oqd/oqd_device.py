@@ -29,7 +29,7 @@ BACKENDS = ["default"]
 
 
 class OQDDevice(Device):
-    """The OQD device allows to access the hardware devices from OQD using Catalyst."""
+    """The OQD device allows access to the hardware devices from OQD using Catalyst."""
 
     config_filepath = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/backend" + "/oqd.toml"
 
@@ -47,8 +47,10 @@ class OQDDevice(Device):
         self,
         execution_config: Optional[ExecutionConfig] = None,
     ):
-        """This function defines the device transform program to be applied and
-        an updated device configuration.
+        """Device preprocessing function.
+
+        This function defines the device transform program to be applied and an updated device
+        configuration.
 
         TODO: This function is boilerplate only
         """
@@ -58,6 +60,11 @@ class OQDDevice(Device):
         transform_program = TransformProgram()
 
         return transform_program, execution_config
+
+    def execute(self, circuits, execution_config):
+        """Python execution is not supported."""
+        # Check availability
+        raise NotImplementedError("The OQD device only supports Catalyst.")
 
 
 def _check_backend(backend):

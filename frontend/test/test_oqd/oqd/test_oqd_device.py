@@ -19,7 +19,6 @@ import pennylane as qml
 import pytest
 
 
-@pytest.mark.xfail(reason="OQD device not yet implemented")
 class TestOQDDevice:
     """Test the OQD device python layer for Catalyst."""
 
@@ -28,11 +27,10 @@ class TestOQDDevice:
 
         The test checks that the backend, ion, shots, and wires parameters are correctly set.
         """
-        device = qml.device("oqd", backend="default", ion="Yb_171_II", shots=1000, wires=8)
+        device = qml.device("oqd.default", backend="default", shots=1024, wires=8)
 
         assert device.backend == "default"
-        assert device.ion == "Yb_171_II"
-        assert device.shots == qml.measurements.Shots(1000)
+        assert device.shots == qml.measurements.Shots(1024)
         assert device.wires == qml.wires.Wires(range(0, 8))
 
 
