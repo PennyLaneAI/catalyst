@@ -131,6 +131,9 @@
   6283185307.179586
   ```
 
+* A default backend for OQD trapped-ion quantum devices has been added.
+  [(#1355)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
