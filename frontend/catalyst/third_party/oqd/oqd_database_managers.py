@@ -271,7 +271,7 @@ class OQDPhononParameters:
 
 @dataclass
 class OQDQubitDatabase:
-    """A database class to represent the qubit parameters for an OQD trapped-ion experiment workflow."""
+    """A database class to represent the qubit parameters for an OQD trapped-ion experiment workflow."""  # pylint: disable=line-too-long
 
     ion_parameters: dict[str, OQDIonParameters]
     phonon_parameters: dict[str, OQDPhononParameters]
@@ -372,7 +372,7 @@ class OQDBeamParameters:
 
 @dataclass
 class OQDBeamDatabase:
-    """A database class to represent the beam parameters for an OQD trapped-ion experiment workflow."""
+    """A database class to represent the beam parameters for an OQD trapped-ion experiment workflow."""  # pylint: disable=line-too-long
 
     beam_parameters: dict[str, OQDBeamParameters]
 
