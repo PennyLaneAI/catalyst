@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for standalone plugin"""
 
+import platform
 from pathlib import Path
 
 import pennylane as qml
@@ -20,7 +21,8 @@ import pennylane as qml
 from catalyst.passes import apply_pass, apply_pass_plugin
 from catalyst.utils.runtime_environment import get_bin_path
 
-plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../lib/StandalonePlugin.so"
+ext = ".so" if platform.system() == "Linux" else ".dylib"
+plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
 plugin = Path(plugin_path)
 
 

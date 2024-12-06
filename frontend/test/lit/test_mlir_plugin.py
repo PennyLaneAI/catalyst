@@ -60,6 +60,7 @@ that the `standalone-switch-bar-foo` pass can be executed using lower level
 APIs, like the Compiler and options.
 """
 
+import platform
 from pathlib import Path
 
 from catalyst.compiler import CompileOptions, Compiler
@@ -84,7 +85,8 @@ module @module {
 }
 """
 
-plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../lib/StandalonePlugin.so"
+ext = ".so" if platform.system() == "Linux" else ".dylib"
+plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
 plugin = Path(plugin_path)
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
 options = CompileOptions(
