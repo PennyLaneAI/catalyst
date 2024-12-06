@@ -96,7 +96,7 @@ entry_points = {
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
     "catalyst.passes_resolution": [
-        "standalone.passes = catalyst.passes.example_entry_point",
+        "standalone.passes = catalyst.example_entry_point",
     ],
 }
 
