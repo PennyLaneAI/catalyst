@@ -35,6 +35,7 @@ individual Catalyst MLIR compiler passes.
 import copy
 import functools
 from typing import TypeAlias
+from importlib.metadata import entry_points
 
 import pennylane as qml
 
@@ -47,9 +48,20 @@ class Pass:
     """Class intended to hold options for passes"""
 
     def __init__(self, name, *options, **valued_options):
-        self.name = name
         self.options = options
         self.valued_options = valued_options
+        try:
+            resolution_functions = entry_points(group="catalyst.passes_resolution")
+            key, passname = name.split(".")
+            resolution_function = resolution_functions[key + ".passes"]
+            function = resolution_function.load()
+            path, name = function(passname)
+            assert EvaluationContext.is_tracing()
+            EvaluationContext.add_plugin(path)
+        except:
+            pass
+
+        self.name = name
 
     def __repr__(self):
         return (
@@ -57,6 +69,12 @@ class Pass:
             + " ".join(f"--{option}" for option in self.options)
             + " ".join(f"--{option}={value}" for option, value in self.valued_options)
         )
+
+def example_entry_point(name):
+    """Example entry point for standalone plugin"""
+    plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../lib/StandalonePlugin.so"
+    plugin = Path(plugin_path)
+    return plugin, "standalone-switch-bar-foo"
 
 
 class PassPlugin(Pass):
