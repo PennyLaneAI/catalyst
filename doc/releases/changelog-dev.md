@@ -116,6 +116,21 @@
 * Replace Python C-API calls with Stable ABI calls.
   [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
 
+* A framework for loading and interacting with databases containing hardware information and
+  calibration data for Open Quantum Design (OQD) trapped-ion quantum devices has been added.
+  [(#1348)](https://github.com/PennyLaneAI/catalyst/pull/1348)
+
+  A new module, `catalyst.utils.toml_utils`, was also added to assist in loading information from
+  these databases, which are stored as text files in TOML format. In particular, this module
+  contains a new function, :func:`~.utils.toml_utils.safe_eval`, to safely evaluate mathematical
+  expressions:
+
+  ```python
+  >>> from catalyst.utils.toml_utils import safe_eval
+  >>> safe_eval("2 * math.pi * 1e9")
+  6283185307.179586
+  ```
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
