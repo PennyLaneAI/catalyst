@@ -136,7 +136,7 @@ standalone-plugin:
 		standalone
 	cmake --build standalone/build --target check-standalone
 	mkdir -p $(DIALECTS_BUILD_DIR)/lib
-	cp standalone/build/lib/StandalonePlugin.so $(DIALECTS_BUILD_DIR)/lib
+	cp standalone/build/lib/StandalonePlugin.* $(DIALECTS_BUILD_DIR)/lib
 
 .PHONY: dialects
 dialects:
