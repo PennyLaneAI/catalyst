@@ -187,7 +187,7 @@ class EvaluationContext:
         self.ctx = None
 
     @classmethod
-    def add_plugin(cls, plugin):
+    def add_plugin(cls, plugin: Path):
         """Add an MLIR plugin to the set of MLIR plugins encountered in the
         program"""
         cls._mlir_plugins.add(plugin)

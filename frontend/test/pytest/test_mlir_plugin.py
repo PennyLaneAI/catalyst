@@ -44,8 +44,7 @@ def test_standalone_plugin():
     def module():
         return qnode()
 
-    # It would be nice if we were able to convine lit tests with
-    # pytest
+    # It would be nice if we were able to combine lit tests with pytest
     assert "standalone-switch-bar-foo" in module.mlir
 
 
@@ -62,6 +61,6 @@ def test_standalone_plugin_no_preregistration():
     def module():
         return qnode()
 
-    # It would be nice if we were able to convine lit tests with
+    # It would be nice if we were able to combine lit tests with
     # pytest
     assert "standalone-switch-bar-foo" in module.mlir
