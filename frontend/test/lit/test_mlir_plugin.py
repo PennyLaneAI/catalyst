@@ -85,7 +85,7 @@ module @module {
 }
 """
 
-ext = ".so" if platform.system() == "Linux" else ".dylib"
+ext = "so" if platform.system() == "Linux" else "dylib"
 plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
 plugin = Path(plugin_path)
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
