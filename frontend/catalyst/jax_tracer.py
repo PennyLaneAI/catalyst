@@ -97,7 +97,6 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import _add_mlir_quantum_decomposition
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -1145,9 +1144,6 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-
-    # Add the decomposition passes with the transform dialect
-    _add_mlir_quantum_decomposition(device)
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing

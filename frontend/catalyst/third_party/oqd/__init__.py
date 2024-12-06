@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Version information.
-   Version number (major.minor.patch[-label])
+"""
+This submodule contains classes for the OQD device and its properties.
 """
 
-__version__ = "0.10.0-dev19"
+from .oqd_database_managers import OQDDeviceDatabase, OQDQubitDatabase, OQDBeamDatabase
+
+__all__ = ["OQDDeviceDatabase", "OQDQubitDatabase", "OQDBeamDatabase"]

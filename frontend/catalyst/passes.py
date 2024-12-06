@@ -34,21 +34,48 @@ individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
-from typing import Optional
+from typing import TypeAlias
 
 import pennylane as qml
 
-from catalyst.jax_primitives import apply_registered_pass_p
 from catalyst.tracing.contexts import EvaluationContext
+
+PipelineDict: TypeAlias = dict[str, dict[str, str]]
+
+
+class Pass:
+    """Class intended to hold options for passes"""
+
+    def __init__(self, name, *options, **valued_options):
+        self.name = name
+        self.options = options
+        self.valued_options = valued_options
+
+    def __repr__(self):
+        return self.name + ", ".join(self.options)
+
+
+def dictionary_to_tuple_of_passes(pass_pipeline: PipelineDict):
+    """Convert dictionary of passes into tuple of passes"""
+
+    if type(pass_pipeline) != dict:
+        return pass_pipeline
+
+    passes = tuple()
+    pass_names = _API_name_to_pass_name()
+    for API_name, pass_options in pass_pipeline.items():
+        name = pass_names[API_name]
+        passes += (Pass(name, **pass_options),)
+    return passes
 
 
 ## API ##
 # pylint: disable=line-too-long
-def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
+@functools.singledispatch
+def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode within a qjit-compiled program.
 
     Args:
-        fn (QNode): The QNode to run the pass pipeline on.
         pass_pipeline (dict[str, dict[str, str]]): A dictionary that specifies the pass pipeline order, and optionally
             arguments for each pass in the pipeline. Keys of this dictionary should correspond to names of passes
             found in the `catalyst.passes <https://docs.pennylane.ai/projects/catalyst/en/stable/code
@@ -58,7 +85,7 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
             If not specified, the default pass pipeline will be applied.
 
     Returns:
-        ~.QNode:
+        callable : A decorator that can be applied to a qnode.
 
     For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
 
@@ -131,56 +158,27 @@ def pipeline(pass_pipeline: Optional[dict[str, dict[str, str]]] = None):
     will always take precedence over global pass pipelines.
     """
 
-    def _decorator(fn=None, **kwargs):
-        if fn is None:
-            return functools.partial(pipeline, **kwargs)
+    def _decorator(qnode=None):
+        if not isinstance(qnode, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
-        if not isinstance(fn, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        clone = copy.copy(qnode)
+        clone.__name__ += "_transformed"
 
-        if pass_pipeline is None:
-            # TODO: design a default peephole pipeline
-            return fn
-
-        fn_original_name = fn.__name__
-        wrapped_qnode_function = fn.func
-        fn_clone = copy.copy(fn)
-        fn_clone.__name__ = fn_original_name + "_transformed"
-
-        pass_names = _API_name_to_pass_name()
-
-        def wrapper(*args, **kwrags):
-            # TODO: we should not match pass targets by function name.
-            # The quantum scope work will likely put each qnode into a module
-            # instead of a `func.func ... attributes {qnode}`.
-            # When that is in place, the qnode's module can have a proper attribute
-            # (as opposed to discardable) that records its transform schedule, i.e.
-            #    module_with_transform @name_of_module {
-            #      // transform schedule
-            #    } {
-            #      // contents of the module
-            #    }
-            # This eliminates the need for matching target functions by name.
-
+        @functools.wraps(clone)
+        def wrapper(*args, **kwargs):
             if EvaluationContext.is_tracing():
-                for API_name, pass_options in pass_pipeline.items():
-                    opt = ""
-                    for option, option_value in pass_options.items():
-                        opt += " " + str(option) + "=" + str(option_value)
-                    apply_registered_pass_p.bind(
-                        pass_name=pass_names[API_name],
-                    )
-            return wrapped_qnode_function(*args, **kwrags)
+                passes = kwargs.pop("pass_pipeline", tuple())
+                passes += dictionary_to_tuple_of_passes(pass_pipeline)
+                kwargs["pass_pipeline"] = passes
+            return clone(*args, **kwargs)
 
-        fn_clone.func = wrapper
-        fn_clone._peephole_transformed = True  # pylint: disable=protected-access
-
-        return fn_clone
+        return wrapper
 
     return _decorator
 
 
-def cancel_inverses(fn=None):
+def cancel_inverses(qnode=None):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
@@ -290,27 +288,23 @@ def cancel_inverses(fn=None):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    if not isinstance(fn, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
-    funcname = fn.__name__
-    wrapped_qnode_function = fn.func
+    clone = copy.copy(qnode)
+    clone.__name__ += "_cancel_inverses"
 
-    def wrapper(*args, **kwrags):
-        if EvaluationContext.is_tracing():
-            apply_registered_pass_p.bind(
-                pass_name="remove-chained-self-inverse",
-            )
-        return wrapped_qnode_function(*args, **kwrags)
+    @functools.wraps(clone)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
+        pass_pipeline += (Pass("remove-chained-self-inverse"),)
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
 
-    fn_clone = copy.copy(fn)
-    fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_cancel_inverses"
-
-    return fn_clone
+    return wrapper
 
 
-def merge_rotations(fn=None):
+def merge_rotations(qnode=None):
     """
     Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
@@ -371,34 +365,41 @@ def merge_rotations(fn=None):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    if not isinstance(fn, qml.QNode):
-        raise TypeError(f"A QNode is expected, got the classical function {fn}")
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
-    funcname = fn.__name__
-    wrapped_qnode_function = fn.func
+    clone = copy.copy(qnode)
+    clone.__name__ += "_merge_rotations"
 
-    def wrapper(*args, **kwrags):
-        if EvaluationContext.is_tracing():
-            apply_registered_pass_p.bind(
-                pass_name="merge-rotations",
-            )
-        return wrapped_qnode_function(*args, **kwrags)
+    @functools.wraps(clone)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
+        pass_pipeline += (Pass("merge-rotations"),)
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
 
-    fn_clone = copy.copy(fn)
-    fn_clone.func = wrapper
-    fn_clone.__name__ = funcname + "_merge_rotations"
-
-    return fn_clone
+    return wrapper
 
 
 def _API_name_to_pass_name():
-    return {"cancel_inverses": "remove-chained-self-inverse", "merge_rotations": "merge-rotations"}
+    return {
+        "cancel_inverses": "remove-chained-self-inverse",
+        "merge_rotations": "merge-rotations",
+        "ions_decomposition": "ions-decomposition",
+    }
 
 
-def _add_mlir_quantum_decomposition(device):
-    """When called it adds the MLIR decomposition pass thanks to the transform dialect."""
-    # TODO: make this non related to the name of the device
-    if device.original_device.name == "oqd.cloud":
-        apply_registered_pass_p.bind(
-            pass_name="ions-decomposition",
-        )
+def ions_decomposition(qnode=None):  # pragma: nocover
+    """Apply decomposition pass at the MLIR level"""
+
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+    @functools.wraps(qnode)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
+        pass_pipeline += (Pass("ions-decomposition"),)
+        kwargs["pass_pipeline"] = pass_pipeline
+        return qnode(*args, **kwargs)
+
+    return wrapper

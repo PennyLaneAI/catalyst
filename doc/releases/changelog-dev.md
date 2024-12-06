@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Lightning runtime shot-measurement support for Hermitian observables.
+  [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
+
 * Replace pybind11 with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
   [(#1293)](https://github.com/PennyLaneAI/catalyst/pull/1293)
@@ -41,6 +44,9 @@
 
 * Cleans up the output of compiler instrumentation.
   [(#1343)](https://github.com/PennyLaneAI/catalyst/pull/1343)
+
+* Generate stable ABI wheels for Python 3.12 and up.
+  [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
 
 <h3>Breaking changes 💔</h3>
 
@@ -110,6 +116,21 @@
 * Replace Python C-API calls with Stable ABI calls.
   [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
 
+* A framework for loading and interacting with databases containing hardware information and
+  calibration data for Open Quantum Design (OQD) trapped-ion quantum devices has been added.
+  [(#1348)](https://github.com/PennyLaneAI/catalyst/pull/1348)
+
+  A new module, `catalyst.utils.toml_utils`, was also added to assist in loading information from
+  these databases, which are stored as text files in TOML format. In particular, this module
+  contains a new function, :func:`~.utils.toml_utils.safe_eval`, to safely evaluate mathematical
+  expressions:
+
+  ```python
+  >>> from catalyst.utils.toml_utils import safe_eval
+  >>> safe_eval("2 * math.pi * 1e9")
+  6283185307.179586
+  ```
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
@@ -128,5 +149,6 @@ Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
+Shuli Shu,
 Raul Torres,
 Paul Haochen Wang.
