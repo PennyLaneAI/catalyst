@@ -45,6 +45,9 @@
 * Cleans up the output of compiler instrumentation.
   [(#1343)](https://github.com/PennyLaneAI/catalyst/pull/1343)
 
+* Generate stable ABI wheels for Python 3.12 and up.
+  [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
+
 <h3>Breaking changes 💔</h3>
 
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
@@ -112,6 +115,21 @@
 
 * Replace Python C-API calls with Stable ABI calls.
   [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
+
+* A framework for loading and interacting with databases containing hardware information and
+  calibration data for Open Quantum Design (OQD) trapped-ion quantum devices has been added.
+  [(#1348)](https://github.com/PennyLaneAI/catalyst/pull/1348)
+
+  A new module, `catalyst.utils.toml_utils`, was also added to assist in loading information from
+  these databases, which are stored as text files in TOML format. In particular, this module
+  contains a new function, :func:`~.utils.toml_utils.safe_eval`, to safely evaluate mathematical
+  expressions:
+
+  ```python
+  >>> from catalyst.utils.toml_utils import safe_eval
+  >>> safe_eval("2 * math.pi * 1e9")
+  6283185307.179586
+  ```
 
 <h3>Documentation 📝</h3>
 
