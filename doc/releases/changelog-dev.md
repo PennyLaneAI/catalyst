@@ -128,8 +128,6 @@
   6283185307.179586
   ```
 
-A new module, `toml_utils`, has been added to 
-
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
