@@ -654,13 +654,15 @@ class QJIT(CatalystCallable):
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
-            jaxpr, out_type, treedef = trace_to_jaxpr(
+            jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
                 self.user_function,
                 static_argnums,
                 abstracted_axes,
                 full_sig,
                 kwargs,
             )
+            self.compile_options.pass_plugins.update(plugins)
+            self.compile_options.dialect_plugins.update(plugins)
 
         return jaxpr, out_type, treedef, dynamic_sig
 

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pennylane as qml
 
-from catalyst.passes import apply_pass
+from catalyst.passes import apply_pass, apply_pass_plugin
 from catalyst.utils.runtime_environment import get_bin_path
 
 plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../StandalonePlugin.so"
@@ -34,7 +34,25 @@ def test_standalone_plugin():
     def qnode():
         return qml.state()
 
-    @qml.qjit(pass_plugins=[plugin], dialect_plugins=[plugin], target="mlir")
+    @qml.qjit(pass_plugins={plugin}, dialect_plugins={plugin}, target="mlir")
+    def module():
+        return qnode()
+
+    # It would be nice if we were able to convine lit tests with
+    # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+def test_standalone_plugin_no_preregistration():
+    """Generate MLIR for the standalone plugin, no need to register the
+    plugin ahead of time in the qjit decorator"""
+
+    @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
     def module():
         return qnode()
 
