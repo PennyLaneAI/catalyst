@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pennylane as qml
 
-from catalyst.passes import apply_pass, apply_pass_plugin
+from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
 from catalyst.utils.runtime_environment import get_bin_path
 
 ext = ".so" if platform.system() == "Linux" else ".dylib"
@@ -44,7 +44,7 @@ def test_standalone_plugin():
     def module():
         return qnode()
 
-    # It would be nice if we were able to convine lit tests with
+    # It would be nice if we were able to combine lit tests with
     # pytest
     assert "standalone-switch-bar-foo" in module.mlir
 
@@ -62,6 +62,40 @@ def test_standalone_plugin_no_preregistration():
     def module():
         return qnode()
 
-    # It would be nice if we were able to convine lit tests with
+    # It would be nice if we were able to combine lit tests with
+    # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+def test_standalone_entry_point():
+    """Generate MLIR for the standalone plugin via entry-point"""
+
+    @apply_pass("standalone.standalone-switch-bar-foo")
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
+    # It would be nice if we were able to combine lit tests with
+    # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+def test_standalone_dictionary():
+    """Generate MLIR for the standalone plugin via entry-point"""
+
+    @pipeline({"standalone.standalone-switch-bar-foo": {}})
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
+    # It would be nice if we were able to combine lit tests with
     # pytest
     assert "standalone-switch-bar-foo" in module.mlir

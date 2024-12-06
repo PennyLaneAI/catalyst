@@ -34,6 +34,7 @@ individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
+from importlib.metadata import entry_points
 from typing import TypeAlias
 
 import pennylane as qml
@@ -47,9 +48,20 @@ class Pass:
     """Class intended to hold options for passes"""
 
     def __init__(self, name, *options, **valued_options):
-        self.name = name
         self.options = options
         self.valued_options = valued_options
+        try:
+            resolution_functions = entry_points(group="catalyst.passes_resolution")
+            key, passname = name.split(".")
+            resolution_function = resolution_functions[key + ".passes"]
+            module = resolution_function.load()
+            path, name = module.name2pass(passname)
+            assert EvaluationContext.is_tracing()
+            EvaluationContext.add_plugin(path)
+        except:
+            pass
+
+        self.name = name
 
     def __repr__(self):
         return (
@@ -78,8 +90,11 @@ def dictionary_to_tuple_of_passes(pass_pipeline: PipelineDict):
     passes = tuple()
     pass_names = _API_name_to_pass_name()
     for API_name, pass_options in pass_pipeline.items():
-        name = pass_names[API_name]
-        passes += (Pass(name, **pass_options),)
+        try:
+            passes += (Pass(API_name, **pass_options),)
+        except:
+            name = pass_names[API_name]
+            passes += (Pass(name, **pass_options),)
     return passes
 
 
