@@ -706,6 +706,7 @@ def trace_quantum_operations(
                 ctrl_len=len(controlled_qubits),
                 ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
+                static_compile=static_compile,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
