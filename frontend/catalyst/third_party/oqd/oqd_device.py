@@ -63,7 +63,6 @@ class OQDDevice(Device):
 
     def execute(self, circuits, execution_config):
         """Python execution is not supported."""
-        # Check availability
         raise NotImplementedError("The OQD device only supports Catalyst.")
 
 
