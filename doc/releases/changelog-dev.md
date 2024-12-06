@@ -42,6 +42,9 @@
 * Cleans up the output of compiler instrumentation.
   [(#1343)](https://github.com/PennyLaneAI/catalyst/pull/1343)
 
+* Generate stable ABI wheels for Python 3.12 and up.
+  [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
+
 <h3>Breaking changes 💔</h3>
 
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
