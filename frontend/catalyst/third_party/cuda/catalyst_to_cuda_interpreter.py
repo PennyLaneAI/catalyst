@@ -576,13 +576,8 @@ def change_expval(ctx, eqn):
     invals = _map(ctx.read, eqn.invars)
     obs = invals[0]
 
-    # Params:
-    # * shots: Shots
-    shots = eqn.params["shots"]
-    shots = shots if shots is not None else -1
-
     # To obtain expval, we first obtain an observe object.
-    observe_results = cudaq_observe(ctx.kernel, obs, shots)
+    observe_results = cudaq_observe(ctx.kernel, obs)
     # And then we call expectation on that object.
     result = cudaq_expectation(observe_results)
     outvariables = [ctx.new_variable()]
