@@ -131,6 +131,9 @@
   6283185307.179586
   ```
 
+* `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
+  [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
