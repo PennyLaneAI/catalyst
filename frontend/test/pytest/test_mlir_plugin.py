@@ -64,3 +64,20 @@ def test_standalone_plugin_no_preregistration():
     # It would be nice if we were able to combine lit tests with
     # pytest
     assert "standalone-switch-bar-foo" in module.mlir
+
+def test_standalone_entry_point():
+    """Generate MLIR for the standalone plugin via entry-point"""
+
+    @apply_pass("standalone.standalone-switch-bar-foo")
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
+    # It would be nice if we were able to combine lit tests with
+    # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+    print(module.mlir)
