@@ -128,12 +128,13 @@ class CMakeExtension(Extension):
     """setuptools Extension wrapper for CMake.
 
     Provides access to the source directories directly for modules to be compiled.
-    
+
     For example, to build the `libcustom_calls` library, the direct module path can be provided as
     ```python
     CMakeExtension("catalyst.utils.libcustom_calls", sourcedir=frontend_dir)
     ```
     """
+
     def __init__(self, name, sourcedir=""):
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
