@@ -1448,8 +1448,6 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape=Non
     assert ir.OpaqueType(obs.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(obs.type).data == "obs"
 
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    #shots_attr = ir.IntegerAttr.get(i64_type, shots) if shots is not None else None
     result_type = ir.F64Type.get()
 
     mres = ExpvalOp(result_type, obs).result

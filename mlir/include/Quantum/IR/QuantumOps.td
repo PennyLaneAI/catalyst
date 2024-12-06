@@ -877,7 +877,6 @@ def ExpvalOp : Measurement_Op<"expval"> {
 
     let arguments = (ins
         ObservableType:$obs
-        //OptionalAttr<I64Attr>:$shots
     );
 
     let results = (outs
