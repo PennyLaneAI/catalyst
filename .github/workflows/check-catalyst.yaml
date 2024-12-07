@@ -380,7 +380,8 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
         make standalone-plugin
-        mv mlir/standalone/build/lib/StandalonePlugin.so quantum-build/lib/
+        mkdir -p $(pwd)/quantum-build/lib
+        mv mlir/standalone/build/lib/StandalonePlugin.so "$(pwd)/quantum-build/lib"
 
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v4

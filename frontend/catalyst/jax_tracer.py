@@ -548,8 +548,9 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            plugins = EvaluationContext.get_plugins()
 
-    return jaxpr, out_type, out_treedef
+    return jaxpr, out_type, out_treedef, plugins
 
 
 @debug_logger

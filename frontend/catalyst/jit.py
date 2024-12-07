@@ -87,6 +87,8 @@ def qjit(
     seed=None,
     experimental_capture=False,
     circuit_transform_pipeline=None,
+    pass_plugins=None,
+    dialect_plugins=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -155,6 +157,8 @@ def qjit(
             dictionaries of valid keyword arguments and values for the specific pass.
             The order of keys in this dictionary will determine the pass pipeline.
             If not specified, the default pass pipeline will be applied.
+        pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
+        dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
 
     Returns:
         QJIT object.
@@ -650,13 +654,15 @@ class QJIT(CatalystCallable):
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
-            jaxpr, out_type, treedef = trace_to_jaxpr(
+            jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
                 self.user_function,
                 static_argnums,
                 abstracted_axes,
                 full_sig,
                 kwargs,
             )
+            self.compile_options.pass_plugins.update(plugins)
+            self.compile_options.dialect_plugins.update(plugins)
 
         return jaxpr, out_type, treedef, dynamic_sig
 
