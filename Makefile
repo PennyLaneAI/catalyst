@@ -19,7 +19,6 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
-MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -117,7 +116,7 @@ oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
-test: test-runtime test-frontend test-demos
+test: test-runtime standalone-plugin test-frontend test-demos
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)

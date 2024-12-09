@@ -15,6 +15,7 @@ BUILD_TYPE?=Release
 TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
 PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
+MLIR_DIR ?= $(shell pwd)/llvm-project/build/lib/cmake/mlir
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
