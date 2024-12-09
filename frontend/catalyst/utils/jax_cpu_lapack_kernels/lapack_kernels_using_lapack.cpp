@@ -113,7 +113,6 @@ jax::Sytrd<std::complex<double>>::FnType GET_SYMBOL(LAPACKE_zhetrd);
 } // extern "C"
 
 namespace jax {
-
 static auto init = []() -> int {
     RealTrsm<float>::fn = GET_SYMBOL(cblas_strsm);
     RealTrsm<double>::fn = GET_SYMBOL(cblas_dtrsm);

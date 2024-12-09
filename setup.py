@@ -153,7 +153,7 @@ class CMakeBuild(build_ext):
     def initialize_options(self):
         super().initialize_options()
         self.define = None
-        self.verbosity = ""
+        self.verbosity = "-VVV"
 
     def finalize_options(self):
         # Parse the custom CMake options and store them in a new attribute
@@ -219,7 +219,9 @@ class CMakeBuild(build_ext):
         subprocess.check_call(
             [cmake_path, "-G", "Ninja", ext.sourcedir] + configure_args, cwd=build_temp
         )
-        subprocess.check_call([cmake_path, "--build", "."] + build_args, cwd=build_temp)
+        subprocess.check_call(
+            [cmake_path, "--build", ".", "--verbose"] + build_args, cwd=build_temp
+        )
 
 
 # Compile the library of custom calls in the frontend
@@ -229,18 +231,10 @@ if system_platform == "Linux":
 elif system_platform == "Darwin":
     cmdclass = {"build_ext": CMakeExtension}
 
-    # variables = sysconfig.get_config_vars()
-    # Here we need to switch the deault to MacOs dynamic lib
-    # variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
-    # if sysconfig.get_config_var("LDCXXSHARED"):
-    #    variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
-    # cmdclass = {"build_ext": CustomBuildExtMacos}
-
 project_root_dir = os.path.abspath(os.path.dirname(__file__))
 frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
-    CMakeExtension("catalyst.utils.libcustom_calls", sourcedir=frontend_dir),
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
 ]
 
@@ -266,6 +260,9 @@ setup(
         exclude=["catalyst.third_party.oqc.*"],
     ),
     package_dir={"": "frontend"},
+    package_data={
+        "catalyst.utils": [os.path.join(frontend_dir, "catalyst", "utils", "libcustom_calls.*")]
+    },
     include_package_data=True,
     ext_modules=ext_modules,
     cmdclass={"build_ext": CMakeBuild},

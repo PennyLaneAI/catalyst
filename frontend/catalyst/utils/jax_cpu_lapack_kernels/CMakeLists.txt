@@ -1,7 +1,7 @@
 project(catalyst_jax_cpu_lapack_kernels)
 
 # Create a static library for LAPACK kernels to be included into the
-# custom_calls librar in the parent scope.
+# custom_calls library in the parent scope.
 
 add_library(catalyst_jax_cpu_lapack_kernels STATIC
     ${PROJECT_SOURCE_DIR}/lapack_kernels.cpp
@@ -21,6 +21,7 @@ target_include_directories(catalyst_jax_cpu_lapack_kernels PUBLIC
 # library. See https://cmake.org/cmake/help/latest/module/FindBLAS.html for info.
 option(CATALYST_LINK_BLAS "Link the CMake-defined BLAS and LAPACK libraries as part of the extension module" OFF)
 
+
 if(CATALYST_LINK_BLAS)
     find_package( BLAS REQUIRED )
     find_package( LAPACK REQUIRED)
@@ -34,3 +35,8 @@ endif()
 
 # Ensure the availability of symbol exports. Only necessary with `SHARED`
 set_property(TARGET catalyst_jax_cpu_lapack_kernels PROPERTY ENABLE_EXPORTS ON)
+
+# If building on MacOS avoid the linker complaining about undefined symbols
+if(APPLE)
+target_link_options(catalyst_jax_cpu_lapack_kernels PUBLIC -undefined dynamic_lookup)
+endif()

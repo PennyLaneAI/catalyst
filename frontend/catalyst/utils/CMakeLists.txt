@@ -56,6 +56,8 @@ target_include_directories(wrapper PRIVATE ${Python_NumPy_INCLUDE_DIRS})
 # This is necessary for compatibility with setuptools build extensions
 set_target_properties(wrapper PROPERTIES SUFFIX ".so")
 
-# Allow custom calls to be loaded alongside wrapper
-target_link_libraries(wrapper INTERFACE custom_calls)
-set_target_properties(wrapper PROPERTIES BUILD_RPATH "$ORIGIN/")
+# Allow custom calls to be built with explicit linkage against wrapper
+add_dependencies(wrapper custom_calls)
+
+# Explicitly set RPATH to allow access to libraries within same directory
+set_target_properties(wrapper PROPERTIES BUILD_RPATH "$ORIGIN")
