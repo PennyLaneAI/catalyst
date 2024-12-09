@@ -119,16 +119,11 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-<<<<<<< HEAD
 oqd:
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
-test: test-runtime test-frontend test-demos
-=======
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime standalone-plugin test-frontend test-demos
->>>>>>> main
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
