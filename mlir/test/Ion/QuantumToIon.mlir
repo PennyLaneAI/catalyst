@@ -12,44 +12,157 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --quantum-to-ion
-
-// TODO: Add Filecheck above
+// RUN: quantum-opt %s --quantum-to-ion --split-input-file -verify-diagnostics | FileCheck %s
 
 func.func @example_ion(%arg0: f64) -> !quantum.bit {
     %0 = ion.ion {
-    name="YB117", 
-    mass=10.1, 
-    charge=12.1, 
-    position=dense<[0, 1]>: tensor<2xi64>, 
-    levels=[#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>], 
-    transitions=[#ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>,#ion.transition<level_0 = #ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, level_1 =#ion.level<principal=1, spin=1.1, orbital=2.2, nuclear=3.3, spin_orbital=4.4, spin_orbital_nuclear=5.5, spin_orbital_nuclear_magnetization=6.6, energy=8.8>, einstein_a=10.10>]}: !ion.ion
-    ion.system(%0) {beams1=[#ion.beam<
-        rabi=10.10,
-        detuning=11.11,
-        polarization=dense<[0, 1]>: tensor<2xi64>,
-        wavevector=dense<[0, 1]>: tensor<2xi64>>,#ion.beam<
-        rabi=10.10,
-        detuning=11.11,
-        polarization=dense<[0, 1]>: tensor<2xi64>,
-        wavevector=dense<[0, 1]>: tensor<2xi64>> ],
-        beams2=[#ion.beam<
-        rabi=10.10,
-        detuning=11.11,
-        polarization=dense<[0, 1]>: tensor<2xi64>,
-        wavevector=dense<[0, 1]>: tensor<2xi64>>,#ion.beam<
-        rabi=10.10,
-        detuning=11.11,
-        polarization=dense<[0, 1]>: tensor<2xi64>,
-        wavevector=dense<[0, 1]>: tensor<2xi64>> ],
-        phonons=[#ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>, #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>]}
-    %1 = quantum.alloc( 1) : !quantum.reg
+        name="YB117",
+        mass=10.1,
+        charge=12.1,
+        position=dense<[0, 1]>: tensor<2xi64>,
+        levels=[
+            #ion.level<
+                principal=1,
+                spin=1.1,
+                orbital=2.2,
+                nuclear=3.3,
+                spin_orbital=4.4,
+                spin_orbital_nuclear=5.5,
+                spin_orbital_nuclear_magnetization=6.6,
+                energy=8.8
+            >,
+            #ion.level<
+                principal=1,
+                spin=1.1,
+                orbital=2.2,
+                nuclear=3.3,
+                spin_orbital=4.4,
+                spin_orbital_nuclear=5.5,
+                spin_orbital_nuclear_magnetization=6.6,
+                energy=8.8
+            >
+        ],
+        transitions=[
+            #ion.transition<
+                level_0 = #ion.level<
+                    principal=1,
+                    spin=1.1,
+                    orbital=2.2,
+                    nuclear=3.3,
+                    spin_orbital=4.4,
+                    spin_orbital_nuclear=5.5,
+                    spin_orbital_nuclear_magnetization=6.6,
+                    energy=8.8
+                >,
+                level_1 = #ion.level<
+                    principal=1,
+                    spin=1.1,
+                    orbital=2.2,
+                    nuclear=3.3,
+                    spin_orbital=4.4,
+                    spin_orbital_nuclear=5.5,
+                    spin_orbital_nuclear_magnetization=6.6,
+                    energy=8.8
+                >,
+                einstein_a=10.10
+            >,
+            #ion.transition<
+                level_0 = #ion.level<
+                    principal=1,
+                    spin=1.1,
+                    orbital=2.2,
+                    nuclear=3.3,
+                    spin_orbital=4.4,
+                    spin_orbital_nuclear=5.5,
+                    spin_orbital_nuclear_magnetization=6.6,
+                    energy=8.8
+                >,
+                level_1 = #ion.level<
+                    principal=1,
+                    spin=1.1,
+                    orbital=2.2,
+                    nuclear=3.3,
+                    spin_orbital=4.4,
+                    spin_orbital_nuclear=5.5,
+                    spin_orbital_nuclear_magnetization=6.6,
+                    energy=8.8
+                >,
+                einstein_a=10.10
+            >
+        ]
+    }: !ion.ion
+    ion.system(%0) {
+        beams1=[
+            #ion.beam<
+                rabi=10.10,
+                detuning=11.11,
+                polarization=dense<[0, 1]>: tensor<2xi64>,
+                wavevector=dense<[0, 1]>: tensor<2xi64>
+            >,
+            #ion.beam<
+                rabi=10.10,
+                detuning=11.11,
+                polarization=dense<[0, 1]>: tensor<2xi64>,
+                wavevector=dense<[0, 1]>: tensor<2xi64>
+            >
+        ],
+        beams2=[
+            #ion.beam<
+                rabi=10.10,
+                detuning=11.11,
+                polarization=dense<[0, 1]>: tensor<2xi64>,
+                wavevector=dense<[0, 1]>: tensor<2xi64>
+            >,
+            #ion.beam<
+                rabi=10.10,
+                detuning=11.11,
+                polarization=dense<[0, 1]>: tensor<2xi64>,
+                wavevector=dense<[0, 1]>: tensor<2xi64>
+            >
+        ],
+        phonons=[
+            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
+            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
+            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
+            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
+            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
+            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>
+        ]
+    }
+    %1 = quantum.alloc( 2) : !quantum.reg
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-    %5 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
-    %6 = quantum.custom "RY"(%arg0) %5 : !quantum.bit
-    %7 = quantum.custom "RX"(%arg0) %6 : !quantum.bit
-    %8:2 = quantum.custom "MS"(%arg0) %7, %3 : !quantum.bit, !quantum.bit
-    return %8#0: !quantum.bit
-}
 
+    // CHECK: [[rx1out:%.+]] = ion.parallelprotocol(%2) : !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: }
+    %4 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
+
+    // CHECK: [[ry1out:%.+]] = ion.parallelprotocol([[rx1out]]) : !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 3.14{{.*}} : f64}
+    // CHECK-NEXT: }
+    %5 = quantum.custom "RY"(%arg0) %4 : !quantum.bit
+
+    // CHECK: [[rx2out:%.+]] = ion.parallelprotocol([[ry1out]]) : !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: }
+    %6 = quantum.custom "RX"(%arg0) %5 : !quantum.bit
+
+    // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], %3) : !quantum.bit, !quantum.bit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<{{.*}}>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: }
+    %7:2 = quantum.custom "MS"(%arg0) %6, %3 : !quantum.bit, !quantum.bit
+    return %7#0: !quantum.bit
+}
