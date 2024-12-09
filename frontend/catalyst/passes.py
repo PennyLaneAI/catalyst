@@ -34,6 +34,7 @@ individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
+from pathlib import Path
 from typing import TypeAlias
 
 import pennylane as qml
@@ -52,7 +53,23 @@ class Pass:
         self.valued_options = valued_options
 
     def __repr__(self):
-        return self.name + ", ".join(self.options)
+        return (
+            self.name
+            + " ".join(f"--{option}" for option in self.options)
+            + " ".join(f"--{option}={value}" for option, value in self.valued_options)
+        )
+
+
+class PassPlugin(Pass):
+    """Class intended to hold options for pass plugins"""
+
+    def __init__(
+        self, path: Path, name: str, *options: list[str], **valued_options: dict[str, str]
+    ):
+        assert EvaluationContext.is_tracing()
+        EvaluationContext.add_plugin(path)
+        self.path = path
+        super().__init__(name, *options, **valued_options)
 
 
 def dictionary_to_tuple_of_passes(pass_pipeline: PipelineDict):
@@ -302,6 +319,49 @@ def cancel_inverses(qnode=None):
         return clone(*args, **kwargs)
 
     return wrapper
+
+
+def apply_pass(pass_name, *flags, **valued_options):
+    """Applies a single pass to the qnode"""
+
+    def decorator(qnode):
+
+        if not isinstance(qnode, qml.QNode):
+            # Technically, this apply pass is general enough that it can apply to
+            # classical functions too. However, since we lack the current infrastructure
+            # to denote a function, let's limit it to qnodes
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+        def qnode_call(*args, **kwargs):
+            pass_pipeline = kwargs.get("pass_pipeline", [])
+            pass_pipeline.append(Pass(pass_name, *flags, **valued_options))
+            kwargs["pass_pipeline"] = pass_pipeline
+            return qnode(*args, **kwargs)
+
+        return qnode_call
+
+    return decorator
+
+
+def apply_pass_plugin(plugin_name, pass_name, *flags, **valued_options):
+    """Applies a pass plugin"""
+
+    def decorator(qnode):
+        if not isinstance(qnode, qml.QNode):
+            # Technically, this apply pass is general enough that it can apply to
+            # classical functions too. However, since we lack the current infrastructure
+            # to denote a function, let's limit it to qnodes
+            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+
+        def qnode_call(*args, **kwargs):
+            pass_pipeline = kwargs.get("pass_pipeline", [])
+            pass_pipeline.append(PassPlugin(plugin_name, pass_name, *flags, **valued_options))
+            kwargs["pass_pipeline"] = pass_pipeline
+            return qnode(*args, **kwargs)
+
+        return qnode_call
+
+    return decorator
 
 
 def merge_rotations(qnode=None):

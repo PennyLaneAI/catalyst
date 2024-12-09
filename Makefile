@@ -192,6 +192,7 @@ wheel:
 	done
 	mkdir -p $(MK_DIR)/frontend/catalyst/bin
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst-cli $(MK_DIR)/frontend/catalyst/bin
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.* $(MK_DIR)/frontend/catalyst/lib
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
