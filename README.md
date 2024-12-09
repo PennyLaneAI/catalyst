@@ -81,7 +81,7 @@ pip install pennylane-catalyst
 ```
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-[building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#building-from-source)
+[building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#minimal-building-from-source-guide)
 are also available.
 
 ## Trying Catalyst with PennyLane
