@@ -51,7 +51,7 @@ class Pass:
     def __init__(self, name, *options, **valued_options):
         self.options = options
         self.valued_options = valued_options
-        try:
+        if "." in name:
             resolution_functions = entry_points(group="catalyst.passes_resolution")
             key, passname = name.split(".")
             resolution_function = resolution_functions[key + ".passes"]
@@ -59,8 +59,6 @@ class Pass:
             path, name = module.name2pass(passname)
             assert EvaluationContext.is_tracing()
             EvaluationContext.add_plugin(path)
-        except:
-            pass
 
         self.name = name
 
@@ -93,11 +91,8 @@ def dictionary_to_tuple_of_passes(pass_pipeline: PipelineDict):
     passes = tuple()
     pass_names = _API_name_to_pass_name()
     for API_name, pass_options in pass_pipeline.items():
-        try:
-            passes += (Pass(API_name, **pass_options),)
-        except:
-            name = pass_names[API_name]
-            passes += (Pass(name, **pass_options),)
+        name = pass_names.get(API_name, API_name)
+        passes += (Pass(name, **pass_options),)
     return passes
 
 
