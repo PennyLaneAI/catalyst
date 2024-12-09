@@ -132,7 +132,7 @@ test-frontend: lit pytest
 test-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
-lit:
+lit: standalone-plugin
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"

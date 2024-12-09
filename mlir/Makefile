@@ -51,7 +51,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects
+all: llvm mhlo enzyme dialects standalone-plugin
 
 .PHONY: llvm
 llvm:
