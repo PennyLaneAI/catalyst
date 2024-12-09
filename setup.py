@@ -95,6 +95,9 @@ entry_points = {
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
+    "catalyst.passes_resolution": [
+        "standalone.passes = catalyst.example_entry_point",
+    ],
 }
 
 classifiers = [
