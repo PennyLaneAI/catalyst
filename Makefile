@@ -21,7 +21,6 @@ TEST_BRAKET ?= NONE
 SKIP_OQD ?= false
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
-MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -120,11 +119,16 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
+<<<<<<< HEAD
 oqd:
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
 test: test-runtime test-frontend test-demos
+=======
+.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+test: test-runtime standalone-plugin test-frontend test-demos
+>>>>>>> main
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
@@ -143,7 +147,7 @@ test-oqc:
 test-oqd:
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src test
 
-lit:
+lit: standalone-plugin
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
