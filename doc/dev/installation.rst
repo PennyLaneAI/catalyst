@@ -26,44 +26,6 @@ try out our Docker and Dev Container images described in the `next section <#dev
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
 building from source are also included `further down <#minimal-building-from-source-guide>`_.
 
-Dev Containers
---------------
-
-
-Try out Catalyst in self-contained, ready-to-go environments called
-`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`__:
-
-.. image:: https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square
-  :alt: Try Catalyst in Dev Container
-  :target: https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst
-  :align: center
-
-| You will need an existing installation of `Docker <https://www.docker.com/>`_,
-  `VS Code <https://code.visualstudio.com/>`_, and the VS Code
-  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`__
-  extension.
-
-If desired, the Docker images can also be used in a standalone fashion:
-
-| `Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`_
-| `Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`_
-
-The user image provides an officially supported environment and automatically installs the latest
-release of Catalyst. The developer image only provides the right environment to build Catalyst from
-source, and requires launching the post-install script at ``.devcontainer/dev/post-install.sh``
-from within the root of the running container.
-
-.. note::
-
-  Due to `a bug <https://github.com/microsoft/vscode-remote-release/issues/8412>`_ in the Dev
-  Containers extension, clicking on the "Launch" badge will not prompt for a choice between the User
-  and Dev containers. Instead, the User container is automatically chosen.
-
-  As a workaround, you can clone the `Catalyst repository <https://github.com/PennyLaneAI/catalyst>`_
-  first, open it as a VS Code Workspace, and then reopen the Workspace in a Dev Container via the
-  ``Reopen in Container`` command.
-
-
 
 Minimal Building From Source Guide
 ----------------------------------
