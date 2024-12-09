@@ -70,6 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -96,7 +97,6 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import _add_mlir_quantum_decomposition
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -548,8 +548,9 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            plugins = EvaluationContext.get_plugins()
 
-    return jaxpr, out_type, out_treedef
+    return jaxpr, out_type, out_treedef, plugins
 
 
 @debug_logger
@@ -887,7 +888,9 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                    result = bind_flexible_primitive(
+                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
+                    )
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
@@ -906,9 +909,9 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(reshaped_result)
 
             elif type(o) is ExpectationMP:
-                out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
+                out_classical_tracers.append(expval_p.bind(obs_tracers))
             elif type(o) is VarianceMP:
-                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
+                out_classical_tracers.append(var_p.bind(obs_tracers))
             elif type(o) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
@@ -920,7 +923,9 @@ def trace_quantum_measurements(
                         "Please specify a finite number of shots."
                     )
                 shape = (2**nqubits,) if using_compbasis else (2,)
-                results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
+                results = bind_flexible_primitive(
+                    counts_p, {"shots": shots}, obs_tracers, shape=shape
+                )
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
@@ -1140,8 +1145,6 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-    # Add the decomposition passes with the transform dialect
-    _add_mlir_quantum_decomposition(f, device)
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
@@ -1199,7 +1202,12 @@ def trace_quantum_function(
                 # We just need to ensure there is a tape cut in between each.
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
+
+                # TODO: device shots is now always a concrete integer or None
+                # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
+                device_shots = get_device_shots(device) or 0
                 qdevice_p.bind(
+                    device_shots,
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),

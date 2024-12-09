@@ -28,12 +28,18 @@ from pennylane.capture import (
     qnode_prim,
 )
 
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import (
+    extract_backend_info,
+    get_device_capabilities,
+    get_device_shots,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
     compbasis_p,
+    counts_p,
     expval_p,
     gphase_p,
     namedobs_p,
@@ -240,7 +246,7 @@ class QFuncPlxprInterpreter:
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
-        qdevice_p.bind(**_get_device_kwargs(self._device))
+        qdevice_p.bind(get_device_shots(self._device) or 0, **_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
@@ -351,7 +357,25 @@ class QFuncPlxprInterpreter:
         )[0]
 
         primitive = measurement_map[eqn.primitive.name]
-        mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+        device_shots = get_device_shots(self._device) or 0
+
+        # TODO: as we are in the process of migrating to dynamic measurement primitive shapes,
+        # we will gradually get rid of the shape argument for these primitives
+        # While we are in the migrating process, we need to handle them explicitly one by one
+        if primitive is sample_p:
+            mval = bind_flexible_primitive(
+                sample_p, {"shots": device_shots}, obs, num_qubits=shaped_array.shape[1]
+            )
+        elif primitive is counts_p:
+            mval = bind_flexible_primitive(
+                counts_p, {"shots": device_shots}, obs, shape=shaped_array.shape
+            )
+        elif primitive in (expval_p, var_p):
+            mval = primitive.bind(obs, shape=shaped_array.shape)
+        else:
+            mval = primitive.bind(
+                obs, shape=shaped_array.shape, shots=self._device.shots.total_shots
+            )
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if shaped_array.dtype != mval.dtype:

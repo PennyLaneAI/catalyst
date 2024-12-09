@@ -121,24 +121,25 @@ class LinkerDriver:
         path_within_package = "lib"
         file_extension = ".so" if platform.system() == "Linux" else ".dylib"  # pragma: no branch
 
+        package_spec = importlib.util.find_spec(package_name)
+        package_directory = path.dirname(package_spec.origin)
+        lapack_lib_path = path.join(package_directory, path_within_package)
+
+        search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+        search_result = glob.glob(search_pattern)
+        if not search_result:  # pragma: nocover
+            raise CompileError(
+                f'Unable to find OpenBLAS library at "{search_pattern}". '
+                "Please ensure that scipy is installed and available via pip."
+            )
+
+        lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
+        lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
+
+        lapack_libs = [lapack_lib_name]
         if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
             # use our own build of LAPACKe to interface with Accelerate
-            lapack_lib_name = "lapacke.3"
-        else:
-            package_spec = importlib.util.find_spec(package_name)
-            package_directory = path.dirname(package_spec.origin)
-            lapack_lib_path = path.join(package_directory, path_within_package)
-
-            search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
-            search_result = glob.glob(search_pattern)
-            if not search_result:  # pragma: nocover
-                raise CompileError(
-                    f'Unable to find OpenBLAS library at "{search_pattern}". '
-                    "Please ensure that scipy is installed and available via pip."
-                )
-
-            lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
-            lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
+            lapack_libs += ["lapacke.3"]
 
         system_flags = []
         if platform.system() == "Linux":
@@ -158,6 +159,8 @@ class LinkerDriver:
         elif options.async_qnodes and platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-lc++"]
 
+        lapack_libs = [f"-l{name}" for name in lapack_libs]
+
         default_flags = [
             "-shared",
             "-rdynamic",
@@ -166,7 +169,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            f"-l{lapack_lib_name}",  # required for custom_calls lib
+            *lapack_libs,
             "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
@@ -283,6 +286,14 @@ class Compiler:
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
         if not self.options.lower_to_llvm:
             cmd += ["--tool", "opt"]
+        if self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            for plugin in plugins:
+                cmd += ["--load-pass-plugin", str(plugin)]
+        if self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            for plugin in plugins:
+                cmd += ["--load-dialect-plugin", str(plugin)]
         if self.options.keep_intermediate:
             cmd += ["--keep-intermediate"]
         # The async tests are not included as part of coverage.

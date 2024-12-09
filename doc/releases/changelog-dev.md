@@ -2,7 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* Catalyst can now load local MLIR plugins from python.
+  [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
+
 <h3>Improvements 🛠</h3>
+
+* Lightning runtime shot-measurement support for Hermitian observables.
+  [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
 
 * Replace pybind11 with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
@@ -39,7 +45,26 @@
 * Improves the readability of conditional passes in pipelines
   [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
 
+* Cleans up the output of compiler instrumentation.
+  [(#1343)](https://github.com/PennyLaneAI/catalyst/pull/1343)
+
+* Generate stable ABI wheels for Python 3.12 and up.
+  [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
+
 <h3>Breaking changes 💔</h3>
+
+* The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
+
+  To support this, `SampleOp` and `CountsOp` in mlir no longer carry the shots attribute, since integer attributes are tied to literal values and must be static.
+
+  `DeviceInitOp` now takes in an optional SSA argument for shots, and the device init runtime CAPI will take in this SSA shots value as an argument and set it as the device shots.
+  The sample and counts runtime CAPI functions no longer take in the shots argument and will retrieve shots from the device.
+
+  Correspondingly, the device C++ interface should no longer parse the `DeviceInitOp`'s attributes dictionary for the shots.
+  For now we still keep the shots as an attribute so device implementors can have time to migrate, but we will remove shots from the attribute dictionary in the next release.
+
+  [(#1170)](https://github.com/PennyLaneAI/catalyst/pull/1170)
+  [(#1310)](https://github.com/PennyLaneAI/catalyst/pull/1310)
 
 * The `toml` module has been migrated to PennyLane with an updated schema for declaring device
   capabilities. Devices with TOML files using `schema = 2` will not be compatible with the latest
@@ -86,6 +111,42 @@
   [(#1332)](https://github.com/PennyLaneAI/catalyst/pull/1332)
   [(#1337)](https://github.com/PennyLaneAI/catalyst/pull/1337)
 
+* Each qnode now has its own transformation schedule.
+  Instead of relying on the name of the qnode, each qnode now has a transformation module,
+  which denotes the transformation schedule, embedded in its MLIR representation.
+  [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
+
+* The `apply_registered_pass_p` primitive is removed. The API for scheduling passes
+  to run using the transform dialect has been refactored. In particular,
+  passes are appended to a tuple as they are being registered and they will
+  be run in order. If there are no local passes, the global `pass_pipeline` is
+  scheduled. Furthermore, this commit also reworks the caching mechanism for
+  primitives, which is important as qnodes and functions are primitives and
+  now that we can apply passes to them, they are distinct based on which
+  passes have been scheduled to run on them.
+  [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
+
+* Replace Python C-API calls with Stable ABI calls.
+  [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
+
+* A framework for loading and interacting with databases containing hardware information and
+  calibration data for Open Quantum Design (OQD) trapped-ion quantum devices has been added.
+  [(#1348)](https://github.com/PennyLaneAI/catalyst/pull/1348)
+
+  A new module, `catalyst.utils.toml_utils`, was also added to assist in loading information from
+  these databases, which are stored as text files in TOML format. In particular, this module
+  contains a new function, :func:`~.utils.toml_utils.safe_eval`, to safely evaluate mathematical
+  expressions:
+
+  ```python
+  >>> from catalyst.utils.toml_utils import safe_eval
+  >>> safe_eval("2 * math.pi * 1e9")
+  6283185307.179586
+  ```
+
+* `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
+  [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
@@ -104,5 +165,6 @@ Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
+Shuli Shu,
 Raul Torres,
 Paul Haochen Wang.

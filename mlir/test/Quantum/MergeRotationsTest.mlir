@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(merge-rotations{func-name=test_merge_rotations})" --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(merge-rotations)" --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg

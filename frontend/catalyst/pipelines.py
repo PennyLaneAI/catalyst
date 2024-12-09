@@ -31,7 +31,8 @@ from dataclasses import dataclass
 from functools import partial
 from io import TextIOWrapper
 from operator import is_not
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
 
@@ -74,6 +75,8 @@ class CompileOptions:
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
             Default is None.
+        pass_plugins (Optional[Set[Path]]): List of paths to pass plugins.
+        dialect_plugins (Optional[Set[Path]]): List of paths to dialect plugins.
     """
 
     verbose: Optional[bool] = False
@@ -93,6 +96,8 @@ class CompileOptions:
     seed: Optional[int] = None
     experimental_capture: Optional[bool] = False
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
+    pass_plugins: Optional[Set[Path]] = None
+    dialect_plugins: Optional[Set[Path]] = None
 
     def __post_init__(self):
         # Check that async runs must not be seeded
@@ -121,6 +126,10 @@ class CompileOptions:
             self.static_argnums = (static_argnums,)
         elif isinstance(static_argnums, Iterable):
             self.static_argnums = tuple(static_argnums)
+        if self.pass_plugins is None:
+            self.pass_plugins = set()
+        if self.dialect_plugins is None:
+            self.dialect_plugins = set()
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -159,7 +168,7 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # Split multiple tapes enforces that invariant.
         "split-multiple-tapes",
         # Run the transform sequence defined in the MLIR module
-        "apply-transform-sequence",
+        "builtin.module(apply-transform-sequence)",
         # Nested modules are something that will be used in the future
         # for making device specific transformations.
         # Since at the moment, nothing in the runtime is using them
