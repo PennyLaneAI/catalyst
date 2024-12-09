@@ -37,6 +37,7 @@ import functools
 from typing import TypeAlias
 
 import pennylane as qml
+from pathlib import Path
 
 from catalyst.tracing.contexts import EvaluationContext
 
@@ -62,7 +63,9 @@ class Pass:
 class PassPlugin(Pass):
     """Class intended to hold options for pass plugins"""
 
-    def __init__(self, path, name, *options, **valued_options):
+    def __init__(
+        self, path: Path, name: str, *options: list[str], **valued_options: dict[str, str]
+    ):
         assert EvaluationContext.is_tracing()
         EvaluationContext.add_plugin(path)
         self.path = path
