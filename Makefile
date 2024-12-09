@@ -18,6 +18,7 @@ COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+SKIP_OQD ?= false
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
@@ -162,7 +163,7 @@ endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd --skip-oqd=$(SKIP_OQD) $(PARALLELIZE)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
