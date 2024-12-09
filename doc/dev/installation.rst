@@ -2,8 +2,8 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) 
-platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64)
+platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
 Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
@@ -24,19 +24,17 @@ be guaranteed. If you would like to use Catalyst on Windows, we recommend trying
 `WSL <https://learn.microsoft.com/windows/wsl/>`_.
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-building from source are also included `further down <#minimal-building-from-source-guide>`_.
+building from source are detailed `below <#minimal-building-from-source-guide>`_.
 
 
 Minimal Building From Source Guide
 ----------------------------------
 
 
-Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. 
-
-The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
-
-
-The essential steps are:
+This is an abbreviated set of instructions that can be copy-pasted into the terminal of most
+common systems. For information on pre-requisites, how to build individual components, or if
+you are encoutering issues, please consult the detailed guide
+`in the next section <#detailed-building-from-source-guide>`_.
 
 
 .. tabs::
@@ -52,9 +50,9 @@ The essential steps are:
       .. code-block:: console
 
         # Install common requirements
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake 
+        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
-        # Clone the Catalyst repository  
+        # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
         # Install specific requirements for Catalyst
@@ -81,12 +79,12 @@ The essential steps are:
         # Add ccache drop-in compiler replacements to the PATH
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
-        # Clone the Catalyst repository  
+        # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
         # Install specific requirements for Catalyst
         cd catalyst
-        pip install -r requirements.txt 
+        pip install -r requirements.txt
 
         # Build Catalyst
         make all
@@ -94,15 +92,9 @@ The essential steps are:
         # Test that everything is built properly
         make test
 
-These steps should give you the full functionality of Catalyst. 
-
 
 Detailed Building From Source Guide
 -----------------------------------
-
-
-.. note::
-  This section is a detailed building-from-source guide. Some commands in this section has already been included in the minimal guide. 
 
 
 To build Catalyst from source, developers should follow the instructions provided below for building
@@ -359,7 +351,7 @@ To build and test documentation for Catalyst, you will need to install
 Additionally, `doxygen <https://www.doxygen.nl>`_ is required to build C++ documentation, and
 `pandoc <https://pandoc.org>`_ to render Jupyter Notebooks.
 
-They can be installed via 
+They can be installed via
 
 
 .. tabs::
@@ -394,16 +386,16 @@ Known Issues
 
    .. group-tab:: Linux Debian/Ubuntu
 
-      If you get this error: 
+      If you get this error:
 
       .. code-block:: console
-        
+
         cannot find -lstdc++: No such file or directory
 
-      you might need to install a recent version of ``libstdc``. E.g.: 
+      you might need to install a recent version of ``libstdc``. E.g.:
 
       .. code-block:: console
-        
+
         sudo apt install libstdc++-12-dev
 
       (See user's report `here <https://discourse.llvm.org/t/usr-bin-clang-is-not-able-to-compile-a-simple-test-program/72889/3>`_)
@@ -415,13 +407,13 @@ Known Issues
       Under Ubuntu 24.04, if you get this error:
 
       .. code-block:: console
-      
+
         fatal error: 'Python.h' file not found
-      
+
       you might need to install the Python Dev package:
 
       .. code-block:: console
-        
+
         sudo apt install python3-dev
 
       (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/1084>`_)
@@ -441,9 +433,9 @@ Known Issues
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
 
-It is possible to work on the source code repository and test the changes without 
-having to compile Catalyst. This is ideal for situations where the changes do not target the 
-runtime or the MLIR infrastructure, and only concern the frontend. It basically 
+It is possible to work on the source code repository and test the changes without
+having to compile Catalyst. This is ideal for situations where the changes do not target the
+runtime or the MLIR infrastructure, and only concern the frontend. It basically
 makes use of the shared libraries already shipped with the TestPyPI Catalyst wheels.
 
 Essential Steps
@@ -495,7 +487,7 @@ How Does it Work?
 The provided script first creates and activates a Python virtual environment, so the system Python
 configurations do not get affected, nor other virtual environments.
 
-In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard 
+In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard
 links from the wheel code to the frontend code of the repository, in order to allow working
 directly with the frontend code of the repository and at the same time test the changes while
 using the installed Catalyst wheel libraries, hence avoiding compilation.
@@ -503,7 +495,7 @@ using the installed Catalyst wheel libraries, hence avoiding compilation.
 Further Steps
 ^^^^^^^^^^^^^
 
-If everything goes well, ``git status`` should not report any changed files. 
+If everything goes well, ``git status`` should not report any changed files.
 
 Before making changes to the frontend, make sure you create a new branch:
 
@@ -514,7 +506,7 @@ Before making changes to the frontend, make sure you create a new branch:
 Once in the new branch, make the wanted changes. Use the IDE of your preference.
 
 You can test the changes by executing your sample code under the same virtual environment you used
-with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually 
+with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually
 changing the code stored at the Python ``site-packages`` folder as well, and you will be automatically
 using the shared libraries provided by the Python wheels. Again, there is no need to compile Catalyst
 from source.
@@ -523,7 +515,7 @@ You can commit your changes as usual. Once ready, push the new branch to the rem
 repository:
 
 .. code-block:: console
-  
+
   git push -u origin new-branch-name
 
 Now you can go to GitHub and issue a Pull Request based on the new branch.
