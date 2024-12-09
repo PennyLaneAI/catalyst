@@ -5,7 +5,6 @@
 [![PyPI](https://img.shields.io/pypi/v/PennyLane-Catalyst.svg?style=flat-square)](https://pypi.org/project/PennyLane-Catalyst)
 [![Forum](https://img.shields.io/discourse/https/discuss.pennylane.ai/posts.svg?logo=discourse&style=flat-square)](https://discuss.pennylane.ai)
 [![License](https://img.shields.io/pypi/l/PennyLane.svg?logo=apache&style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Dev Container](https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/PennyLaneAI/catalyst/main/doc/_static/catalyst.png#gh-light-mode-only" width="700px">
@@ -73,20 +72,13 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 ## Installation
 
-Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) platforms,
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) platforms,
 and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.10 and
 higher. To install it, simply run the following ``pip`` command:
 
 ```console
 pip install pennylane-catalyst
 ```
-
-Pre-built packages for Windows are not yet available, and comptability with Windows
-is untested and cannot be guaranteed. If you are using one of these platforms, please
-try out our Docker and Dev Container images described in the [documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#dev-containers)
-or click this button:
-
-[![Dev Container](https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst).
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
 [building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#building-from-source)
