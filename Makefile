@@ -166,7 +166,7 @@ endif
 	MDD_BENCHMARK_PRECISION=1 \
 	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PARALLELIZE)
 
-wheel:
+wheel: standalone-plugin
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
 
 	# Copy libs to frontend/catalyst/lib
@@ -205,6 +205,10 @@ clean:
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
+
+	# Remove the standalone plugin 
+	rm -rf  $(MK_DIR)/mlir/build/lib/StandalonePlugin.*
+	rm -rf  $(MK_DIR)/mlir/standalone/build/lib/StandalonePlugin.*
 
 clean-all: clean-frontend clean-mlir clean-runtime clean-oqc
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
