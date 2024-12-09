@@ -546,11 +546,18 @@ jobs:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
+    - name: Download OQD-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: oqd-build-${{ matrix.compiler }}
+        path: oqd-build
+
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/oqd-build" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
 
