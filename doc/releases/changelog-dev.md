@@ -2,6 +2,9 @@
 
 <h3>New features since last release</h3>
 
+* Catalyst can now load local MLIR plugins from python.
+  [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
+
 <h3>Improvements 🛠</h3>
 
 * Lightning runtime shot-measurement support for Hermitian observables.
@@ -113,6 +116,16 @@
   which denotes the transformation schedule, embedded in its MLIR representation.
   [(#1323)](https://github.com/PennyLaneAI/catalyst/pull/1323)
 
+* The `apply_registered_pass_p` primitive is removed. The API for scheduling passes
+  to run using the transform dialect has been refactored. In particular,
+  passes are appended to a tuple as they are being registered and they will
+  be run in order. If there are no local passes, the global `pass_pipeline` is
+  scheduled. Furthermore, this commit also reworks the caching mechanism for
+  primitives, which is important as qnodes and functions are primitives and
+  now that we can apply passes to them, they are distinct based on which
+  passes have been scheduled to run on them.
+  [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
+
 * Replace Python C-API calls with Stable ABI calls.
   [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
 
@@ -130,6 +143,9 @@
   >>> safe_eval("2 * math.pi * 1e9")
   6283185307.179586
   ```
+
+* `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
+  [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
 
 <h3>Documentation 📝</h3>
 

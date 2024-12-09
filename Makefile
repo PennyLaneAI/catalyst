@@ -19,7 +19,6 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
-MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -117,7 +116,7 @@ oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
-test: test-runtime test-frontend test-demos
+test: test-runtime standalone-plugin test-frontend test-demos
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
@@ -133,7 +132,7 @@ test-frontend: lit pytest
 test-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
-lit:
+lit: standalone-plugin
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
@@ -192,6 +191,7 @@ wheel:
 	done
 	mkdir -p $(MK_DIR)/frontend/catalyst/bin
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst-cli $(MK_DIR)/frontend/catalyst/bin
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.* $(MK_DIR)/frontend/catalyst/lib
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
