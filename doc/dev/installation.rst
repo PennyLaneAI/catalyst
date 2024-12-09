@@ -19,9 +19,9 @@ Python versions 3.10 and higher. To install it, simply run the following ``pip``
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
     app.
 
-Pre-built packages for Windows are not yet available, and compatibility with other platforms is
-untested and cannot be guaranteed. If you are using one of these platforms, please
-try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
+Pre-built packages for Windows are not yet available, and compatibility is untested and cannot
+be guaranteed. If you would like to use Catalyst on Windows, we recommend trying the
+`WSL <https://learn.microsoft.com/windows/wsl/>`_.
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
 building from source are also included `further down <#minimal-building-from-source-guide>`_.
