@@ -42,44 +42,68 @@ static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift"
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        }
-        else if (rotationsOps.contains(name)) {
-            auto params = op.getDynParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(
-                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues(),
-                nullptr);
-
-            return success();
-        }
+    if (!op.getAdjoint()) {
         return failure();
+    }
+
+    auto name = op.getGateName();
+    if (hermitianOps.contains(name)) {
+        op.setAdjoint(false);
+        return success();
+    }
+
+    if (rotationsOps.contains(name)) {
+        auto dynParams = op.getDynParams();
+        SmallVector<Value> dynParamsNeg;
+
+        for (auto param : dynParams) {
+            auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+            dynParamsNeg.push_back(paramNeg);
+        }
+
+        ArrayAttr staticParams = op.getStaticParamsAttr();
+        ArrayAttr staticParamsNeg = nullptr;
+        if (staticParams && !staticParams.empty()) {
+            SmallVector<Attribute, 4> AttrNeg;
+            for (Attribute attr : staticParams) {
+                auto fAttr = cast<FloatAttr>(attr);
+                AttrNeg.push_back(rewriter.getF64FloatAttr(-fAttr.getValueAsDouble()));
+            }
+            staticParamsNeg = rewriter.getArrayAttr(AttrNeg);
+        }
+
+        rewriter.replaceOpWithNewOp<CustomOp>(op, op.getOutQubits().getTypes(),
+                                              op.getOutCtrlQubits().getTypes(), dynParamsNeg,
+                                              op.getInQubits(), name, nullptr, op.getInCtrlQubits(),
+                                              op.getInCtrlValues(), staticParamsNeg);
+
+        return success();
     }
     return failure();
 }
 
 LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
 {
-    if (op.getAdjoint()) {
-        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+    if (!op.getAdjoint()) {
+        return failure();
+    }
 
-        rewriter.replaceOpWithNewOp<MultiRZOp>(
-            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
-            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues(), nullptr);
+    ArrayAttr staticParam = op.getStaticParamsAttr();
+    ArrayAttr StaticParamNeg = nullptr;
+    mlir::Value paramNeg = op.getTheta();
+    if (staticParam && staticParam.size() == 1) {
+        auto fAttr = cast<FloatAttr>(staticParam[0]);
+        auto AttrNeg = rewriter.getF64FloatAttr(-fAttr.getValueAsDouble());
+        StaticParamNeg = rewriter.getArrayAttr({AttrNeg});
+    }
+    else {
+        paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+    }
 
-        return success();
-    };
-    return failure();
+    rewriter.replaceOpWithNewOp<MultiRZOp>(
+        op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), cast<Value>(paramNeg),
+        op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues(), StaticParamNeg);
+    return success();
 }
 
 LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
