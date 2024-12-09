@@ -34,10 +34,10 @@ individual Catalyst MLIR compiler passes.
 
 import copy
 import functools
+from pathlib import Path
 from typing import TypeAlias
 
 import pennylane as qml
-from pathlib import Path
 
 from catalyst.tracing.contexts import EvaluationContext
 
