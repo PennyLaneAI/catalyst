@@ -16,14 +16,13 @@
 
 # pylint: disable=wrong-import-order
 
-import glob
 import os
 import platform
 import subprocess
 import sys
-from typing import Optional
+from typing import Optional, Sequence, Union
 
-from setuptools import Extension, find_namespace_packages, setup
+from setuptools import Extension, find_namespace_packages, find_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
 
@@ -127,14 +126,22 @@ description = {
 
 
 class CMakeExtension(Extension):
-    """A setuptools Extension class for modules with a CMake configuration."""
+    """setuptools Extension wrapper for CMake.
+
+    Provides access to the source directories directly for modules to be compiled.
+
+    For example, to build the `libcustom_calls` library, the direct module path can be provided as
+    ```python
+    CMakeExtension("catalyst.utils.libcustom_calls", sourcedir=frontend_dir)
+    ```
+    """
 
     def __init__(self, name, sourcedir=""):
-        super().__init__(name, sources=[])
+        Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
-class UnifiedBuildExt(build_ext):
+class CMakeBuild(build_ext):
     """Custom build extension class for the Catalyst Frontend.
 
     This class overrides a number of methods from its parent class
@@ -142,21 +149,12 @@ class UnifiedBuildExt(build_ext):
 
         1. `get_ext_filename`, in order to remove the architecture/python
            version suffix of the library name.
-        2. `build_extension`, in order to handle the compilation of extensions
-           with CMake configurations, namely the catalyst.utils.wrapper module,
-           and of generic C/C++ extensions without a CMake configuration, namely
-           the catalyst.utils.libcustom_calls module, which is currently built
-           as a plain setuptools Extension.
-
-    TODO: Eventually it would be better to build the utils.libcustom_calls
-    module using a CMake configuration as well, rather than as a setuptools
-    Extension.
     """
 
     def initialize_options(self):
         super().initialize_options()
         self.define = None
-        self.verbosity = ""
+        self.verbosity = "-VVV"
 
     def finalize_options(self):
         # Parse the custom CMake options and store them in a new attribute
@@ -176,12 +174,6 @@ class UnifiedBuildExt(build_ext):
         return filename.replace(suffix, "") + extension
 
     def build_extension(self, ext):
-        if isinstance(ext, CMakeExtension):
-            self.build_cmake_extension(ext)
-        else:
-            super().build_extension(ext)
-
-    def build_cmake_extension(self, ext: CMakeExtension):
         """Configure and build CMake extension."""
         cmake_path = "cmake"
         ninja_path = "ninja"
@@ -228,85 +220,24 @@ class UnifiedBuildExt(build_ext):
         subprocess.check_call(
             [cmake_path, "-G", "Ninja", ext.sourcedir] + configure_args, cwd=build_temp
         )
-        subprocess.check_call([cmake_path, "--build", "."] + build_args, cwd=build_temp)
-
-
-class CustomBuildExtLinux(UnifiedBuildExt):
-    """Custom build extension class for Linux platforms
-
-    Currently no extra work needs to be performed with respect to the base class
-    UnifiedBuildExt.
-    """
-
-
-class CustomBuildExtMacos(UnifiedBuildExt):
-    """Custom build extension class for macOS platforms
-
-    In addition to the work performed by the base class UnifiedBuildExt, this
-    class also changes the LC_ID_DYLIB that is otherwise constant and equal to
-    where the shared library was created.
-    """
-
-    def run(self):
-        # Run the original build_ext command
-        super().run()
-
-        # Construct library name based on ext suffix (contains python version, architecture and .so)
-        library_name = "libcustom_calls.so"
-
-        package_root = os.path.dirname(__file__)
-        frontend_path = glob.glob(
-            os.path.join(package_root, "frontend", "**", library_name), recursive=True
-        )
-        build_path = glob.glob(os.path.join("build", "**", library_name), recursive=True)
-        lib_with_r_path = "@rpath/libcustom_calls.so"
-
-        original_path = frontend_path[0] if frontend_path else build_path[0]
-
-        # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-        subprocess.run(
-            ["/usr/bin/install_name_tool", "-id", lib_with_r_path, original_path],
-            check=False,
+        subprocess.check_call(
+            [cmake_path, "--build", ".", "--verbose"] + build_args, cwd=build_temp
         )
 
 
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
-    custom_calls_extension = Extension(
-        "catalyst.utils.libcustom_calls",
-        sources=[
-            "frontend/catalyst/utils/libcustom_calls.cpp",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
-        ],
-        extra_compile_args=["-std=c++17"],
-    )
-    cmdclass = {"build_ext": CustomBuildExtLinux}
+    cmdclass = {"build_ext": CMakeExtension}
 
 elif system_platform == "Darwin":
-    variables = sysconfig.get_config_vars()
-    # Here we need to switch the deault to MacOs dynamic lib
-    variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
-    if sysconfig.get_config_var("LDCXXSHARED"):
-        variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
-    custom_calls_extension = Extension(
-        "catalyst.utils.libcustom_calls",
-        sources=[
-            "frontend/catalyst/utils/libcustom_calls.cpp",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
-            "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
-        ],
-        extra_compile_args=["-std=c++17"],
-    )
-    cmdclass = {"build_ext": CustomBuildExtMacos}
-
+    cmdclass = {"build_ext": CMakeExtension}
 
 project_root_dir = os.path.abspath(os.path.dirname(__file__))
 frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
-    custom_calls_extension,
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
+    CMakeExtension("catalyst.utils.libcustom_calls", sourcedir=frontend_dir),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
@@ -316,6 +247,7 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 # - `context`: Path to the compilation evaluation context manager.
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
+
 
 setup(
     classifiers=classifiers,
@@ -333,7 +265,7 @@ setup(
     package_dir={"": "frontend"},
     include_package_data=True,
     ext_modules=ext_modules,
-    cmdclass=cmdclass,
+    cmdclass={"build_ext": CMakeBuild},
     **description,
     options=options,
 )
