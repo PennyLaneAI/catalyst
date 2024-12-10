@@ -217,6 +217,59 @@ func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.
 
 // -----
 
+// CHECK-DAG: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr, !llvm.ptr)
+// CHECK-DAG: llvm.func @__catalyst__qis__CRot(f64, f64, f64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
+
+// CHECK-LABEL: @custom_gate_static_param
+func.func @custom_gate_static_param(%q0 : !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[nullPtr:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: llvm.call @__catalyst__qis__RX([[f]], %arg0, [[nullPtr]])
+    %q1 = quantum.custom "RX"() [2.000000e-01] %q0 : !quantum.bit
+
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[nullPtr:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: [[zero:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[struct:%.+]] = llvm.alloca [[one]] x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[bool_ptr:%.+]] = llvm.getelementptr inbounds [[struct]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[int_ptr:%.+]] = llvm.getelementptr inbounds [[struct]][0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[ptr1:%.+]] = llvm.getelementptr inbounds [[struct]][0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[ptr2:%.+]] = llvm.getelementptr inbounds [[struct]][0, 3] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: llvm.store [[true]], [[bool_ptr]] : i1, !llvm.ptr
+    // CHECK: llvm.store [[zero]], [[int_ptr]] : i64, !llvm.ptr
+    // CHECK: llvm.store [[nullPtr]], [[ptr1]] : !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store [[nullPtr]], [[ptr2]] : !llvm.ptr, !llvm.ptr
+    // CHECK: [[f2:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: llvm.call @__catalyst__qis__RX([[f2]], %arg0, [[struct]])
+    %q2 = quantum.custom "RX"() [2.000000e-01] %q1 { adjoint } : !quantum.bit
+
+    // CHECK: [[one3:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[nullPtr3:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f3:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: [[f4:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: [[f5:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: llvm.call @__catalyst__qis__CRot([[f3]], [[f4]], [[f5]], %arg0, %arg0, [[nullPtr3]])
+    %q3:2 = quantum.custom "CRot"() [2.000000e-01, 2.000000e-01, 2.000000e-01] %q1, %q2 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[one4:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[nullPtr4:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f6:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: llvm.call @__catalyst__qis__RX([[f6]], %arg0, [[nullPtr4]])
+    %q4 = quantum.custom "RX"() [2.000000e-01] %q3 : !quantum.bit
+
+    // CHECK: [[undef_struct:%.+]] = llvm.mlir.undef
+    // CHECK: [[ins0:%.+]] = llvm.insertvalue %arg0, [[undef_struct]][0]
+    // CHECK: [[ins1:%.+]] = llvm.insertvalue %arg0, [[ins0]][1]
+    // CHECK: [[ins2:%.+]] = llvm.insertvalue %arg0, [[ins1]][2]
+    // CHECK: llvm.return [[ins2]]
+    return %q4, %q3#0, %q3#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @multirz
@@ -241,6 +294,42 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
     // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]]
     // CHECK: return [[st3]]
+    return %q3#0, %q3#1, %q3#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr, i64, ...)
+
+// CHECK-LABEL: @multirz_static_param
+func.func @multirz_static_param(%q0 : !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ([[f]], [[p]], [[c1_2]], %arg0)
+    %q1 = quantum.multirz() [2.000000e-01] %q0 : !quantum.bit
+
+    // CHECK: [[c1_3:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[p2:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f2:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ([[f2]], [[p2]], [[c2]], %arg0, %arg0)
+    %q2:2 = quantum.multirz() [2.000000e-01] %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[c1_4:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[p3:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f3:%.+]] = llvm.mlir.constant(2.000000e-01 : f64) : f64
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ([[f3]], [[p3]], [[c3]], %arg0, %arg0, %arg0)
+    %q3:3 = quantum.multirz() [2.000000e-01] %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[undef_struct:%.+]] = llvm.mlir.undef
+    // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0, [[undef_struct]][0]
+    // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]][1]
+    // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]][2]
+    // CHECK: llvm.return [[st3]]
     return %q3#0, %q3#1, %q3#2 : !quantum.bit, !quantum.bit, !quantum.bit
 }
 
@@ -275,6 +364,30 @@ func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
     // CHECK: return [[st2]]
     return %q2#0, %q2#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: @globl_phase_gate
+func.func public @globl_phase_gate() {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[f:%.+]] = llvm.mlir.constant(0.78539816339744828 : f64)
+    // CHECK: [[nullptr:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__GlobalPhase([[f]], [[nullptr]])
+    %f = llvm.mlir.constant(0.78539816339744828 : f64) : f64
+    quantum.gphase(%f) :
+    return
+}
+
+// -----
+
+// CHECK-LABEL: @globl_phase_gate_static
+func.func public @globl_phase_gate_static() {
+    // CHECK: [[nullptr:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[f:%.+]] = llvm.mlir.constant(0.78539816339744828 : f64)
+    // CHECK: llvm.call @__catalyst__qis__GlobalPhase([[f]], [[nullptr]])
+    quantum.gphase() [0.78539816339744828] :
+    return
 }
 
 // -----
