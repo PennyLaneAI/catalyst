@@ -96,3 +96,15 @@ Supported backend devices include:
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for natively supported instructions.
 
+  * - ``oqd.default``
+
+    - Experimental support for execution on `Open Quantum Design (OQD) <https://openquantumdesign.org/>`__
+      trapped-ion hardware. To use OQD with Catalyst, use the ``backend`` argument to specify the
+      OQD backend to use when initializing the device:
+
+      .. code-block:: python
+
+          dev = qml.device("oqd", backend="default", shots=1024, wires=2)
+
+      See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqd/src/oqd.toml>`__
+      for natively supported instructions.

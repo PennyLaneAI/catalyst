@@ -144,6 +144,9 @@
   6283185307.179586
   ```
 
+* A default backend for OQD trapped-ion quantum devices has been added.
+  [(#1355)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+
 * `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
   [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
 
