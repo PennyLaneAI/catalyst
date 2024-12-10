@@ -12,14 +12,15 @@ MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
+OQD_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqd/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+SKIP_OQD ?= false
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
-MLIR_DIR ?= $(shell pwd)/mlir/llvm-project/build/lib/cmake/mlir
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -67,6 +68,7 @@ help:
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  oqc                to build Catalyst-OQC Runtime"
+	@echo "  oqd                to build Catalyst-OQD Runtime"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
@@ -74,6 +76,7 @@ help:
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
+	@echo "  clean-oqd          to clean build files of OQD Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
@@ -82,7 +85,7 @@ help:
 
 
 .PHONY: all catalyst
-all: runtime oqc mlir frontend
+all: runtime oqc oqd mlir frontend
 catalyst: runtime dialects frontend
 
 .PHONY: frontend
@@ -94,7 +97,7 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
+.PHONY: mlir llvm mhlo enzyme dialects runtime oqc oqd
 mlir:
 	$(MAKE) -C mlir all
 
@@ -116,8 +119,11 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
-test: test-runtime test-frontend test-demos
+oqd:
+	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
+
+.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
+test: test-runtime standalone-plugin test-frontend test-demos
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
@@ -133,7 +139,10 @@ test-frontend: lit pytest
 test-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
-lit:
+test-oqd:
+	$(MAKE) -C frontend/catalyst/third_party/oqd/src test
+
+lit: standalone-plugin
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
@@ -153,7 +162,7 @@ endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd --skip-oqd=$(SKIP_OQD) $(PARALLELIZE)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
@@ -180,6 +189,8 @@ wheel:
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
+	cp $(OQD_BUILD_DIR)/librtd_oqd* $(MK_DIR)/frontend/catalyst/lib
+	cp $(OQD_BUILD_DIR)/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
@@ -207,11 +218,16 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-all: clean-frontend clean-mlir clean-runtime clean-oqc
+clean-all: clean-frontend clean-mlir clean-runtime clean-oqc clean-oqd clean-standalone-plugin
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
+
+.PHONY: clean-standalone-plugin
+clean-standalone-plugin:
+	rm -rf  $(MK_DIR)/mlir/build/lib/StandalonePlugin.*
+	rm -rf  $(MK_DIR)/mlir/standalone/build/lib/StandalonePlugin.*
 
 .PHONY: clean-frontend
 clean-frontend:
@@ -233,12 +249,15 @@ clean-mhlo:
 clean-enzyme:
 	$(MAKE) -C mlir clean-enzyme
 
-.PHONY: clean-runtime clean-oqc
+.PHONY: clean-runtime clean-oqc clean-oqd
 clean-runtime:
 	$(MAKE) -C runtime clean
 
 clean-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
+
+clean-oqd:
+	$(MAKE) -C frontend/catalyst/third_party/oqd/src clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
