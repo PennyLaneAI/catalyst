@@ -1367,7 +1367,10 @@ def _qinst_lowering(
         if not static_params
         else ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
     )
-    assert bool(params_attr) != bool(float_dyn_params)
+    if len(float_dyn_params) > 0:
+        assert (
+            params_attr is None
+        ), "Static parameters are not allowed when having dynamic parameters"
 
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
