@@ -55,20 +55,46 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
-        auto parentParams = parentOp.getDynParams();
-        auto params = op.getDynParams();
+        ArrayAttr parentStaticParams = parentOp.getStaticParamsAttr();
+        ArrayAttr currentStaticParams = op.getStaticParamsAttr();
+        auto parentDynParams = parentOp.getDynParams();
+        auto currentDynParams = op.getDynParams();
+
+        bool parentHasStatic = parentStaticParams && !parentStaticParams.empty();
+        bool currentHasStatic = currentStaticParams && !currentStaticParams.empty();
+
         SmallVector<mlir::Value> sumParams;
-        for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            mlir::Value sumParam =
-                rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
-            sumParams.push_back(sumParam);
-        };
+        ArrayAttr SumAttrs = nullptr;
+
+        if (parentHasStatic && currentHasStatic) {
+            if (parentStaticParams.size() != currentStaticParams.size()) {
+                return failure();
+            }
+            SmallVector<Attribute, 4> SumAttr;
+            for (auto [pAttr, cAttr] : llvm::zip(parentStaticParams, currentStaticParams)) {
+                auto pFloat = cast<FloatAttr>(pAttr).getValueAsDouble();
+                auto cFloat = cast<FloatAttr>(cAttr).getValueAsDouble();
+                SumAttr.push_back(rewriter.getF64FloatAttr(pFloat + cFloat));
+            }
+            SumAttrs = rewriter.getArrayAttr(SumAttr);
+        }
+        else if (!parentHasStatic && !currentHasStatic) {
+            if (currentDynParams.size() != parentDynParams.size()) {
+                return failure();
+            }
+            for (auto [param, parentParam] : llvm::zip(currentDynParams, parentDynParams)) {
+                mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param);
+                sumParams.push_back(sumParam);
+            }
+        }
+        else {
+            return failure();
+        }
+
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
                                                  parentInQubits, opGateName, nullptr,
-                                                 parentInCtrlQubits, parentInCtrlValues, nullptr);
-
+                                                 parentInCtrlQubits, parentInCtrlValues, SumAttrs);
         op.replaceAllUsesWith(mergeOp);
-
         return success();
     }
 };
@@ -98,14 +124,33 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
         ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
+        ArrayAttr parentStaticParams = parentOp.getStaticParamsAttr();
+        ArrayAttr currentStaticParams = op.getStaticParamsAttr();
+
+        bool parentHasStatic = parentStaticParams && parentStaticParams.size() == 1;
+        bool currentHasStatic = currentStaticParams && currentStaticParams.size() == 1;
+
         auto parentTheta = parentOp.getTheta();
         auto theta = op.getTheta();
 
-        mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
+        mlir::Value sumParam = mlir::Value();
+        ArrayAttr SumAttr = nullptr;
+
+        if (parentHasStatic && currentHasStatic) {
+            double pVal = cast<FloatAttr>(parentStaticParams[0]).getValueAsDouble();
+            double cVal = cast<FloatAttr>(currentStaticParams[0]).getValueAsDouble();
+            SumAttr = rewriter.getArrayAttr({rewriter.getF64FloatAttr(pVal + cVal)});
+        }
+        else if (!parentHasStatic && !currentHasStatic) {
+            sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta);
+        }
+        else {
+            return failure();
+        }
 
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,
-                                                  parentInCtrlValues, nullptr);
+                                                  parentInCtrlValues, SumAttr);
         op.replaceAllUsesWith(mergeOp);
         return success();
     }
