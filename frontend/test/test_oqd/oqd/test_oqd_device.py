@@ -27,7 +27,7 @@ class TestOQDDevice:
 
         The test checks that the backend, ion, shots, and wires parameters are correctly set.
         """
-        device = qml.device("oqd.default", backend="default", shots=1024, wires=8)
+        device = qml.device("oqd", backend="default", shots=1024, wires=8)
 
         assert device.backend == "default"
         assert device.shots == qml.measurements.Shots(1024)
@@ -36,11 +36,11 @@ class TestOQDDevice:
     def test_device_initialization_invalid_backend(self):
         """Test that the OQD device raises an error when an invalid backend is provided."""
         with pytest.raises(ValueError, match="The backend invalid is not supported"):
-            qml.device("oqd.default", backend="invalid", shots=1024, wires=8)
+            qml.device("oqd", backend="invalid", shots=1024, wires=8)
 
     def test_device_python_execution_not_implemented(self):
         """Test that the OQD device raises an error for native Python execution."""
-        device = qml.device("oqd.default", backend="default", shots=1024, wires=8)
+        device = qml.device("oqd", backend="default", shots=1024, wires=8)
 
         @qml.qnode(device)
         def circuit():

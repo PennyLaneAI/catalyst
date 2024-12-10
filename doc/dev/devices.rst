@@ -104,7 +104,7 @@ Supported backend devices include:
 
       .. code-block:: python
 
-          dev = qml.device("oqd.default", backend="default", shots=1024, wires=2)
+          dev = qml.device("oqd", backend="default", shots=1024, wires=2)
 
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqd/src/oqd.toml>`__
       for natively supported instructions.
