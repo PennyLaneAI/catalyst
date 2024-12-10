@@ -20,9 +20,9 @@ import os
 import platform
 import subprocess
 import sys
-from typing import Optional
+from typing import Optional, Sequence, Union
 
-from setuptools import Extension, find_namespace_packages, setup
+from setuptools import Extension, find_namespace_packages, find_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
 
@@ -236,6 +236,7 @@ frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
+    CMakeExtension("catalyst.utils.libcustom_calls", sourcedir=frontend_dir),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
@@ -245,6 +246,7 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 # - `context`: Path to the compilation evaluation context manager.
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
+
 
 setup(
     classifiers=classifiers,
@@ -260,9 +262,6 @@ setup(
         exclude=["catalyst.third_party.oqc.*"],
     ),
     package_dir={"": "frontend"},
-    package_data={
-        "catalyst.utils": [os.path.join(frontend_dir, "catalyst", "utils", "libcustom_calls.*")]
-    },
     include_package_data=True,
     ext_modules=ext_modules,
     cmdclass={"build_ext": CMakeBuild},
