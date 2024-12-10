@@ -8,6 +8,7 @@ set(LIBS
     MLIRQuantum
     MLIRGradient
     MLIRMitigation
+    MLIRIon
     MhloRegisterDialects
     StablehloRegister
 )
