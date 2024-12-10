@@ -2,3 +2,8 @@ comment:
   behavior: once
   require_changes: true
   after_n_builds: 2
+
+coverage:
+  status:
+    project: false
+    patch: true

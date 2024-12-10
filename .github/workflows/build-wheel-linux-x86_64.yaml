@@ -357,6 +357,16 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
+    # Build OQD-Runtime
+    - name: Build OQD-Runtime
+      run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
+          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqd
+
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -395,6 +405,7 @@ jobs:
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
@@ -460,3 +471,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto
