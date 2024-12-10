@@ -295,6 +295,21 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
 
 // -----
 
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ret:%.+]] = quantum.custom "RX"() [-5.000000e-01] [[qubit]] : !quantum.bit
+    %2 = quantum.custom "RX"() [2.000000e-01] %1 {adjoint}: !quantum.bit
+    %3 = quantum.custom "RX"() [3.000000e-01] %2 {adjoint}: !quantum.bit
+
+    // CHECK:  return [[ret]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
 
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
     // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
@@ -309,6 +324,22 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum
     // CHECK: [[ret:%.+]]:2 = quantum.multirz([[add]]) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
     %3:2 = quantum.multirz (%arg0) %1, %2 {adjoint}: !quantum.bit, !quantum.bit
     %4:2 = quantum.multirz (%arg1) %3#0, %3#1 {adjoint}: !quantum.bit, !quantum.bit
+    // CHECK: return [[ret]]#0, [[ret]]#1
+    return %4#0, %4#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ret:%.+]]:2 = quantum.multirz() [-5.000000e-01] [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
+    %3:2 = quantum.multirz() [2.000000e-01] %1, %2 {adjoint}: !quantum.bit, !quantum.bit
+    %4:2 = quantum.multirz() [3.000000e-01] %3#0, %3#1 {adjoint}: !quantum.bit, !quantum.bit
     // CHECK: return [[ret]]#0, [[ret]]#1
     return %4#0, %4#1 : !quantum.bit, !quantum.bit
 }
