@@ -19,7 +19,7 @@ from pathlib import Path
 from catalyst.utils.runtime_environment import get_bin_path
 
 
-def name2pass(name):
+def name2pass(_name):
     """Example entry point for standalone plugin"""
     plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/../lib/StandalonePlugin.so"
     plugin = Path(plugin_path)
