@@ -218,11 +218,16 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-all: clean-frontend clean-mlir clean-runtime clean-oqc clean-oqd
+clean-all: clean-frontend clean-mlir clean-runtime clean-oqc clean-oqd clean-standalone-plugin
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
+
+.PHONY: clean-standalone-plugin
+clean-standalone-plugin:
+	rm -rf  $(MK_DIR)/mlir/build/lib/StandalonePlugin.*
+	rm -rf  $(MK_DIR)/mlir/standalone/build/lib/StandalonePlugin.*
 
 .PHONY: clean-frontend
 clean-frontend:
