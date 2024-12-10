@@ -117,6 +117,9 @@
   [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
 
+* Updated catalyst-cli documentation to reflect the removal of func-name option for trasnformation passes.
+  [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
