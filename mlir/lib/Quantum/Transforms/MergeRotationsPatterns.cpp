@@ -55,8 +55,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         ValueRange parentInCtrlQubits = parentOp.getInCtrlQubits();
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
-        auto parentParams = parentOp.getParams();
-        auto params = op.getParams();
+        auto parentParams = parentOp.getDynParams();
+        auto params = op.getDynParams();
         SmallVector<mlir::Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
             mlir::Value sumParam =
@@ -65,7 +65,7 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         };
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
                                                  parentInQubits, opGateName, nullptr,
-                                                 parentInCtrlQubits, parentInCtrlValues);
+                                                 parentInCtrlQubits, parentInCtrlValues, nullptr);
 
         op.replaceAllUsesWith(mergeOp);
 
@@ -105,7 +105,7 @@ struct MergeMultiRZRewritePattern : public mlir::OpRewritePattern<MultiRZOp> {
 
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,
-                                                  parentInCtrlValues);
+                                                  parentInCtrlValues, nullptr);
         op.replaceAllUsesWith(mergeOp);
         return success();
     }
