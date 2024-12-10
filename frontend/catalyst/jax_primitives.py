@@ -1242,11 +1242,20 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
+def _gphase_abstract_eval(
+    *qubits_or_params,
+    ctrl_len=0,
+    ctrl_value_len=0,
+    adjoint=False,
+    static_params=None,
+):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
-    param = qubits_or_params[0]
+    if not static_params:
+        param = qubits_or_params[-1]
+    else:
+        param = static_params[0]
     assert not isinstance(param, AbstractQbit)
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     for idx in range(ctrl_len):
@@ -1262,21 +1271,36 @@ def _gphase_def_impl(*args, **kwargs):
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, ctrl_len=0, adjoint=False
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params,
+    ctrl_len=0,
+    ctrl_value_len=0,
+    adjoint=False,
+    static_params=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    param = qubits_or_params[0]
-    ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
-    ctrl_values = qubits_or_params[1 + ctrl_len :]
+    ctrl_qubits = qubits_or_params[:ctrl_len]
+    ctrl_values = qubits_or_params[ctrl_len : ctrl_len + ctrl_value_len]
+    param = qubits_or_params[ctrl_len + ctrl_value_len :]
+    param = None if len(param) == 0 else param[0]
 
-    param = safe_cast_to_f64(param, "GlobalPhase")
-    param = extract_scalar(param, "GlobalPhase")
+    param_attr = (
+        None
+        if not static_params
+        else ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+    )
 
-    assert ir.F64Type.isinstance(
-        param.type
-    ), "Only scalar double parameters are allowed for quantum gates!"
+    assert bool(param_attr) != bool(param)
+
+    if not param_attr:
+        param = safe_cast_to_f64(param, "GlobalPhase")
+        param = extract_scalar(param, "GlobalPhase")
+
+        assert ir.F64Type.isinstance(
+            param.type
+        ), "Only scalar double parameters are allowed for quantum gates!"
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -1284,11 +1308,12 @@ def _gphase_lowering(
         ctrl_values_i1.append(p)
 
     GlobalPhaseOp(
-        params=param,
+        dyn_params=param,
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
         adjoint=adjoint,
+        static_params=param_attr,
     )
     return ctrl_qubits
 

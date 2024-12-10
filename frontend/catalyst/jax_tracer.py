@@ -684,10 +684,14 @@ def trace_quantum_operations(
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         elif isinstance(op, qml.GlobalPhase):
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = gphase_p.bind(
-                *[*op.parameters, *controlled_qubits, *controlled_values],
+            qubits2 = bind_flexible_primitive(
+                gphase_p,
+                {"static_params": op.parameters},
+                *[*controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
+                static_compile=static_compile,
             )
             qrp.insert(controlled_wires, qubits2)
         elif isinstance(op, qml.StatePrep):
