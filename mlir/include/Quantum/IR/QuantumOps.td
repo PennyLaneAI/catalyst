@@ -478,7 +478,11 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
         Variadic<QubitType>:$in_qubits,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        // NOTE: We currently do not support static_params for.
+        // static_params are just included for consistency in
+        // available methods across parameterized gates.
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
