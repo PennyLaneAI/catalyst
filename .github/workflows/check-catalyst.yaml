@@ -639,14 +639,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan6
+          sudo apt-get -y -q install cmake ninja-build
           python3 -m pip install nanobind
-
-      - name: Install additional dependencies (OpenQasm device)
-        if: ${{ matrix.backend == 'openqasm' }}
-        run: |
-          pip install numpy amazon-braket-sdk
-          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Download Catalyst-Runtime Artifact
         uses: actions/download-artifact@v4
@@ -670,16 +664,6 @@ jobs:
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           make test-oqd
 
-      - name: Build Runtime test suite for OpenQasm device
-        if: ${{ matrix.backend == 'openqasm' }}
-        run: |
-          # Asan prevents dlopen from working?
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
-          COMPILER_LAUNCHER="" \
-          ENABLE_ASAN=OFF \
-          make test-runtime
-
   runtime-code-cov:
     name: Runtime Code Coverage (Linux)
     needs: [constants, determine_runner]
@@ -694,6 +678,11 @@ jobs:
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
           python3 -m pip install nanobind
+
+      - name: Install additional dependencies for OpenQasm device
+        run: |
+          pip install numpy amazon-braket-sdk
+          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
