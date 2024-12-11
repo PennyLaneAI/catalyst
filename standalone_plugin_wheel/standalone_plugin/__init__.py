@@ -12,6 +12,13 @@ def SwitchBarToFoo(*flags, **valued_options):
     SwitchBarToFoo.ext = "so" if platform.system() == "Linux" else "dylib"
     SwitchBarToFoo.path = Path(Path(__file__).parent, f"lib/StandalonePlugin.{SwitchBarToFoo.ext}")
 
+    def add_pass_to_pipeline(**kwargs):
+        pass_pipeline = kwargs.get("pass_pipeline", [])
+        pass_pipeline.append(
+            PassPlugin(SwitchBarToFoo.path, "standalone-switch-bar-foo", *flags, **valued_options)
+        )
+        return pass_pipeline
+
     def decorator(qnode):
         if not isinstance(qnode, qml.QNode):
             # Technically, this apply pass is general enough that it can apply to
@@ -20,15 +27,20 @@ def SwitchBarToFoo(*flags, **valued_options):
             raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
         def qnode_call(*args, **kwargs):
-            pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(
-                PassPlugin(
-                    SwitchBarToFoo.path, "standalone-switch-bar-foo", *flags, **valued_options
-                )
-            )
-            kwargs["pass_pipeline"] = pass_pipeline
+            kwargs["pass_pipeline"] = add_pass_to_pipeline(**kwargs)
             return qnode(*args, **kwargs)
 
         return qnode_call
 
+    # When the decorator is used without ()
+    if len(flags) == 1 and isinstance(flags[0], qml.QNode):
+        qnode = flags[0]
+
+        def qnode_call(*args, **kwargs):
+            kwargs["pass_pipeline"] = add_pass_to_pipeline(**kwargs)
+            return qnode(*args, **kwargs)
+
+        return qnode_call
+
+    # When the decorator is used with ()
     return decorator
