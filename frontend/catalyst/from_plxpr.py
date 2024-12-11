@@ -299,7 +299,7 @@ class QFuncPlxprInterpreter:
         if eqn.primitive.name == "QubitUnitary":
             outvals = qunitary_p.bind(*invals, *wires, **kwargs)
         elif eqn.primitive.name == "GlobalPhase":
-            outvals = gphase_p.bind(*invals, ctrl_len=0, adjoint=False)
+            outvals = gphase_p.bind(*invals, ctrl_len=0, ctrl_value_len=0, adjoint=False)
         else:
             outvals = qinst_p.bind(
                 *wires,
