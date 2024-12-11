@@ -1430,7 +1430,9 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, ctrl_value_len=0, adjoint=False):
+def _qunitary_abstract_eval(
+    matrix, *qubits, qubits_len=0, ctrl_len=0, ctrl_value_len=0, adjoint=False
+):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
