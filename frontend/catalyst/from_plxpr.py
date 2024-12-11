@@ -293,6 +293,7 @@ class QFuncPlxprInterpreter:
         kwargs = {
             "qubits_len": eqn.params["n_wires"],
             "ctrl_len": 0,
+            "ctrl_value_len": 0,
             "adjoint": False,
         }
 

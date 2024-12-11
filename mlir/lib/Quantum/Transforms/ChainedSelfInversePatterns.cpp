@@ -95,7 +95,6 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
 
             // If both gates have static parameters, they must be the same.
             if (opHasStatic && parentHasStatic) {
-
                 // If there are static parameters, both gates must have the number of static
                 // parameters.
                 if (opStaticParams.size() != parentOpStaticParams.size()) {
