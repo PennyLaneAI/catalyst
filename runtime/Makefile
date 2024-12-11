@@ -81,6 +81,7 @@ endif
 .PHONY: coverage
 coverage: capi_target $(RT_BUILD_DIR)/tests/runner_tests_all_targets
 	@echo "check C++ code coverage"
+	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
