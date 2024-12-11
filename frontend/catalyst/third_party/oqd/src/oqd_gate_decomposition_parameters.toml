@@ -14,7 +14,7 @@ oqd_config_schema = "v0.1"
 #    polarization = int array,
 #    wavevector = int array,
 #
-# A pulse operation will consist of a beam, a phase, a time (duration of application), and a target qubit
+# A pulse operation will consist of a beam, a transition, a phase, a time (duration of application), and a target qubit
 #
 # A list of beams is recorded in this toml.
 # The i-th beam is usable on the i-th qubit.
