@@ -126,7 +126,6 @@ class QFunc:
 
         static_argnums = kwargs.pop("static_argnums", ())
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
-        static_compile = kwargs.pop("static_compile", False)
 
         def _eval_quantum(*args, **kwargs):
             closed_jaxpr, out_type, out_tree, out_tree_exp = trace_quantum_function(
@@ -136,7 +135,6 @@ class QFunc:
                 kwargs,
                 self,
                 static_argnums,
-                static_compile,
             )
 
             out_tree_expected.append(out_tree_exp)

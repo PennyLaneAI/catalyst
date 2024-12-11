@@ -63,7 +63,6 @@ class CompileOptions:
             Default is ``None``.
         static_argnames (Optional[Union[str, Iterable[str]]]): names of static arguments.
             Default is ``None``.
-        static_compile (Optional[bool]): flag indicating whether to compile the function statically.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
         disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
@@ -87,7 +86,6 @@ class CompileOptions:
     async_qnodes: Optional[bool] = False
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     static_argnames: Optional[Union[str, Iterable[str]]] = None
-    static_compile: Optional[bool] = False
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
     lower_to_llvm: Optional[bool] = True
     checkpoint_stage: Optional[str] = ""
