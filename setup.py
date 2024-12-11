@@ -22,7 +22,7 @@ import subprocess
 import sys
 from typing import Optional, Sequence, Union
 
-from setuptools import Extension, find_namespace_packages, find_packages, setup
+from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
 
