@@ -50,7 +50,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects standalone-plugin
+all: llvm mhlo enzyme dialects plugin
 
 .PHONY: llvm
 llvm:
@@ -121,8 +121,8 @@ enzyme:
 
 	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
 
-.PHONY: standalone-plugin
-standalone-plugin:
+.PHONY: plugin
+plugin:
 	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
 	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
@@ -193,6 +193,7 @@ clean-enzyme:
 clean-plugin:
 	@echo "clean plugin"
 	rm -rf standalone/build
+	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
 
 .PHONY: format
 format:
