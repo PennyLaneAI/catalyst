@@ -20,7 +20,7 @@ import os
 import platform
 import subprocess
 import sys
-from typing import Optional, Sequence, Union
+from typing import Optional
 
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
