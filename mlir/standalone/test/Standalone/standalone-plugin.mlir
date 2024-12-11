@@ -1,4 +1,4 @@
-// RUN: mlir-opt %s --load-dialect-plugin=%standalone_libs/StandalonePlugin%shlibext --pass-pipeline="builtin.module(standalone-switch-bar-foo)" | FileCheck %s
+// RUN: catalyst-cli --tool=opt %s --load-dialect-plugin=%standalone_libs/StandalonePlugin%shlibext --pass-pipeline="builtin.module(standalone-switch-bar-foo)" | FileCheck %s
 
 module {
   // CHECK-LABEL: func @foo()
