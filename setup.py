@@ -307,6 +307,7 @@ frontend_dir = os.path.join(project_root_dir, "frontend")
 ext_modules = [
     custom_calls_extension,
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
+    CMakeExtension("catalyst.third_party.oqd.oqd_database_managers", sourcedir=frontend_dir),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
