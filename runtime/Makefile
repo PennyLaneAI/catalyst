@@ -59,18 +59,16 @@ configure:
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
 
-capi_target: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
-
-.PHONY: all
-all: configure
+.PHONY: runtime
+runtime: configure
 	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
-$(RT_BUILD_DIR)/tests/runner_tests_all_targets: configure
+.PHONY: test_runner
+test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests_all_targets
+test: test_runner
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
@@ -79,7 +77,7 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 
 .PHONY: coverage
-coverage: capi_target $(RT_BUILD_DIR)/tests/runner_tests_all_targets
+coverage: test_runner
 	@echo "check C++ code coverage"
 	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
