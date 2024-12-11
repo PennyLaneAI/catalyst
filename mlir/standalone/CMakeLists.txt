@@ -1,6 +1,3 @@
-cmake_minimum_required(VERSION 3.20.0)
-project(standalone-dialect LANGUAGES CXX C)
-
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
@@ -35,8 +32,8 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR})
-set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR})
+set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/standalone)
+set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR}/standalone)
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${STANDALONE_SOURCE_DIR}/include)
