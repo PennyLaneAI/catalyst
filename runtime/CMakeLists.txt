@@ -98,9 +98,14 @@ target_include_directories(catalyst_qir_runtime INTERFACE
 
 if(ENABLE_CODE_COVERAGE)
 	message(STATUS "ENABLE_CODE_COVERAGE is ON.")
-    target_compile_options(catalyst_qir_runtime INTERFACE
-        $<$<COMPILE_LANGUAGE:CXX>:-fprofile-arcs;-ftest-coverage>)
-    target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
+    # target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-arcs;-ftest-coverage)
+    # target_link_options(catalyst_qir_runtime INTERFACE -fprofile-arcs;-ftest-coverage)
+    # target_compile_options(catalyst_qir_runtime INTERFACE --coverage)
+    # target_link_options(catalyst_qir_runtime INTERFACE --coverage)
+    target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate;-fcoverage-mapping)
+    target_link_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate;-fcoverage-mapping)
+    # target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
+    # target_link_directories(catalyst_qir_runtime INTERFACE /opt/homebrew/Cellar/gcc/14.2.0_1/lib/gcc/current/gcc/aarch64-apple-darwin23/14/)
 endif()
 
 
