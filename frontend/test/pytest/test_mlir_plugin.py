@@ -21,6 +21,7 @@ import platform
 from pathlib import Path
 
 import pennylane as qml
+import pytest
 
 from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
 from catalyst.utils.runtime_environment import get_bin_path
@@ -98,3 +99,7 @@ def test_standalone_dictionary():
     # It would be nice if we were able to combine lit tests with
     # pytest
     assert "standalone-switch-bar-foo" in module.mlir
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
