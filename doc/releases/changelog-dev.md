@@ -144,6 +144,11 @@
   6283185307.179586
   ```
 
+* Installing Catalyst from source via `make frontend` (and similarly for `make all`) now has the
+  option to enable verbose output in the underlying `pip install` command. This option is enabled by
+  appending `VERBOSE=1` to the `make` command.
+  [(#1371)](https://github.com/PennyLaneAI/catalyst/pull/1371)
+
 * A default backend for OQD trapped-ion quantum devices has been added.
   [(#1355)](https://github.com/PennyLaneAI/catalyst/pull/1355)
 
