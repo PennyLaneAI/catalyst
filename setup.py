@@ -154,7 +154,7 @@ class CMakeBuild(build_ext):
     def initialize_options(self):
         super().initialize_options()
         self.define = None
-        self.verbosity = "-VVV"
+        self.verbosity = ""
 
     def finalize_options(self):
         # Parse the custom CMake options and store them in a new attribute
