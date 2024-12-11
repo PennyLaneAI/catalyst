@@ -21,6 +21,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include <iostream>
 
+#include "oqd_database_managers.hpp"
+
 using namespace mlir;
 using namespace catalyst::ion;
 using namespace catalyst::quantum;
@@ -58,6 +60,8 @@ std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
                                         double phase2)
 {
+    toml_hi();
+
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
     qnode.walk([&](ion::SystemOp op) {

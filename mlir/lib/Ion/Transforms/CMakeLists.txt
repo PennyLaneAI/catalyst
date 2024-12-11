@@ -1,5 +1,13 @@
 set(LIBRARY_NAME ion-transforms)
 
+include(FetchContent)
+FetchContent_Declare(
+    tomlplusplus
+    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+    GIT_TAG v3.4.0
+)
+FetchContent_MakeAvailable(tomlplusplus)
+
 file(GLOB SRC
     quantum_to_ion.cpp
     QuantumToIonPatterns.cpp
@@ -23,3 +31,5 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include)
+
+target_link_libraries(${LIBRARY_NAME} PRIVATE tomlplusplus::tomlplusplus)
