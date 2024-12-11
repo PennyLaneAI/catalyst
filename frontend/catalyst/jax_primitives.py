@@ -1257,7 +1257,7 @@ def _gphase_abstract_eval(
     else:
         param = static_params[0]
     assert not isinstance(param, AbstractQbit)
-    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    ctrl_qubits = qubits_or_params[:ctrl_len]
     for idx in range(ctrl_len):
         qubit = ctrl_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -1332,10 +1332,8 @@ def _qinst_abstract_eval(
     static_params=None,
 ):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, params*, ctrl_qubits*, ctrl_values*
-    qubits = qubits_or_params[:qubits_len]
-    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
-    all_qubits = qubits + ctrl_qubits
+    # qubits*, ctrl_qubits*, ctrl_values*, params*
+    all_qubits = qubits_or_params[: qubits_len + ctrl_len]
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
