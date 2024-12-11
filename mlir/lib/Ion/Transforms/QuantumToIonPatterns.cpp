@@ -60,7 +60,8 @@ std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
                                         double phase2)
 {
-    getGateDecompositionParams();
+    std::vector<Beam> beams1 = getBeams1Params();
+    std::cout << beams1[2].wavevector[1] << "\n";
 
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
@@ -76,12 +77,12 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         BeamAttr beamAttr = cast<BeamAttr>(beam);
 
         // TODO: assumption for indices 0: 0->e, 1: 1->e
-        auto beam0toEAttr = BeamAttr::get(op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0),
-                                          beamAttr.getRabi(), beamAttr.getDetuning(),
-                                          beamAttr.getPolarization(), beamAttr.getWavevector());
-        auto beam1toEAttr = BeamAttr::get(op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1),
-                                          beamAttr.getRabi(), beamAttr.getDetuning(),
-                                          beamAttr.getPolarization(), beamAttr.getWavevector());
+        auto beam0toEAttr = BeamAttr::get(
+            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0), beamAttr.getRabi(),
+            beamAttr.getDetuning(), beamAttr.getPolarization(), beamAttr.getWavevector());
+        auto beam1toEAttr = BeamAttr::get(
+            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1), beamAttr.getRabi(),
+            beamAttr.getDetuning(), beamAttr.getPolarization(), beamAttr.getWavevector());
 
         // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
         // in the database) Potentially Rabi and Detuning become SSA values and not attributes.
