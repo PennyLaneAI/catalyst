@@ -33,9 +33,6 @@ if(CATALYST_LINK_BLAS)
     )
 endif()
 
-# Ensure the availability of symbol exports. Only necessary with `SHARED`
-set_property(TARGET catalyst_jax_cpu_lapack_kernels PROPERTY ENABLE_EXPORTS ON)
-
 # If building on MacOS avoid the linker complaining about undefined symbols
 if(APPLE)
 target_link_options(catalyst_jax_cpu_lapack_kernels PUBLIC -undefined dynamic_lookup)
