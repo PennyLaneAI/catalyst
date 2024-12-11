@@ -15,6 +15,8 @@ on:
 
 env:
   MACOSX_DEPLOYMENT_TARGET: 13
+  _PYTHON_HOST_PLATFORM: "macosx-13.0-x86_64"
+  ARCHFLAGS: "-arch x86_64"
 
 concurrency:
   group: Build Catalyst Wheel on macOS (x86_64)-${{ github.ref }}
