@@ -60,7 +60,7 @@ std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
                                         double phase2)
 {
-    toml_hi();
+    getGateDecompositionParams();
 
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
@@ -76,10 +76,10 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         BeamAttr beamAttr = cast<BeamAttr>(beam);
 
         // TODO: assumption for indices 0: 0->e, 1: 1->e
-        auto beam0toEAttr = BeamAttr::get(op.getContext(), rewriter.getI64IntegerAttr(0),
+        auto beam0toEAttr = BeamAttr::get(op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0),
                                           beamAttr.getRabi(), beamAttr.getDetuning(),
                                           beamAttr.getPolarization(), beamAttr.getWavevector());
-        auto beam1toEAttr = BeamAttr::get(op.getContext(), rewriter.getI64IntegerAttr(1),
+        auto beam1toEAttr = BeamAttr::get(op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1),
                                           beamAttr.getRabi(), beamAttr.getDetuning(),
                                           beamAttr.getPolarization(), beamAttr.getWavevector());
 

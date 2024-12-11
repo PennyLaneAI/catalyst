@@ -1,0 +1,55 @@
+# OQD Beam Parameters
+# ~~~~~~~~~~~~~~~~~~~
+#
+# A database containing parameters relating to the laser beams used in an Open Quantum Design (OQD)
+# trapped-ion quantum computer device.
+
+oqd_config_schema = "v0.1"
+
+
+# Beams
+# A beam contains 4 properties that will be callibrated:
+#    rabi = float,
+#    detuning = float,
+#    polarization = int array,
+#    wavevector = int array,
+#
+# A pulse operation will consist of a beam, a phase, a time (duration of application), and a target qubit
+#
+# A list of beams is recorded in this toml.
+# The i-th beam is usable on the i-th qubit.
+# -------
+
+[[beams]]  # qubit 0
+rabi = 1.1
+detuning = 2.2
+polarization = [0,1]
+wavevector = [2,3]
+
+[[beams]]  # qubit 1
+rabi = 4.4
+detuning = 5.5
+polarization = [6,7]
+wavevector = [8,9]
+
+[[beams]]  # qubit 2
+rabi = 10.10
+detuning = 11.11
+polarization = [12,13]
+wavevector = [14,15]
+
+
+# Phonons
+# -------
+
+[phonons.COM_x]
+energy = "2 * math.pi * 5e6"
+eigenvector = [1, 0, 0]
+
+[phonons.COM_y]
+energy = "2 * math.pi * 5e6"
+eigenvector = [0, 1, 0]
+
+[phonons.COM_z]
+energy = "2 * math.pi * 1e6"
+eigenvector = [0, 0, 1]
