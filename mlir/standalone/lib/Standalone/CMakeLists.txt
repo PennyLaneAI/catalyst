@@ -10,9 +10,11 @@ add_mlir_dialect_library(MLIRStandalone
         DEPENDS
         MLIRStandaloneOpsIncGen
         MLIRStandalonePassesIncGen
+        MLIRQuantum
 
         LINK_LIBS PUBLIC
         MLIRIR
         MLIRInferTypeOpInterface
         MLIRFuncDialect
+        MLIRQuantum
         )
