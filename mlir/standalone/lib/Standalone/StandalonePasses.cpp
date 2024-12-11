@@ -12,6 +12,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Standalone/StandalonePasses.h"
+#include "Quantum/IR/QuantumOps.h"
 
 namespace mlir::standalone {
 #define GEN_PASS_DEF_STANDALONESWITCHBARFOO
