@@ -391,7 +391,7 @@ jobs:
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
-        make standalone-plugin
+        make plugin
         mkdir -p $(pwd)/quantum-build/lib
         mv mlir/standalone/build/lib/StandalonePlugin.so "$(pwd)/quantum-build/lib"
 
@@ -457,7 +457,7 @@ jobs:
       with:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
-    
+
     - name: Download OQC-Runtime Artifact
       uses: actions/download-artifact@v4
       with:
