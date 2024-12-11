@@ -1334,7 +1334,7 @@ def _qinst_abstract_eval(
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
     qubits = qubits_or_params[:qubits_len]
-    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
     all_qubits = qubits + ctrl_qubits
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
