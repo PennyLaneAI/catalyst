@@ -210,6 +210,16 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
+standalone-plugin-wheel: standalone-plugin
+	mkdir -p $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.* $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
+
+	$(PYTHON) -m pip wheel --no-deps $(MK_DIR)/standalone_plugin_wheel -w $(MK_DIR)/standalone_plugin_wheel/dist
+
+	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
+	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin.egg-info
+	rm -r $(MK_DIR)/standalone_plugin_wheel/build
+
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
