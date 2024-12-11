@@ -30,9 +30,9 @@ static const std::string oqd_gate_decomposition_parameters_toml_file_path =
 
 toml::parse_result load_toml_file(const std::string &path) { return toml::parse_file(path); }
 
-std::vector<size_t> TomlArray2StdVector(toml::array arr)
+std::vector<int64_t> TomlArray2StdVector(toml::array arr)
 {
-    std::vector<size_t> vec;
+    std::vector<int64_t> vec;
     for (size_t i = 0; i < arr.size(); i++) {
         vec.push_back(arr[i].as_integer()->get());
     }
@@ -42,12 +42,18 @@ std::vector<size_t> TomlArray2StdVector(toml::array arr)
 struct Beam {
     // This struct contains the calibrated beam parameters.
     double rabi, detuning;
-    std::vector<size_t> polarization, wavevector;
+    llvm::SmallVector<int64_t> polarization, wavevector;
 
-    Beam(double rabi, double detuning, std::vector<size_t> polarization,
-         std::vector<size_t> wavevector)
-        : rabi(rabi), detuning(detuning), polarization(polarization), wavevector(wavevector)
+    Beam(double _rabi, double _detuning, std::vector<int64_t> _polarization,
+         std::vector<int64_t> _wavevector)
+        : rabi(_rabi), detuning(_detuning)
     {
+        for (int64_t i : _polarization){
+            polarization.push_back(i);
+        }
+        for (int64_t i : _wavevector){
+            wavevector.push_back(i);
+        }
     }
 };
 
@@ -75,8 +81,8 @@ std::vector<Beam> getBeams1Params()
         auto beam = TomlBeams[i];
         double rabi = beam["rabi"].as_floating_point()->get();
         double detuning = beam["detuning"].as_floating_point()->get();
-        std::vector<size_t> polarization = TomlArray2StdVector(*(beam["polarization"].as_array()));
-        std::vector<size_t> wavevector = TomlArray2StdVector(*(beam["wavevector"].as_array()));
+        std::vector<int64_t> polarization = TomlArray2StdVector(*(beam["polarization"].as_array()));
+        std::vector<int64_t> wavevector = TomlArray2StdVector(*(beam["wavevector"].as_array()));
 
         beams.push_back(Beam(rabi, detuning, polarization, wavevector));
     }

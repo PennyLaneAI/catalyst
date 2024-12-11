@@ -24,7 +24,7 @@ oqd_config_schema = "v0.1"
 rabi = 1.1
 detuning = 2.2
 polarization = [0,1]
-wavevector = [2,3]
+wavevector = [-2,3]
 
 [[beams]]  # qubit 1
 rabi = 4.4

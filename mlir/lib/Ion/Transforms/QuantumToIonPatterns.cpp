@@ -61,7 +61,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                                         double phase2)
 {
     std::vector<Beam> beams1 = getBeams1Params();
-    std::cout << beams1[2].wavevector[1] << "\n";
+    //std::cout << beams1[2].wavevector[1] << "\n";
 
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
@@ -73,16 +73,23 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
     if (qubitIndex.has_value()) {
         // Set the optional transition index now
         auto qubitIndexValue = qubitIndex.value();
-        auto beam = ionSystem.getBeams1()[qubitIndexValue];
-        BeamAttr beamAttr = cast<BeamAttr>(beam);
+        Beam beam = beams1[qubitIndexValue];
 
         // TODO: assumption for indices 0: 0->e, 1: 1->e
         auto beam0toEAttr = BeamAttr::get(
-            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0), beamAttr.getRabi(),
-            beamAttr.getDetuning(), beamAttr.getPolarization(), beamAttr.getWavevector());
+            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0),
+            rewriter.getF64FloatAttr(beam.rabi),
+            rewriter.getF64FloatAttr(beam.detuning),
+            rewriter.getI64VectorAttr(beam.polarization),
+            rewriter.getI64VectorAttr(beam.wavevector)
+            );
         auto beam1toEAttr = BeamAttr::get(
-            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1), beamAttr.getRabi(),
-            beamAttr.getDetuning(), beamAttr.getPolarization(), beamAttr.getWavevector());
+            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1),
+            rewriter.getF64FloatAttr(beam.rabi),
+            rewriter.getF64FloatAttr(beam.detuning),
+            rewriter.getI64VectorAttr(beam.polarization),
+            rewriter.getI64VectorAttr(beam.wavevector)
+        );
 
         // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
         // in the database) Potentially Rabi and Detuning become SSA values and not attributes.
