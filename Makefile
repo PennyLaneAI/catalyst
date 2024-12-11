@@ -88,13 +88,20 @@ help:
 all: runtime oqc oqd mlir frontend
 catalyst: runtime dialects frontend
 
+# Flag for verbose pip install output
+PIP_VERBOSE_FLAG :=
+
+ifeq ($(VERBOSE),1)
+    PIP_VERBOSE_FLAG := --verbose
+endif
+
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
+	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc oqd
