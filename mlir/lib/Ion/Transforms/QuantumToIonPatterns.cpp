@@ -155,8 +155,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
                                     (qubitIndex1Value - qubitIndex0Value - 1);
 
             // TODO: assumption is that each ion has 3 phonons (x, y, z)
-            auto phonon0ComX = ionSystem.getPhonons()[3*qubitIndex0Value];
-            auto phonon1ComX = ionSystem.getPhonons()[3*qubitIndex1Value];
+            auto phonon0ComX = ionSystem.getPhonons()[3 * qubitIndex0Value];
+            auto phonon1ComX = ionSystem.getPhonons()[3 * qubitIndex1Value];
 
             PhononAttr phonon0ComXAttr = cast<PhononAttr>(phonon0ComX);
             PhononAttr phonon1ComXAttr = cast<PhononAttr>(phonon1ComX);
