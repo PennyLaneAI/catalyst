@@ -83,6 +83,7 @@ requirements = [
 entry_points = {
     "pennylane.plugins": [
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
+        "oqd = catalyst.third_party.oqd:OQDDevice",
         "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
@@ -308,6 +309,7 @@ ext_modules = [
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
 ]
 
+options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
 # the following entry points:
@@ -333,4 +335,5 @@ setup(
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     **description,
+    options=options,
 )

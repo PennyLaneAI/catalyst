@@ -50,7 +50,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects
+all: llvm mhlo enzyme dialects standalone-plugin
 
 .PHONY: llvm
 llvm:
@@ -128,13 +128,15 @@ standalone-plugin:
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
 	cmake -B standalone/build -G Ninja \
-		-DMLIR_DIR=$(MLIR_DIR) \
+		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
 		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		standalone
 	cmake --build standalone/build --target check-standalone
+	mkdir -p $(DIALECTS_BUILD_DIR)/lib
+	cp standalone/build/lib/StandalonePlugin.* $(DIALECTS_BUILD_DIR)/lib
 
 .PHONY: dialects
 dialects:

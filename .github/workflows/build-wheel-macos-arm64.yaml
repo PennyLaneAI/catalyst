@@ -333,6 +333,14 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
+    # Build OQD-Runtime
+    - name: Build OQD-Runtime
+      run: |
+          OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
+          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqd
+
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -359,7 +367,8 @@ jobs:
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         make standalone-plugin
-        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
+        mkdir -p quantum-build/lib
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib
 
     - name: Build wheel
       run: |
@@ -369,6 +378,7 @@ jobs:
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
@@ -399,10 +409,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Install Python 3.10
+    - name: Install Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
@@ -426,6 +436,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
+
     - name: Install OQC client
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
@@ -441,3 +452,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto

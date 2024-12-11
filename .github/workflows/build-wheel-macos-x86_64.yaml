@@ -306,6 +306,14 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
+    # Build OQD-Runtime
+    - name: Build OQD-Runtime
+      run: |
+          OQD_BUILD_DIR="$(pwd)/oqd-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqd
+
     - name: Test Catalyst-Runtime
       run: |
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
@@ -338,7 +346,8 @@ jobs:
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
         make standalone-plugin
-        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib/
+        mkdir -p quantum-build/lib
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib
 
     - name: Build wheel
       run: |
@@ -348,6 +357,7 @@ jobs:
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
@@ -414,3 +424,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto

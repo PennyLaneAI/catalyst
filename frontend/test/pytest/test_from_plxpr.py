@@ -25,7 +25,7 @@ jax = pytest.importorskip("jax")
 # needs to be below the importorskip calls
 # pylint: disable=wrong-import-position
 from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_primitives import _get_call_jaxpr
+from catalyst.jax_primitives import get_call_jaxpr
 
 
 def catalyst_execute_jaxpr(jaxpr):
@@ -216,8 +216,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_globalphase(self):
@@ -242,8 +242,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj(0.5)
 
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_expval(self):
@@ -270,8 +270,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -302,8 +302,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj(0.5)
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -341,8 +341,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj(phi)
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         # confused by the weak_types error here
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
@@ -376,8 +376,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj(x)
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -408,8 +408,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -483,8 +483,8 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qml.qjit(circuit)
         qjit_obj(x, y, z)
         catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(catalxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -528,8 +528,8 @@ class TestHybridPrograms:
         qjit_obj = qml.qjit(workflow)
         qjit_obj(0.5)
 
-        call_jaxpr_pl = _get_call_jaxpr(converted)
-        call_jaxpr_c = _get_call_jaxpr(qjit_obj.jaxpr)
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(qjit_obj.jaxpr)
 
         # qubit extraction and classical equations in a slightly different order
         # thus cant check specific equations and have to discard comparing counts

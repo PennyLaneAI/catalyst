@@ -1,0 +1,17 @@
+oqd_config_schema = "v0.1"
+
+[beams.downstate_upstate]
+transition = "downstate_upstate"
+rabi = "2 * math.pi * 1e6"
+detuning = 0
+phase = 0
+polarization = nan
+wavevector = nan
+
+[beams.downstate_estate]
+transition = "downstate_estate"
+rabi = "2 * math.pi * 1e6"
+detuning = 0
+phase = 0
+polarization = nan
+wavevector = nan

@@ -20,7 +20,8 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import ContextManager, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import ContextManager, Dict, List, Optional, Set, Tuple
 
 from jax._src.core import MainTrace as JaxMainTrace
 from jax._src.core import cur_sublevel, new_base_main
@@ -174,6 +175,7 @@ class EvaluationContext:
     """
 
     _tracing_stack: List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
+    _mlir_plugins: Set[Path] = set()
 
     @debug_logger_init
     def __init__(self, mode: EvaluationMode):
@@ -183,6 +185,20 @@ class EvaluationContext:
         """
         self.mode = mode
         self.ctx = None
+
+    @classmethod
+    def add_plugin(cls, plugin: Path):
+        """Add an MLIR plugin to the set of MLIR plugins encountered in the
+        program"""
+        cls._mlir_plugins.add(plugin)
+
+    @classmethod
+    def get_plugins(cls):
+        """Get and reset all plugins encountered during the trace of the
+        program"""
+        retval = cls._mlir_plugins
+        cls._mlir_plugins = set()
+        return retval
 
     @classmethod
     @contextmanager

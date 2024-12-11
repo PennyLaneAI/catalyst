@@ -33,6 +33,7 @@ import pennylane as qml
 from lit_util_printers import print_jaxpr
 from pennylane.devices import NullQubit
 
+import catalyst
 from catalyst import qjit
 from catalyst.debug import get_compilation_stage
 from catalyst.utils.runtime_environment import get_lib_path
@@ -78,6 +79,7 @@ def test_decomposition_lowering():
     """
 
     @qjit(keep_intermediate=True)
+    @catalyst.passes.ions_decomposition
     @qml.qnode(CustomDevice(2))
     def test_decomposition_lowering_workflow(x):
         qml.RX(x, wires=[0])
@@ -85,9 +87,6 @@ def test_decomposition_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: _:AbstractTransformMod() = apply_registered_pass[
-    # CHECK:   pass_name=ions-decomposition
-    # CHECK: ]
     print_jaxpr(test_decomposition_lowering_workflow, 1.2)
     # CHECK: quantum.custom "RX"
     # CHECK-NOT: quantum.custom "Hadamard"
