@@ -31,6 +31,3 @@ venv
 
 # Cache files
 .cache
-
-# Standalone-plugin example
-mlir/standalone
