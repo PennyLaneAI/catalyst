@@ -25,7 +25,7 @@ set_target_properties(custom_calls PROPERTIES BUILD_RPATH "$ORIGIN/")
 
 # Editable installations do not respect `package_data` in setup.py so 
 # build to mimic extension module expectations from setuptools+distutils
-set_target_properties(wrapper PROPERTIES SUFFIX ".so")
+set_target_properties(custom_calls PROPERTIES SUFFIX ".so")
 
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
