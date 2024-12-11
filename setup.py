@@ -225,13 +225,6 @@ class CMakeBuild(build_ext):
         )
 
 
-# Compile the library of custom calls in the frontend
-if system_platform == "Linux":
-    cmdclass = {"build_ext": CMakeExtension}
-
-elif system_platform == "Darwin":
-    cmdclass = {"build_ext": CMakeExtension}
-
 project_root_dir = os.path.abspath(os.path.dirname(__file__))
 frontend_dir = os.path.join(project_root_dir, "frontend")
 
