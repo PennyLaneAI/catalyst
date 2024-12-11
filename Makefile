@@ -60,6 +60,12 @@ endif
 # Export variables so that they can be set here without needing to also set them in sub-make files.
 export ENABLE_ASAN ASAN_COMMAND
 
+# Flag for verbose pip install output
+PIP_VERBOSE_FLAG :=
+ifeq ($(VERBOSE),1)
+PIP_VERBOSE_FLAG := --verbose
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -87,13 +93,6 @@ help:
 .PHONY: all catalyst
 all: runtime oqc oqd mlir frontend
 catalyst: runtime dialects frontend
-
-# Flag for verbose pip install output
-PIP_VERBOSE_FLAG :=
-
-ifeq ($(VERBOSE),1)
-    PIP_VERBOSE_FLAG := --verbose
-endif
 
 .PHONY: frontend
 frontend:
