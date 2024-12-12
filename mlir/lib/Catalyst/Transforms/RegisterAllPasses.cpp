@@ -31,7 +31,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createDetensorizeSCFPass);
     mlir::registerPass(catalyst::createDisableAssertionPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
-    mlir::registerPass(catalyst::createGateBuilderTesterPass);
     mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
