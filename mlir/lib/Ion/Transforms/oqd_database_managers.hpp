@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <cassert>
-#include <iostream>
 #include <regex>
 #include <type_traits>
 
