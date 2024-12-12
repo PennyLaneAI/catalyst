@@ -18,8 +18,6 @@
 
 #include <toml++/toml.hpp>
 
-#include <iostream>
-
 namespace {
 
 static const std::string catalyst_root_path =
@@ -99,8 +97,6 @@ class OQDDatabaseManager {
         //   wavevector = [8,9]
         //
         // The i-th beam must be used by gates on the i-th qubit.
-
-        std::cout << "get beams1!\n";
 
         toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition["beams"];
         size_t numBeams = beamsToml.as_array()->size();
