@@ -60,6 +60,12 @@ endif
 # Export variables so that they can be set here without needing to also set them in sub-make files.
 export ENABLE_ASAN ASAN_COMMAND
 
+# Flag for verbose pip install output
+PIP_VERBOSE_FLAG :=
+ifeq ($(VERBOSE),1)
+PIP_VERBOSE_FLAG := --verbose
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -86,7 +92,7 @@ help:
 
 .PHONY: all catalyst
 all: runtime oqc oqd mlir frontend
-catalyst: runtime dialects frontend
+catalyst: runtime dialects plugin oqd frontend
 
 .PHONY: frontend
 frontend:
@@ -94,7 +100,7 @@ frontend:
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
+	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc oqd
@@ -114,7 +120,7 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime all
+	$(MAKE) -C runtime runtime
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
@@ -123,7 +129,7 @@ oqd:
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
-test: test-runtime standalone-plugin test-frontend test-demos
+test: test-runtime test-frontend test-demos
 
 test-toml-spec:
 	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
@@ -142,7 +148,7 @@ test-oqc:
 test-oqd:
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src test
 
-lit: standalone-plugin
+lit:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
@@ -209,36 +215,31 @@ wheel:
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
+	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib
+	find frontend/catalyst -name "*.so" -exec rm -v {} +
+	git restore frontend/catalyst/_configuration.py
+	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
+	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
+	rm -rf .benchmarks
 
-clean-all: clean-frontend clean-mlir clean-runtime clean-oqc clean-oqd clean-standalone-plugin
-	@echo "uninstall catalyst and delete all temporary, cache, and build files"
-	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	rm -rf dist __pycache__
-	rm -rf .coverage coverage_html_report/
+clean-all: clean clean-mlir clean-runtime clean-oqc clean-oqd
 
-.PHONY: clean-standalone-plugin
-clean-standalone-plugin:
-	rm -rf  $(MK_DIR)/mlir/build/lib/StandalonePlugin.*
-	rm -rf  $(MK_DIR)/mlir/standalone/build/lib/StandalonePlugin.*
-
-.PHONY: clean-frontend
-clean-frontend:
-	find frontend/catalyst -name "*.so" -exec rm -v {} +
-
-.PHONY: clean-mlir clean-dialects clean-llvm clean-mhlo clean-enzyme
+.PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-mhlo clean-enzyme
 clean-mlir:
 	$(MAKE) -C mlir clean
 
 clean-dialects:
 	$(MAKE) -C mlir clean-dialects
+
+clean-plugin:
+	$(MAKE) -C mlir clean-plugin
 
 clean-llvm:
 	$(MAKE) -C mlir clean-llvm
@@ -274,9 +275,9 @@ endif
 coverage-runtime:
 	$(MAKE) -C runtime coverage
 
-.PHONY: standalone-plugin
-standalone-plugin:
-	$(MAKE) -C mlir standalone-plugin
+.PHONY: plugin
+plugin:
+	$(MAKE) -C mlir plugin
 
 .PHONY: format
 format:
