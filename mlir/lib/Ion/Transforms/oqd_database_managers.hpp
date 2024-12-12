@@ -31,7 +31,7 @@ static const std::string oqd_gate_decomposition_parameters_toml_file_path =
 
 toml::parse_result load_toml_file(const std::string &path) { return toml::parse_file(path); }
 
-template <typename T> std::vector<T> TomlArray2StdVector(toml::array arr)
+template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
 {
     std::vector<T> vec;
     for (size_t i = 0; i < arr.size(); i++) {
@@ -68,23 +68,23 @@ std::vector<Beam> getBeams1Params()
     //
     // The i-th beam must be used by gates on the i-th qubit.
 
-    toml::parse_result SourceToml =
+    toml::parse_result sourceToml =
         load_toml_file(oqd_gate_decomposition_parameters_toml_file_path);
 
-    assert(SourceToml && "Parsing of gate decomposition beam toml failed!");
+    assert(sourceToml && "Parsing of gate decomposition beam toml failed!");
 
-    toml::node_view<toml::node> TomlBeams = SourceToml["beams"];
-    size_t NumOfBeams = TomlBeams.as_array()->size();
+    toml::node_view<toml::node> beamsToml = sourceToml["beams"];
+    size_t numBeams = beamsToml.as_array()->size();
     std::vector<Beam> beams;
 
-    for (size_t i = 0; i < NumOfBeams; i++) {
-        auto beam = TomlBeams[i];
+    for (size_t i = 0; i < numBeams; i++) {
+        auto beam = beamsToml[i];
         double rabi = beam["rabi"].as_floating_point()->get();
         double detuning = beam["detuning"].as_floating_point()->get();
         std::vector<int64_t> polarization =
-            TomlArray2StdVector<int64_t>(*(beam["polarization"].as_array()));
+            tomlArray2StdVector<int64_t>(*(beam["polarization"].as_array()));
         std::vector<int64_t> wavevector =
-            TomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
+            tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
 
         beams.push_back(Beam(rabi, detuning, polarization, wavevector));
     }
