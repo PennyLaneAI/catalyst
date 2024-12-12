@@ -47,7 +47,7 @@ energy = 3.1416e7  # 2 * math.pi * 5e6
 eigenvector = [1, 0, 0]
 
 [phonons.COM_y]
-energy = "2 * math.pi * 5e6"
+energy = 3.1416e7  # 2 * math.pi * 5e6
 eigenvector = [0, 1, 0]
 
 [phonons.COM_z]
