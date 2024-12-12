@@ -51,5 +51,5 @@ energy = 3.1416e7  # 2 * math.pi * 5e6
 eigenvector = [0, 1, 0]
 
 [phonons.COM_z]
-energy = "2 * math.pi * 1e6"
+energy = 6.283e6  # 2 * math.pi * 1e6
 eigenvector = [0, 0, 1]
