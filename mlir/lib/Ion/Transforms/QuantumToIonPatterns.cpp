@@ -19,7 +19,6 @@
 #include "Ion/Transforms/Patterns.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include <iostream>
 
 using namespace mlir;
 using namespace catalyst::ion;
