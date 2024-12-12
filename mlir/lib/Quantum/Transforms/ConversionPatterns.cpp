@@ -381,9 +381,9 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
             }
         }
         else {
-            argTypes.insert(argTypes.end(), adaptor.getDynParams().getTypes().begin(),
-                            adaptor.getDynParams().getTypes().end());
-            args.insert(args.end(), adaptor.getDynParams().begin(), adaptor.getDynParams().end());
+            argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
+                            adaptor.getParams().getTypes().end());
+            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
         }
         argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
                         adaptor.getInQubits().getTypes().end());
@@ -440,7 +440,7 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
             }
         }
         else {
-            args.insert(args.end(), adaptor.getDynParams());
+            args.insert(args.end(), adaptor.getParams());
         }
     }
     LogicalResult matchAndRewrite(GlobalPhaseOp op, GlobalPhaseOpAdaptor adaptor,

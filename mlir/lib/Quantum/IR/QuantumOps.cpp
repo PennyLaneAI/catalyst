@@ -53,7 +53,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
     }
 
     if (rotationsOps.contains(name)) {
-        auto dynParams = op.getDynParams();
+        auto dynParams = op.getParams();
         SmallVector<Value> dynParamsNeg;
 
         for (auto param : dynParams) {

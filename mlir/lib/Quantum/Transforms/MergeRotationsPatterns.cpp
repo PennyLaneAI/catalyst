@@ -57,8 +57,8 @@ struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<CustomOp> {
 
         ArrayAttr parentStaticParams = parentOp.getStaticParamsAttr();
         ArrayAttr currentStaticParams = op.getStaticParamsAttr();
-        auto parentDynParams = parentOp.getDynParams();
-        auto currentDynParams = op.getDynParams();
+        auto parentDynParams = parentOp.getParams();
+        auto currentDynParams = op.getParams();
 
         bool parentHasStatic = parentStaticParams && !parentStaticParams.empty();
         bool currentHasStatic = currentStaticParams && !currentStaticParams.empty();

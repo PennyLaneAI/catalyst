@@ -92,12 +92,12 @@ void hDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 
 void psDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    oneQubitDecomp(op, rewriter, -PI / 2, op.getDynParams().front(), PI / 2);
+    oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
 }
 
 void rzDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    oneQubitDecomp(op, rewriter, -PI / 2, op.getDynParams().front(), PI / 2);
+    oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
 }
 
 void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
