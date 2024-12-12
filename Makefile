@@ -86,7 +86,7 @@ help:
 
 .PHONY: all catalyst
 all: runtime oqc oqd mlir frontend
-catalyst: runtime dialects plugin frontend
+catalyst: runtime dialects plugin oqd frontend
 
 .PHONY: frontend
 frontend:
