@@ -211,7 +211,7 @@ wheel:
 	rm -r $(MK_DIR)/build
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-standalone-plugin-wheel: standalone-plugin
+plugin-wheel: plugin
 	mkdir -p $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.* $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
 

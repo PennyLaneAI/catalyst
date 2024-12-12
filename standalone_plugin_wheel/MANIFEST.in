@@ -1,1 +1,2 @@
 include standalone_plugin/lib/*.so
+include standalone_plugin/test/*.py
