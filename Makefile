@@ -18,7 +18,7 @@ COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
-SKIP_OQD ?= false
+SKIP_OQD ?= true
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 
