@@ -60,6 +60,12 @@ endif
 # Export variables so that they can be set here without needing to also set them in sub-make files.
 export ENABLE_ASAN ASAN_COMMAND
 
+# Flag for verbose pip install output
+PIP_VERBOSE_FLAG :=
+ifeq ($(VERBOSE),1)
+PIP_VERBOSE_FLAG := --verbose
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -94,7 +100,7 @@ frontend:
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
+	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime oqc oqd
