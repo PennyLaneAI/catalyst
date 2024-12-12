@@ -84,11 +84,14 @@ coverage: test_runner
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+ifeq ($(PLATFORM),Linux)
+	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
+	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
+else
 	xcrun llvm-profdata merge default.profraw -o testcov.profdata
 	xcrun llvm-cov show build/tests/runner_tests_qir_runtime -instr-profile=testcov.profdata -output-dir=coverage_html -format=html
-	# lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	# lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
-	# genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
+endif
 
 .PHONY: clean
 clean:
