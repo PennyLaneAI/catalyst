@@ -128,7 +128,6 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         auto qubitIndexValue = qubitIndex.value();
         Beam beam = beams1[qubitIndexValue];
 
-        // TODO: assumption for indices 0: 0->e, 1: 1->e
         auto beam0toEAttr = BeamAttr::get(
             op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
