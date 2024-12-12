@@ -15,28 +15,61 @@ oqd_config_schema = "v0.1"
 #    wavevector = int array,
 #
 # A pulse operation will consist of a beam, a transition, a phase, a time (duration of application), and a target qubit
-#
 # A list of beams is recorded in this toml.
-# The i-th beam is usable on the i-th qubit.
+#
+# `beams1` are the beams used for single-qubit gates.
+# The i-th beams1 is usable on the i-th qubit.
+#
+# `beams2` are the beams used for 2-qubit gates.
+# In a system with n qubits, there are (n choose 2) = n*(n-1)/2 possible two-qubit
+# combinations. Each combination is represented by a unique index. For example, in a 4-qubit system, where the qubits are indexed as [0, 1, 2, 3],
+# the possible two-qubit combinations and their indices are:
+#   0: (0, 1)
+#   1: (0, 2)
+#   2: (0, 3)
+#   3: (1, 2)
+#   4: (1, 3)
+#   5: (2, 3)
+# The i-th beams2 is usable on a gate whose input qubit indices
+# correspond to i in the above encoding combination.
 # -------
 
-[[beams]]  # qubit 0
+[[beams1]]
 rabi = 1.1
 detuning = 2.2
 polarization = [0,1]
 wavevector = [-2,3]
 
-[[beams]]  # qubit 1
+[[beams1]]
 rabi = 4.4
 detuning = 5.5
 polarization = [6,7]
 wavevector = [8,9]
 
-[[beams]]  # qubit 2
+[[beams1]]
 rabi = 10.10
 detuning = 11.11
 polarization = [12,13]
 wavevector = [14,15]
+
+
+[[beams2]]
+rabi = 1.23
+detuning = 4.56
+polarization = [7,8]
+wavevector = [9,10]
+
+[[beams2]]
+rabi = 4.56
+detuning = 7.89
+polarization = [1,2]
+wavevector = [-3,4]
+
+[[beams2]]
+rabi = 99.99
+detuning = 100.100
+polarization = [37,42]
+wavevector = [-42,-37]
 
 
 # Phonons

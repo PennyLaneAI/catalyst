@@ -82,19 +82,26 @@ class OQDDatabaseManager {
         assert(sourceTomlQubit && "Parsing of qubit toml failed!");
         assert(sourceTomlGateDecomposition && "Parsing of gate decomposition toml failed!");
 
-        loadBeamParams();
+        loadBeams1Params();
+        loadBeams2Params();
     }
 
-    std::vector<Beam> getBeamParams() { return beams; }
+    std::vector<Beam> getBeams1Params() { return beams1; }
+    std::vector<Beam> getBeams2Params() { return beams2; }
 
   private:
     toml::parse_result sourceTomlDevice;
     toml::parse_result sourceTomlQubit;
     toml::parse_result sourceTomlGateDecomposition;
 
-    std::vector<Beam> beams;
+    std::vector<Beam> beams1;
+    std::vector<Beam> beams2;
 
-    void loadBeamParams()
+    void loadBeams1Params() { loadBeamsParamsImpl("beams1"); }
+
+    void loadBeams2Params() { loadBeamsParamsImpl("beams2"); }
+
+    void loadBeamsParamsImpl(const std::string &mode)
     {
         // Read in the gate decomposition beam parameters from toml file.
         // The toml contains a list of beams, where each beam has the following fields:
@@ -102,11 +109,21 @@ class OQDDatabaseManager {
         //   detuning = 5.5
         //   polarization = [6,7]
         //   wavevector = [8,9]
-        //
-        // The i-th beam must be used by gates on the i-th qubit.
 
-        toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition["beams"];
+        toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition[mode];
         size_t numBeams = beamsToml.as_array()->size();
+
+        std::vector<Beam> *collector;
+        if (mode == "beams1") {
+            collector = &beams1;
+        }
+        else if (mode == "beams2") {
+            collector = &beams2;
+        }
+        else {
+            assert(false && "Invalid beam mode. Only single-qubit gates and 2-qubit gates are "
+                            "supported for decomposition onto beams.");
+        }
 
         for (size_t i = 0; i < numBeams; i++) {
             auto beam = beamsToml[i];
@@ -117,7 +134,7 @@ class OQDDatabaseManager {
             std::vector<int64_t> wavevector =
                 tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
 
-            beams.push_back(Beam(rabi, detuning, polarization, wavevector));
+            collector->push_back(Beam(rabi, detuning, polarization, wavevector));
         }
     }
 };
