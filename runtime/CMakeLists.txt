@@ -54,6 +54,11 @@ FetchContent_Declare(
     SOURCE_DIR          mlir/ExecutionEngine
 )
 
+# Note on pybind11 vs python discovery order:
+# If Python is looked for first, then we have to look for all the components needed by pybind11.
+# In particular, if pybind11::embed is used, then we need to find both headers (Development.Module)
+# and the shared library (Development.Embed) before pybind11 is discovered.
+# With the other order PyBind will discover everything it needs.
 function(fetch_pybind11)
     find_package(pybind11 CONFIG)
     if (pybind11_FOUND)

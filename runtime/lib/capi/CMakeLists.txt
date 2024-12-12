@@ -17,18 +17,17 @@ if(ENABLE_OPENQASM)
     target_link_libraries(catalyst_qir_qis_obj pybind11::module)
 endif()
 
-target_link_libraries(catalyst_qir_qis_obj 
+target_link_libraries(catalyst_qir_qis_obj
     pthread
-    dl)
-
-message(STATUS "PROJECT_SOURCE_DIR  " ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver)
+    dl
+)
 
 target_include_directories(catalyst_qir_qis_obj PUBLIC .
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${runtime_includes}
     ${mlirrunnerutils_SOURCE_DIR}/../..  # includes are relative to mlir/ExecutionEngine
-    ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver
-    )
+    ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver  # Timer.hpp
+)
 
 # The MLIR Runner Utils raises this warning so we need to disable it for our -Werror builds.
 if(RUNTIME_ENABLE_WARNINGS)

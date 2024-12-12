@@ -32,11 +32,11 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     pybind11::embed
     catalyst_qir_runtime
     rtd_null_qubit
-    )
+)
 
 target_sources(runner_tests_qir_runtime PRIVATE
     Test_NullQubit.cpp
-    )
+)
 
 catch_discover_tests(runner_tests_qir_runtime)
 
@@ -52,18 +52,19 @@ if(ENABLE_OPENQASM)
         set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
     endif()
 
-    # To avoid link to libpython, we use pybind11::module interface library.
-    target_compile_definitions(runner_tests_openqasm PUBLIC INITIALIZE_PYTHON)
+    # preprocessor defition to the compiler (clang -D...)
+    target_compile_definitions(runner_tests_openqasm PRIVATE INITIALIZE_PYTHON)
+
     target_link_libraries(runner_tests_openqasm PRIVATE
         Catch2::Catch2
         pybind11::embed
         catalyst_qir_runtime
-        )
+    )
 
     target_sources(runner_tests_openqasm PRIVATE
         Test_OpenQasmBuilder.cpp
         Test_OpenQasmDevice.cpp
-        )
+    )
 
     catch_discover_tests(runner_tests_openqasm)
 endif()

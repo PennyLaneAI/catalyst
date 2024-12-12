@@ -52,7 +52,7 @@ add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 target_include_directories(rtd_openqasm PRIVATE .
     ${runtime_includes}
     ${backend_includes}
-    )
+)
 
 
 add_dependencies(rtd_openqasm openqasm_python_module)
