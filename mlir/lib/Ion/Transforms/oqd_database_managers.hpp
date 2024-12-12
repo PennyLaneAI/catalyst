@@ -15,6 +15,8 @@
 #include <cassert>
 #include <iostream>
 #include <regex>
+#include <type_traits>
+
 #include <toml++/toml.hpp>
 
 static const std::string catalyst_root_path = std::regex_replace(

@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Ion/IR/IonOps.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "mlir/IR/PatternMatch.h"
-
-#include "Ion/Transforms/Patterns.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include <iostream>
+#include "mlir/IR/PatternMatch.h"
+
+#include "Ion/IR/IonOps.h"
+#include "Ion/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
 
 #include "oqd_database_managers.hpp"
 
