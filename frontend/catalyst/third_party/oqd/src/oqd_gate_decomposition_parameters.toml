@@ -8,7 +8,7 @@ oqd_config_schema = "v0.1"
 
 
 # Beams
-# A beam contains 4 properties that will be callibrated:
+# A beam contains 4 properties that will be calibrated:
 #    rabi = float,
 #    detuning = float,
 #    polarization = int array,
