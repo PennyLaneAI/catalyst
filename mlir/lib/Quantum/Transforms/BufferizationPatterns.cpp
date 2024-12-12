@@ -37,7 +37,7 @@ struct BufferizeQubitUnitaryOp : public OpConversionPattern<QubitUnitaryOp> {
         rewriter.replaceOpWithNewOp<QubitUnitaryOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), adaptor.getMatrix(),
             adaptor.getInQubits(), adaptor.getAdjointAttr(), adaptor.getInCtrlQubits(),
-            adaptor.getInCtrlValues(), nullptr);
+            adaptor.getInCtrlValues(), adaptor.getStaticParamsAttr());
         return success();
     }
 };
