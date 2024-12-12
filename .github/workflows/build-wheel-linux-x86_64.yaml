@@ -472,3 +472,29 @@ jobs:
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto
+
+  test-standalone-plugin-wheels:
+    needs: [constants, catalyst-linux-wheels-x86-64, determine_runner]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
+
+    # To check all wheels for supported python3 versions
+    name: Test Standalone Plugin Wheels (Python ${{ matrix.python_version }}) on Linux x86
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+
+    steps:
+    - name: Build wheel
+      run: |
+        PYTHON=python${{ matrix.python_version }} \
+        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
+        make standalone-plugin-wheel
+    
+    - name: Install Plugin
+      run: |
+        python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/dist/*.whl --no-deps
+    
+    - name: Run Test
+      run: |
+        python${{ matrix.python_version }} standalone_plugin_wheel/test/test_standalone_plugin.py
