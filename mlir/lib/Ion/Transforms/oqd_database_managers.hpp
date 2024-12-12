@@ -18,18 +18,20 @@
 
 #include <toml++/toml.hpp>
 
+#include <iostream>
+
+namespace {
+
 static const std::string catalyst_root_path =
     std::regex_replace(__FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
+
 static const std::string oqd_device_parameters_toml_file_path =
     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_device_parameters.toml";
 static const std::string oqd_qubit_parameters_toml_file_path =
     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_qubit_parameters.toml";
-
 static const std::string oqd_gate_decomposition_parameters_toml_file_path =
     catalyst_root_path +
     "frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml";
-
-toml::parse_result load_toml_file(const std::string &path) { return toml::parse_file(path); }
 
 template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
 {
@@ -61,37 +63,60 @@ struct Beam {
     }
 };
 
-std::vector<Beam> getBeams1Params()
-{
-    // Read in the 1-qubit gate decomposition beam parameters from toml file.
-    // The toml contains a list of beams, where each beam has the following fields:
-    //   rabi = 4.4
-    //   detuning = 5.5
-    //   polarization = [6,7]
-    //   wavevector = [8,9]
-    //
-    // The i-th beam must be used by gates on the i-th qubit.
+class OQDDatabaseManager {
 
-    toml::parse_result sourceToml =
-        load_toml_file(oqd_gate_decomposition_parameters_toml_file_path);
+  public:
+    OQDDatabaseManager()
+    {
+        sourceTomlDevice = toml::parse_file(oqd_device_parameters_toml_file_path);
+        sourceTomlQubit = toml::parse_file(oqd_qubit_parameters_toml_file_path);
+        sourceTomlGateDecomposition =
+            toml::parse_file(oqd_gate_decomposition_parameters_toml_file_path);
 
-    assert(sourceToml && "Parsing of gate decomposition beam toml failed!");
+        assert(sourceTomlDevice && "Parsing of device toml failed!");
+        assert(sourceTomlQubit && "Parsing of qubit toml failed!");
+        assert(sourceTomlGateDecomposition && "Parsing of gate decomposition toml failed!");
 
-    toml::node_view<toml::node> beamsToml = sourceToml["beams"];
-    size_t numBeams = beamsToml.as_array()->size();
-    std::vector<Beam> beams;
-
-    for (size_t i = 0; i < numBeams; i++) {
-        auto beam = beamsToml[i];
-        double rabi = beam["rabi"].as_floating_point()->get();
-        double detuning = beam["detuning"].as_floating_point()->get();
-        std::vector<int64_t> polarization =
-            tomlArray2StdVector<int64_t>(*(beam["polarization"].as_array()));
-        std::vector<int64_t> wavevector =
-            tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
-
-        beams.push_back(Beam(rabi, detuning, polarization, wavevector));
+        loadBeamParams();
     }
 
-    return beams;
-}
+    std::vector<Beam> getBeamParams() { return beams; }
+
+  private:
+    toml::parse_result sourceTomlDevice;
+    toml::parse_result sourceTomlQubit;
+    toml::parse_result sourceTomlGateDecomposition;
+
+    std::vector<Beam> beams;
+
+    void loadBeamParams()
+    {
+        // Read in the gate decomposition beam parameters from toml file.
+        // The toml contains a list of beams, where each beam has the following fields:
+        //   rabi = 4.4
+        //   detuning = 5.5
+        //   polarization = [6,7]
+        //   wavevector = [8,9]
+        //
+        // The i-th beam must be used by gates on the i-th qubit.
+
+        std::cout << "get beams1!\n";
+
+        toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition["beams"];
+        size_t numBeams = beamsToml.as_array()->size();
+
+        for (size_t i = 0; i < numBeams; i++) {
+            auto beam = beamsToml[i];
+            double rabi = beam["rabi"].as_floating_point()->get();
+            double detuning = beam["detuning"].as_floating_point()->get();
+            std::vector<int64_t> polarization =
+                tomlArray2StdVector<int64_t>(*(beam["polarization"].as_array()));
+            std::vector<int64_t> wavevector =
+                tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
+
+            beams.push_back(Beam(rabi, detuning, polarization, wavevector));
+        }
+    }
+};
+
+} // namespace

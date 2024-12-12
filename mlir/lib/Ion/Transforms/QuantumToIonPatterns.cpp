@@ -120,15 +120,13 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
 }
 
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
-                                        double phase2)
+                                        double phase2, const std::vector<Beam> &beams)
 {
-    std::vector<Beam> beams1 = getBeams1Params();
-
     auto qubitIndex = walkBackQubitSSA(op, 0);
     if (qubitIndex.has_value()) {
         // Set the optional transition index now
         auto qubitIndexValue = qubitIndex.value();
-        Beam beam = beams1[qubitIndexValue];
+        Beam beam = beams[qubitIndexValue];
 
         // TODO: assumption for indices 0: 0->e, 1: 1->e
         auto beam0toEAttr = BeamAttr::get(
@@ -347,18 +345,21 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
 struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
+    OQDDatabaseManager dataManager;
+    std::vector<Beam> beams = dataManager.getBeamParams();
+
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
         // TODO: Assumption 1 Ion are in the same funcop as the operations
         // RX case -> PP(P1, P2)
         if (op.getGateName() == "RX") {
-            auto result = oneQubitGateToPulse(op, rewriter, 0.0, 0.0);
+            auto result = oneQubitGateToPulse(op, rewriter, 0.0, 0.0, beams);
             return result;
         }
         // RY case -> PP(P1, P2)
         // FIXME: Should Ry have a phase difference of pi/2 with respect to RX?
         else if (op.getGateName() == "RY") {
-            auto result = oneQubitGateToPulse(op, rewriter, 0.0, llvm::numbers::pi);
+            auto result = oneQubitGateToPulse(op, rewriter, 0.0, llvm::numbers::pi, beams);
             return result;
         }
         // MS case -> PP(P1, P2, P3, P4, P5, P6)
