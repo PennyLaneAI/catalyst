@@ -495,7 +495,7 @@ jobs:
     
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --ignore=frontend/test/pytest/test_mlir_plugin.py -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
@@ -506,4 +506,5 @@ jobs:
       # Run only on Thursday at the given time
       if: github.event.schedule == '35 20 * * 4'
       run: |
-        python${{ matrix.python_version }} standalone_plugin_wheel/standalone_plugin/test/test_standalone_plugin.py
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest/test_mlir_plugin.py -n auto
+        python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
