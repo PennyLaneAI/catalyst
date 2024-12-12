@@ -60,7 +60,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                                         double phase2)
 {
     std::vector<Beam> beams1 = getBeams1Params();
-    //std::cout << beams1[2].wavevector[1] << "\n";
+    // std::cout << beams1[2].wavevector[1] << "\n";
 
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
@@ -77,18 +77,14 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         // TODO: assumption for indices 0: 0->e, 1: 1->e
         auto beam0toEAttr = BeamAttr::get(
             op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0),
-            rewriter.getF64FloatAttr(beam.rabi),
-            rewriter.getF64FloatAttr(beam.detuning),
+            rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
             rewriter.getI64VectorAttr(beam.polarization),
-            rewriter.getI64VectorAttr(beam.wavevector)
-            );
+            rewriter.getI64VectorAttr(beam.wavevector));
         auto beam1toEAttr = BeamAttr::get(
             op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1),
-            rewriter.getF64FloatAttr(beam.rabi),
-            rewriter.getF64FloatAttr(beam.detuning),
+            rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
             rewriter.getI64VectorAttr(beam.polarization),
-            rewriter.getI64VectorAttr(beam.wavevector)
-        );
+            rewriter.getI64VectorAttr(beam.wavevector));
 
         // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
         // in the database) Potentially Rabi and Detuning become SSA values and not attributes.
