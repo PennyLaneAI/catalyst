@@ -393,7 +393,7 @@ jobs:
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 20 * * 4'
+      if: github.event.schedule != '35 20 * * 4'
       run: |
         PYTHON=python${{ matrix.python_version }} \
         CCACHE_DIR="$(pwd)/.ccache" \
@@ -429,7 +429,7 @@ jobs:
 
     - name: Upload Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 20 * * 4'
+      if: github.event.schedule != '35 20 * * 4'
       uses: actions/upload-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
@@ -459,7 +459,7 @@ jobs:
 
     - name: Download Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 20 * * 4'
+      if: github.event.schedule != '35 20 * * 4'
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
@@ -489,7 +489,7 @@ jobs:
 
     - name: Install Standalone Plugin
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 20 * * 4'
+      if: github.event.schedule != '35 20 * * 4'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
     
@@ -504,7 +504,7 @@ jobs:
 
     - name: Run Standalone Plugin Tests
       # Run only on Thursday at the given time
-      if: github.event.schedule == '35 20 * * 4'
+      if: github.event.schedule != '35 20 * * 4'
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest/test_mlir_plugin.py -n auto
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
