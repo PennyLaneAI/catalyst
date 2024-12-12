@@ -29,6 +29,14 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace ion {
 
+enum LevelTransition {
+    // Encoding of level transtions for a pulse
+    // For example, "DOWN_E" means the transition from downstate to estate
+    DOWN_E = 0,
+    UP_E = 1,
+};
+
+
 std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
 {
     // TODO: make that function able to cross control flow op (for, while, ...)
@@ -60,7 +68,6 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                                         double phase2)
 {
     std::vector<Beam> beams1 = getBeams1Params();
-    // std::cout << beams1[2].wavevector[1] << "\n";
 
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
@@ -76,12 +83,12 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
         // TODO: assumption for indices 0: 0->e, 1: 1->e
         auto beam0toEAttr = BeamAttr::get(
-            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(0),
+            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
             rewriter.getI64VectorAttr(beam.polarization),
             rewriter.getI64VectorAttr(beam.wavevector));
         auto beam1toEAttr = BeamAttr::get(
-            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(1),
+            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(LevelTransition::UP_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
             rewriter.getI64VectorAttr(beam.polarization),
             rewriter.getI64VectorAttr(beam.wavevector));
