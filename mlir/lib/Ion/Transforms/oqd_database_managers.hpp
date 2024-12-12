@@ -19,7 +19,7 @@
 #include <toml++/toml.hpp>
 
 static const std::string catalyst_root_path = std::regex_replace(
-    __FILE__, std::regex("mlir/lib/Ion/Transforms/./oqd_database_managers.hpp"), "");
+    __FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
 static const std::string oqd_device_parameters_toml_file_path =
     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_device_parameters.toml";
 static const std::string oqd_qubit_parameters_toml_file_path =
