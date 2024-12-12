@@ -69,12 +69,6 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 {
     std::vector<Beam> beams1 = getBeams1Params();
 
-    auto qnode = op->getParentOfType<func::FuncOp>();
-    ion::SystemOp ionSystem;
-    qnode.walk([&](ion::SystemOp op) {
-        ionSystem = op;
-        return WalkResult::interrupt();
-    });
     auto qubitIndex = walkBackQubitSSA(op, 0);
     if (qubitIndex.has_value()) {
         // Set the optional transition index now
