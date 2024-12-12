@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Ion/IR/IonOps.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "mlir/IR/PatternMatch.h"
+#include <cassert>
 
-#include "Ion/Transforms/Patterns.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/PatternMatch.h"
+
+#include "Ion/IR/IonOps.h"
+#include "Ion/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::ion;
@@ -27,6 +29,14 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace ion {
 
+/**
+ * @brief Walk back the qubit SSA until we reach an ExtractOp that has an idxAttr set, or until we
+ *        reach the root of the SSA.
+ *
+ * @param gate The gate that uses the qubit SSA.
+ * @param position The position of the qubit SSA in the gate.
+ * @return The index of the qubit SSA if it is known, otherwise std::nullopt.
+ */
 std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
 {
     // TODO: make that function able to cross control flow op (for, while, ...)
@@ -52,6 +62,52 @@ std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position
         }
         return walkBackQubitSSA(customOp, position);
     }
+}
+
+/**
+ * @brief Returns the index of the two-qubit combination in the set of all possible combinations of
+ *        two qubits in an n-qubit system.
+ *
+ *        In a system with n qubits, there are (n choose 2) = n*(n-1)/2 possible two-qubit
+ *        combinations. Each combination is represented by a unique index. For example, in a five-
+ *        qubit system, where the qubits are indexed as [0, 1, 2, 3, 4] the possible two-qubit
+ *        combinations and their indices are:
+ *
+ *            0: (0, 1)
+ *            1: (0, 2)
+ *            2: (0, 3)
+ *            3: (0, 4)
+ *            4: (1, 2)
+ *            5: (1, 3)
+ *            6: (1, 4)
+ *            7: (2, 3)
+ *            8: (2, 4)
+ *            9: (3, 4)
+ *
+ *        The formula to compute the index is:
+ *
+ *            index = sum_{j=1}^{i1} (n - j) + i2 - (i1 + 1)
+ *                  = (i1 * n) - (i1 * (i1 + 1) / 2) + (i2 - i1 - 1)
+ *
+ * @param nQubits Number of qubits in the system.
+ * @param idx1 Index of the first qubit.
+ * @param idx2 Index of the second qubit.
+ * @return int64_t
+ */
+int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
+{
+    assert(nQubits >= 2 && "At least two qubits must be present in the system.");
+
+    assert(idx1 >= 0 && idx1 < nQubits && "First qubit index is out of range.");
+    assert(idx2 >= 0 && idx2 < nQubits && "Second qubit index is out of range.");
+
+    assert(idx1 != idx2 && "The two qubit indicies cannot be the same.");
+
+    if (idx1 > idx2) {
+        std::swap(idx1, idx2);
+    };
+
+    return (idx1 * nQubits) - (idx1 * (idx1 + 1) / 2) + (idx2 - idx1 - 1);
 }
 
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
@@ -127,36 +183,17 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter)
         auto qubitIndex1Value = qubitIndex1.value();
         auto nQubits = allocOp.getNqubitsAttr();
         if (nQubits.has_value()) {
-            // Triangular indices: (a, b) -> n(n-1)/2
-            // e.g.
-            // (0, 1) -> 0
-            // (0, 2) -> 1
-            // (0, 3) -> 2
-            // (0, 4) -> 3
-            // (1, 2) -> 4
-            // (1, 3) -> 5
-            // (1, 4) -> 6
-            // (2, 3) -> 7
-            // (2, 4) -> 8
-            // (3, 4) -> 9
-            // Symmetric
-            if (qubitIndex0Value > qubitIndex1Value) {
-                std::swap(qubitIndex0Value, qubitIndex1Value);
-            };
-            // TODO: double check this formula
-            auto indexInteraction = (qubitIndex0Value * (nQubits.value() - 1) -
-                                     qubitIndex0Value * (qubitIndex0Value + 1)) /
-                                        2 +
-                                    (qubitIndex1Value - qubitIndex0Value - 1);
+            auto twoQubitComboIndex =
+                getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
 
-            // TODO: assumption is that each ion has 3 phonons (x, y, z)
+            // Assume that each ion has 3 phonons (x, y, z)
             auto phonon0ComX = ionSystem.getPhonons()[3 * qubitIndex0Value];
             auto phonon1ComX = ionSystem.getPhonons()[3 * qubitIndex1Value];
 
             PhononAttr phonon0ComXAttr = cast<PhononAttr>(phonon0ComX);
             PhononAttr phonon1ComXAttr = cast<PhononAttr>(phonon1ComX);
 
-            auto beam = ionSystem.getBeams2()[indexInteraction];
+            auto beam = ionSystem.getBeams2()[twoQubitComboIndex];
             BeamAttr beamAttr = cast<BeamAttr>(beam);
 
             auto loc = op.getLoc();
@@ -310,6 +347,7 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             return result;
         }
         // RY case -> PP(P1, P2)
+        // FIXME: Should Ry have a phase difference of pi/2 with respect to RX?
         else if (op.getGateName() == "RY") {
             auto result = oneQubitGateToPulse(op, rewriter, 0.0, llvm::numbers::pi);
             return result;
