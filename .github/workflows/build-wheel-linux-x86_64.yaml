@@ -426,7 +426,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: standalone-plugin-wheel/dist
+        path: standalone_plugin_wheel/dist
         retention-days: 14
 
   test-wheels:
@@ -454,7 +454,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: standalone-plugin-wheel/wheel
+        path: standalone_plugin_wheel/wheel
 
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
