@@ -36,7 +36,6 @@ enum LevelTransition {
     UP_E = 1,
 };
 
-
 std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
 {
     // TODO: make that function able to cross control flow op (for, while, ...)
@@ -77,7 +76,8 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
         // TODO: assumption for indices 0: 0->e, 1: 1->e
         auto beam0toEAttr = BeamAttr::get(
-            op.getContext(), /*transition_index=*/rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
+            op.getContext(),
+            /*transition_index=*/rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
             rewriter.getI64VectorAttr(beam.polarization),
             rewriter.getI64VectorAttr(beam.wavevector));
