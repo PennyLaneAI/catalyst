@@ -3,6 +3,7 @@ build
 __pycache__
 pennylane_catalyst.egg-info
 *.so
+*.dylib
 .dylibs
 
 # Testing files and directories
@@ -24,3 +25,12 @@ frontend/mlir_quantum
 doc/_build
 doc/code/api
 .ipynb*
+
+# Development
+venv
+
+# Cache files
+.cache
+
+# Standalone-plugin example
+mlir/standalone

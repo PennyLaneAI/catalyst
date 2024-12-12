@@ -46,10 +46,10 @@ from catalyst.jax_extras import (
     get_implicit_and_explicit_flat_args,
     unzip2,
 )
-from catalyst.jax_primitives import func_p
-from catalyst.jax_tracer import trace_quantum_function
+from catalyst.jax_primitives import quantum_kernel_p
+from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.passes import pipeline
+from catalyst.passes import dictionary_to_tuple_of_passes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -105,11 +105,8 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         # Update the qnode with peephole pipeline
-        if "pass_pipeline" in kwargs.keys():
-            pass_pipeline = kwargs["pass_pipeline"]
-            if not hasattr(self, "_peephole_transformed"):
-                self = pipeline(pass_pipeline=pass_pipeline)(self)
-            kwargs.pop("pass_pipeline")
+        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
+        pass_pipeline = dictionary_to_tuple_of_passes(pass_pipeline)
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
@@ -120,7 +117,7 @@ class QFunc:
 
             if mcm_config.mcm_method == "one-shot":
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
-                return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
+                return Function(dynamic_one_shot(self, mcm_config=mcm_config))(*args, **kwargs)
 
         qjit_device = QJITDevice(self.device)
 
@@ -150,7 +147,9 @@ class QFunc:
         )
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
-        res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
+        res_flat = quantum_kernel_p.bind(
+            flattened_fun, *args_flat, qnode=self, pipeline=pass_pipeline
+        )
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 

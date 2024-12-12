@@ -28,14 +28,19 @@ from pennylane.capture import (
     qnode_prim,
 )
 
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import (
+    extract_backend_info,
+    get_device_capabilities,
+    get_device_shots,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
     compbasis_p,
+    counts_p,
     expval_p,
-    func_p,
     gphase_p,
     namedobs_p,
     probs_p,
@@ -45,6 +50,7 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
+    quantum_kernel_p,
     qunitary_p,
     sample_p,
     state_p,
@@ -149,7 +155,7 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
                 j:AbstractQreg() = qinsert d 0 f
                 qdealloc j
                 in (i,) }
-            fn=<QNode: device='<lightning.qubit device (wires=2) at 0x302761c90>', interface='auto', diff_method='best'>
+            qnode=<QNode: device='<lightning.qubit device (wires=2) at 0x302761c90>', interface='auto', diff_method='best'>
             ] a
         in (b,) }
 
@@ -166,7 +172,7 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
     `Writing custom interpreters in JAX <https://jax.readthedocs.io/en/latest/notebooks/Writing_custom_interpreters_in_Jax.html>`_
     for a walkthrough on the general architecture and behavior of this function.
 
-    Given that ``catalyst.jax_primitives.func_p`` does not define a concrete implementation, this
+    Given that ``catalyst.jax_primitives.quantum_kernel_p`` does not define a concrete implementation, this
     function will fail outside of an abstract evaluation call.
 
     """
@@ -188,10 +194,10 @@ def from_plxpr_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
                 eqn.params["qfunc_jaxpr"],
                 n_consts=eqn.params["n_consts"],
             )
-            # func_p is a CallPrimitive, so interpreter passed as first arg
+            # quantum_kernel_p is a CallPrimitive, so interpreter passed as first arg
             # wrap_init turns the function into a WrappedFun, which can store
             # transformations
-            outvals = func_p.bind(wrap_init(f), *invals, fn=eqn.params["qnode"])
+            outvals = quantum_kernel_p.bind(wrap_init(f), *invals, qnode=eqn.params["qnode"])
         else:
             outvals = eqn.primitive.bind(*invals, **eqn.params)
         # Primitives may return multiple outputs or not
@@ -240,7 +246,7 @@ class QFuncPlxprInterpreter:
         For conversion to catalyst, this allocates the device, extracts a register, and
         resets the wire map.
         """
-        qdevice_p.bind(**_get_device_kwargs(self._device))
+        qdevice_p.bind(get_device_shots(self._device) or 0, **_get_device_kwargs(self._device))
         self.qreg = qalloc_p.bind(len(self._device.wires))
         self.wire_map = {}
 
@@ -351,7 +357,25 @@ class QFuncPlxprInterpreter:
         )[0]
 
         primitive = measurement_map[eqn.primitive.name]
-        mval = primitive.bind(obs, shape=shaped_array.shape, shots=self._device.shots.total_shots)
+        device_shots = get_device_shots(self._device) or 0
+
+        # TODO: as we are in the process of migrating to dynamic measurement primitive shapes,
+        # we will gradually get rid of the shape argument for these primitives
+        # While we are in the migrating process, we need to handle them explicitly one by one
+        if primitive is sample_p:
+            mval = bind_flexible_primitive(
+                sample_p, {"shots": device_shots}, obs, num_qubits=shaped_array.shape[1]
+            )
+        elif primitive is counts_p:
+            mval = bind_flexible_primitive(
+                counts_p, {"shots": device_shots}, obs, shape=shaped_array.shape
+            )
+        elif primitive in (expval_p, var_p):
+            mval = primitive.bind(obs, shape=shaped_array.shape)
+        else:
+            mval = primitive.bind(
+                obs, shape=shaped_array.shape, shots=self._device.shots.total_shots
+            )
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if shaped_array.dtype != mval.dtype:

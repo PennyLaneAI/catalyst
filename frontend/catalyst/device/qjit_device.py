@@ -26,6 +26,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
 import pennylane as qml
+from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
@@ -49,15 +50,6 @@ from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    OperationProperties,
-    ProgramFeatures,
-    TOMLDocument,
-    intersect_operations,
-    load_device_capabilities,
-    read_toml_file,
-)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -104,29 +96,31 @@ RUNTIME_OBSERVABLES = [
     "PauliZ",
     "Hadamard",
     "Hermitian",
-    "Hamiltonian",
     "LinearCombination",
     "Prod",
     "SProd",
     "Sum",
-    "Tensor",
 ]
+
+RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
 
 # The runtime interface does not care about specific gate properties, so set them all to True.
 RUNTIME_OPERATIONS = {
-    op: OperationProperties(invertible=True, controllable=True, differentiable=True)
+    op: OperatorProperties(invertible=True, controllable=True, differentiable=True)
     for op in RUNTIME_OPERATIONS
 }
 
 RUNTIME_OBSERVABLES = {
-    obs: OperationProperties(invertible=True, controllable=True, differentiable=True)
+    obs: OperatorProperties(invertible=True, controllable=True, differentiable=True)
     for obs in RUNTIME_OBSERVABLES
 }
+
+RUNTIME_MPS = {mp: [] for mp in RUNTIME_MPS}
 
 # TODO: This should be removed after implementing `get_c_interface`
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
-    "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
+    "null.qubit": ("NullQubit", "librtd_null_qubit"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
 }
@@ -157,7 +151,7 @@ def extract_backend_info(
 
     dname = device.name
     if isinstance(device, qml.devices.LegacyDeviceFacade):
-        dname = device.target_device.short_name
+        dname = device.target_device.short_name  # pragma: no cover
 
     device_name = ""
     device_lpath = ""
@@ -202,56 +196,73 @@ def extract_backend_info(
                 device.target_device._s3_folder  # pylint: disable=protected-access
             )
 
-    for k, v in capabilities.options.items():
-        if hasattr(device, v) and not k in device_kwargs:
-            device_kwargs[k] = getattr(device, v)
+    for k, v in getattr(device, "device_kwargs", {}).items():
+        if k not in device_kwargs:  # pragma: no branch
+            device_kwargs[k] = v
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
+
+
+def intersect_operations(
+    a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
+) -> Dict[str, OperatorProperties]:
+    """Intersects two sets of operator properties"""
+    return {k: a[k] & b[k] for k in (a.keys() & b.keys())}
+
+
+def intersect_mps(a: dict[str, list], b: dict[str, list]) -> dict[str, list]:
+    """Intersects two sets of measurement processes"""
+    # In the dictionary, each measurement process is associated with a list of conditions.
+    # Therefore, the intersection is really the union of constraints from both measurement
+    # processes declarations, thus the | operator.
+    return {k: list(set(a[k]) | set(b[k])) for k in (a.keys() & b.keys())}
 
 
 @debug_logger
 def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> DeviceCapabilities:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
+
     # Supported gates of the target PennyLane's device
     qjit_capabilities = deepcopy(target_capabilities)
 
-    # Gates and observables that Catalyst runtime supports
-    qir_gates = RUNTIME_OPERATIONS
-    qir_observables = RUNTIME_OBSERVABLES
-
-    # Intersection of the above
-    qjit_capabilities.native_ops = intersect_operations(target_capabilities.native_ops, qir_gates)
-    qjit_capabilities.native_obs = intersect_operations(
-        target_capabilities.native_obs, qir_observables
+    # Intersection of gates and observables supported by the device and by Catalyst runtime.
+    qjit_capabilities.operations = intersect_operations(
+        target_capabilities.operations, RUNTIME_OPERATIONS
+    )
+    qjit_capabilities.observables = intersect_operations(
+        target_capabilities.observables, RUNTIME_OBSERVABLES
+    )
+    qjit_capabilities.measurement_processes = intersect_mps(
+        target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
-    qjit_capabilities.native_ops.update(
+    qjit_capabilities.operations.update(
         {
-            "Cond": OperationProperties(invertible=True, controllable=True, differentiable=True),
-            "WhileLoop": OperationProperties(
+            "Cond": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            "WhileLoop": OperatorProperties(
                 invertible=True, controllable=True, differentiable=True
             ),
-            "ForLoop": OperationProperties(invertible=True, controllable=True, differentiable=True),
+            "ForLoop": OperatorProperties(invertible=True, controllable=True, differentiable=True),
         }
     )
 
-    # Optionally enable runtime-powered mid-circuit measurments
-    if target_capabilities.mid_circuit_measurement_flag:  # pragma: no branch
-        qjit_capabilities.native_ops.update(
+    # Optionally enable runtime-powered mid-circuit measurements
+    if target_capabilities.supported_mcm_methods:  # pragma: no branch
+        qjit_capabilities.operations.update(
             {
-                "MidCircuitMeasure": OperationProperties(
+                "MidCircuitMeasure": OperatorProperties(
                     invertible=False, controllable=False, differentiable=False
                 )
             }
         )
 
-    # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if any(ng.invertible for ng in target_capabilities.native_ops.values()):
-        qjit_capabilities.native_ops.update(
+    # Optionally enable runtime-powered adjoint of quantum gates (inversions)
+    if any(ng.invertible for ng in target_capabilities.operations.values()):  # pragma: no branch
+        qjit_capabilities.operations.update(
             {
-                "HybridAdjoint": OperationProperties(
+                "HybridAdjoint": OperatorProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
@@ -259,13 +270,13 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
 
     # TODO: Optionally enable runtime-powered quantum gate controlling once they
     #       are supported natively in MLIR.
-    # if any(ng.controllable for ng in target_capabilities.native_ops.values()):
-    #     qjit_capabilities.native_ops.update(
+    # if any(ng.controllable for ng in target_capabilities.operations.values()):
+    #     qjit_capabilities.operations.update(
     #         {
-    #             "HybridCtrl": OperationProperties(
+    #             "HybridCtrl": OperatorProperties(
     #                 invertible=True, controllable=True, differentiable=True
     #             )
-    #
+    #         }
     #     )
 
     return qjit_capabilities
@@ -303,14 +314,24 @@ class QJITDevice(qml.devices.Device):
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         # Capability loading
-        original_device_capabilities = get_device_capabilities(original_device)
-        backend = QJITDevice.extract_backend_info(original_device, original_device_capabilities)
+        device_capabilities = get_device_capabilities(original_device)
+
+        # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+        #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
+        if hasattr(original_device, "_to_matrix_ops"):
+            _to_matrix_ops = getattr(original_device, "_to_matrix_ops")
+            setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+            if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
+                raise CompileError(
+                    "The device that specifies to_matrix_ops must support QubitUnitary."
+                )
+
+        backend = QJITDevice.extract_backend_info(original_device, device_capabilities)
 
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
-
-        self.capabilities = get_qjit_device_capabilities(original_device_capabilities)
+        self.capabilities = get_qjit_device_capabilities(device_capabilities)
 
     @debug_logger
     def preprocess(
@@ -382,43 +403,41 @@ class QJITDevice(qml.devices.Device):
         if isinstance(self.original_device, SoftwareQQPP):
             return measurement_program
 
-        supports_sum_observables = any(
-            obs in self.capabilities.native_obs for obs in ("Sum", "Hamiltonian")
-        )
+        supports_sum_observables = "Sum" in self.capabilities.observables
 
-        if self.capabilities.non_commuting_observables_flag is False:
+        if self.capabilities.non_commuting_observables is False:
             measurement_program.add_transform(split_non_commuting)
         elif not supports_sum_observables:
             measurement_program.add_transform(split_to_single_terms)
 
         # if no observables are supported, we apply a transform to convert *everything* to the
         # readout basis, using either sample or counts based on device specification
-        if not self.capabilities.native_obs:
+        if not self.capabilities.observables:
             if not split_non_commuting in measurement_program:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
                 measurement_program.add_transform(split_non_commuting)
-            if "Sample" in self.capabilities.measurement_processes:
+            if "SampleMP" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_samples, self.wires)
-            elif "Counts" in self.capabilities.measurement_processes:
+            elif "CountsMP" in self.capabilities.measurement_processes:
                 measurement_program.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
-        elif not self.capabilities.measurement_processes - {"Counts", "Sample"}:
-            # ToDo: this branch should become unneccessary when selective conversion of
+        elif not self.capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
+            # ToDo: this branch should become unnecessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
-            if not split_non_commuting in measurement_program:
+            if not split_non_commuting in measurement_program:  # pragma: no branch
                 measurement_program.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
-                if "Sample" in self.capabilities.measurement_processes
+                if "SampleMP" in self.capabilities.measurement_processes
                 else measurements_from_counts
             )
             measurement_program.add_transform(mp_transform, self.wires)
 
         # if only some observables are supported, we try to diagonalize those that aren't
-        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.native_obs):
+        elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(self.capabilities.observables):
             if not split_non_commuting in measurement_program:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
@@ -431,7 +450,7 @@ class QJITDevice(qml.devices.Device):
             }
             # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
-                self.capabilities.native_obs
+                self.capabilities.observables
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
@@ -451,6 +470,7 @@ class QJITDevice(qml.devices.Device):
         raise RuntimeError("QJIT devices cannot execute tapes.")
 
 
+# pragam: no cover
 def filter_out_modifiers(operations):
     """Remove Adjoint/Control from operations.
 
@@ -468,16 +488,20 @@ def filter_out_modifiers(operations):
     return set(filter(is_not_modifier, operations))
 
 
-def get_device_toml_config(device) -> TOMLDocument:
+def _load_device_capabilities(device) -> DeviceCapabilities:
     """Get the contents of the device config file."""
-    if hasattr(device, "config"):
-        # The expected case: device specifies its own config.
-        toml_file = device.config
-    else:
-        # TODO: Remove this section when `qml.devices.Device`s are guaranteed to have their own config file
-        # field.
-        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
+    # TODO: This code exists purely for testing. Find another way to customize device Find a
+    #       better way for a device to customize its capabilities as seen by Catalyst.
+    if hasattr(device, "qjit_capabilities"):
+        return device.qjit_capabilities
+
+    if getattr(device, "config_filepath") is not None:
+        toml_file = device.config_filepath
+
+    else:
+        # TODO: Remove this section when devices are guaranteed to have their own config file
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
         name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
@@ -486,32 +510,31 @@ def get_device_toml_config(device) -> TOMLDocument:
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
 
     try:
-        config = read_toml_file(toml_file)
+        capabilities = DeviceCapabilities.from_toml_file(toml_file, "qjit")
+
     except FileNotFoundError as e:
         raise CompileError(
             "Attempting to compile program for incompatible device: "
             f"Config file ({toml_file}) does not exist"
         ) from e
 
-    return config
+    return capabilities
 
 
 def get_device_capabilities(device) -> DeviceCapabilities:
-    """Get or load DeviceCapabilities structure from device"""
+    """Get or load the original DeviceCapabilities from device"""
+
     assert not isinstance(device, QJITDevice)
 
-    # TODO: This code exists purely for testing. Find another way to customize device
-    #       support easily without injecting code into the package.
-    if hasattr(device, "qjit_capabilities"):
-        return device.qjit_capabilities
+    shots_present = bool(device.shots)
+    device_capabilities = _load_device_capabilities(device)
 
-    program_features = ProgramFeatures(shots_present=bool(device.shots))
-    device_config = get_device_toml_config(device)
-    return load_device_capabilities(device_config, program_features)
+    return device_capabilities.filter(finite_shots=shots_present)
 
 
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
+
     if wires is None:
         raise AttributeError("Catalyst does not support device instances without set wires.")
 

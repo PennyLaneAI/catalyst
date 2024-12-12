@@ -8,6 +8,8 @@ extend-exclude = '''
   | mlir/Enzyme
   | build
   | env
+  | demos
+  | mlir/standalone
 )
 '''
 
@@ -19,6 +21,7 @@ skip = [
   "frontend/catalyst/test/test_oqc/conftest.py",
   "frontend/catalyst/third_party",
   "frontend/test/conftest.py",
+  "catalyst/mlir/standalone",
 ]
 extend_skip_glob = [
   "mlir/llvm-project/*",
@@ -30,6 +33,7 @@ extend_skip_glob = [
   ".vscode/*",
   "*venv*/*",
   "_deps/*",
+  "mlir/standalone/*",
 ]
 known_first_party = ["catalyst"]
 known_third_party = ["diastatic-malt", "jax", "jaxlib", "numpy", "pennylane"]
@@ -38,7 +42,7 @@ known_third_party = ["diastatic-malt", "jax", "jaxlib", "numpy", "pennylane"]
 skips = ["B607"]
 
 [build-system]
-requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy==2.0"]
+requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy!=2.0.0", "nanobind", "cmake", "ninja"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
@@ -54,6 +58,7 @@ omit = [
     "*/python_bindings/*",
     "./frontend/catalyst/_version.py",
     "./frontend/catalyst/_revision.py",
+    "*/standalone/*",
 ]
 
 [tool.coverage.html]

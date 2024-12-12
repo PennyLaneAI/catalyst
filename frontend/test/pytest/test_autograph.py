@@ -25,25 +25,7 @@ import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
-from catalyst import (
-    AutoGraphError,
-    adjoint,
-    autograph_source,
-    cond,
-    ctrl,
-    debug,
-    disable_autograph,
-    for_loop,
-    grad,
-    jacobian,
-    jvp,
-    measure,
-    qjit,
-    run_autograph,
-    vjp,
-    vmap,
-    while_loop,
-)
+from catalyst import *
 from catalyst.autograph.transformer import TRANSFORMER
 from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
@@ -295,7 +277,8 @@ class TestIntegration:
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 
-    def test_adjoint_wrapper(self):
+    @pytest.mark.parametrize("adjoint_fn", [adjoint, qml.adjoint])
+    def test_adjoint_wrapper(self, adjoint_fn):
         """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
 
         def inner(x):
@@ -304,14 +287,15 @@ class TestIntegration:
         @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def fn(x: float):
-            adjoint(inner)(x)
+            adjoint_fn(inner)(x)
             return qml.probs()
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
         assert np.allclose(fn(np.pi), [0.0, 1.0])
 
-    def test_ctrl_wrapper(self):
+    @pytest.mark.parametrize("ctrl_fn", [ctrl, qml.ctrl])
+    def test_ctrl_wrapper(self, ctrl_fn):
         """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
 
         def inner(x):
@@ -320,7 +304,7 @@ class TestIntegration:
         @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def fn(x: float):
-            ctrl(inner, control=1)(x)
+            ctrl_fn(inner, control=1)(x)
             return qml.probs()
 
         assert hasattr(fn.user_function, "ag_unconverted")
@@ -2198,7 +2182,7 @@ class TestJaxIndexOperatorUpdate:
             expected = g(x)
             return result, expected
 
-        result, expected = workflow(np.array([5, 3, 4]))
+        result, expected = workflow(np.array([5.0, 3.0, 4.0]))
         assert jnp.allclose(result, jnp.array([2.5, 1.5, 2]))
         assert jnp.allclose(result, expected)
 

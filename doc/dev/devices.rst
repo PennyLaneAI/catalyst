@@ -25,7 +25,7 @@ Supported backend devices include:
   * - ``lightning.qubit``
 
     - A fast state-vector qubit simulator written with a C++ backend. See the
-      `Lightning documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`__
+      `Lightning-Qubit documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`__
       for more details, as well as its
       `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__
       for natively supported instructions.
@@ -34,9 +34,18 @@ Supported backend devices include:
 
     - A fast state-vector qubit simulator utilizing the Kokkos library for CPU and GPU accelerated
       circuit simulation. See the
-      `Lightning documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`__
+      `Lightning-Kokkos documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`__
       for more details, as well as its
       `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
+      for natively supported instructions.
+
+  * - ``lightning.gpu``
+
+    - A fast state-vector qubit simulator based on the `NVIDIA cuQuantum SDK <https://developer.nvidia.com/cuquantum-sdk>`__
+      for the GPU-accelerated quantum simulation. See the
+      `Lightning-GPU documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_gpu/device.html>`__
+      for more details, as well as its
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_gpu/lightning_gpu.toml>`__
       for natively supported instructions.
 
   * - ``braket.aws.qubit``
@@ -87,3 +96,15 @@ Supported backend devices include:
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for natively supported instructions.
 
+  * - ``oqd.default``
+
+    - Experimental support for execution on `Open Quantum Design (OQD) <https://openquantumdesign.org/>`__
+      trapped-ion hardware. To use OQD with Catalyst, use the ``backend`` argument to specify the
+      OQD backend to use when initializing the device:
+
+      .. code-block:: python
+
+          dev = qml.device("oqd", backend="default", shots=1024, wires=2)
+
+      See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqd/src/oqd.toml>`__
+      for natively supported instructions.

@@ -71,8 +71,10 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     let summary = "Lower scatter op from Stable HLO to loops.";
 
     let dependentDialects = [
+        "mlir::func::FuncDialect",
         "index::IndexDialect",
         "mhlo::MhloDialect",
+        "tensor::TensorDialect",
         "scf::SCFDialect"
     ];
 
@@ -183,6 +185,29 @@ def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 
     let constructor = "catalyst::createApplyTransformSequencePass()";
+}
+
+def InlineNestedModulePass : Pass<"inline-nested-module"> {
+    let summary = "Inline nested modules with qnode attribute.";
+
+    let dependentDialects = [
+        "mlir::func::FuncDialect"
+    ];
+
+    let constructor = "catalyst::createInlineNestedModulePass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"stopAfterStep",
+            /*CLI arg name=*/"stop-after-step",
+            /*type=*/"int",
+            /*default=*/"0",
+            /*description=*/
+            "Useful for tests. This will stop the pass after the given step has been executed "
+            "(steps run from 1 to 5). Defaults to 0 which is equivalent to running "
+            "all steps to completion."
+        >
+    ];
 }
 
 #endif // CATALYST_PASSES

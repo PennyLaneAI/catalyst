@@ -83,13 +83,14 @@ def DeviceInitOp : Quantum_Op<"device"> {
     let summary = "Initialize a quantum device.";
 
     let arguments = (ins
+        Optional<I64>:$shots,
         StrAttr:$lib,
         StrAttr:$name,
         StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      `[` $lib `,` $name `,` $kwargs `]` attr-dict
+      (`shots` `(` $shots^ `)`)? `[` $lib `,` $name `,` $kwargs `]` attr-dict
     }];
 }
 
@@ -452,6 +453,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             return getParams();
         }
     }];
+    let hasCanonicalizeMethod = 1;
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
@@ -522,6 +524,8 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
     }];
+    
+    let hasCanonicalizeMethod = 1;
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
@@ -798,10 +802,11 @@ def SampleOp : Measurement_Op<"sample"> {
     let summary = "Sample eigenvalues from the given observable for the current state";
     let description = [{
         The `quantum.sample` operation represents the measurement process of sampling eigenvalues
-        from an observable on the current quantum state. Given the nature of the operation, an
-        attribute specifying the shot number, i.e. the number of samples to draw, must be specified.
-        The only SSA argument is an observable that must be defined by an operation in the local
-        scope.
+        from an observable on the current quantum state.
+        The only SSA argument is an observable that must be defined by an operation in the local scope.
+        from an observable on the current quantum state.
+        The number of samples to draw is determined by the device shots argument in the device initialization operation in the local scope.
+
 
         Note that the return value type depends on the type of observable provided. Computational
         basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
@@ -810,13 +815,14 @@ def SampleOp : Measurement_Op<"sample"> {
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
         {
+            quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs1 = quantum.compbasis %q0, %q1 : !quantum.obs
-            %samples = quantum.samples %obs1 {shots=1000} : tensor<1000xf64>
+            %samples = quantum.samples %obs1 : tensor<?xf64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %samples2 = quantum.samples %obs2 {shots=1000} : tensor<1000x2xf64>
+            %samples2 = quantum.samples %obs2 : tensor<?x2xf64>
 
             func.return
         }
@@ -830,8 +836,7 @@ def SampleOp : Measurement_Op<"sample"> {
             MemRefRankOf<[F64], [1]>,
             MemRefRankOf<[F64], [2]>
            ]>
-        >:$in_data,
-        I64Attr:$shots
+        >:$in_data
     );
 
     let results = (outs
@@ -861,10 +866,10 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
         from an observable on the current quantum state and counting the frequency of each
-        eigenvalue. Given the nature of the operation, an attribute specifying the shot number,
-        i.e. the number of samples to draw, must be specified.
-        The only SSA argument is an observable that must be defined by an operation in the local
-        scope.
+        eigenvalue.
+        The only SSA argument is an observable that must be defined by an operation in the local scope.
+        from an observable on the current quantum state.
+        The number of samples to draw is determined by the device shots argument in the device initialization operation in the local scope.
 
         Note that the "counts dictionary" is returned as two separate arrays of the same length, one
         array for the eigenvalues, and one for count of each eigenvalue. When operating in the
@@ -874,13 +879,14 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
         Example:
 
         ```mlir
-        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit)
+        func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
         {
+            quantum.device shots(%shots) ["rtd_lightning.so", "lightning.qubit", "{my_attr: my_attr_value}"]
             %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-            %counts = quantum.counts %obs {shots=1000} : tensor<4xf64>, tensor<4xi64>
+            %counts = quantum.counts %obs : tensor<4xf64>, tensor<4xi64>
 
             %obs2 = quantum.pauli %q0[3], %q1[1] : !quantum.obs
-            %counts2 = quantum.counts %obs2 {shots=1000} : tensor<2xf64>, tensor<2xi64>
+            %counts2 = quantum.counts %obs2 : tensor<2xf64>, tensor<2xi64>
 
             func.return
         }
@@ -890,8 +896,7 @@ def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicRe
     let arguments = (ins
         ObservableType:$obs,
         Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
-        Optional<MemRefRankOf<[I64], [1]>>:$in_counts,
-        I64Attr:$shots
+        Optional<MemRefRankOf<[I64], [1]>>:$in_counts
     );
 
     let results = (outs
@@ -919,9 +924,9 @@ def ExpvalOp : Measurement_Op<"expval"> {
     let description = [{
         The `quantum.expval` operation represents the measurement process of computing the
         expectation value of an observable on the current quantum state. While this quantity can
-        be computed analytically on simulators, an optional attribute specifiying the shot number,
-        i.e. the number of samples to draw, can be specified for hardware execution or shot noise
-        simulation.
+        be computed analytically on simulators, for hardware execution or shot noise
+        simulation, the shots attached to the device
+        in the local scope is used.
         The only SSA argument is an observable that must be defined by an operation in the local
         scope.
 
@@ -939,8 +944,7 @@ def ExpvalOp : Measurement_Op<"expval"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs,
-        OptionalAttr<I64Attr>:$shots
+        ObservableType:$obs
     );
 
     let results = (outs
@@ -956,9 +960,9 @@ def VarianceOp : Measurement_Op<"var"> {
     let summary = "Compute the variance of the given observable for the current state";
     let description = [{
         The `quantum.var` operation represents the measurement process of computing the variance of
-        an observable on the current quantum state. While this quantity can be computed analytically
-        on simulators, an optional attribute specifiying the shot number, i.e. the number of samples
-        to draw, can be specified for hardware execution or shot noise simulation.
+        an observable on the current quantum state. While this quantity can be computed analytically on simulators, for hardware execution or shot noise
+        simulation, the shots attached to the device
+        in the local scope is used.
         The only SSA argument is an observable that must be defined by an operation in the local
         scope.
 
@@ -976,8 +980,7 @@ def VarianceOp : Measurement_Op<"var"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs,
-        OptionalAttr<I64Attr>:$shots
+        ObservableType:$obs
     );
 
     let results = (outs

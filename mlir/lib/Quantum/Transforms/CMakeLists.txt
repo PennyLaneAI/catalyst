@@ -14,6 +14,9 @@ file(GLOB SRC
     remove_chained_self_inverse.cpp
     SplitMultipleTapes.cpp
     merge_rotation.cpp
+    MergeRotationsPatterns.cpp
+    ions_decompositions.cpp
+    IonsDecompositionPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

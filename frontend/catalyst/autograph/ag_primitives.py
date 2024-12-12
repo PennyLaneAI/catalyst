@@ -36,6 +36,7 @@ from pennylane.queuing import AnnotatedQueue
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
@@ -536,12 +537,16 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # HOTFIX: pass through calls of known Catalyst wrapper functions
         if fn in (
             catalyst.adjoint,
+            qml.adjoint,
             catalyst.ctrl,
+            qml.ctrl,
             catalyst.grad,
+            catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
             catalyst.jvp,
             catalyst.vmap,
+            catalyst.mitigate_with_zne,
         ):
             assert args and callable(args[0])
             wrapped_fn = args[0]
@@ -555,18 +560,22 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 **(kwargs if kwargs is not None else {}),
             )
 
-        # TODO: find a way to handle custom decorators more effectively with autograph
-        # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
-        # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
-        # than the QNode or QJIT call method.
+        # Catalyst decorators / transforms generate a callable class instance. When we invoke
+        # these instances from autograph code, we want to transform the wrapped function as well
+        # but not the __call__ method itself or other class code.
+        # The CatalystCallable class provides a method a transparently call the wrapped function
+        # through an additional wrapper, while the class is invoked.
+        if isinstance(fn, CatalystCallable):
 
-        # For nested QJIT calls, the class already forwards to the wrapped function, bypassing any
-        # class functionality. We just do the same here:
-        if isinstance(fn, catalyst.QJIT):
-            fn = fn.user_function
+            def ag_wrapper(inner_fn):
+                return lambda *inner_args, **inner_kwargs: converted_call(
+                    inner_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                )
 
-        # For QNode calls, we employ a wrapper to correctly forward the quantum function call to
-        # autograph, while still invoking the QNode call method in the surrounding tracing context.
+            return fn.call_with_wrapper(ag_wrapper, args, kwargs if kwargs is not None else {})
+
+        # For QNode calls, since the class is not part of the Catalyst package, we manually add a
+        # wrapper to correctly forward the quantum function call to autograph.
         if isinstance(fn, qml.QNode):
 
             @functools.wraps(fn.func)

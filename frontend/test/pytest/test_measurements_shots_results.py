@@ -124,11 +124,13 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hermitian(self, backend):
+    def test_hermitian(self, backend, tol_stochastic):
         """Test expval Hermitian observables with shots."""
+        n_wires = 3
+        n_shots = 10000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=3, shots=10000))
+        @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -136,13 +138,12 @@ class TestExpval:
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qml.expval(qml.Hermitian(A, wires=2))
 
-        with pytest.raises(
-            RuntimeError,
-            match="Hermitian observables with shot measurement are not supported",
-        ):
-            circuit(np.pi / 4, np.pi / 4)
+        expected = circuit(np.pi / 4, np.pi / 4)
+        result = qjit(circuit)(np.pi / 4, np.pi / 4)
+
+        assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_paulix_pauliy(self, backend, tol_stochastic):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
@@ -332,11 +333,13 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hermitian_shots(self, backend):
+    def test_hermitian_shots(self, backend, tol_stochastic):
         """Test var Hermitian observables with shots."""
+        n_wires = 3
+        n_shots = 10000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=3, shots=10000))
+        @qml.qnode(dev)
         def circuit(x, y):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -344,13 +347,12 @@ class TestVar:
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.var(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qml.var(qml.Hermitian(A, wires=2))
 
-        with pytest.raises(
-            RuntimeError,
-            match="Hermitian observables with shot measurement are not supported",
-        ):
-            circuit(np.pi / 4, np.pi / 4)
+        expected = circuit(np.pi / 4, np.pi / 4)
+        result = qjit(circuit)(np.pi / 4, np.pi / 4)
+
+        assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_paulix_pauliy(self, backend, tol_stochastic):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
@@ -438,7 +440,7 @@ class TestVar:
             # TODO: only raises with the new API, Kokkos should also raise an error.
             with pytest.raises(
                 TypeError,
-                match=r"VarianceMP\(Hamiltonian\/Sum\) cannot be computed with samples",
+                match=r"VarianceMP\(Sum\) cannot be computed with samples.",
             ):
                 circuit(0.432, 0.123, -0.543)
 
@@ -479,6 +481,51 @@ class TestProbs:
         expected = circuit(0.432)
         result = qjit(circuit)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
+
+
+class TestShadow:
+    """Test shadow."""
+
+    @pytest.mark.xfail(reason="Not supported on lightning.")
+    def test_shadow(self):
+        """Test that Shadow can be used with Catalyst."""
+
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+
+        @qjit
+        @qml.qnode(dev)
+        def classical_shadow_circuit():
+            qml.Hadamard(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.classical_shadow(wires=[0, 1])
+
+        expected_bits = [[1, 1], [0, 1]]
+        expected_recipes = [[0, 1], [0, 2]]
+        actual_bits, actual_recipes = classical_shadow_circuit()
+        assert expected_bits == actual_bits
+        assert expected_recipes == actual_recipes
+
+
+class TestShadowExpval:
+    """Test shadowexpval."""
+
+    @pytest.mark.xfail(reason="TypeError in Catalyst")
+    def test_shadow_expval(self):
+        """Test that ShadowExpVal can be used with Catalyst."""
+
+        dev = qml.device("lightning.qubit", wires=range(2), shots=10000)
+
+        @qjit
+        @qml.qnode(dev)
+        def shadow_expval_circuit(x, obs):
+            qml.Hadamard(0)
+            qml.CNOT((0, 1))
+            qml.RX(x, wires=0)
+            return qml.shadow_expval(obs)
+
+        H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
+        expected = 1.9917
+        assert shadow_expval_circuit(0, H) == expected
 
 
 class TestOtherMeasurements:

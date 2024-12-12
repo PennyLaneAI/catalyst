@@ -22,7 +22,6 @@ from catalyst.device.qjit_device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
-    get_device_toml_config,
 )
 
 __all__ = (
@@ -31,5 +30,4 @@ __all__ = (
     "extract_backend_info",
     "get_device_capabilities",
     "get_device_shots",
-    "get_device_toml_config",
 )

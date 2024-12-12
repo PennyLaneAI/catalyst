@@ -1,0 +1,29 @@
+diff -ruN standalone_unmodified/test/lit.cfg.py standalone/test/lit.cfg.py
+--- standalone_unmodified/test/lit.cfg.py	2024-11-20 16:54:58.007932919 -0500
++++ standalone/test/lit.cfg.py	2024-11-20 17:01:13.393276025 -0500
+@@ -51,12 +51,13 @@
+ # Tweak the PATH to include the tools dir.
+ llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
+ 
+-tool_dirs = [config.standalone_tools_dir, config.llvm_tools_dir]
++tool_dirs = [config.standalone_tools_dir, config.llvm_tools_dir, config.catalyst_tools_dir]
+ tools = [
+     "mlir-opt",
+     "standalone-capi-test",
+     "standalone-opt",
+     "standalone-translate",
++    "catalyst-cli",
+ ]
+ 
+ llvm_config.add_tool_substitutions(tools, tool_dirs)
+diff -ruN standalone_unmodified/test/lit.site.cfg.py.in standalone/test/lit.site.cfg.py.in
+--- standalone_unmodified/test/lit.site.cfg.py.in	2024-11-20 16:54:58.007932919 -0500
++++ standalone/test/lit.site.cfg.py.in	2024-11-20 17:01:28.765003073 -0500
+@@ -1,6 +1,7 @@
+ @LIT_SITE_CFG_IN_HEADER@
+ 
+ config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")
++config.catalyst_tools_dir = lit_config.substitute("@CATALYST_TOOLS_DIR@")
+ config.mlir_obj_dir = "@MLIR_BINARY_DIR@"
+ config.enable_bindings_python = @MLIR_ENABLE_BINDINGS_PYTHON@
+ config.standalone_obj_root = "@STANDALONE_BINARY_DIR@"

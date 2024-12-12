@@ -18,8 +18,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
-from catalyst.passes import cancel_inverses, pipeline
+from catalyst import pipeline, qjit
+from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
@@ -64,6 +64,60 @@ def test_cancel_inverses_functionality(theta, backend):
 
 
 @pytest.mark.parametrize("theta", [42.42])
+def test_merge_rotation_functionality(theta, backend):
+
+    @qjit
+    def workflow():
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.RZ(x, wires=0)
+            qml.adjoint(qml.RZ)(x, wires=0)
+            qml.Rot(x, x, x, wires=0)
+            qml.Rot(x, x, x, wires=0)
+            qml.PhaseShift(x, wires=0)
+            qml.PhaseShift(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.probs()
+
+        @merge_rotations
+        @qml.qnode(qml.device(backend, wires=1))
+        def g(x):
+            qml.RX(x, wires=0)
+            qml.RX(x, wires=0)
+            qml.RZ(x, wires=0)
+            qml.adjoint(qml.RZ)(x, wires=0)
+            qml.Rot(x, x, x, wires=0)
+            qml.Rot(x, x, x, wires=0)
+            qml.PhaseShift(x, wires=0)
+            qml.PhaseShift(x, wires=0)
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.probs()
+
+        return f(theta), g(theta)
+
+    @qml.qnode(qml.device("default.qubit", wires=1))
+    def reference(x):
+        qml.RX(x, wires=0)
+        qml.RX(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.adjoint(qml.RZ)(x, wires=0)
+        qml.Rot(x, x, x, wires=0)
+        qml.Rot(x, x, x, wires=0)
+        qml.PhaseShift(x, wires=0)
+        qml.PhaseShift(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.probs()
+
+    assert np.allclose(workflow()[0], workflow()[1])
+    assert np.allclose(workflow()[1], reference(theta))
+
+
+@pytest.mark.parametrize("theta", [42.42])
 def test_cancel_inverses_functionality_outside_qjit(theta, backend):
 
     @cancel_inverses
@@ -92,39 +146,33 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_pipeline_functionality(capfd, theta, backend):
+def test_pipeline_functionality(theta, backend):
     """
     Test that the @pipeline decorator does not change functionality
     when all the passes in the pipeline does not change functionality.
     """
     my_pipeline = {
         "cancel_inverses": {},
-        "merge_rotations": {"my-option": "aloha"},
+        "merge_rotations": {},
     }
 
     @qjit
     def workflow():
         @qml.qnode(qml.device(backend, wires=2))
         def f(x):
+            qml.RX(0.1, wires=[0])
             qml.RX(x, wires=[0])
             qml.Hadamard(wires=[1])
             qml.Hadamard(wires=[1])
             return qml.expval(qml.PauliY(wires=0))
 
         no_pipeline_result = f(theta)
-        pipeline_result = pipeline(pass_pipeline=my_pipeline)(f)(theta)
+        pipeline_result = pipeline(my_pipeline)(f)(theta)
 
         return no_pipeline_result, pipeline_result
 
     res = workflow()
     assert np.allclose(res[0], res[1])
-
-    # TODO: the boilerplate merge rotation pass prints out different messages based on
-    # the pass option.
-    # The purpose is to test the integration of pass options with pipeline decorator.
-    # Remove the string check when merge rotation becomes the actual merge rotation pass.
-    output_message = capfd.readouterr().err
-    assert output_message == "merge rotation pass, aloha!\n"
 
 
 ### Test bad usages of pass decorators ###
@@ -141,13 +189,19 @@ def test_cancel_inverses_bad_usages():
             TypeError,
             match="A QNode is expected, got the classical function",
         ):
-            pipeline(classical_func)
+            pipeline({})(classical_func)
 
         with pytest.raises(
             TypeError,
             match="A QNode is expected, got the classical function",
         ):
             cancel_inverses(classical_func)
+
+        with pytest.raises(
+            TypeError,
+            match="A QNode is expected, got the classical function",
+        ):
+            merge_rotations(classical_func)
 
     test_cancel_inverses_not_on_qnode()
 

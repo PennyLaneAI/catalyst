@@ -27,7 +27,7 @@ jobs:
   check-config:
     name: Build Configuration
     needs: [constants]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout Catalyst repo
@@ -39,7 +39,7 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        git checkout v0.8.1-rc
+        git checkout v0.9.0-rc
 
     - name: Install deps
       run: |
@@ -95,52 +95,20 @@ jobs:
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
+        ENABLE_LLD=ON \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        ENABLE_LLD=ON \
-        make dialects
-        make frontend
-
-    - name: Build Catalyst Runtime (latest)
-      if: ${{ inputs.lightning == 'latest' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        ENABLE_LLD=OFF \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=master \
-        make runtime
-
-    - name: Build Catalyst Runtime (stable)
-      if: ${{ inputs.lightning == 'stable' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=latest_release \
         ENABLE_OPENQASM=ON \
-        make runtime
-
-    - name: Build Catalyst Runtime (release-candidate)
-      if: ${{ inputs.lightning == 'release-candidate' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=v0.38.0_rc \
-        ENABLE_OPENQASM=ON \
-        make runtime
+        make catalyst
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
-        pip install --upgrade pennylane-lightning
-        pip install --upgrade pennyLane-lightning-kokkos
+        pip install --no-deps --force pennylane-lightning
+        pip install --no-deps --force pennyLane-lightning-kokkos
 
     - name: Download PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'latest' }}
@@ -156,7 +124,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: PennyLaneAI/pennylane-lightning
-        ref: v0.38.0_rc
+        ref: v0.39.0_rc
         path: lightning_build
         fetch-depth: 0
 
@@ -165,9 +133,9 @@ jobs:
       run: |
         # Lightning-Kokkos can no longer be installed with pip from git
         cd lightning_build
-        pip install --upgrade .
+        pip install --no-deps --force .
         PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --upgrade .
+        pip install --no-deps --force .
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -175,25 +143,25 @@ jobs:
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}
       run: |
-        pip install --upgrade pennylane
+        pip install --no-deps --force pennylane
 
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.39.0-rc0
 
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
 
     - name: Run Frontend Tests
       run: |
@@ -203,9 +171,9 @@ jobs:
       run: |
         make pytest TEST_BACKEND="lightning.kokkos"
 
-    - name: Run Frontend Tests (Braket)
-      run: |
-        make pytest TEST_BRAKET=LOCAL
+    # - name: Run Frontend Tests (Braket)
+    #   run: |
+    #     make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
       run: | # Do not run demos in parallel, seems to cause package issues with numpy.

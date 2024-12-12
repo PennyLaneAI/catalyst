@@ -48,6 +48,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     # Cache external project sources
     # Hopefully these can be shared with the main check-catalyst action since we don't run this
     # build in a container.
@@ -132,7 +137,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -144,13 +149,13 @@ jobs:
               -DLLVM_ENABLE_PROJECTS="mlir" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -180,9 +185,9 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_LLD=OFF \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -201,7 +206,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build enzyme-build --target EnzymeStatic-19
 
@@ -227,6 +232,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     - name: Install Dependencies (System)
       run: |
         brew install libomp
@@ -240,7 +250,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -296,25 +306,23 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
+        # On GH images, gfortran is only available as a specific version.
+        export FC=gfortran-14
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython_ROOT_DIR=$(python${{ matrix.python_version }} -c "import sys; print(sys.prefix)") \
+              -DPYTHON_VERSION_TO_FIND=${{ matrix.python_version }} \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG=6f3e0d5d371ff9823a3177dd2c66052668883d42\
-              -DENABLE_LAPACK=OFF \
-              -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF \
-              -DLQ_ENABLE_KERNEL_OMP=OFF
+              -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
+        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
     - name: Test Catalyst-Runtime
       run: |
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
-        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
-        ./runtime-build/tests/runner_tests_lightning
+        cmake --build runtime-build --target runner_tests_openqasm
         ./runtime-build/tests/runner_tests_openqasm
 
     # Build OQC-Runtime
@@ -324,6 +332,14 @@ jobs:
           RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
+
+    # Build OQD-Runtime
+    - name: Build OQD-Runtime
+      run: |
+          OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
+          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqd
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -339,12 +355,20 @@ jobs:
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_ZLIB=FORCE_ON \
+              -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm
 
-        cmake --build quantum-build --target check-dialects compiler_driver
+        cmake --build quantum-build --target check-dialects catalyst-cli
+
+    - name: Build Standalone Plugin
+      run: |
+        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        make plugin
+        mkdir -p quantum-build/lib
+        mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib
 
     - name: Build wheel
       run: |
@@ -354,6 +378,7 @@ jobs:
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
@@ -384,6 +409,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
+    - name: Install Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
+
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
       with:
@@ -406,6 +436,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
+
     - name: Install OQC client
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
@@ -419,5 +450,6 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto

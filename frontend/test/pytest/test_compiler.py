@@ -30,7 +30,8 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst.debug import instrumentation
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
@@ -77,6 +78,20 @@ class TestCompilerOptions:
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
         workflow.workspace.cleanup()
 
+    def test_compilation_with_instrumentation(self, capsys, backend):
+        """Test compilation with instrumentation"""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            return qml.state()
+
+        with instrumentation(circuit.__name__, filename=None, detailed=True):
+            qjit(circuit)()
+
+        capture_result = capsys.readouterr()
+        capture = capture_result.out + capture_result.err
+        assert "[DIAGNOSTICS]" in capture
+
 
 class TestCompilerWarnings:
     """Test compiler's warning messages."""
@@ -122,7 +137,7 @@ class TestCompilerErrors:
         """Test the return value if a user requests an intermediate file that doesn't exist."""
         compiler = Compiler()
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("inexistent-file")
+            compiler.get_output_of("inexistent-file", ".")
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
@@ -158,7 +173,10 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     )
                     output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
-                    return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
+                    return (
+                        filename,
+                        "<FAKE_IR>",
+                    )
 
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=1))
@@ -208,9 +226,12 @@ class TestCompilerState:
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
+        options = CompileOptions()
+        pipelines = options.get_stages()
+
         @qjit(
             keep_intermediate=True,
-            pipelines=[("EmptyPipeline1", [])] + DEFAULT_PIPELINES + [("EmptyPipeline2", [])],
+            pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
         )
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
@@ -219,15 +240,15 @@ class TestCompilerState:
 
         compiler = workflow.compiler
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("EmptyPipeline1")
-        assert compiler.get_output_of("HLOLoweringPass")
-        assert compiler.get_output_of("QuantumCompilationPass")
+            compiler.get_output_of("EmptyPipeline1", workflow.workspace)
+        assert compiler.get_output_of("HLOLoweringPass", workflow.workspace)
+        assert compiler.get_output_of("QuantumCompilationPass", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("EmptyPipeline2")
-        assert compiler.get_output_of("BufferizationPass")
-        assert compiler.get_output_of("MLIRToLLVMDialect")
+            compiler.get_output_of("EmptyPipeline2", workflow.workspace)
+        assert compiler.get_output_of("BufferizationPass", workflow.workspace)
+        assert compiler.get_output_of("MLIRToLLVMDialect", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            compiler.get_output_of("None-existing-pipeline")
+            compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
     def test_print_nonexistent_stages(self, backend):
@@ -240,7 +261,7 @@ class TestCompilerState:
             return qml.state()
 
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
-            workflow.compiler.get_output_of("None-existing-pipeline")
+            workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
     def test_workspace(self):
@@ -301,17 +322,18 @@ class TestCompilerState:
             )
             compiled.compile()
 
+        stack_trace_pattern = "diagnostic emitted with trace"
+
         assert "Failed to lower MLIR module" in e.value.args[0]
-        assert "While processing 'TestPass' pass of the 'PipelineB' pipeline" in e.value.args[0]
-        assert "PipelineA" not in e.value.args[0]
-        assert "Trace" not in e.value.args[0]
-        assert isfile(os.path.join(str(compiled.workspace), "2_PipelineB_FAILED.mlir"))
+        assert "While processing 'TestPass' pass " in e.value.args[0]
+        assert stack_trace_pattern not in e.value.args[0]
+        assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
-        assert "Trace" in e.value.args[0]
+        assert stack_trace_pattern in e.value.args[0]
 
 
 class TestCustomCall:

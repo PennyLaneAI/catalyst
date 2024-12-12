@@ -8,19 +8,20 @@ configure_lit_site_cfg(
 set(DIALECT_TESTS_DEPEND
     FileCheck
     quantum-opt
+    catalyst-cli
 )
 
 set(TEST_SUITES
-    Catalyst
     Quantum
     Gradient
     Mitigation
-    Catalyst)
+    Catalyst
+    cli
+    )
 
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
     list(APPEND DIALECT_TESTS_DEPEND QuantumPythonModules)
-    list(APPEND TEST_SUITES python)
 endif()
 
 add_lit_testsuite(check-dialects "Run the regression tests for mlir dialects"

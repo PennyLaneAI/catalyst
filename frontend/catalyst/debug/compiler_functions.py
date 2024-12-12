@@ -21,20 +21,12 @@ import platform
 import re
 import shutil
 import subprocess
-import sys
-import sysconfig
-from itertools import product
-
-from jax.interpreters import mlir
 
 import catalyst
-from catalyst.compiled_functions import CompiledFunction
-from catalyst.compiler import Compiler, LinkerDriver
+from catalyst.compiler import LinkerDriver
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
-from catalyst.utils.exceptions import CompileError
-from catalyst.utils.filesystem import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -71,7 +63,7 @@ def get_compilation_stage(fn, stage):
     Returns:
         str: output ir from the target compiler stage
 
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`, :func:`~.compile_from_mlir`.
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`.
 
     **Example**
 
@@ -102,9 +94,15 @@ def get_compilation_stage(fn, stage):
     if not isinstance(fn, catalyst.QJIT):
         raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
 
-    if stage == "last":
-        return fn.compiler.last_compiler_output.get_output_ir()
-    return fn.compiler.get_output_of(stage)
+    return fn.compiler.get_output_of(stage, fn.workspace)
+
+
+@debug_logger
+def get_compilation_stages_groups(options):
+    """Returns a list of tuples. The tuples correspond to the name
+    of the compilation stage and the list of passes within that stage.
+    """
+    return options.get_stages()
 
 
 @debug_logger
@@ -132,66 +130,6 @@ def get_cmain(fn, *args):
     return fn.compiled_function.get_cmain(*args)
 
 
-# pylint: disable=line-too-long
-@debug_logger
-def compile_from_mlir(ir, compiler=None, compile_options=None):
-    r"""Compile a Catalyst function to binary code from the provided MLIR.
-
-    Args:
-        ir (str): the MLIR to compile in string form
-        compile_options: options to use during compilation
-
-    Returns:
-        CompiledFunction: A callable that manages the compiled shared library and its invocation.
-
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.replace_ir`.
-
-    **Example**
-
-    The main entry point of the program is required to start with ``catalyst.entry_point``, and
-    the program is required to contain ``setup`` and ``teardown`` functions.
-
-    .. code-block:: python
-
-        ir = r\"""
-            module @workflow {
-                func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-                    return %arg0 : tensor<f64>
-                }
-                func.func @setup() {
-                    quantum.init
-                    return
-                }
-                func.func @teardown() {
-                    quantum.finalize
-                    return
-                }
-            }
-        \"""
-
-        compiled_function = debug.compile_from_mlir(ir)
-
-    >>> compiled_function(0.1)
-    [0.1]
-    """
-    EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-
-    if compiler is None:
-        compiler = Compiler(compile_options)
-
-    module_name = "debug_module"
-    workspace_dir = os.getcwd() if compiler.options.keep_intermediate else None
-    workspace = WorkspaceManager.get_or_create_workspace("debug_workspace", workspace_dir)
-    shared_object, _llvm_ir, func_data = compiler.run_from_ir(ir, module_name, workspace)
-
-    # Parse inferred function data, like name and return types.
-    qfunc_name = func_data[0]
-    with mlir.ir.Context():
-        result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
-
-    return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
-
-
 @debug_logger
 def replace_ir(fn, stage, new_ir):
     r"""Replace the IR at any compilation stage that will be used the next time the function runs.
@@ -215,7 +153,7 @@ def replace_ir(fn, stage, new_ir):
         stage (str): Recompilation picks up after this stage.
         new_ir (str): The replacement IR to use for recompilation.
 
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`, :func:`~.compile_from_mlir`.
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.get_compilation_stage`.
 
     **Example**
 
@@ -301,47 +239,6 @@ def compile_executable(fn, *args):
     if not fn.compiled_function:
         fn(*args)
 
-    # Try default library paths in case the targeted python-dev is shipped with OS.
-    path_candidates = [
-        sysconfig.get_config_var("LIBDIR"),
-        "/usr/lib/x86_64-linux-gnu",
-        "/usr/local/lib64",
-        "/usr/local/lib",
-        "/usr/lib64",
-        "/usr/lib",
-    ]
-    version_info = sys.version_info
-    # Check libpython3.x.so first because libpython3.so might not link to it.
-    version_candidates = [f"{version_info.major}.{version_info.minor}", f"{version_info.major}"]
-
-    file_extension = ".so" if platform.system() == "Linux" else ".dylib"
-    python_lib_dir_path = ""
-    version_str = ""
-
-    for candidate in list(product(path_candidates, version_candidates)):
-        path_candidate, version_candidate = candidate
-        if os.path.isfile(path_candidate + f"/libpython{version_candidate}{file_extension}"):
-            version_str = version_candidate
-            python_lib_dir_path = path_candidate
-            break
-
-    if not python_lib_dir_path or not version_str:  # pragma: nocover
-        raise CompileError(
-            f'Unable to find Python library {version_candidates} at "{path_candidates}". '
-            "Please ensure that python-dev or python-devel is installed and available via pip."
-        )
-
-    lib_path_flags = [
-        f"-Wl,-rpath,{python_lib_dir_path}",
-        f"-L{python_lib_dir_path}",
-        "-lpython" + version_str,
-    ]
-
-    # Linker in macOS might use @rpath/Python3.framework/Versions/3.x/Python3.
-    if platform.system() == "Darwin":  # pragma: nocover
-        python_lib_dir_rpath = python_lib_dir_path.split("Python3.framework")[0]
-        lib_path_flags.insert(1, f"-Wl,-rpath,{python_lib_dir_rpath}")
-
     f_name = str(fn.__name__)
     workspace = str(fn.workspace) if fn.compile_options.keep_intermediate else os.getcwd()
     main_c_file = workspace + "/main.c"
@@ -369,7 +266,7 @@ def compile_executable(fn, *args):
         "-Wl,-rpath," + workspace,
         shared_object_file,
         f"-Wl,-rpath,{object_directory}",
-    ] + lib_path_flags
+    ]
     LinkerDriver.run(main_c_file, outfile=output_file, flags=link_so_flags, options=options)
 
     # Patch DLC prefix related to openblas
