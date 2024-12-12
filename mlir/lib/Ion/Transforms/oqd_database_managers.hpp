@@ -18,8 +18,8 @@
 
 #include <toml++/toml.hpp>
 
-static const std::string catalyst_root_path = std::regex_replace(
-    __FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
+static const std::string catalyst_root_path =
+    std::regex_replace(__FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
 static const std::string oqd_device_parameters_toml_file_path =
     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_device_parameters.toml";
 static const std::string oqd_qubit_parameters_toml_file_path =
@@ -34,14 +34,18 @@ toml::parse_result load_toml_file(const std::string &path) { return toml::parse_
 template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
 {
     std::vector<T> vec;
-    for (size_t i = 0; i < arr.size(); i++) {
-        if constexpr (std::is_same_v<T, int64_t>) {
-            vec.push_back(arr[i].as_integer()->get());
-        }
-        else if constexpr (std::is_same_v<T, double>) {
-            vec.push_back(arr[i].as_floating_point()->get());
+
+    if constexpr (std::is_same_v<T, int64_t>) {
+        for (const auto &elem : arr) {
+            vec.push_back(elem.as_integer()->get());
         }
     }
+    else if constexpr (std::is_same_v<T, double>) {
+        for (const auto &elem : arr) {
+            vec.push_back(elem.as_floating_point()->get());
+        }
+    }
+
     return vec;
 }
 
