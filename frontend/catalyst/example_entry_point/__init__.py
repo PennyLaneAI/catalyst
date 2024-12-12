@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-   Version number (major.minor.patch[-label])
-"""
+"""Example module with entry points"""
 
-__version__ = "0.10.0-dev22"
+import platform
+from pathlib import Path
+
+from catalyst.utils.runtime_environment import get_bin_path
+
+
+def name2pass(_name):
+    """Example entry point for standalone plugin"""
+    ext = "so" if platform.system() == "Linux" else "dylib"
+    plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
+    plugin = Path(plugin_path)
+    return plugin, "standalone-switch-bar-foo"
