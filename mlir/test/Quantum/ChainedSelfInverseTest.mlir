@@ -330,12 +330,12 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 
-    %out_qubits = quantum.custom "RX"() [2.000000e-01] %1 : !quantum.bit
-    %out_qubits_1 = quantum.custom "RX"() [2.000000e-01] %out_qubits {adjoint} : !quantum.bit
+    %out_qubits = quantum.custom "RX"( [2.000000e-01]) %1 : !quantum.bit
+    %out_qubits_1 = quantum.custom "RX"( [2.000000e-01]) %out_qubits {adjoint} : !quantum.bit
 
 
-    %out_qubits_2 = quantum.custom "RX"() [2.000000e-01] %out_qubits_1 {adjoint} : !quantum.bit
-    %out_qubits_3 = quantum.custom "RX"() [2.000000e-01] %out_qubits_2 : !quantum.bit
+    %out_qubits_2 = quantum.custom "RX"( [2.000000e-01]) %out_qubits_1 {adjoint} : !quantum.bit
+    %out_qubits_3 = quantum.custom "RX"( [2.000000e-01]) %out_qubits_2 : !quantum.bit
 
     // CHECK-NOT: quantum.custom
     // CHECK: return [[IN]]
@@ -619,8 +619,8 @@ func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit,
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
 
-    %mrz:3 = quantum.multirz() [2.000000e-01] %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
-    %mrz_out:3 = quantum.multirz() [2.000000e-01] %mrz#0, %mrz#1, %mrz#2 {adjoint} : !quantum.bit, !quantum.bit, !quantum.bit
+    %mrz:3 = quantum.multirz( [2.000000e-01]) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mrz_out:3 = quantum.multirz( [2.000000e-01]) %mrz#0, %mrz#1, %mrz#2 {adjoint} : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK-NOT: quantum.multirz
     // CHECK: return [[IN0]], [[IN1]], [[IN2]]
