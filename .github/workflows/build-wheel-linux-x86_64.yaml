@@ -396,7 +396,9 @@ jobs:
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         make plugin-wheel
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/dist/*.whl --no-deps
+        python${{ matrix.python_version }} -m pip install pennylane
         python${{ matrix.python_version }} standalone_plugin_wheel/standalone_plugin/test/test_standalone_plugin.py
+        python${{ matrix.python_version }} -m pip uninstall pennylane
 
     - name: Build wheel
       run: |
