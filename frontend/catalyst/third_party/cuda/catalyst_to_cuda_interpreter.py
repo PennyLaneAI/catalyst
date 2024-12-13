@@ -428,10 +428,11 @@ def change_instruction(ctx, eqn):
     op = params["op"]
     cuda_inst_name = from_catalyst_to_cuda[op]
     qubits_len = params["qubits_len"]
+    static_params = params.get("static_params")
 
     # Now, we can map to the correct op
     # For now just assume rx
-    cuda_inst(ctx.kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
+    cuda_inst(ctx.kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len, static_params=static_params)
 
     # Finally determine how many are qubits.
     qubits = qubits_or_params[:qubits_len]
