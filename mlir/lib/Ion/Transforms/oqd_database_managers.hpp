@@ -67,7 +67,7 @@ class OQDDatabaseManager {
     std::vector<Beam> getBeams1Params() { return beams1; }
     std::vector<Beam> getBeams2Params() { return beams2; }
 
-    std::vector<PhononTriplet> getPhononParams() { return phonons; }
+    std::vector<PhononMode> getPhononParams() { return phonons; }
 
   private:
     toml::parse_result sourceTomlDevice;
@@ -77,7 +77,7 @@ class OQDDatabaseManager {
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
 
-    std::vector<PhononTriplet> phonons;
+    std::vector<PhononMode> phonons;
 
     void loadBeams1Params() { loadBeamsParamsImpl("beams1"); }
     void loadBeams2Params() { loadBeamsParamsImpl("beams2"); }
@@ -122,7 +122,7 @@ class OQDDatabaseManager {
     void loadPhononParams()
     {
         toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition["phonons"];
-        size_t numPhononTriplets = phononsToml.as_array()->size();
+        size_t numPhononModes = phononsToml.as_array()->size();
 
         auto parseSingleDirection = [](auto direction) {
             double energy = direction["energy"].as_floating_point()->get();
@@ -131,14 +131,14 @@ class OQDDatabaseManager {
             return Phonon(energy, eigenvector);
         };
 
-        for (size_t i = 0; i < numPhononTriplets; i++) {
-            auto phononTriplet = phononsToml[i];
+        for (size_t i = 0; i < numPhononModes; i++) {
+            auto phononMode = phononsToml[i];
 
-            Phonon COM_x = parseSingleDirection(phononTriplet["COM_x"]);
-            Phonon COM_y = parseSingleDirection(phononTriplet["COM_y"]);
-            Phonon COM_z = parseSingleDirection(phononTriplet["COM_z"]);
+            Phonon COM_x = parseSingleDirection(phononMode["COM_x"]);
+            Phonon COM_y = parseSingleDirection(phononMode["COM_y"]);
+            Phonon COM_z = parseSingleDirection(phononMode["COM_z"]);
 
-            phonons.push_back(PhononTriplet(COM_x, COM_y, COM_z));
+            phonons.push_back(PhononMode(COM_x, COM_y, COM_z));
         }
     }
 };

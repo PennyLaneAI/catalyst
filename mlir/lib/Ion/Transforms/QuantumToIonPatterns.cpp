@@ -167,7 +167,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                   const std::vector<Beam> &beams2,
-                                  const std::vector<PhononTriplet> &phonons)
+                                  const std::vector<PhononMode> &phonons)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
 
@@ -360,7 +360,7 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     OQDDatabaseManager dataManager;
     std::vector<Beam> beams1 = dataManager.getBeams1Params();
     std::vector<Beam> beams2 = dataManager.getBeams2Params();
-    std::vector<PhononTriplet> phonons = dataManager.getPhononParams();
+    std::vector<PhononMode> phonons = dataManager.getPhononParams();
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {

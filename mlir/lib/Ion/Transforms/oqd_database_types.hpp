@@ -41,13 +41,13 @@ struct Phonon {
     }
 };
 
-struct PhononTriplet {
+struct PhononMode {
     // This struct contains the calibrated phonon parameters for one ion.
     Phonon COM_x;
     Phonon COM_y;
     Phonon COM_z;
 
-    PhononTriplet(Phonon x, Phonon y, Phonon z) : COM_x(x), COM_y(y), COM_z(z) {}
+    PhononMode(Phonon x, Phonon y, Phonon z) : COM_x(x), COM_y(y), COM_z(z) {}
 };
 
 } // namespace
