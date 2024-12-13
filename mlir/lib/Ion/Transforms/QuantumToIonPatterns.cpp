@@ -166,7 +166,8 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 };
 
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
-                                  const std::vector<Beam> &beams2)
+                                  const std::vector<Beam> &beams2,
+                                  const std::vector<PhononTriplet> &phonons)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
     ion::SystemOp ionSystem;
@@ -193,11 +194,15 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
 
             // Assume that each ion has 3 phonons (x, y, z)
+            /*
             auto phonon0ComX = ionSystem.getPhonons()[3 * qubitIndex0Value];
             auto phonon1ComX = ionSystem.getPhonons()[3 * qubitIndex1Value];
 
             PhononAttr phonon0ComXAttr = cast<PhononAttr>(phonon0ComX);
             PhononAttr phonon1ComXAttr = cast<PhononAttr>(phonon1ComX);
+            */
+
+            Phonon
 
             Beam beam = beams2[twoQubitComboIndex];
 
@@ -360,6 +365,7 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     OQDDatabaseManager dataManager;
     std::vector<Beam> beams1 = dataManager.getBeams1Params();
     std::vector<Beam> beams2 = dataManager.getBeams2Params();
+    std::vector<PhononTriplet> phonons = dataManager.getPhononParams();
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
@@ -377,7 +383,7 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
         }
         // MS case -> PP(P1, P2, P3, P4, P5, P6)
         else if (op.getGateName() == "MS") {
-            auto result = MSGateToPulse(op, rewriter, beams2);
+            auto result = MSGateToPulse(op, rewriter, beams2, phonons);
             return result;
         }
         return failure();

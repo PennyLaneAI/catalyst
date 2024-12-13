@@ -14,17 +14,21 @@
 
 #pragma once
 
+#include <iostream>
+
 #include <cassert>
 #include <regex>
-#include <type_traits>
 
 #include <toml++/toml.hpp>
+
+#include "oqd_database_types.hpp"
+#include "oqd_database_utils.hpp"
 
 namespace {
 
 // TODO: we should decide where the calibration tomls will live.
-// Very likely, they will be dumped into some local locations that are not part of the catalyst tree.
-// It would be best to store the toml locations as pass options on the --quantum-to-ion pass
+// Very likely, they will be dumped into some local locations that are not part of the catalyst
+// tree. It would be best to store the toml locations as pass options on the --quantum-to-ion pass
 // This way, they can be directly specified in the frontend python layer, and passed down
 // to the pass as pass options (via the standard transform dialect lowering pipeline we have)
 // But for now this hard coded prototype is good enough.
@@ -40,42 +44,6 @@ static const std::string oqd_gate_decomposition_parameters_toml_file_path =
     catalyst_root_path +
     "frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml";
 
-template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
-{
-    // A toml node can contain toml objects of arbitrary types, even other toml nodes
-    // i.e. toml nodes are similar to pytrees
-    // Therefore, toml++ does not provide a simple "toml array to std vector" converter
-    //
-    // For a "leaf" array node, whose contents are now simple values,
-    // such a utility would come in handy.
-
-    std::vector<T> vec;
-
-    if constexpr (std::is_same_v<T, int64_t>) {
-        for (const auto &elem : arr) {
-            vec.push_back(elem.as_integer()->get());
-        }
-    }
-    else if constexpr (std::is_same_v<T, double>) {
-        for (const auto &elem : arr) {
-            vec.push_back(elem.as_floating_point()->get());
-        }
-    }
-
-    return vec;
-}
-
-struct Beam {
-    // This struct contains the calibrated beam parameters.
-    double rabi, detuning;
-    std::vector<int64_t> polarization, wavevector;
-
-    Beam(double _rabi, double _detuning, std::vector<int64_t> _polarization,
-         std::vector<int64_t> _wavevector)
-        : rabi(_rabi), detuning(_detuning), polarization(_polarization), wavevector(_wavevector)
-    {
-    }
-};
 
 class OQDDatabaseManager {
 
@@ -93,10 +61,14 @@ class OQDDatabaseManager {
 
         loadBeams1Params();
         loadBeams2Params();
+
+        loadPhononParams();
     }
 
     std::vector<Beam> getBeams1Params() { return beams1; }
     std::vector<Beam> getBeams2Params() { return beams2; }
+
+    std::vector<PhononTriplet> getPhononParams() { return phonons; }
 
   private:
     toml::parse_result sourceTomlDevice;
@@ -106,8 +78,9 @@ class OQDDatabaseManager {
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
 
-    void loadBeams1Params() { loadBeamsParamsImpl("beams1"); }
+    std::vector<PhononTriplet> phonons;
 
+    void loadBeams1Params() { loadBeamsParamsImpl("beams1"); }
     void loadBeams2Params() { loadBeamsParamsImpl("beams2"); }
 
     void loadBeamsParamsImpl(const std::string &mode)
@@ -144,6 +117,29 @@ class OQDDatabaseManager {
                 tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
 
             collector->push_back(Beam(rabi, detuning, polarization, wavevector));
+        }
+    }
+
+    void loadPhononParams()
+    {
+        toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition["phonons"];
+        size_t numPhononTriplets = phononsToml.as_array()->size();
+
+        auto parseSingleDirection = [](auto direction) {
+            double energy = direction["energy"].as_floating_point()->get();
+            std::vector<int64_t> eigenvector =
+                tomlArray2StdVector<int64_t>(*(direction["eigenvector"].as_array()));
+            return Phonon(energy, eigenvector);
+        };
+
+        for (size_t i = 0; i < numPhononTriplets; i++) {
+            auto phononTriplet = phononsToml[i];
+
+            Phonon COM_x = parseSingleDirection(phononTriplet["COM_x"]);
+            Phonon COM_y = parseSingleDirection(phononTriplet["COM_y"]);
+            Phonon COM_z = parseSingleDirection(phononTriplet["COM_z"]);
+
+            phonons.push_back(PhononTriplet(COM_x, COM_y, COM_z));
         }
     }
 };

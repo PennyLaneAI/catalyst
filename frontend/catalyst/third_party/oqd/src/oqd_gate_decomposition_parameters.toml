@@ -73,16 +73,34 @@ wavevector = [-42,-37]
 
 
 # Phonons
+# Each qubit has a phonon triplet (x,y,z)
+# A list of phonon triplets, one triplet per qubit, is stored here
+# On a single direction, a phonon has a calibrated energy.
 # -------
 
+[[phonons]]
 [phonons.COM_x]
-energy = 3.1416e7  # 2 * math.pi * 5e6
+energy = 1.1
 eigenvector = [1, 0, 0]
 
 [phonons.COM_y]
-energy = 3.1416e7  # 2 * math.pi * 5e6
+energy = 2.2
 eigenvector = [0, 1, 0]
 
 [phonons.COM_z]
-energy = 6.283e6  # 2 * math.pi * 1e6
+energy = 3.3
+eigenvector = [0, 0, 1]
+
+
+[[phonons]]
+[phonons.COM_x]
+energy = 4.4
+eigenvector = [1, 0, 0]
+
+[phonons.COM_y]
+energy = 5.5
+eigenvector = [0, 1, 0]
+
+[phonons.COM_z]
+energy = 6.6
 eigenvector = [0, 0, 1]
