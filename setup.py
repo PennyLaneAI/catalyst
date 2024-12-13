@@ -23,6 +23,9 @@ import subprocess
 import sys
 from typing import Optional
 
+# build deps
+import nanobind
+import numpy
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
@@ -212,9 +215,10 @@ class UnifiedBuildExt(build_ext):
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
         configure_args += (
-            [f"-DPYTHON_EXECUTABLE={sys.executable}"]
-            if platform.system() != "Darwin"
-            else [f"-DPython_EXECUTABLE={sys.executable}"]
+            f"-DPython_ROOT_DIR={sys.prefix}",
+            f"-DPYTHON_VERSION_TO_FIND={sys.version_info.major}.{sys.version_info.minor}",
+            f"-Dnanobind_DIR={nanobind.cmake_dir()}",
+            f"-DNUMPY_INCLUDE_DIR={numpy.get_include()}",
         )
 
         configure_args += self.cmake_defines

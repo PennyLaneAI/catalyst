@@ -13,19 +13,7 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Detect the installed nanobind package and import it into CMake
-execute_process(
-    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-    OUTPUT_VARIABLE nanobind_ROOT OUTPUT_STRIP_TRAILING_WHITESPACE)
-
 find_package(nanobind CONFIG REQUIRED)
-
-# Get the NumPy include directory
-execute_process(
-    COMMAND "${Python_EXECUTABLE}" -c "import numpy; print(numpy.get_include())"
-    OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 
 # Source file list for `wrapper` module
 set(REGISTRY_SRC_FILES
