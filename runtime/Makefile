@@ -22,13 +22,6 @@ ifeq ($(ENABLE_OPENQASM), ON)
 	TEST_TARGETS += runner_tests_openqasm
 endif
 
-coverage: CODE_COVERAGE=ON
-coverage: BUILD_TYPE=Debug
-coverage: C_COMPILER=$(shell which gcc)
-coverage: CXX_COMPILER=$(shell which g++)
-test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=RelWithDebInfo
-
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -68,6 +61,8 @@ test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: test
+test: CODE_COVERAGE=OFF
+test: BUILD_TYPE?=RelWithDebInfo
 test: test_runner
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
@@ -77,6 +72,11 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 
 .PHONY: coverage
+coverage: CODE_COVERAGE=ON
+coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
+coverage: export LLVM_PROFILE_FILE := $(RT_BUILD_DIR)/tests/%m.profraw
 coverage: test_runner
 	@echo "check C++ code coverage"
 	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
@@ -88,8 +88,12 @@ ifeq ($(PLATFORM),Linux)
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 else
-	xcrun llvm-profdata merge default.profraw -o testcov.profdata
-	xcrun llvm-cov show build/tests/runner_tests_qir_runtime -instr-profile=testcov.profdata -output-dir=coverage_html -format=html
+	xcrun llvm-profdata merge $(RT_BUILD_DIR)/tests/*.profraw -o $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata
+	xcrun llvm-cov show -instr-profile $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata \
+		-object $(RT_BUILD_DIR)/tests/runner_tests_openqasm \
+		$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime \
+		-format=html -output-dir=$(RT_BUILD_DIR)/coverage_html \
+		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
 endif
 
 .PHONY: clean
