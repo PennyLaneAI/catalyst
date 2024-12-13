@@ -13,6 +13,12 @@ def getStandalonePluginAbsolutePath():
     return Path(Path(__file__).parent.absolute(), f"lib/StandalonePlugin.{SwitchBarToFoo.ext}")
 
 
+def name2pass(_name):
+    """Example entry point for standalone plugin"""
+
+    return getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo"
+
+
 def SwitchBarToFoo(*flags, **valued_options):
     """Applies the "standalone-switch-bar-foo" pass"""
 
