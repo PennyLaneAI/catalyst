@@ -124,10 +124,10 @@ func.func @example_ion(%arg0: f64) -> !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 0 : i64, rabi = 1.230000e+00 : f64, detuning = 4.560000e+00 : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 1 : i64, rabi = 1.230000e+00 : f64, detuning = 5.660000e+00 : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
-    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 1 : i64, rabi = 1.230000e+00 : f64, detuning = 3.4599999999999995 : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 1 : i64, rabi = 1.230000e+00 : f64, detuning = 3.4{{.*}} : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 0 : i64, rabi = 1.230000e+00 : f64, detuning = 4.560000e+00 : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 1 : i64, rabi = 1.230000e+00 : f64, detuning = 8.960000e+00 : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
-    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 1 : i64, rabi = 1.230000e+00 : f64, detuning = 0.15999999999999925 : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
+    // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<transition_index = 1 : i64, rabi = 1.230000e+00 : f64, detuning = 0.1{{.*}} : f64, polarization = dense<[7, 8]> : vector<2xi64>, wavevector = dense<[9, 10]> : vector<2xi64>>, phase = 0.00{{.*}} : f64}
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %6, %3 : !quantum.bit, !quantum.bit
     return %7#0: !quantum.bit
