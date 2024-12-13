@@ -19,7 +19,7 @@ https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 
 import pennylane as qml
 import pytest
-from standalone_plugin import getStandalonePluginAbsolutePath
+from standalone_plugin import SwitchBarToFoo, getStandalonePluginAbsolutePath
 
 from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
 
@@ -93,6 +93,21 @@ def test_standalone_dictionary():
 
     # It would be nice if we were able to combine lit tests with
     # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+def test_standalone_plugin_decorator():
+    """Generate MLIR for the standalone plugin"""
+
+    @SwitchBarToFoo
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
     assert "standalone-switch-bar-foo" in module.mlir
 
 
