@@ -69,12 +69,6 @@ include_directories(${LLVM_INCLUDE_DIRS}
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
-if(APPLE)
-  set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-else()
-  set(CMAKE_CXX_VISIBILITY_PRESET protected)
-endif()
-
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
