@@ -83,6 +83,7 @@ requirements = [
 entry_points = {
     "pennylane.plugins": [
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
+        "oqd = catalyst.third_party.oqd:OQDDevice",
         "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
@@ -94,6 +95,9 @@ entry_points = {
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
+    ],
+    "catalyst.passes_resolution": [
+        "standalone.passes = catalyst.example_entry_point",
     ],
 }
 

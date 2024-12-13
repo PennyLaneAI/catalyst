@@ -175,14 +175,11 @@ two quantum-optimization passes:
    this case the two RX gates the become adjacent after the two Hadamard gates have been removed by
    the ``remove-chained-self-inverse`` pass.
 
-To define the pass pipeline, we must supply the name of the function to which each pass applies
-using the ``func-name`` argument. The ``func-name`` argument is specific to the two passes we are
-applying and is not a general requirement. To apply these two passes to our ``my_circuit`` function,
-we can do so as follows:
+To apply these two passes to our ``my_circuit`` function, we can do so as follows:
 
 .. code-block::
 
-    pipe(remove-chained-self-inverse{func-name=my_circuit};merge-rotations{func-name=my_circuit})
+    pipe(remove-chained-self-inverse;merge-rotations)
 
 Finally, we'll use the option ``--mlir-print-ir-after-all`` to print the resulting MLIR after each
 pass that is applied, and the ``-o`` option to set the name of the output IR file:
@@ -191,7 +188,7 @@ pass that is applied, and the ``-o`` option to set the name of the output IR fil
 
     catalyst-cli my_circuit.mlir \
         --tool=opt \
-        --catalyst-pipeline="pipe(remove-chained-self-inverse{func-name=my_circuit};merge-rotations{func-name=my_circuit})" \
+        --catalyst-pipeline="pipe(remove-chained-self-inverse;merge-rotations)" \
         --mlir-print-ir-after-all \
         -o my_circuit-llvm.mlir
 
@@ -248,7 +245,7 @@ These plugins are shared objects that include dialects and passes written by thi
 This means that you can write dialects and passes that can be used with ``catalyst-cli`` and ``quantum-opt``.
 
 As an example, the `LLVM repository includes a very simple plugin <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone/standalone-plugin>`_.
-To build it, simply run ``make standalone-plugin`` and the standalone plugin
+To build it, simply run ``make plugin`` and the standalone plugin
 will be built in the root directory of the Catalyst project.
 
 With this, you can now run your own passes by using the following flags:

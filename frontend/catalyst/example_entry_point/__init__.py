@@ -11,11 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-This submodule contains classes for the OQD device and its properties.
-"""
 
-from .oqd_device import OQDDevice
-from .oqd_database_managers import OQDDeviceDatabase, OQDQubitDatabase, OQDBeamDatabase
+"""Example module with entry points"""
 
-__all__ = ["OQDDeviceDatabase", "OQDQubitDatabase", "OQDBeamDatabase", "OQDDevice"]
+import platform
+from pathlib import Path
+
+from catalyst.utils.runtime_environment import get_bin_path
+
+
+def name2pass(_name):
+    """Example entry point for standalone plugin"""
+    ext = "so" if platform.system() == "Linux" else "dylib"
+    plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
+    plugin = Path(plugin_path)
+    return plugin, "standalone-switch-bar-foo"

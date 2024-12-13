@@ -2,8 +2,9 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst can now load local MLIR plugins from python.
+* Catalyst can now load local MLIR plugins from python. Including support for `entry_points`.
   [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
+  [(#1361)](https://github.com/PennyLaneAI/catalyst/pull/1361)
 
 <h3>Improvements 🛠</h3>
 
@@ -144,6 +145,9 @@
   6283185307.179586
   ```
 
+* A default backend for OQD trapped-ion quantum devices has been added.
+  [(#1355)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+
 * `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
   [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
 
@@ -153,6 +157,9 @@
   empty pass that prints hello world. The code of the tutorial is at
   [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
+
+* Updated catalyst-cli documentation to reflect the removal of func-name option for trasnformation passes.
+  [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
 
 <h3>Contributors ✍️</h3>
 

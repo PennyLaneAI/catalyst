@@ -333,6 +333,14 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
+    # Build OQD-Runtime
+    - name: Build OQD-Runtime
+      run: |
+          OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
+          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqd
+
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -358,7 +366,7 @@ jobs:
       run: |
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
-        make standalone-plugin
+        make plugin
         mkdir -p quantum-build/lib
         mv mlir/standalone/build/lib/StandalonePlugin.* quantum-build/lib
 
@@ -370,6 +378,7 @@ jobs:
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
@@ -443,3 +452,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto
