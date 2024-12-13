@@ -1,12 +1,11 @@
 add_llvm_library(StandalonePlugin
-        # BUILDTREE_ONLY is only for testing purposes
-        MODULE BUILDTREE_ONLY
+        MODULE 
         standalone-plugin.cpp
 
         DEPENDS
         MLIRStandalone
         PLUGIN_TOOL
-        mlir-opt
+        catalyst-cli
 
         LINK_LIBS
         MLIRStandalone

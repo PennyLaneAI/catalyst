@@ -19,13 +19,15 @@ namespace mlir::standalone {
 #include "Standalone/StandalonePasses.h.inc"
 
 namespace {
-class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
+class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
 public:
-  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(func::FuncOp op,
+  using OpRewritePattern<catalyst::quantum::AllocOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(catalyst::quantum::AllocOp op,
                                 PatternRewriter &rewriter) const final {
-    if (op.getSymName() == "bar") {
-      rewriter.modifyOpInPlace(op, [&op]() { op.setSymName("foo"); });
+    if (op.getNqubitsAttr().value_or(0) == 1) {
+      Type i64 = rewriter.getI64Type();
+      auto fortytwo = rewriter.getIntegerAttr(i64, 42);
+      rewriter.modifyOpInPlace(op, [&]() { op.setNqubitsAttrAttr(fortytwo); });
       return success();
     }
     return failure();

@@ -50,7 +50,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo enzyme dialects plugin
+all: llvm mhlo enzyme dialects 
 
 .PHONY: llvm
 llvm:
@@ -120,23 +120,6 @@ enzyme:
 		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
 	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
-
-.PHONY: plugin
-plugin:
-	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
-	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
-		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
-	fi
-	cmake -B standalone/build -G Ninja \
-		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
-		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
-		-DPython3_EXECUTABLE=$(PYTHON) \
-		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
-		standalone
-	cmake --build standalone/build --target check-standalone
-	mkdir -p $(DIALECTS_BUILD_DIR)/lib
-	cp standalone/build/lib/StandalonePlugin.* $(DIALECTS_BUILD_DIR)/lib
 
 .PHONY: dialects
 dialects:
