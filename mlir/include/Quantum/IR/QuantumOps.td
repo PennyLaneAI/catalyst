@@ -382,7 +382,31 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getParams();
+        }
+
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getParams();
         }
     }];
@@ -496,7 +520,31 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getODSOperands(getParamOperandIdx());
         }
 
@@ -540,7 +588,31 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getODSOperands(getParamOperandIdx());
         }
     }];
@@ -581,7 +653,31 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getODSOperands(getParamOperandIdx());
+        }
+        
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getODSOperands(getParamOperandIdx());
         }
     }];

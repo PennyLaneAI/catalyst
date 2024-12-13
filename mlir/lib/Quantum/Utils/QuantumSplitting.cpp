@@ -113,7 +113,7 @@ void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
 
 void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder)
 {
-    ValueRange params = gate.getAllParams();
+    ValueRange params = gate.getSSAParams();
 
     for (Value param : params) {
         Location loc = gate.getLoc();

@@ -70,62 +70,57 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
 template <typename OpType>
 struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
+    using paramType = std::variant<mlir::ValueRange, mlir::SmallVector<double>>;
 
     bool verifyParentGateParams(OpType op, OpType parentOp) const
     {
         // Verify that the parent gate has the same parameters
-        ValueRange opParams = op.getAllParams();
-        ValueRange parentOpParams = parentOp.getAllParams();
+        paramType opAllParams = op.getAllParams();
+        paramType parentOpAllParams = parentOp.getAllParams();
+        mlir::ValueRange opDynParams;
+        mlir::ValueRange parentDynOpParams;
+        mlir::SmallVector<double> opStaticParams;
+        mlir::SmallVector<double> parentOpStaticParams;
 
-        // If there are dynamic parameters, both gates must have the number of dynamic parameters.
-        if (opParams.size() != parentOpParams.size()) {
-            return false;
+        if (std::holds_alternative<mlir::ValueRange>(opAllParams)) {
+            opDynParams = std::get<mlir::ValueRange>(opAllParams);
+        }
+        else if (std::holds_alternative<mlir::SmallVector<double>>(opAllParams)) {
+            opStaticParams = std::get<mlir::SmallVector<double>>(opAllParams);
         }
 
-        if (isa<CustomOp>(op) || isa<MultiRZOp>(op)) {
-            auto opStaticParams = op.getStaticParamsAttr();
-            auto parentOpStaticParams = parentOp.getStaticParamsAttr();
-            bool opHasStatic = opStaticParams && !opStaticParams.empty();
-            bool parentHasStatic = parentOpStaticParams && !parentOpStaticParams.empty();
+        if (std::holds_alternative<mlir::ValueRange>(parentOpAllParams)) {
+            parentDynOpParams = std::get<mlir::ValueRange>(parentOpAllParams);
+        }
+        else if (std::holds_alternative<mlir::SmallVector<double>>(parentOpAllParams)) {
+            parentOpStaticParams = std::get<mlir::SmallVector<double>>(parentOpAllParams);
+        }
 
-            // If one gate has static parameters and the other does not, return false.
-            if ((!opHasStatic && parentHasStatic) || (opHasStatic && !parentHasStatic)) {
-                return false;
-            }
+        bool bothHaveDynParams = !opDynParams.empty() && !parentDynOpParams.empty() &&
+                                 opStaticParams.empty() && parentOpStaticParams.empty();
+        bool bothHaveStaticParams = !opStaticParams.empty() && !parentOpStaticParams.empty() &&
+                                    opDynParams.empty() && parentDynOpParams.empty();
 
-            // If both gates have static parameters, they must be the same.
-            if (opHasStatic && parentHasStatic) {
-                // If there are static parameters, both gates must have the number of static
-                // parameters.
-                if (opStaticParams.size() != parentOpStaticParams.size()) {
+        if (bothHaveDynParams) {
+            for (auto [opDynParam, parentDynOpParam] : llvm::zip(opDynParams, parentDynOpParams)) {
+                if (opDynParam != parentDynOpParam) {
                     return false;
                 }
+            }
+            return true;
+        }
 
-                // If there are static parameters, there should not be any dynamic parameters.
-                if (!opParams.empty() || !parentOpParams.empty()) {
+        if (bothHaveStaticParams) {
+            for (auto [opStaticParam, parentOpStaticParam] :
+                 llvm::zip(opStaticParams, parentOpStaticParams)) {
+                if (opStaticParam != opStaticParam) {
                     return false;
                 }
-
-                for (auto [opAttr, parentAttr] : llvm::zip(opStaticParams, parentOpStaticParams)) {
-                    auto opFloat = dyn_cast<FloatAttr>(opAttr);
-                    auto parentFloat = dyn_cast<FloatAttr>(parentAttr);
-
-                    if (!opFloat || !parentFloat ||
-                        (opFloat.getValueAsDouble() != parentFloat.getValueAsDouble())) {
-                        return false;
-                    }
-                }
-                return true;
             }
+            return true;
         }
 
-        //  if there are no static parameters, both gates must have the same dynamic parameters.
-        for (auto [opParam, parentOpParam] : llvm::zip(opParams, parentOpParams)) {
-            if (opParam != parentOpParam) {
-                return false;
-            }
-        }
-        return true;
+        return false;
     }
 
     bool verifyOneAdjoint(OpType op, OpType parentOp) const
