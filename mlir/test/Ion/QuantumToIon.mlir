@@ -91,44 +91,7 @@ func.func @example_ion(%arg0: f64) -> !quantum.bit {
             >
         ]
     }: !ion.ion
-    ion.system(%0) {
-        beams1=[
-            #ion.beam<
-                rabi=10.10,
-                detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
-            >,
-            #ion.beam<
-                rabi=10.10,
-                detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
-            >
-        ],
-        beams2=[
-            #ion.beam<
-                rabi=10.10,
-                detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
-            >,
-            #ion.beam<
-                rabi=10.10,
-                detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
-            >
-        ],
-        phonons=[
-            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
-            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
-            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
-            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
-            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>,
-            #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>
-        ]
-    }
+
     %1 = quantum.alloc( 2) : !quantum.reg
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit

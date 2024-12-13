@@ -170,14 +170,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                   const std::vector<PhononTriplet> &phonons)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
-    ion::SystemOp ionSystem;
-    qnode.walk([&](ion::SystemOp op) {
-        ionSystem = op;
-        return WalkResult::interrupt();
-    });
+
     auto qubitIndex0 = walkBackQubitSSA(op, 0);
     auto qubitIndex1 = walkBackQubitSSA(op, 1);
+
     if (qubitIndex0.has_value() && qubitIndex1.has_value()) {
+
         // TODO: double check the nex assumption, there is (n**2, 2) (combinatorial) =
         // n**2(n**2-1)/2 two qubits They are 3 phonons per ion (x, y , z)
 
@@ -194,15 +192,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
 
             // Assume that each ion has 3 phonons (x, y, z)
-            /*
-            auto phonon0ComX = ionSystem.getPhonons()[3 * qubitIndex0Value];
-            auto phonon1ComX = ionSystem.getPhonons()[3 * qubitIndex1Value];
-
-            PhononAttr phonon0ComXAttr = cast<PhononAttr>(phonon0ComX);
-            PhononAttr phonon1ComXAttr = cast<PhononAttr>(phonon1ComX);
-            */
-
-            Phonon
+            Phonon phonon0ComX = phonons[qubitIndex0Value].COM_x;
+            Phonon phonon1ComX = phonons[qubitIndex1Value].COM_x;
 
             Beam beam = beams2[twoQubitComboIndex];
 
@@ -254,7 +245,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     auto beam2Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/ rewriter.getF64FloatAttr(beam.detuning),
+                        /*TODO: fill in formula*/
+                        rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(beam.wavevector));
                     builder.create<ion::PulseOp>(loc, time, qubit0, beam2Attr, phase0Attr);
@@ -276,7 +268,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     auto beam3Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/ rewriter.getF64FloatAttr(beam.detuning),
+                        /*TODO: fill in formula*/
+                        rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(beam.wavevector));
                     builder.create<ion::PulseOp>(loc, time, qubit0, beam3Attr, phase0Attr);
@@ -315,7 +308,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     auto beam5Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/ rewriter.getF64FloatAttr(beam.detuning),
+                        /*TODO: fill in formula*/
+                        rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(beam.wavevector));
                     builder.create<ion::PulseOp>(loc, time, qubit1, beam5Attr, phase0Attr);
@@ -337,7 +331,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     auto beam6Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/ rewriter.getF64FloatAttr(beam.detuning),
+                        /*TODO: fill in formula*/
+                        rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(beam.wavevector));
                     builder.create<ion::PulseOp>(loc, time, qubit1, beam6Attr, phase0Attr);

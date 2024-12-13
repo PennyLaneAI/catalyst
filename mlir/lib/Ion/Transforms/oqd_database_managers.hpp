@@ -44,7 +44,6 @@ static const std::string oqd_gate_decomposition_parameters_toml_file_path =
     catalyst_root_path +
     "frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml";
 
-
 class OQDDatabaseManager {
 
   public:
