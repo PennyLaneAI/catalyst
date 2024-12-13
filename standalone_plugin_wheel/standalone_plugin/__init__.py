@@ -9,8 +9,8 @@ from catalyst.passes import PassPlugin
 def getStandalonePluginAbsolutePath():
     """Returns the absolute path to the standalone plugin"""
 
-    SwitchBarToFoo.ext = "so" if platform.system() == "Linux" else "dylib"
-    return Path(Path(__file__).parent.absolute(), f"lib/StandalonePlugin.{SwitchBarToFoo.ext}")
+    ext = "so" if platform.system() == "Linux" else "dylib"
+    return Path(Path(__file__).parent.absolute(), f"lib/StandalonePlugin.{ext}")
 
 
 def name2pass(_name):
