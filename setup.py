@@ -68,6 +68,13 @@ else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
 
+# Ensure MacOS minimum version is set for CMake builder
+if platform.system() == "Darwin":
+    if val := os.environ.get("MACOSX_DEPLOYMENT_TARGET"):
+        MacOS_SDK_version = val
+    else:
+        MacOS_SDK_version = "13.0"
+
 requirements = [
     pennylane_dep,
     lightning_dep,
@@ -210,6 +217,8 @@ class CMakeBuild(build_ext):
         )
 
         configure_args += self.cmake_defines
+        if platform.system() == "Darwin":
+            configure_args += f"-DCMAKE_OSX_DEPLOYMENT_TARGET={MacOS_SDK_version}"
 
         if "CMAKE_ARGS" in os.environ:
             configure_args += os.environ["CMAKE_ARGS"].split(" ")

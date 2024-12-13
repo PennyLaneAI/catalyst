@@ -14,8 +14,8 @@ on:
   workflow_call:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 14.0
-  _PYTHON_HOST_PLATFORM: "macosx-14.0-arm64"
+  MACOSX_DEPLOYMENT_TARGET: 13.0
+  _PYTHON_HOST_PLATFORM: "macosx-13.0-arm64"
   ARCHFLAGS: "-arch arm64"
 
 concurrency:
