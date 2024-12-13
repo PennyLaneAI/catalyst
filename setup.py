@@ -218,7 +218,7 @@ class CMakeBuild(build_ext):
 
         configure_args += self.cmake_defines
         if platform.system() == "Darwin":
-            configure_args += f"-DCMAKE_OSX_DEPLOYMENT_TARGET={MacOS_SDK_version}"
+            configure_args += [f"-DCMAKE_OSX_DEPLOYMENT_TARGET={MacOS_SDK_version}"]
 
         if "CMAKE_ARGS" in os.environ:
             configure_args += os.environ["CMAKE_ARGS"].split(" ")
