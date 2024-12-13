@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(PYTHON_VERSION_TO_FIND "3" CACHE STRING "Python version to find and use")
 
 find_package(Python ${PYTHON_VERSION_TO_FIND}
-    REQUIRED COMPONENTS Interpreter Development.Module
+    REQUIRED COMPONENTS Interpreter Development.Module NumPy
     OPTIONAL_COMPONENTS Development.SABIModule)
 
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
@@ -29,7 +29,7 @@ set(WRAPPER_SRC_FILES
 nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
 
 # Add the NumPy include directory to the library's include paths
-target_include_directories(wrapper PRIVATE ${NUMPY_INCLUDE_DIR})
+target_include_directories(wrapper PRIVATE ${Python_NumPy_INCLUDE_DIRS})
 
 # Use suffix ".so" rather than ".abi3.so" for library file using Stable ABI
 # This is necessary for compatibility with setuptools build extensions
