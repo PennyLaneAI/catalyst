@@ -72,6 +72,7 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 
 .PHONY: coverage
+coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
 coverage: C_COMPILER=$(shell which gcc)
@@ -99,7 +100,7 @@ endif
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) cov coverage.info $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
 
 .PHONY: format
 format:
