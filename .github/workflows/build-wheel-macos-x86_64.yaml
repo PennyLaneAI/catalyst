@@ -347,10 +347,9 @@ jobs:
       # Run only on Thursday at the given time (TODO: set comparison to == before merging)
       if: github.event.schedule != '35 4 * * 4'
       run: |
-        PYTHON=python${{ matrix.python_version }} \
         CCACHE_DIR="$(pwd)/.ccache" \
-        MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
         make plugin-wheel
 
     - name: Build wheel
