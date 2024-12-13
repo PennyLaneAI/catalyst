@@ -122,6 +122,8 @@ add_subdirectory(lib)
 add_subdirectory(tests)
 
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
+# Don't rerun external project everytime we configure the runtime build.
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
         GIT_TAG master
@@ -131,5 +133,6 @@ if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
         INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
         COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
     )
-    add_dependencies(rt_capi lapacke-accelerate)  # automatically build when the runtime is built
+    add_dependencies(rt_capi lapacke-accelerate)  # automatically build with the runtime
+endif()
 endif()
