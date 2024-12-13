@@ -10,7 +10,7 @@ def getStandalonePluginAbsolutePath():
     """Returns the absolute path to the standalone plugin"""
 
     SwitchBarToFoo.ext = "so" if platform.system() == "Linux" else "dylib"
-    return Path(Path(__file__).parent, f"lib/StandalonePlugin.{SwitchBarToFoo.ext}").resolve()
+    return Path(Path(__file__).parent.absolute(), f"lib/StandalonePlugin.{SwitchBarToFoo.ext}")
 
 
 def SwitchBarToFoo(*flags, **valued_options):
