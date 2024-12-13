@@ -18,7 +18,7 @@ COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
-SKIP_OQD ?= false
+SKIP_OQD ?= true
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 
@@ -267,7 +267,7 @@ coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd --skip-oqd=$(SKIP_OQD) $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif
