@@ -74,7 +74,7 @@ if platform.system() == "Darwin":
         MacOS_SDK_VERSION = val
     else:
         MacOS_SDK_VERSION = "13.0"
-    os.environ["_PYTHON_HOST_PLATFORM"] = f"macosx-{MacOS_SDK_VERSION}-arm64"
+    os.environ["_PYTHON_HOST_PLATFORM"] = f"macosx-{MacOS_SDK_VERSION}-{platform.machine()}"
 
 requirements = [
     pennylane_dep,
