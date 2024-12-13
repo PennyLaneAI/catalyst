@@ -17,18 +17,13 @@ The Standalone plugin may be found here:
 https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 """
 
-import platform
-from pathlib import Path
-
 import pennylane as qml
 import pytest
+from standalone_plugin import getStandalonePluginAbsolutePath
 
 from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
-from catalyst.utils.runtime_environment import get_bin_path
 
-ext = "so" if platform.system() == "Linux" else "dylib"
-plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
-plugin = Path(plugin_path)
+plugin = getStandalonePluginAbsolutePath()
 
 
 def test_standalone_plugin():

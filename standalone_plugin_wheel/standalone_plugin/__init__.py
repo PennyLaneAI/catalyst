@@ -6,16 +6,25 @@ import pennylane as qml
 from catalyst.passes import PassPlugin
 
 
-def SwitchBarToFoo(*flags, **valued_options):
-    """Applies the "standalone-switch-bar-foo" pass"""
+def getStandalonePluginAbsolutePath():
+    """Returns the absolute path to the standalone plugin"""
 
     SwitchBarToFoo.ext = "so" if platform.system() == "Linux" else "dylib"
-    SwitchBarToFoo.path = Path(Path(__file__).parent, f"lib/StandalonePlugin.{SwitchBarToFoo.ext}")
+    return Path(Path(__file__).parent, f"lib/StandalonePlugin.{SwitchBarToFoo.ext}").absolute()
+
+
+def SwitchBarToFoo(*flags, **valued_options):
+    """Applies the "standalone-switch-bar-foo" pass"""
 
     def add_pass_to_pipeline(**kwargs):
         pass_pipeline = kwargs.get("pass_pipeline", [])
         pass_pipeline.append(
-            PassPlugin(SwitchBarToFoo.path, "standalone-switch-bar-foo", *flags, **valued_options)
+            PassPlugin(
+                getStandalonePluginAbsolutePath(),
+                "standalone-switch-bar-foo",
+                *flags,
+                **valued_options,
+            )
         )
         return pass_pipeline
 

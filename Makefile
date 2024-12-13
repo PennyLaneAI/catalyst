@@ -166,22 +166,12 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "check the Catalyst PyTest suite"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE) --ignore=frontend/test/pytest/test_mlir_plugin.py
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqc/oqc
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd --skip-oqd=$(SKIP_OQD) $(PARALLELIZE)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
-
-test-plugin:
-ifeq ($(ENABLE_ASAN),ON)
-ifneq ($(findstring clang,$(C_COMPILER)),clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
-	@exit 1
-endif
-endif
-	@echo "check the Plugin PyTest tests"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest/test_mlir_plugin.py --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 
 test-demos:
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
