@@ -15,6 +15,7 @@
 #pragma once
 
 #include "mlir/IR/OpDefinition.h"
+#include <variant>
 
 //===----------------------------------------------------------------------===//
 // Quantum interface declarations.
