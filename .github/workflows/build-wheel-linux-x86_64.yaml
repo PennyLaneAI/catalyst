@@ -11,8 +11,8 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # Thursdays we test the standalone plugin
-    - cron: '35 20 * * 4'
+    # Thursdays we test the standalone plugin (TODO: set comparisons to == before merging)
+    - cron: '35 4 * * 4'
   workflow_dispatch:
   workflow_call:
 
@@ -392,8 +392,8 @@ jobs:
         cmake --build quantum-build --target check-dialects catalyst-cli
 
     - name: Build Plugin wheel
-      # Run only on Thursday at the given time
-      if: github.event.schedule != '35 20 * * 4'
+      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      if: github.event.schedule != '35 4 * * 4'
       run: |
         PYTHON=python${{ matrix.python_version }} \
         CCACHE_DIR="$(pwd)/.ccache" \
@@ -426,8 +426,8 @@ jobs:
         retention-days: 14
 
     - name: Upload Standalone Plugin Wheel Artifact
-      # Run only on Thursday at the given time
-      if: github.event.schedule != '35 20 * * 4'
+      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      if: github.event.schedule != '35 4 * * 4'
       uses: actions/upload-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
@@ -456,8 +456,8 @@ jobs:
         path: dist
 
     - name: Download Standalone Plugin Wheel Artifact
-      # Run only on Thursday at the given time
-      if: github.event.schedule != '35 20 * * 4'
+      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      if: github.event.schedule != '35 4 * * 4'
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
@@ -486,8 +486,8 @@ jobs:
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Install Standalone Plugin
-      # Run only on Thursday at the given time
-      if: github.event.schedule != '35 20 * * 4'
+      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      if: github.event.schedule != '35 4 * * 4'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
     
@@ -501,7 +501,7 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto
 
     - name: Run Standalone Plugin Tests
-      # Run only on Thursday at the given time
-      if: github.event.schedule != '35 20 * * 4'
+      # Run only on Thursday at the given time (TODO: set comparison to == before merging)
+      if: github.event.schedule != '35 4 * * 4'
       run: |
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
