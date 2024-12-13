@@ -7,11 +7,6 @@ include(ExternalProject)
 set(CMAKE_CXX_STANDARD  20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Avoid warning raised by pybind11 on newer cmake versions. PYBIND11_FINDPYTHON=ON caused issues.
-if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.27")
- cmake_policy(SET CMP0148 OLD)
-endif()
-
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
@@ -59,22 +54,19 @@ FetchContent_Declare(
 # In particular, if pybind11::embed is used, then we need to find both headers (Development.Module)
 # and the shared library (Development.Embed) before pybind11 is discovered.
 # With the other order PyBind will discover everything it needs.
-function(fetch_pybind11)
-    find_package(pybind11 CONFIG)
-    if (pybind11_FOUND)
-        message(STATUS, "FOUND pybind11")
-    else()
-        message(STATUS "Could not find existing pybind11-dev package. Building from source.")
-        set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
+# Note on flags:
+# - PYTHON_EXECUTABLE is a pybind11 specific flag used by its own (legacy) Python discovery process,
+#   it will not affect find_package(Python) calls.
+# - Python_EXECUTABLE is a cmake flag used in find_package(Python) to guide the discovery.
+# Note that pybind11 can be made to use find_python (instead of its legacy discovery), and thus
+# respect Python_EXECUTABLE), via the PYBIND11_FINDPYTHON flag.
 
-        FetchContent_Declare(pybind11
-            GIT_REPOSITORY https://github.com/pybind/pybind11.git
-            GIT_TAG        v2.10.1
-        )
-
-        FetchContent_MakeAvailable(pybind11)
-    endif()
-endfunction()
+# Here, we look for the desired Python version early to avoid any problems with mismatched packages.
+# The desired Python environment should be specified ahead of time via -DPython_EXECUTABLE=...
+find_package(Python REQUIRED
+    COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.Embed
+)
 
 if(RUNTIME_ENABLE_WARNINGS)
     message(STATUS "Building with compiler warnings as errors enabled.")

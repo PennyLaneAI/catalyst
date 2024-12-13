@@ -48,10 +48,7 @@ configure:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DPython_ROOT_DIR=$(PYTHON_PREFIX) \
-		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
-		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
-		-Dnanobind_DIR=$(shell $(PYTHON) -c "import nanobind; print(nanobind.cmake_dir())") \
+        -DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
 
 .PHONY: runtime

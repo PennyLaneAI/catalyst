@@ -12,11 +12,6 @@ FetchContent_MakeAvailable(MLIRFloat16Bits)
 # link to rt_backend
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS})
 
-if(ENABLE_OPENQASM)
-    fetch_pybind11()
-    target_link_libraries(catalyst_qir_qis_obj pybind11::module)
-endif()
-
 target_link_libraries(catalyst_qir_qis_obj
     pthread
     dl
@@ -50,7 +45,7 @@ target_include_directories(rt_capi PUBLIC .
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${runtime_includes}
     ${capi_utils_includes}
-    )
+)
 
 set_property(TARGET rt_capi PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET rt_capi APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:catalyst_callback_registry>")

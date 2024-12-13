@@ -10,31 +10,16 @@ set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Avoid warning raised by pybind11 on newer cmake versions. PYBIND11_FINDPYTHON=ON caused issues.
-if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.27")
- cmake_policy(SET CMP0148 OLD)
-endif()
-
-include(FetchContent)
-
-function(fetch_pybind11)
-    find_package(pybind11 CONFIG)
-    if (pybind11_FOUND)
-        message(STATUS, "FOUND pybind11")
-    else()
-        message(STATUS "Could not find existing pybind11-dev package. Building from source.")
-        set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
-
-        FetchContent_Declare(pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.10.1
-        )
-
-        FetchContent_MakeAvailable(pybind11)
-    endif()
-endfunction()
-
-fetch_pybind11()
+# Locate Python & PyBind11
+find_package(Python REQUIRED
+    COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.Embed
+)
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
+    OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+find_package(pybind11 CONFIG REQUIRED)
 
 message(STATUS "Building the OQC device.")
 
@@ -43,7 +28,7 @@ add_library(rtd_oqc SHARED OQCDevice.cpp)
 target_include_directories(rtd_oqc PUBLIC .
     ${runtime_includes}
     ${backend_includes}
-    )
+)
 
 set(OQC_LIBRARIES
     rtd_oqc

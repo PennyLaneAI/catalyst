@@ -290,10 +290,7 @@ jobs:
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
-              -DPYTHON_VERSION_TO_FIND=${{ matrix.python_version }} \
-              -DPython_ROOT_DIR=$(python${{ matrix.python_version }} -c "import sys; print(sys.prefix)") \
-              -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -Dnanobind_DIR=$(python${{ matrix.python_version }} -c "import nanobind; print(nanobind.cmake_dir())") \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
