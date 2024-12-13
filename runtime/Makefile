@@ -17,6 +17,8 @@ ENABLE_ASAN?=OFF
 BUILD_TARGETS := rt_capi rtd_null_qubit
 TEST_TARGETS := runner_tests_qir_runtime
 
+PLATFORM := $(shell uname -s)
+
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
 	TEST_TARGETS += runner_tests_openqasm
