@@ -151,7 +151,6 @@ jobs:
               -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
 
-
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
         # This tests fails on CI/CD not locally.
