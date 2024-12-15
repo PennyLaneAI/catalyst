@@ -64,10 +64,10 @@ class OQDDatabaseManager {
         loadPhononParams();
     }
 
-    std::vector<Beam> getBeams1Params() { return beams1; }
-    std::vector<Beam> getBeams2Params() { return beams2; }
+    const std::vector<Beam> &getBeams1Params() const { return beams1; }
+    const std::vector<Beam> &getBeams2Params() const { return beams2; }
 
-    std::vector<PhononMode> getPhononParams() { return phonons; }
+    const std::vector<PhononMode> &getPhononParams() const { return phonons; }
 
   private:
     toml::parse_result sourceTomlDevice;

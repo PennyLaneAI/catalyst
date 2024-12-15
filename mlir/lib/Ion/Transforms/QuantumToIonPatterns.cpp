@@ -358,9 +358,9 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
     OQDDatabaseManager dataManager;
-    std::vector<Beam> beams1 = dataManager.getBeams1Params();
-    std::vector<Beam> beams2 = dataManager.getBeams2Params();
-    std::vector<PhononMode> phonons = dataManager.getPhononParams();
+    const std::vector<Beam> &beams1 = dataManager.getBeams1Params();
+    const std::vector<Beam> &beams2 = dataManager.getBeams2Params();
+    const std::vector<PhononMode> &phonons = dataManager.getPhononParams();
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
