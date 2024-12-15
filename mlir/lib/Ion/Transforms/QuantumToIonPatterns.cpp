@@ -371,7 +371,6 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
             return result;
         }
         // RY case -> PP(P1, P2)
-        // FIXME: Should Ry have a phase difference of pi/2 with respect to RX?
         else if (op.getGateName() == "RY") {
             auto result = oneQubitGateToPulse(op, rewriter, 0.0, llvm::numbers::pi, beams1);
             return result;
