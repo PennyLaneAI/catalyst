@@ -195,8 +195,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                    "Missing phonon parameters for second input qubit to MS gate");
 
             // Assume that each ion has 3 phonons (x, y, z)
-            Phonon phonon0ComX = phonons[qubitIndex0Value].COM_x;
-            Phonon phonon1ComX = phonons[qubitIndex1Value].COM_x;
+            const Phonon &phonon0ComX = phonons[qubitIndex0Value].COM_x;
+            const Phonon &phonon1ComX = phonons[qubitIndex1Value].COM_x;
 
             auto twoQubitComboIndex =
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
@@ -205,7 +205,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             assert(static_cast<size_t>(twoQubitComboIndex) < beams2.size() &&
                    "Missing two-qubit beam parameters for input qubits to MS gate");
 
-            Beam beam = beams2[twoQubitComboIndex];
+            const Beam &beam = beams2[twoQubitComboIndex];
 
             auto loc = op.getLoc();
             auto qubits = op.getInQubits();
