@@ -191,9 +191,19 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto twoQubitComboIndex =
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
 
+            // TODO: Is there a more graceful way to handle these errors?
+            assert(static_cast<size_t>(qubitIndex0Value) < phonons.size() &&
+                   "Missing phonon parameters for first input qubit to MS gate");
+            assert(static_cast<size_t>(qubitIndex1Value) < phonons.size() &&
+                   "Missing phonon parameters for second input qubit to MS gate");
+
             // Assume that each ion has 3 phonons (x, y, z)
             Phonon phonon0ComX = phonons[qubitIndex0Value].COM_x;
             Phonon phonon1ComX = phonons[qubitIndex1Value].COM_x;
+
+            // TODO: Is there a more graceful way to handle these errors?
+            assert(static_cast<size_t>(twoQubitComboIndex) < beams2.size() &&
+                   "Missing two-qubit beam parameters for input qubits to MS gate");
 
             Beam beam = beams2[twoQubitComboIndex];
 
