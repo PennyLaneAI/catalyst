@@ -129,8 +129,8 @@ description = {
 class CMakeExtension(Extension):
     """A setuptools Extension class for modules with a CMake configuration."""
 
-    def __init__(self, name, sourcedir=""):
-        super().__init__(name, sources=[])
+    def __init__(self, name, define_macros=[], sourcedir=""):
+        super().__init__(name, sources=[], define_macros=define_macros)
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -270,6 +270,8 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         )
 
 
+define_macros = [("Py_LIMITED_API", "0x030C0000")]
+
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     custom_calls_extension = Extension(
@@ -280,6 +282,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=define_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -297,6 +300,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=define_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
@@ -306,7 +310,11 @@ frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
     custom_calls_extension,
-    CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
+    CMakeExtension(
+        "catalyst.utils.wrapper",
+        sourcedir=frontend_dir,
+        define_macros=define_macros,
+    ),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
