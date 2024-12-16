@@ -153,7 +153,7 @@
 
 * A new `ion` dialect is added for sending catalyst programs to OQD trapped ion quantum hardware.
   A pass, `--quantum-to-ion`, is added to convert logical gate-based circuits in the `quantum` dialect to pulses with physical parameters (like detuning frequency and polarization) in the `ion` dialect.
-  This allows us to have the physical paramters inside the IR, which will be necessary to lowering to OQD's backend calls.
+  This allows us to have the physical paramters inside the IR, which will be necessary when lowering to OQD's backend calls.
   The physical parameters are read in from toml files during the `--quantum-to-ion` conversion. The toml files are assumed to exist by the pass (toml file locations taken in as pass options), and are supposed to be generated during hardware calibration.
   [(#1260)](https://github.com/PennyLaneAI/catalyst/pull/1260)
   [(#1372)](https://github.com/PennyLaneAI/catalyst/pull/1372)
