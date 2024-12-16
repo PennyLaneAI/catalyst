@@ -24,12 +24,16 @@ public:
   using OpRewritePattern<catalyst::quantum::AllocOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(catalyst::quantum::AllocOp op,
                                 PatternRewriter &rewriter) const final {
+    // get the number of qubits allocated
     if (op.getNqubitsAttr().value_or(0) == 1) {
       Type i64 = rewriter.getI64Type();
       auto fortytwo = rewriter.getIntegerAttr(i64, 42);
+
+      // modify the allocation to change the number of qubits to 42.
       rewriter.modifyOpInPlace(op, [&]() { op.setNqubitsAttrAttr(fortytwo); });
       return success();
     }
+    // failure indicates that nothing was modified.
     return failure();
   }
 };

@@ -26,9 +26,9 @@ def StandaloneSwitchBarFoo: Pass<"standalone-switch-bar-foo", "::mlir::ModuleOp"
     ```
   }];
 
-    let dependentDialects = [
-        "catalyst::quantum::QuantumDialect"
-    ];
+   let dependentDialects = [
+       "catalyst::quantum::QuantumDialect"
+   ];
 
 }
 
