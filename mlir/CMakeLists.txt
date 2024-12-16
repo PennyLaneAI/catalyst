@@ -73,7 +73,6 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(test)
-add_subdirectory(standalone)
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
