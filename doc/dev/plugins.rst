@@ -336,7 +336,7 @@ With the steps above, you can take an MLIR program with a ``quantum.alloc`` inst
 5. Build your own python wheel and ship your plugin.
 
 Now that you have your ``StandalonePlugin.so``, you can ship it in a python wheel.
-To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PluginPass`.
+To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PassPlugin`.
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
 For example:
 
