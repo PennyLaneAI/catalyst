@@ -104,3 +104,17 @@ eigenvector = [0, 1, 0]
 [phonons.COM_z]
 energy = 6.6
 eigenvector = [0, 0, 1]
+
+
+[[phonons]]
+[phonons.COM_x]
+energy = 7.7
+eigenvector = [1, 0, 0]
+
+[phonons.COM_y]
+energy = 8.8
+eigenvector = [0, 1, 0]
+
+[phonons.COM_z]
+energy = 9.9
+eigenvector = [0, 0, 1]
