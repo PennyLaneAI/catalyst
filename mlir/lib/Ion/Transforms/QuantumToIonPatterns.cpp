@@ -175,7 +175,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
     auto qubitIndex1 = walkBackQubitSSA(op, 1);
 
     if (qubitIndex0.has_value() && qubitIndex1.has_value()) {
-
         // TODO: double check the nex assumption, there is (n**2, 2) (combinatorial) =
         // n**2(n**2-1)/2 two qubits They are 3 phonons per ion (x, y , z)
 
@@ -376,7 +375,6 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
                                const std::string &Gate2PulseDecompTomlLoc)
         : mlir::OpRewritePattern<CustomOp>::OpRewritePattern(ctx)
     {
-
         OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
         beams1 = dataManager.getBeams1Params();
         beams2 = dataManager.getBeams2Params();
