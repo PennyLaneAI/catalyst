@@ -26,26 +26,7 @@
 
 namespace {
 
-// TODO: we should decide where the calibration tomls will live.
-// Very likely, they will be dumped into some local locations that are not part of the catalyst
-// tree. It would be best to store the toml locations as pass options on the --quantum-to-ion pass
-// This way, they can be directly specified in the frontend python layer, and passed down
-// to the pass as pass options (via the standard transform dialect lowering pipeline we have)
-// But for now this hard coded prototype is good enough.
-
-// static const std::string catalyst_root_path =
-//     std::regex_replace(__FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
-
-// static const std::string oqd_device_parameters_toml_file_path =
-//     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_device_parameters.toml";
-// static const std::string oqd_qubit_parameters_toml_file_path =
-//     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_qubit_parameters.toml";
-// static const std::string oqd_gate_decomposition_parameters_toml_file_path =
-//     catalyst_root_path +
-//     "frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml";
-
 class OQDDatabaseManager {
-
   public:
     OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
                        const std::string &Gate2PulseDecompTomlLoc)

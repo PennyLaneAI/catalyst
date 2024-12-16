@@ -18,9 +18,6 @@
 // RUN:    gate-to-pulse-toml-loc=%S/oqd_gate_decomposition_parameters.toml" \
 // RUN: --split-input-file -verify-diagnostics | FileCheck %s
 
-// COM: the physical parameters come from
-// COM: frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml
-
 func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     %0 = ion.ion {
         name="YB117",
