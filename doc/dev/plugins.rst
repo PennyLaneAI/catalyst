@@ -39,6 +39,7 @@ For example using ``quantum-opt --help`` while loading your pass plugin will ena
 Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
 
 .. code-block:: mlir
+
     module @module {
       func.func private @bar() -> (tensor<i64>) {
         %c = stablehlo.constant dense<0> : tensor<i64>
@@ -49,11 +50,13 @@ Taking into account the description of the pass ``standalone-switch-bar-foo``, l
 And you can schedule this pass as any other pass 
 
 .. code-block::
+
     quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
 
 And you have your transformed program
 
 .. code-block:: mlir
+
     module @module {
       func.func private @foo() -> tensor<i64> {
         %c = stablehlo.constant dense<0> : tensor<i64>
@@ -75,6 +78,7 @@ It is a simple dialect intended only for testing purposes, and it only contains 
 We can write a program that contains operations in the standalone dialect:
 
 .. code-block:: mlir
+
     module @module {
       func.func private @bar() -> (i32) {
         %0 = arith.constant 0 : i32
@@ -86,11 +90,13 @@ We can write a program that contains operations in the standalone dialect:
 But if we try to run it, using the same command as shown earlier 
 
 .. code-block::
+
       quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
 
 the compilation will fail with a message similar to:
 
 .. code-block::
+
     example.mlir:4:10: error: Dialect `standalone' not found for custom op 'standalone.foo' 
     %1 = standalone.foo %0 : i32
          ^
@@ -99,6 +105,7 @@ the compilation will fail with a message similar to:
 to be able to parse this dialect, we need to load the dialect which is stored in the same file
 
 .. code-block::
+
     quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
 
 Now, you can parse the program without the error.
@@ -116,6 +123,7 @@ For now, we found that the following process is the easiest one:
 1. Add the standalone plugin directory as a subdirectory of Catalyst:
 
 .. code-block:: diff
+
     diff --git a/mlir/CMakeLists.txt b/mlir/CMakeLists.txt
     index c0b8dfd6c..1b5c2e528 100644
     --- a/mlir/CMakeLists.txt
