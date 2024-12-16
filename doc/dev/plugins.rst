@@ -139,57 +139,56 @@ For now, we found that the following process is the easiest one:
 
 You will also need to make the following change:
 
-```
-diff --git a/mlir/standalone/CMakeLists.txt b/mlir/standalone/CMakeLists.txt
-index e999ae34d..fd6ee8f10 100644
---- a/mlir/standalone/CMakeLists.txt
-+++ b/mlir/standalone/CMakeLists.txt
-@@ -1,6 +1,3 @@
--cmake_minimum_required(VERSION 3.20.0)
--project(standalone-dialect LANGUAGES CXX C)
--
- set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
- 
- set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
-```
+.. code-block:: diff
 
-```
-diff --git a/mlir/standalone/CMakeLists.txt b/mlir/standalone/CMakeLists.txt
-index 280cd80e1..fd6ee8f10 100644
---- a/mlir/standalone/CMakeLists.txt
-+++ b/mlir/standalone/CMakeLists.txt
-@@ -32,8 +32,8 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
-   mlir_configure_python_dev_packages()
- endif()
- 
--set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR})
--set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR})
-+set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/standalone)
-+set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR}/standalone)
- include_directories(${LLVM_INCLUDE_DIRS})
- include_directories(${MLIR_INCLUDE_DIRS})
- include_directories(${STANDALONE_SOURCE_DIR}/include)
-```
+    diff --git a/mlir/standalone/CMakeLists.txt b/mlir/standalone/CMakeLists.txt
+    index e999ae34d..fd6ee8f10 100644
+    --- a/mlir/standalone/CMakeLists.txt
+    +++ b/mlir/standalone/CMakeLists.txt
+    @@ -1,6 +1,3 @@
+    -cmake_minimum_required(VERSION 3.20.0)
+    -project(standalone-dialect LANGUAGES CXX C)
+    -
+     set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
+     
+     set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+
+.. code-block:: diff
+
+    diff --git a/mlir/standalone/CMakeLists.txt b/mlir/standalone/CMakeLists.txt
+    index 280cd80e1..fd6ee8f10 100644
+    --- a/mlir/standalone/CMakeLists.txt
+    +++ b/mlir/standalone/CMakeLists.txt
+    @@ -32,8 +32,8 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
+       mlir_configure_python_dev_packages()
+     endif()
+     
+    -set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR})
+    -set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR})
+    +set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/standalone)
+    +set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR}/standalone)
+     include_directories(${LLVM_INCLUDE_DIRS})
+     include_directories(${MLIR_INCLUDE_DIRS})
+     include_directories(${STANDALONE_SOURCE_DIR}/include)
 
 With these changes, you should now be able to use ``make all`` and build the standalone plugin.
 
 2. Include the header files in the standalone plugin pass.
 
-```
-diff --git a/mlir/standalone/lib/Standalone/StandalonePasses.cpp b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-index a23d0420f..83e2ce255 100644
---- a/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-+++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-@@ -12,6 +12,7 @@
- #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
- 
- #include "Standalone/StandalonePasses.h"
-+#include "Quantum/IR/QuantumOps.h"
- 
- namespace mlir::standalone {
- #define GEN_PASS_DEF_STANDALONESWITCHBARFOO
+.. code-block:: diff
 
-```
+    diff --git a/mlir/standalone/lib/Standalone/StandalonePasses.cpp b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    index a23d0420f..83e2ce255 100644
+    --- a/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    +++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    @@ -12,6 +12,7 @@
+     #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+     
+     #include "Standalone/StandalonePasses.h"
+    +#include "Quantum/IR/QuantumOps.h"
+     
+     namespace mlir::standalone {
+     #define GEN_PASS_DEF_STANDALONESWITCHBARFOO
 
 You can type ``make all`` and see the compilation succeed.
 Please note that Catalyst has three custom dialects, the Quantum, Catalyst and Gradient dialect.
@@ -197,23 +196,23 @@ Depending on which dialect you are interested in, you can include the definition
 
 3. Marking dialects as dependent in the pass TableGen file.
 
-```
-diff --git a/mlir/standalone/include/Standalone/StandalonePasses.td b/mlir/standalone/include/Standalone/StandalonePasses.td
-index dc8fb43d2..29510d74d 100644
---- a/mlir/standalone/include/Standalone/StandalonePasses.td
-+++ b/mlir/standalone/include/Standalone/StandalonePasses.td
-@@ -26,6 +26,10 @@ def StandaloneSwitchBarFoo: Pass<"standalone-switch-bar-foo", "::mlir::ModuleOp"
-     ```
-   }];
- 
-+   let dependentDialects = [
-+       "catalyst::quantum::QuantumDialect"
-+   ];
-+
- }
- 
- #endif // STANDALONE_PASS
-```
+.. code-block:: diff
+
+    diff --git a/mlir/standalone/include/Standalone/StandalonePasses.td b/mlir/standalone/include/Standalone/StandalonePasses.td
+    index dc8fb43d2..29510d74d 100644
+    --- a/mlir/standalone/include/Standalone/StandalonePasses.td
+    +++ b/mlir/standalone/include/Standalone/StandalonePasses.td
+    @@ -26,6 +26,10 @@ def StandaloneSwitchBarFoo: Pass<"standalone-switch-bar-foo", "::mlir::ModuleOp"
+         ```
+       }];
+     
+    +   let dependentDialects = [
+    +       "catalyst::quantum::QuantumDialect"
+    +   ];
+    +
+     }
+     
+     #endif // STANDALONE_PASS
 
 LLVM and MLIR use an embedded DSL to create passes called Tablegen.
 We are not going to go in depth into Tablegen, you just need to know that transformations require to register which passes are used.
@@ -221,37 +220,40 @@ In this example, since we are interested in using the quantum dialect, we will a
 
 One also needs to link the MLIRQuantum library and change the plugin tool to catalyst-cli.
 
-```
-diff --git a/mlir/standalone/lib/Standalone/CMakeLists.txt b/mlir/standalone/lib/Standalone/CMakeLists.txt
-index 0f1705a25..8874e410d 100644
---- a/mlir/standalone/lib/Standalone/CMakeLists.txt
-+++ b/mlir/standalone/lib/Standalone/CMakeLists.txt
-@@ -10,9 +10,11 @@ add_mlir_dialect_library(MLIRStandalone
-         DEPENDS
-         MLIRStandaloneOpsIncGen
-         MLIRStandalonePassesIncGen
-+        MLIRQuantum
- 
-         LINK_LIBS PUBLIC
-         MLIRIR
-         MLIRInferTypeOpInterface
-         MLIRFuncDialect
-+        MLIRQuantum
-         )
-diff --git a/mlir/standalone/standalone-plugin/CMakeLists.txt b/mlir/standalone/standalone-plugin/CMakeLists.txt
-index 3e3383608..2dbeea9d5 100644
---- a/mlir/standalone/standalone-plugin/CMakeLists.txt
-+++ b/mlir/standalone/standalone-plugin/CMakeLists.txt
-@@ -5,7 +5,7 @@ add_llvm_library(StandalonePlugin
-         DEPENDS
-         MLIRStandalone
-         PLUGIN_TOOL
--        mlir-opt
-+        catalyst-cli
- 
-         LINK_LIBS
-         MLIRStandalone
-```
+.. code-block:: diff
+
+    diff --git a/mlir/standalone/lib/Standalone/CMakeLists.txt b/mlir/standalone/lib/Standalone/CMakeLists.txt
+    index 0f1705a25..8874e410d 100644
+    --- a/mlir/standalone/lib/Standalone/CMakeLists.txt
+    +++ b/mlir/standalone/lib/Standalone/CMakeLists.txt
+    @@ -10,9 +10,11 @@ add_mlir_dialect_library(MLIRStandalone
+             DEPENDS
+             MLIRStandaloneOpsIncGen
+             MLIRStandalonePassesIncGen
+    +        MLIRQuantum
+     
+             LINK_LIBS PUBLIC
+             MLIRIR
+             MLIRInferTypeOpInterface
+             MLIRFuncDialect
+    +        MLIRQuantum
+             )
+
+.. code-block:: diff
+
+    diff --git a/mlir/standalone/standalone-plugin/CMakeLists.txt b/mlir/standalone/standalone-plugin/CMakeLists.txt
+    index 3e3383608..2dbeea9d5 100644
+    --- a/mlir/standalone/standalone-plugin/CMakeLists.txt
+    +++ b/mlir/standalone/standalone-plugin/CMakeLists.txt
+    @@ -5,7 +5,7 @@ add_llvm_library(StandalonePlugin
+             DEPENDS
+             MLIRStandalone
+             PLUGIN_TOOL
+    -        mlir-opt
+    +        catalyst-cli
+     
+             LINK_LIBS
+             MLIRStandalone
 
 Please note that if you are using the Catalyst or Gradient dialects, you should also add MLIRCatalyst and MLIRGradient to the list of dependences and libraries to be linked.
 
@@ -263,62 +265,62 @@ We recommend reading MLIR tutorials on how to write MLIR passes, reading the Cat
 
 The first thing we need to do is change the ``OpRewritePattern`` to match against our ``quantum::AllocOp`` which denotes how many qubits should be allocated for a given quantum program.
 
-```
-diff --git a/mlir/standalone/lib/Standalone/StandalonePasses.cpp b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-index 83e2ce255..504cf2d20 100644
---- a/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-+++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-@@ -19,10 +19,10 @@ namespace mlir::standalone {
- #include "Standalone/StandalonePasses.h.inc"
- 
- namespace {
--class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
-+class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
- public:
--  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
--  LogicalResult matchAndRewrite(func::FuncOp op,
-+  using OpRewritePattern<catalyst::quantum::AllocOp>::OpRewritePattern;
-+  LogicalResult matchAndRewrite(catalyst::quantum::AllocOp op,
-                                 PatternRewriter &rewriter) const final {
-     if (op.getSymName() == "bar") {
-       rewriter.modifyOpInPlace(op, [&op]() { op.setSymName("foo"); });
-```
+.. code-block:: diff
+
+    diff --git a/mlir/standalone/lib/Standalone/StandalonePasses.cpp b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    index 83e2ce255..504cf2d20 100644
+    --- a/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    +++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    @@ -19,10 +19,10 @@ namespace mlir::standalone {
+     #include "Standalone/StandalonePasses.h.inc"
+     
+     namespace {
+    -class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
+    +class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
+     public:
+    -  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
+    -  LogicalResult matchAndRewrite(func::FuncOp op,
+    +  using OpRewritePattern<catalyst::quantum::AllocOp>::OpRewritePattern;
+    +  LogicalResult matchAndRewrite(catalyst::quantum::AllocOp op,
+                                     PatternRewriter &rewriter) const final {
+         if (op.getSymName() == "bar") {
+           rewriter.modifyOpInPlace(op, [&op]() { op.setSymName("foo"); });
 
 The next step is changing the contents of the function itself:
 
-```
-diff --git a/mlir/standalone/lib/Standalone/StandalonePasses.cpp b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-index 83e2ce255..e8a7f805e 100644
---- a/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-+++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
-@@ -19,15 +19,21 @@ namespace mlir::standalone {
- #include "Standalone/StandalonePasses.h.inc"
- 
- namespace {
--class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
-+class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
- public:
--  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
--  LogicalResult matchAndRewrite(func::FuncOp op,
-+  using OpRewritePattern<catalyst::quantum::AllocOp>::OpRewritePattern;
-+  LogicalResult matchAndRewrite(catalyst::quantum::AllocOp op,
-                                 PatternRewriter &rewriter) const final {
--    if (op.getSymName() == "bar") {
--      rewriter.modifyOpInPlace(op, [&op]() { op.setSymName("foo"); });
-+    // get the number of qubits allocated
-+    if (op.getNqubitsAttr().value_or(0) == 1) {
-+      Type i64 = rewriter.getI64Type();
-+      auto fortytwo = rewriter.getIntegerAttr(i64, 42);
-+
-+      // modify the allocation to change the number of qubits to 42.
-+      rewriter.modifyOpInPlace(op, [&]() { op.setNqubitsAttrAttr(fortytwo); });
-       return success();
-     }
-+    // failure indicates that nothing was modified.
-     return failure();
-   }
- };
-```
+.. code-block:: diff
+
+    diff --git a/mlir/standalone/lib/Standalone/StandalonePasses.cpp b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    index 83e2ce255..e8a7f805e 100644
+    --- a/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    +++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
+    @@ -19,15 +19,21 @@ namespace mlir::standalone {
+     #include "Standalone/StandalonePasses.h.inc"
+     
+     namespace {
+    -class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
+    +class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
+     public:
+    -  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
+    -  LogicalResult matchAndRewrite(func::FuncOp op,
+    +  using OpRewritePattern<catalyst::quantum::AllocOp>::OpRewritePattern;
+    +  LogicalResult matchAndRewrite(catalyst::quantum::AllocOp op,
+                                     PatternRewriter &rewriter) const final {
+    -    if (op.getSymName() == "bar") {
+    -      rewriter.modifyOpInPlace(op, [&op]() { op.setSymName("foo"); });
+    +    // get the number of qubits allocated
+    +    if (op.getNqubitsAttr().value_or(0) == 1) {
+    +      Type i64 = rewriter.getI64Type();
+    +      auto fortytwo = rewriter.getIntegerAttr(i64, 42);
+    +
+    +      // modify the allocation to change the number of qubits to 42.
+    +      rewriter.modifyOpInPlace(op, [&]() { op.setNqubitsAttrAttr(fortytwo); });
+           return success();
+         }
+    +    // failure indicates that nothing was modified.
+         return failure();
+       }
+     };
 
 And then we can ``make all``. The shared object of the standalone plugin should be available in ``mlir/build/lib/StandalonePlugin.so``.
 This shared object can be used with ``catalyst-cli`` and ``quantum-opt``
@@ -334,7 +336,7 @@ To allow users to run your pass, we have provided a class called ``Pass`` and ``
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
 For example:
 
-```
+.. code-block:: python
 
     @SwitchBarToFoo
     @qml.qnode(qml.device("lightning.qubit", wires=0))
@@ -344,7 +346,5 @@ For example:
     @qml.qjit
     def module():
         return qnode()
-
-```
 
 Take a look into the ``standalone_plugin_wheel``
