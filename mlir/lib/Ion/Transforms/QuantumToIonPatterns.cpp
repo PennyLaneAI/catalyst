@@ -197,7 +197,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "Missing phonon parameters for qubit " << qubitIndex0Value
                     << " used as input to MS gate; there are only " << phonons.size()
                     << " phonon parameters in the database.";
-                return failure();
+                assert(false && "Compilation failed; "
+                    "ensure that the database contains all necessary parameters for the circuit.");
             }
 
             if (static_cast<size_t>(qubitIndex1Value) >= phonons.size()) {
@@ -205,7 +206,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "Missing phonon parameters for qubit " << qubitIndex1Value
                     << " used as input to MS gate; there are only " << phonons.size()
                     << " phonon parameters in the database.";
-                return failure();
+                assert(false && "Compilation failed; "
+                    "ensure that the database contains all necessary parameters for the circuit.");
             }
 
             // Assume that each ion has 3 phonons (x, y, z)
@@ -222,7 +224,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "used as input to MS gate. Expected beam parameters for two-qubit "
                     << "combinatorial index " << twoQubitComboIndex << " but there are only "
                     << beams2.size() << " beam parameters in the database.";
-                return failure();
+                assert(false && "Compilation failed; "
+                    "ensure that the database contains all necessary parameters for the circuit.");
             }
 
             const Beam &beam = beams2[twoQubitComboIndex];
