@@ -226,36 +226,5 @@ func.func @example_ion() -> !ion.ion {
             >
         ]
     }: !ion.ion
-    // ion.system(%0) {
-    //     beams1=[
-    //         #ion.beam<
-    //             rabi=10.10,
-    //             detuning=11.11,
-    //             polarization=dense<[0, 1]>: tensor<2xi64>,
-    //             wavevector=dense<[0, 1]>: tensor<2xi64>
-    //         >,
-    //         #ion.beam<
-    //             rabi=10.10,
-    //             detuning=11.11,
-    //             polarization=dense<[0, 1]>: tensor<2xi64>,
-    //             wavevector=dense<[0, 1]>: tensor<2xi64>
-    //         >
-    //     ],
-    //     beams2=[
-    //         #ion.beam<
-    //             rabi=10.10,
-    //             detuning=11.11,
-    //             polarization=dense<[0, 1]>: tensor<2xi64>,
-    //             wavevector=dense<[0, 1]>: tensor<2xi64>>,#ion.beam<
-    //             rabi=10.10,
-    //             detuning=11.11,
-    //             polarization=dense<[0, 1]>: tensor<2xi64>,
-    //             wavevector=dense<[0, 1]>: tensor<2xi64>
-    //         >
-    //     ],
-    //     phonons=[
-    //         #ion.phonon<energy=10.10, eigen_vector=dense<[0, 1]>: tensor<2xi64>>
-    //     ]
-    // }
     return %0: !ion.ion
 }
