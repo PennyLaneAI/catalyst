@@ -11,6 +11,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Locate Python & PyBind11
+# The optional component is only used for the C++ test suite (to spin up their its interpreter),
+# and requires libpython.so to be available on the system.
 find_package(Python REQUIRED
     COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.Embed
@@ -37,7 +39,7 @@ set(OQC_LIBRARIES
 set_target_properties(rtd_oqc PROPERTIES BUILD_RPATH "$ORIGIN/../utils")
 target_link_directories(rtd_oqc PRIVATE ${runtime_lib})
 
-pybind11_add_module(oqc_python_module SHARED oqc_python_module.cpp)
+pybind11_add_module(oqc_python_module oqc_python_module.cpp)
 target_include_directories(oqc_python_module PRIVATE ${runtime_includes})
 
 add_dependencies(rtd_oqc oqc_python_module)

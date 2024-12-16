@@ -63,6 +63,8 @@ FetchContent_Declare(
 
 # Here, we look for the desired Python version early to avoid any problems with mismatched packages.
 # The desired Python environment should be specified ahead of time via -DPython_EXECUTABLE=...
+# The optional component is only used for the C++ test suite (to spin up its own interpreter),
+# and requires libpython.so to be available on the system.
 find_package(Python REQUIRED
     COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.Embed
