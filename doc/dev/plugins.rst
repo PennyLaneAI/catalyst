@@ -11,20 +11,18 @@ Building the Standalone Plugin
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Catalyst comes with ``Makefile`` rules to build the standalone-plugin from MLIR upstream.
-Simply type:
+Simply type 
 
-```
-make standalone-plugin
-```
+``make standalone-plugin``
 
 and in the ``catalyst/mlir/standalone/build/lib`` folder, you will find the ``StandalonePlugin.so`` plugin.
-The ``StandalonePlugin.so`` is a simple plugin that has its own dialect (called Standalone dialect) and a single transformation that transforms symbols from ``bar`` to ``foo``.
+The ``StandalonePlugin.so`` file is a simple plugin that has its own dialect (called Standalone dialect) and a single transformation that transforms symbol names from ``bar`` to ``foo``.
 It is intended to show how one would build an MLIR plugin, rather than showing all the features to build a usable MLIR plugin.
 
-With the ``StandalonePlugin.so`` plugin built, you can:
+You can use the ``StandalonePlugin.so`` plugin
 
-* use it on the command line with either ``quantum-opt`` or ``catalyst-cli``.
-* load it from Python and schedule it in one of your quantum programs.
+* with either ``quantum-opt`` or ``catalyst-cli``,
+* load it from Python and transform a quantum program.
 
 For example, if you are interested in using it from the command line interface, you can use the following flags to load the standalone plugin:
 
@@ -32,44 +30,36 @@ For example, if you are interested in using it from the command line interface, 
 * ``--load-dialect-plugin=/path/to/StandalonePlugin.so``
 
 This allows all normal flags to work.
-For example using ``quantum-opt --help``, while loading your pass plugin will enable you to see the documentation available for the standalone pass.
+For example using ``quantum-opt --help`` while loading your pass plugin will enable you to see the documentation available for the standalone pass.
 
-```
-      --standalone-switch-bar-foo                            -   Switches the name of a FuncOp named `bar` to `foo` and folds.
-```
+.. code-block::
 
-To run a pass you need a program to transform.
+    --standalone-switch-bar-foo                            -   Switches the name of a FuncOp named `bar` to `foo` and folds.
+
 Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
 
-```
-
-module @module {
-  func.func private @bar() -> (tensor<i64>) {
-    %c = stablehlo.constant dense<0> : tensor<i64>
-    return %c : tensor<i64>
-  }
-}
-
-```
+.. code-block:: mlir
+    module @module {
+      func.func private @bar() -> (tensor<i64>) {
+        %c = stablehlo.constant dense<0> : tensor<i64>
+        return %c : tensor<i64>
+      }
+    }
 
 And you can schedule this pass as any other pass 
 
-```
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
-```
+.. code-block::
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
 
 And you have your transformed program
 
-```
-
-module @module {
-  func.func private @foo() -> tensor<i64> {
-    %c = stablehlo.constant dense<0> : tensor<i64>
-    return %c : tensor<i64>
-  }
-}
-
-```
+.. code-block:: mlir
+    module @module {
+      func.func private @foo() -> tensor<i64> {
+        %c = stablehlo.constant dense<0> : tensor<i64>
+        return %c : tensor<i64>
+      }
+    }
 
 Notice that the name of the function ``bar`` has been changed to ``foo``.
 
@@ -79,42 +69,37 @@ Pass Plugins vs Dialect Plugins
 You may now be asking, "how come we used the option ``--load-pass-plugin`` but we didn't use the option ``--load-dialect-plugin``?"
 The ``--load-pass-plugin`` option is used to load passes, while the ``--load-dialect-plugin`` is used to load dialects.
 As mentioned earlier, the ``StandalonePlugin.so`` file also contains a dialect.
-It is a simple dialect intended only for learning purposes, and it only contains a single operation. It is the ``standalone.foo`` operation.
+It is a simple dialect intended only for testing purposes, and it only contains a single operation. It is the ``standalone.foo`` operation.
 (Please do not confuse this operation with symbols named ``foo``).
 
 We can write a program that contains operations in the standalone dialect:
 
-```
-module @module {
-  func.func private @bar() -> (i32) {
-    %0 = arith.constant 0 : i32
-    %1 = standalone.foo %0 : i32
-    return %1 : i32
-  }
-}
-```
+.. code-block:: mlir
+    module @module {
+      func.func private @bar() -> (i32) {
+        %0 = arith.constant 0 : i32
+        %1 = standalone.foo %0 : i32
+        return %1 : i32
+      }
+    }
 
 But if we try to run it, using the same command as shown earlier 
 
-```
+.. code-block::
       quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
-```
 
 the compilation will fail with a message similar to:
 
-```
+.. code-block::
     example.mlir:4:10: error: Dialect `standalone' not found for custom op 'standalone.foo' 
     %1 = standalone.foo %0 : i32
          ^
-a.mlir:4:10: note: Registered dialects: acc, affine, amdgpu, amx, arith, arm_neon, arm_sme, arm_sve, async, bufferization, builtin, catalyst, cf, chlo, complex, dlti, emitc, func, gpu, gradient, index, irdl, linalg, llvm, math, memref, mesh, mhlo, mitigation, ml_program, mpi, nvgpu, nvvm, omp, pdl, pdl_interp, polynomial, quant, quantum, rocdl, scf, shape, sparse_tensor, spirv, stablehlo, tensor, test, tosa, transform, ub, vector, vhlo, x86vector, xegpu ; for more info on dialect registration see https://mlir.llvm.org/getting_started/Faq/#registered-loaded-dependent-whats-up-with-dialects-management
-
-```
+    a.mlir:4:10: note: Registered dialects: acc, affine, amdgpu, amx, arith, arm_neon, arm_sme, arm_sve, async, bufferization, builtin, catalyst, cf, chlo, complex, dlti, emitc, func, gpu, gradient, index, irdl, linalg, llvm, math, memref, mesh, mhlo, mitigation, ml_program, mpi, nvgpu, nvvm, omp, pdl, pdl_interp, polynomial, quant, quantum, rocdl, scf, shape, sparse_tensor, spirv, stablehlo, tensor, test, tosa, transform, ub, vector, vhlo, x86vector, xegpu ; for more info on dialect registration see https://mlir.llvm.org/getting_started/Faq/#registered-loaded-dependent-whats-up-with-dialects-management
 
 to be able to parse this dialect, we need to load the dialect which is stored in the same file
 
-```
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
-```
+.. code-block::
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
 
 Now, you can parse the program without the error.
 
@@ -130,20 +115,19 @@ For now, we found that the following process is the easiest one:
 
 1. Add the standalone plugin directory as a subdirectory of Catalyst:
 
-```
-diff --git a/mlir/CMakeLists.txt b/mlir/CMakeLists.txt
-index c0b8dfd6c..1b5c2e528 100644
---- a/mlir/CMakeLists.txt
-+++ b/mlir/CMakeLists.txt
-@@ -73,6 +73,7 @@ add_subdirectory(include)
- add_subdirectory(lib)
- add_subdirectory(tools)
- add_subdirectory(test)
-+add_subdirectory(standalone)
- 
- if(QUANTUM_ENABLE_BINDINGS_PYTHON)
-   message(STATUS "Enabling Python API")
-```
+.. code-block:: diff
+    diff --git a/mlir/CMakeLists.txt b/mlir/CMakeLists.txt
+    index c0b8dfd6c..1b5c2e528 100644
+    --- a/mlir/CMakeLists.txt
+    +++ b/mlir/CMakeLists.txt
+    @@ -73,6 +73,7 @@ add_subdirectory(include)
+    add_subdirectory(lib)
+     add_subdirectory(tools)
+     add_subdirectory(test)
+    +add_subdirectory(standalone)
+     
+     if(QUANTUM_ENABLE_BINDINGS_PYTHON)
+       message(STATUS "Enabling Python API")
 
 You will also need to make the following change:
 
