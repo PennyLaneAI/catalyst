@@ -5,6 +5,7 @@
 * Catalyst can now load local MLIR plugins from python. Including support for `entry_points`.
   [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
   [(#1361)](https://github.com/PennyLaneAI/catalyst/pull/1361)
+  [(#1370)](https://github.com/PennyLaneAI/catalyst/pull/1370)
 
 <h3>Improvements 🛠</h3>
 

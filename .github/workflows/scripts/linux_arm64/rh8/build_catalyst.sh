@@ -92,7 +92,6 @@ export OQC_BUILD_DIR=/catalyst/oqc-build
 export OQD_BUILD_DIR=/catalyst/oqd-build
 export ENZYME_BUILD_DIR=/catalyst/enzyme-build
 export PYTHON=/usr/bin/python3
-make plugin
 make wheel
 
 # Exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
