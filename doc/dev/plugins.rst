@@ -10,7 +10,7 @@ So, let's get started!
 Building the Standalone Plugin
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Catalyst comes with ``Makefile`` rules to build the standalone-plugin from MLIR upstream.
+Catalyst comes with ``Makefile`` rules to build the `standalone-plugin from MLIR upstream's source code <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone>`_.
 Simply type 
 
 ``make standalone-plugin``
@@ -172,6 +172,8 @@ You will also need to make the following change:
      include_directories(${STANDALONE_SOURCE_DIR}/include)
 
 With these changes, you should now be able to use ``make all`` and build the standalone plugin.
+Please note that the location of the ``StandalonePlugin.so`` shared object has changed.
+It will now be stored in the ``mlir/build/lib/`` folder.
 
 2. Include the header files in the standalone plugin pass.
 
@@ -214,7 +216,8 @@ Depending on which dialect you are interested in, you can include the definition
      
      #endif // STANDALONE_PASS
 
-LLVM and MLIR use an embedded DSL to create passes called Tablegen.
+LLVM and MLIR use an embedded DSL to declare passes called `Tablegen <https://llvm.org/docs/TableGen/>`_.
+This saves LLVM and MLIR developers time, because Tablegen generates C++ files that are mostly just boilerplate code.
 We are not going to go in depth into Tablegen, you just need to know that transformations require to register which passes are used.
 In this example, since we are interested in using the quantum dialect, we will add the Quantum Dialect in the list of dependent dialects.
 
@@ -322,9 +325,10 @@ The next step is changing the contents of the function itself:
        }
      };
 
-And then we can ``make all``. The shared object of the standalone plugin should be available in ``mlir/build/lib/StandalonePlugin.so``.
+And then we can run ``make all`` again.
+The shared object of the standalone plugin should be available in ``mlir/build/lib/StandalonePlugin.so``.
 This shared object can be used with ``catalyst-cli`` and ``quantum-opt``
-You can of course, change the name of the pass and change the name of the shared object.
+You can change the name of the pass, change the name of the shared object and make any changes you want to get started with your quantum compilation journey.
 This was just an easy example to get started.
 
 With the steps above, you can take an MLIR program with a ``quantum.alloc`` instruction which allocates statically 1 qubit, and the program will be transformed to allocate 42 qubits statically.
@@ -332,14 +336,14 @@ With the steps above, you can take an MLIR program with a ``quantum.alloc`` inst
 5. Build your own python wheel and ship your plugin.
 
 Now that you have your ``StandalonePlugin.so``, you can ship it in a python wheel.
-To allow users to run your pass, we have provided a class called ``Pass`` and ``PluginPass``.
+To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PluginPass`.
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
 For example:
 
 .. code-block:: python
 
     @SwitchBarToFoo
-    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     def qnode():
         return qml.state()
 
@@ -347,4 +351,5 @@ For example:
     def module():
         return qnode()
 
-Take a look into the ``standalone_plugin_wheel``
+If you inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
+Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
