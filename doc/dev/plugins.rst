@@ -353,3 +353,5 @@ For example:
 
 If you inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
 Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
+For more information, please consult our `dialect guide <dev/dialects>`_, our `compiler passes guide <dev/transforms>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_
+
