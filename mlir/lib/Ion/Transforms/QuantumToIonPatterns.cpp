@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cassert>
+#include <optional>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -48,7 +49,7 @@ enum LevelTransition {
  */
 std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
 {
-    // TODO: make that function able to cross control flow op (for, while, ...)
+    // TODO (backlog): make that function able to cross control flow op (for, while, ...)
     auto qubit = gate.getInQubits()[position];
     auto definingOp = qubit.getDefiningOp();
 
@@ -59,6 +60,12 @@ std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position
         return std::nullopt;
     }
     else {
+        // TODO (backlog): if a pass on one operation fails, there may be a mixture of quantum ops
+        // and parallel protocol ops in the IR. Since MLIR will continue processing other ops after
+        // a failure, we may end up in a situation in which we attempt to cast a parallel protocol
+        // op to a quantum op, which will raise an incompatible-type assertion error. It would be
+        // best if we can immediately and gracefully exit after an emitError() call before this
+        // happens, or modify this function to handle this case.
         auto customOp = cast<quantum::CustomOp>(definingOp);
         auto outQubits = customOp.getOutQubits();
         int64_t index = 0;
@@ -139,8 +146,9 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
             rewriter.getI64VectorAttr(beam.polarization),
             rewriter.getI64VectorAttr(beam.wavevector));
 
-        // TODO: Pull the math formula from database and apply it in MLIR (but right now it is not
-        // in the database) Potentially Rabi and Detuning become SSA values and not attributes.
+        // TODO (backlog): Pull the math formula from database and apply it in MLIR (but right now
+        // it is not in the database)
+        // Potentially Rabi and Detuning become SSA values and not attributes.
 
         auto loc = op.getLoc();
         auto qubits = op.getInQubits();
@@ -175,9 +183,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
     auto qubitIndex1 = walkBackQubitSSA(op, 1);
 
     if (qubitIndex0.has_value() && qubitIndex1.has_value()) {
-        // TODO: double check the nex assumption, there is (n**2, 2) (combinatorial) =
-        // n**2(n**2-1)/2 two qubits They are 3 phonons per ion (x, y , z)
-
         quantum::AllocOp allocOp;
         qnode.walk([&](quantum::AllocOp op) {
             allocOp = op;
@@ -187,11 +192,21 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
         auto qubitIndex1Value = qubitIndex1.value();
         auto nQubits = allocOp.getNqubitsAttr();
         if (nQubits.has_value()) {
-            // TODO: Is there a more graceful way to handle these errors?
-            assert(static_cast<size_t>(qubitIndex0Value) < phonons.size() &&
-                   "Missing phonon parameters for first input qubit to MS gate");
-            assert(static_cast<size_t>(qubitIndex1Value) < phonons.size() &&
-                   "Missing phonon parameters for second input qubit to MS gate");
+            if (static_cast<size_t>(qubitIndex0Value) >= phonons.size()) {
+                op.emitError()
+                    << "Missing phonon parameters for qubit " << qubitIndex0Value
+                    << " used as input to MS gate; there are only " << phonons.size()
+                    << " phonon parameters in the database.";
+                return failure();
+            }
+
+            if (static_cast<size_t>(qubitIndex1Value) >= phonons.size()) {
+                op.emitError()
+                    << "Missing phonon parameters for qubit " << qubitIndex1Value
+                    << " used as input to MS gate; there are only " << phonons.size()
+                    << " phonon parameters in the database.";
+                return failure();
+            }
 
             // Assume that each ion has 3 phonons (x, y, z)
             const Phonon &phonon0ComX = phonons[qubitIndex0Value].COM_x;
@@ -200,9 +215,15 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto twoQubitComboIndex =
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
 
-            // TODO: Is there a more graceful way to handle these errors?
-            assert(static_cast<size_t>(twoQubitComboIndex) < beams2.size() &&
-                   "Missing two-qubit beam parameters for input qubits to MS gate");
+            if (static_cast<size_t>(twoQubitComboIndex) >= beams2.size()) {
+                op.emitError()
+                    << "Missing two-qubit beam parameters for qubits "
+                    << "(" << qubitIndex0Value << ", " << qubitIndex1Value << ") "
+                    << "used as input to MS gate. Expected beam parameters for two-qubit "
+                    << "combinatorial index " << twoQubitComboIndex << " but there are only "
+                    << beams2.size() << " beam parameters in the database.";
+                return failure();
+            }
 
             const Beam &beam = beams2[twoQubitComboIndex];
 
@@ -250,7 +271,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: where to find delta and mu?
-                    // TODO: wave vector change sign
+                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     auto beam2Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
@@ -273,7 +294,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // TODO: where to find delta and mu?
                     // TODO: phonon0ComXAttr change sign
-                    // TODO: wave vector change sign
+                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     auto beam3Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
@@ -312,7 +333,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: where to find delta and mu?
-                    // TODO: wave vector change sign
+                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     // TODO: phonon1ComXAttr change sign
                     auto beam5Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
@@ -335,7 +356,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: where to find delta and mu?
-                    // TODO: wave vector change sign
+                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     // TODO: phonon1ComXAttr change sign
                     auto beam6Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
@@ -383,7 +404,7 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        // TODO: Assumption 1 Ion are in the same funcop as the operations
+        // Assume ions are in the same funcop as the operations
         // RX case -> PP(P1, P2)
         if (op.getGateName() == "RX") {
             auto result = oneQubitGateToPulse(op, rewriter, 0.0, 0.0, beams1);
