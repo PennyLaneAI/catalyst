@@ -161,4 +161,28 @@ index e999ae34d..fd6ee8f10 100644
  set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 ```
 
+```
+diff --git a/mlir/standalone/CMakeLists.txt b/mlir/standalone/CMakeLists.txt
+index 280cd80e1..fd6ee8f10 100644
+--- a/mlir/standalone/CMakeLists.txt
++++ b/mlir/standalone/CMakeLists.txt
+@@ -32,8 +32,8 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
+   mlir_configure_python_dev_packages()
+ endif()
+ 
+-set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR})
+-set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR})
++set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/standalone)
++set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR}/standalone)
+ include_directories(${LLVM_INCLUDE_DIRS})
+ include_directories(${MLIR_INCLUDE_DIRS})
+ include_directories(${STANDALONE_SOURCE_DIR}/include)
+```
+
+With these changes, the include directories with Catalyst dialects are available in the MLIR standalone plugin.
+This means that the following change:
+
+```
+```
+
 2. Include the header files 
