@@ -67,13 +67,8 @@ from catalyst.compiler import CompileOptions, Compiler
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.runtime_environment import get_bin_path
 
-# CHECK: module
 mlir_module = """
 module @module {
-  func.func public @jit_module() -> tensor<1xcomplex<f64>> attributes {llvm.emit_c_interface} {
-    %0 = catalyst.launch_kernel @module_qnode::@qnode() : () -> tensor<1xcomplex<f64>>
-    return %0 : tensor<1xcomplex<f64>>
-  }
   module @module_qnode {
     module attributes {transform.with_named_sequence} {
       transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
@@ -81,38 +76,11 @@ module @module {
         transform.yield 
       }
     }
-    func.func public @qnode() -> tensor<1xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-      quantum.device["/home/ubuntu/code/env/lib/python3.10/site-packages/pennylane_lightning/liblightning_qubit_catalyst.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-      %c = stablehlo.constant dense<0> : tensor<i64>
-      %0 = quantum.alloc( 1) : !quantum.reg
-      %1 = call @baz() : () -> tensor<i64>
-      %extracted = tensor.extract %1[] : tensor<i64>
-      %2 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
-      %out_qubits = quantum.custom "Hadamard"() %2 : !quantum.bit
-      %extracted_0 = tensor.extract %1[] : tensor<i64>
-      %3 = quantum.insert %0[%extracted_0], %out_qubits : !quantum.reg, !quantum.bit
-      %4 = quantum.compbasis  : !quantum.obs
-      %5 = quantum.state %4 : tensor<1xcomplex<f64>>
-      quantum.dealloc %3 : !quantum.reg
-      quantum.device_release
-      return %5 : tensor<1xcomplex<f64>>
-    }
-    func.func private @baz() -> (tensor<i64> {mhlo.layout_mode = "default"}) attributes {llvm.linkage = #llvm.linkage<internal>} {
+    // CHECK: func.func private @foo()
+    func.func private @bar() -> (tensor<i64>) {
       %c = stablehlo.constant dense<0> : tensor<i64>
       return %c : tensor<i64>
     }
-    func.func private @bar() -> (tensor<i64> {mhlo.layout_mode = "default"}) attributes {llvm.linkage = #llvm.linkage<internal>} {
-      %c = stablehlo.constant dense<0> : tensor<i64>
-      return %c : tensor<i64>
-    }
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
   }
 }
 """
