@@ -253,19 +253,20 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
 
-                    // TODO: Double check the formula in Ion dialect document (each beamAttr is
-                    // different) see below.
+                    // Note that the each beamAttr below is different! The respective formulas are
+                    // taken from the Ion dialect specification document.
+
                     // TODO: Pull the math formula from database and apply it in MLIR
                     // Rabi and phase becomes SSA values and not attributes.
 
                     // Pulse1(
                     //     transition=Transition(level1=0,level2=e),
-                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     rabi=float from calibration db(~100 KHz-MHz),
                     //     detuning=float from calibration db,
                     //     phase=0,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=Int array from from calibration db,
-                    //     target=qubit0
+                    //     target=qubit0,
                     //     time=rabi/ms_angle (double check the formula)
                     // )
                     auto beam1Attr = BeamAttr::get(
@@ -278,10 +279,13 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // Pulse2(
                     //     transition=Transition(level1=1,level2=e),
-                    //     rabi= float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu
-                    //     (from database), phase=0, polarization=Int array from from calibration
-                    //     db, wavevector=-Int array from from calibration db, target=qubit0
+                    //     rabi=float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu(from
+                    //       database),
+                    //     phase=0,
+                    //     polarization=Int array from from calibration db,
+                    //     wavevector=-Int array from from calibration db,
+                    //     target=qubit0,
                     //     time=rabi/ms_angle (double check the formula)
                     // )
 
@@ -297,12 +301,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // Pulse3(
                     //     transition=Transition(level1=1,level2=e),
-                    //     rabi= float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) - omega_0 - mu(from database)
+                    //     rabi=float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) - omega_0 - mu(from database),
                     //     phase=0,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=-Int array from from calibration db,
-                    //     target=qubit0
+                    //     target=qubit0,
                     //     time=rabi/ms_angle (double check the formula)
                     // )
 
@@ -319,12 +323,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // Pulse4(
                     //     transition=Transition(level1=0,level2=e),
-                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     rabi=float from calibration db(~100 KHz-MHz),
                     //     detuning=float from calibration db,
                     //     phase=0,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=Int array from from calibration db,
-                    //     target=qubit1
+                    //     target=qubit1,
                     //     time=rabi/ms_angle (double check the formula)
                     // )
 
@@ -338,10 +342,13 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // Pulse5(
                     //     transition=Transition(level1=1,level2=e),
-                    //     rabi= float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu
-                    //     (from database), phase=0, polarization=Int array from from calibration
-                    //     db, wavevector=-Int array from from calibration db, target=qubit1
+                    //     rabi=float from calibration db(~100 KHz-MHz),
+                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu(from
+                    //       database),
+                    //     phase=0,
+                    //     polarization=Int array from from calibration db,
+                    //     wavevector=-Int array from from calibration db,
+                    //     target=qubit1,
                     //     time=rabi/ms_angle (double check the formula)
                     // )
 
@@ -358,13 +365,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // Pulse6(
                     //     transition=Transition(level1=1,level2=e),
-                    //     rabi= float from calibration db(~100 KHz-MHz),
+                    //     rabi=float from calibration db(~100 KHz-MHz),
                     //     detuning=Delta(from database) - omega_0 (COMx phonon frequency) - mu(from
-                    //     database) phase=0, polarization=Int array from from calibration db,
+                    //       database),
+                    //     phase=0,
+                    //     polarization=Int array from from calibration db,
                     //     wavevector=-Int array from from calibration db,
-                    //     target=qubit1
+                    //     target=qubit1,
                     //     time=rabi/ms_angle (double check the formula)
-                    // )
                     // )
 
                     // TODO: where to find delta and mu?
