@@ -537,12 +537,21 @@ class QJIT(CatalystCallable):
         """Compile Python function on initialization using the type hint signature."""
 
         self.workspace = self._get_workspace()
+        return_annotation = inspect.signature(self.original_function).return_annotation
+        if return_annotation and return_annotation != inspect.Signature.empty:
+            return_annotation = get_abstract_signature(return_annotation)
+        else:
+            return_annotation = None
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
+
+        if return_annotation:
+            vals, self.out_treedef = tree_flatten(return_annotation)
+            self.out_type = [(True, retty) for retty in vals]
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()

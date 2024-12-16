@@ -15,12 +15,17 @@
 """
 This module contains debug functions to interact with the compiler and compiled functions.
 """
+import dis
+import functools
+import inspect
 import logging
 import os
 import platform
 import re
 import shutil
 import subprocess
+
+from jax._src.interpreters import mlir
 
 import catalyst
 from catalyst.compiler import LinkerDriver
@@ -181,6 +186,66 @@ def replace_ir(fn, stage, new_ir):
     fn.overwrite_ir = new_ir
     fn.compiler.options.checkpoint_stage = stage
     fn.fn_cache.clear()
+
+
+def get_docstring_ir(kallable, opts):
+    # This is necessary because of recursive imports...
+    class DocstringIR(catalyst.QJIT):
+
+        def __init__(self, kallable, compile_options):
+            assert callable(kallable)
+
+            docstring = inspect.getdoc(kallable)
+            assert docstring
+
+            bytecode = dis.get_instructions(kallable)
+
+            @functools.wraps(kallable)
+            def noop(*args, **kwargs):
+                """Dummy docstring"""
+
+            super().__init__(noop, compile_options)
+
+            noop_bytecode = dis.get_instructions(noop)
+            is_applicable = all(
+                itarget.opcode == itruth.opcode for itarget, itruth in zip(bytecode, noop_bytecode)
+            )
+            assert is_applicable
+
+            replace_ir(self, "mlir", docstring)
+
+            options = catalyst.compiler.CompileOptions()
+            options.pipelines = [("Generic", ["builtin.module(canonicalize)"])]
+            options.lower_to_llvm = False
+
+            print_generic = catalyst.compiler.Compiler(options)
+            _, generic_ir = print_generic.run_from_ir(
+                docstring, "generic", self.workspace, "--mlir-print-op-generic"
+            )
+
+            ctx = mlir.make_ir_context()
+            ctx.allow_unregistered_dialects = True
+
+            self.aot_compile()
+            self.mlir_module = mlir.ir.Module.parse(generic_ir, context=ctx)
+            self.mlir = docstring
+            self.fn_cache.clear()
+            self.compile_options.keep_intermediate = True
+            self.compiled_function, self.qir = self.compile()
+            self.fn_cache.insert(
+                self.compiled_function, self.user_sig, self.out_treedef, self.workspace
+            )
+
+    return DocstringIR(kallable, opts)
+
+
+@debug_logger
+def docstringir(kallable):
+    """Decorator that denotes that a function's docstring is
+    actually IR."""
+
+    options = catalyst.compiler.CompileOptions()
+    return foo(kallable, options)
 
 
 @debug_logger

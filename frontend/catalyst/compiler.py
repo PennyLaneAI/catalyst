@@ -269,7 +269,7 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
 
     @debug_logger
-    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace, *args):
         """Prepare the command for catalyst-cli to compile the file.
 
         Args:
@@ -303,6 +303,9 @@ class Compiler:
             cmd += ["--verbose"]
         if self.options.checkpoint_stage:
             cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
+        if args:
+            for arg in args:
+                cmd += [str(arg)]
 
         pipeline_str = ""
         for pipeline in self.options.get_pipelines():
@@ -314,7 +317,7 @@ class Compiler:
         return cmd
 
     @debug_logger
-    def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
+    def run_from_ir(self, ir: str, module_name: str, workspace: Directory, *args):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
         Args:
@@ -348,7 +351,7 @@ class Compiler:
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
         output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
 
-        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace, *args)
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
