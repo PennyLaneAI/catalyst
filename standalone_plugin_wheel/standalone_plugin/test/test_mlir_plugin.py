@@ -20,6 +20,8 @@ https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 import pennylane as qml
 import pytest
 
+from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
+
 have_standalone_plugin = True
 
 try:
@@ -28,9 +30,6 @@ try:
     plugin = getStandalonePluginAbsolutePath()
 except ImportError:
     have_standalone_plugin = False
-
-
-from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
 
 
 @pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
