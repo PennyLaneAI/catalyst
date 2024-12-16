@@ -127,3 +127,22 @@ However, as mentioned earlier, the standalone plugin is a bare bones example.
 You may be wondering, well, how can I make a standalone plugin but that is able to change some aspects of the quantum program?
 For that, you will need to change the build script for the standalone plugin.
 For now, we found that the following process is the easiest one:
+
+1. Add the standalone plugin directory as a subdirectory of Catalyst:
+
+```
+diff --git a/mlir/CMakeLists.txt b/mlir/CMakeLists.txt
+index c0b8dfd6c..1b5c2e528 100644
+--- a/mlir/CMakeLists.txt
++++ b/mlir/CMakeLists.txt
+@@ -73,6 +73,7 @@ add_subdirectory(include)
+ add_subdirectory(lib)
+ add_subdirectory(tools)
+ add_subdirectory(test)
++add_subdirectory(standalone)
+ 
+ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
+   message(STATUS "Enabling Python API")
+```
+
+2. Include the header files 
