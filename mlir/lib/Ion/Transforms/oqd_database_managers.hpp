@@ -33,26 +33,27 @@ namespace {
 // to the pass as pass options (via the standard transform dialect lowering pipeline we have)
 // But for now this hard coded prototype is good enough.
 
-static const std::string catalyst_root_path =
-    std::regex_replace(__FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
 
-static const std::string oqd_device_parameters_toml_file_path =
-    catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_device_parameters.toml";
-static const std::string oqd_qubit_parameters_toml_file_path =
-    catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_qubit_parameters.toml";
-static const std::string oqd_gate_decomposition_parameters_toml_file_path =
-    catalyst_root_path +
-    "frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml";
+// static const std::string catalyst_root_path =
+//     std::regex_replace(__FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
+
+// static const std::string oqd_device_parameters_toml_file_path =
+//     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_device_parameters.toml";
+// static const std::string oqd_qubit_parameters_toml_file_path =
+//     catalyst_root_path + "frontend/catalyst/third_party/oqd/src/oqd_qubit_parameters.toml";
+// static const std::string oqd_gate_decomposition_parameters_toml_file_path =
+//     catalyst_root_path +
+//     "frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml";
 
 class OQDDatabaseManager {
 
   public:
-    OQDDatabaseManager()
+    OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc, const std::string &Gate2PulseDecompTomlLoc)
     {
-        sourceTomlDevice = toml::parse_file(oqd_device_parameters_toml_file_path);
-        sourceTomlQubit = toml::parse_file(oqd_qubit_parameters_toml_file_path);
+        sourceTomlDevice = toml::parse_file(DeviceTomlLoc);
+        sourceTomlQubit = toml::parse_file(QubitTomlLoc);
         sourceTomlGateDecomposition =
-            toml::parse_file(oqd_gate_decomposition_parameters_toml_file_path);
+            toml::parse_file(Gate2PulseDecompTomlLoc);
 
         assert(sourceTomlDevice && "Parsing of device toml failed!");
         assert(sourceTomlQubit && "Parsing of qubit toml failed!");

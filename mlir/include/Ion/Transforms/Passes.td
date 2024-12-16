@@ -20,6 +20,18 @@ include "mlir/Pass/PassBase.td"
 def QuantumToIonPass : Pass<"quantum-to-ion"> {
     let summary = "Lower a quantum circuit to an ionic pulse program.";
 
+    let options = [
+    Option<"DeviceTomlLoc", "device-toml-loc",
+           "std::string", /*default=*/"\"\"",
+           "Toml file location for the ion hardware device parameters.">,
+    Option<"QubitTomlLoc", "qubit-toml-loc",
+           "std::string", /*default=*/"\"\"",
+           "Toml file location for the ion hardware qubit parameters.">,
+    Option<"Gate2PulseDecompTomlLoc", "gate-to-pulse-toml-loc",
+           "std::string", /*default=*/"\"\"",
+           "Toml file location for the ion hardware gate-to-pulse decomposition parameters.">,
+    ];
+
     let dependentDialects = [
         "quantum::QuantumDialect",
         "ion::IonDialect"

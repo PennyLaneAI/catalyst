@@ -42,7 +42,7 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     void runOnOperation() final
     {
         RewritePatternSet ionPatterns(&getContext());
-        populateQuantumToIonPatterns(ionPatterns);
+        populateQuantumToIonPatterns(ionPatterns, DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(ionPatterns)))) {
             return signalPassFailure();

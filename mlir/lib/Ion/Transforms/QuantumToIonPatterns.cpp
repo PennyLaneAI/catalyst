@@ -367,10 +367,19 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
-    OQDDatabaseManager dataManager;
-    const std::vector<Beam> &beams1 = dataManager.getBeams1Params();
-    const std::vector<Beam> &beams2 = dataManager.getBeams2Params();
-    const std::vector<PhononMode> &phonons = dataManager.getPhononParams();
+    std::vector<Beam> beams1;
+    std::vector<Beam> beams2;
+    std::vector<PhononMode> phonons;
+
+QuantumToIonRewritePattern(mlir::MLIRContext* ctx, const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
+    const std::string &Gate2PulseDecompTomlLoc) : mlir::OpRewritePattern<CustomOp>::OpRewritePattern(ctx) {
+
+    OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
+    beams1 = dataManager.getBeams1Params();
+    beams2 = dataManager.getBeams2Params();
+    phonons = dataManager.getPhononParams();
+}
+
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
@@ -394,9 +403,11 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     }
 };
 
-void populateQuantumToIonPatterns(RewritePatternSet &patterns)
+void populateQuantumToIonPatterns(RewritePatternSet &patterns,
+    const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc, const std::string &Gate2PulseDecompTomlLoc)
 {
-    patterns.add<QuantumToIonRewritePattern>(patterns.getContext());
+    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(),
+        DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 }
 
 } // namespace ion
