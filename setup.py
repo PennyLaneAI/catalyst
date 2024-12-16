@@ -270,7 +270,7 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         )
 
 
-define_macros = [("Py_LIMITED_API", "0x030C0000")]
+Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
 
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
@@ -282,7 +282,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
-        define_macros=define_macros,
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -300,7 +300,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
-        define_macros=define_macros,
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
@@ -313,7 +313,7 @@ ext_modules = [
     CMakeExtension(
         "catalyst.utils.wrapper",
         sourcedir=frontend_dir,
-        define_macros=define_macros,
+        define_macros=Py_LIMITED_API_macros,
     ),
 ]
 
