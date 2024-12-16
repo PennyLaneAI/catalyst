@@ -33,7 +33,6 @@ namespace {
 // to the pass as pass options (via the standard transform dialect lowering pipeline we have)
 // But for now this hard coded prototype is good enough.
 
-
 // static const std::string catalyst_root_path =
 //     std::regex_replace(__FILE__, std::regex("mlir/(.)*/oqd_database_managers.hpp"), "");
 
@@ -48,12 +47,12 @@ namespace {
 class OQDDatabaseManager {
 
   public:
-    OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc, const std::string &Gate2PulseDecompTomlLoc)
+    OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
+                       const std::string &Gate2PulseDecompTomlLoc)
     {
         sourceTomlDevice = toml::parse_file(DeviceTomlLoc);
         sourceTomlQubit = toml::parse_file(QubitTomlLoc);
-        sourceTomlGateDecomposition =
-            toml::parse_file(Gate2PulseDecompTomlLoc);
+        sourceTomlGateDecomposition = toml::parse_file(Gate2PulseDecompTomlLoc);
 
         assert(sourceTomlDevice && "Parsing of device toml failed!");
         assert(sourceTomlQubit && "Parsing of qubit toml failed!");

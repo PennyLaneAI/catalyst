@@ -21,7 +21,8 @@
 namespace catalyst {
 namespace ion {
 
-void populateQuantumToIonPatterns(mlir::RewritePatternSet &, const std::string &, const std::string &, const std::string &);
+void populateQuantumToIonPatterns(mlir::RewritePatternSet &, const std::string &,
+                                  const std::string &, const std::string &);
 
 } // namespace ion
 } // namespace catalyst

@@ -371,15 +371,17 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     std::vector<Beam> beams2;
     std::vector<PhononMode> phonons;
 
-QuantumToIonRewritePattern(mlir::MLIRContext* ctx, const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
-    const std::string &Gate2PulseDecompTomlLoc) : mlir::OpRewritePattern<CustomOp>::OpRewritePattern(ctx) {
+    QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const std::string &DeviceTomlLoc,
+                               const std::string &QubitTomlLoc,
+                               const std::string &Gate2PulseDecompTomlLoc)
+        : mlir::OpRewritePattern<CustomOp>::OpRewritePattern(ctx)
+    {
 
-    OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
-    beams1 = dataManager.getBeams1Params();
-    beams2 = dataManager.getBeams2Params();
-    phonons = dataManager.getPhononParams();
-}
-
+        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
+        beams1 = dataManager.getBeams1Params();
+        beams2 = dataManager.getBeams2Params();
+        phonons = dataManager.getPhononParams();
+    }
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
@@ -403,11 +405,12 @@ QuantumToIonRewritePattern(mlir::MLIRContext* ctx, const std::string &DeviceToml
     }
 };
 
-void populateQuantumToIonPatterns(RewritePatternSet &patterns,
-    const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc, const std::string &Gate2PulseDecompTomlLoc)
+void populateQuantumToIonPatterns(RewritePatternSet &patterns, const std::string &DeviceTomlLoc,
+                                  const std::string &QubitTomlLoc,
+                                  const std::string &Gate2PulseDecompTomlLoc)
 {
-    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(),
-        DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
+    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(), DeviceTomlLoc, QubitTomlLoc,
+                                             Gate2PulseDecompTomlLoc);
 }
 
 } // namespace ion
