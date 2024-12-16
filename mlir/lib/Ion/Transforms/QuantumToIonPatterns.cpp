@@ -193,20 +193,22 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
         auto nQubits = allocOp.getNqubitsAttr();
         if (nQubits.has_value()) {
             if (static_cast<size_t>(qubitIndex0Value) >= phonons.size()) {
-                op.emitError()
-                    << "Missing phonon parameters for qubit " << qubitIndex0Value
-                    << " used as input to MS gate; there are only " << phonons.size()
-                    << " phonon parameters in the database.";
-                assert(false && "Compilation failed; "
+                op.emitError() << "Missing phonon parameters for qubit " << qubitIndex0Value
+                               << " used as input to MS gate; there are only " << phonons.size()
+                               << " phonon parameters in the database.";
+                assert(
+                    false &&
+                    "Compilation failed; "
                     "ensure that the database contains all necessary parameters for the circuit.");
             }
 
             if (static_cast<size_t>(qubitIndex1Value) >= phonons.size()) {
-                op.emitError()
-                    << "Missing phonon parameters for qubit " << qubitIndex1Value
-                    << " used as input to MS gate; there are only " << phonons.size()
-                    << " phonon parameters in the database.";
-                assert(false && "Compilation failed; "
+                op.emitError() << "Missing phonon parameters for qubit " << qubitIndex1Value
+                               << " used as input to MS gate; there are only " << phonons.size()
+                               << " phonon parameters in the database.";
+                assert(
+                    false &&
+                    "Compilation failed; "
                     "ensure that the database contains all necessary parameters for the circuit.");
             }
 
@@ -224,7 +226,9 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "used as input to MS gate. Expected beam parameters for two-qubit "
                     << "combinatorial index " << twoQubitComboIndex << " but there are only "
                     << beams2.size() << " beam parameters in the database.";
-                assert(false && "Compilation failed; "
+                assert(
+                    false &&
+                    "Compilation failed; "
                     "ensure that the database contains all necessary parameters for the circuit.");
             }
 
