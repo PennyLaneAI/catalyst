@@ -179,7 +179,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 5.660000e+00 : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -187,7 +187,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 3.4{{.*}} : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -203,7 +203,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 8.960000e+00 : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -211,7 +211,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 0.1{{.*}} : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %6, %3 : !quantum.bit, !quantum.bit
@@ -318,7 +318,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 5.660000e+00 : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -326,7 +326,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 3.4599999999999995 : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -342,7 +342,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:        rabi = 1.230000e+00 : f64,
     // CHECK-SAME:        detuning = 8.960000e+00 : f64,
     // CHECK-SAME:        polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:        wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:        wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:    phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -350,7 +350,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 0.15999999999999925 : f64,
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[9, 10]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: }
     %5:2 = quantum.custom "MS"(%arg0) %2, %3 : !quantum.bit, !quantum.bit
@@ -371,7 +371,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 8.990000e+00 : f64,
     // CHECK-SAME:         polarization = dense<[1, 2]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[-3, 4]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[3, -4]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -379,7 +379,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 6.7899999999999991 : f64,
     // CHECK-SAME:         polarization = dense<[1, 2]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[-3, 4]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[3, -4]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -395,7 +395,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:        rabi = 4.560000e+00 : f64,
     // CHECK-SAME:        detuning = 1.559000e+01 : f64,
     // CHECK-SAME:        polarization = dense<[1, 2]> : vector<2xi64>,
-    // CHECK-SAME:        wavevector = dense<[-3, 4]> : vector<2xi64>>,
+    // CHECK-SAME:        wavevector = dense<[3, -4]> : vector<2xi64>>,
     // CHECK-SAME:    phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -403,7 +403,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 0.1899999999999995 : f64,
     // CHECK-SAME:         polarization = dense<[1, 2]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[-3, 4]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[3, -4]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: }
     %6:2 = quantum.custom "MS"(%arg0) %5#0, %4 : !quantum.bit, !quantum.bit
@@ -424,7 +424,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.045000e+02 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[-42, -37]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -432,7 +432,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 95.699999999999989 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[-42, -37]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -448,7 +448,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:        rabi = 99.989999999999994 : f64,
     // CHECK-SAME:        detuning = 1.078000e+02 : f64,
     // CHECK-SAME:        polarization = dense<[37, 42]> : vector<2xi64>,
-    // CHECK-SAME:        wavevector = dense<[-42, -37]> : vector<2xi64>>,
+    // CHECK-SAME:        wavevector = dense<[42, 37]> : vector<2xi64>>,
     // CHECK-SAME:    phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -456,7 +456,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 92.399999999999991 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
-    // CHECK-SAME:         wavevector = dense<[-42, -37]> : vector<2xi64>>,
+    // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %5#1, %6#1 : !quantum.bit, !quantum.bit

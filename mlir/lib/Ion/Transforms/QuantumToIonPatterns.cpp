@@ -237,6 +237,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto loc = op.getLoc();
             auto qubits = op.getInQubits();
 
+            // Helper function to flip the sign of each element in a vector,
+            // e.g. [a, b, c] -> [-a, -b, -c]
+            auto flipSign = [](const std::vector<int64_t> &v) -> std::vector<int64_t> {
+                std::vector<int64_t> result(v.size());
+                std::transform(v.begin(), v.end(), result.begin(), [](int64_t x) { return -x; });
+                return result;
+            };
+
             auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
                 loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                     mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
@@ -278,14 +286,13 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: where to find delta and mu?
-                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     auto beam2Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
                         /*TODO: fill in formula*/
                         rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(beam.wavevector));
+                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, time, qubit0, beam2Attr, phase0Attr);
 
                     // Pulse3(
@@ -301,14 +308,13 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
 
                     // TODO: where to find delta and mu?
                     // TODO: phonon0ComXAttr change sign
-                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     auto beam3Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
                         /*TODO: fill in formula*/
                         rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(beam.wavevector));
+                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, time, qubit0, beam3Attr, phase0Attr);
 
                     // Pulse4(
@@ -340,7 +346,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: where to find delta and mu?
-                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     // TODO: phonon1ComXAttr change sign
                     auto beam5Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
@@ -348,7 +353,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                         /*TODO: fill in formula*/
                         rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(beam.wavevector));
+                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, time, qubit1, beam5Attr, phase0Attr);
 
                     // Pulse6(
@@ -363,7 +368,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: where to find delta and mu?
-                    // TODO: wave vector change sign, i.e. [a, b, c] -> [-a, -b, -c]
                     // TODO: phonon1ComXAttr change sign
                     auto beam6Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
@@ -371,7 +375,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                         /*TODO: fill in formula*/
                         rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(beam.wavevector));
+                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, time, qubit1, beam6Attr, phase0Attr);
 
                     builder.create<ion::YieldOp>(loc);
