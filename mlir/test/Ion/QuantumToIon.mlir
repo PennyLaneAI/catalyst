@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --quantum-to-ion --split-input-file -verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --quantum-to-ion="\
+// RUN:    device-toml-loc=%S/oqd_device_parameters.toml \
+// RUN:    qubit-toml-loc=%S/oqd_qubit_parameters.toml \
+// RUN:    gate-to-pulse-toml-loc=%S/oqd_gate_decomposition_parameters.toml" \
+// RUN: --split-input-file -verify-diagnostics | FileCheck %s
 
 // COM: the physical parameters come from
 // COM: frontend/catalyst/third_party/oqd/src/oqd_gate_decomposition_parameters.toml
