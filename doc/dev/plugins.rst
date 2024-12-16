@@ -2,7 +2,7 @@ MLIR Plugins
 ============
 
 This page outlines documentation on how to start developping an MLIR plugin that can work with Catalyst.
-And MLIR plugin, is a shared object that implements a compilation pass compatible with the MLIR framework.
+An MLIR plugin is a shared object that implements a compilation pass compatible with the MLIR framework.
 Catalyst is built on top of MLIR, this means that MLIR plugins work with Catalyst.
 This can enable anyone to build quantum compilation passes and new dialects as well.
 So, let's get started!
@@ -121,4 +121,9 @@ Now, you can parse the program without the error.
 Creating your own Pass Plugin
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-
+Catalyst lists LLVM as a git submodule in its repository and the LLVM project already contains an example standalone plugin.
+When running ``make standalone-plugin`` Catalyst will copy the directory containing the standalone plugin and patch it to make sure that it works with Catalyst.
+However, as mentioned earlier, the standalone plugin is a bare bones example.
+You may be wondering, well, how can I make a standalone plugin but that is able to change some aspects of the quantum program?
+For that, you will need to change the build script for the standalone plugin.
+For now, we found that the following process is the easiest one:
