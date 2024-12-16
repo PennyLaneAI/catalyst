@@ -7,11 +7,6 @@ include(ExternalProject)
 set(CMAKE_CXX_STANDARD  20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Avoid warning raised by pybind11 on newer cmake versions. PYBIND11_FINDPYTHON=ON caused issues.
-if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.27")
- cmake_policy(SET CMP0148 OLD)
-endif()
-
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
@@ -54,22 +49,26 @@ FetchContent_Declare(
     SOURCE_DIR          mlir/ExecutionEngine
 )
 
-function(fetch_pybind11)
-    find_package(pybind11 CONFIG)
-    if (pybind11_FOUND)
-        message(STATUS, "FOUND pybind11")
-    else()
-        message(STATUS "Could not find existing pybind11-dev package. Building from source.")
-        set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
+# Note on pybind11 vs python discovery order:
+# If Python is looked for first, then we have to look for all the components needed by pybind11.
+# In particular, if pybind11::embed is used, then we need to find both headers (Development.Module)
+# and the shared library (Development.Embed) before pybind11 is discovered.
+# With the other order PyBind will discover everything it needs.
+# Note on flags:
+# - PYTHON_EXECUTABLE is a pybind11 specific flag used by its own (legacy) Python discovery process,
+#   it will not affect find_package(Python) calls.
+# - Python_EXECUTABLE is a cmake flag used in find_package(Python) to guide the discovery.
+# Note that pybind11 can be made to use find_python (instead of its legacy discovery), and thus
+# respect Python_EXECUTABLE), via the PYBIND11_FINDPYTHON flag.
 
-        FetchContent_Declare(pybind11
-            GIT_REPOSITORY https://github.com/pybind/pybind11.git
-            GIT_TAG        v2.10.1
-        )
-
-        FetchContent_MakeAvailable(pybind11)
-    endif()
-endfunction()
+# Here, we look for the desired Python version early to avoid any problems with mismatched packages.
+# The desired Python environment should be specified ahead of time via -DPython_EXECUTABLE=...
+# The optional component is only used for the C++ test suite (to spin up its own interpreter),
+# and requires libpython.so to be available on the system.
+find_package(Python REQUIRED
+    COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.Embed
+)
 
 if(RUNTIME_ENABLE_WARNINGS)
     message(STATUS "Building with compiler warnings as errors enabled.")
@@ -94,13 +93,17 @@ target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}
     ${backend_includes}
-    )
+)
 
 if(ENABLE_CODE_COVERAGE)
-	message(STATUS "ENABLE_CODE_COVERAGE is ON.")
-    target_compile_options(catalyst_qir_runtime INTERFACE
-        $<$<COMPILE_LANGUAGE:CXX>:-fprofile-arcs;-ftest-coverage>)
-    target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
+    message(STATUS "ENABLE_CODE_COVERAGE is ON.")
+    if(APPLE)
+        target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate -fcoverage-mapping)
+        target_link_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate -fcoverage-mapping)
+    else()
+        target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-arcs -ftest-coverage)
+        target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
+    endif()
 endif()
 
 
@@ -114,6 +117,8 @@ add_subdirectory(lib)
 add_subdirectory(tests)
 
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
+# Don't rerun external project everytime we configure the runtime build.
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
         GIT_TAG master
@@ -123,5 +128,6 @@ if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
         INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
         COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
     )
-    add_dependencies(rt_capi lapacke-accelerate)  # automatically build when the runtime is built
+    add_dependencies(rt_capi lapacke-accelerate)  # automatically build with the runtime
+endif()
 endif()

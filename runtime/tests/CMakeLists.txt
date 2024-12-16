@@ -1,10 +1,3 @@
-cmake_minimum_required(VERSION 3.20)
-
-project(lightning_qir_runtime_tests)
-
-
-set(CMAKE_CXX_STANDARD 20)
-
 Include(FetchContent)
 
 FetchContent_Declare(
@@ -15,7 +8,12 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-fetch_pybind11()
+# Locate PyBind11
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
+    OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+find_package(pybind11 CONFIG REQUIRED)
 
 # Required for catch_discover_tests().
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
@@ -26,17 +24,17 @@ include(Catch)
 
 add_executable(runner_tests_qir_runtime runner_main.cpp)
 
-# To avoid link to libpython, we use pybind11::module interface library.
+# For tests we do require libpython in order to embed a Python interpreter.
 target_link_libraries(runner_tests_qir_runtime PRIVATE
     Catch2::Catch2
     pybind11::embed
     catalyst_qir_runtime
     rtd_null_qubit
-    )
+)
 
 target_sources(runner_tests_qir_runtime PRIVATE
     Test_NullQubit.cpp
-    )
+)
 
 catch_discover_tests(runner_tests_qir_runtime)
 
@@ -52,18 +50,16 @@ if(ENABLE_OPENQASM)
         set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
     endif()
 
-    # To avoid link to libpython, we use pybind11::module interface library.
-    target_compile_definitions(runner_tests_openqasm PUBLIC INITIALIZE_PYTHON)
     target_link_libraries(runner_tests_openqasm PRIVATE
         Catch2::Catch2
         pybind11::embed
         catalyst_qir_runtime
-        )
+    )
 
     target_sources(runner_tests_openqasm PRIVATE
         Test_OpenQasmBuilder.cpp
         Test_OpenQasmDevice.cpp
-        )
+    )
 
     catch_discover_tests(runner_tests_openqasm)
 endif()
