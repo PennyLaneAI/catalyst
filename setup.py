@@ -129,7 +129,7 @@ description = {
 class CMakeExtension(Extension):
     """A setuptools Extension class for modules with a CMake configuration."""
 
-    def __init__(self, name, define_macros=[], sourcedir=""):
+    def __init__(self, name, define_macros, sourcedir=""):
         super().__init__(name, sources=[], define_macros=define_macros)
         self.sourcedir = os.path.abspath(sourcedir)
 
