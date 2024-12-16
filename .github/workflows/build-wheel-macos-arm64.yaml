@@ -17,7 +17,9 @@ on:
   workflow_call:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 14.0
+  MACOSX_DEPLOYMENT_TARGET: 13.0
+  _PYTHON_HOST_PLATFORM: "macosx-13.0-arm64"
+  ARCHFLAGS: "-arch arm64"
 
 concurrency:
   group: Build Catalyst Wheel on macOS (arm64)-${{ github.ref }}
