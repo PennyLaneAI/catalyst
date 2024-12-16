@@ -145,4 +145,20 @@ index c0b8dfd6c..1b5c2e528 100644
    message(STATUS "Enabling Python API")
 ```
 
+You will also need to make the following change:
+
+```
+diff --git a/mlir/standalone/CMakeLists.txt b/mlir/standalone/CMakeLists.txt
+index e999ae34d..fd6ee8f10 100644
+--- a/mlir/standalone/CMakeLists.txt
++++ b/mlir/standalone/CMakeLists.txt
+@@ -1,6 +1,3 @@
+-cmake_minimum_required(VERSION 3.20.0)
+-project(standalone-dialect LANGUAGES CXX C)
+-
+ set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
+ 
+ set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+```
+
 2. Include the header files 
