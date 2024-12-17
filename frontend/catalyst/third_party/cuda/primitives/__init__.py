@@ -307,7 +307,9 @@ def make_primitive_for_gate():
         Quantum operations in CUDA-quantum return no values. But JAXPR expects return values.
         We can just say that multiple_results = True and return an empty tuple.
         """
-        kernel_gate_p.bind(kernel, *qubits_or_params, inst=inst, qubits_len=qubits_len, static_params=static_params)
+        kernel_gate_p.bind(
+            kernel, *qubits_or_params, inst=inst, qubits_len=qubits_len, static_params=static_params
+        )
         return tuple()
 
     @kernel_gate_p.def_impl

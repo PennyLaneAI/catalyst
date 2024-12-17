@@ -432,7 +432,13 @@ def change_instruction(ctx, eqn):
 
     # Now, we can map to the correct op
     # For now just assume rx
-    cuda_inst(ctx.kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len, static_params=static_params)
+    cuda_inst(
+        ctx.kernel,
+        *qubits_or_params,
+        inst=cuda_inst_name,
+        qubits_len=qubits_len,
+        static_params=static_params,
+    )
 
     # Finally determine how many are qubits.
     qubits = qubits_or_params[:qubits_len]
