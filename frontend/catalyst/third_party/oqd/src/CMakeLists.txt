@@ -17,7 +17,7 @@ add_library(rtd_oqd SHARED OQDDevice.cpp)
 target_include_directories(rtd_oqd PUBLIC .
     ${runtime_includes}
     ${backend_includes}
-    )
+)
 
 set(OQD_LIBRARIES
     rtd_oqd

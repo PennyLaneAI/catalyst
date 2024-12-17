@@ -204,7 +204,7 @@ jobs:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 1
       matrix:
         python_version: [{major_minor: "3.10", patch: "14", package: "python3.10", alternative: "310"},
                          {major_minor: "3.11", patch: "9",  package: "python3.11", alternative: "311"},
@@ -299,7 +299,7 @@ jobs:
     needs: [constants, catalyst-linux-wheels-arm64]
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 1
       matrix:
         python_version: [{major_minor: "3.10", patch: "14", package: "python3.10"},
                          {major_minor: "3.11", patch: "9",  package: "python3.11"},

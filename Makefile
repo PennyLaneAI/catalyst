@@ -92,7 +92,7 @@ help:
 
 .PHONY: all catalyst
 all: runtime oqc oqd mlir frontend
-catalyst: runtime dialects plugin frontend
+catalyst: runtime dialects plugin oqd frontend
 
 .PHONY: frontend
 frontend:
@@ -209,13 +209,22 @@ wheel:
 	done
 	mkdir -p $(MK_DIR)/frontend/catalyst/bin
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst-cli $(MK_DIR)/frontend/catalyst/bin
-	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.* $(MK_DIR)/frontend/catalyst/lib
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
 	rm -r frontend/PennyLane_Catalyst.egg-info
+
+plugin-wheel: plugin
+	mkdir -p $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.* $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
+
+	$(PYTHON) -m pip wheel --no-deps $(MK_DIR)/standalone_plugin_wheel -w $(MK_DIR)/standalone_plugin_wheel/dist
+
+	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin/lib
+	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin.egg-info
+	rm -r $(MK_DIR)/standalone_plugin_wheel/build
 
 .PHONY: clean clean-all
 clean:

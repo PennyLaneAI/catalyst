@@ -1,0 +1,2 @@
+include standalone_plugin/lib/*
+include standalone_plugin/test/*.py

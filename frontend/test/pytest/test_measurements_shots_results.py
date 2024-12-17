@@ -41,7 +41,7 @@ class TestExpval:
             return qml.expval(qml.Identity(wires=0)), qml.expval(qml.Identity(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz(self, backend, tol_stochastic):
@@ -61,7 +61,7 @@ class TestExpval:
             return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliZ(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_paulix(self, backend, tol_stochastic):
@@ -81,7 +81,7 @@ class TestExpval:
             return qml.expval(qml.PauliX(wires=0)), qml.expval(qml.PauliX(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliy(self, backend, tol_stochastic):
@@ -101,7 +101,7 @@ class TestExpval:
             return qml.expval(qml.PauliY(wires=0)), qml.expval(qml.PauliY(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_hadamard(self, backend, tol_stochastic):
@@ -121,7 +121,7 @@ class TestExpval:
             return qml.expval(qml.Hadamard(wires=0)), qml.expval(qml.Hadamard(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_hermitian(self, backend, tol_stochastic):
@@ -141,7 +141,7 @@ class TestExpval:
             return qml.expval(qml.Hermitian(A, wires=2))
 
         expected = circuit(np.pi / 4, np.pi / 4)
-        result = qjit(circuit)(np.pi / 4, np.pi / 4)
+        result = qjit(circuit, seed=37)(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -165,7 +165,7 @@ class TestExpval:
             return qml.expval(qml.PauliX(wires=0) @ qml.PauliY(wires=2))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_pauliy_prod(self, backend, tol_stochastic):
@@ -184,7 +184,7 @@ class TestExpval:
             return qml.expval(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
         expected = circuit(0.432, 0.123, -0.543)
-        result = qjit(circuit)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_hamiltonian(self, backend, tol_stochastic):
@@ -205,7 +205,7 @@ class TestExpval:
             )
 
         expected = circuit(0.432, 0.123, -0.543)
-        result = qjit(circuit)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_prod_hamiltonian(self, backend, tol_stochastic):
@@ -226,7 +226,7 @@ class TestExpval:
             )
 
         expected = circuit(0.432, 0.123, -0.543)
-        result = qjit(circuit)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 
@@ -250,7 +250,7 @@ class TestVar:
             return qml.var(qml.Identity(wires=0)), qml.var(qml.Identity(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz(self, backend, tol_stochastic):
@@ -270,7 +270,7 @@ class TestVar:
             return qml.var(qml.PauliZ(wires=0)), qml.var(qml.PauliZ(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_paulix(self, backend, tol_stochastic):
@@ -290,7 +290,7 @@ class TestVar:
             return qml.var(qml.PauliX(wires=0)), qml.var(qml.PauliX(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliy(self, backend, tol_stochastic):
@@ -310,7 +310,7 @@ class TestVar:
             return qml.var(qml.PauliY(wires=0)), qml.var(qml.PauliY(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_hadamard(self, backend, tol_stochastic):
@@ -330,7 +330,7 @@ class TestVar:
             return qml.var(qml.Hadamard(wires=0)), qml.var(qml.Hadamard(wires=1))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_hermitian_shots(self, backend, tol_stochastic):
@@ -350,7 +350,7 @@ class TestVar:
             return qml.var(qml.Hermitian(A, wires=2))
 
         expected = circuit(np.pi / 4, np.pi / 4)
-        result = qjit(circuit)(np.pi / 4, np.pi / 4)
+        result = qjit(circuit, seed=37)(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -374,7 +374,7 @@ class TestVar:
             return qml.var(qml.PauliX(wires=0) @ qml.PauliY(wires=2))
 
         expected = circuit()
-        result = qjit(circuit)()
+        result = qjit(circuit, seed=37)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_hadamard_pauliy_prod(self, backend, tol_stochastic):
@@ -393,7 +393,7 @@ class TestVar:
             return qml.var(qml.Hadamard(wires=1) @ qml.PauliY(wires=2))
 
         expected = circuit(0.432, 0.123, -0.543)
-        result = qjit(circuit)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_pauliy_prod(self, backend, tol_stochastic):
@@ -412,7 +412,7 @@ class TestVar:
             return qml.var(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
         expected = circuit(0.432, 0.123, -0.543)
-        result = qjit(circuit)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_pauliz_hamiltonian(self, backend):
@@ -462,7 +462,7 @@ class TestProbs:
             return qml.probs()
 
         expected = circuit(0.432)
-        result = qjit(circuit)(0.432)
+        result = qjit(circuit, seed=37)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
     def test_probs_wire(self, backend, tol_stochastic):
@@ -479,7 +479,7 @@ class TestProbs:
             return qml.probs(wires=[0])
 
         expected = circuit(0.432)
-        result = qjit(circuit)(0.432)
+        result = qjit(circuit, seed=37)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 

@@ -1,9 +1,9 @@
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+cmake_minimum_required(VERSION 3.26)
 
-find_package(Python 3
-    REQUIRED COMPONENTS Interpreter Development.Module
-    OPTIONAL_COMPONENTS Development.SABIModule)
+project(catalyst_frontend)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
@@ -14,19 +14,15 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Detect the installed nanobind package and import it into CMake
-execute_process(
-    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-    OUTPUT_VARIABLE nanobind_ROOT OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-find_package(nanobind CONFIG REQUIRED)
-
-# Get the NumPy include directory
-execute_process(
-    COMMAND "${Python_EXECUTABLE}" -c "import numpy; print(numpy.get_include())"
-    OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
+# Locate Python & nanobind
+find_package(Python REQUIRED
+    COMPONENTS Interpreter Development.Module NumPy
 )
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
+    OUTPUT_VARIABLE nanobind_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+find_package(nanobind CONFIG REQUIRED)
 
 # Source file list for `wrapper` module
 set(WRAPPER_SRC_FILES
@@ -39,7 +35,7 @@ set(WRAPPER_SRC_FILES
 nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
 
 # Add the NumPy include directory to the library's include paths
-target_include_directories(wrapper PRIVATE ${NUMPY_INCLUDE_DIR})
+target_include_directories(wrapper PRIVATE ${Python_NumPy_INCLUDE_DIRS})
 
 # Use suffix ".so" rather than ".abi3.so" for library file using Stable ABI
 # This is necessary for compatibility with setuptools build extensions
