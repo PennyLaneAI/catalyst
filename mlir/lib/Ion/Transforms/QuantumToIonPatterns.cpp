@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
@@ -126,6 +127,30 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
     return (idx1 * nQubits) - (idx1 * (idx1 + 1) / 2) + (idx2 - idx1 - 1);
 }
 
+/**
+ * @brief Computes the pulse duration given the rotation angle and the Rabi frequency.
+ *
+ *        The pulse duration t is given by:
+ *
+ *            t = angle / rabi.
+ *
+ *        This function returns the pulse duration as an mlir::Value by creating an arith::DivFOp.
+ *        In order to do so, it must also create an arith::ConstantOp for the Rabi frequency.
+ *
+ * @param rewriter MLIR PatternRewriter
+ * @param loc      MLIR Location
+ * @param angle    Rotation angle as mlir::Value
+ * @param rabi     Rabi frequency
+ * @return mlir::Value The pulse duration.
+ */
+mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location &loc,
+                                 const mlir::Value &angle, double rabi)
+{
+    TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
+    mlir::Value rabiValue = rewriter.create<arith::ConstantOp>(loc, rabiAttr).getResult();
+    return rewriter.create<arith::DivFOp>(loc, angle, rabiValue).getResult();
+}
+
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
                                         double phase2, const std::vector<Beam> &beams1)
 {
@@ -157,8 +182,8 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
             loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                 mlir::FloatAttr phase1Attr = builder.getF64FloatAttr(phase1);
                 mlir::FloatAttr phase2Attr = builder.getF64FloatAttr(phase2);
-                // TODO: Add the relationship between angle and time
-                auto time = op.getParams().front();
+                auto angle = op.getParams().front();
+                auto time = computePulseDuration(rewriter, loc, angle, beam.rabi);
                 auto qubit = qubits.front();
                 builder.create<ion::PulseOp>(loc, time, qubit, beam0toEAttr, phase1Attr);
                 builder.create<ion::PulseOp>(loc, time, qubit, beam1toEAttr, phase2Attr);
@@ -248,8 +273,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
                 loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                     mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
-                    // TODO: Add the relationship between angle and time
-                    auto time = op.getParams().front();
+                    auto angle = op.getParams().front();
+                    auto time = computePulseDuration(rewriter, loc, angle, beam.rabi);
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
 
@@ -267,7 +292,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=Int array from from calibration db,
                     //     target=qubit0,
-                    //     time=rabi/ms_angle (double check the formula)
+                    //     time=ms_angle/rabi
                     // )
                     auto beam1Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
@@ -286,7 +311,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=-Int array from from calibration db,
                     //     target=qubit0,
-                    //     time=rabi/ms_angle (double check the formula)
+                    //     time=ms_angle/rabi
                     // )
 
                     // TODO: where to find delta and mu?
@@ -307,7 +332,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=-Int array from from calibration db,
                     //     target=qubit0,
-                    //     time=rabi/ms_angle (double check the formula)
+                    //     time=ms_angle/rabi
                     // )
 
                     // TODO: where to find delta and mu?
@@ -329,7 +354,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=Int array from from calibration db,
                     //     target=qubit1,
-                    //     time=rabi/ms_angle (double check the formula)
+                    //     time=ms_angle/rabi
                     // )
 
                     auto beam4Attr = BeamAttr::get(
@@ -349,7 +374,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=-Int array from from calibration db,
                     //     target=qubit1,
-                    //     time=rabi/ms_angle (double check the formula)
+                    //     time=ms_angle/rabi
                     // )
 
                     // TODO: where to find delta and mu?
@@ -372,7 +397,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     polarization=Int array from from calibration db,
                     //     wavevector=-Int array from from calibration db,
                     //     target=qubit1,
-                    //     time=rabi/ms_angle (double check the formula)
+                    //     time=ms_angle/rabi
                     // )
 
                     // TODO: where to find delta and mu?
