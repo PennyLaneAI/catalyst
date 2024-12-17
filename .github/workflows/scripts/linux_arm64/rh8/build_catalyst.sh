@@ -41,12 +41,7 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${
 cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
-    -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-    -DPython_ROOT_DIR=$(/usr/bin/python3 -c "import sys; print(sys.prefix)") \
-    -DPYTHON_VERSION_TO_FIND=${PYTHON_VERSION} \
-    -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
-    -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
-    -Dpybind11_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/pybind11/share/cmake/pybind11 \
+    -DPython_EXECUTABLE=${PYTHON} \
     -DENABLE_OPENQASM=ON
 cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
