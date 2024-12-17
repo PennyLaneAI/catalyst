@@ -306,6 +306,7 @@ class QFuncPlxprInterpreter:
                 *wires,
                 *invals,
                 op=eqn.primitive.name,
+                ctrl_value_len=0,
                 **kwargs,
             )
 

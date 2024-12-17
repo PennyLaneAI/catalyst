@@ -86,6 +86,7 @@ from mlir_quantum.dialects.quantum import (
     SetBasisStateOp,
     SetStateOp,
     StateOp,
+    StaticCustomOp,
     TensorOp,
     VarianceOp,
 )
@@ -1062,7 +1063,7 @@ def _qinst_lowering(
     params_attr = (
         None
         if not static_params
-        else ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
     )
     if len(float_params) > 0:
         assert (
@@ -1075,7 +1076,15 @@ def _qinst_lowering(
 
     if name_str == "MultiRZ":
         assert len(float_params) <= 1, "MultiRZ takes at most one dynamic float parameter"
-        float_param = None if len(float_params) == 0 else float_params[0]
+        assert (
+            not static_params or len(static_params) <= 1
+        ), "MultiRZ takes at most one static float parameter"
+        # TODO: Add support for MultiRZ with static params
+        float_param = (
+            TensorExtractOp(ir.F64Type.get(), mlir.ir_constant(static_params[0]), [])
+            if len(float_params) == 0
+            else float_params[0]
+        )
         return MultiRZOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1086,7 +1095,17 @@ def _qinst_lowering(
             adjoint=adjoint,
             static_params=params_attr,
         ).results
-
+    if params_attr:
+        return StaticCustomOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            static_params=params_attr,
+            in_qubits=qubits,
+            gate_name=name_attr,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],

@@ -2,8 +2,10 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst can now load local MLIR plugins from python.
+* Catalyst can now load local MLIR plugins from python. Including support for `entry_points`.
   [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
+  [(#1361)](https://github.com/PennyLaneAI/catalyst/pull/1361)
+  [(#1370)](https://github.com/PennyLaneAI/catalyst/pull/1370)
 
 <h3>Improvements 🛠</h3>
 
@@ -50,6 +52,7 @@
 
 * Generate stable ABI wheels for Python 3.12 and up.
   [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
+  [(#1385)](https://github.com/PennyLaneAI/catalyst/pull/1385)
 
 <h3>Breaking changes 💔</h3>
 

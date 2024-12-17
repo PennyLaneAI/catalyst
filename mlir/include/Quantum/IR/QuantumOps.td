@@ -377,6 +377,74 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         Variadic<QubitType>:$out_ctrl_qubits
     );
 
+    let builders = [
+        OpBuilder<
+        // Convenience builder for a gate with parameters and controls
+        // Note that number of out_qubits = number of in_qubits,
+        // and number of out_ctrl_qubits = number of in_ctrl_qubits
+        (ins
+             "llvm::StringRef":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$in_ctrl_qubits,
+             "mlir::ValueRange":$in_ctrl_values,
+             "mlir::ValueRange":$params,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*out_ctrl_qubits=*/ mlir::TypeRange(in_ctrl_qubits),
+            /*params=*/ params,
+            /*in_qubits=*/ in_qubits,
+            /*gate_name=*/ $_builder.getStringAttr(gate),
+            /*(optional) adjoint=*/ nullptr,
+            /*in_ctrl_qubits=*/ in_ctrl_qubits,
+            /*in_ctrl_values=*/ in_ctrl_values
+            );
+
+            if (adjoint){
+                $_state.addAttribute("adjoint", $_builder.getUnitAttr());
+            }
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with parameters and no controls
+        (ins
+             "llvm::StringRef":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$params,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, mlir::ValueRange(), mlir::ValueRange(),
+            params, adjoint);
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with controls and no parameters
+        (ins
+             "llvm::StringRef":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$in_ctrl_qubits,
+             "mlir::ValueRange":$in_ctrl_values,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, in_ctrl_qubits, in_ctrl_values,
+            mlir::ValueRange(), adjoint);
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with no parameters and no controls
+        (ins
+             "llvm::StringRef":$gate,
+             "mlir::ValueRange":$in_qubits,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, mlir::ValueRange(), adjoint);
+        }]>,
+    ];
+
     let assemblyFormat = [{
         $gate_name `(` $params ($static_params^)? `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
@@ -497,6 +565,42 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     ];
     let hasCanonicalizeMethod = 1;
 }
+
+def StaticCustomOp : UnitaryGate_Op<"static_custom", [NoMemoryEffect,
+                                                      AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "A generic quantum gate on n qubits with static parameters in the form of a DenseF64ArrayAttr.";
+    let description = [{
+        This operation represents a quantum gate with parameters defined statically as a
+        DenseF64ArrayAttr, rather than passed dynamically as operands. This is useful for gates
+        with parameters known at compile-time.
+    }];
+
+    let arguments = (ins
+        DenseF64ArrayAttr:$static_params,
+        Variadic<QubitType>:$in_qubits,
+        StrAttr:$gate_name,
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $gate_name $static_params $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        llvm::ArrayRef<double> getAllParams() {
+            return getStaticParams();
+        }
+    }];
+    let hasCanonicalizeMethod = 1;
+}
+
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
