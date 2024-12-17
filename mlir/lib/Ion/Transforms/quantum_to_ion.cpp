@@ -24,6 +24,8 @@
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Passes.h"
 #include "Ion/Transforms/Patterns.h"
+#include "Ion/Transforms/oqd_database_managers.hpp"
+#include "Ion/Transforms/oqd_database_types.hpp"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -41,9 +43,14 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
 
     void runOnOperation() final
     {
+        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
+
+        // if load ion
+        Ion ion = dataManager.getIonParams().at("Yb171");
+        llvm::errs() << ion.mass << " aloha\n";
+
         RewritePatternSet ionPatterns(&getContext());
-        populateQuantumToIonPatterns(ionPatterns, DeviceTomlLoc, QubitTomlLoc,
-                                     Gate2PulseDecompTomlLoc);
+        populateQuantumToIonPatterns(ionPatterns, dataManager);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(ionPatterns)))) {
             return signalPassFailure();

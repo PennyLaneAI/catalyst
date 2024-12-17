@@ -18,11 +18,12 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Ion/Transforms/oqd_database_managers.hpp"
+
 namespace catalyst {
 namespace ion {
 
-void populateQuantumToIonPatterns(mlir::RewritePatternSet &, const std::string &,
-                                  const std::string &, const std::string &);
+void populateQuantumToIonPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
 
 } // namespace ion
 } // namespace catalyst

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <cassert>
 #include <optional>
 
@@ -21,9 +22,8 @@
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
+#include "Ion/Transforms/oqd_database_managers.hpp"
 #include "Quantum/IR/QuantumOps.h"
-
-#include "oqd_database_managers.hpp"
 
 using namespace mlir;
 using namespace catalyst::ion;
@@ -410,12 +410,9 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     std::vector<Beam> beams2;
     std::vector<PhononMode> phonons;
 
-    QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const std::string &DeviceTomlLoc,
-                               const std::string &QubitTomlLoc,
-                               const std::string &Gate2PulseDecompTomlLoc)
+    QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
         : mlir::OpRewritePattern<CustomOp>::OpRewritePattern(ctx)
     {
-        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
         beams1 = dataManager.getBeams1Params();
         beams2 = dataManager.getBeams2Params();
         phonons = dataManager.getPhononParams();
@@ -443,12 +440,10 @@ struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     }
 };
 
-void populateQuantumToIonPatterns(RewritePatternSet &patterns, const std::string &DeviceTomlLoc,
-                                  const std::string &QubitTomlLoc,
-                                  const std::string &Gate2PulseDecompTomlLoc)
+void populateQuantumToIonPatterns(RewritePatternSet &patterns,
+                                  const OQDDatabaseManager &dataManager)
 {
-    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(), DeviceTomlLoc, QubitTomlLoc,
-                                             Gate2PulseDecompTomlLoc);
+    patterns.add<QuantumToIonRewritePattern>(patterns.getContext(), dataManager);
 }
 
 } // namespace ion

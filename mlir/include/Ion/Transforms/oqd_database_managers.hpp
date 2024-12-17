@@ -21,7 +21,8 @@
 #include "oqd_database_types.hpp"
 #include "oqd_database_utils.hpp"
 
-namespace {
+namespace catalyst {
+namespace ion {
 
 class OQDDatabaseManager {
   public:
@@ -40,12 +41,16 @@ class OQDDatabaseManager {
         loadBeams2Params();
 
         loadPhononParams();
+
+        loadIonParams();
     }
 
     const std::vector<Beam> &getBeams1Params() const { return beams1; }
     const std::vector<Beam> &getBeams2Params() const { return beams2; }
 
     const std::vector<PhononMode> &getPhononParams() const { return phonons; }
+
+    const std::map<std::string, Ion> &getIonParams() const { return ions; }
 
   private:
     toml::parse_result sourceTomlDevice;
@@ -56,6 +61,8 @@ class OQDDatabaseManager {
     std::vector<Beam> beams2;
 
     std::vector<PhononMode> phonons;
+
+    std::map<std::string, Ion> ions;
 
     void loadBeams1Params() { loadBeamsParamsImpl("beams1"); }
     void loadBeams2Params() { loadBeamsParamsImpl("beams2"); }
@@ -119,6 +126,79 @@ class OQDDatabaseManager {
             phonons.push_back(PhononMode(COM_x, COM_y, COM_z));
         }
     }
+
+    void loadIonParams()
+    {
+        toml::node_view<toml::node> ionsToml = sourceTomlQubit["ions"];
+
+        auto parseSingleLevel = [](auto level) {
+            int64_t principal = level["principal"].as_integer()->get();
+
+            std::vector<std::string> properties{"spin",
+                                                "orbital",
+                                                "nuclear",
+                                                "spin_orbital",
+                                                "spin_orbital_nuclear",
+                                                "spin_orbital_nuclear_magnetization",
+                                                "energy"};
+            std::vector<double> propertiesData(properties.size());
+
+            std::transform(properties.begin(), properties.end(), propertiesData.begin(),
+                           [&level](const std::string &name) {
+                               return level[name].as_floating_point()->get();
+                           });
+
+            return Level(principal, propertiesData[0], propertiesData[1], propertiesData[2],
+                         propertiesData[3], propertiesData[4], propertiesData[5],
+                         propertiesData[6]);
+        };
+
+        auto parseSingleTransition = [](auto transition, const std::vector<Level> &allLevels) {
+            // FIXME: `allLevels` is hardcoded as {downstate, upstate, estate}
+            // Not super important, as the ion species is extremely unlikely to change, so
+            // hardcoding is fine
+
+            double einstein_a = transition["einstein_a"].as_floating_point()->get();
+            std::string level1 = transition["level1"].as_string()->get();
+            std::string level2 = transition["level2"].as_string()->get();
+
+            std::map<std::string, int64_t> levelEncodings{
+                {"downstate", 0}, {"upstate", 1}, {"estate", 2}};
+            assert((levelEncodings.count(level1) & levelEncodings.count(level2)) &&
+                   "Only \"downstate\", \"upstate\" and \"estate\" are allowed in the atom's "
+                   "transition levels.");
+
+            return Transition(allLevels[levelEncodings[level1]], allLevels[levelEncodings[level2]],
+                              einstein_a);
+        };
+
+        for (auto ion_it : *(ionsToml.as_table())) {
+            std::string name(ion_it.first.str());
+            toml::table *data = ion_it.second.as_table();
+
+            double mass = data->at_path("mass").as_floating_point()->get();
+            double charge = data->at_path("charge").as_floating_point()->get();
+
+            std::vector<int64_t> position =
+                tomlArray2StdVector<int64_t>(*(data->at_path("position").as_array()));
+
+            Level downstate = parseSingleLevel(data->at_path("levels")["downstate"]);
+            Level upstate = parseSingleLevel(data->at_path("levels")["upstate"]);
+            Level estate = parseSingleLevel(data->at_path("levels")["estate"]);
+            std::vector<Level> levels{downstate, upstate, estate};
+
+            std::vector<Transition> transitions;
+            auto *transitionsTable = data->at_path("transitions").as_table();
+            for (auto transition : *transitionsTable) {
+                transitions.push_back(
+                    parseSingleTransition(*(transition.second.as_table()), levels));
+            }
+
+            Ion ion(name, mass, charge, position, levels, transitions);
+            ions.insert({name, ion});
+        }
+    }
 };
 
-} // namespace
+} // namespace ion
+} // namespace catalyst
