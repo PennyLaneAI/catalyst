@@ -287,8 +287,9 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // Note that the each beamAttr below is different! The respective formulas are
                     // taken from the Ion dialect specification document.
 
-                    // TODO: Pull the math formula from database and apply it in MLIR
-                    // Rabi and phase becomes SSA values and not attributes.
+                    // TODO: Pull the math formula from database and apply it in MLIR once OQD
+                    // provides it.
+                    // Rabi and phase may become SSA values and not attributes.
 
                     // Pulse1(
                     //     transition=Transition(level1=0,level2=e),
@@ -320,11 +321,11 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     time=ms_angle/rabi
                     // )
 
-                    // TODO: where to find delta and mu?
+                    // TODO: Also need delta and mu (waiting on OQD to provide them)
                     auto beam2Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/
+                        // TODO: fill in formula with delta and mu once available
                         rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
@@ -341,12 +342,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     time=ms_angle/rabi
                     // )
 
-                    // TODO: where to find delta and mu?
+                    // TODO: Also need delta and mu (waiting on OQD to provide them)
                     // TODO: phonon0ComXAttr change sign
                     auto beam3Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/
+                        // TODO: fill in formula with delta and mu once available
                         rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
@@ -383,12 +384,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     time=ms_angle/rabi
                     // )
 
-                    // TODO: where to find delta and mu?
+                    // TODO: Also need delta and mu (waiting on OQD to provide them)
                     // TODO: phonon1ComXAttr change sign
                     auto beam5Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/
+                        // TODO: fill in formula with delta and mu once available
                         rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
@@ -406,12 +407,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     time=ms_angle/rabi
                     // )
 
-                    // TODO: where to find delta and mu?
+                    // TODO: Also need delta and mu (waiting on OQD to provide them)
                     // TODO: phonon1ComXAttr change sign
                     auto beam6Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
-                        /*TODO: fill in formula*/
+                        // TODO: fill in formula with delta and mu once available
                         rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
