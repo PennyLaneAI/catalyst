@@ -98,7 +98,7 @@ def test_native_controlled_custom():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled
     def native_controlled():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.custom "Rot"
+        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.static_custom "Rot"
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true, %true)
         qml.ctrl(qml.Rot(0.3, 0.4, 0.5, wires=[0]), control=[1, 2])

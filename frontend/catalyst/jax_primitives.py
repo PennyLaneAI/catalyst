@@ -86,6 +86,7 @@ from mlir_quantum.dialects.quantum import (
     SetBasisStateOp,
     SetStateOp,
     StateOp,
+    StaticCustomOp,
     TensorOp,
     VarianceOp,
 )
@@ -972,13 +973,17 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    ctrl_len=0,
+    ctrl_value_len=0,
+    adjoint=False,
+    static_params=None,
 ):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, params*, ctrl_qubits*, ctrl_values*
-    qubits = qubits_or_params[:qubits_len]
-    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
-    all_qubits = qubits + ctrl_qubits
+    # qubits*, ctrl_qubits*, ctrl_values*, params*
+    all_qubits = qubits_or_params[: qubits_len + ctrl_len]
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -996,17 +1001,18 @@ def _qinst_lowering(
     *qubits_or_params,
     op=None,
     qubits_len=0,
-    params_len=0,
     ctrl_len=0,
+    ctrl_value_len=0,
     adjoint=False,
+    static_params=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len : qubits_len + params_len]
-    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
-    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + ctrl_len : qubits_len + ctrl_len + ctrl_value_len]
+    params = qubits_or_params[qubits_len + ctrl_len + ctrl_value_len :]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -1029,13 +1035,31 @@ def _qinst_lowering(
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
+    params_attr = (
+        None
+        if not static_params
+        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+    )
+    if len(float_params) > 0:
+        assert (
+            params_attr is None
+        ), "Static parameters are not allowed when having dynamic parameters"
+
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
     if name_str == "MultiRZ":
-        assert len(float_params) == 1, "MultiRZ takes one float parameter"
-        float_param = float_params[0]
+        assert len(float_params) <= 1, "MultiRZ takes at most one dynamic float parameter"
+        assert (
+            not static_params or len(static_params) <= 1
+        ), "MultiRZ takes at most one static float parameter"
+        # TODO: Add support for MultiRZ with static params
+        float_param = (
+            TensorExtractOp(ir.F64Type.get(), mlir.ir_constant(static_params[0]), [])
+            if len(float_params) == 0
+            else float_params[0]
+        )
         return MultiRZOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1045,7 +1069,17 @@ def _qinst_lowering(
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
         ).results
-
+    if params_attr:
+        return StaticCustomOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            static_params=params_attr,
+            in_qubits=qubits,
+            gate_name=name_attr,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
