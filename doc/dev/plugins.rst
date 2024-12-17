@@ -13,7 +13,7 @@ Building the Standalone Plugin
 Catalyst comes with ``Makefile`` rules to build the `standalone-plugin from MLIR upstream's source code <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone>`_.
 Simply type 
 
-``make standalone-plugin``
+``make plugin``
 
 and in the ``catalyst/mlir/standalone/build/lib`` folder, you will find the ``StandalonePlugin.so`` plugin.
 The ``StandalonePlugin.so`` file is a simple plugin that has its own dialect (called Standalone dialect) and a single transformation that transforms symbol names from ``bar`` to ``foo``.
@@ -51,7 +51,7 @@ And you can schedule this pass as any other pass
 
 .. code-block::
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --standalone-switch-bar-to-foo example.mlir'
 
 And you have your transformed program
 
@@ -91,7 +91,7 @@ But if we try to run it, using the same command as shown earlier
 
 .. code-block::
 
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
+      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --standalone-switch-bar-to-foo example.mlir'
 
 the compilation will fail with a message similar to:
 
@@ -106,7 +106,7 @@ to be able to parse this dialect, we need to load the dialect which is stored in
 
 .. code-block::
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-to-foo) example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --standalone-switch-bar-to-foo example.mlir'
 
 Now, you can parse the program without the error.
 
@@ -327,7 +327,7 @@ The next step is changing the contents of the function itself:
 
 And then we can run ``make all`` again.
 The shared object of the standalone plugin should be available in ``mlir/build/lib/StandalonePlugin.so``.
-This shared object can be used with ``catalyst-cli`` and ``quantum-opt``
+This shared object can be used with ``catalyst-cli`` and ``quantum-opt``.
 You can change the name of the pass, change the name of the shared object and make any changes you want to get started with your quantum compilation journey.
 This was just an easy example to get started.
 
@@ -353,5 +353,5 @@ For example:
 
 If you inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
 Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
-For more information, please consult our `dialect guide <../dev/dialects.html>`_, our `compiler passes guide <../dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_
+For more information, please consult our `dialect guide <../dev/dialects.html>`_, our `compiler passes guide <../dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
 
