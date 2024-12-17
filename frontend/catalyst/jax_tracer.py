@@ -636,6 +636,7 @@ def trace_quantum_operations(
         qreg: JAX tracer for quantum register in its initial state.
         ctx: JAX tracing context object.
         trace: JAX frame to emit the Jaxpr equations into.
+        mcm_config: Mid-circuit measurement configuration.
 
     Returns:
         qrp: QRegPromise object holding the JAX tracer representing the quantum register into its
@@ -672,15 +673,19 @@ def trace_quantum_operations(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
+                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         elif isinstance(op, qml.GlobalPhase):
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = gphase_p.bind(
-                *[*op.parameters, *controlled_qubits, *controlled_values],
+            qubits2 = bind_flexible_primitive(
+                gphase_p,
+                {"static_params": op.parameters},
+                *[*controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
@@ -726,7 +731,7 @@ def trace_quantum_operations(
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
         else:
-            qrp2 = bind_native_operation(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [], False)
 
         assert qrp2 is not None
         qrp = qrp2
@@ -1141,6 +1146,7 @@ def trace_quantum_function(
         args: Positional arguments to pass to ``f``
         kwargs: Keyword arguments to pass to ``f``
         qnode: The quantum node to be traced, it contains user transforms.
+        static_argnums: indices of static arguments.
 
     Returns:
         closed_jaxpr: JAXPR expression of the function ``f``.

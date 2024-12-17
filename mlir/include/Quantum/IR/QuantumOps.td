@@ -368,7 +368,8 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         StrAttr:$gate_name,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
@@ -445,14 +446,123 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     ];
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        $gate_name `(` $params ($static_params^)? `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getParams();
+        }
+
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getParams();
         }
     }];
+
+    let builders = [
+        OpBuilder<
+        // Convenience builder for a gate with parameters and controls
+        // Note that number of out_qubits = number of in_qubits,
+        // and number of out_ctrl_qubits = number of in_ctrl_qubits
+        (ins
+             "std::string":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$in_ctrl_qubits,
+             "mlir::ValueRange":$in_ctrl_values,
+             "mlir::ValueRange":$params,
+             CArg<"mlir::ArrayAttr", "nullptr">:$static_params,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*out_ctrl_qubits=*/ mlir::TypeRange(in_ctrl_qubits),
+            /*params=*/ params,
+            /*in_qubits=*/ in_qubits,
+            /*gate_name=*/ $_builder.getStringAttr(gate),
+            /*(optional) adjoint=*/ nullptr,
+            /*in_ctrl_qubits=*/ in_ctrl_qubits,
+            /*in_ctrl_values=*/ in_ctrl_values,
+            /*(optional) static_params=*/ static_params
+            );
+
+            if (adjoint){
+                $_state.addAttribute("adjoint", $_builder.getUnitAttr());
+            }
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with dynamic parameters and no controls
+        (ins
+             "std::string":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$params,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, mlir::ValueRange(), mlir::ValueRange(),
+            params, nullptr, adjoint);
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with static parameters and no controls
+        (ins
+             "std::string":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ArrayAttr":$static_params,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, mlir::ValueRange(), mlir::ValueRange(),
+            mlir::ValueRange(), static_params, adjoint);
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with controls and no parameters
+        (ins
+             "std::string":$gate,
+             "mlir::ValueRange":$in_qubits,
+             "mlir::ValueRange":$in_ctrl_qubits,
+             "mlir::ValueRange":$in_ctrl_values,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, in_ctrl_qubits, in_ctrl_values,
+            mlir::ValueRange(), nullptr, adjoint);
+        }]>,
+
+        OpBuilder<
+        // Convenience builder for a gate with no parameters and no controls
+        (ins
+             "std::string":$gate,
+             "mlir::ValueRange":$in_qubits,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            CustomOp::build($_builder, $_state,
+            gate, in_qubits, mlir::ValueRange(), adjoint);
+        }]>,
+        
+
+    ];
     let hasCanonicalizeMethod = 1;
 }
 
@@ -498,10 +608,11 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     }];
 
     let arguments = (ins
-        F64:$params,
+        Optional<F64>:$params,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
@@ -509,11 +620,35 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     );
 
     let assemblyFormat = [{
-        `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $params ($static_params^)? `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getODSOperands(getParamOperandIdx());
         }
 
@@ -539,11 +674,12 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let arguments = (ins
-        F64:$theta,
+        Optional<F64>:$theta,
         Variadic<QubitType>:$in_qubits,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
@@ -552,11 +688,35 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta ($static_params^)? `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getODSOperands(getParamOperandIdx());
         }
     }];
@@ -580,7 +740,11 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
         Variadic<QubitType>:$in_qubits,
         OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        // NOTE: We currently do not support static_params for.
+        // static_params are just included for consistency in
+        // available methods across parameterized gates.
+        OptionalAttr<ArrayAttr>:$static_params
     );
 
     let results = (outs
@@ -593,7 +757,31 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
+        std::variant<mlir::ValueRange, mlir::SmallVector<double>> getAllParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<double> params;
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(fAttr.getValueAsDouble());
+                }
+                return params;
+            }
+            return getODSOperands(getParamOperandIdx());
+        }
+        
+        mlir::ValueRange getSSAParams() {
+            auto staticParams = getStaticParamsAttr();
+            if (staticParams && !staticParams.empty()) {
+                mlir::SmallVector<mlir::Value> params;
+                mlir::OpBuilder builder(getContext());
+                builder.setInsertionPoint(getOperation());
+                for (mlir::Attribute paramAttr : staticParams) {
+                    auto fAttr = mlir::cast<mlir::FloatAttr>(paramAttr);
+                    params.push_back(builder.create<mlir::arith::ConstantOp>(getLoc(), fAttr));
+                }
+                return params;
+            }
             return getODSOperands(getParamOperandIdx());
         }
     }];

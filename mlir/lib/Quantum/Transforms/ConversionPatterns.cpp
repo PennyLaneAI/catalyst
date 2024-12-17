@@ -365,6 +365,31 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
 struct CustomOpPattern : public OpConversionPattern<CustomOp> {
     using OpConversionPattern::OpConversionPattern;
 
+    void populateArguments(CustomOp op, CustomOpAdaptor adaptor,
+                           ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
+                           SmallVectorImpl<Type> &argTypes, SmallVectorImpl<Value> &args) const
+    {
+        ArrayAttr staticParams = op.getStaticParamsAttr();
+
+        if (staticParams && !staticParams.empty()) {
+            for (Attribute paramAttr : staticParams) {
+                auto fAttr = cast<FloatAttr>(paramAttr);
+                Value constVal =
+                    rewriter.create<LLVM::ConstantOp>(loc, Float64Type::get(ctx), fAttr);
+                args.push_back(constVal);
+                argTypes.push_back(Float64Type::get(ctx));
+            }
+        }
+        else {
+            argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
+                            adaptor.getParams().getTypes().end());
+            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
+        }
+        argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
+                        adaptor.getInQubits().getTypes().end());
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+    }
+
     LogicalResult matchAndRewrite(CustomOp op, CustomOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
@@ -375,22 +400,20 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
-        std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
-        argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
-                        adaptor.getParams().getTypes().end());
-        argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                        adaptor.getInQubits().getTypes().end());
-        argTypes.insert(argTypes.end(), modifiersPtr.getType());
+        SmallVector<Value> args;
+
+        populateArguments(op, adaptor, rewriter, loc, ctx, argTypes, args);
+
+        args.push_back(modifiersPtr);
+        argTypes.push_back(modifiersPtr.getType());
+
+        std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        SmallVector<Value> args;
-        args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
-        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        args.insert(args.end(), modifiersPtr);
-
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
@@ -403,24 +426,43 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
 
 struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
     using OpConversionPattern::OpConversionPattern;
-
+    void populateArguments(GlobalPhaseOp op, GlobalPhaseOpAdaptor adaptor,
+                           ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
+                           SmallVectorImpl<Value> &args) const
+    {
+        ArrayAttr staticParams = adaptor.getStaticParamsAttr();
+        if (staticParams && !staticParams.empty()) {
+            for (Attribute paramAttr : staticParams) {
+                auto fAttr = cast<FloatAttr>(paramAttr);
+                Value constVal =
+                    rewriter.create<LLVM::ConstantOp>(loc, Float64Type::get(ctx), fAttr);
+                args.push_back(constVal);
+            }
+        }
+        else {
+            args.insert(args.end(), adaptor.getParams());
+        }
+    }
     LogicalResult matchAndRewrite(GlobalPhaseOp op, GlobalPhaseOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
+
         const TypeConverter *conv = getTypeConverter();
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
+        SmallVector<Value> args;
+
+        populateArguments(op, adaptor, rewriter, loc, ctx, args);
+
+        args.insert(args.end(), modifiersPtr);
+
         std::string qirName = "__catalyst__qis__GlobalPhase";
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), modifiersPtr.getType()});
-
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        SmallVector<Value> args;
-        args.insert(args.end(), adaptor.getParams());
-        args.insert(args.end(), modifiersPtr);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         rewriter.eraseOp(op);
@@ -432,30 +474,48 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
 struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     using OpConversionPattern::OpConversionPattern;
 
+    void populateArguments(MultiRZOp op, MultiRZOpAdaptor adaptor,
+                           ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
+                           SmallVectorImpl<Value> &args) const
+    {
+        auto staticTheta = adaptor.getStaticParamsAttr();
+        if (staticTheta && staticTheta.size() == 1) {
+            auto fAttr = cast<FloatAttr>(staticTheta[0]);
+            args.insert(args.end(),
+                        rewriter.create<LLVM::ConstantOp>(loc, Float64Type::get(ctx), fAttr));
+        }
+        else {
+            args.insert(args.end(), adaptor.getTheta());
+        }
+    }
+
     LogicalResult matchAndRewrite(MultiRZOp op, MultiRZOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
+        int64_t numQubits = op.getOutQubits().size();
+
         const TypeConverter *conv = getTypeConverter();
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
+
+        SmallVector<Value> args;
+
+        populateArguments(op, adaptor, rewriter, loc, ctx, args);
+
+        args.insert(args.end(), modifiersPtr);
+        args.insert(args.end(),
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
 
         std::string qirName = "__catalyst__qis__MultiRZ";
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx),
             {Float64Type::get(ctx), modifiersPtr.getType(), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
-
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        int64_t numQubits = op.getOutQubits().size();
-        SmallVector<Value> args;
-        args.insert(args.end(), adaptor.getTheta());
-        args.insert(args.end(), modifiersPtr);
-        args.insert(args.end(),
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
-        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 
         SmallVector<Value> values;

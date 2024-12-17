@@ -981,7 +981,6 @@ def bind_flexible_primitive(primitive, flexible_args: dict[str, Any], *dyn_args,
     """
 
     static_literal_pool = (int, float, bool)
-
     for flex_arg_name, flex_arg_value in flexible_args.items():
         if type(flex_arg_value) in static_literal_pool:
             static_args |= {flex_arg_name: flex_arg_value}
