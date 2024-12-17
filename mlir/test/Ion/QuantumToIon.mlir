@@ -18,89 +18,90 @@
 // RUN:    gate-to-pulse-toml-loc=%S/oqd_gate_decomposition_parameters.toml" \
 // RUN: --split-input-file -verify-diagnostics | FileCheck %s
 
+// CHECK-LABEL: example_ion_two_qubit
 func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
-    %0 = ion.ion {
-        name="YB117",
-        mass=10.1,
-        charge=12.1,
-        position=dense<[0, 1]>: tensor<2xi64>,
-        levels=[
-            #ion.level<
-                principal=1,
-                spin=1.1,
-                orbital=2.2,
-                nuclear=3.3,
-                spin_orbital=4.4,
-                spin_orbital_nuclear=5.5,
-                spin_orbital_nuclear_magnetization=6.6,
-                energy=8.8
-            >,
-            #ion.level<
-                principal=1,
-                spin=1.1,
-                orbital=2.2,
-                nuclear=3.3,
-                spin_orbital=4.4,
-                spin_orbital_nuclear=5.5,
-                spin_orbital_nuclear_magnetization=6.6,
-                energy=8.8
-            >
-        ],
-        transitions=[
-            #ion.transition<
-                level_0 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                level_1 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                einstein_a=10.10
-            >,
-            #ion.transition<
-                level_0 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                level_1 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                einstein_a=10.10
-            >
-        ]
-    }: !ion.ion
+    // %0 = ion.ion {
+    //     name="YB117",
+    //     mass=10.1,
+    //     charge=12.1,
+    //     position=dense<[0, 1]>: tensor<2xi64>,
+    //     levels=[
+    //         #ion.level<
+    //             principal=1,
+    //             spin=1.1,
+    //             orbital=2.2,
+    //             nuclear=3.3,
+    //             spin_orbital=4.4,
+    //             spin_orbital_nuclear=5.5,
+    //             spin_orbital_nuclear_magnetization=6.6,
+    //             energy=8.8
+    //         >,
+    //         #ion.level<
+    //             principal=1,
+    //             spin=1.1,
+    //             orbital=2.2,
+    //             nuclear=3.3,
+    //             spin_orbital=4.4,
+    //             spin_orbital_nuclear=5.5,
+    //             spin_orbital_nuclear_magnetization=6.6,
+    //             energy=8.8
+    //         >
+    //     ],
+    //     transitions=[
+    //         #ion.transition<
+    //             level_0 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             level_1 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             einstein_a=10.10
+    //         >,
+    //         #ion.transition<
+    //             level_0 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             level_1 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             einstein_a=10.10
+    //         >
+    //     ]
+    // }: !ion.ion
 
     %1 = quantum.alloc( 2) : !quantum.reg
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[rx1out:%.+]] = ion.parallelprotocol(%2) : !quantum.bit {
+    // CHECK: [[rx1out:%.+]] = ion.parallelprotocol({{%.+}}) : !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -163,7 +164,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-NEXT: }
     %6 = quantum.custom "RX"(%arg0) %5 : !quantum.bit
 
-    // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], %3) : !quantum.bit, !quantum.bit {
+    // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], {{%.+}}) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -219,90 +220,94 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 }
 
 
+// -----
+
+
+// CHECK-LABEL: example_ion_three_qubit
 func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
-    %0 = ion.ion {
-        name="YB117",
-        mass=10.1,
-        charge=12.1,
-        position=dense<[0, 1]>: tensor<2xi64>,
-        levels=[
-            #ion.level<
-                principal=1,
-                spin=1.1,
-                orbital=2.2,
-                nuclear=3.3,
-                spin_orbital=4.4,
-                spin_orbital_nuclear=5.5,
-                spin_orbital_nuclear_magnetization=6.6,
-                energy=8.8
-            >,
-            #ion.level<
-                principal=1,
-                spin=1.1,
-                orbital=2.2,
-                nuclear=3.3,
-                spin_orbital=4.4,
-                spin_orbital_nuclear=5.5,
-                spin_orbital_nuclear_magnetization=6.6,
-                energy=8.8
-            >
-        ],
-        transitions=[
-            #ion.transition<
-                level_0 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                level_1 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                einstein_a=10.10
-            >,
-            #ion.transition<
-                level_0 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                level_1 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                einstein_a=10.10
-            >
-        ]
-    }: !ion.ion
+    // %0 = ion.ion {
+    //     name="YB117",
+    //     mass=10.1,
+    //     charge=12.1,
+    //     position=dense<[0, 1]>: tensor<2xi64>,
+    //     levels=[
+    //         #ion.level<
+    //             principal=1,
+    //             spin=1.1,
+    //             orbital=2.2,
+    //             nuclear=3.3,
+    //             spin_orbital=4.4,
+    //             spin_orbital_nuclear=5.5,
+    //             spin_orbital_nuclear_magnetization=6.6,
+    //             energy=8.8
+    //         >,
+    //         #ion.level<
+    //             principal=1,
+    //             spin=1.1,
+    //             orbital=2.2,
+    //             nuclear=3.3,
+    //             spin_orbital=4.4,
+    //             spin_orbital_nuclear=5.5,
+    //             spin_orbital_nuclear_magnetization=6.6,
+    //             energy=8.8
+    //         >
+    //     ],
+    //     transitions=[
+    //         #ion.transition<
+    //             level_0 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             level_1 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             einstein_a=10.10
+    //         >,
+    //         #ion.transition<
+    //             level_0 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             level_1 = #ion.level<
+    //                 principal=1,
+    //                 spin=1.1,
+    //                 orbital=2.2,
+    //                 nuclear=3.3,
+    //                 spin_orbital=4.4,
+    //                 spin_orbital_nuclear=5.5,
+    //                 spin_orbital_nuclear_magnetization=6.6,
+    //                 energy=8.8
+    //             >,
+    //             einstein_a=10.10
+    //         >
+    //     ]
+    // }: !ion.ion
 
     %1 = quantum.alloc( 3) : !quantum.reg
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
     %4 = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[ms1out:%.+]]:2 = ion.parallelprotocol(%2, %3) : !quantum.bit, !quantum.bit {
+    // CHECK: [[ms1out:%.+]]:2 = ion.parallelprotocol({{%.+}}, {{%.+}}) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -355,7 +360,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: }
     %5:2 = quantum.custom "MS"(%arg0) %2, %3 : !quantum.bit, !quantum.bit
 
-    // CHECK: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, %4) : !quantum.bit, !quantum.bit {
+    // CHECK: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, {{%.+}}) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: ion.pulse(%arg0 : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<

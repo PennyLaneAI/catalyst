@@ -41,13 +41,57 @@ namespace ion {
 struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     using QuantumToIonPassBase::QuantumToIonPassBase;
 
+    LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level){
+        return LevelAttr::get(ctx,
+            builder.getI64IntegerAttr(level.principal),
+            builder.getF64FloatAttr(level.spin),
+            builder.getF64FloatAttr(level.orbital),
+            builder.getF64FloatAttr(level.nuclear),
+            builder.getF64FloatAttr(level.spin_orbital),
+            builder.getF64FloatAttr(level.spin_orbital_nuclear),
+            builder.getF64FloatAttr(level.spin_orbital_nuclear_magnetization),
+            builder.getF64FloatAttr(level.energy)
+            );
+    }
+
+    TransitionAttr getTransitionAttr(MLIRContext *ctx, IRRewriter &builder, Transition transition){
+        return TransitionAttr::get(ctx,
+            getLevelAttr(ctx, builder, transition.level_0),
+            getLevelAttr(ctx, builder, transition.level_1),
+            builder.getF64FloatAttr(transition.einstein_a)
+            );
+    }
+
     void runOnOperation() final
     {
         OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 
-        // if load ion
+        // if load ion {
+        // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
+        MLIRContext *ctx = getOperation()->getContext();
+        IRRewriter builder(ctx);
         Ion ion = dataManager.getIonParams().at("Yb171");
-        llvm::errs() << ion.mass << " aloha\n";
+        //llvm::errs() << ion.mass << " aloha\n";
+
+        SmallVector<Attribute> levels, transitions;
+        for (const Level &level : ion.levels) {
+            levels.push_back(cast<Attribute>(getLevelAttr(ctx, builder, level)));
+        }
+        for (const Transition &transition : ion.transitions) {
+            transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
+        }
+
+        builder.setInsertionPointToStart(&(getOperation()->getRegion(0).front()));
+        builder.create<ion::IonOp>(getOperation()->getLoc(), IonType::get(ctx),
+            builder.getStringAttr(ion.name),
+            builder.getF64FloatAttr(ion.mass),
+            builder.getF64FloatAttr(ion.charge),
+            builder.getI64VectorAttr(ion.position),
+            builder.getArrayAttr(levels),
+            builder.getArrayAttr(transitions)
+        );
+
+        // } // if load ion
 
         RewritePatternSet ionPatterns(&getContext());
         populateQuantumToIonPatterns(ionPatterns, dataManager);
