@@ -343,7 +343,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    // TODO: phonon0ComXAttr change sign
                     auto beam3Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
@@ -385,7 +384,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    // TODO: phonon1ComXAttr change sign
                     auto beam5Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
@@ -408,7 +406,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    // TODO: phonon1ComXAttr change sign
                     auto beam6Attr = BeamAttr::get(
                         op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
                         rewriter.getF64FloatAttr(beam.rabi),
