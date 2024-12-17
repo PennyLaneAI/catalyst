@@ -23,6 +23,7 @@ import subprocess
 import sys
 from typing import Optional
 
+# build deps
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
@@ -95,9 +96,6 @@ entry_points = {
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
-    ],
-    "catalyst.passes_resolution": [
-        "standalone.passes = catalyst.example_entry_point",
     ],
 }
 
@@ -211,11 +209,9 @@ class UnifiedBuildExt(build_ext):
             f"-DCMAKE_BUILD_TYPE={build_type}",
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
-        configure_args += (
-            [f"-DPYTHON_EXECUTABLE={sys.executable}"]
-            if platform.system() != "Darwin"
-            else [f"-DPython_EXECUTABLE={sys.executable}"]
-        )
+        configure_args += [
+            f"-DPython_EXECUTABLE={sys.executable}",
+        ]
 
         configure_args += self.cmake_defines
 

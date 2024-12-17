@@ -17,20 +17,22 @@ The Standalone plugin may be found here:
 https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 """
 
-import platform
-from pathlib import Path
-
 import pennylane as qml
 import pytest
 
 from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
-from catalyst.utils.runtime_environment import get_bin_path
 
-ext = "so" if platform.system() == "Linux" else "dylib"
-plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlugin.{ext}"
-plugin = Path(plugin_path)
+have_standalone_plugin = True
+
+try:
+    from standalone_plugin import SwitchBarToFoo, getStandalonePluginAbsolutePath
+
+    plugin = getStandalonePluginAbsolutePath()
+except ImportError:
+    have_standalone_plugin = False
 
 
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
 def test_standalone_plugin():
     """Generate MLIR for the standalone plugin. Do not execute code.
     The code execution test is in the lit test. See that test
@@ -49,6 +51,7 @@ def test_standalone_plugin():
     assert "standalone-switch-bar-foo" in module.mlir
 
 
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
 def test_standalone_plugin_no_preregistration():
     """Generate MLIR for the standalone plugin, no need to register the
     plugin ahead of time in the qjit decorator"""
@@ -67,6 +70,7 @@ def test_standalone_plugin_no_preregistration():
     assert "standalone-switch-bar-foo" in module.mlir
 
 
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
 def test_standalone_entry_point():
     """Generate MLIR for the standalone plugin via entry-point"""
 
@@ -84,6 +88,7 @@ def test_standalone_entry_point():
     assert "standalone-switch-bar-foo" in module.mlir
 
 
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
 def test_standalone_dictionary():
     """Generate MLIR for the standalone plugin via entry-point"""
 
@@ -98,6 +103,22 @@ def test_standalone_dictionary():
 
     # It would be nice if we were able to combine lit tests with
     # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
+def test_standalone_plugin_decorator():
+    """Generate MLIR for the standalone plugin"""
+
+    @SwitchBarToFoo
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
     assert "standalone-switch-bar-foo" in module.mlir
 
 
