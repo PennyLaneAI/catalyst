@@ -15,7 +15,7 @@ configure:
 	cmake -G Ninja -B $(OQD_BUILD_DIR) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DRUNTIME_BUILD_DIR=$(RT_BUILD_DIR) \
+		-DRUNTIME_BUILD_DIR=$(RT_BUILD_DIR)
 
 $(OQD_BUILD_DIR)/librtd_oqd.so: configure
 	cmake --build $(OQD_BUILD_DIR) --target rtd_oqd -j$(NPROC)

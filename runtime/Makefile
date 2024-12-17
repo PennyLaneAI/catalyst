@@ -17,17 +17,12 @@ ENABLE_ASAN?=OFF
 BUILD_TARGETS := rt_capi rtd_null_qubit
 TEST_TARGETS := runner_tests_qir_runtime
 
+PLATFORM := $(shell uname -s)
+
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
 	TEST_TARGETS += runner_tests_openqasm
 endif
-
-coverage: CODE_COVERAGE=ON
-coverage: BUILD_TYPE=Debug
-coverage: C_COMPILER=$(shell which gcc)
-coverage: CXX_COMPILER=$(shell which g++)
-test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=RelWithDebInfo
 
 .PHONY: help
 help:
@@ -53,11 +48,7 @@ configure:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DPYTHON_EXECUTABLE=$(PYTHON) \
-		-DPython_ROOT_DIR=$(PYTHON_PREFIX) \
-		-DPYTHON_VERSION_TO_FIND=$(PYTHON_VERSION) \
-		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
-		-Dnanobind_DIR=$(shell $(PYTHON) -c "import nanobind; print(nanobind.cmake_dir())") \
+        -DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
 
 .PHONY: runtime
@@ -69,6 +60,8 @@ test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: test
+test: CODE_COVERAGE=OFF
+test: BUILD_TYPE?=RelWithDebInfo
 test: test_runner
 	@echo "Catalyst runtime test suite - NullQubit"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
@@ -78,20 +71,35 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 
 .PHONY: coverage
+coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
+coverage: CODE_COVERAGE=ON
+coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
+coverage: export LLVM_PROFILE_FILE := $(RT_BUILD_DIR)/tests/%m.profraw
 coverage: test_runner
 	@echo "check C++ code coverage"
 	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
+else
+	xcrun llvm-profdata merge $(RT_BUILD_DIR)/tests/*.profraw -o $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata
+	xcrun llvm-cov show -instr-profile $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata \
+		-object $(RT_BUILD_DIR)/tests/runner_tests_openqasm \
+		$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime \
+		-format=html -output-dir=$(RT_BUILD_DIR)/coverage_html \
+		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
+endif
 
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) cov coverage.info $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
 
 .PHONY: format
 format:

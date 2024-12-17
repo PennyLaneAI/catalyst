@@ -23,6 +23,7 @@ import subprocess
 import sys
 from typing import Optional
 
+# build deps
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
@@ -95,9 +96,6 @@ entry_points = {
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
-    ],
-    "catalyst.passes_resolution": [
-        "standalone.passes = catalyst.example_entry_point",
     ],
 }
 
@@ -211,11 +209,9 @@ class UnifiedBuildExt(build_ext):
             f"-DCMAKE_BUILD_TYPE={build_type}",
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
-        configure_args += (
-            [f"-DPYTHON_EXECUTABLE={sys.executable}"]
-            if platform.system() != "Darwin"
-            else [f"-DPython_EXECUTABLE={sys.executable}"]
-        )
+        configure_args += [
+            f"-DPython_EXECUTABLE={sys.executable}",
+        ]
 
         configure_args += self.cmake_defines
 
@@ -273,6 +269,8 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         )
 
 
+Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
+
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     custom_calls_extension = Extension(
@@ -283,6 +281,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -300,6 +299,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
