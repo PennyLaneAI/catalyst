@@ -34,7 +34,7 @@ namespace catalyst {
 namespace ion {
 
 enum LevelTransition {
-    // Encoding of level transtions for a pulse
+    // Encoding of level transitions for a pulse
     // For example, "DOWN_E" means the transition from downstate to estate
     DOWN_E = 0,
     UP_E = 1,
@@ -43,6 +43,9 @@ enum LevelTransition {
 /**
  * @brief Walk back the qubit SSA until we reach an ExtractOp that has an idxAttr set, or until we
  *        reach the root of the SSA.
+ *
+ *        TODO (backlog): This function will likely not scale well as circuit depth increases.
+ *        Is there a more efficient way to get the index of the qubit SSA?
  *
  * @param gate The gate that uses the qubit SSA.
  * @param position The position of the qubit SSA in the gate.
@@ -221,6 +224,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex0Value
                                << " used as input to MS gate; there are only " << phonons.size()
                                << " phonon parameters in the database.";
+                // TODO (backlog): It would be nice if we could exit gracefully rather than assert
                 assert(
                     false &&
                     "Compilation failed; "
@@ -231,6 +235,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex1Value
                                << " used as input to MS gate; there are only " << phonons.size()
                                << " phonon parameters in the database.";
+                // TODO (backlog): It would be nice if we could exit gracefully rather than assert
                 assert(
                     false &&
                     "Compilation failed; "
@@ -251,6 +256,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "used as input to MS gate. Expected beam parameters for two-qubit "
                     << "combinatorial index " << twoQubitComboIndex << " but there are only "
                     << beams2.size() << " beam parameters in the database.";
+                // TODO (backlog): It would be nice if we could exit gracefully rather than assert
                 assert(
                     false &&
                     "Compilation failed; "
