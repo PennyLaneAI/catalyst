@@ -269,6 +269,8 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         )
 
 
+Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
+
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     custom_calls_extension = Extension(
@@ -279,6 +281,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -296,6 +299,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
