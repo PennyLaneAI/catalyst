@@ -71,7 +71,6 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         MLIRContext *ctx = getOperation()->getContext();
         IRRewriter builder(ctx);
         Ion ion = dataManager.getIonParams().at("Yb171");
-        //llvm::errs() << ion.mass << " aloha\n";
 
         SmallVector<Attribute> levels, transitions;
         for (const Level &level : ion.levels) {
