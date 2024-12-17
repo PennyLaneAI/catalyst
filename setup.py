@@ -129,8 +129,8 @@ description = {
 class CMakeExtension(Extension):
     """A setuptools Extension class for modules with a CMake configuration."""
 
-    def __init__(self, name, define_macros, sourcedir=""):
-        super().__init__(name, sources=[], define_macros=define_macros)
+    def __init__(self, name, sourcedir=""):
+        super().__init__(name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -310,11 +310,7 @@ frontend_dir = os.path.join(project_root_dir, "frontend")
 
 ext_modules = [
     custom_calls_extension,
-    CMakeExtension(
-        "catalyst.utils.wrapper",
-        sourcedir=frontend_dir,
-        define_macros=Py_LIMITED_API_macros,
-    ),
+    CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
