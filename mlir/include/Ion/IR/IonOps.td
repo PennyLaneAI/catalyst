@@ -78,18 +78,6 @@ def LevelAttr : Ion_Attr<"Level", "level"> {
   let assemblyFormat = "`<` struct(params) `>`";
 }
 
-def PhononAttr : Ion_Attr<"Phonon", "phonon"> {
-  let summary = "A class to represent a phonon.";
-
-  let parameters = (ins
-    "mlir::FloatAttr":$energy,
-    "mlir::DenseIntElementsAttr":$eigen_vector
-  );
-
-
-  let assemblyFormat = "`<` struct(params) `>`";
-}
-
 def TransitionAttr : Ion_Attr<"Transition", "transition"> {
   let summary = "A class to represent a atomic transition between two levels.";
 
@@ -133,16 +121,6 @@ def LevelArrayAttr : TypedArrayAttrBase<LevelAttr,
 
 def TransitionArrayAttr : TypedArrayAttrBase<TransitionAttr,
                          TransitionAttr.summary # " array"> {
-  let constBuilderCall = ?;
-}
-
-def BeamArrayAttr : TypedArrayAttrBase<BeamAttr,
-                         BeamAttr.summary # " array"> {
-  let constBuilderCall = ?;
-}
-
-def PhononArrayAttr : TypedArrayAttrBase<PhononAttr,
-                         PhononAttr.summary # " array"> {
   let constBuilderCall = ?;
 }
 
