@@ -30,6 +30,9 @@ def QuantumToIonPass : Pass<"quantum-to-ion"> {
     Option<"Gate2PulseDecompTomlLoc", "gate-to-pulse-toml-loc",
            "std::string", /*default=*/"\"\"",
            "Toml file location for the ion hardware gate-to-pulse decomposition parameters.">,
+    Option<"LoadIon", "load-ion",
+           "bool", /*default=*/"true",
+           "Whether to load the physical parameters for the ion (e.g. mass, charge, spin) into the IR.">,
     ];
 
     let dependentDialects = [

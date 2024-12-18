@@ -71,28 +71,27 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
 
         OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 
-        // if load ion {
-        // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
-        MLIRContext *ctx = op->getContext();
-        IRRewriter builder(ctx);
-        Ion ion = dataManager.getIonParams().at("Yb171");
+        if (LoadIon) {
+            // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
+            MLIRContext *ctx = op->getContext();
+            IRRewriter builder(ctx);
+            Ion ion = dataManager.getIonParams().at("Yb171");
 
-        SmallVector<Attribute> levels, transitions;
-        for (const Level &level : ion.levels) {
-            levels.push_back(cast<Attribute>(getLevelAttr(ctx, builder, level)));
+            SmallVector<Attribute> levels, transitions;
+            for (const Level &level : ion.levels) {
+                levels.push_back(cast<Attribute>(getLevelAttr(ctx, builder, level)));
+            }
+            for (const Transition &transition : ion.transitions) {
+                transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
+            }
+
+            builder.setInsertionPointToStart(&(op->getRegion(0).front()));
+            builder.create<ion::IonOp>(
+                op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
+                builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
+                builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
+                builder.getArrayAttr(transitions));
         }
-        for (const Transition &transition : ion.transitions) {
-            transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
-        }
-
-        builder.setInsertionPointToStart(&(op->getRegion(0).front()));
-        builder.create<ion::IonOp>(op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
-                                   builder.getF64FloatAttr(ion.mass),
-                                   builder.getF64FloatAttr(ion.charge),
-                                   builder.getI64VectorAttr(ion.position),
-                                   builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
-
-        // } // if load ion
 
         RewritePatternSet ionPatterns(&getContext());
         populateQuantumToIonPatterns(ionPatterns, dataManager);
