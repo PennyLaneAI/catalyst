@@ -20,85 +20,123 @@
 
 // CHECK-LABEL: example_ion_two_qubit
 func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
-    // %0 = ion.ion {
-    //     name="YB117",
-    //     mass=10.1,
-    //     charge=12.1,
-    //     position=dense<[0, 1]>: tensor<2xi64>,
-    //     levels=[
-    //         #ion.level<
-    //             principal=1,
-    //             spin=1.1,
-    //             orbital=2.2,
-    //             nuclear=3.3,
-    //             spin_orbital=4.4,
-    //             spin_orbital_nuclear=5.5,
-    //             spin_orbital_nuclear_magnetization=6.6,
-    //             energy=8.8
-    //         >,
-    //         #ion.level<
-    //             principal=1,
-    //             spin=1.1,
-    //             orbital=2.2,
-    //             nuclear=3.3,
-    //             spin_orbital=4.4,
-    //             spin_orbital_nuclear=5.5,
-    //             spin_orbital_nuclear_magnetization=6.6,
-    //             energy=8.8
-    //         >
-    //     ],
-    //     transitions=[
-    //         #ion.transition<
-    //             level_0 = #ion.level<
-    //                 principal=1,
-    //                 spin=1.1,
-    //                 orbital=2.2,
-    //                 nuclear=3.3,
-    //                 spin_orbital=4.4,
-    //                 spin_orbital_nuclear=5.5,
-    //                 spin_orbital_nuclear_magnetization=6.6,
-    //                 energy=8.8
-    //             >,
-    //             level_1 = #ion.level<
-    //                 principal=1,
-    //                 spin=1.1,
-    //                 orbital=2.2,
-    //                 nuclear=3.3,
-    //                 spin_orbital=4.4,
-    //                 spin_orbital_nuclear=5.5,
-    //                 spin_orbital_nuclear_magnetization=6.6,
-    //                 energy=8.8
-    //             >,
-    //             einstein_a=10.10
-    //         >,
-    //         #ion.transition<
-    //             level_0 = #ion.level<
-    //                 principal=1,
-    //                 spin=1.1,
-    //                 orbital=2.2,
-    //                 nuclear=3.3,
-    //                 spin_orbital=4.4,
-    //                 spin_orbital_nuclear=5.5,
-    //                 spin_orbital_nuclear_magnetization=6.6,
-    //                 energy=8.8
-    //             >,
-    //             level_1 = #ion.level<
-    //                 principal=1,
-    //                 spin=1.1,
-    //                 orbital=2.2,
-    //                 nuclear=3.3,
-    //                 spin_orbital=4.4,
-    //                 spin_orbital_nuclear=5.5,
-    //                 spin_orbital_nuclear_magnetization=6.6,
-    //                 energy=8.8
-    //             >,
-    //             einstein_a=10.10
-    //         >
-    //     ]
-    // }: !ion.ion
 
     // CHECK-DAG: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
     // CHECK-DAG: [[rabi2:%.+]] = arith.constant 1.230000e+00 : f64
+
+    // COM: attr-dict in op's assembly format sorts fields alphabetically
+    // COM: so we have to CHECK-SAME in alphabetical order as well
+    // COM: The order is charge, levels, mass, name, position, transitions
+
+    // CHECK: {{%.+}} = ion.ion {
+    // CHECK-SAME:    charge = 1.000000e+00
+    // CHECK-SAME:    levels = [
+    // CHECK-SAME:        #ion.level<
+    // CHECK-SAME:            principal = 6
+    // CHECK-SAME:            spin = 4.000000e-01
+    // CHECK-SAME:            orbital = 5.000000e-01
+    // CHECK-SAME:            nuclear = 6.000000e-01
+    // CHECK-SAME:            spin_orbital = 8.000000e-01
+    // CHECK-SAME:            spin_orbital_nuclear = 9.000000e-01
+    // CHECK-SAME:            spin_orbital_nuclear_magnetization = 1.000000e+00
+    // CHECK-SAME:            energy = 0.000000e+00
+    // CHECK-SAME:        >,
+    // CHECK-SAME:        #ion.level<
+    // CHECK-SAME:            principal = 6
+    // CHECK-SAME:            spin = 1.400000e+00
+    // CHECK-SAME:            orbital = 1.500000e+00
+    // CHECK-SAME:            nuclear = 1.600000e+00
+    // CHECK-SAME:            spin_orbital = 1.800000e+00
+    // CHECK-SAME:            spin_orbital_nuclear = 1.900000e+00
+    // CHECK-SAME:            spin_orbital_nuclear_magnetization = 2.000000e+00
+    // CHECK-SAME:            energy = 1.264300e+10
+    // CHECK-SAME:        >,
+    // CHECK-SAME:        #ion.level<
+    // CHECK-SAME:            principal = 5
+    // CHECK-SAME:            spin = 2.400000e+00
+    // CHECK-SAME:            orbital = 2.500000e+00
+    // CHECK-SAME:            nuclear = 2.600000e+00
+    // CHECK-SAME:            spin_orbital = 2.800000e+00
+    // CHECK-SAME:            spin_orbital_nuclear = 2.900000e+00
+    // CHECK-SAME:            spin_orbital_nuclear_magnetization = 3.000000e+00
+    // CHECK-SAME:            energy = 8.115200e+14
+    // CHECK-SAME:        >
+    // CHECK-SAME:    ],
+    // CHECK-SAME:    mass = 1.710000e+02
+    // CHECK-SAME:    name = "Yb171"
+    // CHECK-SAME:    position = dense<[1, 2, -1]> : vector<3xi64>
+    // CHECK-SAME:    transitions = [
+    // CHECK-SAME:        #ion.transition<
+    // CHECK-SAME:            level_0 = <
+    // CHECK-SAME:                principal = 6
+    // CHECK-SAME:                spin = 4.000000e-01
+    // CHECK-SAME:                orbital = 5.000000e-01
+    // CHECK-SAME:                nuclear = 6.000000e-01
+    // CHECK-SAME:                spin_orbital = 8.000000e-01
+    // CHECK-SAME:                spin_orbital_nuclear = 9.000000e-01
+    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 1.000000e+00
+    // CHECK-SAME:                energy = 0.000000e+00
+    // CHECK-SAME:            >,
+    // CHECK-SAME:            level_1 = <
+    // CHECK-SAME:                principal = 5
+    // CHECK-SAME:                spin = 2.400000e+00
+    // CHECK-SAME:                orbital = 2.500000e+00
+    // CHECK-SAME:                nuclear = 2.600000e+00
+    // CHECK-SAME:                spin_orbital = 2.800000e+00
+    // CHECK-SAME:                spin_orbital_nuclear = 2.900000e+00
+    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 3.000000e+00
+    // CHECK-SAME:                energy = 8.115200e+14
+    // CHECK-SAME:            >,
+    // CHECK-SAME:            einstein_a = 2.200000e+00
+    // CHECK-SAME:        >,
+    // CHECK-SAME:        #ion.transition<
+    // CHECK-SAME:            level_0 = <
+    // CHECK-SAME:                principal = 6
+    // CHECK-SAME:                spin = 4.000000e-01
+    // CHECK-SAME:                orbital = 5.000000e-01
+    // CHECK-SAME:                nuclear = 6.000000e-01
+    // CHECK-SAME:                spin_orbital = 8.000000e-01
+    // CHECK-SAME:                spin_orbital_nuclear = 9.000000e-01
+    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 1.000000e+00
+    // CHECK-SAME:                energy = 0.000000e+00
+    // CHECK-SAME:            >,
+    // CHECK-SAME:            level_1 = <
+    // CHECK-SAME:                principal = 6
+    // CHECK-SAME:                spin = 1.400000e+00
+    // CHECK-SAME:                orbital = 1.500000e+00
+    // CHECK-SAME:                nuclear = 1.600000e+00
+    // CHECK-SAME:                spin_orbital = 1.800000e+00
+    // CHECK-SAME:                spin_orbital_nuclear = 1.900000e+00
+    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 2.000000e+00
+    // CHECK-SAME:                energy = 1.264300e+10
+    // CHECK-SAME:            >,
+    // CHECK-SAME:            einstein_a = 1.100000e+00
+    // CHECK-SAME:        >,
+    // CHECK-SAME:        #ion.transition<
+    // CHECK-SAME:            level_0 = <
+    // CHECK-SAME:                principal = 5
+    // CHECK-SAME:                spin = 2.400000e+00
+    // CHECK-SAME:                orbital = 2.500000e+00
+    // CHECK-SAME:                nuclear = 2.600000e+00
+    // CHECK-SAME:                spin_orbital = 2.800000e+00
+    // CHECK-SAME:                spin_orbital_nuclear = 2.900000e+00
+    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 3.000000e+00
+    // CHECK-SAME:                energy = 8.115200e+14
+    // CHECK-SAME:            >,
+    // CHECK-SAME:            level_1 = <
+    // CHECK-SAME:                principal = 6
+    // CHECK-SAME:                spin = 1.400000e+00
+    // CHECK-SAME:                orbital = 1.500000e+00
+    // CHECK-SAME:                nuclear = 1.600000e+00
+    // CHECK-SAME:                spin_orbital = 1.800000e+00
+    // CHECK-SAME:                spin_orbital_nuclear = 1.900000e+00
+    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 2.000000e+00
+    // CHECK-SAME:                energy = 1.264300e+10
+    // CHECK-SAME:            >,
+    // CHECK-SAME:            einstein_a = 3.300000e+00
+    // CHECK-SAME:        >
+    // CHECK-SAME:    ]
+    // CHECK-SAME: } : !ion.ion
 
     %1 = quantum.alloc( 2) : !quantum.reg
 
