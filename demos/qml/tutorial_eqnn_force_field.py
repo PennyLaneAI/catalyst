@@ -485,8 +485,8 @@ running_loss = []
 # We train our VQLM using stochastic gradient descent.
 
 
-num_batches = 5000  # number of optimization steps
-batch_size = 256  # number of training data per batch
+num_batches = 200 # 5000  # number of optimization steps
+batch_size = 5 # 256  # number of training data per batch
 
 
 for ibatch in range(num_batches):
