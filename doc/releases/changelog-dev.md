@@ -153,6 +153,23 @@
 * `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
   [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
 
+* A new `ion` dialect has been added for Catalyst programs targeting OQD trapped-ion quantum devices.
+  [(#1260)](https://github.com/PennyLaneAI/catalyst/pull/1260)
+  [(#1372)](https://github.com/PennyLaneAI/catalyst/pull/1372)
+
+  The `ion` dialect defines the set of physical properties of the device, such as the ion species
+  and their atomic energy levels, as well as the operations to manipulate the qubits in the
+  trapped-ion system, such as laser pulse durations, polarizations, detuning frequencies, etc.
+
+  A new pass, `--quantum-to-ion`, has also been added to convert logical gate-based circuits in the
+  Catalyst `quantum` dialect to laser pulse operations in the `ion` dialect. This pass accepts
+  logical quantum gates from the set {RX, RY, Mølmer–Sørensen (MS)}. Doing so enables the insertion
+  of physical device parameters into the IR, which will be necessary when lowering to OQD's backend
+  calls. The physical parameters are read in from [TOML](https://toml.io/en/) files during the
+  `--quantum-to-ion` conversion. The TOML files are assumed to exist by the pass (the paths to the
+  TOML file locations are taken in as pass options), with the intention that they are generated
+  immediately before compilation during hardware-calibration runs.
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an

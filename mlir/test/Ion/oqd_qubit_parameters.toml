@@ -1,0 +1,69 @@
+# OQD Qubit Parameters
+# ~~~~~~~~~~~~~~~~~~~~
+#
+# A database containing parameters relating to the qubit(s) used in an Open Quantum Design (OQD)
+# trapped-ion quantum computer device.
+
+oqd_config_schema = "v0.1"
+
+# ----- TODO: Is this needed? --------------------------------------------------
+# [ion.Yb_171_II]
+# level.q0_m0 = "0"
+# level.q1_m0 = "12.643e9"
+# level.q1_m1 = "12.643e9 + 1.4e6"
+# level.q1_mneg1 = "12.643e9 - 1.4e6"
+# level.e0_m0 = "811.302e12"
+# level.e1_m0 = "811.302e12 + 2.105e9"
+# level.e1_m1 = "811.302e12 + 2.105e9 + 0.47e6"
+# level.e1_mneg1 = "811.302e12 + 2.105e9 - 0.47e6"
+# ------------------------------------------------------------------------------
+
+# Ions
+# ----
+
+[ions.Yb171]
+mass = 171.0
+charge = +1.0
+position = [1, 2, -1]
+
+levels.downstate.principal = 6
+levels.downstate.spin = 0.4
+levels.downstate.orbital = 0.5
+levels.downstate.nuclear = 0.6
+levels.downstate.spin_orbital = 0.8
+levels.downstate.spin_orbital_nuclear = 0.9
+levels.downstate.spin_orbital_nuclear_magnetization = 1.0
+levels.downstate.energy = 0.0
+
+levels.upstate.principal = 6
+levels.upstate.spin = 1.4
+levels.upstate.orbital = 1.5
+levels.upstate.nuclear = 1.6
+levels.upstate.spin_orbital = 1.8
+levels.upstate.spin_orbital_nuclear = 1.9
+levels.upstate.spin_orbital_nuclear_magnetization = 2.0
+levels.upstate.energy = 12.643e9
+
+levels.estate.principal = 5
+levels.estate.spin = 2.4
+levels.estate.orbital = 2.5
+levels.estate.nuclear = 2.6
+levels.estate.spin_orbital = 2.8
+levels.estate.spin_orbital_nuclear = 2.9
+levels.estate.spin_orbital_nuclear_magnetization = 3.0
+levels.estate.energy = 811.52e12
+
+[ions.Yb171.transitions.downstate_upstate]
+level1 = "downstate"
+level2 = "upstate"
+einstein_a = 1.1
+
+[ions.Yb171.transitions.downstate_estate]
+level1 = "downstate"
+level2 = "estate"
+einstein_a = 2.2
+
+[ions.Yb171.transitions.estate_upstate]
+level1 = "estate"
+level2 = "upstate"
+einstein_a = 3.3

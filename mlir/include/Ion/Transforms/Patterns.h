@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,18 +14,16 @@
 
 #pragma once
 
-#include "mlir/CAPI/Registration.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "Ion/Transforms/oqd_database_managers.hpp"
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Ion, ion);
+namespace catalyst {
+namespace ion {
 
-#ifdef __cplusplus
-}
-#endif
+void populateQuantumToIonPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
+
+} // namespace ion
+} // namespace catalyst
