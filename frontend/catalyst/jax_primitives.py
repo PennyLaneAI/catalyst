@@ -1006,6 +1006,7 @@ def _qinst_lowering(
     adjoint=False,
     static_params=None,
 ):
+    assert ctrl_value_len == ctrl_len, "Control values must be the same length as control qubits"
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
