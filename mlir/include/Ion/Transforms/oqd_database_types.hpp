@@ -21,7 +21,7 @@
 namespace {
 
 //
-// Callibrated parameters
+// Calibrated parameters
 //
 
 struct Beam {
