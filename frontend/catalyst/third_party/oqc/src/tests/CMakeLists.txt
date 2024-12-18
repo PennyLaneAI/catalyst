@@ -34,7 +34,6 @@ target_link_directories(runner_tests_oqc PRIVATE ${runtime_lib})
 
 target_link_libraries(runner_tests_oqc PRIVATE
     Catch2::Catch2
-    pybind11::embed
     ${OQC_LIBRARIES}
 )
 
