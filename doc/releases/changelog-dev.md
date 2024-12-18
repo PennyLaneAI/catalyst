@@ -15,6 +15,7 @@
 * Replace pybind11 with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
   [(#1293)](https://github.com/PennyLaneAI/catalyst/pull/1293)
+  [(#1391)](https://github.com/PennyLaneAI/catalyst/pull/1391)
 
   Nanobind has been developed as a natural successor to the pybind11 library and offers a number of
   [advantages](https://nanobind.readthedocs.io/en/latest/why.html#major-additions), in particular,
@@ -53,7 +54,6 @@
 * Generate stable ABI wheels for Python 3.12 and up.
   [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
   [(#1385)](https://github.com/PennyLaneAI/catalyst/pull/1385)
-  [(#1391)](https://github.com/PennyLaneAI/catalyst/pull/1391)
 
 <h3>Breaking changes 💔</h3>
 
