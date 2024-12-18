@@ -14,6 +14,7 @@
 
 #include <memory>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -59,13 +60,19 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                                    builder.getF64FloatAttr(transition.einstein_a));
     }
 
+  bool canScheduleOn(RegisteredOperationName opInfo) const override {
+    return opInfo.hasInterface<FunctionOpInterface>();
+  }
+
     void runOnOperation() final
     {
+        func::FuncOp op = cast<func::FuncOp>(getOperation());
+
         OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 
         // if load ion {
         // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
-        MLIRContext *ctx = getOperation()->getContext();
+        MLIRContext *ctx = op->getContext();
         IRRewriter builder(ctx);
         Ion ion = dataManager.getIonParams().at("Yb171");
 
@@ -77,9 +84,9 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
             transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
         }
 
-        builder.setInsertionPointToStart(&(getOperation()->getRegion(0).front()));
+        builder.setInsertionPointToStart(&(op->getRegion(0).front()));
         builder.create<ion::IonOp>(
-            getOperation()->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
+            op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
             builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
             builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
             builder.getArrayAttr(transitions));
@@ -89,7 +96,7 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         RewritePatternSet ionPatterns(&getContext());
         populateQuantumToIonPatterns(ionPatterns, dataManager);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(ionPatterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(op, std::move(ionPatterns)))) {
             return signalPassFailure();
         }
     }
