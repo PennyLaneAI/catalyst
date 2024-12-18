@@ -969,9 +969,9 @@ def bind_flexible_primitive(primitive, flexible_args: dict[str, Any], *dyn_args,
 
     The flexible_args is a dictionary containing the flexible arguments.
     These are the arguments that can either be static or dynamic. This method
-    will bind a flexible argument as static only if it is an integer, float, or boolean
-    literal. In the static case, the binded primitive's param name is the flexible arg's key,
-    and the jaxpr param value is the flexible arg's value.
+    will bind a flexible argument as static only if it is a single or a list of only integer, float,
+    or boolean literals. In the static case, the binded primitive's param name is the flexible arg's
+    key, and the jaxpr param value is the flexible arg's value.
 
     If a flexible argument is received as a tracer, it will be binded dynamically with
     the flexible arg's value.
