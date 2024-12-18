@@ -43,55 +43,60 @@ static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift"
 
 LogicalResult StaticCustomOp::canonicalize(StaticCustomOp op, mlir::PatternRewriter &rewriter)
 {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        }
-        else if (rotationsOps.contains(name)) {
-            auto params = op.getStaticParams();
-            SmallVector<double> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = -1 * param;
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<StaticCustomOp>(
-                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
-                rewriter.getDenseF64ArrayAttr(paramsNeg), op.getInQubits(), name, nullptr,
-                op.getInCtrlQubits(), op.getInCtrlValues());
-
-            return success();
-        }
+    if (!op.getAdjoint()) {
         return failure();
     }
+    auto name = op.getGateName();
+
+    if (hermitianOps.contains(name)) {
+        rewriter.modifyOpInPlace(op, [&op]() { op.setAdjoint(false); });
+        return success();
+    }
+
+    if (rotationsOps.contains(name)) {
+        auto params = op.getStaticParams();
+        SmallVector<double> paramsNeg;
+        for (auto param : params) {
+            auto paramNeg = -1 * param;
+            paramsNeg.push_back(paramNeg);
+        }
+
+        rewriter.replaceOpWithNewOp<StaticCustomOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+            rewriter.getDenseF64ArrayAttr(paramsNeg), op.getInQubits(), name, nullptr,
+            op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
+    }
+
     return failure();
 }
 
 LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        }
-        else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(
-                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
-
-            return success();
-        }
+    if (!op.getAdjoint()) {
         return failure();
+    }
+    auto name = op.getGateName();
+
+    if (hermitianOps.contains(name)) {
+        rewriter.modifyOpInPlace(op, [&op]() { op.setAdjoint(false); });
+        return success();
+    }
+
+    if (rotationsOps.contains(name)) {
+        auto params = op.getParams();
+        SmallVector<Value> paramsNeg;
+        for (auto param : params) {
+            auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+            paramsNeg.push_back(paramNeg);
+        }
+
+        rewriter.replaceOpWithNewOp<CustomOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
+            op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
     }
     return failure();
 }
