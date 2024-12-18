@@ -167,7 +167,7 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
 def StaticGate : OpInterface<"StaticGate", [QuantumGate]> {
     let description = [{
         This interface provides a generic way to interact with quantum
-        instructions with static parameters (known at runtime). These parameters
+        instructions with static parameters (known at compile time). These parameters
         are specified by a set of constant literals in the form of an array attribute.
     }];
 
