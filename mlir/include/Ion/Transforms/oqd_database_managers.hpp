@@ -173,7 +173,7 @@ class OQDDatabaseManager {
                               einstein_a);
         };
 
-        for (auto ion_it : *(ionsToml.as_table())) {
+        for (auto &ion_it : *(ionsToml.as_table())) {
             std::string name(ion_it.first.str());
             toml::table *data = ion_it.second.as_table();
 
@@ -190,7 +190,7 @@ class OQDDatabaseManager {
 
             std::vector<Transition> transitions;
             auto *transitionsTable = data->at_path("transitions").as_table();
-            for (auto transition : *transitionsTable) {
+            for (auto &transition : *transitionsTable) {
                 transitions.push_back(
                     parseSingleTransition(*(transition.second.as_table()), levels));
             }
