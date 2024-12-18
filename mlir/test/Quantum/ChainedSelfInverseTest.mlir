@@ -323,6 +323,31 @@ func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
 // -----
 
 
+// test quantum.static_custom with static parameters
+
+// CHECK-LABEL: test_chained_self_inverse
+func.func @test_chained_self_inverse() -> !quantum.bit {
+    // CHECK: quantum.alloc
+    // CHECK: [[IN:%.+]] = quantum.extract
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    %out_qubits = quantum.static_custom "RX" [2.000000e-01] %1 : !quantum.bit
+    %out_qubits_1 = quantum.static_custom "RX" [2.000000e-01] %out_qubits {adjoint} : !quantum.bit
+
+
+    %out_qubits_2 = quantum.static_custom "RX" [2.000000e-01] %out_qubits_1 {adjoint} : !quantum.bit
+    %out_qubits_3 = quantum.static_custom "RX" [2.000000e-01] %out_qubits_2 : !quantum.bit
+
+    // CHECK-NOT: quantum.static_custom
+    // CHECK: return [[IN]]
+    return %out_qubits_3 : !quantum.bit
+}
+
+
+// -----
+
+
 // test quantum.custom labeled both with adjoints
 
 // CHECK-LABEL: test_chained_self_inverse
