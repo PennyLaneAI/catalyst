@@ -41,25 +41,22 @@ namespace ion {
 struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     using QuantumToIonPassBase::QuantumToIonPassBase;
 
-    LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level){
-        return LevelAttr::get(ctx,
-            builder.getI64IntegerAttr(level.principal),
-            builder.getF64FloatAttr(level.spin),
-            builder.getF64FloatAttr(level.orbital),
-            builder.getF64FloatAttr(level.nuclear),
+    LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level)
+    {
+        return LevelAttr::get(
+            ctx, builder.getI64IntegerAttr(level.principal), builder.getF64FloatAttr(level.spin),
+            builder.getF64FloatAttr(level.orbital), builder.getF64FloatAttr(level.nuclear),
             builder.getF64FloatAttr(level.spin_orbital),
             builder.getF64FloatAttr(level.spin_orbital_nuclear),
             builder.getF64FloatAttr(level.spin_orbital_nuclear_magnetization),
-            builder.getF64FloatAttr(level.energy)
-            );
+            builder.getF64FloatAttr(level.energy));
     }
 
-    TransitionAttr getTransitionAttr(MLIRContext *ctx, IRRewriter &builder, Transition transition){
-        return TransitionAttr::get(ctx,
-            getLevelAttr(ctx, builder, transition.level_0),
-            getLevelAttr(ctx, builder, transition.level_1),
-            builder.getF64FloatAttr(transition.einstein_a)
-            );
+    TransitionAttr getTransitionAttr(MLIRContext *ctx, IRRewriter &builder, Transition transition)
+    {
+        return TransitionAttr::get(ctx, getLevelAttr(ctx, builder, transition.level_0),
+                                   getLevelAttr(ctx, builder, transition.level_1),
+                                   builder.getF64FloatAttr(transition.einstein_a));
     }
 
     void runOnOperation() final
@@ -81,14 +78,11 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         }
 
         builder.setInsertionPointToStart(&(getOperation()->getRegion(0).front()));
-        builder.create<ion::IonOp>(getOperation()->getLoc(), IonType::get(ctx),
-            builder.getStringAttr(ion.name),
-            builder.getF64FloatAttr(ion.mass),
-            builder.getF64FloatAttr(ion.charge),
-            builder.getI64VectorAttr(ion.position),
-            builder.getArrayAttr(levels),
-            builder.getArrayAttr(transitions)
-        );
+        builder.create<ion::IonOp>(
+            getOperation()->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
+            builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
+            builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
+            builder.getArrayAttr(transitions));
 
         // } // if load ion
 
