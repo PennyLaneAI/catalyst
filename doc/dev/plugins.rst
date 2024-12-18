@@ -261,8 +261,7 @@ Please note that if you are using the Catalyst or Gradient dialects, you should 
 
 4. Modify the standalone plugin to modify quantum operations.
 
-Here we will create a very simple pass that will change a the quantum qubit allocation from 1 to 42.
-Yes, this is also a very simple and unnecessary task, but just one to illustrate a little bit how MLIR works.
+Here we will create a very simple pass that will change a the quantum qubit allocation from 1 to 42 (for illustration purposes).
 We recommend reading MLIR tutorials on how to write MLIR passes, reading the Catalyst source to understand the Catalyst IR, and submitting issues if you are having troubles building your own plugin.
 
 The first thing we need to do is change the ``OpRewritePattern`` to match against our ``quantum::AllocOp`` which denotes how many qubits should be allocated for a given quantum program.
@@ -327,10 +326,8 @@ The next step is changing the contents of the function itself:
 And then we can run ``make all`` again.
 The shared object of the standalone plugin should be available in ``mlir/build/lib/StandalonePlugin.so``.
 This shared object can be used with ``catalyst-cli`` and ``quantum-opt``.
-You can change the name of the pass, change the name of the shared object and make any changes you want.
-This was just an easy example to get started.
+From here, you can change the name of the pass, change the name of the shared object, and implement more complex transformations.
 
-With the steps above, you can take an MLIR program with a ``quantum.alloc`` instruction which allocates statically 1 qubit, and the program will be transformed to allocate 42 qubits statically.
 
 5. Build your own python wheel and ship your plugin.
 
