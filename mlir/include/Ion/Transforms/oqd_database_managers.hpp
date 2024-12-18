@@ -154,14 +154,15 @@ class OQDDatabaseManager {
                          propertiesData[6]);
         };
 
-        auto parseSingleTransition = [](auto transition, const std::vector<Level> &allLevels) {
+        auto parseSingleTransition = [](const auto &transition_table,
+                                        const std::vector<Level> &allLevels) {
             // FIXME: `allLevels` is hardcoded as {downstate, upstate, estate}
             // Not super important, as the ion species is extremely unlikely to change, so
             // hardcoding is fine
 
-            double einstein_a = transition["einstein_a"].as_floating_point()->get();
-            std::string level1 = transition["level1"].as_string()->get();
-            std::string level2 = transition["level2"].as_string()->get();
+            double einstein_a = transition_table["einstein_a"].as_floating_point()->get();
+            std::string level1 = transition_table["level1"].as_string()->get();
+            std::string level2 = transition_table["level2"].as_string()->get();
 
             std::map<std::string, int64_t> levelEncodings{
                 {"downstate", 0}, {"upstate", 1}, {"estate", 2}};
