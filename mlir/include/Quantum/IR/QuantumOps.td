@@ -457,8 +457,10 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def StaticCustomOp : UnitaryGate_Op<"static_custom", [NoMemoryEffect,
-                                                      AttrSizedOperandSegments, AttrSizedResultSegments]> {
-    let summary = "A generic quantum gate on n qubits with static parameters in the form of a DenseF64ArrayAttr.";
+                                                      AttrSizedOperandSegments, 
+                                                      AttrSizedResultSegments]> {
+    let summary = "A generic quantum gate on n qubits with static parameters in the form of a 
+                   DenseF64ArrayAttr.";
     let description = [{
         This operation represents a quantum gate with parameters defined statically as a
         DenseF64ArrayAttr, rather than passed dynamically as operands. This is useful for gates
@@ -480,7 +482,9 @@ def StaticCustomOp : UnitaryGate_Op<"static_custom", [NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        $gate_name $static_params $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        $gate_name $static_params $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) 
+        (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
