@@ -60,9 +60,10 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                                    builder.getF64FloatAttr(transition.einstein_a));
     }
 
-  bool canScheduleOn(RegisteredOperationName opInfo) const override {
-    return opInfo.hasInterface<FunctionOpInterface>();
-  }
+    bool canScheduleOn(RegisteredOperationName opInfo) const override
+    {
+        return opInfo.hasInterface<FunctionOpInterface>();
+    }
 
     void runOnOperation() final
     {
@@ -85,11 +86,11 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         }
 
         builder.setInsertionPointToStart(&(op->getRegion(0).front()));
-        builder.create<ion::IonOp>(
-            op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
-            builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
-            builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
-            builder.getArrayAttr(transitions));
+        builder.create<ion::IonOp>(op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
+                                   builder.getF64FloatAttr(ion.mass),
+                                   builder.getF64FloatAttr(ion.charge),
+                                   builder.getI64VectorAttr(ion.position),
+                                   builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
 
         // } // if load ion
 
