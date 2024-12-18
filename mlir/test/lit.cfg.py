@@ -1,3 +1,4 @@
+# pylint: disable=undefined-variable
 import os
 
 import lit.formats
