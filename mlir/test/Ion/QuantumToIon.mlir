@@ -97,15 +97,17 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     //     ]
     // }: !ion.ion
 
-    %1 = quantum.alloc( 2) : !quantum.reg
-    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-    %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-
-
     // CHECK-DAG: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
     // CHECK-DAG: [[rabi2:%.+]] = arith.constant 1.230000e+00 : f64
 
-    // CHECK: [[rx1out:%.+]] = ion.parallelprotocol({{%.+}}) : !quantum.bit {
+    %1 = quantum.alloc( 2) : !quantum.reg
+
+    // CHECK: [[qubit0:%.+]] = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit1:%.+]] = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[rx1out:%.+]] = ion.parallelprotocol([[qubit0]]) : !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
     // CHECK-NEXT: [[timerx1:%.+]] = arith.divf %arg0, [[rabi1]] : f64
     // CHECK-NEXT: ion.pulse([[timerx1]] : f64) %arg1 {
@@ -171,7 +173,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-NEXT: }
     %6 = quantum.custom "RX"(%arg0) %5 : !quantum.bit
 
-    // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], {{%.+}}) : !quantum.bit, !quantum.bit {
+    // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], [[qubit1]]) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: [[timems:%.+]] = arith.divf %arg0, [[rabi2]] : f64
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
@@ -310,16 +312,20 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     //     ]
     // }: !ion.ion
 
-    %1 = quantum.alloc( 3) : !quantum.reg
-    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-    %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-    %4 = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
-
     // CHECK-DAG: [[rabi1:%.+]] = arith.constant 1.230000e+00 : f64
     // CHECK-DAG: [[rabi2:%.+]] = arith.constant 4.560000e+00 : f64
     // CHECK-DAG: [[rabi3:%.+]] = arith.constant 99.989999999999994 : f64
 
-    // CHECK: [[ms1out:%.+]]:2 = ion.parallelprotocol({{%.+}}, {{%.+}}) : !quantum.bit, !quantum.bit {
+    %1 = quantum.alloc( 3) : !quantum.reg
+
+    // CHECK: [[qubit0:%.+]] = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit1:%.+]] = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
+    %4 = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[ms1out:%.+]]:2 = ion.parallelprotocol([[qubit0]], [[qubit1]]) : !quantum.bit, !quantum.bit {
 
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: [[timems1:%.+]] = arith.divf %arg0, [[rabi1]] : f64
@@ -374,7 +380,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: }
     %5:2 = quantum.custom "MS"(%arg0) %2, %3 : !quantum.bit, !quantum.bit
 
-    // CHECK: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, {{%.+}}) : !quantum.bit, !quantum.bit {
+    // CHECK: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, [[qubit2]]) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: [[timems2:%.+]] = arith.divf %arg0, [[rabi2]] : f64
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
