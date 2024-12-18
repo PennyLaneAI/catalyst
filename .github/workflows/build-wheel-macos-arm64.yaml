@@ -475,7 +475,6 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
-        # python${{ matrix.python_version }} -m pytest frontend/test/test_oqd/oqd -n auto
 
     - name: Run Standalone Plugin Tests
       # Run only on Thursday at the given time
