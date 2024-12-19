@@ -301,27 +301,33 @@ def make_primitive_for_gate():
     kernel_gate_p = jax.core.Primitive("kernel_inst")
     kernel_gate_p.multiple_results = True
 
-    def gate_func(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+    def gate_func(kernel, *qubits_or_params, inst=None, qubits_len=-1, static_params=None):
         """Convenience.
 
         Quantum operations in CUDA-quantum return no values. But JAXPR expects return values.
         We can just say that multiple_results = True and return an empty tuple.
         """
-        kernel_gate_p.bind(kernel, *qubits_or_params, inst=inst, qubits_len=qubits_len)
+        kernel_gate_p.bind(
+            kernel, *qubits_or_params, inst=inst, qubits_len=qubits_len, static_params=static_params
+        )
         return tuple()
 
     @kernel_gate_p.def_impl
-    def gate_impl(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+    def gate_impl(kernel, *qubits_or_params, inst=None, qubits_len=-1, static_params=None):
         """Concrete implementation."""
         assert inst and qubits_len > 0
+        if static_params is None:
+            static_params = []
         method = getattr(cudaq.Kernel, inst)
         targets = qubits_or_params[:qubits_len]
         params = qubits_or_params[qubits_len:]
+        if not params:
+            params = static_params
         method(kernel, *params, *targets)
         return tuple()
 
     @kernel_gate_p.def_abstract_eval
-    def gate_abs(_kernel, *_qubits_or_params, inst=None, qubits_len=-1):
+    def gate_abs(_kernel, *_qubits_or_params, inst=None, qubits_len=-1, static_params=None):
         """Abstract evaluation."""
         return tuple()
 

@@ -44,6 +44,8 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         Operation *module = getOperation();
 
         RewritePatternSet patternsCanonicalization(&getContext());
+        catalyst::quantum::StaticCustomOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                       &getContext());
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
         catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
