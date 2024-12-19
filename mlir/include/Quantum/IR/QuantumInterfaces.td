@@ -176,7 +176,11 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
     let methods = [
         InterfaceMethod<
             "Return all operands which are considered gate parameters.",
-            "mlir::ValueRange", "getAllParams"
+            "std::variant<mlir::ValueRange, mlir::SmallVector<double>>", "getAllParams"
+        >,
+        InterfaceMethod<
+            "Return all gate parameters as ssa values no matter dynamic or static",
+            "mlir::ValueRange", "getSSAParams"
         >,
         InterfaceMethod<
             "Return the starting index at which to find gate parameter operands.",
@@ -200,7 +204,7 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
             "Return all operands which are considered differentiable gate parameters.",
             "mlir::ValueRange", "getDiffParams", (ins), /*methodBody=*/[{}],
             /*defaultImplementation=*/[{
-                return $_op.getAllParams();
+                return $_op.getSSAParams();
             }]
         >,
         InterfaceMethod<

@@ -165,7 +165,7 @@ class AdjointGenerator {
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
             OpBuilder::InsertionGuard insertionGuard(builder);
             builder.setInsertionPoint(clone);
-            ValueRange params = parametrizedGate.getAllParams();
+            ValueRange params = parametrizedGate.getSSAParams();
             size_t numParams = params.size();
             SmallVector<Value> cachedParams(numParams);
             // popping gives the parameters in reverse

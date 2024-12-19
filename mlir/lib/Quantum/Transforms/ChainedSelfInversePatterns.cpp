@@ -70,24 +70,57 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
 template <typename OpType>
 struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
+    using paramType = std::variant<mlir::ValueRange, mlir::SmallVector<double>>;
 
     bool verifyParentGateParams(OpType op, OpType parentOp) const
     {
         // Verify that the parent gate has the same parameters
-        ValueRange opParams = op.getAllParams();
-        ValueRange parentOpParams = parentOp.getAllParams();
+        paramType opAllParams = op.getAllParams();
+        paramType parentOpAllParams = parentOp.getAllParams();
+        mlir::ValueRange opDynParams;
+        mlir::ValueRange parentDynOpParams;
+        mlir::SmallVector<double> opStaticParams;
+        mlir::SmallVector<double> parentOpStaticParams;
 
-        if (opParams.size() != parentOpParams.size()) {
-            return false;
+        if (std::holds_alternative<mlir::ValueRange>(opAllParams)) {
+            opDynParams = std::get<mlir::ValueRange>(opAllParams);
+        }
+        else if (std::holds_alternative<mlir::SmallVector<double>>(opAllParams)) {
+            opStaticParams = std::get<mlir::SmallVector<double>>(opAllParams);
         }
 
-        for (auto [opParam, parentOpParam] : llvm::zip(opParams, parentOpParams)) {
-            if (opParam != parentOpParam) {
-                return false;
+        if (std::holds_alternative<mlir::ValueRange>(parentOpAllParams)) {
+            parentDynOpParams = std::get<mlir::ValueRange>(parentOpAllParams);
+        }
+        else if (std::holds_alternative<mlir::SmallVector<double>>(parentOpAllParams)) {
+            parentOpStaticParams = std::get<mlir::SmallVector<double>>(parentOpAllParams);
+        }
+
+        bool bothHaveDynParams = !opDynParams.empty() && !parentDynOpParams.empty() &&
+                                 opStaticParams.empty() && parentOpStaticParams.empty();
+        bool bothHaveStaticParams = !opStaticParams.empty() && !parentOpStaticParams.empty() &&
+                                    opDynParams.empty() && parentDynOpParams.empty();
+
+        if (bothHaveDynParams) {
+            for (auto [opDynParam, parentDynOpParam] : llvm::zip(opDynParams, parentDynOpParams)) {
+                if (opDynParam != parentDynOpParam) {
+                    return false;
+                }
             }
+            return true;
         }
 
-        return true;
+        if (bothHaveStaticParams) {
+            for (auto [opStaticParam, parentOpStaticParam] :
+                 llvm::zip(opStaticParams, parentOpStaticParams)) {
+                if (opStaticParam != opStaticParam) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return false;
     }
 
     bool verifyOneAdjoint(OpType op, OpType parentOp) const
