@@ -49,7 +49,7 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
             return failure();
         }
 
-        VerifyParentGateAndNameAnalysis vpga(op);
+        VerifyParentGateAndNameAnalysis<CustomOp> vpga(op);
         if (!vpga.getVerifierResult()) {
             return failure();
         }
@@ -67,6 +67,41 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
     }
 };
 
+struct ChainedNamedHermitianStaticOpRewritePattern : public mlir::OpRewritePattern<StaticCustomOp> {
+    using mlir::OpRewritePattern<StaticCustomOp>::OpRewritePattern;
+
+    /// We simplify consecutive Hermitian quantum gates by removing them.
+    /// Hermitian gates are self-inverse and applying the same gate twice in succession
+    /// cancels out the effect. This pattern rewrites such redundant operations by
+    /// replacing the operation with its "grandparent" operation in the quantum circuit.
+    mlir::LogicalResult matchAndRewrite(StaticCustomOp op,
+                                        mlir::PatternRewriter &rewriter) const override
+    {
+        LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
+
+        StringRef OpGateName = op.getGateName();
+        if (!HermitianOps.contains(OpGateName)) {
+            return failure();
+        }
+
+        VerifyParentGateAndNameAnalysis<StaticCustomOp> vpga(op);
+        if (!vpga.getVerifierResult()) {
+            return failure();
+        }
+
+        // Replace uses
+        ValueRange InQubits = op.getInQubits();
+        auto parentOp = cast<StaticCustomOp>(InQubits[0].getDefiningOp());
+
+        // TODO: it would make more sense for getQubitOperands()
+        // to return ValueRange, like the other getters
+        std::vector<mlir::Value> originalQubits = parentOp.getQubitOperands();
+
+        rewriter.replaceOp(op, originalQubits);
+        return success();
+    }
+};
+
 template <typename OpType>
 struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
@@ -74,8 +109,8 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     bool verifyParentGateParams(OpType op, OpType parentOp) const
     {
         // Verify that the parent gate has the same parameters
-        ValueRange opParams = op.getAllParams();
-        ValueRange parentOpParams = parentOp.getAllParams();
+        auto opParams = op.getAllParams();
+        auto parentOpParams = parentOp.getAllParams();
 
         if (opParams.size() != parentOpParams.size()) {
             return false;
@@ -109,7 +144,13 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         if (isa<CustomOp>(op)) {
-            VerifyParentGateAndNameAnalysis vpga(cast<CustomOp>(op));
+            VerifyParentGateAndNameAnalysis<CustomOp> vpga(cast<CustomOp>(op));
+            if (!vpga.getVerifierResult()) {
+                return failure();
+            }
+        }
+        else if (isa<StaticCustomOp>(op)) {
+            VerifyParentGateAndNameAnalysis<StaticCustomOp> vpga(cast<StaticCustomOp>(op));
             if (!vpga.getVerifierResult()) {
                 return failure();
             }
@@ -151,12 +192,14 @@ namespace quantum {
 
 void populateSelfInversePatterns(RewritePatternSet &patterns)
 {
+    patterns.add<ChainedNamedHermitianStaticOpRewritePattern>(patterns.getContext(), 1);
     patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
 
     // TODO: better organize the quantum dialect
     // There is an interface `QuantumGate` for all the unitary gate operations,
     // but interfaces cannot be accepted by pattern matchers, since pattern
     // matchers require the target operations to have concrete names in the IR.
+    patterns.add<ChainedUUadjOpRewritePattern<StaticCustomOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<CustomOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<MultiRZOp>>(patterns.getContext(), 1);

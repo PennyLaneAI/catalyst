@@ -305,7 +305,7 @@ class QFuncPlxprInterpreter:
                 *wires,
                 *invals,
                 op=eqn.primitive.name,
-                params_len=len(eqn.invars) - eqn.params["n_wires"],
+                ctrl_value_len=0,
                 **kwargs,
             )
 

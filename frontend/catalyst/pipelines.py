@@ -169,6 +169,8 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         "split-multiple-tapes",
         # Run the transform sequence defined in the MLIR module
         "builtin.module(apply-transform-sequence)",
+        # Lower the static custom ops to regular custom ops with dynamic parameters.
+        "static-custom-lowering",
         # Nested modules are something that will be used in the future
         # for making device specific transformations.
         # Since at the moment, nothing in the runtime is using them

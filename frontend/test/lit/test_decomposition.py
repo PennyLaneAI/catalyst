@@ -133,10 +133,8 @@ def test_decompose_s():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_decompose_s
     def decompose_s():
-        # CHECK-NOT: name="S"
-        # CHECK: [[pi_div_2:%.+]] = arith.constant 1.57079{{.+}} : f64
         # CHECK-NOT: name = "S"
-        # CHECK: {{%.+}} = quantum.custom "PhaseShift"([[pi_div_2]])
+        # CHECK: {{%.+}} = quantum.static_custom "PhaseShift" [1.570796e+00]
         # CHECK-NOT: name = "S"
         qml.S(wires=0)
         return measure(wires=0)

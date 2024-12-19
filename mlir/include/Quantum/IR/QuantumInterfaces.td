@@ -164,6 +164,23 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
     }];
 }
 
+def StaticGate : OpInterface<"StaticGate", [QuantumGate]> {
+    let description = [{
+        This interface provides a generic way to interact with quantum
+        instructions with static parameters (known at runtime). These parameters
+        are specified by a set of constant literals in the form of an array attribute.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return all operands which are considered gate parameters.",
+            "mlir::DenseF64ArrayAttr", "getAllParams"
+        >,
+    ];
+}
+
 def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
     let description = [{
         This interface provides a generic way to interact with parametrized

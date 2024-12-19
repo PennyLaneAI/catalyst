@@ -691,12 +691,14 @@ def trace_quantum_operations(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = qinst_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+            qubits2 = bind_flexible_primitive(
+                qinst_p,
+                {"static_params": op.parameters},
+                *[*qubits, *controlled_qubits, *controlled_values],
                 op=op.name,
                 qubits_len=len(qubits),
-                params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])

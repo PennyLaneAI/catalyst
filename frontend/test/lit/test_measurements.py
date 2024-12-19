@@ -38,7 +38,7 @@ try:
     def sample1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        # COM: CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
@@ -54,7 +54,7 @@ try:
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        # COM: CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs1:%.+]] = quantum.namedobs [[q1]][ PauliX]
@@ -77,7 +77,7 @@ def sample3(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
@@ -145,7 +145,7 @@ try:
     def counts1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        # COM: CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
@@ -160,7 +160,7 @@ try:
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
+        # COM: CHECK: [[q0:%.+]] = "quantum.static_custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
@@ -183,7 +183,7 @@ def counts3(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
@@ -228,7 +228,7 @@ print(test_counts_dynamic.mlir)
 def expval1(x: float, y: float):
     qml.RX(x, wires=0)
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -247,7 +247,7 @@ def expval2(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     # CHECK: [[p1:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -304,7 +304,7 @@ def expval5(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     B = np.array(
@@ -334,7 +334,7 @@ def expval5(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     coeffs = np.array([0.2, -0.543])
@@ -426,7 +426,7 @@ def expval9(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     # CHECK: [[p1:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -448,7 +448,7 @@ def expval10(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     B = np.array(
@@ -476,7 +476,7 @@ print(expval10.mlir)
 def var1(x: float, y: float):
     qml.RX(x, wires=0)
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -519,7 +519,7 @@ def probs1(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # qml.probs()  # unsupported by PennyLane
@@ -540,7 +540,7 @@ def state1(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # qml.state(wires=[0])  # unsupported by PennyLane
