@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(disentangle-CNOT{func-name=circuit}))" --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(disentangle-CNOT))" --split-input-file --verify-diagnostics | FileCheck %s
 
 
 // Explicit unit tests for all CNOT disentangling table entries

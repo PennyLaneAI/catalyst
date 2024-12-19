@@ -46,17 +46,6 @@ struct PropagateSimpleStatesTesterPass
 
     void runOnOperation() override
     {
-        LLVM_DEBUG(dbgs() << "propagate simple states pass"
-                          << "\n");
-
-        func::FuncOp func = cast<func::FuncOp>(getOperation());
-        if (func.getSymName() != FuncNameOpt) {
-            // not the function to run the pass on
-            return;
-        }
-
-        ///////////////////////////
-
         PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
         llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
 
