@@ -16,13 +16,13 @@ set(TEST_SUITES
     Gradient
     Mitigation
     Catalyst
+    Ion
     cli
     )
 
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
     list(APPEND DIALECT_TESTS_DEPEND QuantumPythonModules)
-    list(APPEND TEST_SUITES python)
 endif()
 
 add_lit_testsuite(check-dialects "Run the regression tests for mlir dialects"

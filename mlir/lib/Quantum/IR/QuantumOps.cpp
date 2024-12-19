@@ -229,6 +229,7 @@ LogicalResult HermitianOp::verify()
 LogicalResult SampleOp::verify()
 {
     std::optional<size_t> numQubits = 0;
+
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
@@ -237,25 +238,13 @@ LogicalResult SampleOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
-    if (getObs().getDefiningOp<ComputationalBasisOp>() &&
-        failed(verifyTensorResult(toVerify, getShots(), numQubits.value()))) {
-        // In the computational basis, Pennylane adds a second dimension for the number of qubits.
-        return emitOpError("return tensor must have 2D static shape equal to "
-                           "(number of shots, number of qubits in observable)");
-    }
-    else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
-             failed(verifyTensorResult(toVerify, getShots()))) {
-        // For any given observables, Pennylane always returns a 1D tensor.
-        return emitOpError("return tensor must have 1D static shape equal to (number of shots)");
-    }
-
     return success();
 }
 
 LogicalResult CountsOp::verify()
 {
     std::optional<size_t> numQubits = 0;
+
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }

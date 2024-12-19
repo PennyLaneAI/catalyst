@@ -7,7 +7,9 @@ add_mlir_public_c_api_library(QuantumCAPI
     MLIRQuantum
     quantum-transforms
     MLIRGradient
-    MLIRCatalyst
     gradient-transforms
     MLIRMitigation
+    mitigation-transforms
+    MLIRIon
+    ion-transforms
 )

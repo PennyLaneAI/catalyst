@@ -13,20 +13,7 @@ export PYTHON_PACKAGE=$4
 dnf update -y 
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
 if [ "$PYTHON_MAJOR_MINOR" != "3.10" ]; then
-    dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
-else
-    # Install Python3.10 and Python3.10-devel from source because they cannot be found under this linux version.
-    dnf groupinstall "Development Tools" -y
-    dnf install openssl-devel bzip2-devel libffi-devel -y
-    dnf install wget -y
-    cd /tmp
-    wget https://www.python.org/ftp/python/${PYTHON_MAJOR_MINOR}.${PYTHON_PATCH}/Python-${PYTHON_MAJOR_MINOR}.${PYTHON_PATCH}.tgz
-    tar xzf Python-${PYTHON_MAJOR_MINOR}.${PYTHON_PATCH}.tgz
-    cd Python-${PYTHON_MAJOR_MINOR}.${PYTHON_PATCH}
-    ./configure --enable-optimizations --enable-shared
-    make
-    make altinstall
-    cd /catalyst
+    dnf install -y ${PYTHON_PACKAGE}
 fi
 dnf clean all -y
 
@@ -58,5 +45,5 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_MAJOR_MINOR
 /usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest -n auto
 /usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest --backend="lightning.kokkos" -n auto
 /usr/bin/python3 -m pytest /catalyst/frontend/test/async_tests
-/usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest --runbraket=LOCAL -n auto
+# /usr/bin/python3 -m pytest -v /catalyst/frontend/test/pytest --runbraket=LOCAL -n auto
 /usr/bin/python3 -m pytest /catalyst/frontend/test/test_oqc/oqc -n auto

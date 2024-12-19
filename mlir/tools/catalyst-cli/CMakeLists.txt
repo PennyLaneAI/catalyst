@@ -32,6 +32,8 @@ set(LIBS
     gradient-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRIon
+    ion-transforms
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest
@@ -40,7 +42,8 @@ set(LIBS
     CatalystCompilerDriver
 )
 
-add_llvm_executable(catalyst-cli catalyst-cli.cpp)
+add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)
 target_link_libraries(catalyst-cli PRIVATE ${LIBS})
 llvm_update_compile_flags(catalyst-cli)
 mlir_check_all_link_libraries(catalyst-cli)
+export_executable_symbols_for_plugins(catalyst-cli)

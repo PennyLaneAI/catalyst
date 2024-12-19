@@ -94,7 +94,7 @@ class TestShotVector:
         with pytest.raises(
             NotImplementedError,
             match=re.escape(
-                "Measurement expval is not supported a shot-vector. Use qml.sample() instead."
+                "Measurement ExpectationMP is not supported a shot-vector. Use qml.sample() instead."
             ),
         ):
 
@@ -109,7 +109,7 @@ class TestShotVector:
         with pytest.raises(
             NotImplementedError,
             match=re.escape(
-                "Measurement var is not supported a shot-vector. Use qml.sample() instead."
+                "Measurement VarianceMP is not supported a shot-vector. Use qml.sample() instead."
             ),
         ):
 
@@ -124,7 +124,7 @@ class TestShotVector:
         with pytest.raises(
             NotImplementedError,
             match=re.escape(
-                "Measurement probs is not supported a shot-vector. Use qml.sample() instead."
+                "Measurement ProbabilityMP is not supported a shot-vector. Use qml.sample() instead."
             ),
         ):
 

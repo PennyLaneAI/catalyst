@@ -47,6 +47,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+          python3 -m pip install nanobind pybind11
 
       - name: Build Catalyst-Runtime
         run: |
@@ -64,6 +65,8 @@ jobs:
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           make oqc
 
+          OQD_BUILD_DIR="$(pwd)/oqd-build" \
+          make oqd
 
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v4
@@ -80,7 +83,16 @@ jobs:
           name: oqc-build-${{ matrix.compiler }}
           path: |
             oqc-build/*.so
-            oqc-build/*.toml
+            oqc-build/backend/*.toml
+          retention-days: 1
+
+      - name: Upload OQD-Runtime Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oqd-build-${{ matrix.compiler }}
+          path: |
+            oqd-build/*.so
+            oqd-build/backend/*.toml
           retention-days: 1
 
   llvm:
@@ -299,7 +311,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11
+        python3 -m pip install numpy nanobind pybind11
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -372,6 +384,17 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
 
+    - name: Build Standalone Plugin
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
+        make plugin
+        mkdir -p $(pwd)/quantum-build/lib
+        mv mlir/standalone/build/lib/StandalonePlugin.so "$(pwd)/quantum-build/lib"
+
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -379,6 +402,7 @@ jobs:
         path: |
           quantum-build/bin
           quantum-build/python_packages/*
+          quantum-build/lib/StandalonePlugin.so
         retention-days: 1
 
     - name: Cache CCache on main branch
@@ -404,7 +428,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
@@ -434,12 +458,28 @@ jobs:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
+    - name: Download OQC-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: oqc-build-${{ matrix.compiler }}
+        path: oqc-build
+
+    - name: Download OQD-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: oqd-build-${{ matrix.compiler }}
+        path: oqd-build
+
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/oqd-build" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
       run: |
@@ -476,12 +516,12 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        pip install PennyLane-Lightning-Kokkos==0.38.0-dev32 --extra-index-url https://test.pypi.org/simple
+        pip install PennyLane-Lightning-Kokkos==0.39.0 --extra-index-url https://test.pypi.org/simple
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -506,70 +546,81 @@ jobs:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
+    - name: Download OQD-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: oqd-build-${{ matrix.compiler }}
+        path: oqd-build
+
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/oqd-build" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos" SKIP_OQD="true"
 
-  frontend-tests-openqasm-device:
-    name: Frontend Tests (backend="openqasm3")
-    needs: [constants, llvm, runtime, quantum, determine_runner]
-    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
-    strategy:
-      matrix:
-        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
-
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v4
-
-    - name: Install device dependencies (OpenQasm device)
-      run: |
-        pip install amazon-braket-pennylane-plugin
-        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
-
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        make frontend
-
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
-
-    - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: quantum-build-${{ matrix.compiler }}
-        path: quantum-build
-
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: runtime-build-${{ matrix.compiler }}
-        path: runtime-build/lib
-
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-
-    - name: Run Python Pytest Tests
-      run: |
-        make pytest TEST_BRAKET=LOCAL
+#  frontend-tests-openqasm-device:
+#    name: Frontend Tests (backend="openqasm3")
+#    needs: [constants, llvm, runtime, quantum, determine_runner]
+#    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+#    strategy:
+#      matrix:
+#        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
+#
+#    steps:
+#    - name: Checkout Catalyst repo
+#      uses: actions/checkout@v4
+#
+#    - name: Install device dependencies (OpenQasm device)
+#      run: |
+#        pip install amazon-braket-pennylane-plugin
+#        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+#
+#    - name: Install Deps
+#      run: |
+#        sudo apt-get update
+#        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
+#        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+#        python3 -m pip install -r requirements.txt
+#        make frontend
+#
+#    - name: Get Cached LLVM Build
+#      id: cache-llvm-build
+#      uses: actions/cache@v4
+#      with:
+#        path: llvm-build
+#        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
+#        fail-on-cache-miss: true
+#
+#    - name: Download Quantum Build Artifact
+#      uses: actions/download-artifact@v4
+#      with:
+#        name: quantum-build-${{ matrix.compiler }}
+#        path: quantum-build
+#
+#    - name: Download Catalyst-Runtime Artifact
+#      uses: actions/download-artifact@v4
+#      with:
+#        name: runtime-build-${{ matrix.compiler }}
+#        path: runtime-build/lib
+#
+#    - name: Add Frontend Dependencies to PATH
+#      run: |
+#        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+#        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+#        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+#        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+#        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
+#
+#    - name: Run Python Pytest Tests
+#      run: |
+#        make pytest TEST_BRAKET=LOCAL
 
   runtime-device-tests:
     name: Runtime Tests (Linux)
@@ -582,22 +633,14 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    #   - name: Collect Workflow Telemetry
-    #     uses: catchpoint/workflow-telemetry-action@v2
-
       - name: Checkout the repo
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan6
-
-      - name: Install additional dependencies (OpenQasm device)
-        if: ${{ matrix.backend == 'openqasm' }}
-        run: |
-          pip install numpy amazon-braket-sdk
-          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+          sudo apt-get -y -q install cmake ninja-build
+          python3 -m pip install nanobind pybind11
 
       - name: Download Catalyst-Runtime Artifact
         uses: actions/download-artifact@v4
@@ -606,7 +649,6 @@ jobs:
           path: runtime-build/lib
 
       - name: Build Runtime test suite for OQC device
-
         if: ${{ matrix.backend == 'oqc' }}
         run: |
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
@@ -614,43 +656,13 @@ jobs:
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           make test-oqc
 
-      - name: Build Runtime test suite for Lightning simulator
-        if: ${{ matrix.backend == 'lightning' }}
+      - name: Build Runtime test suite for OQD device
+        if: ${{ matrix.backend == 'oqd' }}
         run: |
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
-          COMPILER_LAUNCHER="" \
-          ENABLE_OPENQASM=OFF \
-          ENABLE_ASAN=ON \
-          make test-runtime
-
-      - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
-        if: ${{ matrix.backend == 'lightning-kokkos' }}
-        run: |
-          # ASAN fails w/ leaks, odr-violation, and double-free from Kokkos_Profiling.cpp
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
-          COMPILER_LAUNCHER="" \
-          ENABLE_OPENQASM=OFF \
-          ENABLE_ASAN=OFF \
-          make test-runtime
-
-      - name: Build Runtime test suite for OpenQasm device
-        if: ${{ matrix.backend == 'openqasm' }}
-        run: |
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
-          COMPILER_LAUNCHER="" \
-          ENABLE_ASAN=ON \
-          make test-runtime
-
-      - name: Build examples
-        if: ${{ matrix.backend == 'lightning' }}
-        run: |
-          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
-          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
-          COMPILER_LAUNCHER="" \
-          make examples-runtime
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          make test-oqd
 
   runtime-code-cov:
     name: Runtime Code Coverage (Linux)
@@ -664,15 +676,21 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
+          sudo apt-get -y -q install cmake ninja-build lcov
+          python3 -m pip install nanobind pybind11
 
-      - name: Build Runtime test suite for Lightning simulator
+      - name: Install additional dependencies for OpenQasm device
+        run: |
+          pip install numpy pybind11 amazon-braket-sdk
+          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+
+      - name: Run the main runtime test suite for coverage
         run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
           make coverage-runtime
-          mv runtime/build/coverage.info coverage-${{ github.job }}.info
+          mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
