@@ -194,5 +194,5 @@ William Maxwell
 Romain Moyard,
 Shuli Shu,
 Raul Torres,
-Paul Haochen Wang
+Paul Haochen Wang,
 Ritu Thombre.
