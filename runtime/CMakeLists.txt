@@ -67,7 +67,7 @@ FetchContent_Declare(
 # and requires libpython.so to be available on the system.
 find_package(Python REQUIRED
     COMPONENTS Interpreter Development.Module
-    OPTIONAL_COMPONENTS Development.Embed
+    OPTIONAL_COMPONENTS Development.Embed Development.SABIModule
 )
 
 if(RUNTIME_ENABLE_WARNINGS)
