@@ -916,13 +916,22 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
+def _gphase_abstract_eval(
+    *qubits_or_params,
+    ctrl_len=0,
+    ctrl_value_len=0,
+    adjoint=False,
+    static_params=None,
+):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
-    param = qubits_or_params[0]
+    if not static_params:
+        param = qubits_or_params[-1]
+    else:
+        param = static_params[0]
     assert not isinstance(param, AbstractQbit)
-    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    ctrl_qubits = qubits_or_params[:ctrl_len]
     for idx in range(ctrl_len):
         qubit = ctrl_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -936,21 +945,36 @@ def _gphase_def_impl(*args, **kwargs):
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, ctrl_len=0, adjoint=False
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params,
+    ctrl_len=0,
+    ctrl_value_len=0,
+    adjoint=False,
+    static_params=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    param = qubits_or_params[0]
-    ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
-    ctrl_values = qubits_or_params[1 + ctrl_len :]
+    ctrl_qubits = qubits_or_params[:ctrl_len]
+    ctrl_values = qubits_or_params[ctrl_len : ctrl_len + ctrl_value_len]
+    param = qubits_or_params[ctrl_len + ctrl_value_len :]
+    param = None if len(param) == 0 else param[0]
 
-    param = safe_cast_to_f64(param, "GlobalPhase")
-    param = extract_scalar(param, "GlobalPhase")
+    param_attr = (
+        None
+        if not static_params
+        else ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+    )
 
-    assert ir.F64Type.isinstance(
-        param.type
-    ), "Only scalar double parameters are allowed for quantum gates!"
+    assert bool(param_attr) != bool(param)
+
+    if not param_attr:
+        param = safe_cast_to_f64(param, "GlobalPhase")
+        param = extract_scalar(param, "GlobalPhase")
+
+        assert ir.F64Type.isinstance(
+            param.type
+        ), "Only scalar double parameters are allowed for quantum gates!"
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -963,6 +987,7 @@ def _gphase_lowering(
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
         adjoint=adjoint,
+        static_params=param_attr,
     )
     return ctrl_qubits
 
@@ -972,13 +997,17 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    ctrl_len=0,
+    ctrl_value_len=0,
+    adjoint=False,
+    static_params=None,
 ):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, params*, ctrl_qubits*, ctrl_values*
-    qubits = qubits_or_params[:qubits_len]
-    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
-    all_qubits = qubits + ctrl_qubits
+    # qubits*, ctrl_qubits*, ctrl_values*, params*
+    all_qubits = qubits_or_params[: qubits_len + ctrl_len]
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -996,17 +1025,18 @@ def _qinst_lowering(
     *qubits_or_params,
     op=None,
     qubits_len=0,
-    params_len=0,
     ctrl_len=0,
+    ctrl_value_len=0,
     adjoint=False,
+    static_params=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len : qubits_len + params_len]
-    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
-    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+    ctrl_qubits = qubits_or_params[qubits_len : qubits_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + ctrl_len : qubits_len + ctrl_len + ctrl_value_len]
+    params = qubits_or_params[qubits_len + ctrl_len + ctrl_value_len :]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -1029,13 +1059,23 @@ def _qinst_lowering(
         p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
         ctrl_values_i1.append(p)
 
+    params_attr = (
+        None
+        if not static_params
+        else ir.ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
+    )
+    if len(float_params) > 0:
+        assert (
+            params_attr is None
+        ), "Static parameters are not allowed when having dynamic parameters"
+
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
     if name_str == "MultiRZ":
-        assert len(float_params) == 1, "MultiRZ takes one float parameter"
-        float_param = float_params[0]
+        assert len(float_params) <= 1, "MultiRZ takes at most one dynamic float parameter"
+        float_param = None if len(float_params) == 0 else float_params[0]
         return MultiRZOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -1044,6 +1084,7 @@ def _qinst_lowering(
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
+            static_params=params_attr,
         ).results
 
     return CustomOp(
@@ -1055,6 +1096,7 @@ def _qinst_lowering(
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
         adjoint=adjoint,
+        static_params=params_attr,
     ).results
 
 
@@ -1062,7 +1104,9 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
+def _qunitary_abstract_eval(
+    matrix, *qubits, qubits_len=0, ctrl_len=0, ctrl_value_len=0, adjoint=False
+):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -1080,6 +1124,7 @@ def _qunitary_lowering(
     *qubits_or_controlled: tuple,
     qubits_len=0,
     ctrl_len=0,
+    ctrl_value_len=0,
     adjoint=False,
 ):
     qubits = qubits_or_controlled[:qubits_len]
