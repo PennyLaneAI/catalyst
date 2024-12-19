@@ -20,7 +20,7 @@
 
 // CHECK: func.func private @circuit()
   func.func private @circuit() -> f64 {
-  	%cst = arith.constant 3.140000e+00 : f64
+    %cst = arith.constant 1.230000e+00 : f64
     %_ = quantum.alloc( 2) : !quantum.reg
     %ZERO_0 = quantum.extract %_[ 0] : !quantum.reg -> !quantum.bit
     %ZERO_1 = quantum.extract %_[ 1] : !quantum.reg -> !quantum.bit
