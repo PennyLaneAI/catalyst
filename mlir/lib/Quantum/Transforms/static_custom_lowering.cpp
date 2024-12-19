@@ -21,6 +21,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -44,9 +45,10 @@ struct StaticCustomLoweringPass : impl::StaticCustomLoweringPassBase<StaticCusto
         auto &context = getContext();
         RewritePatternSet patterns(&context);
         ConversionTarget target(context);
-
+        
+        target.addLegalOp<CustomOp>();
+        target.addLegalOp<mlir::arith::ConstantOp>();
         target.addIllegalOp<StaticCustomOp>();
-        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
         populateStaticCustomPatterns(patterns);
 
