@@ -73,6 +73,12 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
         PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
         llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
 
+        if (EmitFSMStateRemark) {
+            for (auto it = qubitValues.begin(); it != qubitValues.end(); ++it) {
+                it->first.getDefiningOp()->emitRemark(pssa.QubitState2String(it->second));
+            }
+        }
+
         func->walk([&](quantum::CustomOp op) {
             StringRef gate = op.getGateName();
             if (gate != "CNOT") {
