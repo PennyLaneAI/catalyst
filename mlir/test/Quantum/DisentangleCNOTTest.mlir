@@ -200,5 +200,18 @@
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[_24]]#0, [[_24]]#1 : !quantum.bit, !quantum.bit
 
 
+    %true = arith.constant true
+    // CHECK: scf.if
+    %scf_res = scf.if %true -> !quantum.bit {
+        %ZERO_0_in_if = quantum.extract %_[ 0] : !quantum.reg -> !quantum.bit
+
+        // CHECK: quantum.custom "CNOT"
+        %25:2 = quantum.custom "CNOT"() %ZERO_0_in_if, %OTHERS_1 : !quantum.bit, !quantum.bit
+        %user_25:2 = quantum.custom "CRZ"(%cst) %25#0, %25#1 : !quantum.bit, !quantum.bit
+        scf.yield %user_25#0 : !quantum.bit
+    } else {
+        scf.yield %ZERO_0 : !quantum.bit
+    }
+
     return %cst : f64
   }

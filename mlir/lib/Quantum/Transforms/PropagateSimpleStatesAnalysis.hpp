@@ -108,27 +108,49 @@ class PropagateSimpleStatesAnalysis {
     PropagateSimpleStatesAnalysis(Operation *target)
     {
         // `target` is a qnode function
-        target->walk([&](Operation *op) {
+        // We restrict the analysis to gates at the top-level body of the function
+        // This is so that gates inside nested regions, like control flows, are not valid targets
+        // e.g.
+        //   func.func circuit() {
+        //      %0 = |0>
+        //      %1 = scf.if (condition) {
+        //          true:  Hadamard
+        //          false: PauliZ
+        //      }
+        //   }
+        // since depending on the control flow path, %1 can be in multiple different states
+
+        // Two kinds of operations produce qubit values: extract ops and custom ops
+        // For extract ops, if its operand is a alloc op directly, then it's a starting qubit and is
+        // in |0>. Then the FSM propagates the states through the custom op gates
+
+        target->walk([&](quantum::ExtractOp op) {
+            // Do not analyze any operations in invalid ops or regions.
+            // The only valid ops are the custom/extract ops whose immediate parent is the qnode
+            // function. With this, we skip over regions like control flow.
+            if (!isImmediateChild(op, target)) {
+                return;
+            }
+
+            // starting qubits are in |0>
+            // We restrict "starting qubits" to those who are extracted immediately from alloc ops
+            if (isa<quantum::AllocOp>(op->getOperand(0).getDefiningOp())) {
+                qubitValues[op->getResult(0)] = QubitState::ZERO;
+                return;
+            }
+        });
+
+        target->walk([&](quantum::CustomOp op) {
+            if (!isImmediateChild(op, target)) {
+                return;
+            }
+
             if (op->getNumResults() != 1) {
                 // restrict to single-qubit gates
                 return;
             }
 
             Value res = op->getResult(0);
-            if (!isa<quantum::QubitType>(res.getType())) {
-                // not a qubit value
-                return;
-            }
-
-            // starting qubits are in |0>
-            // We restrict "starting qubits" to those who are extracted immediately from alloc ops
-            if (isa<quantum::ExtractOp>(op) &&
-                isa<quantum::AllocOp>(op->getOperand(0).getDefiningOp())) {
-                qubitValues[res] = QubitState::ZERO;
-                return;
-            }
-
-            assert(isa<quantum::CustomOp>(op));
 
             // takes in parameters other than the parent qubit
             // e.g. the rotation angle
@@ -233,6 +255,13 @@ class PropagateSimpleStatesAnalysis {
     // It is a map of the form
     // <mlir Value representing a qubit, its abstract QubitState>
     llvm::DenseMap<Value, QubitState> qubitValues;
+
+    bool isImmediateChild(Operation *op, Operation *ancestor)
+    {
+        // returns true if op is an immediate child of ancestor,
+        // with no extra operations in between
+        return op->getParentOp() == ancestor;
+    }
 };
 
 } // namespace catalyst
