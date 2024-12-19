@@ -25,7 +25,7 @@ execute_process(
 )
 find_package(nanobind CONFIG REQUIRED)
 
-# Create the Python `catalyst_callback_registry` module
+# Create the Python `openqasm_python_module` module
 # Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
 # built (`STABLE_ABI` does nothing on older Python versions).
 nanobind_add_module(openqasm_python_module STABLE_ABI openqasm_python_module.cpp)
