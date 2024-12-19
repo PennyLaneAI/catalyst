@@ -84,6 +84,11 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
             Value controlOut = op->getResult(0);
             Value targetOut = op->getResult(1);
 
+            // Do nothing if the inputs states are not tracked
+            if (!qubitValues.contains(controlIn) || !qubitValues.contains(targetIn)) {
+                return;
+            }
+
             // |0> control, always do nothing
             if (pssa.isZero(qubitValues[controlIn])) {
                 controlOut.replaceAllUsesWith(controlIn);
