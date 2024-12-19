@@ -10,12 +10,6 @@ set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(PYTHON_VERSION_TO_FIND "3" CACHE STRING "Python version to find and use")
-
-find_package(Python ${PYTHON_VERSION_TO_FIND} EXACT
-    REQUIRED COMPONENTS Interpreter Development.Module
-    OPTIONAL_COMPONENTS Development.SABIModule)
-
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
 # slowly and produce large binaries.
@@ -25,14 +19,14 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Detect the installed nanobind package and import it into CMake
+# Locate nanobind
 execute_process(
-    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-    OUTPUT_VARIABLE nanobind_ROOT OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+    COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
+    OUTPUT_VARIABLE nanobind_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 find_package(nanobind CONFIG REQUIRED)
 
-# Create the Python `catalyst_callback_registry` module
+# Create the Python `oqc_python_module` module
 # Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
 # built (`STABLE_ABI` does nothing on older Python versions).
 nanobind_add_module(oqc_python_module STABLE_ABI oqc_python_module.cpp)
