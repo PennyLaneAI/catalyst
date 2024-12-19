@@ -19,6 +19,27 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Note on pybind11 vs python discovery order:
+# If Python is looked for first, then we have to look for all the components needed by pybind11.
+# In particular, if pybind11::embed is used, then we need to find both headers (Development.Module)
+# and the shared library (Development.Embed) before pybind11 is discovered.
+# With the other order PyBind will discover everything it needs.
+# Note on flags:
+# - PYTHON_EXECUTABLE is a pybind11 specific flag used by its own (legacy) Python discovery process,
+#   it will not affect find_package(Python) calls.
+# - Python_EXECUTABLE is a cmake flag used in find_package(Python) to guide the discovery.
+# Note that pybind11 can be made to use find_python (instead of its legacy discovery), and thus
+# respect Python_EXECUTABLE), via the PYBIND11_FINDPYTHON flag.
+
+# Here, we look for the desired Python version early to avoid any problems with mismatched packages.
+# The desired Python environment should be specified ahead of time via -DPython_EXECUTABLE=...
+# The optional component is only used for the C++ test suite (to spin up its own interpreter),
+# and requires libpython.so to be available on the system.
+find_package(Python REQUIRED
+    COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.Embed
+)
+
 # Locate nanobind
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
