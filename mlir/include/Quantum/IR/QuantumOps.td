@@ -459,8 +459,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 def StaticCustomOp : UnitaryGate_Op<"static_custom", [NoMemoryEffect,
                                                       AttrSizedOperandSegments, 
                                                       AttrSizedResultSegments]> {
-    let summary = "A generic quantum gate on n qubits with static parameters in the form of a 
-                   DenseF64ArrayAttr.";
+    let summary = "A generic quantum gate with static parameters in form of a DenseF64ArrayAttr.";
     let description = [{
         This operation represents a quantum gate with parameters defined statically as a
         DenseF64ArrayAttr, rather than passed dynamically as operands. This is useful for gates

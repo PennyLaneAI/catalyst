@@ -40,11 +40,17 @@ struct StaticCustomLoweringPass : impl::StaticCustomLoweringPassBase<StaticCusto
     {
         LLVM_DEBUG(dbgs() << "static custom op lowering pass"
                           << "\n");
+        auto module = getOperation();
+        auto &context = getContext();
+        RewritePatternSet patterns(&context);
+        ConversionTarget target(context);
 
-        RewritePatternSet patterns(&getContext());
+        target.addIllegalOp<StaticCustomOp>();
+        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+
         populateStaticCustomPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

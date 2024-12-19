@@ -14,10 +14,9 @@
 
 #define DEBUG_TYPE "static-custom"
 
-#include "mlir/IR/PatternMatch.h"
-
 #include "Quantum/IR/QuantumOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "llvm/Support/Debug.h"
 
 using llvm::dbgs;
@@ -26,10 +25,12 @@ using namespace catalyst::quantum;
 
 namespace {
 
-struct LowerStaticCustomOp : public OpRewritePattern<StaticCustomOp> {
-    using OpRewritePattern::OpRewritePattern;
+struct LowerStaticCustomOp : public OpConversionPattern<StaticCustomOp> {
+    using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(StaticCustomOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(StaticCustomOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+
     {
         LLVM_DEBUG(dbgs() << "Lowering the following static custom operation:\n" << op << "\n");
         SmallVector<Value, 4> paramValues;
