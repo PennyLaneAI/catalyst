@@ -17,6 +17,7 @@ endif()
 # Locate Python & nanobind
 find_package(Python REQUIRED
     COMPONENTS Interpreter Development.Module NumPy
+    OPTIONAL_COMPONENTS Development.SABIModule
 )
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
