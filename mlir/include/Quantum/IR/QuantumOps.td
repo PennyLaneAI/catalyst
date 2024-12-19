@@ -457,6 +457,45 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasCanonicalizeMethod = 1;
 }
 
+def StaticCustomOp : UnitaryGate_Op<"static_custom", [NoMemoryEffect,
+                                                      AttrSizedOperandSegments, 
+                                                      AttrSizedResultSegments]> {
+    let summary = "A generic quantum gate with static parameters in form of a DenseF64ArrayAttr.";
+    let description = [{
+        This operation represents a quantum gate with parameters defined statically as a
+        DenseF64ArrayAttr, rather than passed dynamically as operands. This is useful for gates
+        with parameters known at compile-time.
+    }];
+
+    let arguments = (ins
+        DenseF64ArrayAttr:$static_params,
+        Variadic<QubitType>:$in_qubits,
+        StrAttr:$gate_name,
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $gate_name $static_params $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) 
+        (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        llvm::ArrayRef<double> getAllParams() {
+            return getStaticParams();
+        }
+    }];
+    let hasCanonicalizeMethod = 1;
+}
+
+
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
     let description = [{

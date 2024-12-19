@@ -31,6 +31,7 @@ void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
 {
     pm.addPass(catalyst::createSplitMultipleTapesPass());
     pm.addPass(catalyst::createApplyTransformSequencePass());
+    pm.addPass(catalyst::createStaticCustomLoweringPass());
     pm.addPass(catalyst::createInlineNestedModulePass());
 }
 void createHloLoweringPipeline(OpPassManager &pm)

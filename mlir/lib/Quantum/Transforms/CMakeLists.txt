@@ -19,6 +19,8 @@ file(GLOB SRC
     DisentangleCNOT.cpp
     ions_decompositions.cpp
     IonsDecompositionPatterns.cpp
+    static_custom_lowering.cpp
+    StaticCustomPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

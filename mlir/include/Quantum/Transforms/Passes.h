@@ -32,5 +32,6 @@ std::unique_ptr<mlir::Pass> createMergeRotationsPass();
 std::unique_ptr<mlir::Pass> createPropagateSimpleStatesTesterPass();
 std::unique_ptr<mlir::Pass> createDisentangleCNOTPass();
 std::unique_ptr<mlir::Pass> createIonsDecompositionPass();
+std::unique_ptr<mlir::Pass> createStaticCustomLoweringPass();
 
 } // namespace catalyst
