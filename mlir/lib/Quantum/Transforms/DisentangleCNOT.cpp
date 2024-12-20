@@ -39,19 +39,6 @@ namespace catalyst {
 struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
     using impl::DisentangleCNOTPassBase<DisentangleCNOTPass>::DisentangleCNOTPassBase;
 
-    quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
-                                             const Value &outQubit, mlir::IRRewriter &builder,
-                                             Location &loc, const quantum::CustomOp &originalCNOT)
-    {
-        OpBuilder::InsertionGuard insertionGuard(builder);
-        builder.setInsertionPointAfter(originalCNOT);
-        quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc, /*gate_name=*/gateName,
-                                              /*in_qubits=*/mlir::ValueRange({inQubit}));
-
-        return newGate;
-    }
-
     bool canScheduleOn(RegisteredOperationName opInfo) const override
     {
         return opInfo.hasInterface<FunctionOpInterface>();
@@ -107,8 +94,10 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                     return;
                 }
                 else {
-                    quantum::CustomOp xgate =
-                        createSimpleOneBitGate("PauliX", targetIn, targetOut, builder, loc, op);
+                    builder.setInsertionPoint(op);
+                    quantum::CustomOp xgate = builder.create<quantum::CustomOp>(
+                        loc, /*gate_name=*/"PauliX",
+                        /*in_qubits=*/mlir::ValueRange({targetIn}));
                     targetOut.replaceAllUsesWith(xgate->getResult(0));
                     op->erase();
                     return;
@@ -134,8 +123,10 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                     return;
                 }
                 else {
-                    quantum::CustomOp zgate =
-                        createSimpleOneBitGate("PauliZ", controlIn, controlOut, builder, loc, op);
+                    builder.setInsertionPoint(op);
+                    quantum::CustomOp zgate = builder.create<quantum::CustomOp>(
+                        loc, /*gate_name=*/"PauliZ",
+                        /*in_qubits=*/mlir::ValueRange({controlIn}));
                     controlOut.replaceAllUsesWith(zgate->getResult(0));
                     op->erase();
                     return;
