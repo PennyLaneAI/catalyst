@@ -46,15 +46,8 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(originalCNOT);
         quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
-                                              /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange(),
-                                              /*params=*/mlir::ValueRange(),
-                                              /*in_qubits=*/mlir::ValueRange({inQubit}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/nullptr,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange(),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+            builder.create<quantum::CustomOp>(loc, /*gate_name=*/gateName,
+                                              /*in_qubits=*/mlir::ValueRange({inQubit}));
 
         return newGate;
     }
