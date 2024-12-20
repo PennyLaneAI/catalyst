@@ -85,9 +85,7 @@ static std::map<QubitState, std::map<StringRef, QubitState>> QubitTransitions = 
          {"PauliX", QubitState::RIGHT},
          {"PauliY", QubitState::LEFT},
          {"PauliZ", QubitState::RIGHT},
-         // We leave in S+ to indicate the FSM structure
-         // The actual implementation is `quantum.custom "S"() %in {adjoint}`
-         //{"S+", QubitState::PLUS},
+         {"S+", QubitState::PLUS},
      }},
 
     {QubitState::RIGHT,
@@ -96,9 +94,7 @@ static std::map<QubitState, std::map<StringRef, QubitState>> QubitTransitions = 
          {"PauliX", QubitState::LEFT},
          {"PauliY", QubitState::RIGHT},
          {"PauliZ", QubitState::LEFT},
-         // We leave in S+ to indicate the FSM structure
-         // The actual implementation is `quantum.custom "S"() %in {adjoint}`
-         //{"S+", QubitState::MINUS},
+         {"S+", QubitState::MINUS},
      }},
 };
 
@@ -177,27 +173,9 @@ class PropagateSimpleStatesAnalysis {
 
             // A valid FSM transition gate
             // Special treatment for S+ gate from |L> and |R>
-            if ((isLeft(qubitValues[parent]) || isRight(qubitValues[parent])) && gate == "S") {
-                if (op->hasAttr("adjoint")) {
-                    switch (qubitValues[parent]) {
-                    case QubitState::LEFT:
-                        qubitValues[res] = QubitState::PLUS;
-                        break;
-                    case QubitState::RIGHT:
-                        qubitValues[res] = QubitState::MINUS;
-                        break;
-                    default:
-                        // this will never trigger as the switch is inside an if
-                        break;
-                    }
-                }
-                else {
-                    qubitValues[res] = QubitState::NOT_A_BASIS;
-                }
-                return;
+            if (gate == "S" && op->hasAttr("adjoint")) {
+                gate = "S+";
             }
-
-            // A valid FSM transition gate
             if (QubitTransitions[qubitValues[parent]].count(gate) == 1) {
                 qubitValues[res] = QubitTransitions[qubitValues[parent]][gate];
             }
