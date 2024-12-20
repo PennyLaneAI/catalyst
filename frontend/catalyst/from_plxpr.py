@@ -41,7 +41,6 @@ from catalyst.jax_primitives import (
     compbasis_p,
     counts_p,
     expval_p,
-    gphase_p,
     namedobs_p,
     probs_p,
     qalloc_p,
@@ -298,8 +297,6 @@ class QFuncPlxprInterpreter:
 
         if eqn.primitive.name == "QubitUnitary":
             outvals = qunitary_p.bind(*invals, *wires, **kwargs)
-        elif eqn.primitive.name == "GlobalPhase":
-            outvals = gphase_p.bind(*invals, ctrl_len=0, adjoint=False)
         else:
             outvals = qinst_p.bind(
                 *wires,
