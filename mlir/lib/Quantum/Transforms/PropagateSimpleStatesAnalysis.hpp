@@ -163,10 +163,9 @@ class PropagateSimpleStatesAnalysis {
             // get state from parent and gate
             StringRef gate = cast<quantum::CustomOp>(op).getGateName();
             Value parent = op->getOperand(0);
-            assert(qubitValues.contains(parent));
 
-            // non basis states stay as non basis states
-            if (qubitValues[parent] == QubitState::NOT_A_BASIS) {
+            // Unknown parent state, child state is thus also unknown
+            if (!qubitValues.contains(parent) || isOther(qubitValues[parent])) {
                 qubitValues[res] = QubitState::NOT_A_BASIS;
                 return;
             }
@@ -179,9 +178,7 @@ class PropagateSimpleStatesAnalysis {
 
             // A valid FSM transition gate
             // Special treatment for S+ gate from |L> and |R>
-            if (((qubitValues[parent] == QubitState::LEFT) ||
-                 (qubitValues[parent] == QubitState::RIGHT)) &&
-                (gate == "S")) {
+            if ((isLeft(qubitValues[parent]) || isRight(qubitValues[parent])) && gate == "S") {
                 if (op->hasAttr("adjoint")) {
                     switch (qubitValues[parent]) {
                     case QubitState::LEFT:
