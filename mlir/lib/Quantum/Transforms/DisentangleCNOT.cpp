@@ -27,7 +27,6 @@
 
 #include "PropagateSimpleStatesAnalysis.hpp"
 
-using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 

@@ -27,7 +27,6 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
-using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
