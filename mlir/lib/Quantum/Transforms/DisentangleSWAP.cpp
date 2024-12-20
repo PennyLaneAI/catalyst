@@ -139,16 +139,9 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     {
         LLVM_DEBUG(dbgs() << "disentangle SWAP pass\n");
 
-        func::FuncOp func = cast<func::FuncOp>(getOperation());
+        FunctionOpInterface func = cast<FunctionOpInterface>(getOperation());
         mlir::IRRewriter builder(func->getContext());
         Location loc = func->getLoc();
-
-        if (func.getSymName() != FuncNameOpt) {
-            // not the function to run the pass on
-            return;
-        }
-
-        ///////////////////////////
 
         PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
         llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();

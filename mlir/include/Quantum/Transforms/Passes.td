@@ -131,7 +131,11 @@ def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
     let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
 
     let constructor = "catalyst::createDisentangleSWAPPass()";
-    let options = QuantumCircuitTransformationPass.options;
+    let options = [
+    Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
+           "bool", /*default=*/"false",
+           "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
+    ];
 }
 
 // ----- Quantum circuit transformation passes end ----- //
