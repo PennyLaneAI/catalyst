@@ -17,8 +17,6 @@
 
 #define DEBUG_TYPE "disentangleswap"
 
-#include "PropagateSimpleStatesAnalysis.hpp"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -27,6 +25,8 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "PropagateSimpleStatesAnalysis.hpp"
 
 using namespace mlir;
 using namespace catalyst;
