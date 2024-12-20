@@ -48,7 +48,7 @@
     %user_0:2 = quantum.custom "CRZ"(%cst) %0#0, %0#1 : !quantum.bit, !quantum.bit
     // CHECK-NOT: quantum.custom "SWAP"
     // CHECK: [[a:%.+]]:2 = quantum.custom "CNOT"() [[OTHERS_1]], [[ZERO_0]] : !quantum.bit, !quantum.bit
-    // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]]#0, [[a]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]]#1, [[a]]#0 : !quantum.bit, !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[b]]#0, [[b]]#1 : !quantum.bit, !quantum.bit
 
     %1:2 = quantum.custom "SWAP"() %ZERO_0, %ZERO_1 : !quantum.bit, !quantum.bit
@@ -84,7 +84,7 @@
     // CHECK-NOT: quantum.custom "SWAP"
     // CHECK: [[a:%.+]] = quantum.custom "PauliX"() [[OTHERS_1]] : !quantum.bit
     // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]], [[ONE_0]] : !quantum.bit, !quantum.bit
-    // CHECK: [[c:%.+]]:2 = quantum.custom "CNOT"() [[b]]#0, [[b]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: [[c:%.+]]:2 = quantum.custom "CNOT"() [[b]]#1, [[b]]#0 : !quantum.bit, !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[c]]#0, [[c]]#1 : !quantum.bit, !quantum.bit
 
     %6:2 = quantum.custom "SWAP"() %ONE_0, %ZERO_1 : !quantum.bit, !quantum.bit
@@ -121,7 +121,7 @@
     // CHECK-NOT: quantum.custom "SWAP"
     // CHECK: [[a:%.+]]:2 = quantum.custom "CNOT"() [[PLUS_0]], [[OTHERS_1]] : !quantum.bit, !quantum.bit
     // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]]#1, [[a]]#0 : !quantum.bit, !quantum.bit
-    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[b]]#0, [[b]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[b]]#1, [[b]]#0 : !quantum.bit, !quantum.bit
 
     %11:2 = quantum.custom "SWAP"() %PLUS_0, %ZERO_1 : !quantum.bit, !quantum.bit
     %user_11:2 = quantum.custom "CRZ"(%cst) %11#0, %11#1 : !quantum.bit, !quantum.bit
@@ -157,7 +157,7 @@
     // CHECK: [[a:%.+]] = quantum.custom "PauliZ"() [[OTHERS_1]] : !quantum.bit
     // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[MINUS_0]], [[a]] : !quantum.bit, !quantum.bit
     // CHECK: [[c:%.+]]:2 = quantum.custom "CNOT"() [[b]]#1, [[b]]#0 : !quantum.bit, !quantum.bit
-    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[c]]#0, [[c]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[c]]#1, [[c]]#0 : !quantum.bit, !quantum.bit
 
     %16:2 = quantum.custom "SWAP"() %MINUS_0, %ZERO_1 : !quantum.bit, !quantum.bit
     %user_16:2 = quantum.custom "CRZ"(%cst) %16#0, %16#1 : !quantum.bit, !quantum.bit
@@ -197,7 +197,7 @@
     // CHECK-NOT: quantum.custom "SWAP"
     // CHECK: [[a:%.+]]:2 = quantum.custom "CNOT"() [[OTHERS_0]], [[ZERO_1]] : !quantum.bit, !quantum.bit
     // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]]#1, [[a]]#0 : !quantum.bit, !quantum.bit
-    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[b]]#0, [[b]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[b]]#1, [[b]]#0 : !quantum.bit, !quantum.bit
 
     %22:2 = quantum.custom "SWAP"() %OTHERS_0, %ONE_1 : !quantum.bit, !quantum.bit
     %user_22:2 = quantum.custom "CRZ"(%cst) %22#0, %22#1 : !quantum.bit, !quantum.bit
@@ -205,13 +205,13 @@
     // CHECK: [[a:%.+]] = quantum.custom "PauliX"() [[OTHERS_0]] : !quantum.bit
     // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]], [[ONE_1]] : !quantum.bit, !quantum.bit
     // CHECK: [[c:%.+]]:2 = quantum.custom "CNOT"() [[b]]#1, [[b]]#0 : !quantum.bit, !quantum.bit
-    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[c]]#0, [[c]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[c]]#1, [[c]]#0 : !quantum.bit, !quantum.bit
 
     %23:2 = quantum.custom "SWAP"() %OTHERS_0, %PLUS_1 : !quantum.bit, !quantum.bit
     %user_23:2 = quantum.custom "CRZ"(%cst) %23#0, %23#1 : !quantum.bit, !quantum.bit
     // CHECK-NOT: quantum.custom "SWAP"
     // CHECK: [[a:%.+]]:2 = quantum.custom "CNOT"() [[PLUS_1]], [[OTHERS_0]] : !quantum.bit, !quantum.bit
-    // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]]#0, [[a]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[a]]#1, [[a]]#0 : !quantum.bit, !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[b]]#0, [[b]]#1 : !quantum.bit, !quantum.bit
 
     %24:2 = quantum.custom "SWAP"() %OTHERS_0, %MINUS_1 : !quantum.bit, !quantum.bit
@@ -219,7 +219,7 @@
     // CHECK-NOT: quantum.custom "SWAP"
     // CHECK: [[a:%.+]] = quantum.custom "PauliZ"() [[OTHERS_0]] : !quantum.bit
     // CHECK: [[b:%.+]]:2 = quantum.custom "CNOT"() [[MINUS_1]], [[a]] : !quantum.bit, !quantum.bit
-    // CHECK: [[c:%.+]]:2 = quantum.custom "CNOT"() [[b]]#0, [[b]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: [[c:%.+]]:2 = quantum.custom "CNOT"() [[b]]#1, [[b]]#0 : !quantum.bit, !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[c]]#0, [[c]]#1 : !quantum.bit, !quantum.bit
 
     return %cst : f64
