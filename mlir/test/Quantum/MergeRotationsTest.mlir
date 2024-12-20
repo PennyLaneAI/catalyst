@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(merge-rotations{func-name=test_merge_rotations})" --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(merge-rotations)" --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -288,6 +288,22 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
     // CHECK: [[ret:%.+]] = quantum.custom "RX"([[add]]) [[qubit]] : !quantum.bit
     %2 = quantum.custom "RX"(%arg0) %1 {adjoint}: !quantum.bit
     %3 = quantum.custom "RX"(%arg1) %2 {adjoint}: !quantum.bit
+
+    // CHECK:  return [[ret]]
+    return %3 : !quantum.bit
+}
+
+// -----
+
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ret:%.+]] = quantum.static_custom "RX" [-5.000000e-01] [[qubit]] : !quantum.bit
+    %2 = quantum.static_custom "RX" [2.000000e-01] %1 {adjoint}: !quantum.bit
+    %3 = quantum.static_custom "RX" [3.000000e-01] %2 {adjoint}: !quantum.bit
 
     // CHECK:  return [[ret]]
     return %3 : !quantum.bit

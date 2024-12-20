@@ -193,6 +193,6 @@ Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
 Shuli Shu,
+Ritu Thombre,
 Raul Torres,
-Paul Haochen Wang,
-Ritu Thombre.
+Paul Haochen Wang.

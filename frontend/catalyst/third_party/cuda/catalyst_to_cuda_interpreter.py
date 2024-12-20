@@ -428,10 +428,17 @@ def change_instruction(ctx, eqn):
     op = params["op"]
     cuda_inst_name = from_catalyst_to_cuda[op]
     qubits_len = params["qubits_len"]
+    static_params = params.get("static_params")
 
     # Now, we can map to the correct op
     # For now just assume rx
-    cuda_inst(ctx.kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
+    cuda_inst(
+        ctx.kernel,
+        *qubits_or_params,
+        inst=cuda_inst_name,
+        qubits_len=qubits_len,
+        static_params=static_params,
+    )
 
     # Finally determine how many are qubits.
     qubits = qubits_or_params[:qubits_len]
@@ -576,13 +583,8 @@ def change_expval(ctx, eqn):
     invals = _map(ctx.read, eqn.invars)
     obs = invals[0]
 
-    # Params:
-    # * shots: Shots
-    shots = eqn.params["shots"]
-    shots = shots if shots is not None else -1
-
     # To obtain expval, we first obtain an observe object.
-    observe_results = cudaq_observe(ctx.kernel, obs, shots)
+    observe_results = cudaq_observe(ctx.kernel, obs)
     # And then we call expectation on that object.
     result = cudaq_expectation(observe_results)
     outvariables = [ctx.new_variable()]
@@ -848,7 +850,8 @@ class QJIT_CUDAQ:
             # We could also pass abstract arguments here in *args
             # the same way we do so in Catalyst.
             # But I think that is redundant now given make_jaxpr2
-            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            jaxpr, _, out_treedef, plugins = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            assert not plugins, "Plugins are not compatible with CUDA integration"
 
         # TODO(@erick-xanadu):
         # What about static_args?

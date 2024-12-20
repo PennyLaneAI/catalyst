@@ -14,10 +14,13 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+import jax
 import numpy as np
 import pennylane as qml
 
 from catalyst import CompileError, qjit
+from catalyst.jax_extras.tracing import bind_flexible_primitive
+from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 
 # TODO: NOTE:
 # The tests sample1 and sample2 below used to pass, before verification steps were added in the
@@ -35,7 +38,7 @@ try:
     def sample1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        # COM: CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
@@ -51,7 +54,7 @@ try:
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        # COM: CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs1:%.+]] = quantum.namedobs [[q1]][ PauliX]
@@ -68,19 +71,63 @@ except CompileError:
 # CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+# CHECK: [[shots:%.+]] = arith.constant 1000 : i64
+# CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.sample [[obs]] {shots = 1000 : i64} : tensor<1000x2xf64>
+    # CHECK: quantum.sample [[obs]] : tensor<1000x2xf64>
     return qml.sample()
 
 
 print(sample3.mlir)
+
+
+# CHECK-LABEL: public @test_sample_static(
+@qjit
+@qml.qnode(
+    qml.device("null.qubit", wires=1)
+)  # SampleOp is only legal if there is a device in the same scope
+def test_sample_static():
+    """Test that the sample primitive can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return bind_flexible_primitive(sample_p, {"shots": 5}, obs, num_qubits=0)
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<5x0xf64>
+# CHECK: return [[sample]] : tensor<5x0xf64>
+print(test_sample_static.mlir)
+
+
+# TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
+# CHECK-LABEL: public @test_sample_dynamic(
+@qjit
+@qml.qnode(
+    qml.device("null.qubit", wires=1)
+)  # SampleOp is only legal if there is a device in the same scope
+def test_sample_dynamic(shots: int):
+    """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    x = shots + 1
+    sample = bind_flexible_primitive(sample_p, {"shots": x}, obs, num_qubits=0)
+    return sample + jax.numpy.zeros((x, 0))
+
+
+# CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[plusOne:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
+# CHECK: [[sample:%.+]] = quantum.sample [[obs]] : tensor<?x0xf64>
+# CHECK: [[zeroVec:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?x0xf64>
+# CHECK: [[outVecSum:%.+]] = stablehlo.add [[sample]], [[zeroVec]] : tensor<?x0xf64>
+# CHECK: return [[plusOne]], [[outVecSum]] : tensor<i64>, tensor<?x0xf64>
+print(test_sample_dynamic.mlir)
+
 
 # TODO: NOTE:
 # The tests below used to pass before the compiler driver (in the case of counts2) and device
@@ -98,7 +145,7 @@ try:
     def counts1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = quantum.custom "RZ"
+        # COM: CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ]
@@ -113,7 +160,7 @@ try:
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
         qml.RY(y, wires=1)
-        # COM: CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
+        # COM: CHECK: [[q0:%.+]] = "quantum.static_custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
         qml.RZ(0.1, wires=0)
 
         # COM: CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
@@ -130,19 +177,49 @@ except:
 # CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+# CHECK: [[shots:%.+]] = arith.constant 1000 : i64
+# CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.compbasis [[q0]], [[q1]]
-    # CHECK: quantum.counts [[obs]] {shots = 1000 : i64} : tensor<4xf64>, tensor<4xi64>
+    # CHECK: quantum.counts [[obs]] : tensor<4xf64>, tensor<4xi64>
     return qml.counts()
 
 
 print(counts3.mlir)
+
+
+# CHECK-LABEL: public @jit_test_counts_static(
+@qjit
+def test_counts_static():
+    """Test that the counts primitive can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return bind_flexible_primitive(counts_p, {"shots": 5}, obs, shape=(1,))
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+print(test_counts_static.mlir)
+
+
+# CHECK-LABEL: public @jit_test_counts_dynamic(
+@qjit
+def test_counts_dynamic(shots: int):
+    """Test that the counts primitive with dynamic shape can be correctly compiled to mlir."""
+    obs = compbasis_p.bind()
+    return bind_flexible_primitive(counts_p, {"shots": shots}, obs, shape=(1,))
+
+
+# CHECK: [[obs:%.+]] = quantum.compbasis  : !quantum.obs
+# CHECK: [[eigvals:%.+]], [[counts:%.+]] = quantum.counts [[obs]] : tensor<1xf64>, tensor<1xi64>
+# CHECK: return [[eigvals]], [[counts]] : tensor<1xf64>, tensor<1xi64>
+print(test_counts_dynamic.mlir)
 
 
 # CHECK-LABEL: public @expval1(
@@ -151,7 +228,7 @@ print(counts3.mlir)
 def expval1(x: float, y: float):
     qml.RX(x, wires=0)
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -170,7 +247,7 @@ def expval2(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     # CHECK: [[p1:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -227,7 +304,7 @@ def expval5(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     B = np.array(
@@ -257,7 +334,7 @@ def expval5(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     coeffs = np.array([0.2, -0.543])
@@ -349,7 +426,7 @@ def expval9(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     # CHECK: [[p1:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -371,7 +448,7 @@ def expval10(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q2:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=2)
 
     B = np.array(
@@ -399,7 +476,7 @@ print(expval10.mlir)
 def var1(x: float, y: float):
     qml.RX(x, wires=0)
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliX]
@@ -442,7 +519,7 @@ def probs1(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # qml.probs()  # unsupported by PennyLane
@@ -463,7 +540,7 @@ def state1(x: float, y: float):
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
     qml.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: [[q0:%.+]] = quantum.static_custom "RZ"
     qml.RZ(0.1, wires=0)
 
     # qml.state(wires=[0])  # unsupported by PennyLane

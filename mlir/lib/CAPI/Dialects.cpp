@@ -18,12 +18,13 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
+#include "Ion/IR/IonDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
-#include "mlir/CAPI/Registration.h"
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Quantum, quantum, catalyst::quantum::QuantumDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Gradient, gradient, catalyst::gradient::GradientDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst, catalyst::CatalystDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation,
                                       catalyst::mitigation::MitigationDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Ion, ion, catalyst::ion::IonDialect)

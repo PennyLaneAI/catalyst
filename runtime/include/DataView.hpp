@@ -102,11 +102,12 @@ template <typename T, size_t R> class DataView {
         strides[0] = 1;
     }
 
-    explicit DataView(T *_data_aligned, size_t _offset, size_t *_sizes, size_t *_strides)
+    explicit DataView(T *_data_aligned, size_t _offset, const size_t *_sizes,
+                      const size_t *_strides)
         : data_aligned(_data_aligned), offset(_offset)
     {
         static_assert(R > 0, "[Class: DataView] Assertion: R > 0");
-        if (_sizes && _strides) {
+        if (_sizes != nullptr && _strides != nullptr) {
             for (size_t i = 0; i < R; i++) {
                 sizes[i] = _sizes[i];
                 strides[i] = _strides[i];

@@ -33,7 +33,7 @@ class TestCondToJaxpr:
 
         expected = dedent(
             """
-            { lambda ; a:i64[]. let transform_named_sequence
+            { lambda ; a:i64[]. let
                 b:bool[] = eq a 5
                 c:i64[] = cond[
                   branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },

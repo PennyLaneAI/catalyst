@@ -28,11 +28,21 @@ DEFAULT_LIB_PATHS = {
     "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
     "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
     "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
+    "oqd_runtime": os.path.join(package_root, "../../catalyst/third_party/oqd/src/build"),
 }
 
+DEFAULT_BIN_PATHS = {
+    "cli": os.path.join(package_root, "../../../mlir/build/bin"),
+}
 
 def get_lib_path(project, env_var):
     """Get the library path."""
     if INSTALLED:
         return os.path.join(package_root, "..", "lib")  # pragma: no cover
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
+
+def get_bin_path(project, env_var):
+    """Get the library path."""
+    if INSTALLED:
+        return os.path.join(package_root, "..", "bin")  # pragma: no cover
+    return os.getenv(env_var, DEFAULT_BIN_PATHS.get(project, ""))
