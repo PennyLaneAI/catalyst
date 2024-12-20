@@ -48,6 +48,8 @@ struct StaticCustomLoweringPass : impl::StaticCustomLoweringPassBase<StaticCusto
 
         target.addLegalOp<CustomOp>();
         target.addLegalOp<mlir::arith::ConstantOp>();
+        target.addLegalOp<GlobalPhaseOp>();
+        target.addLegalOp<MultiRZOp>();
         target.addIllegalOp<StaticCustomOp>();
 
         populateStaticCustomPatterns(patterns);

@@ -189,6 +189,9 @@
   TOML file locations are taken in as pass options), with the intention that they are generated
   immediately before compilation during hardware-calibration runs.
 
+* Static custom operation not support MultiRZ and GlobalPhase gates.
+  [(#1396)](https://github.com/PennyLaneAI/catalyst/pull/1396)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
