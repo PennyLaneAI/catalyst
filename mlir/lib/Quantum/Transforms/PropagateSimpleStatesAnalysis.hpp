@@ -156,8 +156,8 @@ class PropagateSimpleStatesAnalysis {
             }
 
             // get state from parent and gate
-            StringRef gate = cast<quantum::CustomOp>(op).getGateName();
-            Value parent = op->getOperand(0);
+            StringRef gate = op.getGateName();
+            Value parent = op.getInQubits()[0];
 
             // Unknown parent state, child state is thus also unknown
             if (!qubitValues.contains(parent) || isOther(qubitValues[parent])) {
