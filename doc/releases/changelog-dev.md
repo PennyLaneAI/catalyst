@@ -171,6 +171,10 @@
   TOML file locations are taken in as pass options), with the intention that they are generated
   immediately before compilation during hardware-calibration runs.
 
+* IR is now extended to support literal values as opposed to SSA Values for static parameters of
+  quantum gates by adding a new gate called StaticCustomOp with lowering to regular customOp.
+  [(#1387)](https://github.com/PennyLaneAI/catalyst/pull/1387)
+
 <h3>Documentation 📝</h3>
 
 * A new tutorial going through how to write a new MLIR pass is available. The tutorial writes an
