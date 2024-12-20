@@ -116,6 +116,28 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let constructor = "catalyst::createMergeRotationsPass()";
 }
 
+def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+    let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleCNOTPass()";
+    let options = [
+    Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
+           "bool", /*default=*/"false",
+           "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
+    ];
+}
+
+def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
+    let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
+
+    let constructor = "catalyst::createDisentangleSWAPPass()";
+    let options = [
+    Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
+           "bool", /*default=*/"false",
+           "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
+    ];
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
