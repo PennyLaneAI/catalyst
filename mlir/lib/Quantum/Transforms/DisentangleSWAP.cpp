@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This algorithm is taken from https://arxiv.org/pdf/2012.07711, table 6 (Equivalences for basis-states in SWAP gate)
+// This algorithm is taken from https://arxiv.org/pdf/2012.07711, table 6 (Equivalences for
+// basis-states in SWAP gate)
 
 #define DEBUG_TYPE "disentangleswap"
 
@@ -27,7 +28,6 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
-using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 
@@ -43,7 +43,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     // right after the SWAP is to be erased
     quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
                                              const Value &outQubit, mlir::IRRewriter &builder,
-                                             Location &loc, const quantum::CustomOp &insert_after_gate)
+                                             Location &loc,
+                                             const quantum::CustomOp &insert_after_gate)
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
@@ -57,15 +58,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                                               /*adjoint=*/nullptr,
                                               /*in_ctrl_qubits=*/mlir::ValueRange(),
                                               /*in_ctrl_values=*/mlir::ValueRange());
-    
+
         return newGate;
     }
 
     // above function overloaded to create a single qubit gate with a given name
     // if multiple gates are to be inserted after SWAP transformation
     quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
-                                             mlir::IRRewriter &builder,
-                                             Location &loc, const quantum::CustomOp &insert_after_gate)
+                                             mlir::IRRewriter &builder, Location &loc,
+                                             const quantum::CustomOp &insert_after_gate)
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
@@ -79,53 +80,53 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                                               /*adjoint=*/nullptr,
                                               /*in_ctrl_qubits=*/mlir::ValueRange(),
                                               /*in_ctrl_values=*/mlir::ValueRange());
-    
+
         return newGate;
     }
 
     // function to create a two qubit gate with a given name
     // right after the SWAP is to be erased
-    quantum::CustomOp createSimpleTwoBitGate(StringRef gateName, 
-                                             const Value &controlIn, const Value &targetIn, 
-                                             const Value &controlOut, const Value &targetOut, 
-                                             mlir::IRRewriter &builder, Location &loc, 
+    quantum::CustomOp createSimpleTwoBitGate(StringRef gateName, const Value &controlIn,
+                                             const Value &targetIn, const Value &controlOut,
+                                             const Value &targetOut, mlir::IRRewriter &builder,
+                                             Location &loc,
                                              const quantum::CustomOp &insert_after_gate)
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
-        quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
-                                              /*out_qubits=*/mlir::TypeRange({controlOut.getType(), targetOut.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange({}),
-                                              /*params=*/mlir::ValueRange(),
-                                              /*in_qubits=*/mlir::ValueRange({controlIn,targetIn}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/nullptr,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange({}),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+        quantum::CustomOp newGate = builder.create<quantum::CustomOp>(
+            loc,
+            /*out_qubits=*/mlir::TypeRange({controlOut.getType(), targetOut.getType()}),
+            /*out_ctrl_qubits=*/mlir::TypeRange({}),
+            /*params=*/mlir::ValueRange(),
+            /*in_qubits=*/mlir::ValueRange({controlIn, targetIn}),
+            /*gate_name=*/gateName,
+            /*adjoint=*/nullptr,
+            /*in_ctrl_qubits=*/mlir::ValueRange({}),
+            /*in_ctrl_values=*/mlir::ValueRange());
 
         return newGate;
     }
 
     // above function overloaded to create a two qubit gate with a given name
     // if multiple gates are to be inserted after SWAP transformation
-    quantum::CustomOp createSimpleTwoBitGate(StringRef gateName, 
-                                             const Value &controlIn, const Value &targetIn, 
-                                             mlir::IRRewriter &builder, Location &loc, 
+    quantum::CustomOp createSimpleTwoBitGate(StringRef gateName, const Value &controlIn,
+                                             const Value &targetIn, mlir::IRRewriter &builder,
+                                             Location &loc,
                                              const quantum::CustomOp &insert_after_gate)
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
-        quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
-                                              /*out_qubits=*/mlir::TypeRange({controlIn.getType(),targetIn.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange({}),
-                                              /*params=*/mlir::ValueRange(),
-                                              /*in_qubits=*/mlir::ValueRange({controlIn,targetIn}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/nullptr,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange({}),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+        quantum::CustomOp newGate = builder.create<quantum::CustomOp>(
+            loc,
+            /*out_qubits=*/mlir::TypeRange({controlIn.getType(), targetIn.getType()}),
+            /*out_ctrl_qubits=*/mlir::TypeRange({}),
+            /*params=*/mlir::ValueRange(),
+            /*in_qubits=*/mlir::ValueRange({controlIn, targetIn}),
+            /*gate_name=*/gateName,
+            /*adjoint=*/nullptr,
+            /*in_ctrl_qubits=*/mlir::ValueRange({}),
+            /*in_ctrl_values=*/mlir::ValueRange());
 
         return newGate;
     }
@@ -157,7 +158,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
             Value SwapQubit_0_Out = op->getResult(0);
             Value SwapQubit_1_Out = op->getResult(1);
 
-            // first qubit in |0> 
+            // first qubit in |0>
             if (pssa.isZero(qubitValues[SwapQubit_0_In])) {
                 // second qubit in |0>: SWAP(|0>,|0>)
                 if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
@@ -168,24 +169,24 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
                 // second qubit in |1>: SWAP(|0>,|1>)
                 else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                        "PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
 
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
+                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                        "PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
                     op->erase();
                     return;
                 }
                 // second qubit in |+>: SWAP(|0>,|+>)
                 else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
                     op->erase();
                     return;
@@ -196,17 +197,17 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
                     xgate_on_0->getOperand(0) = SwapQubit_0_Out;
 
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
+                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                        "Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
                     (hgate_on_0->getOperand(0)) = (xgate_on_0->getResult(0));
                     SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
                     hgate_on_1->getOperand(0) = SwapQubit_1_Out;
 
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
+                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                        "PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
                     xgate_on_1->getOperand(0) = hgate_on_1->getResult(0);
                     SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
                     op->erase();
@@ -214,16 +215,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
                 // second qubit in NON_BASIS: SWAP(|0>,|NON_BASIS>)
                 else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                SwapQubit_1_In, SwapQubit_0_In, 
-                                                builder, loc, op);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", SwapQubit_1_In, SwapQubit_0_In, builder, loc, op);
 
                     cnot_on_1_0->getOperand(0) = SwapQubit_0_Out;
                     cnot_on_1_0->getOperand(1) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), 
-                                                builder, loc, cnot_on_1_0);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), builder, loc,
+                        cnot_on_1_0);
                     cnot_on_0_1->getOperand(0) = cnot_on_1_0->getResult(0);
                     cnot_on_0_1->getOperand(1) = cnot_on_1_0->getResult(1);
 
@@ -234,16 +234,16 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
             }
 
-            // first qubit in |1> 
+            // first qubit in |1>
             else if (pssa.isOne(qubitValues[SwapQubit_0_In])) {
                 // second qubit in |0>: SWAP(|1>,|0>)
                 if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                        "PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
 
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
+                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                        "PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
                     op->erase();
                     return;
@@ -261,17 +261,17 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
                     xgate_on_0->getOperand(0) = SwapQubit_0_Out;
 
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
+                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                        "Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
                     (hgate_on_0->getOperand(0)) = (xgate_on_0->getResult(0));
                     SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
                     hgate_on_1->getOperand(0) = SwapQubit_1_Out;
 
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
+                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                        "PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
                     xgate_on_1->getOperand(0) = hgate_on_1->getResult(0);
                     SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
                     op->erase();
@@ -279,12 +279,12 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
                 // second qubit in |->: SWAP(|1>,|->)
                 else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
                     op->erase();
                     return;
@@ -295,15 +295,14 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, op);
                     xgate_on_1->getOperand(0) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                xgate_on_1->getResult(0), SwapQubit_0_In, 
-                                                builder, loc, xgate_on_1);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", xgate_on_1->getResult(0), SwapQubit_0_In, builder, loc, xgate_on_1);
                     cnot_on_1_0->getOperand(0) = SwapQubit_0_Out;
                     cnot_on_1_0->getOperand(1) = xgate_on_1->getResult(0);
 
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), 
-                                                builder, loc, cnot_on_1_0);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), builder, loc,
+                        cnot_on_1_0);
                     cnot_on_0_1->getOperand(0) = cnot_on_1_0->getResult(0);
                     cnot_on_0_1->getOperand(1) = cnot_on_1_0->getResult(1);
 
@@ -314,16 +313,16 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
             }
 
-            // first qubit in |+> 
+            // first qubit in |+>
             else if (pssa.isPlus(qubitValues[SwapQubit_0_In])) {
                 // second qubit in |0>: SWAP(|+>,|0>)
                 if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
                     op->erase();
                     return;
@@ -334,8 +333,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("Hadamard", SwapQubit_0_In, builder, loc, op);
                     hgate_on_0->getOperand(0) = SwapQubit_0_Out;
 
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
+                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                        "PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
                     (xgate_on_0->getOperand(0)) = (hgate_on_0->getResult(0));
                     SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
 
@@ -343,8 +342,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, xgate_on_0);
                     xgate_on_1->getOperand(0) = SwapQubit_1_Out;
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
                     hgate_on_1->getOperand(0) = xgate_on_1->getResult(0);
                     SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
                     op->erase();
@@ -359,27 +358,26 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
                 // second qubit in |->: SWAP(|+>,|->)
                 else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp zgate_on_0 =
-                        createSimpleOneBitGate("PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp zgate_on_0 = createSimpleOneBitGate(
+                        "PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(zgate_on_0->getResult(0));
 
-                    quantum::CustomOp zgate_on_1 =
-                        createSimpleOneBitGate("PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
+                    quantum::CustomOp zgate_on_1 = createSimpleOneBitGate(
+                        "PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(zgate_on_1->getResult(0));
                     op->erase();
                     return;
                 }
                 // second qubit in |NON_BASIS>: SWAP(|+>,|NON_BASIS>)
                 else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                SwapQubit_0_In, SwapQubit_1_In, 
-                                                builder, loc, op);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", SwapQubit_0_In, SwapQubit_1_In, builder, loc, op);
                     cnot_on_0_1->getOperand(0) = SwapQubit_0_Out;
                     cnot_on_0_1->getOperand(1) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), 
-                                                builder, loc, cnot_on_0_1);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
+                        cnot_on_0_1);
                     cnot_on_1_0->getOperand(0) = cnot_on_0_1->getResult(0);
                     cnot_on_1_0->getOperand(1) = cnot_on_0_1->getResult(1);
 
@@ -390,7 +388,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
             }
 
-            // first qubit in |-> 
+            // first qubit in |->
             else if (pssa.isMinus(qubitValues[SwapQubit_0_In])) {
                 // second qubit in |0>: SWAP(|->,|0>)
                 if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
@@ -398,8 +396,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("Hadamard", SwapQubit_0_In, builder, loc, op);
                     hgate_on_0->getOperand(0) = SwapQubit_0_Out;
 
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
+                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                        "PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
                     (xgate_on_0->getOperand(0)) = (hgate_on_0->getResult(0));
                     SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
 
@@ -407,8 +405,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, xgate_on_0);
                     xgate_on_1->getOperand(0) = SwapQubit_1_Out;
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
                     hgate_on_1->getOperand(0) = xgate_on_1->getResult(0);
                     SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
                     op->erase();
@@ -416,24 +414,24 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
                 // second qubit in |1>: SWAP(|->,|1>)
                 else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
                     op->erase();
                     return;
                 }
                 // second qubit in |+>: SWAP(|->,|+>)
                 else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp zgate_on_0 =
-                        createSimpleOneBitGate("PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                    quantum::CustomOp zgate_on_0 = createSimpleOneBitGate(
+                        "PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
                     SwapQubit_0_Out.replaceAllUsesWith(zgate_on_0->getResult(0));
 
-                    quantum::CustomOp zgate_on_1 =
-                        createSimpleOneBitGate("PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
+                    quantum::CustomOp zgate_on_1 = createSimpleOneBitGate(
+                        "PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
                     SwapQubit_1_Out.replaceAllUsesWith(zgate_on_1->getResult(0));
                     op->erase();
                     return;
@@ -451,15 +449,14 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliZ", SwapQubit_1_In, builder, loc, op);
                     zgate_on_1->getOperand(0) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                SwapQubit_0_In, zgate_on_1->getResult(0), 
-                                                builder, loc, zgate_on_1);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", SwapQubit_0_In, zgate_on_1->getResult(0), builder, loc, zgate_on_1);
                     cnot_on_0_1->getOperand(1) = SwapQubit_0_Out;
                     cnot_on_0_1->getOperand(1) = zgate_on_1->getResult(0);
 
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), 
-                                                builder, loc, cnot_on_0_1);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
+                        cnot_on_0_1);
                     cnot_on_1_0->getOperand(0) = cnot_on_0_1->getResult(0);
                     cnot_on_1_0->getOperand(1) = cnot_on_0_1->getResult(1);
 
@@ -471,18 +468,17 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
             }
 
             // first qubit in |NON_BASIS>
-            else if (pssa.isOther(qubitValues[SwapQubit_0_In])){
+            else if (pssa.isOther(qubitValues[SwapQubit_0_In])) {
                 // second qubit in |0>: SWAP(|NON_BASIS>,|0>)
                 if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                SwapQubit_0_In, SwapQubit_1_In, 
-                                                builder, loc, op);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", SwapQubit_0_In, SwapQubit_1_In, builder, loc, op);
                     cnot_on_0_1->getOperand(0) = SwapQubit_0_Out;
                     cnot_on_0_1->getOperand(1) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), 
-                                                builder, loc, cnot_on_0_1);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
+                        cnot_on_0_1);
                     cnot_on_1_0->getOperand(0) = cnot_on_0_1->getResult(0);
                     cnot_on_1_0->getOperand(1) = cnot_on_0_1->getResult(1);
 
@@ -498,16 +494,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
 
                     xgate_on_0->getOperand(0) = SwapQubit_0_Out;
 
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                xgate_on_0->getResult(0), SwapQubit_1_In, 
-                                                builder, loc, xgate_on_0);
-                    
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", xgate_on_0->getResult(0), SwapQubit_1_In, builder, loc, xgate_on_0);
+
                     cnot_on_0_1->getOperand(0) = xgate_on_0->getResult(0);
                     cnot_on_0_1->getOperand(1) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), 
-                                                builder, loc, cnot_on_0_1);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
+                        cnot_on_0_1);
                     cnot_on_1_0->getOperand(0) = cnot_on_0_1->getResult(0);
                     cnot_on_1_0->getOperand(1) = cnot_on_0_1->getResult(1);
 
@@ -518,16 +513,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                 }
                 // second qubit in |+>: SWAP(|NON_BASIS>,|+>)
                 else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                            SwapQubit_1_In, SwapQubit_0_In, 
-                            builder, loc, op);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", SwapQubit_1_In, SwapQubit_0_In, builder, loc, op);
 
                     cnot_on_1_0->getOperand(0) = SwapQubit_0_Out;
                     cnot_on_1_0->getOperand(1) = SwapQubit_1_Out;
 
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), 
-                                                builder, loc, cnot_on_1_0);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), builder, loc,
+                        cnot_on_1_0);
                     cnot_on_0_1->getOperand(0) = cnot_on_1_0->getResult(0);
                     cnot_on_0_1->getOperand(1) = cnot_on_1_0->getResult(1);
 
@@ -542,17 +536,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                         createSimpleOneBitGate("PauliZ", SwapQubit_0_In, builder, loc, op);
                     zgate_on_0->getOperand(0) = SwapQubit_0_Out;
 
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate("CNOT", 
-                                                SwapQubit_1_In, zgate_on_0->getResult(0), 
-                                                builder, loc, zgate_on_0);
+                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                        "CNOT", SwapQubit_1_In, zgate_on_0->getResult(0), builder, loc, zgate_on_0);
 
                     cnot_on_1_0->getOperand(0) = zgate_on_0->getResult(0);
                     cnot_on_1_0->getOperand(1) = SwapQubit_1_Out;
 
-
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate("CNOT", 
-                                                cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), 
-                                                builder, loc, cnot_on_1_0);
+                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                        "CNOT", cnot_on_1_0->getResult(0), cnot_on_1_0->getResult(1), builder, loc,
+                        cnot_on_1_0);
                     cnot_on_0_1->getOperand(0) = cnot_on_1_0->getResult(0);
                     cnot_on_0_1->getOperand(1) = cnot_on_1_0->getResult(1);
 
