@@ -138,8 +138,6 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
 
     void runOnOperation() override
     {
-        LLVM_DEBUG(dbgs() << "disentangle SWAP pass\n");
-
         FunctionOpInterface func = cast<FunctionOpInterface>(getOperation());
         mlir::IRRewriter builder(func->getContext());
         Location loc = func->getLoc();
