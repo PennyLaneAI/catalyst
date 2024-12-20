@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(disentangle-CNOT{func-name=circuit}))" --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(disentangle-CNOT))" --split-input-file --verify-diagnostics | FileCheck %s
 
 
 // Explicit unit tests for all CNOT disentangling table entries
@@ -20,7 +20,7 @@
 
 // CHECK: func.func private @circuit()
   func.func private @circuit() -> f64 {
-  	%cst = arith.constant 3.140000e+00 : f64
+    %cst = arith.constant 1.230000e+00 : f64
     %_ = quantum.alloc( 2) : !quantum.reg
     %ZERO_0 = quantum.extract %_[ 0] : !quantum.reg -> !quantum.bit
     %ZERO_1 = quantum.extract %_[ 1] : !quantum.reg -> !quantum.bit
@@ -199,6 +199,19 @@
     // CHECK: [[_24:%.+]]:2 = quantum.custom "CNOT"() [[OTHERS_0]], [[ONE_1]] : !quantum.bit, !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[_24]]#0, [[_24]]#1 : !quantum.bit, !quantum.bit
 
+
+    %true = arith.constant true
+    // CHECK: scf.if
+    %scf_res = scf.if %true -> !quantum.bit {
+        %ZERO_0_in_if = quantum.extract %_[ 0] : !quantum.reg -> !quantum.bit
+
+        // CHECK: quantum.custom "CNOT"
+        %25:2 = quantum.custom "CNOT"() %ZERO_0_in_if, %OTHERS_1 : !quantum.bit, !quantum.bit
+        %user_25:2 = quantum.custom "CRZ"(%cst) %25#0, %25#1 : !quantum.bit, !quantum.bit
+        scf.yield %user_25#0 : !quantum.bit
+    } else {
+        scf.yield %ZERO_0 : !quantum.bit
+    }
 
     return %cst : f64
   }

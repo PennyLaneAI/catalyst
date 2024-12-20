@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(propagate-simple-states-tester{func-name=circuit}))" --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(disentangle-CNOT{emit-FSM-state-remark=true}))" --split-input-file --verify-diagnostics | FileCheck %s
 
 
 // Basic test with an actual circuit that has every state in the standard FSM.

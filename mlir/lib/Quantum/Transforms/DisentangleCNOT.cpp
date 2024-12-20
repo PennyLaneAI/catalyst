@@ -16,8 +16,6 @@
 
 #define DEBUG_TYPE "disentanglecnot"
 
-#include "PropagateSimpleStatesAnalysis.hpp"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -27,7 +25,8 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
-using namespace llvm;
+#include "PropagateSimpleStatesAnalysis.hpp"
+
 using namespace mlir;
 using namespace catalyst;
 
@@ -39,26 +38,6 @@ namespace catalyst {
 struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
     using impl::DisentangleCNOTPassBase<DisentangleCNOTPass>::DisentangleCNOTPassBase;
 
-    quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
-                                             const Value &outQubit, mlir::IRRewriter &builder,
-                                             Location &loc, const quantum::CustomOp &originalCNOT)
-    {
-        OpBuilder::InsertionGuard insertionGuard(builder);
-        builder.setInsertionPointAfter(originalCNOT);
-        quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
-                                              /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange(),
-                                              /*params=*/mlir::ValueRange(),
-                                              /*in_qubits=*/mlir::ValueRange({inQubit}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/nullptr,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange(),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
-
-        return newGate;
-    }
-
     bool canScheduleOn(RegisteredOperationName opInfo) const override
     {
         return opInfo.hasInterface<FunctionOpInterface>();
@@ -66,21 +45,18 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
 
     void runOnOperation() override
     {
-        LLVM_DEBUG(dbgs() << "disentangle CNOT pass\n");
-
-        func::FuncOp func = cast<func::FuncOp>(getOperation());
+        FunctionOpInterface func = cast<FunctionOpInterface>(getOperation());
         mlir::IRRewriter builder(func->getContext());
         Location loc = func->getLoc();
 
-        if (func.getSymName() != FuncNameOpt) {
-            // not the function to run the pass on
-            return;
-        }
-
-        ///////////////////////////
-
         PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
         llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
+
+        if (EmitFSMStateRemark) {
+            for (auto it = qubitValues.begin(); it != qubitValues.end(); ++it) {
+                it->first.getDefiningOp()->emitRemark(pssa.QubitState2String(it->second));
+            }
+        }
 
         func->walk([&](quantum::CustomOp op) {
             StringRef gate = op.getGateName();
@@ -92,6 +68,11 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
             Value targetIn = op->getOperand(1);
             Value controlOut = op->getResult(0);
             Value targetOut = op->getResult(1);
+
+            // Do nothing if the inputs states are not tracked
+            if (!qubitValues.contains(controlIn) || !qubitValues.contains(targetIn)) {
+                return;
+            }
 
             // |0> control, always do nothing
             if (pssa.isZero(qubitValues[controlIn])) {
@@ -112,8 +93,10 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                     return;
                 }
                 else {
-                    quantum::CustomOp xgate =
-                        createSimpleOneBitGate("PauliX", targetIn, targetOut, builder, loc, op);
+                    builder.setInsertionPoint(op);
+                    quantum::CustomOp xgate = builder.create<quantum::CustomOp>(
+                        loc, /*gate_name=*/"PauliX",
+                        /*in_qubits=*/mlir::ValueRange({targetIn}));
                     targetOut.replaceAllUsesWith(xgate->getResult(0));
                     op->erase();
                     return;
@@ -139,8 +122,10 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
                     return;
                 }
                 else {
-                    quantum::CustomOp zgate =
-                        createSimpleOneBitGate("PauliZ", controlIn, controlOut, builder, loc, op);
+                    builder.setInsertionPoint(op);
+                    quantum::CustomOp zgate = builder.create<quantum::CustomOp>(
+                        loc, /*gate_name=*/"PauliZ",
+                        /*in_qubits=*/mlir::ValueRange({controlIn}));
                     controlOut.replaceAllUsesWith(zgate->getResult(0));
                     op->erase();
                     return;

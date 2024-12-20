@@ -116,18 +116,15 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let constructor = "catalyst::createMergeRotationsPass()";
 }
 
-def PropagateSimpleStatesTesterPass : Pass<"propagate-simple-states-tester"> {
-    let summary = "Propagate simple states through their corresponding gates down the circuit. The simple states are the six Pauli basis states.";
-
-    let constructor = "catalyst::createPropagateSimpleStatesTesterPass()";
-    let options = QuantumCircuitTransformationPass.options;
-}
-
 def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 
     let constructor = "catalyst::createDisentangleCNOTPass()";
-    let options = QuantumCircuitTransformationPass.options;
+    let options = [
+    Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
+           "bool", /*default=*/"false",
+           "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
+    ];
 }
 
 def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
