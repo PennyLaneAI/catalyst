@@ -15,6 +15,7 @@ file(GLOB SRC
     SplitMultipleTapes.cpp
     merge_rotation.cpp
     MergeRotationsPatterns.cpp
+    DisentangleSWAP.cpp
     DisentangleCNOT.cpp
     ions_decompositions.cpp
     IonsDecompositionPatterns.cpp

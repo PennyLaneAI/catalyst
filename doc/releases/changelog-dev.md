@@ -65,6 +65,14 @@
 
   The algorithm is taken from [Relaxed Peephole Optimization: A Novel Compiler Optimization for Quantum Circuits, by Ji Liu, Luciano Bello, and Huiyang Zhou](https://arxiv.org/abs/2012.07711).
 
+* A new circuit optimization pass, `--disentangle-SWAP`, is available.
+  [(#1297)](https://github.com/PennyLaneAI/catalyst/pull/1297)
+
+  The pass disentangles SWAP gates whenever possible by using a finite state
+  machine to propagate simple one-qubit states, similar to the `--disentangle-CNOT` pass.
+
+  The algorithm is taken from [Relaxed Peephole Optimization: A Novel Compiler Optimization for Quantum Circuits, by Ji Liu, Luciano Bello, and Huiyang Zhou](https://arxiv.org/abs/2012.07711).
+
 <h3>Breaking changes 💔</h3>
 
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
@@ -203,5 +211,6 @@ Mehrdad Malekmohammadi,
 William Maxwell
 Romain Moyard,
 Shuli Shu,
+Ritu Thombre,
 Raul Torres,
 Paul Haochen Wang.
