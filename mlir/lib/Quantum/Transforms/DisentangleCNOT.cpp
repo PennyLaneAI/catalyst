@@ -16,8 +16,6 @@
 
 #define DEBUG_TYPE "disentanglecnot"
 
-#include "PropagateSimpleStatesAnalysis.hpp"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -26,6 +24,8 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "PropagateSimpleStatesAnalysis.hpp"
 
 using namespace llvm;
 using namespace mlir;
