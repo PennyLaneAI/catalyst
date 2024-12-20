@@ -134,8 +134,8 @@ class PropagateSimpleStatesAnalysis {
 
             // starting qubits are in |0>
             // We restrict "starting qubits" to those who are extracted immediately from alloc ops
-            if (isa<quantum::AllocOp>(op->getOperand(0).getDefiningOp())) {
-                qubitValues[op->getResult(0)] = QubitState::ZERO;
+            if (isa<quantum::AllocOp>(op.getQreg().getDefiningOp())) {
+                qubitValues[op.getQubit()] = QubitState::ZERO;
                 return;
             }
         });
