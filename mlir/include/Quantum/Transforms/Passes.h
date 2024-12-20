@@ -29,6 +29,8 @@ std::unique_ptr<mlir::Pass> createRemoveChainedSelfInversePass();
 std::unique_ptr<mlir::Pass> createAnnotateFunctionPass();
 std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
 std::unique_ptr<mlir::Pass> createMergeRotationsPass();
+std::unique_ptr<mlir::Pass> createDisentangleCNOTPass();
+std::unique_ptr<mlir::Pass> createDisentangleSWAPPass();
 std::unique_ptr<mlir::Pass> createIonsDecompositionPass();
 std::unique_ptr<mlir::Pass> createStaticCustomLoweringPass();
 
