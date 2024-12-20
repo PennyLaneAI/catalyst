@@ -46,7 +46,7 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
 
     void runOnOperation() override
     {
-        func::FuncOp func = cast<func::FuncOp>(getOperation());
+        FunctionOpInterface func = cast<FunctionOpInterface>(getOperation());
         mlir::IRRewriter builder(func->getContext());
         Location loc = func->getLoc();
 
