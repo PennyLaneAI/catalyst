@@ -55,9 +55,6 @@
   [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
   [(#1385)](https://github.com/PennyLaneAI/catalyst/pull/1385)
 
-* Static custom operation not support MultiRZ and GlobalPhase gates.
-  [(#1396)](https://github.com/PennyLaneAI/catalyst/pull/1396)
-
 <h3>Breaking changes 💔</h3>
 
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
@@ -173,6 +170,9 @@
   `--quantum-to-ion` conversion. The TOML files are assumed to exist by the pass (the paths to the
   TOML file locations are taken in as pass options), with the intention that they are generated
   immediately before compilation during hardware-calibration runs.
+
+* Static custom operation not support MultiRZ and GlobalPhase gates.
+  [(#1396)](https://github.com/PennyLaneAI/catalyst/pull/1396)
 
 <h3>Documentation 📝</h3>
 
