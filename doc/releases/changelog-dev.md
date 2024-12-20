@@ -56,7 +56,7 @@
   [(#1385)](https://github.com/PennyLaneAI/catalyst/pull/1385)
 
 * A new peephole optimization pass, `--disentangle-CNOT`, is available.
-  [(#1268)](https://github.com/PennyLaneAI/catalyst/pull/1268)
+  [(#1154)](https://github.com/PennyLaneAI/catalyst/pull/1154)
 
   The pass disentangles CNOT gates whenever possible, e.g. when the control bit
   is known to be in |0>, the pass removes the CNOT. The pass uses a finite state
