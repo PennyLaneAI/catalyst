@@ -23,6 +23,60 @@ from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
+#
+# Complex_merging_rotations
+#
+
+@pytest.mark.parametrize("params1, params2", [
+    ((0.5, 1.0, 1.5), (0.6, 0.8, 0.7)), 
+    ((np.pi / 2, np.pi / 4, np.pi / 6), (np.pi, 3 * np.pi / 4, np.pi / 3))  
+])
+def test_complex_merge_rotation(params1, params2, backend):
+
+    # Test for qml.Rot
+    def create_rot_circuit():
+        """Helper function to create qml.Rot circuit for testing."""
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            qml.Rot(params1[0], params1[1], params1[2], wires=0)
+            qml.Rot(params2[0], params2[1], params2[2], wires=0)
+            return qml.probs()
+        return circuit
+
+    # Create unmerged and merged circuits
+    unmerged_rot_circuit = create_rot_circuit()
+    merged_rot_circuit = qml.transforms.merge_rotations(create_rot_circuit())
+
+    # Verify that the circuits produce the same results
+    assert np.allclose(unmerged_rot_circuit(), merged_rot_circuit()), "Merged result for qml.Rot differs from unmerged."
+
+    # Check if the merged circuit has fewer rotation gates
+    unmerged_rot_count = sum(1 for op in unmerged_rot_circuit.tape.operations if op.name == "Rot")
+    merged_rot_count = sum(1 for op in merged_rot_circuit.tape.operations if op.name == "Rot")
+    assert merged_rot_count < unmerged_rot_count, "Rotation gates were not merged in qml.Rot."
+
+    # Test for qml.CRot
+    def create_crot_circuit():
+        """Helper function to create qml.CRot circuit for testing."""
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            qml.CRot(params1[0], params1[1], params1[2], wires=[0, 1])
+            qml.CRot(params2[0], params2[1], params2[2], wires=[0, 1])
+            return qml.probs()
+        return circuit
+
+    # Create unmerged and merged circuits for qml.CRot
+    unmerged_crot_circuit = create_crot_circuit()
+    merged_crot_circuit = qml.transforms.merge_rotations(create_crot_circuit())
+
+    # Verify that the circuits produce the same results
+    assert np.allclose(unmerged_crot_circuit(), merged_crot_circuit()), "Merged result for qml.CRot differs from unmerged."
+
+    # Check if the merged circuit has fewer controlled rotation gates
+    unmerged_crot_count = sum(1 for op in unmerged_crot_circuit.tape.operations if op.name == "CRot")
+    merged_crot_count = sum(1 for op in merged_crot_circuit.tape.operations if op.name == "CRot")
+    assert merged_crot_count < unmerged_crot_count, "Controlled rotation gates were not merged in qml.CRot."
+
 
 #
 # cancel_inverses
