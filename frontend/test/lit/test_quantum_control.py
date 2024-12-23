@@ -148,7 +148,7 @@ def test_native_controlled_multirz():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_multirz
     def native_controlled_multirz():
-        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.multirz
+        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.static_custom "MultiRZ"
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true)
         qml.ctrl(qml.MultiRZ(0.6, wires=[0, 2]), control=[1])

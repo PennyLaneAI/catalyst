@@ -45,6 +45,8 @@ def test_static_params():
         qml.CRY(x, wires=[0, 1])
         qml.CRZ(x, wires=[0, 1])
 
+        qml.MultiRZ(x, wires=[0, 1, 2, 3])
+
         return qml.state()
 
     print(circuit.mlir)
@@ -65,4 +67,6 @@ def test_static_params():
 # CHECK: %[[CRX:.*]] = quantum.static_custom "CRX"
 # CHECK: %[[CRY:.*]] = quantum.static_custom "CRY"
 # CHECK: %[[CRZ:.*]] = quantum.static_custom "CRZ"
+# CHECK: %[[BIT3:.*]] = quantum.extract %[[REG]][ 3]
+# CHECK: %[[MRZ:.*]] = quantum.static_custom "MultiRZ"
 test_static_params()
