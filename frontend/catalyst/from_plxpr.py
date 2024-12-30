@@ -15,6 +15,7 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 from functools import partial
+from random import sample
 from typing import Callable
 
 import jax
@@ -38,7 +39,6 @@ from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
-    AbstractQreg,
     compbasis_p,
     counts_p,
     expval_p,
@@ -251,13 +251,20 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             device_wires=len(self._device.wires))
     
         prim = measurement_map[type(measurement)]
-        mval = prim.bind(obs, shape=shape, shots=self._device.shots.total_shots)
+        device_shots = get_device_shots(self._device) or 0
+        if prim is sample_p:
+            mval = bind_flexible_primitive(sample_p, {"shots": device_shots}, obs, num_qubits=len(measurement.wires))
+        elif prim is counts_p:
+            mval = bind_flexible_primitive(counts_p, {"shots": device_shots}, shape=shape)
+        elif prim in {expval_p, var_p}:
+            mval = prim.bind(obs, shape=shape)
+        else:
+            mval = prim.bind(obs, shape=shape, shots=self._device.shots.total_shots)
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if dtype != mval.dtype: 
             return jax.lax.convert_element_type(mval, dtype)
         return mval
-
 
 @QFuncPlxprInterpreter.register_primitive(qml.ops.Adjoint._primitive)
 def _(self, op):
