@@ -15,16 +15,21 @@
 # RUN: %PYTHON %s | FileCheck %s
 """ Test the lowering cases involving quantum control """
 
+import os
+import pathlib
 import platform
 from copy import deepcopy
 
 import jax.numpy as jnp
 import pennylane as qml
+from pennylane.devices.capabilities import OperatorProperties
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import OperationProperties
+
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 def get_custom_qjit_device(num_wires, discards, additions):
@@ -34,24 +39,14 @@ def get_custom_qjit_device(num_wires, discards, additions):
         """Custom Gate Set Device"""
 
         name = "lightning.qubit"
-        pennylane_requires = "0.35.0"
-        version = "0.0.2"
-        author = "Tester"
-
-        lightning_device = qml.device("lightning.qubit", wires=0)
-
-        backend_name = "default"
-        backend_lib = "default"
-        backend_kwargs = {}
+        config_filepath = CONFIG_CUSTOM_DEVICE
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            lightning_capabilities = get_device_capabilities(self.lightning_device)
-            custom_capabilities = deepcopy(lightning_capabilities)
+            self.qjit_capabilities = get_device_capabilities(self)
             for gate in discards:
-                custom_capabilities.native_ops.pop(gate)
-            custom_capabilities.native_ops.update(additions)
-            self.qjit_capabilities = custom_capabilities
+                self.qjit_capabilities.operations.pop(gate, None)
+            self.qjit_capabilities.operations.update(additions)
 
         @staticmethod
         def get_c_interface():
@@ -97,13 +92,13 @@ test_named_controlled()
 
 def test_native_controlled_custom():
     """Test native control of a custom operation."""
-    dev = get_custom_qjit_device(3, set(), {"Rot": OperationProperties(True, True, False)})
+    dev = get_custom_qjit_device(3, set(), {"Rot": OperatorProperties(True, True, False)})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled
     def native_controlled():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.custom "Rot"
+        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.static_custom "Rot"
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true, %true)
         qml.ctrl(qml.Rot(0.3, 0.4, 0.5, wires=[0]), control=[1, 2])
@@ -147,7 +142,7 @@ test_native_controlled_unitary()
 
 def test_native_controlled_multirz():
     """Test native control of the multirz operation."""
-    dev = get_custom_qjit_device(3, set(), {"MultiRZ": OperationProperties(True, True, True)})
+    dev = get_custom_qjit_device(3, set(), {"MultiRZ": OperatorProperties(True, True, True)})
 
     @qjit(target="mlir")
     @qml.qnode(dev)

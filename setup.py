@@ -23,6 +23,7 @@ import subprocess
 import sys
 from typing import Optional
 
+# build deps
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
@@ -75,15 +76,15 @@ requirements = [
     kokkos_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "tomlkit; python_version < '3.11'",
     "numpy!=2.0.0",
-    "scipy<1.14",
+    "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
 ]
 
 entry_points = {
     "pennylane.plugins": [
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
+        "oqd = catalyst.third_party.oqd:OQDDevice",
         "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
@@ -208,11 +209,9 @@ class UnifiedBuildExt(build_ext):
             f"-DCMAKE_BUILD_TYPE={build_type}",
             f"-DCMAKE_MAKE_PROGRAM={ninja_path}",
         ]
-        configure_args += (
-            [f"-DPYTHON_EXECUTABLE={sys.executable}"]
-            if platform.system() != "Darwin"
-            else [f"-DPython_EXECUTABLE={sys.executable}"]
-        )
+        configure_args += [
+            f"-DPython_EXECUTABLE={sys.executable}",
+        ]
 
         configure_args += self.cmake_defines
 
@@ -270,6 +269,8 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         )
 
 
+Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
+
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     custom_calls_extension = Extension(
@@ -280,6 +281,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -297,6 +299,7 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
         extra_compile_args=["-std=c++17"],
+        define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
@@ -309,6 +312,7 @@ ext_modules = [
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
 ]
 
+options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
 # the following entry points:
@@ -334,4 +338,5 @@ setup(
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     **description,
+    options=options,
 )

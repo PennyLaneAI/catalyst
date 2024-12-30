@@ -116,36 +116,29 @@ class LinkerDriver:
 
         # Discover the LAPACK library provided by scipy & add link against it.
         # Doing this here ensures we will always have the correct library name.
+        lib_name = "openblas"
+        package_name = "scipy_openblas32"
+        path_within_package = "lib"
+        file_extension = ".so" if platform.system() == "Linux" else ".dylib"  # pragma: no branch
 
-        if platform.system() == "Linux":
-            file_path_within_package = "../scipy.libs/"
-            file_extension = ".so"
-        else:  # pragma: nocover
-            msg = "Attempting to use catalyst on an unsupported system"
-            assert platform.system() == "Darwin", msg
-            file_path_within_package = ".dylibs/"
-            file_extension = ".dylib"
+        if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
+            # use our own build of LAPACKe to interface with Accelerate
+            lapack_lib_name = "lapacke.3"
+        else:
+            package_spec = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(package_spec.origin)
+            lapack_lib_path = path.join(package_directory, path_within_package)
 
-        package_name = "scipy"
-        scipy_package = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(scipy_package.origin)
-        scipy_lib_path = path.join(package_directory, file_path_within_package)
+            search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+            search_result = glob.glob(search_pattern)
+            if not search_result:  # pragma: nocover
+                raise CompileError(
+                    f'Unable to find OpenBLAS library at "{search_pattern}". '
+                    "Please ensure that scipy is installed and available via pip."
+                )
 
-        file_prefix = "libopenblas"
-        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that SciPy is installed and available via pip."
-            )
-        openblas_so_file = search_result[0]
-        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
-
-        lib_path_flags += [
-            f"-Wl,-rpath,{scipy_lib_path}",
-            f"-L{scipy_lib_path}",
-        ]
+            lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
+            lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
 
         system_flags = []
         if platform.system() == "Linux":
@@ -153,7 +146,8 @@ class LinkerDriver:
             # RPATH influences search paths globally while RUNPATH only works for
             # a single file, but not its dependencies.
             system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            assert platform.system() == "Darwin", f"Unsupported OS {platform.system()}"
             system_flags += ["-Wl,-arch_errors_fatal"]
 
         # The exception handling mechanism requires linking against
@@ -172,7 +166,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            f"-l{openblas_lib_name}",  # required for custom_calls lib
+            f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
@@ -289,6 +283,14 @@ class Compiler:
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
         if not self.options.lower_to_llvm:
             cmd += ["--tool", "opt"]
+        if self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            for plugin in plugins:
+                cmd += ["--load-pass-plugin", str(plugin)]
+        if self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            for plugin in plugins:
+                cmd += ["--load-dialect-plugin", str(plugin)]
         if self.options.keep_intermediate:
             cmd += ["--keep-intermediate"]
         # The async tests are not included as part of coverage.

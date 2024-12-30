@@ -29,12 +29,18 @@ from pennylane.capture import (
 )
 from pennylane.capture import PlxprInterpreter
 
-from catalyst.device import extract_backend_info, get_device_capabilities
+from catalyst.device import (
+    extract_backend_info,
+    get_device_capabilities,
+    get_device_shots,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
     compbasis_p,
+    counts_p,
     expval_p,
     gphase_p,
     namedobs_p,
@@ -183,7 +189,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     def setup(self):
         if self.stateref is None:
-            qdevice_p.bind(**_get_device_kwargs(self._device))
+            qdevice_p.bind(get_device_shots(self._device) or 0, **_get_device_kwargs(self._device))
             self.stateref = {
                 "qreg": qalloc_p.bind(len(self._device.wires)),
                 "wire_map": {}
@@ -212,7 +218,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             *in_qubits,
             *op.data,
             op=op.name,
-            params_len=len(op.data),
+            ctrl_value_len=0,
             qubits_len=len(op.wires),
             adjoint=is_adjoint,
         )

@@ -17,17 +17,25 @@ This module contains functions tracing and lowering JAX code to MLIR.
 """
 
 import logging
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
-from pennylane.measurements import DensityMatrixMP, MeasurementProcess, StateMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementProcess,
+    ProbabilityMP,
+    StateMP,
+    VarianceMP,
+)
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
@@ -62,6 +70,7 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
+from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -88,7 +97,6 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.passes import add_mlir_quantum_decomposition
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -540,8 +548,9 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
         }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            plugins = EvaluationContext.get_plugins()
 
-    return jaxpr, out_type, out_treedef
+    return jaxpr, out_type, out_treedef, plugins
 
 
 @debug_logger
@@ -682,12 +691,14 @@ def trace_quantum_operations(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            qubits2 = qinst_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+            qubits2 = bind_flexible_primitive(
+                qinst_p,
+                {"static_params": op.parameters},
+                *[*qubits, *controlled_qubits, *controlled_values],
                 op=op.name,
                 qubits_len=len(qubits),
-                params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
@@ -856,23 +867,19 @@ def trace_quantum_measurements(
         if isinstance(o, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if device.shots.num_copies > 1 and o.return_type.value != "sample":  # qml.sample()
+            if device.shots.num_copies > 1 and not isinstance(o, qml.measurements.SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {o.return_type.value} is not supported a shot-vector. "
+                    f"Measurement {type(o).__name__} is not supported a shot-vector. "
                     "Use qml.sample() instead."
                 )
 
-            if isinstance(device, qml.devices.LegacyDevice):
-                m_wires = o.wires if o.wires else range(device.num_wires)
-            else:
-                m_wires = o.wires if o.wires else range(len(device.wires))
+            m_wires = o.wires if o.wires else range(len(device.wires))
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
-            if o.return_type.value == "sample":
-                results = []  # list of results per copy
+            if isinstance(o, qml.measurements.SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
@@ -883,7 +890,9 @@ def trace_quantum_measurements(
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                    result = bind_flexible_primitive(
+                        sample_p, {"shots": shots}, obs_tracers, num_qubits=nqubits
+                    )
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
 
@@ -901,22 +910,24 @@ def trace_quantum_measurements(
 
                     out_classical_tracers.append(reshaped_result)
 
-            elif o.return_type.value == "expval":
-                out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
-            elif o.return_type.value == "var":
-                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
-            elif o.return_type.value == "probs":
+            elif type(o) is ExpectationMP:
+                out_classical_tracers.append(expval_p.bind(obs_tracers))
+            elif type(o) is VarianceMP:
+                out_classical_tracers.append(var_p.bind(obs_tracers))
+            elif type(o) is ProbabilityMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
-            elif o.return_type.value == "counts":
+            elif type(o) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
                         "qml.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
                 shape = (2**nqubits,) if using_compbasis else (2,)
-                results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
+                results = bind_flexible_primitive(
+                    counts_p, {"shots": shots}, obs_tracers, shape=shape
+                )
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
@@ -931,7 +942,7 @@ def trace_quantum_measurements(
                     )
                 else:
                     out_tree = counts_tree
-            elif isinstance(o, StateMP) and not isinstance(o, DensityMatrixMP):
+            elif type(o) is StateMP:
                 assert using_compbasis
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
@@ -1136,8 +1147,6 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-    # Add the decomposition passes with the transform dialect
-    add_mlir_quantum_decomposition(f, device)
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
@@ -1195,7 +1204,12 @@ def trace_quantum_function(
                 # We just need to ensure there is a tape cut in between each.
                 # Each tape will be outlined into its own function with mlir pass
                 # -split-multiple-tapes
+
+                # TODO: device shots is now always a concrete integer or None
+                # When PennyLane allows dynamic shots, update tracing to accept dynamic shots too
+                device_shots = get_device_shots(device) or 0
                 qdevice_p.bind(
+                    device_shots,
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
                     rtd_kwargs=str(device.backend_kwargs),

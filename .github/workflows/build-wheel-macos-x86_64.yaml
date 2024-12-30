@@ -10,6 +10,9 @@ on:
       - ready_for_review
   push:
     branches: [ main ]
+  schedule:
+    # Thursdays we test the standalone plugin
+    - cron: '35 4 * * 4'
   workflow_dispatch:
   workflow_call:
 
@@ -146,7 +149,7 @@ jobs:
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -178,7 +181,7 @@ jobs:
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -197,7 +200,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
-              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+              -DCMAKE_CXX_VISIBILITY_PRESET=default
 
         cmake --build enzyme-build --target EnzymeStatic-19
 
@@ -290,10 +293,7 @@ jobs:
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
-              -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython_ROOT_DIR=$(python${{ matrix.python_version }} -c "import sys; print(sys.prefix)") \
-              -DPYTHON_VERSION_TO_FIND=${{ matrix.python_version }} \
-              -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
@@ -305,6 +305,14 @@ jobs:
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
+
+    # Build OQD-Runtime
+    - name: Build OQD-Runtime
+      run: |
+          OQD_BUILD_DIR="$(pwd)/oqd-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
+          make oqd
 
     - name: Test Catalyst-Runtime
       run: |
@@ -332,6 +340,15 @@ jobs:
 
         cmake --build quantum-build --target check-dialects catalyst-cli
 
+    - name: Build Plugin wheel
+      # Run only on Thursday at the given time
+      if: github.event.schedule == '35 4 * * 4'
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        MLIR_DIR="$(pwd)/llvm-build/lib/cmake/mlir" \
+        make plugin-wheel
+
     - name: Build wheel
       run: |
         PYTHON=python${{ matrix.python_version }} \
@@ -340,6 +357,7 @@ jobs:
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
         OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
+        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
@@ -353,6 +371,15 @@ jobs:
       with:
         name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: wheel/
+        retention-days: 14
+
+    - name: Upload Standalone Plugin Wheel Artifact
+      # Run only on Thursday at the given time
+      if: github.event.schedule == '35 4 * * 4'
+      uses: actions/upload-artifact@v4
+      with:
+        name: standalone-plugin-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        path: standalone_plugin_wheel/dist
         retention-days: 14
 
   test-wheels:
@@ -376,6 +403,14 @@ jobs:
         name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
 
+    - name: Download Standalone Plugin Wheel Artifact
+      # Run only on Thursday at the given time
+      if: github.event.schedule == '35 4 * * 4'
+      uses: actions/download-artifact@v4
+      with:
+        name: standalone-plugin-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        path: standalone_plugin_wheel/wheel
+
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
       with:
@@ -398,6 +433,12 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
+    - name: Install Standalone Plugin
+      # Run only on Thursday at the given time
+      if: github.event.schedule == '35 4 * * 4'
+      run: |
+        python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
+
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
@@ -406,3 +447,9 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+
+    - name: Run Standalone Plugin Tests
+      # Run only on Thursday at the given time
+      if: github.event.schedule == '35 4 * * 4'
+      run: |
+        python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto

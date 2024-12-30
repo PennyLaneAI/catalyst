@@ -205,10 +205,12 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         StringRef qirName = "__catalyst__rt__device_init"; // (int8_t *, int8_t *, int8_t *) -> void
 
         Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type int64Type = IntegerType::get(rewriter.getContext(), 64);
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
-                                                         /* rtd_kwargs = */ charPtrType});
+                                                         /* rtd_kwargs = */ charPtrType,
+                                                         /* shots = */ int64Type});
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         auto rtd_lib = op.getLib().str();
@@ -223,6 +225,15 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
             loc, rewriter, rtd_kwargs, StringRef(rtd_kwargs.c_str(), rtd_kwargs.length() + 1), mod);
 
         SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
+
+        Value shots = op.getShots();
+        if (!shots) {
+            auto zeroShots = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+            operands.push_back(zeroShots);
+        }
+        else {
+            operands.push_back(shots);
+        }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 
@@ -713,11 +724,10 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
 
-        Type qirSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                        {LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                         IntegerType::get(ctx, 64), IntegerType::get(ctx, 64)},
-                                        /*isVarArg=*/true);
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
@@ -733,10 +743,9 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
         ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
 
-        Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShotsAttr());
         Value numQubits =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-        SmallVector<Value> args = {structPtr, numShots, numQubits};
+        SmallVector<Value> args = {structPtr, numQubits};
         args.insert(args.end(), qubits.begin(), qubits.end());
 
         if constexpr (std::is_same_v<T, SampleOp>) {

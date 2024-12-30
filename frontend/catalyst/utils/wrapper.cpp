@@ -190,8 +190,8 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
         // Decrement reference counts.
         // The final ref count of `new_array` should be 2: one for the `returns` list and one for
         // the `numpy_arrays` dict.
-        Py_DECREF(pyLong);
-        Py_DECREF(new_array);
+        Py_DecRef(pyLong);
+        Py_DecRef(new_array);
     }
     return returns;
 }

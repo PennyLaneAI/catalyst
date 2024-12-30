@@ -119,7 +119,7 @@ jobs:
         path: lightning_build
         fetch-depth: 0
 
-    - name: Download PennyLane-Lightning (latest)
+    - name: Download PennyLane-Lightning (release-candidate)
       if: ${{ inputs.lightning == 'release-candidate' }}
       uses: actions/checkout@v4
       with:

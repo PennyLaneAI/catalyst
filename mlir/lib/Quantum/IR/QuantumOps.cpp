@@ -40,29 +40,63 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
                                                "CY",       "CZ",     "SWAP",   "Toffoli"};
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
+
+LogicalResult StaticCustomOp::canonicalize(StaticCustomOp op, mlir::PatternRewriter &rewriter)
+{
+    if (!op.getAdjoint()) {
+        return failure();
+    }
+    auto name = op.getGateName();
+
+    if (hermitianOps.contains(name)) {
+        rewriter.modifyOpInPlace(op, [&op]() { op.setAdjoint(false); });
+        return success();
+    }
+
+    if (rotationsOps.contains(name)) {
+        auto params = op.getStaticParams();
+        SmallVector<double> paramsNeg;
+        for (auto param : params) {
+            auto paramNeg = -1 * param;
+            paramsNeg.push_back(paramNeg);
+        }
+
+        rewriter.replaceOpWithNewOp<StaticCustomOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(),
+            rewriter.getDenseF64ArrayAttr(paramsNeg), op.getInQubits(), name, nullptr,
+            op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
+    }
+
+    return failure();
+}
+
 LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
 {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        }
-        else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(
-                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
-
-            return success();
-        }
+    if (!op.getAdjoint()) {
         return failure();
+    }
+    auto name = op.getGateName();
+
+    if (hermitianOps.contains(name)) {
+        rewriter.modifyOpInPlace(op, [&op]() { op.setAdjoint(false); });
+        return success();
+    }
+
+    if (rotationsOps.contains(name)) {
+        auto params = op.getParams();
+        SmallVector<Value> paramsNeg;
+        for (auto param : params) {
+            auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+            paramsNeg.push_back(paramNeg);
+        }
+
+        rewriter.replaceOpWithNewOp<CustomOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
+            op.getInQubits(), name, nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
     }
     return failure();
 }
@@ -229,6 +263,7 @@ LogicalResult HermitianOp::verify()
 LogicalResult SampleOp::verify()
 {
     std::optional<size_t> numQubits = 0;
+
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
@@ -237,25 +272,13 @@ LogicalResult SampleOp::verify()
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
-    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
-    if (getObs().getDefiningOp<ComputationalBasisOp>() &&
-        failed(verifyTensorResult(toVerify, getShots(), numQubits.value()))) {
-        // In the computational basis, Pennylane adds a second dimension for the number of qubits.
-        return emitOpError("return tensor must have 2D static shape equal to "
-                           "(number of shots, number of qubits in observable)");
-    }
-    else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
-             failed(verifyTensorResult(toVerify, getShots()))) {
-        // For any given observables, Pennylane always returns a 1D tensor.
-        return emitOpError("return tensor must have 1D static shape equal to (number of shots)");
-    }
-
     return success();
 }
 
 LogicalResult CountsOp::verify()
 {
     std::optional<size_t> numQubits = 0;
+
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
     }
