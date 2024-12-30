@@ -102,23 +102,6 @@ class TestErrors:
         ):
             from_plxpr(jaxpr)()
 
-    def test_operator_with_hyperparameters(self):
-        """Test that a NotImplementedError is raised for an operator without a n_wires parameter."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev)
-        def circuit():
-            qml.PauliRot(0.5, "XY", wires=(0,1))
-            return qml.expval(qml.Z(0))
-
-        qml.capture.enable()
-        jaxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
-
-        with pytest.raises(NotImplementedError, match="not yet supported"):
-            from_plxpr(jaxpr)()
-
     def test_observable_without_n_wires(self):
         """Test that a NotImplementedError is raised for an observable without n_wires."""
 

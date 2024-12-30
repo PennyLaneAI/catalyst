@@ -149,7 +149,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
 
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalxpr variant."""
-    pass
+
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
@@ -192,10 +192,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
             qdevice_p.bind(get_device_shots(self._device) or 0, **_get_device_kwargs(self._device))
-            self.stateref = {
-                "qreg": qalloc_p.bind(len(self._device.wires)),
-                "wire_map": {}
-            }
+            self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
     def cleanup(self):
@@ -217,10 +214,10 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     def interpret_operation(self, op, is_adjoint=False):
         """Re-bind a pennylane operation as a catalyst instruction."""
-        if op.arithmetic_depth > 0:
-            raise NotImplementedError("operator arithmetic not yet supported for conversion.")
         if op.hyperparameters:
-            raise NotImplementedError("operators with hyperparameters not yet supported for conversion.")
+            raise NotImplementedError(
+                "operators with hyperparameters not yet supported for conversion."
+            )
 
         in_qubits = [self.get_wire(w) for w in op.wires]
         out_qubits = qinst_p.bind(
@@ -251,11 +248,19 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction."""
         if type(measurement) not in measurement_map:
-            raise NotImplementedError(f"measurement {measurement} not yet supported for conversion.")
+            raise NotImplementedError(
+                f"measurement {measurement} not yet supported for conversion."
+            )
 
-        if measurement._eigvals is not None: # pylint: disable=protected-access
-            raise NotImplementedError("from_plxpr does not yet support measurements with manual eigvals.")
-        if measurement.mv is not None or measurement.obs is not None and not isinstance(measurement.obs, qml.operation.Operator):
+        if measurement._eigvals is not None:  # pylint: disable=protected-access
+            raise NotImplementedError(
+                "from_plxpr does not yet support measurements with manual eigvals."
+            )
+        if (
+            measurement.mv is not None
+            or measurement.obs is not None
+            and not isinstance(measurement.obs, qml.operation.Operator)
+        ):
             raise NotImplementedError("Measurements of mcms are not yet supported.")
 
         if measurement.obs:
@@ -264,15 +269,19 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             obs = self._compbasis_obs(*measurement.wires)
 
         # pylint: disable=protected-access
-        shape, dtype = measurement._abstract_eval(n_wires=len(measurement.wires),
+        shape, dtype = measurement._abstract_eval(
+            n_wires=len(measurement.wires),
             shots=self._device.shots.total_shots,
-            num_device_wires=len(self._device.wires))
-    
+            num_device_wires=len(self._device.wires),
+        )
+
         prim = measurement_map[type(measurement)]
         device_shots = get_device_shots(self._device) or 0
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
-            mval = bind_flexible_primitive(sample_p, {"shots": device_shots}, obs, num_qubits=num_qubits)
+            mval = bind_flexible_primitive(
+                sample_p, {"shots": device_shots}, obs, num_qubits=num_qubits
+            )
         elif prim is counts_p:
             mval = bind_flexible_primitive(counts_p, {"shots": device_shots}, shape=shape)
         elif prim in {expval_p, var_p}:
@@ -281,25 +290,34 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             mval = prim.bind(obs, shape=shape, shots=self._device.shots.total_shots)
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
-        if dtype != mval.dtype: 
+        if dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, dtype)
         return mval
 
+
 # pylint: disable=unused-argument
-@QFuncPlxprInterpreter.register_primitive(qml.ops.Adjoint._primitive) # pylint: disable=protected-access
+@QFuncPlxprInterpreter.register_primitive(
+    qml.ops.Adjoint._primitive
+)  # pylint: disable=protected-access
 def _(self, op):
     self.interpret_operation(op, is_adjoint=True)
 
+
 # pylint: disable=unused-argument
-@QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive) # pylint: disable=protected-access
+@QFuncPlxprInterpreter.register_primitive(
+    qml.QubitUnitary._primitive
+)  # pylint: disable=protected-access
 def _(self, *invals, n_wires):
     wires = [self.get_wire(w) for w in invals[1:]]
     outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
         self.wire_map[wire_values] = new_wire
 
+
 # pylint: disable=unused-argument
-@QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive) # pylint: disable=protected-access
+@QFuncPlxprInterpreter.register_primitive(
+    qml.GlobalPhase._primitive
+)  # pylint: disable=protected-access
 def _(self, phase, *wires, n_wires):
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
@@ -331,10 +349,11 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
             enable()
 
         args = sig
-        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-
-        if not capture_on:
-            disable()
+        try:
+            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+        finally:
+            if not capture_on:
+                disable()
 
         jaxpr = from_plxpr(plxpr)(*args, **kwargs)
     return jaxpr, out_type, out_treedef, sig
