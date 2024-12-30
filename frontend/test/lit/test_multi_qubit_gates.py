@@ -71,6 +71,7 @@ print(circuit.mlir)
 # would be decomposed.
 """
 
+
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("braket.local.qubit", wires=2, shots=100))
@@ -83,7 +84,6 @@ def circuit(x: float):
 
 
 print(circuit.mlir)
-
 
 
 # CHECK-LABEL: public @jit_isingZZ_circuit
