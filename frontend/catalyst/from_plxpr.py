@@ -15,7 +15,6 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 from functools import partial
-from random import sample
 from typing import Callable
 
 import jax
