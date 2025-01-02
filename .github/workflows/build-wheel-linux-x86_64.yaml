@@ -471,7 +471,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1' "boto3==1.26"
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
 
     - name: Install OQC client
       run: |
@@ -492,7 +492,7 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        # python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
 
     - name: Run Standalone Plugin Tests
