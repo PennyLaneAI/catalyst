@@ -471,7 +471,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1' "boto3==1.26"
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
 
     - name: Install OQC client
       run: |
