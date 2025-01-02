@@ -332,8 +332,8 @@ setup(
         include=["catalyst", "catalyst.*", "mlir_quantum"],
         exclude=[
             "catalyst.third_party.oqc.*",
-            "catalyst.third_party.oqd.*",  # Exclude OQD packages and modules from wheels
-            "catalyst.third_party.oqd",    # as they are still under development
+            "catalyst.third_party.oqd.*",
+            "catalyst.third_party.oqd",  # Exclude OQD from wheels as it is still under development
         ],
     ),
     package_dir={"": "frontend"},
