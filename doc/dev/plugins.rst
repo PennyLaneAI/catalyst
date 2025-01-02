@@ -385,7 +385,7 @@ See our ``setup.py`` `file in the standalone plugin python package <https://gith
         # ... snip ...
     )
 
-After this, the user will be able to use your pass with the `~passes.apply_pass` function.
+After this, the user will be able to use your pass with the :func:`~passes.apply_pass` function.
 
 .. code-block:: python
 
@@ -400,7 +400,7 @@ After this, the user will be able to use your pass with the `~passes.apply_pass`
 
     print(module.mlir)
 
-You can of course, also define your own decorators similar to `~passes.apply_pass` to check parameters, do some other validation or perhaps just to improve the user interface.
+You can of course, also define your own decorators similar to :func:`~passes.apply_pass` to check parameters, do some other validation or perhaps just to improve the user interface.
 E.g.,:
 
 
