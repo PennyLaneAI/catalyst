@@ -98,6 +98,21 @@ intermediate files are saved.
 Keep intermediate files after each pipeline in the compilation. By default, no intermediate files
 are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-after-each=pipeline``.
 
+``--{passname}``
+"""""""""""""""
+
+Enable a specific pass. For example, to enable the ``remove-chained-self-inverse`` pass, use
+``--remove-chained-self-inverse``.
+Catalyst has a set of default pipelines that are registered as seperate passes, and can be enabled
+using this option. Currently, the following passes are available:
+``enforce-runtime-invariants-pipeline``,
+``hlo_lowering-pipeline``,
+``quantum-compilation-pipeline``,
+``bufferization-pipeline``,
+``llvm-dialect-lowring-pipeline``, and finally 
+``default-catalyst-pipeline`` which is the default pipeline used by the Catalyst CLI tool if no 
+pipeline is specified.
+
 ``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -113,7 +128,7 @@ applies the pass ``inline-nested-module``, we would specify this pipeline config
 
 .. code-block::
 
-    --catalyst-pipeline=pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)
+    --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)"
 
 ``--workspace=<path>``
 """"""""""""""""""""""
@@ -138,7 +153,11 @@ Enable asynchronous QNodes.
 """""""""""""""""""""""""""""""""""
 
 Define a *checkpoint stage*, used to indicate that the compiler should start only after reaching the
-given pass.
+given stage. The stages that are currently available are:
+* MLIR:: ``mlir``, and the name of piplines defined using the ``--catalyst-pipeline`` option.
+* LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``.
+Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+(automatic differentiation) passes do not always happen.
 
 ``--dump-catalyst-pipeline[=<true|false>]``
 """""""""""""""""""""""""""""""""""""""""""
