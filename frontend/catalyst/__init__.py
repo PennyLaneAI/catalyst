@@ -89,7 +89,7 @@ from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
-from catalyst.passes import Pass, PassPlugin, pipeline
+from catalyst.passes import Pass, PassPlugin, apply_pass, apply_pass_plugin, pipeline
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
@@ -187,6 +187,8 @@ __all__ = (
     "debug_assert",
     "CompileOptions",
     "debug",
+    "apply_pass",
+    "apply_pass_plugin",
     "pipeline",
     "Pass",
     "PassPlugin",
