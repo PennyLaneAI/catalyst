@@ -334,7 +334,7 @@ From here, you can change the name of the pass, change the name of the shared ob
 Now that you have your ``StandalonePlugin.so``, you can ship it in a python wheel.
 To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PassPlugin`.
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
-We provide the `~passes.apply_pass_plugin` decorator to allow pass plugins to be loaded and executed.
+We provide the :func:`~passes.apply_pass_plugin` decorator to allow pass plugins to be loaded and executed.
 See for example:
 
 .. code-block:: python
