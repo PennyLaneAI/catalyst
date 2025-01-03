@@ -8,32 +8,59 @@
   [(#1370)](https://github.com/PennyLaneAI/catalyst/pull/1370)
 
   Custom compilation passes and dialects in MLIR can be specified for use in Catalyst via a shared 
-  object (`*.so`) that implements the pass. MLIR plugins can be loaded from Python as follows:
+  object (`*.so` or `*.dylib` on MacOS) that implements the pass. Details on creating your own 
+  plugin can be found in our 
+  [compiler plugin documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html).
+  At a high level, there are three ways to utilize a plugin once it's properly specified:
 
-  ```python
-  from pathlib import Path
+  * :func:`~.passes.apply_pass`: use this on QNodes when there is a  
+    [Python entry point](https://packaging.python.org/en/latest/specifications/entry-points/) 
+    defined for the plugin.
 
-  plugin = Path("shared_object_file.so")
-  ```
+    ```python
+    @catalyst.passes.apply_pass(pass_name)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def qnode():
+        return qml.state()
 
-  In this dummy example, the plugin may define compilation passes and/or new dialects that can be
-  specified in the new `pass_plugins` and `dialect_plugins` keyword arguments of :func:`~.qjit`. Passes can 
-  then be applied to QNodes via :func:`~.passes.apply_pass`.
+    @qml.qjit
+    def module():
+        return qnode()
+    ```
 
-  ```python
-  import catalyst
+  * :func:`~.passes.apply_pass_plugin`: use this on QNodes when there is not an entry point defined
+    for the plugin.
 
-  @qml.qnode(qml.device("lightning.qubit", wires=0))
-  def qnode():
-    qml.Hadamard(wires=0)
-    return qml.state()
+    ```python
+    @catalyst.passes.apply_pass_plugin(path_to_plugin, pass_name)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def qnode():
+        return qml.state()
 
-  @qml.qjit(pass_plugins=[plugin], dialect_plugins=[plugin])
-  def module():
-    return catalyst.apply_pass(qnode, "pass_name")()
-  ```
+    @qml.qjit
+    def module():
+        return qnode()
+    ```
 
-  Alternatively, `apply_pass` can be used as a decorator on `qnode`. For more information on usage, 
+  * Specifying multiple compilation pass plugins or dialect plugins directly in :func:`~.qjit` via 
+    the `pass_plugins` and `dialect_plugins` keyword arguments, which must be lists of plugin paths.
+
+    ```python
+    from pathlib import Path
+
+    plugin = Path("shared_object_file.so")
+
+    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    def qnode():
+      qml.Hadamard(wires=0)
+      return qml.state()
+
+    @qml.qjit(pass_plugins=[plugin], dialect_plugins=[plugin])
+    def module():
+      return catalyst.passes.apply_pass(qnode, "pass_name")()
+    ```
+
+  For more information on usage, 
   visit our [compiler plugin documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html).
 
 <h3>Improvements 🛠</h3>
@@ -254,7 +281,7 @@ Joey Carter,
 David Ittah,
 Erick Ochoa Lopez,
 Mehrdad Malekmohammadi,
-William Maxwell
+William Maxwell,
 Romain Moyard,
 Shuli Shu,
 Ritu Thombre,
