@@ -103,8 +103,10 @@ are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-afte
 
 Enable a specific pass. For example, to enable the ``remove-chained-self-inverse`` pass, use
 ``--remove-chained-self-inverse``.
-Catalyst has a set of default pipelines that are registered as seperate passes, and can be enabled
-using this option. Currently, the following passes are available:
+
+Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines that can also be run
+individually via this option. In that case, the name of the pipeline is substituted for the pass
+name. Currently, the following pipelines are available:
 ``enforce-runtime-invariants-pipeline``,
 ``hlo_lowering-pipeline``,
 ``quantum-compilation-pipeline``,
