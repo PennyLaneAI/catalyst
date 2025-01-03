@@ -73,6 +73,9 @@
 
   The algorithm is taken from [Relaxed Peephole Optimization: A Novel Compiler Optimization for Quantum Circuits, by Ji Liu, Luciano Bello, and Huiyang Zhou](https://arxiv.org/abs/2012.07711).
 
+* Allow specifying a branch to switch to when setting up a dev environment from the wheels.
+  [(#1406)](https://github.com/PennyLaneAI/catalyst/pull/1406)
+
 <h3>Breaking changes 💔</h3>
 
 * The `sample` and `counts` measurement primitives now support dynamic shot values across catalyst, although at the PennyLane side, the device shots still is constrained to a static integer literal.
