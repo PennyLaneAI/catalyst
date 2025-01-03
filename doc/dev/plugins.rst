@@ -338,6 +338,7 @@ We provide the :func:`~.passes.apply_pass_plugin` decorator to allow pass plugin
 See for example:
 
 .. code-block:: python
+
     from standalone import getStandalonePluginAbsolutePath
 
     @apply_pass_plugin("standalone-switch-bar-foo", getStandalonePluginAbsolutePath())
@@ -362,6 +363,7 @@ To do this, you only need to define a function named ``name2pass``—it must be 
 For the `standalone plugin python <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ package we defined:
 
 .. code-block:: python
+
     def name2pass(_name):
         """Example entry point for standalone plugin"""
 
@@ -406,6 +408,7 @@ E.g.,:
 
 
 .. code-block:: python
+
     from standalone import SwitchBarToFoo
 
     @SwitchBarToFoo
