@@ -8,7 +8,7 @@ sphinxcontrib-htmlhelp==2.0.1
 sphinxcontrib-serializinghtml==1.1.5
 ipykernel
 nbsphinx==0.7
-Jinja2==3.1.4
+Jinja2==3.1.5
 version_information
 sphinx-copybutton
 sphinx-tabs
