@@ -2,8 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst can now load and apply local MLIR plugins from the PennyLane frontend, including support 
-  for `entry_points`. 
+* Catalyst can now load and apply local MLIR plugins from the PennyLane frontend.
   [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
   [(#1361)](https://github.com/PennyLaneAI/catalyst/pull/1361)
   [(#1370)](https://github.com/PennyLaneAI/catalyst/pull/1370)
@@ -18,8 +17,8 @@
   ```
 
   In this dummy example, the plugin may define compilation passes and/or new dialects that can be
-  specified in the new `pass_plugins` and `dialect_plugins` keyword arguments of `qjit`. Passes can 
-  then be applied to QNodes via `catalyst.apply_pass`.
+  specified in the new `pass_plugins` and `dialect_plugins` keyword arguments of :func:`~.qjit`. Passes can 
+  then be applied to QNodes via :func:`~.passes.apply_pass`.
 
   ```python
   import catalyst
@@ -96,7 +95,7 @@
   to propagate simple one-qubit states, similar to the `--disentangle-CNOT` pass.
 
   Both passes are implemented in accordance with the algorithm from 
-  [Relaxed Peephole Optimization: A Novel Compiler Optimization for Quantum Circuits, by Ji Liu, Luciano Bello, and Huiyang Zhou](https://arxiv.org/abs/2012.07711).
+  J. Liu, L. Bello, and H. Zhou, _Relaxed Peephole Optimization: A Novel Compiler Optimization for Quantum Circuits_, 2020, [arXiv:2012.07711](https://arxiv.org/abs/2012.07711) [quant-ph].
 
 <h3>Breaking changes 💔</h3>
 
@@ -134,7 +133,7 @@
   `qml.adjoint(qml.adjoint(qml.H(0)))`).
   [(#1301)](https://github.com/PennyLaneAI/catalyst/issues/1301)
 
-* Fixed a bug in `debug.compile_executable` which would generate incorrect stride information for
+* Fixed a bug in :func:`~.debug.compile_executable` that would generate incorrect stride information for
   array arguments of the function, in particular when non-64bit datatypes are used.
   [(#1338)](https://github.com/PennyLaneAI/catalyst/pull/1338)
 
@@ -151,7 +150,7 @@
   Python's stable ABI, which pybind11 does not support.
   [(#1187)](https://github.com/PennyLaneAI/catalyst/pull/1187)
 
-* Code to for using `lightning.qubit` with Catalyst has been moved from the Catalyst repository to 
+* Code for using `lightning.qubit` with Catalyst has been moved from the Catalyst repository to 
   the [Lightning repository](https://github.com/PennyLaneAI/pennylane-lightning) so that Catalyst
   wheels will build faster.
   [(#1227)](https://github.com/PennyLaneAI/catalyst/pull/1227)
@@ -236,7 +235,7 @@
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
 
 * The `catalyst-cli` documentation has been updated to reflect the removal of the `func-name` option 
-  for trasnformation passes.
+  for transformation passes.
   [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
 
 <h3>Contributors ✍️</h3>
