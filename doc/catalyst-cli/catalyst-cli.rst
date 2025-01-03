@@ -156,10 +156,12 @@ Enable asynchronous QNodes.
 
 Define a *checkpoint stage*, used to indicate that the compiler should start only after reaching the
 given stage. The stages that are currently available are:
-* MLIR:: ``mlir``, and the name of piplines defined using the ``--catalyst-pipeline`` option.
-* LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``.
-Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
-(automatic differentiation) passes do not always happen.
+* MLIR:: ``mlir``, ``{pipeline}`` such as any of the built-in pipeline names
+  described under the ``--{passname}`` option, OR any custom pipeline names if the
+  ``--catalyst-pipeline={pipeline(...),...}`` option is used.
+* * LLVM: ``llvm_ir``, ``CoroOpt``, ``O2Opt``, ``Enzyme``.
+  Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+  (automatic differentiation) passes are only run conditionally as needed.
 
 ``--dump-catalyst-pipeline[=<true|false>]``
 """""""""""""""""""""""""""""""""""""""""""
