@@ -168,6 +168,10 @@
 
 * A default backend for OQD trapped-ion quantum devices has been added.
   [(#1355)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+  [(#1403)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+
+  Support for OQD devices is still under development, therefore the OQD modules are currently not
+  included in the distributed wheels.
 
 * `expval` and `var` operations no longer keep the static shots attribute, as a step towards supporting dynamic shots across catalyst.
   [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)

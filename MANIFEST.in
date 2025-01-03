@@ -3,4 +3,3 @@ recursive-include frontend/catalyst/lib *
 recursive-include frontend/catalyst/enzyme *
 recursive-include frontend/mlir_quantum *
 recursive-include frontend/catalyst/third_party/cuda/ *.toml
-recursive-include frontend/catalyst/third_party/oqd/ *.toml
