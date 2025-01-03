@@ -97,6 +97,9 @@
   Both passes are implemented in accordance with the algorithm from 
   J. Liu, L. Bello, and H. Zhou, _Relaxed Peephole Optimization: A Novel Compiler Optimization for Quantum Circuits_, 2020, [arXiv:2012.07711](https://arxiv.org/abs/2012.07711) [quant-ph].
 
+* Allow specifying a branch to switch to when setting up a dev environment from the wheels.
+  [(#1406)](https://github.com/PennyLaneAI/catalyst/pull/1406)
+
 <h3>Breaking changes 💔</h3>
 
 * The `sample` and `counts` measurement primitives now support dynamic shot values across Catalyst, 
@@ -199,6 +202,10 @@
 
 * A default backend for OQD trapped-ion quantum devices has been added.
   [(#1355)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+  [(#1403)](https://github.com/PennyLaneAI/catalyst/pull/1355)
+
+  Support for OQD devices is still under development, therefore the OQD modules are currently not
+  included in the distributed wheels.
 
 * As a step towards supporting dynamic shots across catalyst, `expval` and `var` operations no 
   longer keep the static shots attribute.
