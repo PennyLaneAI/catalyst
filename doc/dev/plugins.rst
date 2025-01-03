@@ -356,8 +356,9 @@ If you have followed all the steps in this tutorial and inspect the MLIR sources
 Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
 For more information, please consult our `dialect guide <../dev/dialects.html>`_, our `compiler passes guide <../dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
 
-You can also register your pass with Catalyst via Python's `entry_ponts <https://packaging.python.org/en/latest/specifications/entry-points/>`_.
-To do this, you only need to define a function named ``name2pass`` that takes a string with the name of the pass (from the user perspective) and returns the absolute path to the plugin stored in your package and the name of the MLIR pass.
+You can also register your pass with Catalyst via Python's `entry_ponts <https://packaging.python.org/en/latest/specifications/entry-points/>`_ (for reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ 
+that implements the standalone plugin as a Python package).
+To do this, you only need to define a function named ``name2pass``—it must be named ``name2pass``—that takes a string with the name of the pass (from the user perspective) and returns the absolute path to the plugin stored in your package and the name of the MLIR pass.
 For the `standalone plugin python <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ package we defined:
 
 .. code-block:: python
@@ -380,9 +381,9 @@ See our ``setup.py`` `file in the standalone plugin python package <https://gith
     setup(
         name="standalone_plugin",
         version="0.1.0",
-        # ... snip ...
+        # ... 
         entry_points=entry_points,
-        # ... snip ...
+        # ... 
     )
 
 After this, the user will be able to use your pass with the :func:`~.passes.apply_pass` function.
@@ -400,7 +401,7 @@ After this, the user will be able to use your pass with the :func:`~.passes.appl
 
     print(module.mlir)
 
-You can of course, also define your own decorators similar to :func:`~.passes.apply_pass` to check parameters, do some other validation or perhaps just to improve the user interface.
+Of course, you can also define your own decorators similar to :func:`~.passes.apply_pass` to check parameters, do some other validation or perhaps just to improve the user interface.
 E.g.,:
 
 
