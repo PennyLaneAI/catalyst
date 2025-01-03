@@ -175,25 +175,11 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_BUILD_EXAMPLES=OFF \
-              -DLLVM_TARGETS_TO_BUILD="host" \
-              -DLLVM_ENABLE_PROJECTS="mlir" \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DLLVM_INSTALL_UTILS=ON \
-              -DLLVM_ENABLE_ZLIB=FORCE_ON \
-              -DLLVM_ENABLE_ZSTD=OFF \
-              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_CXX_VISIBILITY_PRESET=default \
-              -DLLVM_ENABLE_LLD=ON
-
-        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-        # and remove filter
-        # This tests fails on CI/CD not locally.
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
+        PYTHON=$(which python${{ matrix.python_version }}) \
+        LLVM_BUILD_DIR="llvm-build" \
+        LLVM_TARGETS="check-mlir" \
+        ENABLE_ZLIB=FORCE_ON \
+        make llvm
 
     - name: Save LLVM Build
       id: save-llvm-build
@@ -486,7 +472,7 @@ jobs:
       if: github.event.schedule == '35 4 * * 4'
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
-    
+
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto

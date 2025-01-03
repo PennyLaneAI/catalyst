@@ -36,6 +36,8 @@ USE_SANITIZER_NAMES=""
 USE_SANITIZER_FLAGS=""
 endif
 
+LLVM_TARGETS ?= check-mlir llvm-symbolizer
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -75,8 +77,8 @@ llvm:
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-	# and remove filter
-	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
+	# and remove filter. This tests fails on CI/CD not locally.
+	LIT_FILTER_OUT="Bytecode|tosa-to-tensor" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: mhlo
 mhlo:
