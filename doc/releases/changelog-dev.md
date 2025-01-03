@@ -57,6 +57,7 @@
 
 * A new circuit optimization pass, `--disentangle-CNOT`, is available.
   [(#1154)](https://github.com/PennyLaneAI/catalyst/pull/1154)
+  [(#1407)](https://github.com/PennyLaneAI/catalyst/pull/1407)
 
   The pass disentangles CNOT gates whenever possible, e.g. when the control bit
   is known to be in |0>, the pass removes the CNOT. The pass uses a finite state
@@ -67,6 +68,7 @@
 
 * A new circuit optimization pass, `--disentangle-SWAP`, is available.
   [(#1297)](https://github.com/PennyLaneAI/catalyst/pull/1297)
+  [(#1407)](https://github.com/PennyLaneAI/catalyst/pull/1407)
 
   The pass disentangles SWAP gates whenever possible by using a finite state
   machine to propagate simple one-qubit states, similar to the `--disentangle-CNOT` pass.
