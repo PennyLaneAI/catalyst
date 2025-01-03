@@ -913,12 +913,12 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
-    std::string helpStr = "Catalyst Command Line Interface options.\n\n"
-                          "Below, there is a complete list of options for the Catalyst CLI tool\n"
-                          "In the first section, you can find the options that are used to\n"
-                          "configure the Catalyst compiler. Next, you can find the options\n"
-                          "specific to mlir-opt tool. Please note that we do not support all the\n"
-                          "options of mlir-opt tool. For the relavent options that are supported\n"
+    std::string helpStr = "Catalyst Command Line Interface options. \n"
+                          "Below, there is a complete list of options for the Catalyst CLI tool"
+                          "In the first section, you can find the options that are used to"
+                          "configure the Catalyst compiler. Next, you can find the options"
+                          "specific to mlir-opt tool. Please note that we do not support all the"
+                          "options of mlir-opt tool. For the relavent options that are supported"
                           "please refer to the documentation of the Catalyst CLI tool.\n";
     std::tie(inputFilename, outputFilename) =
         registerAndParseCLIOptions(argc, argv, helpStr, registry);
