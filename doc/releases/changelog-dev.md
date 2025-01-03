@@ -34,14 +34,14 @@
   ```
 
   Alternatively, `apply_pass` can be used as a decorator on `qnode`. For more information on usage, 
-  visit our [MLIR plugin documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html).
+  visit our [compiler plugin documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html).
 
 <h3>Improvements 🛠</h3>
 
 * The lightning runtime now supports finite shots with measuring expectation values of `qml.Hermitian`.
   [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
 
-* pybind11 has been replaced with nanobind for C++/Python bindings in the frontend and in the runtime.
+* Pybind11 has been replaced with nanobind for C++/Python bindings in the frontend and in the runtime.
   [(#1173)](https://github.com/PennyLaneAI/catalyst/pull/1173)
   [(#1293)](https://github.com/PennyLaneAI/catalyst/pull/1293)
   [(#1391)](https://github.com/PennyLaneAI/catalyst/pull/1391)
