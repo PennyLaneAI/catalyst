@@ -334,8 +334,19 @@ def cancel_inverses(qnode=None):
     return wrapper
 
 
-def apply_pass(pass_name, *flags, **valued_options):
-    """Applies a single pass to the qnode"""
+def apply_pass(pass_name: str, *flags, **valued_options):
+    """Applies a single pass to the QNode, where the pass is from Catalyst or a third-party
+    if `entry_points` has been implemented. See :doc:`the compiler plugin documentation <dev/plugins>`
+    for more details.
+
+    Args:
+        pass_name (str): Name of the pass
+        *flags: Pass options
+        **valued_options: options with values
+
+    Returns:
+        function that can be used as a decorator to a qnode.
+    """
 
     def decorator(qnode):
 
@@ -356,8 +367,19 @@ def apply_pass(pass_name, *flags, **valued_options):
     return decorator
 
 
-def apply_pass_plugin(plugin_name, pass_name, *flags, **valued_options):
-    """Applies a pass plugin"""
+def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_options):
+    """Applies a pass plugin to the QNode. See :doc:`the compiler plugin documentation <dev/plugins>`
+    for more details.
+
+    Args:
+        path_to_plugin (Path): full path to plugin
+        pass_name (str): Name of the pass
+        *flags: Pass options
+        **valued_options: options with values
+
+    Returns:
+        function that can be used as a decorator to a qnode.
+    """
 
     def decorator(qnode):
         if not isinstance(qnode, qml.QNode):
@@ -368,7 +390,7 @@ def apply_pass_plugin(plugin_name, pass_name, *flags, **valued_options):
 
         def qnode_call(*args, **kwargs):
             pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(PassPlugin(plugin_name, pass_name, *flags, **valued_options))
+            pass_pipeline.append(PassPlugin(path_to_plugin, pass_name, *flags, **valued_options))
             kwargs["pass_pipeline"] = pass_pipeline
             return qnode(*args, **kwargs)
 
