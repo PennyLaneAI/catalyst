@@ -112,8 +112,8 @@ name. Currently, the following pipelines are available:
 ``quantum-compilation-pipeline``,
 ``bufferization-pipeline``,
 ``llvm-dialect-lowring-pipeline``, and finally 
-``default-catalyst-pipeline`` which is the default pipeline used by the Catalyst CLI tool if no 
-pipeline is specified.
+``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
+Catalyst CLI tool if no pass option is specified.
 
 ``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""

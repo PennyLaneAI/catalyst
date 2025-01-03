@@ -865,7 +865,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     // ---------
     // Any modifications made to the command-line interface should be documented in
     // doc/catalyst-cli/catalyst-cli.rst
-    cl::OptionCategory CatalystCat("Catalyst-cli Options", "Frist print catalyst-cli options");
+    cl::OptionCategory CatalystCat("Catalyst-cli Options", "");
     cl::opt<std::string> WorkspaceDir("workspace", cl::desc("Workspace directory"), cl::init("."),
                                       cl::cat(CatalystCat));
     cl::opt<std::string> ModuleName("module-name", cl::desc("Module name"),
@@ -913,7 +913,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
-    std::string helpStr = "Catalyst Command Line Interface options. \n"
+    std::string helpStr = "Catalyst Command Line Interface options.\n\n"
                           "Below, there is a complete list of options for the Catalyst CLI tool\n"
                           "In the first section, you can find the options that are used to\n"
                           "configure the Catalyst compiler. Next, you can find the options\n"
