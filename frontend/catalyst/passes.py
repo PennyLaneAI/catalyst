@@ -345,7 +345,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
         **valued_options: options with values
 
     Returns:
-        function that can be used as a decorator to a qnode.
+        Function that can be used as a decorator to a QNode.
     """
 
     def decorator(qnode):
@@ -378,7 +378,7 @@ def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_opt
         **valued_options: options with values
 
     Returns:
-        function that can be used as a decorator to a qnode.
+        Function that can be used as a decorator to a QNode.
     """
 
     def decorator(qnode):
