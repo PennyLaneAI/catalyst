@@ -12,8 +12,6 @@ ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 BUILD_TYPE?=Release
-TARGET_FILE=$(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
-PATCH_FILE=$(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
@@ -55,8 +53,15 @@ help:
 all: llvm mhlo enzyme dialects plugin
 
 .PHONY: llvm
+llvm: TARGET_FILE := $(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/BufferDeallocation.cpp
+llvm: PATCH_FILE := $(MK_DIR)/patches/mlir-buffer-deallocation.patch
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
+	# Patch in MLIR buffer deallocation bugfix
+	# TODO: remove once https://github.com/llvm/llvm-project/pull/121582 is merged & the dep updated
+	@if patch --dry-run -p1 -N $(TARGET_FILE) $(PATCH_FILE) > /dev/null 2>&1; then \
+		patch -p1 $(TARGET_FILE) $(PATCH_FILE); \
+	fi
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
@@ -81,6 +86,8 @@ llvm:
 	LIT_FILTER_OUT="Bytecode|tosa-to-tensor" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: mhlo
+mhlo: TARGET_FILE := $(MK_DIR)/mlir-hlo/mhlo/transforms/CMakeLists.txt
+mhlo: PATCH_FILE := $(MK_DIR)/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
 mhlo:
 	@echo "build MLIR-HLO"
 	# Patch MHLO cmake dependency
