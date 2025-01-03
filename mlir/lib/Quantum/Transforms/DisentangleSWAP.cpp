@@ -131,371 +131,375 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         return newGate;
     }
 
-    bool canScheduleOn(RegisteredOperationName opInfo) const override
-    {
-        return opInfo.hasInterface<FunctionOpInterface>();
-    }
-
     void runOnOperation() override
     {
-        FunctionOpInterface func = cast<FunctionOpInterface>(getOperation());
-        mlir::IRRewriter builder(func->getContext());
-        Location loc = func->getLoc();
+        auto op = getOperation();
+        SmallVector<Operation *> targets;
+        op->walk([&](FunctionOpInterface func) { targets.push_back(func); });
 
-        PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
-        llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
+        for (auto func : targets) {
+            mlir::IRRewriter builder(func->getContext());
+            Location loc = func->getLoc();
 
-        func->walk([&](quantum::CustomOp op) {
-            StringRef gate = op.getGateName();
-            if (gate != "SWAP") {
-                return;
-            }
+            PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
+            llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
 
-            Value SwapQubit_0_In = op->getOperand(0);
-            Value SwapQubit_1_In = op->getOperand(1);
-            Value SwapQubit_0_Out = op->getResult(0);
-            Value SwapQubit_1_Out = op->getResult(1);
-
-            // first qubit in |0>
-            if (pssa.isZero(qubitValues[SwapQubit_0_In])) {
-                // second qubit in |0>: SWAP(|0>,|0>)
-                if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
-                    SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
-                    op->erase();
+            func->walk([&](quantum::CustomOp op) {
+                StringRef gate = op.getGateName();
+                if (gate != "SWAP") {
                     return;
                 }
-                // second qubit in |1>: SWAP(|0>,|1>)
-                else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
-                        "PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
 
-                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
-                        "PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
-                    op->erase();
-                    return;
+                Value SwapQubit_0_In = op->getOperand(0);
+                Value SwapQubit_1_In = op->getOperand(1);
+                Value SwapQubit_0_Out = op->getResult(0);
+                Value SwapQubit_1_Out = op->getResult(1);
+
+                // first qubit in |0>
+                if (pssa.isZero(qubitValues[SwapQubit_0_In])) {
+                    // second qubit in |0>: SWAP(|0>,|0>)
+                    if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
+                        SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
+                        SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |1>: SWAP(|0>,|1>)
+                    else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                            "PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
+
+                        quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                            "PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |+>: SWAP(|0>,|+>)
+                    else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |->: SWAP(|0>,|->)
+                    else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp xgate_on_0 =
+                            createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
+
+                        quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                            "Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
+                        SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
+
+                        quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                            "PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
+                        SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in NON_BASIS: SWAP(|0>,|NON_BASIS>)
+                    else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                            "CNOT", SwapQubit_1_In, SwapQubit_0_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder,
+                            loc, cnot_on_1_0);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
+                        op->erase();
+                        return;
+                    }
                 }
-                // second qubit in |+>: SWAP(|0>,|+>)
-                else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
-                    op->erase();
-                    return;
+                // first qubit in |1>
+                else if (pssa.isOne(qubitValues[SwapQubit_0_In])) {
+                    // second qubit in |0>: SWAP(|1>,|0>)
+                    if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                            "PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
+
+                        quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                            "PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |1>: SWAP(|1>,|1>)
+                    else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
+                        SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
+                        SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |+>: SWAP(|1>,|+>)
+                    else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp xgate_on_0 =
+                            createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
+
+                        quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                            "Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
+                        SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
+
+                        quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                            "PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
+                        SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |->: SWAP(|1>,|->)
+                    else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |NON_BASIS>: SWAP(|1>,|NON_BASIS>)
+                    else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp xgate_on_1 =
+                            createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_1_0 =
+                            createSimpleTwoBitGate("CNOT", xgate_on_1->getResult(0), SwapQubit_0_In,
+                                                   builder, loc, xgate_on_1);
+
+                        quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder,
+                            loc, cnot_on_1_0);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
+                        op->erase();
+                        return;
+                    }
                 }
-                // second qubit in |->: SWAP(|0>,|->)
-                else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
 
-                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
-                        "Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
-                    SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
+                // first qubit in |+>
+                else if (pssa.isPlus(qubitValues[SwapQubit_0_In])) {
+                    // second qubit in |0>: SWAP(|+>,|0>)
+                    if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
 
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |01>: SWAP(|+>,|1>)
+                    else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp hgate_on_0 =
+                            createSimpleOneBitGate("Hadamard", SwapQubit_0_In, builder, loc, op);
 
-                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
-                        "PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
-                    SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
-                    op->erase();
-                    return;
+                        quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                            "PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
+                        SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
+
+                        quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                            "PauliX", SwapQubit_1_In, builder, loc, xgate_on_0);
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
+                        SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |+>: SWAP(|+>,|+>)
+                    else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
+                        SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
+                        SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |->: SWAP(|+>,|->)
+                    else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp zgate_on_0 = createSimpleOneBitGate(
+                            "PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(zgate_on_0->getResult(0));
+
+                        quantum::CustomOp zgate_on_1 = createSimpleOneBitGate(
+                            "PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(zgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |NON_BASIS>: SWAP(|+>,|NON_BASIS>)
+                    else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                            "CNOT", SwapQubit_0_In, SwapQubit_1_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder,
+                            loc, cnot_on_0_1);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
+                        op->erase();
+                        return;
+                    }
                 }
-                // second qubit in NON_BASIS: SWAP(|0>,|NON_BASIS>)
-                else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", SwapQubit_1_In, SwapQubit_0_In, builder, loc, op);
 
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder, loc,
-                        cnot_on_1_0);
+                // first qubit in |->
+                else if (pssa.isMinus(qubitValues[SwapQubit_0_In])) {
+                    // second qubit in |0>: SWAP(|->,|0>)
+                    if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp hgate_on_0 =
+                            createSimpleOneBitGate("Hadamard", SwapQubit_0_In, builder, loc, op);
 
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
-                    op->erase();
-                    return;
+                        quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
+                            "PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
+                        SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
+
+                        quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
+                            "PauliX", SwapQubit_1_In, builder, loc, xgate_on_0);
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
+                        SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |1>: SWAP(|->,|1>)
+                    else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
+
+                        quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
+                            "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |+>: SWAP(|->,|+>)
+                    else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp zgate_on_0 = createSimpleOneBitGate(
+                            "PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
+                        SwapQubit_0_Out.replaceAllUsesWith(zgate_on_0->getResult(0));
+
+                        quantum::CustomOp zgate_on_1 = createSimpleOneBitGate(
+                            "PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
+                        SwapQubit_1_Out.replaceAllUsesWith(zgate_on_1->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |->: SWAP(|->,|->)
+                    else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
+                        SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
+                        SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |NON_BASIS>: SWAP(|->,|NON_BASIS>)
+                    else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp zgate_on_1 =
+                            createSimpleOneBitGate("PauliZ", SwapQubit_1_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_0_1 =
+                            createSimpleTwoBitGate("CNOT", SwapQubit_0_In, zgate_on_1->getResult(0),
+                                                   builder, loc, zgate_on_1);
+
+                        quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder,
+                            loc, cnot_on_0_1);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
+                        op->erase();
+                        return;
+                    }
                 }
-            }
 
-            // first qubit in |1>
-            else if (pssa.isOne(qubitValues[SwapQubit_0_In])) {
-                // second qubit in |0>: SWAP(|1>,|0>)
-                if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
-                        "PauliX", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
+                // first qubit in |NON_BASIS>
+                else if (pssa.isOther(qubitValues[SwapQubit_0_In])) {
+                    // second qubit in |0>: SWAP(|NON_BASIS>,|0>)
+                    if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                            "CNOT", SwapQubit_0_In, SwapQubit_1_In, builder, loc, op);
 
-                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
-                        "PauliX", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, xgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
-                    op->erase();
-                    return;
+                        quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder,
+                            loc, cnot_on_0_1);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |1>: SWAP(|NON_BASIS>,|1>)
+                    else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp xgate_on_0 =
+                            createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_0_1 =
+                            createSimpleTwoBitGate("CNOT", xgate_on_0->getResult(0), SwapQubit_1_In,
+                                                   builder, loc, xgate_on_0);
+
+                        quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder,
+                            loc, cnot_on_0_1);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |+>: SWAP(|NON_BASIS>,|+>)
+                    else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
+                            "CNOT", SwapQubit_1_In, SwapQubit_0_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder,
+                            loc, cnot_on_1_0);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
+                        op->erase();
+                        return;
+                    }
+                    // second qubit in |->: SWAP(|NON_BASIS>,|->)
+                    else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
+                        quantum::CustomOp zgate_on_0 =
+                            createSimpleOneBitGate("PauliZ", SwapQubit_0_In, builder, loc, op);
+
+                        quantum::CustomOp cnot_on_1_0 =
+                            createSimpleTwoBitGate("CNOT", SwapQubit_1_In, zgate_on_0->getResult(0),
+                                                   builder, loc, zgate_on_0);
+
+                        quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
+                            "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder,
+                            loc, cnot_on_1_0);
+
+                        SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
+                        SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
+                        op->erase();
+                        return;
+                    }
                 }
-                // second qubit in |1>: SWAP(|1>,|1>)
-                else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
-                    SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
-                    op->erase();
-                    return;
-                }
-                // second qubit in |+>: SWAP(|1>,|+>)
-                else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
-
-                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
-                        "Hadamard", xgate_on_0->getResult(0), builder, loc, xgate_on_0);
-                    SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
-
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_1_In, builder, loc, hgate_on_0);
-
-                    quantum::CustomOp xgate_on_1 = createSimpleOneBitGate(
-                        "PauliX", hgate_on_1->getResult(0), builder, loc, hgate_on_1);
-                    SwapQubit_1_Out.replaceAllUsesWith(xgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |->: SWAP(|1>,|->)
-                else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
-
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |NON_BASIS>: SWAP(|1>,|NON_BASIS>)
-                else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", xgate_on_1->getResult(0), SwapQubit_0_In, builder, loc, xgate_on_1);
-
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder, loc,
-                        cnot_on_1_0);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
-                    op->erase();
-                    return;
-                }
-            }
-
-            // first qubit in |+>
-            else if (pssa.isPlus(qubitValues[SwapQubit_0_In])) {
-                // second qubit in |0>: SWAP(|+>,|0>)
-                if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
-
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |01>: SWAP(|+>,|1>)
-                else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_0_In, builder, loc, op);
-
-                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
-                        "PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
-                    SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
-
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, xgate_on_0);
-
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
-                    SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |+>: SWAP(|+>,|+>)
-                else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
-                    SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
-                    op->erase();
-                    return;
-                }
-                // second qubit in |->: SWAP(|+>,|->)
-                else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp zgate_on_0 = createSimpleOneBitGate(
-                        "PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(zgate_on_0->getResult(0));
-
-                    quantum::CustomOp zgate_on_1 = createSimpleOneBitGate(
-                        "PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(zgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |NON_BASIS>: SWAP(|+>,|NON_BASIS>)
-                else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", SwapQubit_0_In, SwapQubit_1_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
-                        cnot_on_0_1);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
-                    op->erase();
-                    return;
-                }
-            }
-
-            // first qubit in |->
-            else if (pssa.isMinus(qubitValues[SwapQubit_0_In])) {
-                // second qubit in |0>: SWAP(|->,|0>)
-                if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 =
-                        createSimpleOneBitGate("Hadamard", SwapQubit_0_In, builder, loc, op);
-
-                    quantum::CustomOp xgate_on_0 = createSimpleOneBitGate(
-                        "PauliX", hgate_on_0->getResult(0), builder, loc, hgate_on_0);
-                    SwapQubit_0_Out.replaceAllUsesWith(xgate_on_0->getResult(0));
-
-                    quantum::CustomOp xgate_on_1 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_1_In, builder, loc, xgate_on_0);
-
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", xgate_on_1->getResult(0), builder, loc, xgate_on_1);
-                    SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |1>: SWAP(|->,|1>)
-                else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp hgate_on_0 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(hgate_on_0->getResult(0));
-
-                    quantum::CustomOp hgate_on_1 = createSimpleOneBitGate(
-                        "Hadamard", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, hgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(hgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |+>: SWAP(|->,|+>)
-                else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp zgate_on_0 = createSimpleOneBitGate(
-                        "PauliZ", SwapQubit_0_In, SwapQubit_0_Out, builder, loc, op);
-                    SwapQubit_0_Out.replaceAllUsesWith(zgate_on_0->getResult(0));
-
-                    quantum::CustomOp zgate_on_1 = createSimpleOneBitGate(
-                        "PauliZ", SwapQubit_1_In, SwapQubit_1_Out, builder, loc, zgate_on_0);
-                    SwapQubit_1_Out.replaceAllUsesWith(zgate_on_1->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |->: SWAP(|->,|->)
-                else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    SwapQubit_0_Out.replaceAllUsesWith(SwapQubit_0_In);
-                    SwapQubit_1_Out.replaceAllUsesWith(SwapQubit_1_In);
-                    op->erase();
-                    return;
-                }
-                // second qubit in |NON_BASIS>: SWAP(|->,|NON_BASIS>)
-                else if (pssa.isOther(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp zgate_on_1 =
-                        createSimpleOneBitGate("PauliZ", SwapQubit_1_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", SwapQubit_0_In, zgate_on_1->getResult(0), builder, loc, zgate_on_1);
-
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
-                        cnot_on_0_1);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
-                    op->erase();
-                    return;
-                }
-            }
-
-            // first qubit in |NON_BASIS>
-            else if (pssa.isOther(qubitValues[SwapQubit_0_In])) {
-                // second qubit in |0>: SWAP(|NON_BASIS>,|0>)
-                if (pssa.isZero(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", SwapQubit_0_In, SwapQubit_1_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
-                        cnot_on_0_1);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |1>: SWAP(|NON_BASIS>,|1>)
-                else if (pssa.isOne(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp xgate_on_0 =
-                        createSimpleOneBitGate("PauliX", SwapQubit_0_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", xgate_on_0->getResult(0), SwapQubit_1_In, builder, loc, xgate_on_0);
-
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_0_1->getResult(1), cnot_on_0_1->getResult(0), builder, loc,
-                        cnot_on_0_1);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_1_0->getResult(1));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_1_0->getResult(0));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |+>: SWAP(|NON_BASIS>,|+>)
-                else if (pssa.isPlus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", SwapQubit_1_In, SwapQubit_0_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder, loc,
-                        cnot_on_1_0);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
-                    op->erase();
-                    return;
-                }
-                // second qubit in |->: SWAP(|NON_BASIS>,|->)
-                else if (pssa.isMinus(qubitValues[SwapQubit_1_In])) {
-                    quantum::CustomOp zgate_on_0 =
-                        createSimpleOneBitGate("PauliZ", SwapQubit_0_In, builder, loc, op);
-
-                    quantum::CustomOp cnot_on_1_0 = createSimpleTwoBitGate(
-                        "CNOT", SwapQubit_1_In, zgate_on_0->getResult(0), builder, loc, zgate_on_0);
-
-                    quantum::CustomOp cnot_on_0_1 = createSimpleTwoBitGate(
-                        "CNOT", cnot_on_1_0->getResult(1), cnot_on_1_0->getResult(0), builder, loc,
-                        cnot_on_1_0);
-
-                    SwapQubit_0_Out.replaceAllUsesWith(cnot_on_0_1->getResult(0));
-                    SwapQubit_1_Out.replaceAllUsesWith(cnot_on_0_1->getResult(1));
-                    op->erase();
-                    return;
-                }
-            }
-        });
+            });
+        }
     }
 };
 
