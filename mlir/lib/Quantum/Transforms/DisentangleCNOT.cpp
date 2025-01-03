@@ -40,13 +40,11 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
 
     void runOnOperation() override
     {
-
         auto op = getOperation();
         SmallVector<Operation *> targets;
         op->walk([&](FunctionOpInterface func) { targets.push_back(func); });
 
         for (auto func : targets) {
-
             mlir::IRRewriter builder(func->getContext());
             Location loc = func->getLoc();
 
