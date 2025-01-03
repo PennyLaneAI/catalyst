@@ -555,7 +555,7 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
     }
-    if (options.keepIntermediate && options.checkpointStage.empty()) {
+    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -568,7 +568,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output, TimingScope &timing)
 
 {
-    if (options.keepIntermediate && options.checkpointStage.empty()) {
+    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
