@@ -32,11 +32,11 @@ each stage individually. For example:
 
 .. note::
 
-    The Catalyst CLI tool is currently only available when Catalyst is built from source, and is not
-    included when installing Catalyst via pip or from wheels.
+    If catalyst is built from source, the (``catalyst-cli``) executable would be located in 
+    the ``mlir/build/bin/`` directory relative to the root of your Catalyst source directory.
 
-    After building Catalyst, the ``catalyst-cli`` executable will be available in the
-    ``mlir/build/bin/`` directory.
+    If building Catalyst via pip or from wheels, the executable qould be located 
+    at ``catalyst/bin/`` directory relative to the environment’s installation directory.
 
 Usage
 -----
