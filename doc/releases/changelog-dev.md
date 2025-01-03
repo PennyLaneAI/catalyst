@@ -13,7 +13,7 @@
   [compiler plugin documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html).
   At a high level, there are three ways to utilize a plugin once it's properly specified:
 
-  * :func:`~.passes.apply_pass`: use this on QNodes when there is a  
+  * :func:`~.passes.apply_pass` can be used on QNodes when there is a  
     [Python entry point](https://packaging.python.org/en/latest/specifications/entry-points/) 
     defined for the plugin.
 
@@ -28,8 +28,8 @@
         return qnode()
     ```
 
-  * :func:`~.passes.apply_pass_plugin`: use this on QNodes when there is not an entry point defined
-    for the plugin.
+  * :func:`~.passes.apply_pass_plugin` can be used on QNodes when there is not an entry point 
+    defined for the plugin.
 
     ```python
     @catalyst.passes.apply_pass_plugin(path_to_plugin, pass_name)
