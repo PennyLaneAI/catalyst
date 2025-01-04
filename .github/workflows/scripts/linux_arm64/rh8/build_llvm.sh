@@ -34,19 +34,7 @@ export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/o
 /usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja
 
 # Build LLVM
-cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_BUILD_EXAMPLES=OFF \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DLLVM_ENABLE_PROJECTS="mlir" \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DLLVM_INSTALL_UTILS=ON \
-    -DLLVM_ENABLE_ZLIB=FORCE_ON \
-    -DLLVM_ENABLE_ZSTD=OFF \
-    -DLLVM_ENABLE_LLD=ON \
-    -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-    -DPython3_EXECUTABLE=/usr/bin/python3 \
-    -DPython3_NumPy_INCLUDE_DIRS=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include \
-    -DCMAKE_CXX_VISIBILITY_PRESET=default
-
-LIT_FILTER_OUT="Bytecode|tosa-to-tensor" cmake --build /catalyst/llvm-build --target check-mlir llvm-symbolizer
+export LLVM_BUILD_DIR="/catalyst/llvm-build"
+export LLVM_TARGETS="check-mlir"
+export ENABLE_ZLIB=FORCE_ON
+make llvm
