@@ -917,7 +917,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                           "Below, there is a complete list of options for the Catalyst CLI tool"
                           "In the first section, you can find the options that are used to"
                           "configure the Catalyst compiler. Next, you can find the options"
-                          "specific to mlir-opt tool.\n";
+                          "specific to the mlir-opt tool.\n";
     std::tie(inputFilename, outputFilename) =
         registerAndParseCLIOptions(argc, argv, helpStr, registry);
     llvm::InitLLVM y(argc, argv);

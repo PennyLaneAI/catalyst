@@ -32,11 +32,11 @@ each stage individually. For example:
 
 .. note::
 
-    If catalyst is built from source, the (``catalyst-cli``) executable would be located in 
+    If Catalyst is built from source, the ``catalyst-cli`` executable will be located in 
     the ``mlir/build/bin/`` directory relative to the root of your Catalyst source directory.
 
-    If building Catalyst via pip or from wheels, the executable qould be located 
-    at ``catalyst/bin/`` directory relative to the environment’s installation directory.
+    If Catalyst is installed via pip or from wheels, the executable will be located 
+    in the ``catalyst/bin/`` directory relative to the environment’s installation directory.
 
 Usage
 -----
@@ -157,7 +157,7 @@ Enable asynchronous QNodes.
 Define a *checkpoint stage*, used to indicate that the compiler should start only after reaching the
 given stage. The stages that are currently available are:
 
-* MLIR:: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
+* MLIR: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
   names described under the ``--{passname}`` option, OR any custom pipeline names if the
   ``--catalyst-pipeline={pipeline(...),...}`` option is used.
 * LLVM: ``llvm_ir`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
