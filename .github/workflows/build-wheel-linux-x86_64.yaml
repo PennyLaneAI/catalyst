@@ -172,6 +172,7 @@ jobs:
         LLVM_PROJECTS="lld;mlir" \
         LLVM_TARGETS="lld check-mlir" \
         ENABLE_ZLIB=FORCE_ON \
+        ENABLE_LLD=OFF \
         make llvm
 
     - name: Save LLVM Build

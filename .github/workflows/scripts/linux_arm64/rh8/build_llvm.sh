@@ -37,5 +37,6 @@ export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/o
 export LLVM_BUILD_DIR="/catalyst/llvm-build"
 export LLVM_PROJECTS="lld;mlir"
 export LLVM_TARGETS="lld check-mlir"
+export ENABLE_LLD=OFF
 export ENABLE_ZLIB=FORCE_ON
 make llvm
