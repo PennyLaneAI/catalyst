@@ -233,6 +233,8 @@ qdealloc_p = core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
 qextract_p = core.Primitive("qextract")
 qinsert_p = core.Primitive("qinsert")
+gphase_p = core.Primitive("gphase")
+gphase_p.multiple_results = True
 qinst_p = core.Primitive("qinst")
 qinst_p.multiple_results = True
 qunitary_p = core.Primitive("qunitary")
@@ -912,6 +914,97 @@ def _qinsert_lowering(
 
 
 #
+# gphase
+#
+@gphase_p.def_abstract_eval
+def _gphase_abstract_eval(
+    *qubits_or_params,
+    ctrl_len=0,
+    adjoint=False,
+    static_params=None,
+):
+    # The signature here is: (using * to denote zero or more)
+    # param, ctrl_qubits*, ctrl_values*
+    # since gphase has no target qubits.
+    if not static_params:
+        param = qubits_or_params[-1]
+    else:
+        param = static_params[0]
+    assert not isinstance(param, AbstractQbit)
+    ctrl_qubits = qubits_or_params[:ctrl_len]
+    for idx in range(ctrl_len):
+        qubit = ctrl_qubits[idx]
+        assert isinstance(qubit, AbstractQbit)
+    return (AbstractQbit(),) * (ctrl_len)
+
+
+@gphase_p.def_impl
+def _gphase_def_impl(*args, **kwargs):
+    """Not implemented"""
+    raise NotImplementedError()
+
+
+def _gphase_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params,
+    ctrl_len=0,
+    adjoint=False,
+    static_params=None,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    param = None if static_params else qubits_or_params[-1]
+    ctrl_qubits = qubits_or_params[:ctrl_len]
+    ctrl_values = qubits_or_params[ctrl_len:-1] if param else qubits_or_params[ctrl_len:]
+
+    assert (
+        not static_params or len(static_params) == 1
+    ), "GlobalPhase only takes one static float parameter"
+    param_attr = (
+        None
+        if not static_params
+        else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(static_params[0])])
+    )
+
+    assert bool(param_attr) != bool(param)
+
+    if not param_attr:
+        param = safe_cast_to_f64(param, "GlobalPhase")
+        param = extract_scalar(param, "GlobalPhase")
+
+        assert ir.F64Type.isinstance(
+            param.type
+        ), "Only scalar double parameters are allowed for quantum gates!"
+
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    if static_params:
+        return StaticCustomOp(
+            out_qubits=[],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            static_params=param_attr,
+            in_qubits=[],
+            gate_name="GlobalPhase",
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    GlobalPhaseOp(
+        params=param,
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
+    )
+    return ctrl_qubits
+
+
+#
 # qinst
 #
 @qinst_p.def_abstract_eval
@@ -1024,26 +1117,6 @@ def _qinst_lowering(
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
         ).results
-
-    if name_str == "GlobalPhase":
-        assert len(float_params) <= 1, "GlobalPhase takes at most one dynamic float parameter"
-        assert (
-            not static_params or len(static_params) <= 1
-        ), "GlobalPhase takes at most one static float parameter"
-        float_param = (
-            TensorExtractOp(ir.F64Type.get(), mlir.ir_constant(static_params[0]), [])
-            if len(float_params) == 0
-            else float_params[0]
-        )
-        GlobalPhaseOp(
-            params=float_param,
-            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-            in_ctrl_qubits=ctrl_qubits,
-            in_ctrl_values=ctrl_values_i1,
-            adjoint=adjoint,
-        )
-        return ctrl_qubits
-
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
@@ -2064,6 +2137,7 @@ CUSTOM_LOWERING_RULES = (
     (qextract_p, _qextract_lowering),
     (qinsert_p, _qinsert_lowering),
     (qinst_p, _qinst_lowering),
+    (gphase_p, _gphase_lowering),
     (qunitary_p, _qunitary_lowering),
     (qmeasure_p, _qmeasure_lowering),
     (compbasis_p, _compbasis_lowering),

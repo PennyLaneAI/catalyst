@@ -77,6 +77,7 @@ from catalyst.jax_primitives import (
     counts_p,
     expval_p,
     func_p,
+    gphase_p,
     hamiltonian_p,
     hermitian_p,
     namedobs_p,
@@ -200,7 +201,7 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
 # is constrained to occur before all subsequent equations in the quantum operations trace.
-FORCED_ORDER_PRIMITIVES = {qdevice_p}
+FORCED_ORDER_PRIMITIVES = {qdevice_p, gphase_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
@@ -678,12 +679,10 @@ def trace_quantum_operations(
         elif isinstance(op, qml.GlobalPhase):
             controlled_qubits = qrp.extract(controlled_wires)
             qubits2 = bind_flexible_primitive(
-                qinst_p,
+                gphase_p,
                 {"static_params": op.parameters},
                 *[*controlled_qubits, *controlled_values],
-                op=op.name,
                 ctrl_len=len(controlled_qubits),
-                ctrl_value_len=len(controlled_values),
                 adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
