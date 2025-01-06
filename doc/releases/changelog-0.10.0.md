@@ -260,6 +260,7 @@
   parameters of quantum gates by adding a new gate called `StaticCustomOp` with lowering to regular 
   `CustomOp`.
   [(#1387)](https://github.com/PennyLaneAI/catalyst/pull/1387)
+  [(#1396)](https://github.com/PennyLaneAI/catalyst/pull/1396)
 
 <h3>Documentation 📝</h3>
 
