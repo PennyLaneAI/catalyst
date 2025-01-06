@@ -481,6 +481,12 @@ If you require the Catalyst repository with all its submodules, clone it this wa
 
   git clone --recurse-submodules --shallow-submodules git@github.com:PennyLaneAI/catalyst.git
 
+If you need to work on an existing branch, provide its name as a second argument:
+
+.. code-block:: console
+
+  bash ./setup_dev_from_wheel.sh /path/to/virtual/env branch-name
+
 How Does it Work?
 ^^^^^^^^^^^^^^^^^
 
@@ -495,8 +501,7 @@ using the installed Catalyst wheel libraries, hence avoiding compilation.
 Further Steps
 ^^^^^^^^^^^^^
 
-If everything goes well, ``git status`` should not report any changed files.
-
+``git status`` should not report any changed files when a branch name is not specified.
 Before making changes to the frontend, make sure you create a new branch:
 
 .. code-block:: console
@@ -504,6 +509,9 @@ Before making changes to the frontend, make sure you create a new branch:
   git checkout -b new-branch-name
 
 Once in the new branch, make the wanted changes. Use the IDE of your preference.
+
+When specifying a branch to switch to, ``git status`` might report changes in some files.
+This is normal. Proceed to make changes in the selected branch.
 
 You can test the changes by executing your sample code under the same virtual environment you used
 with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually
