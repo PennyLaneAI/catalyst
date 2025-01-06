@@ -176,6 +176,8 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         PYTHON=$(which python${{ matrix.python_version }}) \
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="llvm-build" \
         LLVM_TARGETS="check-mlir" \
         ENABLE_ZLIB=FORCE_ON \
