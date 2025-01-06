@@ -33,7 +33,7 @@ For example using ``quantum-opt --help`` while loading your pass plugin will ena
 
 .. code-block::
 
-    --standalone-switch-bar-foo                            -   Switches the name of a FuncOp named `bar` to `foo` and folds.
+    --standalone-switch-bar-foo		-   Switches the name of a FuncOp named `bar` to `foo` and folds.
 
 Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
 
