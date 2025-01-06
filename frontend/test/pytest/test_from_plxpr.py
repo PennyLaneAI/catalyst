@@ -115,7 +115,7 @@ class TestErrors:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError, match="operator arithmetic not yet supported for conversion."):
+        with pytest.raises(NotImplementedError, match="from_plxpr can not yet interpret observables of type Sum"):
             from_plxpr(jaxpr)()
 
     def test_measuring_eigvals_not_supported(self):
