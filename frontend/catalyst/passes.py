@@ -335,8 +335,9 @@ def cancel_inverses(qnode=None):
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
-    """Applies a single pass to the QNode, where the pass is from Catalyst or a third-party
-    if `entry_points` has been implemented. See :doc:`the compiler plugin documentation <dev/plugins>`
+    """
+    Applies a single pass to the QNode, where the pass is from Catalyst or a third-party
+    if `entry_points` has been implemented. See :doc:`doc/plugins`
     for more details.
 
     Args:
@@ -368,7 +369,8 @@ def apply_pass(pass_name: str, *flags, **valued_options):
 
 
 def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_options):
-    """Applies a pass plugin to the QNode. See :doc:`the compiler plugin documentation <dev/plugins>`
+    """
+    Applies a pass plugin to the QNode. See :doc:`dev/plugins`
     for more details.
 
     Args:
