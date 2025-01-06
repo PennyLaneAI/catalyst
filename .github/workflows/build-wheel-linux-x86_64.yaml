@@ -71,7 +71,7 @@ jobs:
       id: cache-llvm-source
       uses: actions/cache@v4
       with:
-        path:  mlir/llvm-project
+        path: ${{ github.workspace }}/mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
         enableCrossOsArchive: True
 
@@ -79,7 +79,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache@v4
       with:
-        path: mlir/mlir-hlo
+        path: ${{ github.workspace }}/mlir/mlir-hlo
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
         enableCrossOsArchive: True
 
@@ -87,7 +87,7 @@ jobs:
       id: cache-enzyme-source
       uses: actions/cache@v4
       with:
-        path:  mlir/Enzyme
+        path: ${{ github.workspace }}/mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
         enableCrossOsArchive: True
 
@@ -97,7 +97,7 @@ jobs:
       with:
         repository: llvm/llvm-project
         ref: ${{ needs.constants.outputs.llvm_version }}
-        path: mlir/llvm-project
+        path: ${{ github.workspace }}/mlir/llvm-project
 
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
@@ -105,7 +105,7 @@ jobs:
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
-        path: mlir/mlir-hlo
+        path: ${{ github.workspace }}/mlir/mlir-hlo
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -113,21 +113,21 @@ jobs:
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
+        path: ${{ github.workspace }}/mlir/Enzyme
 
     # Cache external project builds
     - name: Restore LLVM Build
       id: cache-llvm-build
       uses: actions/cache/restore@v4
       with:
-        path:  llvm-build
+        path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Restore MHLO Build
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
-        path:  mhlo-build
+        path: ${{ github.workspace }}/mhlo-build
         key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         lookup-only: True
 
@@ -135,7 +135,7 @@ jobs:
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
       with:
-        path:  enzyme-build
+        path: ${{ github.workspace }}/enzyme-build
         key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         lookup-only: True
 
@@ -168,7 +168,7 @@ jobs:
         PYTHON=$(which python${{ matrix.python_version }}) \
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
-        LLVM_BUILD_DIR="llvm-build" \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         LLVM_PROJECTS="lld;mlir" \
         LLVM_TARGETS="lld check-mlir" \
         ENABLE_ZLIB=FORCE_ON \
@@ -179,7 +179,7 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path:  llvm-build
+        path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Build MHLO Dialect
@@ -192,45 +192,45 @@ jobs:
         export PATCH_FILE=mlir/patches/mhlo-Add-PassesIncGen-in-transforms-CMakeList.patch
         if patch --dry-run -p1 -N $TARGET_FILE $PATCH_FILE > /dev/null 2>&1; then patch -p1 $TARGET_FILE $PATCH_FILE; fi
 
-        cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+        cmake -S mlir/mlir-hlo -B $GITHUB_WORKSPACE/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
               -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DLLVM_ENABLE_LLD=ON
 
-        LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build mhlo-build --target check-mlir-hlo
+        LIT_FILTER_OUT="chlo_legalize_to_mhlo" cmake --build $GITHUB_WORKSPACE/mhlo-build --target check-mlir-hlo
 
     - name: Save MHLO Build
       id: save-mhlo-build
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path:  mhlo-build
+        path: ${{ github.workspace }}/mhlo-build
         key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
+        cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm" \
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=default \
               -DCMAKE_CXX_FLAGS="-fuse-ld=lld"
 
-        cmake --build enzyme-build --target EnzymeStatic-19
+        cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-19
 
     - name: Save Enzyme Build
       id: save-enzyme-build
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path: enzyme-build
+        path: ${{ github.workspace }}/enzyme-build
         key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
 
   catalyst-linux-wheels-x86-64:
@@ -268,7 +268,7 @@ jobs:
       id: cache-llvm-source
       uses: actions/cache/restore@v4
       with:
-        path: mlir/llvm-project
+        path: ${{ github.workspace }}/mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -277,7 +277,7 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache/restore@v4
       with:
-        path:  llvm-build
+        path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.10-wheel-build
         fail-on-cache-miss: True
 
@@ -285,7 +285,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache/restore@v4
       with:
-        path: mlir/mlir-hlo
+        path: ${{ github.workspace }}/mlir/mlir-hlo
         key: mhlo-${{ needs.constants.outputs.mhlo_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -294,7 +294,7 @@ jobs:
       id: cache-mhlo-build
       uses: actions/cache/restore@v4
       with:
-        path:  mhlo-build
+        path: ${{ github.workspace }}/mhlo-build
         key: ${{ matrix.container_img }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-wheel-build
         fail-on-cache-miss: True
 
@@ -302,7 +302,7 @@ jobs:
       id: cache-enzyme-source
       uses: actions/cache/restore@v4
       with:
-        path:  mlir/Enzyme
+        path: ${{ github.workspace }}/mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -311,28 +311,28 @@ jobs:
       id: cache-enzyme-build
       uses: actions/cache/restore@v4
       with:
-        path:  enzyme-build
+        path: ${{ github.workspace }}/enzyme-build
         key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
-        cmake -S runtime -B runtime-build -G Ninja \
+        cmake -S runtime -B $GITHUB_WORKSPACE/runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
               -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
-          OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
-          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+          OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
+          RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
@@ -341,8 +341,8 @@ jobs:
       run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
-          OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
-          RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+          OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
+          RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqd
 
@@ -350,28 +350,27 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        cmake -S mlir -B quantum-build -G Ninja \
+        cmake -S mlir -B $GITHUB_WORKSPACE/quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
-              -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
-              -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
-              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
+              -DMHLO_DIR="$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo" \
+              -DMHLO_BINARY_DIR="$GITHUB_WORKSPACE/mhlo-build/bin" \
+              -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
+              -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=ON
 
-        cmake --build quantum-build --target check-dialects catalyst-cli
+        cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
       if: github.event.schedule == '35 4 * * 4'
       run: |
-        CCACHE_DIR="$(pwd)/.ccache" \
         MLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
         make plugin-wheel
@@ -379,13 +378,13 @@ jobs:
     - name: Build wheel
       run: |
         PYTHON=python${{ matrix.python_version }} \
-        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
-        MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
-        DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
-        RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
-        OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
-        OQD_BUILD_DIR=$GITHUB_WORKSPACE/oqd-build \
-        ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        MHLO_BUILD_DIR="$GITHUB_WORKSPACE/mhlo-build" \
+        DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
+        RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
+        OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
+        OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
+        ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
         make wheel
 
     - name: Repair wheel using auditwheel
@@ -397,7 +396,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: wheel/
+        path: ${{ github.workspace }}/wheel/
         retention-days: 14
 
     - name: Upload Standalone Plugin Wheel Artifact
@@ -406,7 +405,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: standalone_plugin_wheel/dist
+        path: ${{ github.workspace }}/standalone_plugin_wheel/dist
         retention-days: 14
 
   test-wheels:
@@ -428,7 +427,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: catalyst-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: dist
+        path: ${{ github.workspace }}/dist
 
     - name: Download Standalone Plugin Wheel Artifact
       # Run only on Thursday at the given time
@@ -436,7 +435,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: standalone-plugin-manylinux_2_28_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: standalone_plugin_wheel/wheel
+        path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Set up Python ${{ matrix.python_version }}
       uses: actions/setup-python@v5
