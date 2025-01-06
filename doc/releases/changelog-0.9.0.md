@@ -1,4 +1,4 @@
-# Release 0.9.0 (current release)
+# Release 0.9.0
 
 <h3>New features</h3>
 
