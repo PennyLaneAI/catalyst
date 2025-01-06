@@ -28,6 +28,7 @@ from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import get_call_jaxpr
 
 
+
 def catalyst_execute_jaxpr(jaxpr):
     """Create a function capable of executing the provided catalyst-variant jaxpr."""
 

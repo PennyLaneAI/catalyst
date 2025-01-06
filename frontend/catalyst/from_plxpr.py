@@ -144,8 +144,16 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
-    assert qml.capture.enabled(), "from_plxpr requires capture to be enabled."
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+    if enabled():
+        capture_on = True
+    else:
+        capture_on = False
+        enable()
+    try:
+        return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+    finally:
+        if not capture_on:
+            disable()
 
 
 class WorkflowInterpreter(PlxprInterpreter):
