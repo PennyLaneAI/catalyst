@@ -31,10 +31,11 @@ export PYTHON=/usr/bin/python3
 export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:/catalyst/llvm-build/bin:$PATH
 
 # Install python dependencies
-/usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja
+/usr/bin/python3 -m pip install pybind11 PyYAML cmake ninja
 
 # Build LLVM
 export LLVM_BUILD_DIR="/catalyst/llvm-build"
-export LLVM_TARGETS="check-mlir"
+export LLVM_PROJECTS="lld;mlir"
+export LLVM_TARGETS="lld check-mlir"
 export ENABLE_ZLIB=FORCE_ON
 make llvm

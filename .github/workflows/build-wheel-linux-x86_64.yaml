@@ -158,19 +158,9 @@ jobs:
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
 
-    # Required for MHLO and building MLIR with protected symbols.
+    # LLD is required for MHLO builds.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
     # other tools can find it, in particular collect2 invoked by gcc.)
-    - name: Build LLD
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      run: |
-        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_TARGETS_TO_BUILD="host" \
-              -DLLVM_ENABLE_PROJECTS="lld"
-
-        cmake --build llvm-build --target lld
-
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
@@ -179,7 +169,8 @@ jobs:
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="llvm-build" \
-        LLVM_TARGETS="check-mlir" \
+        LLVM_PROJECTS="lld;mlir" \
+        LLVM_TARGETS="lld check-mlir" \
         ENABLE_ZLIB=FORCE_ON \
         make llvm
 
