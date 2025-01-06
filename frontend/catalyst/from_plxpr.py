@@ -144,6 +144,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
+    assert qml.capture.enabled(), "from_plxpr requires capture to be enabled."
     return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
 
 
@@ -214,10 +215,6 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
     def interpret_operation(self, op, is_adjoint=False):
         """Re-bind a pennylane operation as a catalyst instruction."""
-        if op.hyperparameters:
-            raise NotImplementedError(
-                "operators with hyperparameters not yet supported for conversion."
-            )
 
         in_qubits = [self.get_wire(w) for w in op.wires]
         out_qubits = qinst_p.bind(
@@ -351,9 +348,9 @@ def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
         args = sig
         try:
             plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+            jaxpr = from_plxpr(plxpr)(*args, **kwargs)
         finally:
             if not capture_on:
                 disable()
 
-        jaxpr = from_plxpr(plxpr)(*args, **kwargs)
     return jaxpr, out_type, out_treedef, sig

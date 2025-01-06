@@ -115,7 +115,9 @@ class TestErrors:
         jaxpr = jax.make_jaxpr(circuit)()
         qml.capture.disable()
 
-        with pytest.raises(NotImplementedError, match="operator arithmetic not yet supported for conversion."):
+        with pytest.raises(
+            NotImplementedError, match="operator arithmetic not yet supported for conversion."
+        ):
             from_plxpr(jaxpr)()
 
     def test_measuring_eigvals_not_supported(self):
@@ -216,8 +218,8 @@ class TestCatalystCompareJaxpr:
         phi = 0.5
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(phi)
-        qml.capture.disable()
         converted = from_plxpr(plxpr)(phi)
+        qml.capture.disable()
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
         assert qml.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
 
@@ -305,9 +307,9 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(phi)
-        qml.capture.disable()
 
         converted = from_plxpr(plxpr)(phi)
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -376,9 +378,9 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
 
         converted = from_plxpr(plxpr)()
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
