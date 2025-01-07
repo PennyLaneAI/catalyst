@@ -41,10 +41,8 @@ class OQDDevice(Device):
         """
 
         system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = (
-            get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/librtd_oqd" + system_extension
-        )
-            
+        lib_path = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/librtd_oqd" + system_extension
+
         return "oqd", lib_path
 
     def __init__(self, wires, shots, backend="default", **kwargs):
