@@ -926,7 +926,7 @@ def _gphase_abstract_eval(
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
-    if not static_params:
+    if static_params is None:
         param = qubits_or_params[-1]
     else:
         param = static_params[0]
@@ -961,15 +961,16 @@ def _gphase_lowering(
     assert (
         not static_params or len(static_params) == 1
     ), "GlobalPhase only takes one static float parameter"
+
     param_attr = (
         None
-        if not static_params
+        if static_params is None
         else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(static_params[0])])
     )
 
     assert bool(param_attr) != bool(param)
 
-    if not param_attr:
+    if param_attr is None:
         param = safe_cast_to_f64(param, "GlobalPhase")
         param = extract_scalar(param, "GlobalPhase")
 
@@ -1074,7 +1075,7 @@ def _qinst_lowering(
 
     params_attr = (
         None
-        if not static_params
+        if static_params is None
         else ir.DenseF64ArrayAttr.get([ir.FloatAttr.get_f64(val) for val in static_params])
     )
     if len(float_params) > 0:
