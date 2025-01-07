@@ -28,7 +28,6 @@ from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import get_call_jaxpr
 
 
-
 def catalyst_execute_jaxpr(jaxpr):
     """Create a function capable of executing the provided catalyst-variant jaxpr."""
 
@@ -96,12 +95,12 @@ class TestErrors:
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(f)()
-        qml.capture.disable()
 
         with pytest.raises(
             NotImplementedError, match="catalyst does not yet support dynamic shots"
         ):
             from_plxpr(jaxpr)()
+        qml.capture.disable()
 
     def test_observable_without_n_wires(self):
         """Test that a NotImplementedError is raised for an observable without n_wires."""
@@ -114,12 +113,12 @@ class TestErrors:
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
 
         with pytest.raises(
             NotImplementedError, match="operator arithmetic not yet supported for conversion."
         ):
             from_plxpr(jaxpr)()
+        qml.capture.disable()
 
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
@@ -135,10 +134,9 @@ class TestErrors:
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
-
         with pytest.raises(NotImplementedError, match="does not yet support measurements with"):
             from_plxpr(jaxpr)()
+        qml.capture.disable()
 
     def test_measuring_measurement_values(self):
         """Test that measuring a MeasurementValue raises a NotImplementedError."""
@@ -153,10 +151,10 @@ class TestErrors:
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
 
         with pytest.raises(NotImplementedError, match=r"not yet supported"):
             from_plxpr(jaxpr)()
+        qml.capture.disable()
 
     def test_unsupported_measurement(self):
         """Test that a NotImplementedError is raised if a measurement
@@ -170,10 +168,10 @@ class TestErrors:
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
+        qml.capture.disable()
 
 
 class TestCatalystCompareJaxpr:
@@ -192,8 +190,8 @@ class TestCatalystCompareJaxpr:
         x = qml.X.compute_matrix()
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x)
-        qml.capture.disable()
         converted = from_plxpr(plxpr)(x)
+        qml.capture.disable()
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
         assert len(catalyst_res) == 1
@@ -243,8 +241,8 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(0.5)
-        qml.capture.disable()
         converted = from_plxpr(plxpr)(0.5)
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -273,9 +271,9 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(0.5)
-        qml.capture.disable()
 
         converted = from_plxpr(plxpr)(0.5)
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -347,9 +345,9 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x)
-        qml.capture.disable()
 
         converted = from_plxpr(plxpr)(np.array(0.724))
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -412,9 +410,8 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
-        qml.capture.disable()
-
         converted = from_plxpr(plxpr)()
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -446,9 +443,9 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x, y, z)
-        qml.capture.disable()
 
         converted = from_plxpr(plxpr)(x, y, z)
+        qml.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -496,9 +493,9 @@ class TestHybridPrograms:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(workflow)(0.5)
-        qml.capture.disable()
 
         converted = from_plxpr(plxpr)(0.5)
+        qml.capture.disable()
 
         res = catalyst_execute_jaxpr(converted)(0.5)
 
@@ -543,8 +540,8 @@ class TestHybridPrograms:
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(workflow)(0.5, 1.2)
-        qml.capture.disable()
         catalxpr = from_plxpr(jaxpr)(0.5, 1.2)
+        qml.capture.disable()
         results = catalyst_execute_jaxpr(catalxpr)(0.5, 1.2)
 
         expected = -np.sin(0.5) + np.cos(1.2)

@@ -144,16 +144,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
         in (b,) }
 
     """
-    if enabled():
-        capture_on = True
-    else:
-        capture_on = False
-        enable()
-    try:
-        return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
-    finally:
-        if not capture_on:
-            disable()
+    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
 
 
 class WorkflowInterpreter(PlxprInterpreter):
