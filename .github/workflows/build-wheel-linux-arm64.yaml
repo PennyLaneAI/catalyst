@@ -316,15 +316,6 @@ jobs:
         name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version.major_minor }}.zip
         path: ${{ github.workspace }}/dist
 
-    # Needed for accessing llvm-symbolizer
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-wheel-build
-        fail-on-cache-miss: True
-
     - name: Run Python Pytest Tests
       run: |
         set -x
