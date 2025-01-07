@@ -24,7 +24,7 @@ jax = pytest.importorskip("jax")
 
 # needs to be below the importorskip calls
 # pylint: disable=wrong-import-position
-from catalyst.from_plxpr import from_plxpr
+from catalyst.from_plxpr import from_plxpr, QFuncPlxprInterpreter
 from catalyst.jax_primitives import get_call_jaxpr
 
 
@@ -77,6 +77,22 @@ def compare_eqns(eqn1, eqn2):
         assert type(ov1) == type(ov2)  # pylint: disable=unidiomatic-typecheck
         assert ov1.aval == ov2.aval
 
+
+class TestPrivateBehavior:
+
+    def test_uninitialization_errors(self):
+        """Test that QFuncPlxprInterpreter raises errors if properties are not yet set."""
+
+        interpreter = QFuncPlxprInterpreter(qml.device('lightning.qubit', wires=1))
+
+        with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
+            interpreter.qreg
+
+        with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
+            interpreter.wire_map
+
+        with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
+            interpreter.wire_map = {1: 2}
 
 class TestErrors:
     """Test that errors are raised in unsupported situations."""

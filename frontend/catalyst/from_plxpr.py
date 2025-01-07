@@ -14,20 +14,14 @@
 """
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
+# pylint: disable=protected-access
 from functools import partial
 from typing import Callable
 
 import jax
-from jax.extend.linear_util import wrap_init
-
 import pennylane as qml
-from pennylane.capture import (
-    disable,
-    enable,
-    enabled,
-    qnode_prim,
-)
-from pennylane.capture import PlxprInterpreter
+from jax.extend.linear_util import wrap_init
+from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
 
 from catalyst.device import (
     extract_backend_info,
@@ -56,7 +50,6 @@ from catalyst.jax_primitives import (
     state_p,
     var_p,
 )
-
 
 measurement_map = {
     qml.measurements.SampleMP: sample_p,
@@ -112,7 +105,7 @@ def from_plxpr(plxpr: jax.core.ClosedJaxpr) -> Callable[..., jax.core.Jaxpr]:
 
         plxpr = jax.make_jaxpr(circuit)(0.5)
 
-            print(from_plxpr(plxpr)(0.5))
+        print(from_plxpr(plxpr)(0.5))
 
     .. code-block:: none
 
@@ -248,7 +241,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
                 f"measurement {measurement} not yet supported for conversion."
             )
 
-        if measurement._eigvals is not None:  # pylint: disable=protected-access
+        if measurement._eigvals is not None:
             raise NotImplementedError(
                 "from_plxpr does not yet support measurements with manual eigvals."
             )
@@ -264,7 +257,6 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         else:
             obs = self._compbasis_obs(*measurement.wires)
 
-        # pylint: disable=protected-access
         shape, dtype = measurement._abstract_eval(
             n_wires=len(measurement.wires),
             shots=self._device.shots.total_shots,
@@ -291,18 +283,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         return mval
 
 
-# pylint: disable=unused-argument
-@QFuncPlxprInterpreter.register_primitive(
-    qml.ops.Adjoint._primitive
-)  # pylint: disable=protected-access
-def _(self, op):
-    self.interpret_operation(op, is_adjoint=True)
-
-
-# pylint: disable=unused-argument
-@QFuncPlxprInterpreter.register_primitive(
-    qml.QubitUnitary._primitive
-)  # pylint: disable=protected-access
+@QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def _(self, *invals, n_wires):
     wires = [self.get_wire(w) for w in invals[1:]]
     outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
@@ -311,9 +292,7 @@ def _(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
-@QFuncPlxprInterpreter.register_primitive(
-    qml.GlobalPhase._primitive
-)  # pylint: disable=protected-access
+@QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 def _(self, phase, *wires, n_wires):
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
