@@ -20,6 +20,7 @@ This module defines the classes that represent an Open Quantum Design (OQD)
 trapped-ion quantum computer device.
 """
 from typing import Optional
+import platform
 
 from pennylane.devices import Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
@@ -33,7 +34,20 @@ class OQDDevice(Device):
 
     config_filepath = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/backend" + "/oqd.toml"
 
-    def __init__(self, wires, backend, shots, **kwargs):
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = (
+            get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/librtd_oqd" + system_extension
+        )
+            
+        return "oqd", lib_path
+
+    def __init__(self, wires, shots, backend="default", **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
         super().__init__(wires=wires, shots=shots, **kwargs)
