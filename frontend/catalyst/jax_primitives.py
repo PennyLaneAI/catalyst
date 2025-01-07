@@ -983,7 +983,7 @@ def _gphase_lowering(
         ctrl_values_i1.append(p)
 
     if static_params:
-        return StaticCustomOp(
+        StaticCustomOp(
             out_qubits=[],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
             static_params=param_attr,
@@ -992,15 +992,15 @@ def _gphase_lowering(
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
-        ).results
-
-    GlobalPhaseOp(
-        params=param,
-        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
-        in_ctrl_qubits=ctrl_qubits,
-        in_ctrl_values=ctrl_values_i1,
-        adjoint=adjoint,
-    )
+        )
+    else:
+        GlobalPhaseOp(
+            params=param,
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        )
     return ctrl_qubits
 
 
