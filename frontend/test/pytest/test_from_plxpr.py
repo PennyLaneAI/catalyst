@@ -79,6 +79,7 @@ def compare_eqns(eqn1, eqn2):
 
 
 class TestPrivateBehavior:
+    """Tests for behavior that should not be visible to the user."""
 
     def test_uninitialization_errors(self):
         """Test that QFuncPlxprInterpreter raises errors if properties are not yet set."""
@@ -86,10 +87,10 @@ class TestPrivateBehavior:
         interpreter = QFuncPlxprInterpreter(qml.device("lightning.qubit", wires=1))
 
         with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
-            interpreter.qreg
+            _ = interpreter.qreg
 
         with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
-            interpreter.wire_map
+            _ = interpreter.wire_map
 
         with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
             interpreter.wire_map = {1: 2}
