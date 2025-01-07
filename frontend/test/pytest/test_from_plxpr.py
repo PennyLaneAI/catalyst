@@ -83,7 +83,7 @@ class TestPrivateBehavior:
     def test_uninitialization_errors(self):
         """Test that QFuncPlxprInterpreter raises errors if properties are not yet set."""
 
-        interpreter = QFuncPlxprInterpreter(qml.device('lightning.qubit', wires=1))
+        interpreter = QFuncPlxprInterpreter(qml.device("lightning.qubit", wires=1))
 
         with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
             interpreter.qreg
@@ -93,6 +93,7 @@ class TestPrivateBehavior:
 
         with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
             interpreter.wire_map = {1: 2}
+
 
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
