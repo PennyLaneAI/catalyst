@@ -171,6 +171,10 @@
   to not work properly.
   [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
 
+* Fixed a bug that made `catalyst.grad` break when using a computed decomposition or a unitary to 
+rotation transform inside a QNode.
+  [(#1417)](https://github.com/PennyLaneAI/catalyst/pull/1417)
+
 <h3>Internal changes ⚙️</h3>
 
 * Catalyst no longer depends on or pins the `scipy` package. Instead, OpenBLAS is sourced directly
