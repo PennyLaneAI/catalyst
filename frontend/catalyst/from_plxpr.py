@@ -205,16 +205,34 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             return self.wire_map[wire_value]
         return qextract_p.bind(self.qreg, wire_value)
 
-    def interpret_operation(self, op, is_adjoint=False):
+    def interpret_operation(self, op, is_adjoint=False, control_wires=(), control_values=()):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
+        if isinstance(op, qml.ops.Adjoint):
+            return self.interpret_operation(
+                op.base,
+                is_adjoint=not is_adjoint,
+                control_wires=control_wires,
+                control_values=control_values
+            )
+        if isinstance(op, qml.ops.Controlled):
+            return self.interpret_operation(
+                op.base,
+                is_adjoint=is_adjoint,
+                control_wires=op.control_wires + control_wires,
+                control_values=op.control_values + control_values,
+            )
+
         in_qubits = [self.get_wire(w) for w in op.wires]
+        control_wires = [self.get_wire(w) for w in control_wires]
         out_qubits = qinst_p.bind(
             *in_qubits,
+            *control_wires,
+            *control_values,
             *op.data,
             op=op.name,
-            ctrl_value_len=0,
-            ctrl_len=0,
+            ctrl_value_len=len(control_values),
+            ctrl_len=len(control_wires),
             qubits_len=len(op.wires),
             adjoint=is_adjoint,
         )
