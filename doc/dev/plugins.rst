@@ -1,7 +1,7 @@
 MLIR Plugins
 ============
 
-This page outlines documentation on how to start developping an MLIR plugin that can work with Catalyst.
+This page outlines documentation on how to start developing an MLIR plugin that can work with Catalyst.
 An MLIR plugin is a shared object that implements a compilation pass compatible with the MLIR framework.
 Catalyst is built on top of MLIR, this means that MLIR plugins work with Catalyst.
 This can enable anyone to build quantum compilation passes and new dialects as well.
@@ -20,7 +20,7 @@ It is intended to show how one would build an MLIR plugin, rather than showing a
 
 You can use the ``StandalonePlugin.so`` plugin
 
-* with either ``quantum-opt`` or ``catalyst-cli``,
+* with either ``quantum-opt`` or ``catalyst``,
 * load it from Python and transform a quantum program.
 
 For example, if you are interested in using it from the command line interface, you can use the following flags to load the standalone plugin:
@@ -257,7 +257,7 @@ One also needs to link the MLIRQuantum library and change the plugin tool to cat
              LINK_LIBS
              MLIRStandalone
 
-Please note that if you are using the Catalyst or Gradient dialects, you should also add MLIRCatalyst and MLIRGradient to the list of dependences and libraries to be linked.
+Please note that if you are using the Catalyst or Gradient dialects, you should also add MLIRCatalyst and MLIRGradient to the list of dependencies and libraries to be linked.
 
 4. Modify the standalone plugin to modify quantum operations.
 
@@ -325,7 +325,7 @@ The next step is changing the contents of the function itself:
 
 And then we can run ``make all`` again.
 The shared object of the standalone plugin should be available in ``mlir/build/lib/StandalonePlugin.so``.
-This shared object can be used with ``catalyst-cli`` and ``quantum-opt``.
+This shared object can be used with both the ``catalyst`` and ``quantum-opt`` tools.
 From here, you can change the name of the pass, change the name of the shared object, and implement more complex transformations.
 
 

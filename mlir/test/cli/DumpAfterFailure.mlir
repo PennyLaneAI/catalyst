@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: not catalyst-cli --tool=opt %s --catalyst-pipeline="pipeline(llvm-dialect-lowring-pipeline)" --mlir-print-ir-after-failure --verify-diagnostics 2>&1 | FileCheck %s
+// RUN: not catalyst --tool=opt %s --catalyst-pipeline="pipeline(llvm-dialect-lowring-pipeline)" --mlir-print-ir-after-failure --verify-diagnostics 2>&1 | FileCheck %s
 
 func.func @foo(%arg0: tensor<?xf64>) {
     "catalyst.print"(%arg0) : (tensor<?xf64>) -> ()
