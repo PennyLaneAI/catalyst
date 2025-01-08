@@ -12,8 +12,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* A new OQD device entry point `oqd.sinara` has been added to the python frontend. 
-  An OQD device can now be initiated like `qml.device("oqd.sinara", shots=1000, wires=10)`.
+* Added get_c_interface method for the OQD device to be able to point to the c++
+  implementation of the device in python. This makes qjit to accept an instance of the device 
+  and be able to connect to its runtime.
+  [(#1420)](https://github.com/PennyLaneAI/catalyst/pull/1420)
 
 <h3>Documentation 📝</h3>
 

@@ -17,23 +17,13 @@
 
 import pennylane as qml
 import pytest
-
+from catalyst.third_party.oqd import OQDDevice
 
 class TestOQDDevice:
     """Test the OQD device python layer for Catalyst."""
 
-    def test_entrypoint(self):
-        """Test the initialization."""
-
-        device = qml.device("oqd.sinara", shots=1000, wires=8)
-
-        assert device.backend == "default"
-        assert device.shots == qml.measurements.Shots(1000)
-        assert device.wires == qml.wires.Wires(range(0, 8))
-
     def test_initialization(self):
         """Test the initialization."""
-        from catalyst.third_party.oqd import OQDDevice
 
         device = OQDDevice(backend="default", shots=1000, wires=8)
 
@@ -43,31 +33,23 @@ class TestOQDDevice:
 
     def test_wrong_backend(self):
         """Test the backend check."""
-        from catalyst.third_party.oqd import OQDDevice
-
         with pytest.raises(ValueError, match="The backend random_backend is not supported."):
             OQDDevice(backend="random_backend", shots=1000, wires=8)
 
     def test_execute_not_implemented(self):
         """Test the python execute is not implemented."""
-        from catalyst.third_party.oqd import OQDDevice
-
         with pytest.raises(NotImplementedError, match="The OQD device only supports Catalyst."):
             dev = OQDDevice(backend="default", shots=1000, wires=8)
             dev.execute([], [])
 
     def test_preprocess(self):
         """Test the device preprocessing"""
-        from catalyst.third_party.oqd import OQDDevice
-
         dev = OQDDevice(backend="default", shots=1000, wires=8)
         tranform_program, _ = dev.preprocess()
         assert tranform_program == qml.transforms.core.TransformProgram()
 
     def test_preprocess_with_config(self):
         """Test the device preprocessing by explicitly passing an execution config"""
-        from catalyst.third_party.oqd import OQDDevice
-
         dev = OQDDevice(backend="default", shots=1000, wires=8)
         execution_config = qml.devices.ExecutionConfig()
         tranform_program, config = dev.preprocess(execution_config)
@@ -76,8 +58,6 @@ class TestOQDDevice:
 
     def test_get_c_interface(self):
         """Test the device get_c_interface method."""
-        from catalyst.third_party.oqd import OQDDevice
-
         dev = OQDDevice(backend="default", shots=1000, wires=8)
         name, _ = dev.get_c_interface()
         assert name == "oqd"

@@ -87,7 +87,6 @@ entry_points = {
         "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
-        "oqd.sinara = catalyst.third_party.oqd:OQDDevice",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
