@@ -147,22 +147,26 @@ class WorkflowInterpreter(PlxprInterpreter):
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
 def _(self, *args, qnode, shots, device, qnode_kwargs, qfunc_jaxpr, n_consts, batch_dims=None):
-    if device.shots != shots:
-        raise NotImplementedError("catalyst does not yet support dynamic shots")
     consts = args[:n_consts]
     non_const_args = args[n_consts:]
 
-    f = partial(QFuncPlxprInterpreter(device).eval, qfunc_jaxpr, consts)
+    f = partial(QFuncPlxprInterpreter(device, shots).eval, qfunc_jaxpr, consts)
 
     return quantum_kernel_p.bind(wrap_init(f), *non_const_args, qnode=qnode)
 
 
 class QFuncPlxprInterpreter(PlxprInterpreter):
-    """This dataclass stores the mutable variables modified
-    over the course of interpreting the plxpr as catalxpr."""
+    """An interpreter that converts plxpr into catalyst-variant jaxpr.
 
-    def __init__(self, device):
+    Args:
+        device (qml.devices.Device)
+        shots (qml.measurements.Shots)
+
+    """
+
+    def __init__(self, device, shots: qml.measurements.Shots):
         self._device = device
+        self._shots = shots.total_shots if shots else 0
         self.stateref = None
         super().__init__()
 
@@ -184,7 +188,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
     def setup(self):
         """Initialize the stateref and bind the device."""
         if self.stateref is None:
-            qdevice_p.bind(get_device_shots(self._device) or 0, **_get_device_kwargs(self._device))
+            qdevice_p.bind(self._shots, **_get_device_kwargs(self._device))
             self.stateref = {"qreg": qalloc_p.bind(len(self._device.wires)), "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
@@ -205,7 +209,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             return self.wire_map[wire_value]
         return qextract_p.bind(self.qreg, wire_value)
 
-    def interpret_operation(self, op, is_adjoint=False):
+    def interpret_operation(self, op):
         """Re-bind a pennylane operation as a catalyst instruction."""
 
         in_qubits = [self.get_wire(w) for w in op.wires]
@@ -216,7 +220,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             ctrl_value_len=0,
             ctrl_len=0,
             qubits_len=len(op.wires),
-            adjoint=is_adjoint,
+            adjoint=False,
         )
         for wire_values, new_wire in zip(op.wires, out_qubits):
             self.wire_map[wire_values] = new_wire
@@ -264,18 +268,17 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         )
 
         prim = measurement_map[type(measurement)]
-        device_shots = get_device_shots(self._device) or 0
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self._device.wires)
             mval = bind_flexible_primitive(
-                sample_p, {"shots": device_shots}, obs, num_qubits=num_qubits
+                sample_p, {"shots": self._shots}, obs, num_qubits=num_qubits
             )
         elif prim is counts_p:
-            mval = bind_flexible_primitive(counts_p, {"shots": device_shots}, shape=shape)
+            mval = bind_flexible_primitive(counts_p, {"shots": self._shots}, shape=shape)
         elif prim in {expval_p, var_p}:
             mval = prim.bind(obs, shape=shape)
         else:
-            mval = prim.bind(obs, shape=shape, shots=self._device.shots.total_shots)
+            mval = prim.bind(obs, shape=shape, shots=self._shots)
 
         # sample_p returns floats, so we need to converted it back to the expected integers here
         if dtype != mval.dtype:

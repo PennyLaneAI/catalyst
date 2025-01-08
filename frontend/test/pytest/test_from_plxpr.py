@@ -84,7 +84,7 @@ class TestPrivateBehavior:
     def test_uninitialization_errors(self):
         """Test that QFuncPlxprInterpreter raises errors if properties are not yet set."""
 
-        interpreter = QFuncPlxprInterpreter(qml.device("lightning.qubit", wires=1))
+        interpreter = QFuncPlxprInterpreter(qml.device("lightning.qubit", wires=1), shots=0)
 
         with pytest.raises(AttributeError, match=r"execution is not yet initialized"):
             _ = interpreter.qreg
@@ -98,27 +98,6 @@ class TestPrivateBehavior:
 
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
-
-    def test_dynamic_shots(self):
-        """Test that a NotImplementedError is raised is shots do not match device shots."""
-
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
-
-        @qml.qnode(dev)
-        def circuit():
-            return qml.sample(wires=0)
-
-        def f():
-            return circuit(shots=1000)
-
-        qml.capture.enable()
-        jaxpr = jax.make_jaxpr(f)()
-
-        with pytest.raises(
-            NotImplementedError, match="catalyst does not yet support dynamic shots"
-        ):
-            from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_observable_without_n_wires(self):
         """Test that a NotImplementedError is raised for an observable without n_wires."""
@@ -488,6 +467,28 @@ class TestCatalystCompareJaxpr:
         call_jaxpr_c = get_call_jaxpr(catalxpr)
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    def test_dynamic_shots(self):
+        """Test that shots can be specified on qnode call."""
+
+        dev = qml.device("lightning.qubit", wires=2, shots=50)
+
+        @qml.qnode(dev)
+        def circuit():
+            return qml.sample(wires=0)
+
+        def f():
+            return circuit(shots=100)
+
+        qml.capture.enable()
+        jaxpr = jax.make_jaxpr(f)()
+
+        converted = from_plxpr(jaxpr)()
+        qml.capture.disable()
+
+        assert converted.out_avals[0].shape == (100, 1)
+        [samples] = catalyst_execute_jaxpr(converted)()
+        assert qml.math.allclose(samples, np.zeros((100, 1)))
 
 
 class TestHybridPrograms:
