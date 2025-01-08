@@ -12,8 +12,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
+  [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Christina Lee
