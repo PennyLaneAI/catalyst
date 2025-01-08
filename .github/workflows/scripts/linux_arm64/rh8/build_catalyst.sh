@@ -55,7 +55,7 @@ export OQD_BUILD_DIR="/catalyst/oqd-build"
 make oqd
 
 # Build Catalyst dialects
-cmake -S mlir -B quantum-build -G Ninja \
+cmake -S mlir -B /catalyst/quantum-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
@@ -70,7 +70,7 @@ cmake -S mlir -B quantum-build -G Ninja \
     -DLLVM_ENABLE_ZSTD=OFF \
     -DLLVM_ENABLE_LLD=ON \
     -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm
-cmake --build quantum-build --target check-dialects catalyst-cli
+cmake --build /catalyst/quantum-build --target check-dialects catalyst-cli
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
