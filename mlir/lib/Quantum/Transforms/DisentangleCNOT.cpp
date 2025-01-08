@@ -133,7 +133,11 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
     void runOnOperation() override
     {
         auto op = getOperation();
-        op->walk([&](FunctionOpInterface func) { disentangleCNOTs(func, EmitFSMStateRemark); });
+        for (Operation &nestedOp : op->getRegion(0).front().getOperations()) {
+            if (auto func = dyn_cast<FunctionOpInterface>(nestedOp)) {
+                disentangleCNOTs(func, EmitFSMStateRemark);
+            }
+        }
     }
 };
 

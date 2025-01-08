@@ -136,7 +136,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         mlir::IRRewriter builder(func->getContext());
         Location loc = func->getLoc();
 
-        PropagateSimpleStatesAnalysis &pssa = getAnalysis<PropagateSimpleStatesAnalysis>();
+        PropagateSimpleStatesAnalysis pssa(func);
         llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
 
         func->walk([&](quantum::CustomOp op) {
@@ -495,7 +495,11 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     void runOnOperation() override
     {
         auto op = getOperation();
-        op->walk([&](FunctionOpInterface func) { disentangleSWAPs(func); });
+        for (Operation &nestedOp : op->getRegion(0).front().getOperations()) {
+            if (auto func = dyn_cast<FunctionOpInterface>(nestedOp)) {
+                disentangleSWAPs(func);
+             }
+        }
     }
 };
 
