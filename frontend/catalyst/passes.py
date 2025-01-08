@@ -380,13 +380,13 @@ def apply_pass(pass_name: str, *flags, **valued_options):
     return decorator
 
 
-def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_options):
+def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valued_options):
     """
     Applies a pass plugin to the QNode. See :doc:`dev/plugins`
     for more details.
 
     Args:
-        path_to_plugin (Path): full path to plugin
+        path_to_plugin (str | Path): full path to plugin
         pass_name (str): Name of the pass
         *flags: Pass options
         **valued_options: options with values
@@ -408,6 +408,12 @@ def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_opt
             def module():
                 return qnode()
     """
+
+    if not isinstance(path_to_plugin, Path):
+        path_to_plugin = Path(path_to_plugin)
+
+    if not path_to_plugin.exists():
+        raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
     def decorator(qnode):
         if not isinstance(qnode, qml.QNode):
