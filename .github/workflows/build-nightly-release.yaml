@@ -35,10 +35,10 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
-  # linux-aarch:
-  #   name: Build on Linux aarch64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+  linux-aarch:
+    name: Build on Linux aarch64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
 
   macos-arm:
     name: Build on macOS arm64
