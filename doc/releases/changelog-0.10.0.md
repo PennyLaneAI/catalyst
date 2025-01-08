@@ -71,9 +71,10 @@
 
 <h3>Improvements 🛠</h3>
 
-* The Catalyst CLI introduced in `v0.9`, which was not included in the binary distributions (wheels),
-  is now available as the `catalyst` command from the terminal after Pip installing Catalyst. The
-  full usage instructions are available in the 
+* The Catalyst CLI, a command line interface for debugging and dissecting different stages of
+  compilation, is now available under the `catalyst` command after installing Catalyst with pip.
+  Even though the tool was first introduced in `v0.9`, it was not yet included in binary
+  distributions of Catalyst (wheels). The full usage instructions are available in the
   [Catalyst CLI documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html).
   [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
   [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
@@ -160,8 +161,8 @@
 <h3>Internal changes ⚙️</h3>
 
 * Starting with Python 3.12, Catalyst's binary distributions (wheels) will now follow Python's
-  [Stable ABI](https://docs.python.org/3/c-api/stable.html), eliminating the need for a separate wheel per minor Python version. To enable this,
-  the following changes have made:
+  [Stable ABI](https://docs.python.org/3/c-api/stable.html), eliminating the need for a separate
+  wheel per minor Python version. To enable this, the following changes have made:
 
   - Stable ABI wheels are now generated for Python 3.12 and up.
     [(#1357)](https://github.com/PennyLaneAI/catalyst/pull/1357)
@@ -181,8 +182,8 @@
   - Python C-API calls have been replaced with functions from Python's Limited API.
     [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
 
-  - The MLIR `QuantumExtension` module — previously implemented with pybind11 - has been removed.
-    This  module was never included in the distributed wheels and could not be converted to
+  - The `QuantumExtension` module for MLIR Python bindings, which relies on pybind11, has been
+    removed. The module was never included in the distributed wheels and could not be converted to
     nanobind easily due to its dependency on upstream MLIR code. Pybind11 does not support the
     Python Stable ABI.
     [(#1187)](https://github.com/PennyLaneAI/catalyst/pull/1187)
@@ -220,8 +221,9 @@
   [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
 
 * The Catalyst infrastructure has been upgraded to support a dynamic `shots` parameter for quantum
-  execution. Previously, this value had to be a static compile-time constant, and could not be changed
-  once the program was compiled. Upcoming UI changes will make the feature accessible to users.
+  execution. Previously, this value had to be a static compile-time constant, and could not be
+  changed once the program was compiled. Upcoming UI changes will make the feature accessible to
+  users.
   [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
 
 * Several changes for experimental support of trapped-ion OQD devices have been made, including:
@@ -259,7 +261,8 @@
   to the regular `CustomOp` operation.
   [(#1387)](https://github.com/PennyLaneAI/catalyst/pull/1387)
 
-* A small refactor of code related to Catalyst compilation pipelines in the frontend.
+* Code readability in the `catalyst.pipelines` module has been improved, in particular for pipelines
+  with conditionally included passes.
   [(#1194)](https://github.com/PennyLaneAI/catalyst/pull/1194)
 
 <h3>Documentation 📝</h3>
