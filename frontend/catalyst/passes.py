@@ -350,7 +350,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
         E.g.,
 
         .. code-block:: python
-        
+
             @apply_pass("merge-rotations")
             @qml.qnode(qml.device("lightning.qubit", wires=1))
             def qnode():
@@ -394,9 +394,9 @@ def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_opt
     Returns:
         Function that can be used as a decorator to a QNode.
         E.g.,
-        
+
         .. code-block:: python
-        
+
             from standalone import getStandalonePluginAbsolutePath
 
             @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
