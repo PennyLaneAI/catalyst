@@ -12,9 +12,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Added get_c_interface method for the OQD device to be able to point to the c++
-  implementation of the device in python. This makes qjit to accept an instance of the device 
-  and be able to connect to its runtime.
+* The `get_c_interface` method has been added to the OQD device, which enables retrieval of the C++
+  implementation of the device from Python. This allows `qjit` to accept an instance of the device
+  and connect to its runtime.
   [(#1420)](https://github.com/PennyLaneAI/catalyst/pull/1420)
 
 <h3>Documentation 📝</h3>
