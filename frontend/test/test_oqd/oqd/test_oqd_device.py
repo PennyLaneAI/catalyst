@@ -17,7 +17,9 @@
 
 import pennylane as qml
 import pytest
+
 from catalyst.third_party.oqd import OQDDevice
+
 
 class TestOQDDevice:
     """Test the OQD device python layer for Catalyst."""
