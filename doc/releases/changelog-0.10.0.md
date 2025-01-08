@@ -167,6 +167,10 @@
   array arguments of the function, in particular when non-64bit datatypes are used.
   [(#1338)](https://github.com/PennyLaneAI/catalyst/pull/1338)
 
+* Fixed a bug in catalyst cli where using `checkpoint-stage` would cause `save-ir-after-each`
+  to not work properly.
+  [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
+
 <h3>Internal changes ⚙️</h3>
 
 * Catalyst no longer depends on or pins the `scipy` package. Instead, OpenBLAS is sourced directly
@@ -271,6 +275,10 @@
 * The `catalyst-cli` documentation has been updated to reflect the removal of the `func-name` option 
   for transformation passes.
   [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
+
+* Added more details to catalyst-cli documentation specifiying available options for
+  checkpoint-stage and default pipelines
+  [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
 
 <h3>Contributors ✍️</h3>
 

@@ -32,11 +32,11 @@ each stage individually. For example:
 
 .. note::
 
-    The Catalyst CLI tool is currently only available when Catalyst is built from source, and is not
-    included when installing Catalyst via pip or from wheels.
+    If Catalyst is built from source, the ``catalyst-cli`` executable will be located in 
+    the ``mlir/build/bin/`` directory relative to the root of your Catalyst source directory.
 
-    After building Catalyst, the ``catalyst-cli`` executable will be available in the
-    ``mlir/build/bin/`` directory.
+    If Catalyst is installed via pip or from wheels, the executable will be located 
+    in the ``catalyst/bin/`` directory relative to the environment’s installation directory.
 
 Usage
 -----
@@ -98,6 +98,23 @@ intermediate files are saved.
 Keep intermediate files after each pipeline in the compilation. By default, no intermediate files
 are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-after-each=pipeline``.
 
+``--{passname}``
+"""""""""""""""
+
+Enable a specific pass. For example, to enable the ``remove-chained-self-inverse`` pass, use
+``--remove-chained-self-inverse``.
+
+Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines that can also be run
+individually via this option. In that case, the name of the pipeline is substituted for the pass
+name. Currently, the following pipelines are available:
+``enforce-runtime-invariants-pipeline``,
+``hlo_lowering-pipeline``,
+``quantum-compilation-pipeline``,
+``bufferization-pipeline``,
+``llvm-dialect-lowring-pipeline``, and finally 
+``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
+Catalyst CLI tool if no pass option is specified.
+
 ``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -113,7 +130,7 @@ applies the pass ``inline-nested-module``, we would specify this pipeline config
 
 .. code-block::
 
-    --catalyst-pipeline=pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)
+    --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)"
 
 ``--workspace=<path>``
 """"""""""""""""""""""
@@ -138,7 +155,14 @@ Enable asynchronous QNodes.
 """""""""""""""""""""""""""""""""""
 
 Define a *checkpoint stage*, used to indicate that the compiler should start only after reaching the
-given pass.
+given stage. The stages that are currently available are:
+
+* MLIR: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
+  names described under the ``--{passname}`` option, OR any custom pipeline names if the
+  ``--catalyst-pipeline={pipeline(...),...}`` option is used.
+* LLVM: ``llvm_ir`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
+  Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
+  (automatic differentiation) passes are only run conditionally as needed.
 
 ``--dump-catalyst-pipeline[=<true|false>]``
 """""""""""""""""""""""""""""""""""""""""""

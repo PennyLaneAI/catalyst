@@ -15,14 +15,14 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 """
-This test makes sure that we can use plugins from the compiler
+This test makes sure that we can use plugins from the compiler.
 
 Given the standalone-plugin in the MLIR repository, can we verify that
 it works when loading it from python?
 
 This test uses a lot of machinery that is not exposed to the user.
 However, testing the standalone-plugin (as written in the LLVM repository)
-is impractical. The standalone-plugin rewrites a symbols with the name
+is impractical. The standalone-plugin rewrites all symbols with the name
 `bar` to symbols with the name `foo`. However, since the standalone
 plugin is meant to be more of an example, it does not modify
 the uses of symbol `bar` and change them to `foo`.
@@ -50,7 +50,7 @@ something like the following:
   print(module.mlir)
   ```
 
-It would succeed in generate correct MLIR during the lowering from JAXPR to MLIR.
+It would succeed at generating correct MLIR during the lowering from JAXPR to MLIR.
 However, after the `standalone-switch-bar-foo` pass, the verifier would fail
 because it would see callsites to `@bar` but no definitions for `@bar`.
 
