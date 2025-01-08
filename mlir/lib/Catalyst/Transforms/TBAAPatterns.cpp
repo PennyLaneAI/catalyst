@@ -71,7 +71,7 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
             loadOp, typeConverter->convertType(type.getElementType()), dataPtr, 0, false,
             loadOp.getNontemporal());
 
-        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType, ComplexType>(baseType)) {
             setTag(baseType, tree, loadOp.getContext(), op);
         }
         else {
@@ -102,7 +102,7 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         auto op = rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, adaptor.getValue(), dataPtr,
                                                              0, false, storeOp.getNontemporal());
 
-        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
+        if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType, ComplexType>(baseType)) {
             setTag(baseType, tree, storeOp.getContext(), op);
         }
         else {
