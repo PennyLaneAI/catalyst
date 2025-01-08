@@ -341,7 +341,7 @@ See for example:
 
     from standalone import getStandalonePluginAbsolutePath
 
-    @apply_pass_plugin("standalone-switch-bar-foo", getStandalonePluginAbsolutePath())
+    @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def qnode():
         return qml.state()
