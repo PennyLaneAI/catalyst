@@ -30,7 +30,7 @@
         return qnode()
     ```
 
-  - :func:`~.passes.apply_pass_plugin` can be used on QNodes when the plugin did define an entry
+  - :func:`~.passes.apply_pass_plugin` can be used on QNodes when the plugin did not define an entry
     point. In that case the full filesystem path must be specified in addition to the pass name.
 
     ```python
@@ -101,6 +101,7 @@
 * Two additional circuit optimizations have been added to Catalyst: `disentangle-CNOT` and
   `disentangle-SWAP`. The optimizations are available via the :mod:`~.passes` module.
   [(#1154)](https://github.com/PennyLaneAI/catalyst/pull/1154)
+  [(#1407)](https://github.com/PennyLaneAI/catalyst/pull/1407)
 
   The optimizations use a finite state machine to propagate limited qubit state information through
   the circuit to turn CNOT and SWAP gates into cheaper instructions. The pass is based on the work
@@ -177,7 +178,6 @@
     Nanobind has been developed as a natural successor to the pybind11 library and offers a number
     of [advantages](https://nanobind.readthedocs.io/en/latest/why.html#major-additions) like its
     ability to target Python's Stable ABI.
-    starting with Python 3.12.
 
   - Python C-API calls have been replaced with functions from Python's Limited API.
     [(#1354)](https://github.com/PennyLaneAI/catalyst/pull/1354)
