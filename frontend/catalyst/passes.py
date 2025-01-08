@@ -381,6 +381,20 @@ def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_opt
 
     Returns:
         Function that can be used as a decorator to a QNode.
+        E.g.,
+        
+        .. code-block:: python
+        
+            from standalone import getStandalonePluginAbsolutePath
+
+           @apply_pass_plugin("standalone-switch-bar-foo", getStandalonePluginAbsolutePath())
+           @qml.qnode(qml.device("lightning.qubit", wires=1))
+           def qnode():
+               return qml.state()
+
+           @qml.qjit(target="mlir")
+           def module():
+               return qnode()
     """
 
     def decorator(qnode):

@@ -355,7 +355,7 @@ See for example:
 
 If you have followed all the steps in this tutorial and inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
 Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
-For more information, please consult our `dialect guide <../dev/dialects.html>`_, our `compiler passes guide <../dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
+For more information, please consult our :doc:`dialect guide </dev/dialects.html>`_, our `compiler passes guide :doc:</dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
 
 You can also register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_ (for reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ 
 that implements the standalone plugin as a Python package).
