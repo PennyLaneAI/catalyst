@@ -347,6 +347,18 @@ def apply_pass(pass_name: str, *flags, **valued_options):
 
     Returns:
         Function that can be used as a decorator to a QNode.
+        E.g.,
+
+        .. code-block:: python
+        
+            @apply_pass("merge-rotations")
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def qnode():
+                return qml.state()
+
+            @qml.qjit(target="mlir")
+            def module():
+                return qnode()
     """
 
     def decorator(qnode):
@@ -387,14 +399,14 @@ def apply_pass_plugin(path_to_plugin: Path, pass_name: str, *flags, **valued_opt
         
             from standalone import getStandalonePluginAbsolutePath
 
-           @apply_pass_plugin("standalone-switch-bar-foo", getStandalonePluginAbsolutePath())
-           @qml.qnode(qml.device("lightning.qubit", wires=1))
-           def qnode():
-               return qml.state()
+            @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def qnode():
+                return qml.state()
 
-           @qml.qjit(target="mlir")
-           def module():
-               return qnode()
+            @qml.qjit(target="mlir")
+            def module():
+                return qnode()
     """
 
     def decorator(qnode):
