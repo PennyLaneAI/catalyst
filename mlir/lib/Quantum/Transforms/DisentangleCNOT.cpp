@@ -30,6 +30,98 @@
 using namespace mlir;
 using namespace catalyst;
 
+namespace {
+void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
+{
+    mlir::IRRewriter builder(func->getContext());
+    Location loc = func->getLoc();
+
+    PropagateSimpleStatesAnalysis pssa(func);
+    llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
+
+    if (verbose) {
+        for (auto it = qubitValues.begin(); it != qubitValues.end(); ++it) {
+            it->first.getDefiningOp()->emitRemark(pssa.QubitState2String(it->second));
+        }
+    }
+
+    func->walk([&](quantum::CustomOp op) {
+        StringRef gate = op.getGateName();
+        if (gate != "CNOT") {
+            return;
+        }
+
+        Value controlIn = op->getOperand(0);
+        Value targetIn = op->getOperand(1);
+        Value controlOut = op->getResult(0);
+        Value targetOut = op->getResult(1);
+
+        // Do nothing if the inputs states are not tracked
+        if (!qubitValues.contains(controlIn) || !qubitValues.contains(targetIn)) {
+            return;
+        }
+
+        // |0> control, always do nothing
+        if (pssa.isZero(qubitValues[controlIn])) {
+            controlOut.replaceAllUsesWith(controlIn);
+            targetOut.replaceAllUsesWith(targetIn);
+            op->erase();
+            return;
+        }
+
+        // |1> control, insert PauliX gate on target
+        if (pssa.isOne(qubitValues[controlIn])) {
+            controlOut.replaceAllUsesWith(controlIn);
+
+            // PauliX on |+-> is unnecessary: they are eigenstates!
+            if ((pssa.isPlus(qubitValues[targetIn])) || (pssa.isMinus(qubitValues[targetIn]))) {
+                targetOut.replaceAllUsesWith(targetIn);
+                op->erase();
+                return;
+            }
+            else {
+                builder.setInsertionPoint(op);
+                quantum::CustomOp xgate =
+                    builder.create<quantum::CustomOp>(loc, /*gate_name=*/"PauliX",
+                                                      /*in_qubits=*/mlir::ValueRange({targetIn}));
+                targetOut.replaceAllUsesWith(xgate->getResult(0));
+                op->erase();
+                return;
+            }
+        }
+
+        // |+> target, always do nothing
+        if (pssa.isPlus(qubitValues[targetIn])) {
+            controlOut.replaceAllUsesWith(controlIn);
+            targetOut.replaceAllUsesWith(targetIn);
+            op->erase();
+            return;
+        }
+
+        // |-> target, insert PauliZ on control
+        if (pssa.isMinus(qubitValues[targetIn])) {
+            targetOut.replaceAllUsesWith(targetIn);
+
+            // PauliZ on |01> is unnecessary: they are eigenstates!
+            if ((pssa.isZero(qubitValues[controlIn])) || (pssa.isOne(qubitValues[controlIn]))) {
+                controlOut.replaceAllUsesWith(controlIn);
+                op->erase();
+                return;
+            }
+            else {
+                builder.setInsertionPoint(op);
+                quantum::CustomOp zgate =
+                    builder.create<quantum::CustomOp>(loc, /*gate_name=*/"PauliZ",
+                                                      /*in_qubits=*/mlir::ValueRange({controlIn}));
+                controlOut.replaceAllUsesWith(zgate->getResult(0));
+                op->erase();
+                return;
+            }
+        }
+    });
+}
+} // namespace
+
 namespace catalyst {
 #define GEN_PASS_DEF_DISENTANGLECNOTPASS
 #define GEN_PASS_DECL_DISENTANGLECNOTPASS
@@ -41,99 +133,7 @@ struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNO
     void runOnOperation() override
     {
         auto op = getOperation();
-        SmallVector<Operation *> targets;
-        op->walk([&](FunctionOpInterface func) { targets.push_back(func); });
-
-        for (auto func : targets) {
-            mlir::IRRewriter builder(func->getContext());
-            Location loc = func->getLoc();
-
-            PropagateSimpleStatesAnalysis pssa(func);
-            llvm::DenseMap<Value, QubitState> qubitValues = pssa.getQubitValues();
-
-            if (EmitFSMStateRemark) {
-                for (auto it = qubitValues.begin(); it != qubitValues.end(); ++it) {
-                    it->first.getDefiningOp()->emitRemark(pssa.QubitState2String(it->second));
-                }
-            }
-
-            func->walk([&](quantum::CustomOp op) {
-                StringRef gate = op.getGateName();
-                if (gate != "CNOT") {
-                    return;
-                }
-
-                Value controlIn = op->getOperand(0);
-                Value targetIn = op->getOperand(1);
-                Value controlOut = op->getResult(0);
-                Value targetOut = op->getResult(1);
-
-                // Do nothing if the inputs states are not tracked
-                if (!qubitValues.contains(controlIn) || !qubitValues.contains(targetIn)) {
-                    return;
-                }
-
-                // |0> control, always do nothing
-                if (pssa.isZero(qubitValues[controlIn])) {
-                    controlOut.replaceAllUsesWith(controlIn);
-                    targetOut.replaceAllUsesWith(targetIn);
-                    op->erase();
-                    return;
-                }
-
-                // |1> control, insert PauliX gate on target
-                if (pssa.isOne(qubitValues[controlIn])) {
-                    controlOut.replaceAllUsesWith(controlIn);
-
-                    // PauliX on |+-> is unnecessary: they are eigenstates!
-                    if ((pssa.isPlus(qubitValues[targetIn])) ||
-                        (pssa.isMinus(qubitValues[targetIn]))) {
-                        targetOut.replaceAllUsesWith(targetIn);
-                        op->erase();
-                        return;
-                    }
-                    else {
-                        builder.setInsertionPoint(op);
-                        quantum::CustomOp xgate = builder.create<quantum::CustomOp>(
-                            loc, /*gate_name=*/"PauliX",
-                            /*in_qubits=*/mlir::ValueRange({targetIn}));
-                        targetOut.replaceAllUsesWith(xgate->getResult(0));
-                        op->erase();
-                        return;
-                    }
-                }
-
-                // |+> target, always do nothing
-                if (pssa.isPlus(qubitValues[targetIn])) {
-                    controlOut.replaceAllUsesWith(controlIn);
-                    targetOut.replaceAllUsesWith(targetIn);
-                    op->erase();
-                    return;
-                }
-
-                // |-> target, insert PauliZ on control
-                if (pssa.isMinus(qubitValues[targetIn])) {
-                    targetOut.replaceAllUsesWith(targetIn);
-
-                    // PauliZ on |01> is unnecessary: they are eigenstates!
-                    if ((pssa.isZero(qubitValues[controlIn])) ||
-                        (pssa.isOne(qubitValues[controlIn]))) {
-                        controlOut.replaceAllUsesWith(controlIn);
-                        op->erase();
-                        return;
-                    }
-                    else {
-                        builder.setInsertionPoint(op);
-                        quantum::CustomOp zgate = builder.create<quantum::CustomOp>(
-                            loc, /*gate_name=*/"PauliZ",
-                            /*in_qubits=*/mlir::ValueRange({controlIn}));
-                        controlOut.replaceAllUsesWith(zgate->getResult(0));
-                        op->erase();
-                        return;
-                    }
-                }
-            });
-        }
+        op->walk([&](FunctionOpInterface func) { disentangleCNOTs(func, EmitFSMStateRemark); });
     }
 };
 
