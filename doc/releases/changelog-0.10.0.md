@@ -9,15 +9,15 @@
   [(#1370)](https://github.com/PennyLaneAI/catalyst/pull/1370)
 
   Custom compilation passes and dialects in MLIR can be specified for use in Catalyst via a shared
-  object (`*.so` or `*.dylib` on MacOS) that implements the pass. Details on creating your own
+  object (`*.so` or `*.dylib` on macOS) that implements the pass. Details on creating your own
   plugin can be found in our
   [compiler plugin documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html).
-  At a high level, there are three ways to utilize a plugin once it's properly specified:
+  At a high level, there are three ways to use a plugin once it's properly specified:
 
   - :func:`~.passes.apply_pass` can be used on QNodes when there is a
     [Python entry point](https://packaging.python.org/en/latest/specifications/entry-points/)
     defined for the plugin. In that case, the plugin and pass should both be specified and separated
-    by a `.`.
+    by a period.
 
     ```python
     @catalyst.passes.apply_pass("plugin_name.pass_name")
@@ -71,10 +71,10 @@
 
 <h3>Improvements 🛠</h3>
 
-* The Catalyst CLI introduced in `v0.9` without being included in binary distributions (wheels)
+* The Catalyst CLI introduced in `v0.9`, which was not included in the binary distributions (wheels),
   is now available as the `catalyst` command from the terminal after Pip installing Catalyst. The
-  full documentation is available
-  [here](https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html).
+  full usage instructions are available in the 
+  [Catalyst CLI documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html).
   [(#1285)](https://github.com/PennyLaneAI/catalyst/pull/1285)
   [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
   [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
@@ -91,7 +91,7 @@
   compiled programs.
   [(#1305)](https://github.com/PennyLaneAI/catalyst/pull/1305)
 
-* In Catalyst v0.9.0 the output of the compiler instrumentation (:func:`~.debug.instrumentation`)
+* In Catalyst `v0.9` the output of the compiler instrumentation (:func:`~.debug.instrumentation`)
   had inadvertently been made more verbose by printing timing information for each run of each pass.
   This change has been reverted. Instead, the :func:`~.qjit` option `verbose=True` will now instruct
   the instrumentation to produce this more detailed output.
@@ -108,7 +108,7 @@
 
 <h3>Breaking changes 💔</h3>
 
-* The minimum supported PennyLane version has been updated `v0.40`, backwards compatibility in
+* The minimum supported PennyLane version has been updated to `v0.40`; backwards compatibility in
   either direction is not maintained.
   [(#1308)](https://github.com/PennyLaneAI/catalyst/pull/1308)
 
@@ -139,9 +139,9 @@
     opposed to the deprecated `mp.return_type` shorthand (e.g. `ExpectationMP` instead of `Expval`).
   - The `mid_circuit_measurements` field has been replaced with `supported_mcm_methods`, which
     expects a list of mcm methods that the device is able to work with (or empty if unsupported).
-  - A new field is added, `overlapping_observables`, which indicates whether a device supports
-    multiple measurements during one execution on overlapping overlapping wires.
-  - The `options` section is removed. Instead, the Python device class should define a
+  - A new field has been added, `overlapping_observables`, which indicates whether a device supports
+    multiple measurements during one execution on overlapping wires.
+  - The `options` section has been removed. Instead, the Python device class should define a
     `device_kwargs` field holding the name and values of C++ device constructor kwargs.
 
   See the [Custom Devices page](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html)
@@ -160,7 +160,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * Starting with Python 3.12, Catalyst's binary distributions (wheels) will now follow Python's
-  Stable ABI, eliminating the need for a separate wheel per minor Python version. To enable this,
+  [Stable ABI](https://docs.python.org/3/c-api/stable.html), eliminating the need for a separate wheel per minor Python version. To enable this,
   the following changes have made:
 
   - Stable ABI wheels are now generated for Python 3.12 and up.
@@ -175,7 +175,7 @@
 
     Nanobind has been developed as a natural successor to the pybind11 library and offers a number
     of [advantages](https://nanobind.readthedocs.io/en/latest/why.html#major-additions) like its
-    ability to target Python's [stable ABI interface](https://docs.python.org/3/c-api/stable.html)
+    ability to target Python's Stable ABI.
     starting with Python 3.12.
 
   - Python C-API calls have been replaced with functions from Python's Limited API.
@@ -184,11 +184,11 @@
   - The MLIR `QuantumExtension` module — previously implemented with pybind11 - has been removed.
     This  module was never included in the distributed wheels and could not be converted to
     nanobind easily due to its dependency on upstream MLIR code. Pybind11 does not support the
-    stable Python ABI.
+    Python Stable ABI.
     [(#1187)](https://github.com/PennyLaneAI/catalyst/pull/1187)
 
 * Catalyst no longer depends on or pins the `scipy` package. Instead, OpenBLAS is sourced directly
-  from [`scipy-openblas32`](https://pypi.org/project/scipy-openblas32/) or
+  from [scipy-openblas32](https://pypi.org/project/scipy-openblas32/) or
   [Accelerate](https://developer.apple.com/accelerate/) is used.
   [(#1322)](https://github.com/PennyLaneAI/catalyst/pull/1322)
   [(#1328)](https://github.com/PennyLaneAI/catalyst/pull/1328)
@@ -220,7 +220,7 @@
   [(#1317)](https://github.com/PennyLaneAI/catalyst/pull/1317)
 
 * The Catalyst infrastructure has been upgraded to support a dynamic `shots` parameter for quantum
-  execution. Previously, this value had to a static compile-time constant, and could not be changed
+  execution. Previously, this value had to be a static compile-time constant, and could not be changed
   once the program was compiled. Upcoming UI changes will make the feature accessible to users.
   [(#1360)](https://github.com/PennyLaneAI/catalyst/pull/1360)
 
@@ -239,7 +239,7 @@
     the Catalyst `quantum` dialect to laser pulse operations in the `ion` dialect. This pass accepts
     logical quantum gates from the set `{RX, RY, MS}`, where `MS` is the Mølmer–Sørensen gate. Doing
     so enables the insertion of physical device parameters into the IR, which will be necessary when
-    lowering to OQD's backend calls. The physical parameters, which are typically be obtained from
+    lowering to OQD's backend calls. The physical parameters, which are typically obtained from
     hardware-calibration runs, are read in from [TOML](https://toml.io/en/) files during the
     `--quantum-to-ion` conversion. The TOML filepaths are taken in as pass options.
 
