@@ -490,7 +490,11 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
             s << *op;
-            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName.str()), tmp);
+            std::string fileName = pipelineName.str();
+            if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
+                fileName += "_" + funcOp.getName().str();
+            }
+            dumpToFile(options, output.nextPipelineDumpFilename(fileName), tmp);
         }
     };
 
@@ -551,7 +555,7 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
     }
-    if (options.keepIntermediate && options.checkpointStage.empty()) {
+    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -564,7 +568,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output, TimingScope &timing)
 
 {
-    if (options.keepIntermediate && options.checkpointStage.empty()) {
+    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
@@ -861,26 +865,30 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     // ---------
     // Any modifications made to the command-line interface should be documented in
     // doc/catalyst-cli/catalyst-cli.rst
-    cl::opt<std::string> WorkspaceDir("workspace", cl::desc("Workspace directory"), cl::init("."));
+    cl::OptionCategory CatalystCat("Catalyst-cli Options", "");
+    cl::opt<std::string> WorkspaceDir("workspace", cl::desc("Workspace directory"), cl::init("."),
+                                      cl::cat(CatalystCat));
     cl::opt<std::string> ModuleName("module-name", cl::desc("Module name"),
-                                    cl::init("catalyst_module"));
+                                    cl::init("catalyst_module"), cl::cat(CatalystCat));
 
     cl::opt<enum SaveTemps> SaveAfterEach(
         "save-ir-after-each", cl::desc("Keep intermediate files after each pass or pipeline"),
         cl::values(clEnumValN(SaveTemps::AfterPass, "pass", "Save IR after each pass")),
         cl::values(clEnumValN(SaveTemps::AfterPipeline, "pipeline", "Save IR after each pipeline")),
-        cl::init(SaveTemps::None));
+        cl::init(SaveTemps::None), cl::cat(CatalystCat));
     cl::opt<bool> KeepIntermediate(
         "keep-intermediate", cl::desc("Keep intermediate files"), cl::init(false),
-        cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }));
+        cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }),
+        cl::cat(CatalystCat));
     cl::opt<bool> AsyncQNodes("async-qnodes", cl::desc("Enable asynchronous QNodes"),
-                              cl::init(false));
-    cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false));
-    cl::list<std::string> CatalystPipeline("catalyst-pipeline",
-                                           cl::desc("Catalyst Compiler pass pipelines"),
-                                           cl::ZeroOrMore, cl::CommaSeparated);
+                              cl::init(false), cl::cat(CatalystCat));
+    cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
+                          cl::cat(CatalystCat));
+    cl::list<std::string> CatalystPipeline(
+        "catalyst-pipeline", cl::desc("Catalyst Compiler pass pipelines"), cl::ZeroOrMore,
+        cl::CommaSeparated, cl::cat(CatalystCat));
     cl::opt<std::string> CheckpointStage("checkpoint-stage", cl::desc("Checkpoint stage"),
-                                         cl::init(""));
+                                         cl::init(""), cl::cat(CatalystCat));
     cl::opt<enum Action> LoweringAction(
         "tool", cl::desc("Select the tool to isolate"),
         cl::values(clEnumValN(Action::OPT, "opt", "run quantum-opt on the MLIR input")),
@@ -889,9 +897,10 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         cl::values(clEnumValN(Action::LLC, "llc", "run llc on the llvm IR input")),
         cl::values(clEnumValN(Action::All, "all",
                               "run quantum-opt, mlir-translate, and llc on the MLIR input")),
-        cl::init(Action::All));
-    cl::opt<bool> DumpPassPipeline(
-        "dump-catalyst-pipeline", cl::desc("Print the pipeline that will be run"), cl::init(false));
+        cl::init(Action::All), cl::cat(CatalystCat));
+    cl::opt<bool> DumpPassPipeline("dump-catalyst-pipeline",
+                                   cl::desc("Print the pipeline that will be run"), cl::init(false),
+                                   cl::cat(CatalystCat));
 
     // Create dialect registry
     DialectRegistry registry;
@@ -904,8 +913,13 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
+    std::string helpStr = "Catalyst Command Line Interface options. \n"
+                          "Below, there is a complete list of options for the Catalyst CLI tool"
+                          "In the first section, you can find the options that are used to"
+                          "configure the Catalyst compiler. Next, you can find the options"
+                          "specific to the mlir-opt tool.\n";
     std::tie(inputFilename, outputFilename) =
-        registerAndParseCLIOptions(argc, argv, "quantum compiler", registry);
+        registerAndParseCLIOptions(argc, argv, helpStr, registry);
     llvm::InitLLVM y(argc, argv);
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
