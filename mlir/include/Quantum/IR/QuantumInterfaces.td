@@ -73,7 +73,7 @@ def QuantumOperation : OpInterface<"QuantumOperation"> {
         >,
         InterfaceMethod<
             "Return all results which are considered output qubit values (including controls).",
-            "std::vector<mlir::Value>", "getQubitResults"
+            "std::vector<mlir::OpResult>", "getQubitResults"
         >
     ];
 
@@ -129,7 +129,7 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         >,
         InterfaceMethod<
             "Return all operands which are considered controlling output qubit values.",
-            "mlir::ValueRange", "getCtrlQubitResults"
+            "mlir::ResultRange", "getCtrlQubitResults"
         >,
         InterfaceMethod<
             "Return adjoint flag.",
