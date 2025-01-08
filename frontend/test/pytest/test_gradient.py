@@ -1790,7 +1790,7 @@ class TestDecompositionGradient:
 
         @qml.qnode(dev)
         def circuit(x):
-            U = jnp.array([[1, 0], [0, x]])
+            U = jnp.array([[1, 0], [0, jnp.exp(1j * x)]])
             decomp = qml.QubitUnitary.compute_decomposition(U, wires=0)
             for op in decomp:
                 qml.apply(op)
@@ -1800,7 +1800,7 @@ class TestDecompositionGradient:
             probs = circuit(x)
             return probs[0] + probs[1]
 
-        assert np.isnan(grad(qjit(f), argnums=0)(0.0)) == True
+        assert np.isnan(grad(qjit(f), argnums=0)(1.0)) == True
 
     def test_unitary_to_rot(self):
         """Test usage with unitary to rot transform."""
@@ -1810,7 +1810,7 @@ class TestDecompositionGradient:
         @qml.transforms.unitary_to_rot
         @qml.qnode(dev)
         def circuit(x):
-            U = jnp.array([[1, 0], [0, x]])
+            U = jnp.array([[1, 0], [0, jnp.exp(1j * x)]])
             qml.QubitUnitary(U, wires=0)
             return qml.probs()
 
@@ -1818,7 +1818,7 @@ class TestDecompositionGradient:
             probs = circuit(x)
             return probs[0] + probs[1]
 
-        assert np.isnan(grad(qjit(f), argnums=0)(0.0)) == True
+        assert np.isnan(grad(qjit(f), argnums=0)(1.0)) == True
 
 
 if __name__ == "__main__":
