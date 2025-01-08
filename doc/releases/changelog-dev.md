@@ -12,8 +12,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new OQD device entry point `oqd.sinara` has been added to the python frontend. 
+  An OQD device can now be initiated like `qml.device("oqd.sinara", shots=1000, wires=10)`.
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Mehrdad Malekmohammadi
