@@ -67,6 +67,7 @@ def test_pass_plugin_can_aot_compile():
 
         assert example.mlir
 
+
 def test_get_options():
     """
       ApplyRegisteredPassOp expects options to be a single StringAttr
@@ -82,5 +83,8 @@ def test_get_options():
     However, experimentally we found that single-options also work without values.
     """
     assert catalyst.passes.Pass("example-pass", "single-option").get_options() == "single-option"
-    assert catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options() == "an-option bn-option"
+    assert (
+        catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
+        == "an-option bn-option"
+    )
     assert catalyst.passes.Pass("example-pass", option=True).get_options() == "option=True"

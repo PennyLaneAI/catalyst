@@ -64,6 +64,7 @@ import platform
 from pathlib import Path
 
 import pennylane as qml
+
 import catalyst
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.utils.filesystem import WorkspaceManager
@@ -111,5 +112,6 @@ def test_pass_options():
         return qml.state()
 
     print(example.mlir)
+
 
 test_pass_options()
