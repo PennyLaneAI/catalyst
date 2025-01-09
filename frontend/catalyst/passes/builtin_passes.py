@@ -23,7 +23,7 @@ from catalyst.passes.pass_api import Pass
 
 
 ## API ##
-def cancel_inverses(qnode=None):
+def cancel_inverses(qnode):
     """
     Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
@@ -149,7 +149,7 @@ def cancel_inverses(qnode=None):
     return wrapper
 
 
-def merge_rotations(qnode=None):
+def merge_rotations(qnode):
     """
     Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
@@ -226,7 +226,7 @@ def merge_rotations(qnode=None):
     return wrapper
 
 
-def ions_decomposition(qnode=None):  # pragma: nocover
+def ions_decomposition(qnode):  # pragma: nocover
     """Apply decomposition pass at the MLIR level."""
 
     if not isinstance(qnode, qml.QNode):
