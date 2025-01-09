@@ -74,6 +74,7 @@ void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modif
 void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__MS(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
