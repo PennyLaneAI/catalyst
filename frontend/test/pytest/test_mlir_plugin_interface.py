@@ -66,3 +66,21 @@ def test_pass_plugin_can_aot_compile():
             return qml.state()
 
         assert example.mlir
+
+def test_get_options():
+    """
+      ApplyRegisteredPassOp expects options to be a single StringAttr
+      which follows the same format as the one used with mlir-opt.
+
+    https://mlir.llvm.org/docs/Dialects/Transform/#transformapply_registered_pass-transformapplyregisteredpassop
+
+      Options passed to a pass are specified via the syntax {option1=value1 option2=value2 ...},
+      i.e., use space-separated key=value pairs for each option.
+
+    https://mlir.llvm.org/docs/Tutorials/MlirOpt/#running-a-pass-with-options
+
+    However, experimentally we found that single-options also work without values.
+    """
+    assert catalyst.passes.Pass("example-pass", "single-option").get_options() == "single-option"
+    assert catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options() == "an-option bn-option"
+    assert catalyst.passes.Pass("example-pass", option=True).get_options() == "option=True"

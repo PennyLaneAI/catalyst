@@ -250,11 +250,16 @@ class Pass:
 
         self.name = name
 
+    def get_options(self):
+        retval = " ".join(f"{str(option)}" for option in self.options)
+        retval2 = " ".join(f"{str(key)}={str(value)}" for key, value in self.valued_options.items())
+        return " ".join([retval, retval2])
+
     def __repr__(self):
         return (
             self.name
-            + " ".join(f"--{option}" for option in self.options)
-            + " ".join(f"--{option}={value}" for option, value in self.valued_options)
+            + " ".join(f"--{str(option)}=true" for option in self.options)
+            + " ".join([f"--{str(option)}={str(value)}" for option, value in self.valued_options.items()])
         )
 
 

@@ -63,6 +63,8 @@ APIs, like the Compiler and options.
 import platform
 from pathlib import Path
 
+import pennylane as qml
+import catalyst
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.runtime_environment import get_bin_path
@@ -96,3 +98,18 @@ workspace = WorkspaceManager.get_or_create_workspace("test", None)
 custom_compiler = Compiler(options)
 _, mlir_string = custom_compiler.run_from_ir(mlir_module, "test", workspace)
 print(mlir_string)
+
+
+def test_pass_options():
+    """Is the option in the generated MLIR?"""
+
+    @qml.qjit(target="mlir")
+    # CHECK: options = "an-option maxValue=1"
+    @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def example():
+        return qml.state()
+
+    print(example.mlir)
+
+test_pass_options()
