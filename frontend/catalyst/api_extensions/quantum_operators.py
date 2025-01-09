@@ -723,5 +723,5 @@ def _check_no_measurements(tape: QuantumTape) -> None:
         else:
             if isinstance(op, MidCircuitMeasure):
                 raise ValueError(
-                    "Measurements are not invertible and cannot be used within an adjoint() region."
+                    "Measurements cannot be used within an adjoint() or ctrl() region."
                 )

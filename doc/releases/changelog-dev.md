@@ -15,6 +15,9 @@
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
+* Improve the error message for invalid measurement in `adjoin()` or `ctrl()` region.
+  [(#1425)](https://github.com/PennyLaneAI/catalyst/pull/1425)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -22,3 +25,4 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee
+Sengthai Heng
