@@ -70,6 +70,8 @@ def test_pass_plugin_can_aot_compile():
 
 def test_get_options():
     """
+    Test get_options from Pass
+
       ApplyRegisteredPassOp expects options to be a single StringAttr
       which follows the same format as the one used with mlir-opt.
 
