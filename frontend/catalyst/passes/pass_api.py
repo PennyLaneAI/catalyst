@@ -271,6 +271,8 @@ class Pass:
 
     def get_options(self):
         """
+        Stringify options according to what mlir-opt expects.
+
           ApplyRegisteredPassOp expects options to be a single StringAttr
           which follows the same format as the one used with mlir-opt.
 
@@ -281,7 +283,7 @@ class Pass:
 
         https://mlir.llvm.org/docs/Tutorials/MlirOpt/#running-a-pass-with-options
 
-        However, experimentally we found that single-options also work without values.
+        Experimentally we found that single-options also work without values.
         """
         retval = " ".join(f"{str(option)}" for option in self.options)
         retval2 = " ".join(f"{str(key)}={str(value)}" for key, value in self.valued_options.items())
