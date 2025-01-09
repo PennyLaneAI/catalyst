@@ -159,6 +159,10 @@
   compiled function, due to incorrectly computed stride information.
   [(#1338)](https://github.com/PennyLaneAI/catalyst/pull/1338)
 
+* Fixed a bug in catalyst cli where using `checkpoint-stage` would cause `save-ir-after-each`
+  to not work properly.
+  [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
+
 <h3>Internal changes ⚙️</h3>
 
 * Starting with Python 3.12, Catalyst's binary distributions (wheels) will now follow Python's
@@ -272,6 +276,14 @@
   empty pass that prints `hello world`. The code for the tutorial is located in
   [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
+
+* The `catalyst-cli` documentation has been updated to reflect the removal of the `func-name` option 
+  for transformation passes.
+  [(#1368)](https://github.com/PennyLaneAI/catalyst/pull/1368)
+
+* Added more details to catalyst-cli documentation specifiying available options for
+  checkpoint-stage and default pipelines
+  [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
 
 <h3>Contributors ✍️</h3>
 
