@@ -82,17 +82,20 @@ class PassPlugin(Pass):
         super().__init__(name, *options, **valued_options)
 
 
-def dictionary_to_tuple_of_passes(pass_pipeline: PipelineDict):
-    """Convert dictionary of passes into tuple of passes"""
+def dictionary_to_list_of_passes(pass_pipeline: PipelineDict):
+    """Convert dictionary of passes into list of passes"""
+
+    if pass_pipeline == None:
+        return []
 
     if type(pass_pipeline) != dict:
         return pass_pipeline
 
-    passes = tuple()
+    passes = []
     pass_names = _API_name_to_pass_name()
     for API_name, pass_options in pass_pipeline.items():
         name = pass_names.get(API_name, API_name)
-        passes += (Pass(name, **pass_options),)
+        passes.append(Pass(name, **pass_options))
     return passes
 
 
@@ -195,8 +198,8 @@ def pipeline(pass_pipeline: PipelineDict):
         @functools.wraps(clone)
         def wrapper(*args, **kwargs):
             if EvaluationContext.is_tracing():
-                passes = kwargs.pop("pass_pipeline", tuple())
-                passes += dictionary_to_tuple_of_passes(pass_pipeline)
+                passes = kwargs.pop("pass_pipeline", [])
+                passes += dictionary_to_list_of_passes(pass_pipeline)
                 kwargs["pass_pipeline"] = passes
             return clone(*args, **kwargs)
 
@@ -323,16 +326,40 @@ def cancel_inverses(qnode=None):
 
     @functools.wraps(clone)
     def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
-        pass_pipeline += (Pass("remove-chained-self-inverse"),)
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("remove-chained-self-inverse"))
         kwargs["pass_pipeline"] = pass_pipeline
         return clone(*args, **kwargs)
 
     return wrapper
 
 
-def apply_pass(pass_name, *flags, **valued_options):
-    """Applies a single pass to the qnode"""
+def apply_pass(pass_name: str, *flags, **valued_options):
+    """
+    Applies a single pass to the QNode, where the pass is from Catalyst or a third-party
+    if `entry_points` has been implemented. See :doc:`the compiler plugin documentation <dev/plugins>`
+    for more details.
+
+    Args:
+        pass_name (str): Name of the pass
+        *flags: Pass options
+        **valued_options: options with values
+
+    Returns:
+        Function that can be used as a decorator to a QNode.
+        E.g.,
+
+        .. code-block:: python
+
+            @apply_pass("merge-rotations")
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def qnode():
+                return qml.state()
+
+            @qml.qjit(target="mlir")
+            def module():
+                return qnode()
+    """
 
     def decorator(qnode):
 
@@ -353,8 +380,40 @@ def apply_pass(pass_name, *flags, **valued_options):
     return decorator
 
 
-def apply_pass_plugin(plugin_name, pass_name, *flags, **valued_options):
-    """Applies a pass plugin"""
+def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valued_options):
+    """
+    Applies a pass plugin to the QNode. See :doc:`the compiler plugin documentation <dev/plugins>`
+    for more details.
+
+    Args:
+        path_to_plugin (str | Path): full path to plugin
+        pass_name (str): Name of the pass
+        *flags: Pass options
+        **valued_options: options with values
+
+    Returns:
+        Function that can be used as a decorator to a QNode.
+        E.g.,
+
+        .. code-block:: python
+
+            from standalone import getStandalonePluginAbsolutePath
+
+            @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def qnode():
+                return qml.state()
+
+            @qml.qjit(target="mlir")
+            def module():
+                return qnode()
+    """
+
+    if not isinstance(path_to_plugin, Path):
+        path_to_plugin = Path(path_to_plugin)
+
+    if not path_to_plugin.exists():
+        raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
     def decorator(qnode):
         if not isinstance(qnode, qml.QNode):
@@ -365,7 +424,7 @@ def apply_pass_plugin(plugin_name, pass_name, *flags, **valued_options):
 
         def qnode_call(*args, **kwargs):
             pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(PassPlugin(plugin_name, pass_name, *flags, **valued_options))
+            pass_pipeline.append(PassPlugin(path_to_plugin, pass_name, *flags, **valued_options))
             kwargs["pass_pipeline"] = pass_pipeline
             return qnode(*args, **kwargs)
 
@@ -443,8 +502,8 @@ def merge_rotations(qnode=None):
 
     @functools.wraps(clone)
     def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
-        pass_pipeline += (Pass("merge-rotations"),)
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("merge-rotations"))
         kwargs["pass_pipeline"] = pass_pipeline
         return clone(*args, **kwargs)
 
@@ -467,8 +526,8 @@ def ions_decomposition(qnode=None):  # pragma: nocover
 
     @functools.wraps(qnode)
     def wrapper(*args, **kwargs):
-        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
-        pass_pipeline += (Pass("ions-decomposition"),)
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("ions-decomposition"))
         kwargs["pass_pipeline"] = pass_pipeline
         return qnode(*args, **kwargs)
 

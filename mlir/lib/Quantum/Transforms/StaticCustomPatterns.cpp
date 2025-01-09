@@ -40,7 +40,26 @@ struct LowerStaticCustomOp : public OpConversionPattern<StaticCustomOp> {
                                                                rewriter.getF64FloatAttr(param));
             paramValues.push_back(constant);
         }
-
+        if (op.getGateName() == "MultiRZ") {
+            if (paramValues.size() != 1) {
+                op.emitError() << "MultiRZ gate expects exactly one parameter";
+                return failure();
+            }
+            rewriter.replaceOpWithNewOp<MultiRZOp>(
+                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramValues[0],
+                op.getInQubits(), op.getAdjointAttr(), op.getInCtrlQubits(), op.getInCtrlValues());
+            return success();
+        }
+        if (op.getGateName() == "GlobalPhase") {
+            if (paramValues.size() != 1) {
+                op.emitError() << "GlobalPhase gate expects exactly one parameter";
+                return failure();
+            }
+            rewriter.replaceOpWithNewOp<GlobalPhaseOp>(op, op.getOutCtrlQubits().getTypes(),
+                                                       paramValues[0], op.getAdjointAttr(),
+                                                       op.getInCtrlQubits(), op.getInCtrlValues());
+            return success();
+        }
         rewriter.replaceOpWithNewOp<CustomOp>(op, op.getGateName(), op.getInQubits(),
                                               op.getInCtrlQubits(), op.getInCtrlValues(),
                                               paramValues, op.getAdjointFlag());
