@@ -15,6 +15,9 @@
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
+* Replace `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent and usage. Improve the `matchAndRewrite` function by using `replaceAllUsesWith` instead of for loop.
+  [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -22,3 +25,4 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee
+Sengthai Heng

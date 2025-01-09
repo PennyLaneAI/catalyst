@@ -109,7 +109,7 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         >,
         InterfaceMethod<
             "Return results which are considered non-controlled output qubit values.",
-            "mlir::ValueRange", "getNonCtrlQubitResults"
+            "mlir::ResultRange", "getNonCtrlQubitResults"
         >,
         InterfaceMethod<
             "Return all operands which are considered controlling input qubit values.",
