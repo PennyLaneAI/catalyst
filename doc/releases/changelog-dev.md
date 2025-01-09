@@ -12,6 +12,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `get_c_interface` method has been added to the OQD device, which enables retrieval of the C++
+  implementation of the device from Python. This allows `qjit` to accept an instance of the device
+  and connect to its runtime.
+  [(#1420)](https://github.com/PennyLaneAI/catalyst/pull/1420)
+
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
@@ -25,4 +30,5 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee
+Mehrdad Malekmohammadi
 Sengthai Heng

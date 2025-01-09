@@ -33,7 +33,7 @@ For example using ``quantum-opt --help`` while loading your pass plugin will ena
 
 .. code-block::
 
-    --standalone-switch-bar-foo                            -   Switches the name of a FuncOp named `bar` to `foo` and folds.
+    --standalone-switch-bar-foo		-   Switches the name of a FuncOp named `bar` to `foo` and folds.
 
 Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
 
@@ -334,20 +334,90 @@ From here, you can change the name of the pass, change the name of the shared ob
 Now that you have your ``StandalonePlugin.so``, you can ship it in a python wheel.
 To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PassPlugin`.
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
-For example:
+We provide the :func:`~.passes.apply_pass_plugin` decorator to allow pass plugins to be loaded and executed.
+See for example:
 
 .. code-block:: python
+
+    from standalone import getStandalonePluginAbsolutePath
+
+    @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
+    print(module.mlir)
+
+
+If you have followed all the steps in this tutorial and inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
+Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
+For more information, please consult our :doc:`dialect guide </dev/dialects.html>`_, our `compiler passes guide :doc:</dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
+
+You can also register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_ (for reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ 
+that implements the standalone plugin as a Python package).
+To do this, you only need to define a function named ``name2pass``—it must be named ``name2pass``—that takes a string with the name of the pass (from the user perspective) and returns the absolute path to the plugin stored in your package and the name of the MLIR pass.
+For the `standalone plugin python <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ package we defined:
+
+.. code-block:: python
+
+    def name2pass(_name):
+        """Example entry point for standalone plugin"""
+
+        return getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo"
+
+You will also need to modify your setup to include the ``entry_points``.
+See our ``setup.py`` `file in the standalone plugin python package <https://github.com/PennyLaneAI/catalyst/blob/main/standalone_plugin_wheel/setup.py>`_.
+
+.. code-block:: python
+
+    entry_points = {
+        "catalyst.passes_resolution": [
+            "standalone.passes = standalone_plugin",
+        ],
+    }
+
+    setup(
+        name="standalone_plugin",
+        version="0.1.0",
+        # ... 
+        entry_points=entry_points,
+        # ... 
+    )
+
+After this, the user will be able to use your pass with the :func:`~.passes.apply_pass` function.
+
+.. code-block:: python
+
+    @apply_pass("standalone.standalone-switch-bar-foo")
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def qnode():
+        return qml.state()
+
+    @qml.qjit(target="mlir")
+    def module():
+        return qnode()
+
+    print(module.mlir)
+
+Of course, you can also define your own decorators similar to :func:`~.passes.apply_pass` to check parameters, do some other validation or perhaps just to improve the user interface.
+For example:
+
+
+.. code-block:: python
+
+    from standalone import SwitchBarToFoo
 
     @SwitchBarToFoo
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def qnode():
         return qml.state()
 
-    @qml.qjit
+    @qml.qjit(target="mlir")
     def module():
         return qnode()
 
-If you inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
-Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
-For more information, please consult our `dialect guide <../dev/dialects.html>`_, our `compiler passes guide <../dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
-
+    print(module.mlir)

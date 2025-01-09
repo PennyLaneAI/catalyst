@@ -49,7 +49,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.passes import dictionary_to_tuple_of_passes
+from catalyst.passes import dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -105,8 +105,8 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         # Update the qnode with peephole pipeline
-        pass_pipeline = kwargs.pop("pass_pipeline", tuple())
-        pass_pipeline = dictionary_to_tuple_of_passes(pass_pipeline)
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
@@ -148,7 +148,7 @@ class QFunc:
         dynamic_args = filter_static_args(args, static_argnums)
         args_flat = tree_flatten((dynamic_args, kwargs))[0]
         res_flat = quantum_kernel_p.bind(
-            flattened_fun, *args_flat, qnode=self, pipeline=pass_pipeline
+            flattened_fun, *args_flat, qnode=self, pipeline=tuple(pass_pipeline)
         )
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
