@@ -21,22 +21,7 @@ import pytest
 from catalyst import pipeline, qjit
 from catalyst.passes import cancel_inverses, merge_rotations
 
-default_device = qml.device("default.qubit", wires=1)
-
 # pylint: disable=missing-function-docstring
-
-
-def _assert_against_reference(circuit, theta, backend, optimization):
-
-    customized_device = qml.device(backend, wires=1)
-
-    reference_workflow = qml.QNode(circuit, default_device)
-    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(optimization(qml.QNode(circuit, customized_device)))
-
-    assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
-    assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
-
 
 #
 # cancel_inverses
@@ -53,7 +38,19 @@ def test_cancel_inverses_functionality(theta, backend):
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    _assert_against_reference(circuit, theta, backend, cancel_inverses)
+    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+
+    customized_device = qml.device(backend, wires=1)
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
+    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+
+    assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
+    assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
+
+
+#
+# merge_rotations
+#
 
 
 @pytest.mark.parametrize("theta", [42.42])
@@ -72,7 +69,14 @@ def test_merge_rotation_functionality(theta, backend):
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    _assert_against_reference(circuit, theta, backend, merge_rotations)
+    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+
+    customized_device = qml.device(backend, wires=1)
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
+    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+
+    assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
+    assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
 
 
 @pytest.mark.parametrize("theta", [42.42])
