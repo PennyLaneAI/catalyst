@@ -168,6 +168,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
             # to denote a function, let's limit it to qnodes
             raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
+        @functools.wraps(qnode)
         def qnode_call(*args, **kwargs):
             pass_pipeline = kwargs.get("pass_pipeline", [])
             pass_pipeline.append(Pass(pass_name, *flags, **valued_options))
@@ -220,6 +221,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
             # to denote a function, let's limit it to qnodes
             raise TypeError(f"A QNode is expected, got the classical function {qnode}")
 
+        @functools.wraps(qnode)
         def qnode_call(*args, **kwargs):
             pass_pipeline = kwargs.get("pass_pipeline", [])
             pass_pipeline.append(PassPlugin(path_to_plugin, pass_name, *flags, **valued_options))
@@ -234,7 +236,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
 class Pass:
     """Class intended to hold options for passes."""
 
-    def __init__(self, name, *options, **valued_options):
+    def __init__(self, name: str, *options: list[str], **valued_options: dict[str, str]):
         self.options = options
         self.valued_options = valued_options
         if "." in name:
