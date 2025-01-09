@@ -26,7 +26,6 @@ PipelineDict: TypeAlias = dict[str, dict[str, str]]
 
 
 ## API ##
-@functools.singledispatch
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
