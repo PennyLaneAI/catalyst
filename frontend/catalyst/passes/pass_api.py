@@ -271,7 +271,7 @@ class Pass:
         """
         retval = " ".join(f"{str(option)}" for option in self.options)
         retval2 = " ".join(f"{str(key)}={str(value)}" for key, value in self.valued_options.items())
-        return " ".join([retval, retval2])
+        return " ".join([retval, retval2]).strip()
 
     def __repr__(self):
         return (
