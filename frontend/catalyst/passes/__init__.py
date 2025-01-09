@@ -33,7 +33,11 @@ as load and run external MLIR passes from plugins.
 
 """
 
-from catalyst.passes.builtin_passes import cancel_inverses, merge_rotations
+from catalyst.passes.builtin_passes import (
+    cancel_inverses,
+    ions_decomposition,
+    merge_rotations,
+)
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
 __all__ = (
