@@ -151,7 +151,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
 
         .. code-block:: python
 
-            @apply_pass("merge-rotations")
+            @passes.apply_pass("merge-rotations")
             @qml.qnode(qml.device("lightning.qubit", wires=1))
             def qnode():
                 return qml.state()
@@ -198,7 +198,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
 
             from standalone import getStandalonePluginAbsolutePath
 
-            @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
+            @passes.apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
             @qml.qnode(qml.device("lightning.qubit", wires=1))
             def qnode():
                 return qml.state()
