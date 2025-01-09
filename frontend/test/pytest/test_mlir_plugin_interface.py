@@ -17,13 +17,19 @@
 from pathlib import Path
 
 import pytest
+
 import catalyst
+
 
 def test_path_does_not_exists():
     """Test what happens when a pass_plugin is given an path that does not exist"""
 
     with pytest.raises(FileNotFoundError, match="does not exist"):
-        catalyst.apply_pass_plugin("this-path-does-not-exist", "this-pass-also-doesnt-exists")
+        catalyst.passes.apply_pass_plugin(
+            "this-path-does-not-exist", "this-pass-also-doesnt-exists"
+        )
 
     with pytest.raises(FileNotFoundError, match="does not exist"):
-        catalyst.apply_pass_plugin(Path("this-path-does-not-exist"), "this-pass-also-doesnt-exists")
+        catalyst.passes.apply_pass_plugin(
+            Path("this-path-does-not-exist"), "this-pass-also-doesnt-exists"
+        )
