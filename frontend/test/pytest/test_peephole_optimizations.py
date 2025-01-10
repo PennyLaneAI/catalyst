@@ -19,6 +19,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import pipeline, qjit
+from catalyst.debug import get_compilation_stage
 from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
@@ -39,14 +40,37 @@ def test_cancel_inverses_functionality(theta, backend):
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+    def cancelled_circuit(x):
+        qml.RX(x, wires=0)
+        return qml.probs()
 
     customized_device = qml.device(backend, wires=1)
-    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
 
+    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device), keep_intermediate=True)
+    optimized_workflow = qjit(
+        cancel_inverses(qml.QNode(circuit, customized_device)), keep_intermediate=True
+    )
+    cancelled_workflow = qjit(
+        qml.QNode(cancelled_circuit, customized_device), keep_intermediate=True
+    )
+
+    # Assert result correctness
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
+    assert np.allclose(cancelled_workflow(theta), optimized_workflow(theta))
+
+    qjitted_mlir = get_compilation_stage(qjitted_workflow, "QuantumCompilationPass")
+    optimized_mlir = get_compilation_stage(optimized_workflow, "QuantumCompilationPass")
+    cancelled_mlir = get_compilation_stage(cancelled_workflow, "QuantumCompilationPass")
+
+    # Assert conversion correctness
+    assert (
+        optimized_mlir.count('"Hadamard"')
+        == 0
+        == cancelled_mlir.count('"Hadamard"')
+        != qjitted_mlir.count('"Hadamard"')
+    )
 
 
 #
@@ -57,7 +81,7 @@ def test_cancel_inverses_functionality(theta, backend):
 @pytest.mark.parametrize("theta", [42.42])
 def test_merge_rotation_functionality(theta, backend):
 
-    def circuit(x):
+    def circuit(x: float):
         qml.RX(x, wires=0)
         qml.RX(x, wires=0)
         qml.RZ(x, wires=0)
@@ -70,14 +94,47 @@ def test_merge_rotation_functionality(theta, backend):
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+    def merged_circuit(x: float):
+        qml.RX(2 * x, wires=0)
+        qml.RZ(0, wires=0)
+        qml.Rot(x, x, x, wires=0)
+        qml.Rot(x, x, x, wires=0)
+        qml.PhaseShift(x, wires=0)
+        qml.Hadamard(wires=0)
+        qml.Hadamard(wires=0)
+        return qml.probs()
 
     customized_device = qml.device(backend, wires=1)
-    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(merge_rotations(qml.QNode(circuit, customized_device)))
 
+    reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device), keep_intermediate=True)
+    optimized_workflow = qjit(
+        merge_rotations(qml.QNode(circuit, customized_device)), keep_intermediate=True
+    )
+    merged_workflow = qjit(qml.QNode(merged_circuit, customized_device), keep_intermediate=True)
+
+    # Assert result correctness
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
+    assert np.allclose(merged_workflow(theta), optimized_workflow(theta))
+
+    qjitted_mlir = get_compilation_stage(qjitted_workflow, "QuantumCompilationPass")
+    optimized_mlir = get_compilation_stage(optimized_workflow, "QuantumCompilationPass")
+    merged_mlir = get_compilation_stage(merged_workflow, "QuantumCompilationPass")
+
+    # Assert conversion correctness
+    assert (
+        optimized_mlir.count('"RX"') == 1 == merged_mlir.count('"RX"') != qjitted_mlir.count('"RX"')
+    )
+    assert (
+        optimized_mlir.count('"RZ"') == 1 == merged_mlir.count('"RZ"') != qjitted_mlir.count('"RZ"')
+    )
+    assert (
+        optimized_mlir.count('"PhaseShift"')
+        == 1
+        == merged_mlir.count('"PhaseShift"')
+        != qjitted_mlir.count('"PhaseShift"')
+    )
 
 
 @pytest.mark.parametrize("theta", [42.42])
