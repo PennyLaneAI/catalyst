@@ -42,6 +42,7 @@ from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_pl
 
 __all__ = (
     "cancel_inverses",
+    "ions_decomposition",
     "merge_rotations",
     "Pass",
     "PassPlugin",
