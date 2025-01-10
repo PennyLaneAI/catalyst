@@ -23,6 +23,7 @@ from catalyst.passes import cancel_inverses, merge_rotations
 
 # pylint: disable=missing-function-docstring
 
+
 #
 # cancel_inverses
 #
