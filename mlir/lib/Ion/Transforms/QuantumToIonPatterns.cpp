@@ -18,8 +18,8 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
@@ -223,23 +223,19 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             if (static_cast<size_t>(qubitIndex0Value) >= phonons.size()) {
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex0Value
                                << " used as input to MS gate; there are only " << phonons.size()
-                               << " phonon parameters in the database.";
-                // TODO (backlog): It would be nice if we could exit gracefully rather than assert
-                assert(
-                    false &&
-                    "Compilation failed; "
-                    "ensure that the database contains all necessary parameters for the circuit.");
+                               << " phonon parameters in the database."
+                               << " Ensure that the database contains all necessary parameters for "
+                                  "the circuit.";
+                return failure();
             }
 
             if (static_cast<size_t>(qubitIndex1Value) >= phonons.size()) {
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex1Value
                                << " used as input to MS gate; there are only " << phonons.size()
-                               << " phonon parameters in the database.";
-                // TODO (backlog): It would be nice if we could exit gracefully rather than assert
-                assert(
-                    false &&
-                    "Compilation failed; "
-                    "ensure that the database contains all necessary parameters for the circuit.");
+                               << " phonon parameters in the database."
+                               << " Ensure that the database contains all necessary parameters for "
+                                  "the circuit.";
+                return failure();
             }
 
             // Assume that each ion has 3 phonons (x, y, z)
@@ -255,12 +251,10 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "(" << qubitIndex0Value << ", " << qubitIndex1Value << ") "
                     << "used as input to MS gate. Expected beam parameters for two-qubit "
                     << "combinatorial index " << twoQubitComboIndex << " but there are only "
-                    << beams2.size() << " beam parameters in the database.";
-                // TODO (backlog): It would be nice if we could exit gracefully rather than assert
-                assert(
-                    false &&
-                    "Compilation failed; "
-                    "ensure that the database contains all necessary parameters for the circuit.");
+                    << beams2.size() << " beam parameters in the database."
+                    << " Ensure that the database contains all necessary parameters for the "
+                       "circuit.";
+                return failure();
             }
 
             const Beam &beam = beams2[twoQubitComboIndex];
@@ -432,22 +426,24 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
     }
 };
 
-struct QuantumToIonRewritePattern : public mlir::OpRewritePattern<CustomOp> {
-    using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
+struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
+    using mlir::OpConversionPattern<CustomOp>::OpConversionPattern;
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
     std::vector<PhononMode> phonons;
 
     QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
-        : mlir::OpRewritePattern<CustomOp>::OpRewritePattern(ctx)
+        : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)
     {
         beams1 = dataManager.getBeams1Params();
         beams2 = dataManager.getBeams2Params();
         phonons = dataManager.getPhononParams();
     }
 
-    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(CustomOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+
     {
         // Assume ions are in the same funcop as the operations
         // RX case -> PP(P1, P2)
