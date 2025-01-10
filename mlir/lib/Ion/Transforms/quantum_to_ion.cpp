@@ -68,6 +68,13 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     void runOnOperation() final
     {
         func::FuncOp op = cast<func::FuncOp>(getOperation());
+        // auto module = getOperation();
+        auto &context = getContext();
+        ConversionTarget target(context);
+
+        target.addIllegalOp<catalyst::quantum::CustomOp>();
+        target.addLegalDialect<IonDialect>();
+        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
         OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 
@@ -96,7 +103,7 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         RewritePatternSet ionPatterns(&getContext());
         populateQuantumToIonPatterns(ionPatterns, dataManager);
 
-        if (failed(applyPatternsAndFoldGreedily(op, std::move(ionPatterns)))) {
+        if (failed(applyPartialConversion(op, target, std::move(ionPatterns)))) {
             return signalPassFailure();
         }
     }
