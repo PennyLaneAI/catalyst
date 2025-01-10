@@ -1,7 +1,7 @@
 Catalyst Command Line Interface
 ===============================
 
-Catalyst includes a standalone command-line-interface compiler tool ``catalyst-cli`` that
+Catalyst includes a standalone command-line tool, ``catalyst``, that
 compiles quantum programs written in our MLIR dialects into an object file,
 independent of the Catalyst Python frontend.
 
@@ -13,47 +13,47 @@ This compiler tool combines three stages of compilation:
    `LLVM IR <https://llvm.org/docs/LangRef.html>`_.
 #. ``llc``: Performs lower-level optimizations on the LLVM IR input and creates the object file.
 
-``catalyst-cli`` runs all three stages under the hood by default, but it also has the ability to run
-each stage individually. For example:
+The ``catalyst`` tool will run all three stages under the hood by default, but it also has the
+ability to run each stage individually. For example:
 
 .. code-block:: console
 
     # Creates both the optimized IR and an object file
-    catalyst-cli input.mlir -o output.o
+    catalyst input.mlir -o output.o
 
     # Only performs MLIR optimizations and translates to LLVM dialect
-    catalyst-cli --tool=opt input.mlir -o llvm-dialect.mlir
+    catalyst --tool=opt input.mlir -o llvm-dialect.mlir
 
     # Only lowers LLVM dialect input to LLVM IR
-    catalyst-cli --tool=translate llvm-dialect.mlir -o llvm-ir.ll
+    catalyst --tool=translate llvm-dialect.mlir -o llvm-ir.ll
 
     # Only performs lower-level optimizations and creates object file (object.o)
-    catalyst-cli --tool=llc llvm-ir.ll -o output.ll --module-name object
+    catalyst --tool=llc llvm-ir.ll -o output.ll --module-name object
 
 .. note::
 
-    If Catalyst is built from source, the ``catalyst-cli`` executable will be located in 
+    If Catalyst is built from source, the ``catalyst`` executable will be located in
     the ``mlir/build/bin/`` directory relative to the root of your Catalyst source directory.
 
-    If Catalyst is installed via pip or from wheels, the executable will be located 
-    in the ``catalyst/bin/`` directory relative to the environment’s installation directory.
+    If Catalyst is installed via pip or from wheels, the executable will be located
+    in the ``catalyst/bin/`` directory relative to the environment's installation directory.
 
 Usage
 -----
 
 .. code-block:: console
 
-    catalyst-cli [options] <input file>
+    catalyst [options] <input file>
 
-Calling ``catalyst-cli`` without any options runs the three compilation stages (``quantum-opt``,
+Calling ``catalyst`` without any options runs the three compilation stages (``quantum-opt``,
 ``mlir-translate`` and ``llc``) using all default configurations, and outputs by default an object
-file named ``catalyst_module.o``. The name of the output file can be set by changing the output 
+file named ``catalyst_module.o``. The name of the output file can be set by changing the output
 module name using the ``--module-name`` option (the default module name is ``catalyst_module``).
 
 Command line options
 ^^^^^^^^^^^^^^^^^^^^
 
-The complete list of options for the Catalyst CLI tool can be displayed by running ``catalyst-cli --help``.
+The complete list of options for the Catalyst CLI tool can be displayed by running ``catalyst --help``.
 As this list contains *all* available options, including those for configuring LLVM, the options
 most relevant to the usage of the Catalyst CLI tool are covered in more detail below.
 
@@ -111,7 +111,7 @@ name. Currently, the following pipelines are available:
 ``hlo_lowering-pipeline``,
 ``quantum-compilation-pipeline``,
 ``bufferization-pipeline``,
-``llvm-dialect-lowring-pipeline``, and finally 
+``llvm-dialect-lowering-pipeline``, and finally
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
@@ -138,7 +138,7 @@ applies the pass ``inline-nested-module``, we would specify this pipeline config
 The workspace directory where intermediate files are saved. The default is the current working
 directory.
 
-Note that the workspace directory must exist before running ``catalyst-cli`` with this option.
+Note that the workspace directory must exist before running ``catalyst`` with this option.
 
 ``--module-name=<name>``
 """"""""""""""""""""""""
@@ -210,7 +210,7 @@ pass that is applied, and the ``-o`` option to set the name of the output IR fil
 
 .. code-block::
 
-    catalyst-cli my_circuit.mlir \
+    catalyst my_circuit.mlir \
         --tool=opt \
         --catalyst-pipeline="pipe(remove-chained-self-inverse;merge-rotations)" \
         --mlir-print-ir-after-all \
@@ -259,14 +259,14 @@ optimized MLIR.
 
 For a list of transformation passes currently available in Catalyst, see the
 :ref:`catalyst-s-transformation-library` documentation. The available passes are also listed in the
-``catalyst-cli --help`` message.
+``catalyst --help`` message.
 
 MLIR Plugins
 ------------
 
 ``mlir-opt``-like tools are able to take plugins as inputs.
 These plugins are shared objects that include dialects and passes written by third parties.
-This means that you can write dialects and passes that can be used with ``catalyst-cli`` and ``quantum-opt``.
+This means that you can write dialects and passes that can be used with ``catalyst`` and ``quantum-opt``.
 
 As an example, the `LLVM repository includes a very simple plugin <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone/standalone-plugin>`_.
 To build it, simply run ``make plugin`` and the standalone plugin
@@ -274,8 +274,8 @@ will be built in the root directory of the Catalyst project.
 
 With this, you can now run your own passes by using the following flags:
 
-``catalyst-cli --load-dialect-plugin=$YOUR_PLUGIN --load-pass-plugin=$YOUR_PLUGIN $YOUR_PASS_NAME file.mlir``
+``catalyst --load-dialect-plugin=$YOUR_PLUGIN --load-pass-plugin=$YOUR_PLUGIN $YOUR_PASS_NAME file.mlir``
 
 Concretely for the example plugin, you can use the following command:
 
-``catalyst-cli --tool=opt --load-pass-plugin=standalone/build/lib/StandalonePlugin.so --load-dialect-plugin=standalone/build/lib/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' a.mlir``
+``catalyst --tool=opt --load-pass-plugin=standalone/build/lib/StandalonePlugin.so --load-dialect-plugin=standalone/build/lib/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' a.mlir``
