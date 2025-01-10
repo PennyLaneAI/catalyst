@@ -273,7 +273,7 @@
   [a separate github branch](https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3).
   [(#872)](https://github.com/PennyLaneAI/catalyst/pull/872)
 
-* Fix docstring in `qjit.py`: Replace `verbosity` with `verbose`
+* The `verbose` parameter of :func:`~.qjit` was incorrectly listed as `verbosity` in the API documentation. This is now fixed.
   [(#1440)](https://github.com/PennyLaneAI/catalyst/pull/1440)
 
 <h3>Contributors ✍️</h3>
