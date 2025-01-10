@@ -437,7 +437,10 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
+        # During the 0.10.0 release cycle we discovered that having exactly 2700 test items distributed on 
+        # exactly 3 cores (e.g. GH M1 runner) produces a lot of test failures. Randomizing the test order
+        # (pytest-randomly) fixes the issue for now.
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock pytest-randomly
 
     - name: Install PennyLane Plugins
       run: |
