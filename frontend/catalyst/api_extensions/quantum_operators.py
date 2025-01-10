@@ -712,10 +712,8 @@ def ctrl_distribute(
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
-    msg = "Quantum measurements are not allowed"
-
     if len(tape.measurements) > 0:
-        raise ValueError(msg)
+        raise ValueError("Quantum measurements are not allowed")
     for op in tape.operations:
         if has_nested_tapes(op):
             for r in [r for r in op.regions if r.quantum_tape is not None]:
