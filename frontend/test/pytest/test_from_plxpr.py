@@ -413,7 +413,7 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
+    @pytest.mark.skip(reason="CountsMP returns a dictionary, which is not compatible with capture.")
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
 
@@ -426,6 +426,7 @@ class TestCatalystCompareJaxpr:
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
+        # TODO: tear down fixture to ensure capture is disabled.
         qml.capture.disable()
 
         converted = from_plxpr(plxpr)()
