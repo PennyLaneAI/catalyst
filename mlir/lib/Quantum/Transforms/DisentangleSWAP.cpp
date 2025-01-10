@@ -498,7 +498,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         for (Operation &nestedOp : op->getRegion(0).front().getOperations()) {
             if (auto func = dyn_cast<FunctionOpInterface>(nestedOp)) {
                 disentangleSWAPs(func);
-             }
+            }
         }
     }
 };

@@ -267,7 +267,7 @@ class Compiler:
 
     @debug_logger
     def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
-        """Prepare the command for catalyst-cli to compile the file.
+        """Prepare the command to run the Catalyst CLI to compile the file.
 
         Args:
             module_name (str): Module name to use for naming
@@ -275,9 +275,9 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/catalyst-cli"
+        cli_build_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/catalyst"
         if not path.isfile(cli_build_path):
-            raise FileNotFoundError("catalyst-cli executable was not found.")  # pragma: nocover
+            raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
         cmd = [cli_build_path]
         cmd += [tmp_infile_name, "-o", output_ir_name]
         cmd += ["--module-name", module_name, "--workspace", str(workspace)]
@@ -356,9 +356,7 @@ class Compiler:
                 if result.stderr:
                     print(result.stderr.strip(), file=self.options.logfile)
         except subprocess.CalledProcessError as e:  # pragma: nocover
-            raise CompileError(
-                f"catalyst-cli failed with error code {e.returncode}: {e.stderr}"
-            ) from e
+            raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
         with open(output_ir_name, "r", encoding="utf-8") as f:
             out_IR = f.read()
