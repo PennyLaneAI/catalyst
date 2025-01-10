@@ -74,7 +74,7 @@ def test_merge_rotation_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(merge_rotations(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
