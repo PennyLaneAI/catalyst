@@ -290,7 +290,7 @@ class TestCatalystControlled:
             C_ctrl(_func1, control=[1], control_values=[True])()
             return qml.state()
 
-        with pytest.raises(ValueError, match="Measurements cannot be used"):
+        with pytest.raises(ValueError, match="Mid-circuit measurements cannot be used"):
             qjit(circuit)(0.1)
 
     def test_qctrl_no_end_circuit_measurements(self, backend):
@@ -305,7 +305,7 @@ class TestCatalystControlled:
             C_ctrl(_func1, control=[1], control_values=[True])()
             return qml.state()
 
-        with pytest.raises(ValueError, match="measurements are not allowed"):
+        with pytest.raises(ValueError, match="Measurement process cannot be used"):
             qjit(circuit)(0.1)
 
     def test_qctrl_wires(self, backend):

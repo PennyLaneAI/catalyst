@@ -713,7 +713,7 @@ def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
     if len(tape.measurements) > 0:
-        raise ValueError("Measurement processes cannot be used within an adjoint() or ctrl() region.")
+        raise ValueError("Measurement process cannot be used within an adjoint() or ctrl() region.")
     for op in tape.operations:
         if has_nested_tapes(op):
             for r in [r for r in op.regions if r.quantum_tape is not None]:
@@ -721,5 +721,6 @@ def _check_no_measurements(tape: QuantumTape) -> None:
         else:
             if isinstance(op, MidCircuitMeasure):
                 raise ValueError(
-                    "Mid-circuit measurements cannot be used within an adjoint() or ctrl() region."
+                    "Mid-circuit measurements cannot be used "
+                    "within an adjoint() or ctrl() region."
                 )

@@ -245,7 +245,7 @@ class TestCatalyst:
             qml.RX(np.pi / 2, wires=0)
             qml.sample()
 
-        with pytest.raises(ValueError, match="Quantum measurements are not allowed"):
+        with pytest.raises(ValueError, match="Measurement process cannot be used"):
 
             @qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
