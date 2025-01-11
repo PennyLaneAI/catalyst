@@ -234,7 +234,7 @@ def ions_decomposition(qnode):  # pragma: nocover
     This compiler pass decomposes the gates from the set {
     :class:`qml.T <pennylane.T>`,
     :class:`qml.S <pennylane.S>`,
-    :class:`qml.Z <pennylane.Z>`,
+    :class:`qml.PauliZ <pennylane.PauliZ>`,
     :class:`qml.Hadamard <pennylane.Hadamard>`,
     :class:`qml.PhaseShift <pennylane.PhaseShift>`,
     :class:`qml.RZ <pennylane.RZ>`,
