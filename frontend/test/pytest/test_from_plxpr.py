@@ -81,7 +81,7 @@ def compare_eqns(eqn1, eqn2):
 class TestPrivateBehavior:
     """Tests for behavior that should not be visible to the user."""
 
-    def test_uninitialization_errors(self):
+    def test_uninitialization_errors(self, disable_capture):
         """Test that QFuncPlxprInterpreter raises errors if properties are not yet set."""
 
         interpreter = QFuncPlxprInterpreter(qml.device("lightning.qubit", wires=1), shots=0)
@@ -99,7 +99,7 @@ class TestPrivateBehavior:
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
-    def test_observable_without_n_wires(self):
+    def test_observable_without_n_wires(self, disable_capture):
         """Test that a NotImplementedError is raised for an observable without n_wires."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -117,7 +117,7 @@ class TestErrors:
             from_plxpr(jaxpr)()
         qml.capture.disable()
 
-    def test_measuring_eigvals_not_supported(self):
+    def test_measuring_eigvals_not_supported(self, disable_capture):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
 
@@ -135,7 +135,7 @@ class TestErrors:
             from_plxpr(jaxpr)()
         qml.capture.disable()
 
-    def test_measuring_measurement_values(self):
+    def test_measuring_measurement_values(self, disable_capture):
         """Test that measuring a MeasurementValue raises a NotImplementedError."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -153,7 +153,7 @@ class TestErrors:
             from_plxpr(jaxpr)()
         qml.capture.disable()
 
-    def test_unsupported_measurement(self):
+    def test_unsupported_measurement(self, disable_capture):
         """Test that a NotImplementedError is raised if a measurement
         is not yet supported for conversion."""
 
@@ -174,7 +174,7 @@ class TestErrors:
 class TestCatalystCompareJaxpr:
     """Test comparing catalyst and pennylane jaxpr for a variety of situations."""
 
-    def test_qubit_unitary(self):
+    def test_qubit_unitary(self, disable_capture):
         """Test that qubit unitary can be converted."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -201,7 +201,7 @@ class TestCatalystCompareJaxpr:
         call_jaxpr_c = get_call_jaxpr(catalxpr)
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_globalphase(self):
+    def test_globalphase(self, disable_capture):
         """Test conversion of a global phase."""
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -227,7 +227,7 @@ class TestCatalystCompareJaxpr:
         call_jaxpr_c = get_call_jaxpr(catalxpr)
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_expval(self):
+    def test_expval(self, disable_capture):
         """Test comparison and execution of the jaxpr for a simple qnode."""
         dev = qml.device("lightning.qubit", wires=2)
 
@@ -256,7 +256,7 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_probs(self):
+    def test_probs(self, disable_capture):
         """Test comparison and execution of a jaxpr containing a probability measurement."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -288,7 +288,7 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_state(self):
+    def test_state(self, disable_capture):
         """Test that the state can be converted to catalxpr."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -328,7 +328,7 @@ class TestCatalystCompareJaxpr:
         # confused by the weak_types error here
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_variance(self):
+    def test_variance(self, disable_capture):
         """Test comparison and execution of a jaxpr containing a variance measurement."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -362,7 +362,7 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_sample(self):
+    def test_sample(self, disable_capture):
         """Test comparison and execution of a jaxpr returning samples."""
 
         dev = qml.device("lightning.qubit", wires=2, shots=50)
@@ -394,44 +394,39 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    # ----------------------------------------------------------------------------------------------
-    # TODO: This test is commented out as a temporary workaround to fix an issue where qml.capture()
-    # is not disabled, resulting in failing tests; it should be uncommented once #1445 is merged.
-    #
-    # @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
-    # def test_counts(self):
-    #     """Test comparison and execution of a jaxpr returning counts."""
+    @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
+    def test_counts(self, disable_capture):
+        """Test comparison and execution of a jaxpr returning counts."""
 
-    #     dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2, shots=50)
 
-    #     @qml.qnode(dev)
-    #     def circuit():
-    #         qml.X(0)
-    #         return qml.counts()
+        @qml.qnode(dev)
+        def circuit():
+            qml.X(0)
+            return qml.counts()
 
-    #     qml.capture.enable()
-    #     plxpr = jax.make_jaxpr(circuit)()
-    #     converted = from_plxpr(plxpr)()
-    #     qml.capture.disable()
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
+        converted = from_plxpr(plxpr)()
+        qml.capture.disable()
 
-    #     assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
-    #     assert converted.eqns[0].params["qnode"] is circuit
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
 
-    #     catalyst_res = catalyst_execute_jaxpr(converted)()
-    #     assert len(catalyst_res) == 1
-    #     expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
-    #     assert qml.math.allclose(catalyst_res[0], expected)
+        catalyst_res = catalyst_execute_jaxpr(converted)()
+        assert len(catalyst_res) == 1
+        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
+        assert qml.math.allclose(catalyst_res[0], expected)
 
-    #     qjit_obj = qml.qjit(circuit)
-    #     qjit_obj()
-    #     catalxpr = qjit_obj.jaxpr
-    #     call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-    #     call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        qjit_obj = qml.qjit(circuit)
+        qjit_obj()
+        catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
 
-    #     compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
-    # ----------------------------------------------------------------------------------------------
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_multiple_measurements(self):
+    def test_multiple_measurements(self, disable_capture):
         """Test that we can convert a circuit with multiple measurement returns."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -473,7 +468,7 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    def test_dynamic_shots(self):
+    def test_dynamic_shots(self, disable_capture):
         """Test that shots can be specified on qnode call."""
 
         dev = qml.device("lightning.qubit", wires=2, shots=50)
@@ -499,7 +494,7 @@ class TestCatalystCompareJaxpr:
 class TestHybridPrograms:
     """from_plxpr conversion tests for hybrid programs."""
 
-    def test_pre_post_processing(self):
+    def test_pre_post_processing(self, disable_capture):
         """Test converting a workflow with pre and post processing."""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -545,7 +540,7 @@ class TestHybridPrograms:
         compare_eqns(call_jaxpr_pl.eqns[5], call_jaxpr_c.eqns[6])
         compare_eqns(call_jaxpr_pl.eqns[6], call_jaxpr_c.eqns[4])
 
-    def test_multiple_qnodes(self):
+    def test_multiple_qnodes(self, disable_capture):
         """Test that a workflow with multiple qnodes can be converted."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
