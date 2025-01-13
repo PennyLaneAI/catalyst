@@ -671,6 +671,14 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Mod
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
+{
+    getQuantumDevicePtr()->NamedOperation("MS", {theta},
+                                          {/* control = */ reinterpret_cast<QubitIdType>(control),
+                                           /* target = */ reinterpret_cast<QubitIdType>(target)},
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target,
                            const Modifiers *modifiers)
 {
