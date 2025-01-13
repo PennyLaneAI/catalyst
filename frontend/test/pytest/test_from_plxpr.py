@@ -23,7 +23,7 @@ catalyst = pytest.importorskip("catalyst")
 jax = pytest.importorskip("jax")
 
 # needs to be below the importorskip calls
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,unused-argument
 from catalyst.from_plxpr import QFuncPlxprInterpreter, from_plxpr
 from catalyst.jax_primitives import get_call_jaxpr
 
