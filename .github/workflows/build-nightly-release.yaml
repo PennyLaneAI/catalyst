@@ -7,52 +7,52 @@ on:
   workflow_dispatch:
 
 jobs:
-  setup:
-    name: Setup the release
-    runs-on: ubuntu-22.04
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v4
-      with:
-        ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
+  # setup:
+  #   name: Setup the release
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v4
+  #     with:
+  #       ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
 
-    - name: Bump dev version
-      run: |
-        python $GITHUB_WORKSPACE/.github/workflows/set_nightly_version.py
+  #   - name: Bump dev version
+  #     run: |
+  #       python $GITHUB_WORKSPACE/.github/workflows/set_nightly_version.py
 
-    - name: Push new version
-      run: |
-        git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
-        git config --global user.name "ringo-but-quantum"
-        git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
-        git commit -m "[no ci] bump nightly version"
-        git push
+  #   - name: Push new version
+  #     run: |
+  #       git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
+  #       git config --global user.name "ringo-but-quantum"
+  #       git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
+  #       git commit -m "[no ci] bump nightly version"
+  #       git push
 
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
 
   linux-x86:
     name: Build on Linux x86-64
-    needs: [setup]
+    # needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
-  # linux-aarch:
-  #   name: Build on Linux aarch64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+  linux-aarch:
+    name: Build on Linux aarch64
+    # needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
 
   macos-arm:
     name: Build on macOS arm64
-    needs: [setup]
+    # needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
 
-  # macos-x86:
-  #   name: Build on macOS x86-64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
+  macos-x86:
+    name: Build on macOS x86-64
+    # needs: [setup]
+    uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
+    needs: [linux-x86, macos-arm, linux-aarch, macos-x86]
     runs-on: ubuntu-22.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
