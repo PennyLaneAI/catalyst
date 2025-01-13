@@ -159,6 +159,10 @@
   compiled function, due to incorrectly computed stride information.
   [(#1338)](https://github.com/PennyLaneAI/catalyst/pull/1338)
 
+* Fixed a bug in catalyst cli where using `checkpoint-stage` would cause `save-ir-after-each`
+  to not work properly.
+  [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
+
 <h3>Internal changes ⚙️</h3>
 
 * Starting with Python 3.12, Catalyst's binary distributions (wheels) will now follow Python's
@@ -275,6 +279,10 @@
 
 * The `verbose` parameter of :func:`~.qjit` was incorrectly listed as `verbosity` in the API documentation. This is now fixed.
   [(#1440)](https://github.com/PennyLaneAI/catalyst/pull/1440)
+
+* Added more details to catalyst-cli documentation specifiying available options for
+  checkpoint-stage and default pipelines
+  [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
 
 <h3>Contributors ✍️</h3>
 

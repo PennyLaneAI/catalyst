@@ -189,6 +189,8 @@ __all__ = (
     "debug",
     "passes",
     "pipeline",
+    "Pass",
+    "PassPlugin",
     *_api_extension_list,
     *_autograph_functions,
 )
