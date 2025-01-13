@@ -231,17 +231,10 @@ def ions_decomposition(qnode):  # pragma: nocover
     Specify that the ``--ions-decomposition`` MLIR compiler pass should be
     applied to the decorated QNode during :func:`~.qjit` compilation.
 
-    This compiler pass decomposes the gates from the set {
-    :class:`qml.T <pennylane.T>`,
-    :class:`qml.S <pennylane.S>`,
-    :class:`qml.PauliZ <pennylane.PauliZ>`,
-    :class:`qml.Hadamard <pennylane.Hadamard>`,
-    :class:`qml.PhaseShift <pennylane.PhaseShift>`,
-    :class:`qml.RZ <pennylane.RZ>`,
-    :class:`qml.CNOT <pennylane.CNOT>`
-    }
-    into gates from the set {RX, RY, MS}, where MS is the Mølmer–Sørensen gate,
-    commonly used by trapped-ion quantum devices.
+    This compiler pass decomposes the gates from the set {T, S, PauliZ,
+    Hadamard, PhaseShift, RZ, CNOT} into gates from the set {RX, RY, MS}, where
+    MS is the Mølmer–Sørensen gate, commonly used by trapped-ion quantum
+    devices.
 
     .. note::
 
