@@ -479,7 +479,7 @@ jobs:
         echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
         echo "OQD_LIB_DIR=$(pwd)/oqd-build" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
       run: |
@@ -559,7 +559,7 @@ jobs:
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "OQD_LIB_DIR=$(pwd)/oqd-build" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -616,7 +616,7 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst-cli  # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests
       run: |

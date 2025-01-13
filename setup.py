@@ -319,6 +319,15 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
 
+# Install the `catalyst` binary into the user's Python environment so it is accessible on the PATH.
+# Does not work with editable installs. Requires the Catalyst mlir module to be built.
+if os.path.exists("frontend/catalyst/bin/catalyst"):
+    catalyst_cli = ["frontend/catalyst/bin/catalyst"]
+elif os.path.exists("mlir/build/bin/catalyst"):
+    catalyst_cli = ["mlir/build/bin/catalyst"]
+else:
+    catalyst_cli = []
+
 setup(
     classifiers=classifiers,
     name="PennyLane-Catalyst",
@@ -338,6 +347,9 @@ setup(
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
+    data_files=[
+        ("bin", catalyst_cli),
+    ],
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     **description,
