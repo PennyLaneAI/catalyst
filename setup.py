@@ -321,8 +321,8 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 
 # Install the `catalyst` binary into the user's Python environment so it is accessible on the PATH.
 # Does not work with editable installs. Requires the Catalyst mlir module to be built.
-if os.path.exists("frontend/catalyst/bin/catalyst"):
-    catalyst_cli = ["frontend/catalyst/bin/catalyst"]
+if os.path.exists("frontend/bin/catalyst"):
+    catalyst_cli = ["frontend/bin/catalyst"]
 elif os.path.exists("mlir/build/bin/catalyst"):
     catalyst_cli = ["mlir/build/bin/catalyst"]
 else:

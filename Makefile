@@ -204,8 +204,8 @@ wheel:
 	for file in gradient quantum _ods_common catalyst mitigation _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
-	mkdir -p $(MK_DIR)/frontend/catalyst/bin
-	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/catalyst/bin
+	mkdir -p $(MK_DIR)/frontend/bin
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
