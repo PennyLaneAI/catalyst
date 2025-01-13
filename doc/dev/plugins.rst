@@ -50,7 +50,7 @@ And you can schedule this pass as any other pass
 
 .. code-block::
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --standalone-switch-bar-to-foo example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
 
 And you have your transformed program
 
@@ -90,7 +90,7 @@ But if we try to run it, using the same command as shown earlier
 
 .. code-block::
 
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --standalone-switch-bar-to-foo example.mlir'
+      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
 
 the compilation will fail with the following message:
 
@@ -105,9 +105,9 @@ To be able to parse this dialect, we need to load the dialect which is stored in
 
 .. code-block::
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --standalone-switch-bar-to-foo example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
 
-Now, you can parse the program without the error and run the ``standalone-switch-bar-to-foo`` pass.
+Now, you can parse the program without the error and run the ``standalone-switch-bar-foo`` pass.
 
 Creating your own Pass Plugin
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
