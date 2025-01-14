@@ -35,10 +35,10 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
-  # linux-aarch:
-  #   name: Build on Linux aarch64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+  linux-aarch:
+    name: Build on Linux aarch64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
 
   macos-arm:
     name: Build on macOS arm64
@@ -52,7 +52,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
+    needs: [linux-x86, macos-arm, linux-aarch]  #, macos-x86
     runs-on: ubuntu-22.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing

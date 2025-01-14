@@ -108,7 +108,7 @@ Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines tha
 individually via this option. In that case, the name of the pipeline is substituted for the pass
 name. Currently, the following pipelines are available:
 ``enforce-runtime-invariants-pipeline``,
-``hlo_lowering-pipeline``,
+``hlo-lowering-pipeline``,
 ``quantum-compilation-pipeline``,
 ``bufferization-pipeline``,
 ``llvm-dialect-lowering-pipeline``, and finally

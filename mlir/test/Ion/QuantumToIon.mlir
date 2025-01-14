@@ -21,8 +21,6 @@
 // CHECK-LABEL: example_ion_two_qubit
 func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 
-    // CHECK-DAG: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
-    // CHECK-DAG: [[rabi2:%.+]] = arith.constant 1.230000e+00 : f64
 
     // COM: attr-dict in op's assembly format sorts fields alphabetically
     // COM: so we have to CHECK-SAME in alphabetical order as well
@@ -147,6 +145,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 
     // CHECK: [[rx1out:%.+]] = ion.parallelprotocol([[qubit0]]) : !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
     // CHECK-NEXT: [[timerx1:%.+]] = arith.divf %arg0, [[rabi1]] : f64
     // CHECK-NEXT: ion.pulse([[timerx1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -169,6 +168,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 
     // CHECK: [[ry1out:%.+]] = ion.parallelprotocol([[rx1out]]) : !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
     // CHECK-NEXT: [[timery1:%.+]] = arith.divf %arg0, [[rabi1]] : f64
     // CHECK-NEXT: ion.pulse([[timery1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -191,6 +191,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 
     // CHECK: [[rx2out:%.+]] = ion.parallelprotocol([[ry1out]]) : !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.100000e+00 : f64
     // CHECK-NEXT: [[timerx2:%.+]] = arith.divf %arg0, [[rabi1]] : f64
     // CHECK-NEXT: ion.pulse([[timerx2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -213,6 +214,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 
     // CHECK: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], [[qubit1]]) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[rabi2:%.+]] = arith.constant 1.230000e+00 : f64
     // CHECK-NEXT: [[timems:%.+]] = arith.divf %arg0, [[rabi2]] : f64
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -274,10 +276,6 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 // CHECK-LABEL: example_ion_three_qubit
 func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
 
-    // CHECK-DAG: [[rabi1:%.+]] = arith.constant 1.230000e+00 : f64
-    // CHECK-DAG: [[rabi2:%.+]] = arith.constant 4.560000e+00 : f64
-    // CHECK-DAG: [[rabi3:%.+]] = arith.constant 99.989999999999994 : f64
-
     // CHECK: {{%.+}} = ion.ion
 
     %1 = quantum.alloc( 3) : !quantum.reg
@@ -292,6 +290,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK: [[ms1out:%.+]]:2 = ion.parallelprotocol([[qubit0]], [[qubit1]]) : !quantum.bit, !quantum.bit {
 
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[rabi1:%.+]] = arith.constant 1.230000e+00 : f64
     // CHECK-NEXT: [[timems1:%.+]] = arith.divf %arg0, [[rabi1]] : f64
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -346,6 +345,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
 
     // CHECK: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, [[qubit2]]) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[rabi2:%.+]] = arith.constant 4.560000e+00 : f64
     // CHECK-NEXT: [[timems2:%.+]] = arith.divf %arg0, [[rabi2]] : f64
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
@@ -400,6 +400,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
 
     // CHECK: [[ms3out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#1, [[ms2out]]#1) : !quantum.bit, !quantum.bit {
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[rabi3:%.+]] = arith.constant 99.989999999999994 : f64
     // CHECK-NEXT: [[timems3:%.+]] = arith.divf %arg0, [[rabi3]] : f64
     // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<

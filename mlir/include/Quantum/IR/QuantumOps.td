@@ -211,8 +211,8 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             qubits.assign(replacements);
         }
 
-        std::vector<mlir::Value> getQubitResults() {
-            std::vector<mlir::Value> values;
+        std::vector<mlir::OpResult> getQubitResults() {
+            std::vector<mlir::OpResult> values;
             values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
             return values;
         }
@@ -242,8 +242,8 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
             ctrls.assign(replacements.take_back(ctrls.size()));
         }
 
-        std::vector<mlir::Value> getQubitResults() {
-            std::vector<mlir::Value> values;
+        std::vector<mlir::OpResult> getQubitResults() {
+            std::vector<mlir::OpResult> values;
             values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
             values.insert(values.end(), getOutCtrlQubits().begin(), getOutCtrlQubits().end());
             return values;
@@ -283,10 +283,10 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
                    "must provide values for all control qubit values");
             ctrls.assign(replacements);
         }
-        mlir::ValueRange getNonCtrlQubitResults() {
+        mlir::ResultRange getNonCtrlQubitResults() {
             return getOutQubits();
         }
-        mlir::ValueRange getCtrlQubitResults() {
+        mlir::ResultRange getCtrlQubitResults() {
             return getOutCtrlQubits();
         }
     }];

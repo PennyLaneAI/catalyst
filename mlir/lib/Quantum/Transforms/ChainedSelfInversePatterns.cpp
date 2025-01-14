@@ -175,12 +175,13 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         // Replace uses
         ValueRange originalNonCtrlQubits = parentOp.getNonCtrlQubitOperands();
         ValueRange originalCtrlQubits = parentOp.getCtrlQubitOperands();
-        for (const auto &[idx, nonCtrlQubitResult] : llvm::enumerate(op.getNonCtrlQubitResults())) {
-            nonCtrlQubitResult.replaceAllUsesWith(originalNonCtrlQubits[idx]);
-        }
-        for (const auto &[idx, ctrlQubitResult] : llvm::enumerate(op.getCtrlQubitResults())) {
-            ctrlQubitResult.replaceAllUsesWith(originalCtrlQubits[idx]);
-        }
+
+        ResultRange nonCtrlQubitResults = op.getNonCtrlQubitResults();
+        nonCtrlQubitResults.replaceAllUsesWith(originalNonCtrlQubits);
+
+        ResultRange ctrlQubitResults = op.getCtrlQubitResults();
+        ctrlQubitResults.replaceAllUsesWith(originalCtrlQubits);
+
         return success();
     }
 };

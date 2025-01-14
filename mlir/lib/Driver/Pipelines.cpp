@@ -140,7 +140,7 @@ void registerEnforceRuntimeInvariantsPipeline()
 }
 void registerHloLoweringPipeline()
 {
-    PassPipelineRegistration<>("hlo_lowering-pipeline", "Register HLO lowering pipeline as a pass.",
+    PassPipelineRegistration<>("hlo-lowering-pipeline", "Register HLO lowering pipeline as a pass.",
                                createHloLoweringPipeline);
 }
 void registerQuantumCompilationPipeline()
@@ -157,8 +157,8 @@ void registerBufferizationPipeline()
 }
 void registerLLVMDialectLoweringPipeline()
 {
-    PassPipelineRegistration<>("llvm-dialect-lowring-pipeline",
-                               "Register LLVM dialect lowring pipeline as a pass.",
+    PassPipelineRegistration<>("llvm-dialect-lowering-pipeline",
+                               "Register LLVM dialect lowering pipeline as a pass.",
                                createLLVMDialectLoweringPipeline);
 }
 
