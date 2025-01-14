@@ -35,8 +35,8 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_MAJOR_MINOR
 /usr/bin/python3 -m pip install oqc-qcaas-client
 
 # TODO: --- remove workaround before merging to main ----------------- #
-pip install pennylane-lightning==0.40.0
-pip install pennylane-lightning-kokkos==0.40.0
+pip install -i https://test.pypi.org/simple/ PennyLane-Lightning==0.40.0
+pip install -i https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.40.0
 pip install git+https://github.com/PennyLaneAI/pennylane@v0.40.0-rc0
 # -------------------------------------------------------------------- #
 
