@@ -280,7 +280,7 @@
 * The `verbose` parameter of :func:`~.qjit` was incorrectly listed as `verbosity` in the API documentation. This is now fixed.
   [(#1440)](https://github.com/PennyLaneAI/catalyst/pull/1440)
 
-* Added more details to catalyst-cli documentation specifiying available options for
+* Added more details to catalyst-cli documentation specifying available options for
   checkpoint-stage and default pipelines
   [(#1405)](https://github.com/PennyLaneAI/catalyst/pull/1405)
 
