@@ -56,7 +56,7 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = 0.39
+pl_min_release = 0.40
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -321,8 +321,8 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 
 # Install the `catalyst` binary into the user's Python environment so it is accessible on the PATH.
 # Does not work with editable installs. Requires the Catalyst mlir module to be built.
-if os.path.exists("frontend/catalyst/bin/catalyst"):
-    catalyst_cli = ["frontend/catalyst/bin/catalyst"]
+if os.path.exists("frontend/bin/catalyst"):
+    catalyst_cli = ["frontend/bin/catalyst"]
 elif os.path.exists("mlir/build/bin/catalyst"):
     catalyst_cli = ["mlir/build/bin/catalyst"]
 else:
@@ -331,7 +331,6 @@ else:
 setup(
     classifiers=classifiers,
     name="PennyLane-Catalyst",
-    provides=["catalyst"],
     version=version,
     python_requires=">=3.10",
     entry_points=entry_points,

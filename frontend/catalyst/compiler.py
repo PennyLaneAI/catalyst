@@ -32,7 +32,7 @@ from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime_environment import get_bin_path, get_lib_path
+from catalyst.utils.runtime_environment import get_cli_path, get_lib_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -62,7 +62,7 @@ class LinkerDriver:
     this class defines a compiler resolution order where multiple known compilers are attempted.
     The order is defined as follows:
     1. A user specified compiler via the environment variable CATALYST_CC. It is expected that the
-        user provided compiler is flag compatilble with GCC/Clang.
+        user provided compiler is flag compatible with GCC/Clang.
     2. clang: Priority is given to clang to maintain an LLVM toolchain through most of the process.
     3. gcc: Usually configured to link with LD.
     4. c99: Usually defaults to gcc, but no linker interface is specified.
@@ -275,7 +275,7 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_bin_path("cli", "CATALYST_BIN_DIR") + "/catalyst"
+        cli_build_path = get_cli_path()
         if not path.isfile(cli_build_path):
             raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
         cmd = [cli_build_path]
