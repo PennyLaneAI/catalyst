@@ -1,4 +1,4 @@
-# Release 0.11.0 (development release)
+# Release 0.11.0-dev
 
 <h3>New features since last release</h3>
 
