@@ -4,8 +4,8 @@
 
 <h3>Improvements 🛠</h3>
 
-* Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
-  infrastracture.
+* Changed pattern rewriting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
+  infrastructure.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
 <h3>Breaking changes 💔</h3>
@@ -37,6 +37,6 @@
 
 This release contains contributions from (in alphabetical order):
 
-Christina Lee
-Mehrdad Malekmohammadi
+Christina Lee,
+Mehrdad Malekmohammadi,
 Sengthai Heng
