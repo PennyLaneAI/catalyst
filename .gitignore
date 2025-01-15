@@ -12,7 +12,7 @@ pennylane_catalyst.egg-info
 
 # Packaging directories
 dist
-frontend/catalyst/bin
+frontend/bin
 frontend/catalyst/lib
 frontend/catalyst/_revision.py
 frontend/mlir_quantum
