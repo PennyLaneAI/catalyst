@@ -12,6 +12,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update access to `QNode.execute_kwargs` as there is no more `mcm_config` key. 
+  Instead `postselect_mode` and `mcm_method` should be accessed instead.
+  [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
+
 * The `get_c_interface` method has been added to the OQD device, which enables retrieval of the C++
   implementation of the device from Python. This allows `qjit` to accept an instance of the device
   and connect to its runtime.
@@ -32,3 +36,4 @@ This release contains contributions from (in alphabetical order):
 Christina Lee
 Mehrdad Malekmohammadi
 Sengthai Heng
+Andrija Paurevic
