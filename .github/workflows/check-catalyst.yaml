@@ -436,11 +436,6 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        # TODO: --- remove workaround before merging to main ----------------- #
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.40.0
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.40.0
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.40.0-rc0
-        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Get Cached LLVM Build
@@ -529,11 +524,6 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # TODO: --- remove workaround before merging to main ----------------- #
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.40.0
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.40.0
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.40.0-rc0
-        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Get Cached LLVM Build
@@ -598,11 +588,6 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make ninja-build
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # TODO: --- remove workaround before merging to main ----------------- #
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.40.0
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.40.0
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.40.0-rc0
-        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Get Cached LLVM Build
