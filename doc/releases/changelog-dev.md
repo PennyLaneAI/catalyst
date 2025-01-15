@@ -30,8 +30,9 @@
 
 * To better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`,
   `ValueRange` return types have been replaced with `ResultRange` and `Value` return types with
-  `OpResult`. This change ensures clearer intent and usage. The `matchAndRewrite` function has also
-  been improved by using `replaceAllUsesWith` instead of for loop.
+  `OpResult`. This change ensures clearer intent and usage. The `matchAndRewrite` function of
+  `ChainedUUadjOpRewritePattern` has also been improved by using `replaceAllUsesWith` instead of for
+  loops.
   [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
 
 <h3>Documentation 📝</h3>
