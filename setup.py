@@ -83,8 +83,8 @@ def parse_dep_versions():
     pattern_pl = re.compile(r"^pennylane=(\S+)", re.MULTILINE)
     pattern_lq = re.compile(r"^lightning=(\S+)", re.MULTILINE)
 
-    with open(".dep-versions", encoding="utf-8") as f:
-        lines = f.read()
+    with open(".dep-versions", encoding="utf-8") as fin:
+        lines = fin.read()
 
         match_jax = pattern_jax.search(lines)
         match_pl = pattern_pl.search(lines)
