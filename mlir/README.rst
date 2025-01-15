@@ -46,9 +46,8 @@ directory structure generally follows the recommended practices from the upstrea
 
 - `tools <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/tools>`_:
     A collection of stand-alone executables built by the project. Currently includes the
-    ``catalyst-cli`` compiler tool for orchestrating different stages of compilation,
-    the ``quantum-opt`` tool to run passes on ``.mlir`` files, and
-    ``quantum-lsp-server``, a language
-    server for MLIR with support for the quantum and gradient dialect.
+    ``catalyst`` CLI compiler tool for orchestrating different stages of compilation,
+    the ``quantum-opt`` tool to run passes on ``.mlir`` files, and ``quantum-lsp-server``,
+    a language server for MLIR with support for the quantum and gradient dialect.
 
 .. mlir-end-inclusion-marker-do-not-remove

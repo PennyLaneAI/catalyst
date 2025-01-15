@@ -116,7 +116,7 @@ def qjit(
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
-        verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
+        verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
             ``sys.stderr``).

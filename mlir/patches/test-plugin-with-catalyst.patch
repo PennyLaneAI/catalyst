@@ -12,7 +12,7 @@ diff -ruN standalone_unmodified/test/lit.cfg.py standalone/test/lit.cfg.py
      "standalone-capi-test",
      "standalone-opt",
      "standalone-translate",
-+    "catalyst-cli",
++    "catalyst",
  ]
  
  llvm_config.add_tool_substitutions(tools, tool_dirs)

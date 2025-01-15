@@ -18,9 +18,9 @@ This module contains the pipelines that are used to compile a quantum function t
 
 .. note::
 
-    for DEFAULT_PIPELINES pipeline and the pipelines in DEFAULT_ASYNC_PIPELINES, 
+    For DEFAULT_PIPELINES pipeline and the pipelines in DEFAULT_ASYNC_PIPELINES,
     any change should be reflected in the mlir/lib/Driver/Pipelines.cpp files as well.
-    This is to ensure that the command line tool catalyst-cli default pipelines are 
+    This is to ensure that Catalyst's command line tool default pipelines are
     in sync with the pipelines defined in the Python frontend.
 
 """

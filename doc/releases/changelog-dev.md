@@ -4,6 +4,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
+  infrastracture.
+  [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -24,8 +28,12 @@
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
+* Improve the error message for invalid measurement in `adjoin()` or `ctrl()` region.
+  [(#1425)](https://github.com/PennyLaneAI/catalyst/pull/1425)
+
 * Replace `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent and usage. Improve the `matchAndRewrite` function by using `replaceAllUsesWith` instead of for loop.
   [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
+
 
 <h3>Documentation 📝</h3>
 

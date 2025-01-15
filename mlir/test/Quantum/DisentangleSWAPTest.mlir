@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --pass-pipeline="builtin.module(func.func(disentangle-SWAP))" --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(disentangle-SWAP)" --split-input-file --verify-diagnostics | FileCheck %s
 
 
 // Explicit unit tests for all SWAP disentangling table entries

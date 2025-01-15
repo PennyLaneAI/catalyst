@@ -274,8 +274,9 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
         with ir.InsertionPoint(bb_named_sequence):
             target = bb_named_sequence.arguments[0]
             for _pass in pipeline:
+                options = _pass.get_options()
                 apply_registered_pass_op = ApplyRegisteredPassOp(
-                    result=transform_mod_type, target=target, pass_name=_pass.name
+                    result=transform_mod_type, target=target, pass_name=_pass.name, options=options
                 )
                 target = apply_registered_pass_op.result
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable

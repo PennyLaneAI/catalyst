@@ -701,7 +701,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (runOpt && (inType == InputType::MLIR)) {
         TimingScope optTiming = timing.nest("Optimization");
         // TODO: The enzymeRun flag will not travel correctly in the case where different
-        // stages of compilation are executed independently via the catalyst-cli executable.
+        // stages of compilation are executed independently via the Catalyst CLI.
         // Ideally, It should be added to the IR via an attribute.
         enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
@@ -865,7 +865,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     // ---------
     // Any modifications made to the command-line interface should be documented in
     // doc/catalyst-cli/catalyst-cli.rst
-    cl::OptionCategory CatalystCat("Catalyst-cli Options", "");
+    cl::OptionCategory CatalystCat("Catalyst CLI Options", "");
     cl::opt<std::string> WorkspaceDir("workspace", cl::desc("Workspace directory"), cl::init("."),
                                       cl::cat(CatalystCat));
     cl::opt<std::string> ModuleName("module-name", cl::desc("Module name"),
