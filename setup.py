@@ -52,7 +52,7 @@ with open(os.path.join("frontend", "catalyst", "_revision.py"), "w", encoding="u
     f.write(f"__revision__ = '{REVISION}'\n")
 
 
-def parse_dep_version():
+def parse_dep_versions():
     """Parse the version strings of the Catalyst package dependencies based on the values found in
     the .dep-versions file.
 
@@ -102,7 +102,7 @@ def parse_dep_version():
     return results
 
 
-dep_versions = parse_dep_version()
+dep_versions = parse_dep_versions()
 jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
