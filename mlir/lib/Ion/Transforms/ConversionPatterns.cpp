@@ -72,29 +72,10 @@ LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx)
              });
 }
 
-Value createPositionStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
-                           DenseIntElementsAttr &positionAttr)
+Value createPositionArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
+                          DenseIntElementsAttr &positionAttr)
 {
-    Type positionStructType =
-        LLVM::LLVMStructType::getLiteral(ctx, {
-                                                  IntegerType::get(ctx, 64), // x
-                                                  IntegerType::get(ctx, 64), // y
-                                                  IntegerType::get(ctx, 64), // z
-                                              });
-    Value positionStruct = rewriter.create<LLVM::UndefOp>(loc, positionStructType);
-    int i = 0;
-    for (auto posAttr : positionAttr) {
-        mlir::Value pos = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), posAttr);
-        positionStruct = rewriter.create<LLVM::InsertValueOp>(loc, positionStruct, pos, i);
-        i++;
-    }
-    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value positionStructPtr =
-        rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                        /*elementType=*/positionStruct.getType(), c1);
-    rewriter.create<LLVM::StoreOp>(loc, positionStruct, positionStructPtr);
-    return positionStructPtr;
+    return rewriter.create<LLVM::ConstantOp>(loc, positionAttr);
 }
 
 Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, LevelAttr &levelAttr,
@@ -221,29 +202,31 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         auto levelsAttr = op.getLevels();
         auto transitionsAttr = op.getTransitions();
 
-        Value positionStructPtr = createPositionStruct(loc, rewriter, ctx, positionAttr);
+        Value positionArrayPtr = createPositionArray(loc, rewriter, ctx, positionAttr);
 
         Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, levelsAttr);
 
         Value TransitionsArrayPtr = createTransitionsArray(loc, rewriter, ctx, transitionsAttr);
 
         // Define the function signature for the Ion stub
-        Type ionStructType =
-            LLVM::LLVMStructType::getLiteral(ctx, {
-                                                      ptrType,               // name
-                                                      Float64Type::get(ctx), // mass
-                                                      Float64Type::get(ctx), // charge
-                                                      ptrType,               // position
-                                                      ptrType,               // levels
-                                                      ptrType,               // Transitions
-                                                  });
+        Type ionStructType = LLVM::LLVMStructType::getLiteral(
+            ctx, {
+                     ptrType,               // name
+                     Float64Type::get(ctx), // mass
+                     Float64Type::get(ctx), // charge
+                     VectorType::get(       // position
+                        {positionAttr.size()}, rewriter.getIntegerType(64)
+                        ), 
+                    ptrType,                // levels
+                     ptrType,               // Transitions
+                 });
 
         // Create an instance of the Ion struct
         Value ionStruct = rewriter.create<LLVM::UndefOp>(loc, ionStructType);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, name, 0);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, mass, 1);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, charge, 2);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, positionStructPtr, 3);
+        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, positionArrayPtr, 3);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, levelsArrayPtr, 4);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, TransitionsArrayPtr, 5);
         Value ionStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
