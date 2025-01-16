@@ -34,7 +34,6 @@ namespace ion {
 #include "Ion/Transforms/Passes.h.inc"
 
 struct IonTypeConverter : public LLVMTypeConverter {
-
     IonTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
         addConversion([&](IonType type) { return convertIonType(type); });
