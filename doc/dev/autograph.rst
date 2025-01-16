@@ -1048,6 +1048,7 @@ listed in the `JAX documentation for jax.numpy.ndarray.at
 Under the hood, Catalyst converts anything coming in the latter notation into the former one.
 
 The list of supported operators includes:
+
 - ``=`` (set)
 - ``+=`` (add)
 - ``-=`` (add with negation)
