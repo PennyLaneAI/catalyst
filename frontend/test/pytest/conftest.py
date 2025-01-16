@@ -20,6 +20,7 @@ import pathlib
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+import pennylane as qml
 import pytest
 
 TEST_PATH = os.path.dirname(__file__)
@@ -36,3 +37,13 @@ def create_temporary_toml_file(request) -> str:
             f.write(dedent(content))
         request.node.toml_file = toml_file
         yield
+
+
+@pytest.fixture(scope="function")
+def disable_capture():
+    """enable and disable capture around each test."""
+    try:
+        yield
+    finally:
+        if qml.capture.enabled():
+            qml.capture.disable()
