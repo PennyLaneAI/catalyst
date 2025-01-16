@@ -215,9 +215,8 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
                      Float64Type::get(ctx), // mass
                      Float64Type::get(ctx), // charge
                      VectorType::get(       // position
-                        {positionAttr.size()}, rewriter.getIntegerType(64)
-                        ), 
-                    ptrType,                // levels
+                         {positionAttr.size()}, rewriter.getIntegerType(64)),
+                     ptrType,               // levels
                      ptrType,               // Transitions
                  });
 
