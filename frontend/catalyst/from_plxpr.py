@@ -15,24 +15,29 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+from copy import copy
 from functools import partial
 from typing import Callable
 
 import jax
+import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
+from pennylane.capture.primitives import cond_prim
 
 from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
 )
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
     compbasis_p,
+    cond_p,
     counts_p,
     expval_p,
     gphase_p,
@@ -298,6 +303,19 @@ def _(self, *invals, n_wires):
 @QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 def _(self, phase, *wires, n_wires):
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
+
+
+# pylint: disable=unused-argument, too-many-arguments
+@QFuncPlxprInterpreter.register_primitive(cond_prim)
+def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
+    new_invals = []
+    for inval in invals:
+        if isinstance(inval, jax.core.Tracer):
+            new_invals.append(inval)
+
+    return cond_p.bind(
+        *new_invals, branch_jaxprs=jaxpr_pad_consts(jaxpr_branches), nimplicit_outputs=None
+    )
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
