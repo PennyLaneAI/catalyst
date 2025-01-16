@@ -1,11 +1,11 @@
-# Release 0.11.0 (development release)
+# Release 0.11.0-dev
 
 <h3>New features since last release</h3>
 
 <h3>Improvements 🛠</h3>
 
-* Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
-  infrastracture.
+* The pattern rewriting in the `quantum-to-ion` lowering pass has been updated to use MLIR's dialect
+  conversion infrastructure.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
 <h3>Breaking changes 💔</h3>
@@ -24,12 +24,16 @@
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
-* Improve the error message for invalid measurement in `adjoin()` or `ctrl()` region.
+* The error messages for invalid measurements in :func:`qml.adjoint() <pennylane.adjoint>` and
+  :func:`qml.ctrl() <pennylane.ctrl>` regions have been improved.
   [(#1425)](https://github.com/PennyLaneAI/catalyst/pull/1425)
 
-* Replace `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent and usage. Improve the `matchAndRewrite` function by using `replaceAllUsesWith` instead of for loop.
+* To better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`,
+  `ValueRange` return types have been replaced with `ResultRange` and `Value` return types with
+  `OpResult`. This change ensures clearer intent and usage. The `matchAndRewrite` function of
+  `ChainedUUadjOpRewritePattern` has also been improved by using `replaceAllUsesWith` instead of for
+  loops.
   [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
-
 
 <h3>Documentation 📝</h3>
 
@@ -37,6 +41,6 @@
 
 This release contains contributions from (in alphabetical order):
 
-Christina Lee
-Mehrdad Malekmohammadi
+Christina Lee,
+Mehrdad Malekmohammadi,
 Sengthai Heng
