@@ -16,9 +16,9 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Pass/Pass.h"
-
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
@@ -33,15 +33,24 @@ namespace ion {
 #define GEN_PASS_DEF_IONCONVERSIONPASS
 #include "Ion/Transforms/Passes.h.inc"
 
+struct IonTypeConverter : public LLVMTypeConverter {
+
+    IonTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
+    {
+        addConversion([&](IonType type) { return convertIonType(type); });
+    }
+
+  private:
+    Type convertIonType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
+};
+
 struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
     using IonConversionPassBase::IonConversionPassBase;
 
     void runOnOperation() final
     {
         MLIRContext *context = &getContext();
-        LowerToLLVMOptions options(context);
-
-        LLVMTypeConverter typeConverter(context, options);
+        IonTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
         populateConversionPatterns(typeConverter, patterns);

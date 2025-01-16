@@ -205,7 +205,9 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
+        const TypeConverter *conv = getTypeConverter();
 
+        Type IonTy = conv->convertType(IonType::get(ctx));
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
@@ -249,7 +251,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         rewriter.create<LLVM::StoreOp>(loc, ionStruct, ionStructPtr);
 
         // Create the Ion stub function
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {ptrType});
+        Type qirSignature = LLVM::LLVMFunctionType::get(IonTy, ptrType);
         std::string qirName = "__catalyst_ion";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         rewriter.create<LLVM::CallOp>(loc, fnDecl, ionStructPtr);
