@@ -51,7 +51,7 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<mlir::func::FuncDialect>();
         target.addLegalOp<ParallelProtocolOp>(); // TODO: Remove in the end
-        target.addLegalOp<PulseOp>(); // TODO: Remove in the end
+        target.addLegalOp<PulseOp>();            // TODO: Remove in the end
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

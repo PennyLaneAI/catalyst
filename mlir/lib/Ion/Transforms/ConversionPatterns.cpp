@@ -57,17 +57,19 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
                                         ArrayRef<LLVM::GEPArg>{0, 0}, true);
 }
 
-LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx) {
-    return LLVM::LLVMStructType::getLiteral(ctx, {
-        IntegerType::get(ctx, 64), // principal
-        Float64Type::get(ctx),     // spin
-        Float64Type::get(ctx),     // orbital
-        Float64Type::get(ctx),     // nuclear
-        Float64Type::get(ctx),     // spin_orbital
-        Float64Type::get(ctx),     // spin_orbital_nuclear
-        Float64Type::get(ctx),     // spin_orbital_nuclear_magnetization
-        Float64Type::get(ctx),     // energy
-    });
+LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx)
+{
+    return LLVM::LLVMStructType::getLiteral(
+        ctx, {
+                 IntegerType::get(ctx, 64), // principal
+                 Float64Type::get(ctx),     // spin
+                 Float64Type::get(ctx),     // orbital
+                 Float64Type::get(ctx),     // nuclear
+                 Float64Type::get(ctx),     // spin_orbital
+                 Float64Type::get(ctx),     // spin_orbital_nuclear
+                 Float64Type::get(ctx),     // spin_orbital_nuclear_magnetization
+                 Float64Type::get(ctx),     // energy
+             });
 }
 
 Value createPositionStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
@@ -196,7 +198,7 @@ Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx
 
 struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
     using OpConversionPattern<catalyst::ion::IonOp>::OpConversionPattern;
-    
+
     LogicalResult matchAndRewrite(catalyst::ion::IonOp op, catalyst::ion::IonOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
