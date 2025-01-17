@@ -157,6 +157,7 @@ func.func @example_ion() -> !ion.ion {
         position=dense<[0, 1]>: tensor<2xi64>,
         levels=[
             #ion.level<
+                label="downstate",
                 principal=1,
                 spin=1.1,
                 orbital=2.2,
@@ -167,6 +168,7 @@ func.func @example_ion() -> !ion.ion {
                 energy=8.8
             >,
             #ion.level<
+                label="upstate",
                 principal=1,
                 spin=1.1,
                 orbital=2.2,
@@ -179,49 +181,13 @@ func.func @example_ion() -> !ion.ion {
         ],
         transitions=[
             #ion.transition<
-                level_0 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                level_1 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
+                level_0 = "downstate",
+                level_1 = "upstate",
                 einstein_a=10.10
             >,
             #ion.transition<
-                level_0 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
-                level_1 = #ion.level<
-                    principal=1,
-                    spin=1.1,
-                    orbital=2.2,
-                    nuclear=3.3,
-                    spin_orbital=4.4,
-                    spin_orbital_nuclear=5.5,
-                    spin_orbital_nuclear_magnetization=6.6,
-                    energy=8.8
-                >,
+                level_0 = "upstate",
+                level_1 = "downstate",
                 einstein_a=10.10
             >
         ]

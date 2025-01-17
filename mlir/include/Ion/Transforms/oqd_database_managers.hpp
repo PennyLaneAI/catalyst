@@ -133,6 +133,7 @@ class OQDDatabaseManager {
         toml::node_view<toml::node> ionsToml = sourceTomlQubit["ions"];
 
         auto parseSingleLevel = [](auto level) {
+            std::string label = level["label"].as_string()->get();
             int64_t principal = level["principal"].as_integer()->get();
 
             std::vector<std::string> properties{"spin",
@@ -149,7 +150,7 @@ class OQDDatabaseManager {
                                return level[name].as_floating_point()->get();
                            });
 
-            return Level(principal, propertiesData[0], propertiesData[1], propertiesData[2],
+            return Level(label, principal, propertiesData[0], propertiesData[1], propertiesData[2],
                          propertiesData[3], propertiesData[4], propertiesData[5],
                          propertiesData[6]);
         };
@@ -170,8 +171,7 @@ class OQDDatabaseManager {
                    "Only \"downstate\", \"upstate\" and \"estate\" are allowed in the atom's "
                    "transition levels.");
 
-            return Transition(allLevels[levelEncodings[level1]], allLevels[levelEncodings[level2]],
-                              einstein_a);
+            return Transition(level1, level2, einstein_a);
         };
 
         for (auto &ion_it : *(ionsToml.as_table())) {
