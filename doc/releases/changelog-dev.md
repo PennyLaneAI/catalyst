@@ -30,6 +30,8 @@
 * Replace `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent and usage. Improve the `matchAndRewrite` function by using `replaceAllUsesWith` instead of for loop.
   [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
 
+* Updated the OQD device Toml file to only include the known supported gate for now.
+  [(#1470)](https://github.com/PennyLaneAI/catalyst/pull/1470)
 
 <h3>Documentation 📝</h3>
 
