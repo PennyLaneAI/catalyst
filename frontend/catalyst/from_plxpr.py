@@ -313,8 +313,20 @@ def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
         if isinstance(inval, jax.core.Tracer):
             new_invals.append(inval)
 
+    args = invals[args_slice]
+
+    new_branch_jaxprs = []
+    for const_slice, branch_plxpr in zip(consts_slices, jaxpr_branches):
+        consts = invals[const_slice]
+        if branch_plxpr is None:
+            new_branch_jaxprs.append(None)
+        else:
+            f = partial(QFuncPlxprInterpreter(self._device, self._shots).eval, branch_plxpr, consts)
+            branch_jaxpr = jax.make_jaxpr(f)(*args).jaxpr
+            new_branch_jaxprs.append(branch_jaxpr)
+
     return cond_p.bind(
-        *new_invals, branch_jaxprs=jaxpr_pad_consts(jaxpr_branches), nimplicit_outputs=None
+        *new_invals, branch_jaxprs=jaxpr_pad_consts(new_branch_jaxprs), nimplicit_outputs=None
     )
 
 
