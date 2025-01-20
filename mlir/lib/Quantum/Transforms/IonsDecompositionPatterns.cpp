@@ -140,7 +140,7 @@ void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 }
 
 std::map<std::string, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
-    funcMap = {{"T", &tDecomp},        {"S", &sDecomp},   {"Z", &zDecomp},
+    funcMap = {{"T", &tDecomp},        {"S", &sDecomp},   {"PauliZ", &zDecomp},
                {"Hadamard", &hDecomp}, {"RZ", &rzDecomp}, {"PhaseShift", &psDecomp},
                {"CNOT", &cnotDecomp}};
 
