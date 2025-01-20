@@ -57,7 +57,7 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
         populateConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
-        target.addIllegalOp<IonOp>(); // TODO: The whole Ion dialect should be Illegal
+        target.addIllegalOp<IonOp>();   // TODO: The whole Ion dialect should be Illegal
         target.addIllegalOp<PulseOp>(); // TODO: The whole Ion dialect should be Illegal
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<mlir::func::FuncDialect>();
