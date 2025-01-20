@@ -304,9 +304,6 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
         MLIRContext *ctx = this->getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
         auto time = op.getTime();
         auto phase = rewriter.create<LLVM::ConstantOp>(loc, op.getPhase());
         Type qubitTy = conv->convertType(catalyst::quantum::QubitType::get(ctx));
