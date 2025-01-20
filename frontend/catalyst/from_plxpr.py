@@ -308,11 +308,6 @@ def _(self, phase, *wires, n_wires):
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
 def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
-    new_invals = []
-    for inval in invals:
-        if isinstance(inval, jax.core.Tracer):
-            new_invals.append(inval)
-
     args = invals[args_slice]
 
     new_branch_jaxprs = []
@@ -326,7 +321,7 @@ def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
             new_branch_jaxprs.append(branch_jaxpr)
 
     return cond_p.bind(
-        *new_invals, branch_jaxprs=jaxpr_pad_consts(new_branch_jaxprs), nimplicit_outputs=None
+        *invals, branch_jaxprs=jaxpr_pad_consts(new_branch_jaxprs), nimplicit_outputs=None
     )
 
 
