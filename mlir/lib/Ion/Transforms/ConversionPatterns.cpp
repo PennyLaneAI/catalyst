@@ -192,6 +192,30 @@ Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx
     return TransitionsArrayPtr;
 }
 
+Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
+{
+    Type beamStructType = createBeamStructType(ctx, rewriter, beamAttr);
+
+    auto transitionIndex = beamAttr.getTransitionIndex();
+    auto rabi = beamAttr.getRabi();
+    auto detuning = beamAttr.getDetuning();
+    auto polarization = beamAttr.getPolarization();
+    auto wavevector = beamAttr.getWavevector();
+
+    Value beamStruct = rewriter.create<LLVM::UndefOp>(loc, beamStructType);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, transitionIndex), 0);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, rabi), 1);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, polarization), 3);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, wavevector), 4);
+    return beamStruct;
+}
+
 struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
     using OpConversionPattern<catalyst::ion::IonOp>::OpConversionPattern;
 
@@ -269,30 +293,6 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         return success();
     }
 };
-
-Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
-{
-    Type beamStructType = createBeamStructType(ctx, rewriter, beamAttr);
-
-    auto transitionIndex = beamAttr.getTransitionIndex();
-    auto rabi = beamAttr.getRabi();
-    auto detuning = beamAttr.getDetuning();
-    auto polarization = beamAttr.getPolarization();
-    auto wavevector = beamAttr.getWavevector();
-
-    Value beamStruct = rewriter.create<LLVM::UndefOp>(loc, beamStructType);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, transitionIndex), 0);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, rabi), 1);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, polarization), 3);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, wavevector), 4);
-    return beamStruct;
-}
 
 struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
     using OpConversionPattern<catalyst::ion::PulseOp>::OpConversionPattern;
