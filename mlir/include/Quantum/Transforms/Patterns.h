@@ -29,6 +29,7 @@ void populateSelfInversePatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
 void populateStaticCustomPatterns(mlir::RewritePatternSet &);
+void populateLoopBoundaryPatterns(mlir::RewritePatternSet &);
 
 } // namespace quantum
 } // namespace catalyst

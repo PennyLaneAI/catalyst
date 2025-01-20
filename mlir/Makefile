@@ -11,7 +11,7 @@ MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/bazel-build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
-BUILD_TYPE?=Release
+BUILD_TYPE=Debug
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)

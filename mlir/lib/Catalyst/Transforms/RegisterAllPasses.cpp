@@ -57,4 +57,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createTestPass);
     mlir::registerPass(catalyst::createIonsDecompositionPass);
     mlir::registerPass(catalyst::createQuantumToIonPass);
+    mlir::registerPass(catalyst::createLoopBoundaryOptimizationPass);
 }

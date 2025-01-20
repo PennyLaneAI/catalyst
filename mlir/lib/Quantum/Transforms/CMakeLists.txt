@@ -21,6 +21,8 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     static_custom_lowering.cpp
     StaticCustomPatterns.cpp
+    loop_boundary_optimization.cpp
+    LoopBoundaryOptimizationPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
