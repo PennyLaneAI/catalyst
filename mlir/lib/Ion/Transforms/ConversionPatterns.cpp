@@ -76,13 +76,14 @@ LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
 {
     return LLVM::LLVMStructType::getLiteral(
         ctx, {
-                    Float64Type::get(ctx), // rabi
-                    Float64Type::get(ctx), // detuning
-                    VectorType::get(       // polarization
-                        {beamAttr.getPolarization().size()}, rewriter.getIntegerType(64)),
-                    VectorType::get(       // wavevector
-                        {beamAttr.getWavevector().size()}, rewriter.getIntegerType(64)),
-                });
+                 IntegerType::get(ctx, 64), // transition index
+                 Float64Type::get(ctx),     // rabi
+                 Float64Type::get(ctx),     // detuning
+                 VectorType::get(           // polarization
+                     {beamAttr.getPolarization().size()}, rewriter.getIntegerType(64)),
+                 VectorType::get( // wavevector
+                     {beamAttr.getWavevector().size()}, rewriter.getIntegerType(64)),
+             });
 }
 
 Value createPositionArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
@@ -270,9 +271,10 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
 };
 
 Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
-{   
+{
     Type beamStructType = createBeamStructType(ctx, rewriter, beamAttr);
 
+    auto transitionIndex = beamAttr.getTransitionIndex();
     auto rabi = beamAttr.getRabi();
     auto detuning = beamAttr.getDetuning();
     auto polarization = beamAttr.getPolarization();
@@ -280,17 +282,15 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
 
     Value beamStruct = rewriter.create<LLVM::UndefOp>(loc, beamStructType);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rabi), 0);
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, transitionIndex), 0);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, detuning), 1);
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, rabi), 1);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, polarization), 2);
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, wavevector), 3);
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, polarization), 3);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, wavevector), 4);
     return beamStruct;
 }
 
@@ -312,9 +312,8 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
         Type qubitTy = conv->convertType(catalyst::quantum::QubitType::get(ctx));
         auto inQubit = adaptor.getInQubit();
         auto beamAttr = op.getBeam();
-        
-        Value BeamStruct = createBeamStruct(loc, rewriter, ctx, beamAttr);
 
+        Value BeamStruct = createBeamStruct(loc, rewriter, ctx, beamAttr);
 
         SmallVector<Value> operands;
         operands.push_back(inQubit);
@@ -323,7 +322,10 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
         operands.push_back(BeamStruct);
 
         // Create the Ion stub function
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx), createBeamStructType(ctx, rewriter, beamAttr)});
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
+             createBeamStructType(ctx, rewriter, beamAttr)});
         std::string qirName = "__catalyst_pulse";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
