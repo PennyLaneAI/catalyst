@@ -37,10 +37,12 @@ struct IonTypeConverter : public LLVMTypeConverter {
     IonTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
         addConversion([&](IonType type) { return convertIonType(type); });
+        addConversion([&](catalyst::quantum::QubitType type) { return convertQubitType(type); });
     }
 
   private:
     Type convertIonType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
+    Type convertQubitType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
 };
 
 struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
@@ -56,10 +58,10 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
 
         LLVMConversionTarget target(*context);
         target.addIllegalOp<IonOp>(); // TODO: The whole Ion dialect should be Illegal
+        target.addIllegalOp<PulseOp>(); // TODO: The whole Ion dialect should be Illegal
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<mlir::func::FuncDialect>();
         target.addLegalOp<ParallelProtocolOp>(); // TODO: Remove in the end
-        target.addLegalOp<PulseOp>();            // TODO: Remove in the end
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

@@ -72,6 +72,19 @@ LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx)
              });
 }
 
+LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter, BeamAttr &beamAttr)
+{
+    return LLVM::LLVMStructType::getLiteral(
+        ctx, {
+                    Float64Type::get(ctx), // rabi
+                    Float64Type::get(ctx), // detuning
+                    VectorType::get(       // polarization
+                        {beamAttr.getPolarization().size()}, rewriter.getIntegerType(64)),
+                    VectorType::get(       // wavevector
+                        {beamAttr.getWavevector().size()}, rewriter.getIntegerType(64)),
+                });
+}
+
 Value createPositionArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
                           DenseIntElementsAttr &positionAttr)
 {
@@ -113,6 +126,7 @@ Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Lev
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getEnergy()), 7);
     return levelStruct;
 }
+
 Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ArrayAttr &levelsAttr)
 {
     LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
@@ -255,12 +269,66 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
     }
 };
 
+Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
+{   
+    Type beamStructType = createBeamStructType(ctx, rewriter, beamAttr);
+
+    auto rabi = beamAttr.getRabi();
+    auto detuning = beamAttr.getDetuning();
+    auto polarization = beamAttr.getPolarization();
+    auto wavevector = beamAttr.getWavevector();
+
+    Value beamStruct = rewriter.create<LLVM::UndefOp>(loc, beamStructType);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, rabi), 0);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, detuning), 1);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, polarization), 2);
+    beamStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, beamStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, wavevector), 3);
+    return beamStruct;
+}
+
 struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
     using OpConversionPattern<catalyst::ion::PulseOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(catalyst::ion::PulseOp op, catalyst::ion::PulseOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+
+        auto time = op.getTime();
+        auto phase = rewriter.create<LLVM::ConstantOp>(loc, op.getPhase());
+        Type qubitTy = conv->convertType(catalyst::quantum::QubitType::get(ctx));
+        auto inQubit = adaptor.getInQubit();
+        auto beamAttr = op.getBeam();
+        
+        Value BeamStruct = createBeamStruct(loc, rewriter, ctx, beamAttr);
+
+
+        SmallVector<Value> operands;
+        operands.push_back(inQubit);
+        operands.push_back(time);
+        operands.push_back(phase);
+        operands.push_back(BeamStruct);
+
+        // Create the Ion stub function
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx), createBeamStructType(ctx, rewriter, beamAttr)});
+        std::string qirName = "__catalyst_pulse";
+        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+
+        rewriter.eraseOp(op);
         return success();
     }
 };
