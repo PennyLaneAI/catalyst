@@ -656,14 +656,14 @@ def infer_output_type(
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
-    """Deduce the Jax ``OutputType`` of a part of program (typically, a function) given its
+    """Deduce the Jax ``OutputType`` of a part of a program (typically, a function) given its
     constants, input and ouput tracers or variables. Return the expanded outputs along with the
     output type calculated.
 
     The core task of this function is to find out which tracers have dynamic dimensions and
     translate this information into the language of the De Brujin indices residing in Jax types. In
     order to do this, we scan the outputs and mind what dimensions are already known (from the
-    intputs) and what are not known. The known dimensions are marked with InDBIdx and the unknown
+    inputs) and what are not known. The known dimensions are marked with InDBIdx and the unknown
     dimensions are treated as calculated and marked using OutDBIdx.
 
 
