@@ -24,29 +24,15 @@ schema = 3
 #
 [operators.gates]
 
-Identity = { }
-Hadamard = { }
-PauliX = { }
-PauliY = { }
-PauliZ = { }
-S = { }
-T = { }
-CNOT = { }
-Toffoli = { }
-CY = { }
-CZ = { }
-SWAP = { }
-CSWAP = { }
-RX = { }
-RY = { }
-RZ = { }
-CRX = { }
-CRY = { }
-CRZ = { }
-PhaseShift = { }
-U1 = { }
-U2 = { }
-U3 = { }
+CNOT                   = { properties = [ "invertible",                 "differentiable" ] }
+Hadamard               = { properties = [ "invertible", "controllable", "differentiable" ] }
+PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }
+PhaseShift             = { properties = [ "invertible", "controllable", "differentiable" ] }
+RX                     = { properties = [ "invertible", "controllable", "differentiable" ] }
+RY                     = { properties = [ "invertible", "controllable", "differentiable" ] }
+RZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
+S                      = { properties = [ "invertible", "controllable", "differentiable" ] }
+T                      = { properties = [ "invertible", "controllable", "differentiable" ] }
 
 [operators.observables]
 
