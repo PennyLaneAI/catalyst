@@ -26,6 +26,7 @@ mass = 171.0
 charge = +1.0
 position = [1, 2, -1]
 
+levels.downstate.label = "downstate"
 levels.downstate.principal = 6
 levels.downstate.spin = 0.4
 levels.downstate.orbital = 0.5
@@ -35,6 +36,7 @@ levels.downstate.spin_orbital_nuclear = 0.9
 levels.downstate.spin_orbital_nuclear_magnetization = 1.0
 levels.downstate.energy = 0.0
 
+levels.upstate.label = "upstate"
 levels.upstate.principal = 6
 levels.upstate.spin = 1.4
 levels.upstate.orbital = 1.5
@@ -44,6 +46,7 @@ levels.upstate.spin_orbital_nuclear = 1.9
 levels.upstate.spin_orbital_nuclear_magnetization = 2.0
 levels.upstate.energy = 12.643e9
 
+levels.estate.label = "estate"
 levels.estate.principal = 5
 levels.estate.spin = 2.4
 levels.estate.orbital = 2.5
