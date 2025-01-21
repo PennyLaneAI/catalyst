@@ -2,7 +2,7 @@
 # Object Lib catalyst_qir_qis_obj
 ##################################
 
-add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
+add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp OQDRuntimeCAPI.cpp)
 
 # include external MLIR runner utils
 FetchContent_MakeAvailable(MLIRRunnerUtils)
