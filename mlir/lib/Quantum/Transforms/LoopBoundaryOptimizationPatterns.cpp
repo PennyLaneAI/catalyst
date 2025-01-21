@@ -14,17 +14,18 @@
 
 #define DEBUG_TYPE "loop-boundary"
 
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
-#include "VerifyParentGateAnalysis.hpp"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
+
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+#include "VerifyParentGateAnalysis.hpp"
 
 using llvm::dbgs;
 using namespace mlir;
@@ -55,6 +56,28 @@ std::map<OpType, std::vector<mlir::Value>> traceOperationQubit(mlir::Block *bloc
     return opMap;
 }
 
+bool verifyEdgeQubitOperands(std::map<quantum::CustomOp, std::vector<mlir::Value>> opMap)
+{
+    quantum::CustomOp topEdgeOp = opMap.begin()->first;
+    quantum::CustomOp bottomEdgeOp = opMap.rbegin()->first;
+
+    if (topEdgeOp == bottomEdgeOp) {
+        return false;
+    }
+
+    if (topEdgeOp.getGateName() != bottomEdgeOp.getGateName()) {
+        return false;
+    }
+
+    for (auto [idx, rootTopEdgeQubit] : llvm::enumerate(opMap[topEdgeOp])) {
+        if (rootTopEdgeQubit != opMap[bottomEdgeOp][idx]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::ForOp> {
     using mlir::OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
@@ -70,48 +93,40 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
 
         auto opMap = traceOperationQubit<quantum::CustomOp>(forOp.getBody());
 
-        quantum::CustomOp firstGateOp = opMap.begin()->first;
-        quantum::CustomOp secondGateOp = opMap.rbegin()->first;
+        quantum::CustomOp topEdgeOp = opMap.begin()->first;
+        quantum::CustomOp bottomEdgeOp = opMap.rbegin()->first;
 
-        if (opMap.begin()->first == opMap.rbegin()->first) {
-            return mlir::failure();
-        }
+        if (verifyEdgeQubitOperands(opMap)) {
 
-        if (opMap[firstGateOp][0] == opMap[secondGateOp][0] &&
-            firstGateOp.getGateName() == secondGateOp.getGateName()) {
+            ValueRange parentTopInQubits = topEdgeOp.getInQubits();
 
-            // create new top-edge gate
-            auto firstOp = firstGateOp.clone();
-            firstOp->setOperands(forOp.getInitArgs());
-            rewriter.setInsertionPoint(forOp);
-            rewriter.insert(firstOp);
+            // iter_args(%q_0 = %q)
+            // - %q_0 -> getRegionIterArg(0)
+            // - %q -> getInitArgs()[0]
 
-            // config the operand of for-loop to be the result of the first gate
-            forOp.setOperand(3, firstOp.getResult(0));
+            rewriter.moveOpBefore(topEdgeOp, forOp);
+            topEdgeOp.getOutQubits().replaceAllUsesWith(
+                topEdgeOp.getInQubits()); // config successor
 
-            // config the successor of the first gate to be the for-loop
-            firstGateOp.getOutQubits().replaceAllUsesWith(firstGateOp.getInQubits());
+            for (auto [idx, arg] : llvm::enumerate(forOp.getInitArgs())) {
+                for (auto regionArg : forOp.getRegionIterArgs()) {
+                    if (regionArg == topEdgeOp.getInQubits()[idx]) {
+                        arg.replaceAllUsesWith(topEdgeOp.getOutQubits()[idx]);
+                        topEdgeOp.setOperand(idx, arg);
+                    }
+                }
+            }
 
-            // erase the first gate
-            rewriter.eraseOp(firstGateOp);
-
-            // create new bottom-edge gate
-            auto secondOp = secondGateOp.clone();
-
-            // replace successor of for-loop with the second gate
-            forOp.getResults().replaceAllUsesWith(secondOp);
-
-            // set the operands of the
-            secondOp->setOperands(forOp.getResults());
-            rewriter.setInsertionPointAfter(forOp);
-            rewriter.insert(secondOp);
-
-            // config the successor of the second gate to be the successor of the for-loop
-            secondGateOp.getOutQubits().replaceAllUsesWith(secondGateOp.getInQubits());
-            rewriter.eraseOp(secondGateOp);
+            bottomEdgeOp.getOutQubits().replaceAllUsesWith(
+                bottomEdgeOp.getInQubits()); // config the successor
+            forOp.getResults().replaceAllUsesWith(bottomEdgeOp);
+            bottomEdgeOp.setQubitOperands(forOp.getResults()); // config predecessor
+            rewriter.moveOpAfter(bottomEdgeOp, forOp);
 
             return mlir::success();
         }
+
+        return mlir::failure();
     }
 };
 
