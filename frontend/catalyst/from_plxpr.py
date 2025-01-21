@@ -291,6 +291,34 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         return mval
 
 
+class BranchPlxprInterpreter(QFuncPlxprInterpreter):
+    """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
+
+    Args:
+        parent_interpreter (QFuncPlxprInterpreter)
+
+    """
+
+    def __init__(self, parent_interpreter: QFuncPlxprInterpreter):
+        self._parent_interpreter = parent_interpreter
+        super().__init__(self._parent_interpreter._device, self._parent_interpreter._shots)
+
+    def setup(self):
+        """Initialize the stateref."""
+        if self.stateref is None:
+            self.stateref = {"qreg": self._parent_interpreter.qreg, "wire_map": {}}
+
+    # pylint: disable=attribute-defined-outside-init
+    def cleanup(self):
+        """Perform any final steps after processing the plxpr.
+
+        For conversion to catalyst, this reinserts extracted qubits.
+        """
+        for orig_wire, wire in self.wire_map.items():
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+        self.stateref = None
+
+
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def _(self, *invals, n_wires):
     wires = [self.get_wire(w) for w in invals[1:]]
@@ -316,7 +344,7 @@ def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
         if branch_plxpr is None:
             new_branch_jaxprs.append(None)
         else:
-            f = partial(QFuncPlxprInterpreter(self._device, self._shots).eval, branch_plxpr, consts)
+            f = partial(BranchPlxprInterpreter(self).eval, branch_plxpr, consts)
             branch_jaxpr = jax.make_jaxpr(f)(*args).jaxpr
             new_branch_jaxprs.append(branch_jaxpr)
 
