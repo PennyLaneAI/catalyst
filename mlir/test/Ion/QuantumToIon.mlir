@@ -30,6 +30,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:    charge = 1.000000e+00
     // CHECK-SAME:    levels = [
     // CHECK-SAME:        #ion.level<
+    // CHECK-SAME:            label = "downstate",
     // CHECK-SAME:            principal = 6
     // CHECK-SAME:            spin = 4.000000e-01
     // CHECK-SAME:            orbital = 5.000000e-01
@@ -40,6 +41,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:            energy = 0.000000e+00
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.level<
+    // CHECK-SAME:            label = "upstate",
     // CHECK-SAME:            principal = 6
     // CHECK-SAME:            spin = 1.400000e+00
     // CHECK-SAME:            orbital = 1.500000e+00
@@ -50,6 +52,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:            energy = 1.264300e+10
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.level<
+    // CHECK-SAME:            label = "estate",
     // CHECK-SAME:            principal = 5
     // CHECK-SAME:            spin = 2.400000e+00
     // CHECK-SAME:            orbital = 2.500000e+00
@@ -65,72 +68,18 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:    position = dense<[1, 2, -1]> : vector<3xi64>
     // CHECK-SAME:    transitions = [
     // CHECK-SAME:        #ion.transition<
-    // CHECK-SAME:            level_0 = <
-    // CHECK-SAME:                principal = 6
-    // CHECK-SAME:                spin = 4.000000e-01
-    // CHECK-SAME:                orbital = 5.000000e-01
-    // CHECK-SAME:                nuclear = 6.000000e-01
-    // CHECK-SAME:                spin_orbital = 8.000000e-01
-    // CHECK-SAME:                spin_orbital_nuclear = 9.000000e-01
-    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 1.000000e+00
-    // CHECK-SAME:                energy = 0.000000e+00
-    // CHECK-SAME:            >,
-    // CHECK-SAME:            level_1 = <
-    // CHECK-SAME:                principal = 5
-    // CHECK-SAME:                spin = 2.400000e+00
-    // CHECK-SAME:                orbital = 2.500000e+00
-    // CHECK-SAME:                nuclear = 2.600000e+00
-    // CHECK-SAME:                spin_orbital = 2.800000e+00
-    // CHECK-SAME:                spin_orbital_nuclear = 2.900000e+00
-    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 3.000000e+00
-    // CHECK-SAME:                energy = 8.115200e+14
-    // CHECK-SAME:            >,
+    // CHECK-SAME:            level_0 = "downstate",
+    // CHECK-SAME:            level_1 = "estate",
     // CHECK-SAME:            einstein_a = 2.200000e+00
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.transition<
-    // CHECK-SAME:            level_0 = <
-    // CHECK-SAME:                principal = 6
-    // CHECK-SAME:                spin = 4.000000e-01
-    // CHECK-SAME:                orbital = 5.000000e-01
-    // CHECK-SAME:                nuclear = 6.000000e-01
-    // CHECK-SAME:                spin_orbital = 8.000000e-01
-    // CHECK-SAME:                spin_orbital_nuclear = 9.000000e-01
-    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 1.000000e+00
-    // CHECK-SAME:                energy = 0.000000e+00
-    // CHECK-SAME:            >,
-    // CHECK-SAME:            level_1 = <
-    // CHECK-SAME:                principal = 6
-    // CHECK-SAME:                spin = 1.400000e+00
-    // CHECK-SAME:                orbital = 1.500000e+00
-    // CHECK-SAME:                nuclear = 1.600000e+00
-    // CHECK-SAME:                spin_orbital = 1.800000e+00
-    // CHECK-SAME:                spin_orbital_nuclear = 1.900000e+00
-    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 2.000000e+00
-    // CHECK-SAME:                energy = 1.264300e+10
-    // CHECK-SAME:            >,
+    // CHECK-SAME:            level_0 = "downstate",
+    // CHECK-SAME:            level_1 = "upstate",
     // CHECK-SAME:            einstein_a = 1.100000e+00
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.transition<
-    // CHECK-SAME:            level_0 = <
-    // CHECK-SAME:                principal = 5
-    // CHECK-SAME:                spin = 2.400000e+00
-    // CHECK-SAME:                orbital = 2.500000e+00
-    // CHECK-SAME:                nuclear = 2.600000e+00
-    // CHECK-SAME:                spin_orbital = 2.800000e+00
-    // CHECK-SAME:                spin_orbital_nuclear = 2.900000e+00
-    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 3.000000e+00
-    // CHECK-SAME:                energy = 8.115200e+14
-    // CHECK-SAME:            >,
-    // CHECK-SAME:            level_1 = <
-    // CHECK-SAME:                principal = 6
-    // CHECK-SAME:                spin = 1.400000e+00
-    // CHECK-SAME:                orbital = 1.500000e+00
-    // CHECK-SAME:                nuclear = 1.600000e+00
-    // CHECK-SAME:                spin_orbital = 1.800000e+00
-    // CHECK-SAME:                spin_orbital_nuclear = 1.900000e+00
-    // CHECK-SAME:                spin_orbital_nuclear_magnetization = 2.000000e+00
-    // CHECK-SAME:                energy = 1.264300e+10
-    // CHECK-SAME:            >,
+    // CHECK-SAME:            level_0 = "estate",
+    // CHECK-SAME:            level_1 = "upstate",
     // CHECK-SAME:            einstein_a = 3.300000e+00
     // CHECK-SAME:        >
     // CHECK-SAME:    ]

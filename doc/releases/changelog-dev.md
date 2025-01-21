@@ -30,6 +30,10 @@
 * Replace `ValueRange` with `ResultRange` and `Value` with `OpResult` to better align with the semantics of `**QubitResult()` functions like `getNonCtrlQubitResults()`. This change ensures clearer intent and usage. Improve the `matchAndRewrite` function by using `replaceAllUsesWith` instead of for loop.
   [(#1426)](https://github.com/PennyLaneAI/catalyst/pull/1426)
 
+* Improved ion dialect to reduce redundant code generated. Added a string attribute `label` to Level.
+  Also changed the levels of a transition from `LevelAttr` to `string`
+  [(#1471)](https://github.com/PennyLaneAI/catalyst/pull/1471)
+
 
 <h3>Documentation 📝</h3>
 

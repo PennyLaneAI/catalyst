@@ -45,9 +45,9 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level)
     {
         return LevelAttr::get(
-            ctx, builder.getI64IntegerAttr(level.principal), builder.getF64FloatAttr(level.spin),
-            builder.getF64FloatAttr(level.orbital), builder.getF64FloatAttr(level.nuclear),
-            builder.getF64FloatAttr(level.spin_orbital),
+            ctx, builder.getStringAttr(level.label), builder.getI64IntegerAttr(level.principal),
+            builder.getF64FloatAttr(level.spin), builder.getF64FloatAttr(level.orbital),
+            builder.getF64FloatAttr(level.nuclear), builder.getF64FloatAttr(level.spin_orbital),
             builder.getF64FloatAttr(level.spin_orbital_nuclear),
             builder.getF64FloatAttr(level.spin_orbital_nuclear_magnetization),
             builder.getF64FloatAttr(level.energy));
@@ -55,8 +55,8 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
 
     TransitionAttr getTransitionAttr(MLIRContext *ctx, IRRewriter &builder, Transition transition)
     {
-        return TransitionAttr::get(ctx, getLevelAttr(ctx, builder, transition.level_0),
-                                   getLevelAttr(ctx, builder, transition.level_1),
+        return TransitionAttr::get(ctx, builder.getStringAttr(transition.level_0),
+                                   builder.getStringAttr(transition.level_1),
                                    builder.getF64FloatAttr(transition.einstein_a));
     }
 
