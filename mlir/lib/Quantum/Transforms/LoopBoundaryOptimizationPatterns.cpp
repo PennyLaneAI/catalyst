@@ -22,9 +22,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mlir/IR/Operation.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Operation.h"
 
 using llvm::dbgs;
 using namespace mlir;
@@ -101,7 +101,7 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
             // replace successor of for-loop with the second gate
             forOp.getResults().replaceAllUsesWith(secondOp);
 
-            // set the operands of the 
+            // set the operands of the
             secondOp->setOperands(forOp.getResults());
             rewriter.setInsertionPointAfter(forOp);
             rewriter.insert(secondOp);
@@ -109,10 +109,9 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
             // config the successor of the second gate to be the successor of the for-loop
             secondGateOp.getOutQubits().replaceAllUsesWith(secondGateOp.getInQubits());
             rewriter.eraseOp(secondGateOp);
-            
+
             return mlir::success();
         }
-
     }
 };
 

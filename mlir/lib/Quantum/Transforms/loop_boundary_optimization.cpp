@@ -52,7 +52,7 @@ struct LoopBoundaryOptimizationPass
 
         RewritePatternSet patternsCanonicalization(&getContext());
         scf::ForOp::getCanonicalizationPatterns(patternsCanonicalization, &getContext());
-        
+
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
