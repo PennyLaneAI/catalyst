@@ -20,7 +20,8 @@ https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 import pennylane as qml
 import pytest
 
-from catalyst.passes import apply_pass, apply_pass_plugin, pipeline
+from catalyst import pipeline
+from catalyst.passes import apply_pass, apply_pass_plugin
 
 have_standalone_plugin = True
 
