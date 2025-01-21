@@ -15,7 +15,6 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
-from copy import copy
 from functools import partial
 from typing import Callable
 
@@ -24,7 +23,6 @@ import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
-from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
 from pennylane.capture.primitives import cond_prim
 
 from catalyst.device import (
