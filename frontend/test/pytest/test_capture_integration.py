@@ -199,3 +199,23 @@ class TestCapture:
         actual = catalyst_capture_circuit(theta)
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
+
+    def test_cond_workflow(self, backend):
+        """Test the integration for a circuit with a cond primitive."""
+
+        @qml.qjit(experimental_capture=True)
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        assert circuit(0.1) == 0.9950041652780258
