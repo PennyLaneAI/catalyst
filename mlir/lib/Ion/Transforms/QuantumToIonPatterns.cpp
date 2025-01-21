@@ -190,7 +190,6 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                 auto qubit = qubits.front();
                 builder.create<ion::PulseOp>(loc, time, qubit, beam0toEAttr, phase1Attr);
                 builder.create<ion::PulseOp>(loc, time, qubit, beam1toEAttr, phase2Attr);
-                builder.create<ion::YieldOp>(loc);
             });
         rewriter.replaceOp(op, ppOp);
         return success();
@@ -408,8 +407,6 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                         rewriter.getI64VectorAttr(beam.polarization),
                         rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, time, qubit1, beam6Attr, phase0Attr);
-
-                    builder.create<ion::YieldOp>(loc);
                 });
             rewriter.replaceOp(op, ppOp);
             return success();

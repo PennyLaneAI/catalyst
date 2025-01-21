@@ -42,6 +42,7 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
                                BodyBuilderFn bodyBuilder)
 {
     OpBuilder::InsertionGuard guard(builder);
+    Location loc = result.location;
 
     result.addOperands(inQubits);
     for (Value v : inQubits)
@@ -49,11 +50,15 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
 
     Region *bodyRegion = result.addRegion();
     Block *bodyBlock = builder.createBlock(bodyRegion);
-    for (Value v : inQubits)
+    for (Value v : inQubits) {
         bodyBlock->addArgument(v.getType(), v.getLoc());
+    }
 
     builder.setInsertionPointToStart(bodyBlock);
-    bodyBuilder(builder, result.location, bodyBlock->getArguments());
+    bodyBuilder(builder, loc, bodyBlock->getArguments());
+
+    builder.setInsertionPointToEnd(bodyBlock);
+    builder.create<ion::YieldOp>(loc, bodyBlock->getArguments());
 }
 
 //===----------------------------------------------------------------------===//

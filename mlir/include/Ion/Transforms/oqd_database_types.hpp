@@ -63,13 +63,15 @@ struct PhononMode {
 struct Level {
     // This class represents an atomic level.
     // It contains the innate properties of the qubit.
+    std::string label;
     int64_t principal;
     double spin, orbital, nuclear, spin_orbital, spin_orbital_nuclear,
         spin_orbital_nuclear_magnetization, energy;
 
-    Level(int64_t _principal, double _spin, double _orbital, double _nuclear, double _spin_orbital,
-          double _spin_orbital_nuclear, double _spin_orbital_nuclear_magnetization, double _energy)
-        : principal(_principal), spin(_spin), orbital(_orbital), nuclear(_nuclear),
+    Level(std::string _label, int64_t _principal, double _spin, double _orbital, double _nuclear,
+          double _spin_orbital, double _spin_orbital_nuclear,
+          double _spin_orbital_nuclear_magnetization, double _energy)
+        : label(_label), principal(_principal), spin(_spin), orbital(_orbital), nuclear(_nuclear),
           spin_orbital(_spin_orbital), spin_orbital_nuclear(_spin_orbital_nuclear),
           spin_orbital_nuclear_magnetization(_spin_orbital_nuclear_magnetization), energy(_energy)
     {
@@ -79,10 +81,10 @@ struct Level {
 struct Transition {
     // This class represents a transition between two atomic levels.
     // It contains the innate properties of the qubit.
-    Level level_0, level_1;
+    std::string level_0, level_1;
     double einstein_a;
 
-    Transition(Level _level_0, Level _level_1, double _einstein_a)
+    Transition(std::string _level_0, std::string _level_1, double _einstein_a)
         : level_0(_level_0), level_1(_level_1), einstein_a(_einstein_a)
     {
     }
