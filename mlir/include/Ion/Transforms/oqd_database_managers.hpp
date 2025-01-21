@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <set>
 
 #include <toml++/toml.hpp>
 
@@ -155,18 +156,12 @@ class OQDDatabaseManager {
                          propertiesData[6]);
         };
 
-        auto parseSingleTransition = [](const auto &transition_entry,
-                                        const std::vector<Level> &allLevels) {
-            // FIXME: `allLevels` is hardcoded as {downstate, upstate, estate}
-            // Not super important, as the ion species is extremely unlikely to change, so
-            // hardcoding is fine
-
+        auto parseSingleTransition = [](const auto &transition_entry) {
             double einstein_a = transition_entry["einstein_a"].as_floating_point()->get();
             std::string level1 = transition_entry["level1"].as_string()->get();
             std::string level2 = transition_entry["level2"].as_string()->get();
 
-            std::map<std::string, int64_t> levelEncodings{
-                {"downstate", 0}, {"upstate", 1}, {"estate", 2}};
+            std::set<std::string> levelEncodings{"downstate", "upstate", "estate"};
             assert((levelEncodings.count(level1) & levelEncodings.count(level2)) &&
                    "Only \"downstate\", \"upstate\" and \"estate\" are allowed in the atom's "
                    "transition levels.");
@@ -192,8 +187,7 @@ class OQDDatabaseManager {
             std::vector<Transition> transitions;
             auto *transitionsTable = data->at_path("transitions").as_table();
             for (auto &transition : *transitionsTable) {
-                transitions.push_back(
-                    parseSingleTransition(*(transition.second.as_table()), levels));
+                transitions.push_back(parseSingleTransition(*(transition.second.as_table())));
             }
 
             Ion ion(name, mass, charge, position, levels, transitions);
