@@ -112,6 +112,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         polarization = dense<[0, 1]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-2, 3]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
     %4 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
 
@@ -135,6 +136,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         polarization = dense<[0, 1]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-2, 3]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 3.1415926535{{[0-9]*}} : f64}
+    // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
     %5 = quantum.custom "RY"(%arg0) %4 : !quantum.bit
 
@@ -158,6 +160,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         polarization = dense<[0, 1]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-2, 3]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
     %6 = quantum.custom "RX"(%arg0) %5 : !quantum.bit
 
@@ -213,6 +216,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %6, %3 : !quantum.bit, !quantum.bit
     return %7#0: !quantum.bit
@@ -289,6 +293,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         polarization = dense<[7, 8]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-9, -10]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %5:2 = quantum.custom "MS"(%arg0) %2, %3 : !quantum.bit, !quantum.bit
 
@@ -344,6 +349,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         polarization = dense<[1, 2]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[3, -4]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %6:2 = quantum.custom "MS"(%arg0) %5#0, %4 : !quantum.bit, !quantum.bit
 
@@ -399,6 +405,7 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %5#1, %6#1 : !quantum.bit, !quantum.bit
     return %6#0, %7#0, %7#1: !quantum.bit, !quantum.bit, !quantum.bit
