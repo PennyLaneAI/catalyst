@@ -799,7 +799,7 @@ def test_finite_diff_h(inp, backend):
 
     def interpretted_grad_h(x):
         device = qml.device("default.qubit", wires=1)
-        g = qml.QNode(f, device, diff_method="finite-diff", h=0.1)
+        g = qml.QNode(f, device, diff_method="finite-diff", gradient_kwargs={"h": 0.1})
         h = qml.grad(g, argnum=0)
         return h(x)
 
