@@ -1799,7 +1799,7 @@ def test_grad_argnums(argnums, transform_qjit):
 
     def compare_structure_and_value(o1, o2):
         return tree_structure(o1) == tree_structure(o2) and \
-            tree_all(tree_map(lambda x, y: jnp.allclose(x, y), o1, o2))
+            tree_all(tree_map(jnp.allclose, o1, o2))
 
     result = grad(circuit, argnums=argnums)(weights, inputs)
     expected = jax.grad(circuit, argnums=argnums)(weights, inputs)
