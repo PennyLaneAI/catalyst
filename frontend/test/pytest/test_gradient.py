@@ -19,7 +19,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
-from jax.tree_util import tree_flatten
+from jax.tree_util import tree_flatten, tree_map, tree_all, tree_structure
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
@@ -1783,6 +1783,7 @@ class TestGradientUsagePatterns:
 @pytest.mark.parametrize("argnums", [0, 1, (0, 1)])
 @pytest.mark.parametrize("transform_qjit", [False, True])
 def test_grad_argnums(argnums, transform_qjit):
+    """Tests https://github.com/PennyLaneAI/catalyst/issues/1477"""
     @qml.qnode(device=qml.device("lightning.qubit", wires=4), interface="jax")
     def circuit(inputs, weights):
         qml.AngleEmbedding(features=inputs, wires=range(4), rotation="X")
@@ -1797,7 +1798,8 @@ def test_grad_argnums(argnums, transform_qjit):
     inputs = jnp.array([0.9653214, 0.31468165, 0.63302994])
 
     def compare_structure_and_value(o1, o2):
-        return tree_structure(o1) == tree_structure(o2) and tree_all(tree_map(lambda x, y: jnp.allclose(x, y), o1, o2))
+        return tree_structure(o1) == tree_structure(o2) and \
+            tree_all(tree_map(lambda x, y: jnp.allclose(x, y), o1, o2))
 
     result = grad(circuit, argnums=argnums)(weights, inputs)
     expected = jax.grad(circuit, argnums=argnums)(weights, inputs)
