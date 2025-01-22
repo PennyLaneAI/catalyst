@@ -15,6 +15,7 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
+from copy import copy
 from functools import partial
 from typing import Callable
 
@@ -347,8 +348,14 @@ def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
             invars = []
             invars.append(branch_jaxpr.constvars[0])
             branch_jaxpr = branch_jaxpr.replace(invars=invars)
+            outvars = []
+            outvars.append(copy(branch_jaxpr.constvars[0]))
+            branch_jaxpr = branch_jaxpr.replace(outvars=outvars)
             constvars = branch_jaxpr.constvars[1:]
             branch_jaxpr = branch_jaxpr.replace(constvars=constvars)
+            branch_jaxpr.eqns[len(branch_jaxpr.eqns) - 1] = branch_jaxpr.eqns[
+                len(branch_jaxpr.eqns) - 1
+            ].replace(outvars=outvars)
             new_branch_jaxprs.append(branch_jaxpr)
 
     return cond_p.bind(
