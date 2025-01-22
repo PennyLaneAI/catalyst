@@ -16,7 +16,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update access to `QNode.execute_kwargs` as there is no more `mcm_config` key. 
+* Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
   Instead `postselect_mode` and `mcm_method` should be accessed instead.
   [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
 
