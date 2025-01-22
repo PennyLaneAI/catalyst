@@ -16,9 +16,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update deprecated `gradient_kwargs` usage.
-  [(#1480)](https://github.com/PennyLaneAI/catalyst/pull/1480)
-
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
