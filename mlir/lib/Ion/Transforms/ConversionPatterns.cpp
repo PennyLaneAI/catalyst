@@ -41,9 +41,9 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
 }
 
-Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
-                      ModuleOp mod)
+Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, ModuleOp mod)
 {
+    StringRef value = StringRef(key.data(), key.size() + 1);
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
@@ -61,14 +61,15 @@ LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx)
 {
     return LLVM::LLVMStructType::getLiteral(
         ctx, {
-                 IntegerType::get(ctx, 64), // principal
-                 Float64Type::get(ctx),     // spin
-                 Float64Type::get(ctx),     // orbital
-                 Float64Type::get(ctx),     // nuclear
-                 Float64Type::get(ctx),     // spin_orbital
-                 Float64Type::get(ctx),     // spin_orbital_nuclear
-                 Float64Type::get(ctx),     // spin_orbital_nuclear_magnetization
-                 Float64Type::get(ctx),     // energy
+                 LLVM::LLVMPointerType::get(ctx), // label
+                 IntegerType::get(ctx, 64),       // principal
+                 Float64Type::get(ctx),           // spin
+                 Float64Type::get(ctx),           // orbital
+                 Float64Type::get(ctx),           // nuclear
+                 Float64Type::get(ctx),           // spin_orbital
+                 Float64Type::get(ctx),           // spin_orbital_nuclear
+                 Float64Type::get(ctx),           // spin_orbital_nuclear_magnetization
+                 Float64Type::get(ctx),           // energy
              });
 }
 
@@ -92,43 +93,48 @@ Value createPositionArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
     return rewriter.create<LLVM::ConstantOp>(loc, positionAttr);
 }
 
-Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, LevelAttr &levelAttr,
-                        LLVM::LLVMStructType &levelStructType)
+Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
+                        LevelAttr &levelAttr, LLVM::LLVMStructType &levelStructType)
 {
     Value levelStruct = rewriter.create<LLVM::UndefOp>(loc, levelStructType);
+    auto label = levelAttr.getLabel().getValue().str();
+    auto labelGlobal =
+        getGlobalString(loc, rewriter, label, mod);
+    levelStruct = rewriter.create<LLVM::InsertValueOp>(loc, levelStruct, labelGlobal, 0);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelAttr.getPrincipal()), 0);
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelAttr.getPrincipal()), 1);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpin()), 1);
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpin()), 2);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getOrbital()), 2);
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getOrbital()), 3);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getNuclear()), 3);
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getNuclear()), 4);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpinOrbital()),
-        4);
-    levelStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, levelStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                          levelAttr.getSpinOrbitalNuclear()),
         5);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                          levelAttr.getSpinOrbitalNuclearMagnetization()),
+                                          levelAttr.getSpinOrbitalNuclear()),
         6);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getEnergy()), 7);
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
+                                          levelAttr.getSpinOrbitalNuclearMagnetization()),
+        7);
+    levelStruct = rewriter.create<LLVM::InsertValueOp>(
+        loc, levelStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getEnergy()), 8);
     return levelStruct;
 }
 
-Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ArrayAttr &levelsAttr)
+Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
+                        ArrayAttr &levelsAttr)
 {
     LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
     Value levelsArray = rewriter.create<LLVM::UndefOp>(
@@ -136,7 +142,7 @@ Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Arr
 
     for (size_t i = 0; i < levelsAttr.size(); ++i) {
         auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
-        Value levelStruct = createLevelStruct(loc, rewriter, ctx, levelAttr, levelStructType);
+        Value levelStruct = createLevelStruct(loc, rewriter, ctx, mod, levelAttr, levelStructType);
         levelsArray = rewriter.create<LLVM::InsertValueOp>(loc, levelsArray, levelStruct, i);
     }
     Value levelArraySize =
@@ -149,15 +155,15 @@ Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Arr
     return levelsArrayPtr;
 }
 
-Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
+Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
                              ArrayAttr &transitionsAttr)
 {
     LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
     LLVM::LLVMStructType TransitionStructType =
         LLVM::LLVMStructType::getLiteral(ctx, {
-                                                  levelStructType,       // level_0
-                                                  levelStructType,       // level_1
-                                                  Float64Type::get(ctx), // einstein_a
+                                                  LLVM::LLVMPointerType::get(ctx), // level_0
+                                                  LLVM::LLVMPointerType::get(ctx), // level_1
+                                                  Float64Type::get(ctx),           // einstein_a
                                               });
     Value TransitionsArray = rewriter.create<LLVM::UndefOp>(
         loc, LLVM::LLVMArrayType::get(TransitionStructType, transitionsAttr.size()));
@@ -165,14 +171,14 @@ Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx
     for (size_t i = 0; i < transitionsAttr.size(); ++i) {
         auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
         Value TransitionStruct = rewriter.create<LLVM::UndefOp>(loc, TransitionStructType);
-        LevelAttr level0 = transitionAttr.getLevel_0();
-        LevelAttr level1 = transitionAttr.getLevel_1();
-        TransitionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, TransitionStruct, createLevelStruct(loc, rewriter, ctx, level0, levelStructType),
-            0);
-        TransitionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, TransitionStruct, createLevelStruct(loc, rewriter, ctx, level1, levelStructType),
-            1);
+        auto level0 = transitionAttr.getLevel_0().getValue().str();
+        auto level1 = transitionAttr.getLevel_1().getValue().str();
+        auto level0_global = getGlobalString(loc, rewriter, level1, mod);
+        auto level1_global = getGlobalString(loc, rewriter, level0, mod);
+        TransitionStruct =
+            rewriter.create<LLVM::InsertValueOp>(loc, TransitionStruct, level0_global, 0);
+        TransitionStruct =
+            rewriter.create<LLVM::InsertValueOp>(loc, TransitionStruct, level1_global, 1);
         TransitionStruct = rewriter.create<LLVM::InsertValueOp>(
             loc, TransitionStruct,
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
@@ -233,8 +239,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
 
         // Extract relevant ion properties
         auto nameStr = op.getName().getValue().str();
-        auto name = getGlobalString(loc, rewriter, nameStr,
-                                    StringRef(nameStr.c_str(), nameStr.length() + 1), mod);
+        auto name = getGlobalString(loc, rewriter, nameStr, mod);
         auto mass = rewriter.create<LLVM::ConstantOp>(loc, op.getMass());
         auto charge = rewriter.create<LLVM::ConstantOp>(loc, op.getCharge());
         auto positionAttr = op.getPosition();
@@ -243,9 +248,10 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
 
         Value positionArrayPtr = createPositionArray(loc, rewriter, ctx, positionAttr);
 
-        Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, levelsAttr);
+        Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, mod, levelsAttr);
 
-        Value TransitionsArrayPtr = createTransitionsArray(loc, rewriter, ctx, transitionsAttr);
+        Value TransitionsArrayPtr =
+            createTransitionsArray(loc, rewriter, ctx, mod, transitionsAttr);
 
         // Define the function signature for the Ion stub
         Type ionStructType = LLVM::LLVMStructType::getLiteral(

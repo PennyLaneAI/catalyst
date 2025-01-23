@@ -81,6 +81,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
         position = dense<[1, 2, -1]> : vector<3xi64>, 
         levels = [
             #ion.level<
+                label="downstate",
                 principal = 6 : i64, 
                 spin = 4.000000e-01 : f64, 
                 orbital = 5.000000e-01 : f64, 
@@ -91,6 +92,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
                 energy = 0.000000e+00 : f64
             >, 
             #ion.level<
+                label="estate",
                 principal = 6 : i64, 
                 spin = 1.400000e+00 : f64, 
                 orbital = 1.500000e+00 : f64, 
@@ -101,6 +103,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
                 energy = 1.264300e+10 : f64
             >, 
             #ion.level<
+                label="upstate",
                 principal = 5 : i64, 
                 spin = 2.400000e+00 : f64, 
                 orbital = 2.500000e+00 : f64, 
@@ -113,72 +116,18 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
         ], 
         transitions = [
             #ion.transition<
-                level_0 = <
-                    principal = 6 : i64, 
-                    spin = 4.000000e-01 : f64, 
-                    orbital = 5.000000e-01 : f64, 
-                    nuclear = 6.000000e-01 : f64, 
-                    spin_orbital = 8.000000e-01 : f64, 
-                    spin_orbital_nuclear = 9.000000e-01 : f64, 
-                    spin_orbital_nuclear_magnetization = 1.000000e+00 : f64, 
-                    energy = 0.000000e+00 : f64
-                >, 
-                level_1 = <
-                    principal = 5 : i64, 
-                    spin = 2.400000e+00 : f64, 
-                    orbital = 2.500000e+00 : f64, 
-                    nuclear = 2.600000e+00 : f64, 
-                    spin_orbital = 2.800000e+00 : f64, 
-                    spin_orbital_nuclear = 2.900000e+00 : f64, 
-                    spin_orbital_nuclear_magnetization = 3.000000e+00 : f64, 
-                    energy = 8.115200e+14 : f64
-                >, 
+                level_0 = "downstate",
+                level_1 = "estate",
                 einstein_a = 2.200000e+00 : f64
             >, 
             #ion.transition<
-                level_0 = <
-                    principal = 6 : i64, 
-                    spin = 4.000000e-01 : f64, 
-                    orbital = 5.000000e-01 : f64, 
-                    nuclear = 6.000000e-01 : f64, 
-                    spin_orbital = 8.000000e-01 : f64, 
-                    spin_orbital_nuclear = 9.000000e-01 : f64, 
-                    spin_orbital_nuclear_magnetization = 1.000000e+00 : f64, 
-                    energy = 0.000000e+00 : f64
-                >, 
-                level_1 = <
-                    principal = 6 : i64, 
-                    spin = 1.400000e+00 : f64, 
-                    orbital = 1.500000e+00 : f64, 
-                    nuclear = 1.600000e+00 : f64, 
-                    spin_orbital = 1.800000e+00 : f64, 
-                    spin_orbital_nuclear = 1.900000e+00 : f64, 
-                    spin_orbital_nuclear_magnetization = 2.000000e+00 : f64, 
-                    energy = 1.264300e+10 : f64
-                >, 
+                level_0 = "downstate", 
+                level_1 = "upstate", 
                 einstein_a = 1.100000e+00 : f64
             >, 
             #ion.transition<
-                level_0 = <
-                    principal = 5 : i64, 
-                    spin = 2.400000e+00 : f64, 
-                    orbital = 2.500000e+00 : f64, 
-                    nuclear = 2.600000e+00 : f64, 
-                    spin_orbital = 2.800000e+00 : f64, 
-                    spin_orbital_nuclear = 2.900000e+00 : f64, 
-                    spin_orbital_nuclear_magnetization = 3.000000e+00 : f64, 
-                    energy = 8.115200e+14 : f64
-                >, 
-                level_1 = <
-                    principal = 6 : i64, 
-                    spin = 1.400000e+00 : f64, 
-                    orbital = 1.500000e+00 : f64, 
-                    nuclear = 1.600000e+00 : f64, 
-                    spin_orbital = 1.800000e+00 : f64, 
-                    spin_orbital_nuclear = 1.900000e+00 : f64, 
-                    spin_orbital_nuclear_magnetization = 2.000000e+00 : f64, 
-                    energy = 1.264300e+10 : f64
-                >, 
+                level_0 = "estate", 
+                level_1 = "upstate", 
                 einstein_a = 3.300000e+00 : f64
             >
         ]
