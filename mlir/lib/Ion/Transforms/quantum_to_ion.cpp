@@ -95,7 +95,6 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                 transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
             }
 
-            // builder.setInsertionPointToStart(&(op->getRegion(0).front()));
             builder.setInsertionPointAfter(qExtract);
             ion::IonOp ionOp = builder.create<ion::IonOp>(
                 op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),

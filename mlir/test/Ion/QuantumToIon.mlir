@@ -19,7 +19,7 @@
 // RUN: --split-input-file -verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: example_ion_two_qubit
-func.func @example_ion_two_qubit(%arg0: f64) -> () {//!quantum.bit {
+func.func @example_ion_two_qubit(%arg0: f64) -> () {
 
 
     // COM: attr-dict in op's assembly format sorts fields alphabetically
@@ -219,7 +219,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> () {//!quantum.bit {
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %6, %3 : !quantum.bit, !quantum.bit
-    return //%7#0: !quantum.bit
+    return
 }
 
 
@@ -227,7 +227,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> () {//!quantum.bit {
 
 
 // CHECK-LABEL: example_ion_three_qubit
-func.func @example_ion_three_qubit(%arg0: f64) -> () {//(!quantum.bit, !quantum.bit, !quantum.bit) {
+func.func @example_ion_three_qubit(%arg0: f64) -> () {
 
     // CHECK: {{%.+}} = ion.ion
 
@@ -408,5 +408,5 @@ func.func @example_ion_three_qubit(%arg0: f64) -> () {//(!quantum.bit, !quantum.
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %5#1, %6#1 : !quantum.bit, !quantum.bit
-    return //%6#0, %7#0, %7#1: !quantum.bit, !quantum.bit, !quantum.bit
+    return
 }
