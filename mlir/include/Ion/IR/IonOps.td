@@ -157,13 +157,13 @@ def PulseOp : Ion_Op<"pulse"> {
 
     let arguments = (ins
         AnyFloat: $time,
-        QubitType: $in_qubit,
+        AnyTypeOf<[IonType, QubitType]>: $in_qubit,
         BeamAttr: $beam,
         Builtin_FloatAttr: $phase
     );
 
     let assemblyFormat = [{
-        `(` $time `:` type($time) `)` $in_qubit attr-dict
+        `(` $time `:` type($time) `)` $in_qubit `:` type($in_qubit) attr-dict
     }];
 }
 
@@ -172,7 +172,7 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
     let summary = "Represent a parallel protocol of pulses.";
 
     let arguments = (ins
-        Variadic<QubitType>: $in_qubits
+        Variadic<AnyTypeOf<[IonType, QubitType]>>: $in_qubits
     );
 
     let results = (outs Variadic<QubitType>:$out_qubits);
@@ -192,7 +192,7 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
     }];
 
     let assemblyFormat = [{
-        `(` $in_qubits `)` attr-dict `:` type($out_qubits) $region
+        `(` ($in_qubits^ `:` type($in_qubits))? `)` attr-dict `:` type($out_qubits) $region
     }];
 }
 
