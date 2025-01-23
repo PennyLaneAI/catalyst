@@ -68,7 +68,6 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     void runOnOperation() final
     {
         func::FuncOp op = cast<func::FuncOp>(getOperation());
-        // auto module = getOperation();
         auto &context = getContext();
         ConversionTarget target(context);
 
@@ -140,6 +139,9 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
 
         op->walk(Qubit2Ion);
 
+        // Then, we decompose the quantum gates on qubits to pulses on qubits
+        // We keep the quantum dialect at this stage since we still want the SSA def use
+        // chains from the quantum dialect.
         RewritePatternSet ionPatterns(&getContext());
         populateQuantumToIonPatterns(ionPatterns, dataManager);
 
@@ -147,9 +149,20 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
             return signalPassFailure();
         }
 
+        // Finally, to aid api stub generation, we eliminate all quantum dialect
+        // We change all quantum.bit types to ion.ion types
         for (auto [qubit, ion] : qubitMap) {
             qubit.replaceAllUsesWith(ion);
+            qubit.getDefiningOp()->erase();
         }
+
+        Type ionType = IonType::get(ctx);
+        op->walk( [&](ion::ParallelProtocolOp ppOp){
+            for (auto v : ppOp->getResults()){
+                v.setType(ionType);
+            }
+        }
+        );
     }
 };
 

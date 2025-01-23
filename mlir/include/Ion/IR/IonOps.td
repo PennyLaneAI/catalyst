@@ -175,7 +175,7 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
         Variadic<AnyTypeOf<[IonType, QubitType]>>: $in_qubits
     );
 
-    let results = (outs Variadic<QubitType>:$out_qubits);
+    let results = (outs Variadic<AnyTypeOf<[IonType, QubitType]>>:$out_qubits);
     let regions = (region SizedRegion<1>:$region);
 
     let builders = [
@@ -200,7 +200,7 @@ def YieldOp : Ion_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["Paral
     let summary = "Return results from parallel protocol regions";
 
     let arguments = (ins
-        Variadic<QubitType>:$results
+        Variadic<AnyTypeOf<[IonType, QubitType]>>:$results
     );
 
     let assemblyFormat = [{

@@ -43,15 +43,18 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = result.location;
+    Type ionType = IonType::get(result.getContext());
 
     result.addOperands(inQubits);
-    for (Value v : inQubits)
+    for (Value v : inQubits) {
         result.addTypes(v.getType());
+    }
 
     Region *bodyRegion = result.addRegion();
     Block *bodyBlock = builder.createBlock(bodyRegion);
     for (Value v : inQubits) {
-        bodyBlock->addArgument(v.getType(), v.getLoc());
+        //bodyBlock->addArgument(v.getType(), v.getLoc());
+        bodyBlock->addArgument(ionType, v.getLoc());
     }
 
     builder.setInsertionPointToStart(bodyBlock);
