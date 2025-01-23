@@ -696,7 +696,7 @@ class GradCallable(CatalystCallable):
                         results, in_arg_tree, out_tree, grad_params, len(jaxpr.out_avals)
                     )
             else:
-                if argnums := self.grad_params.argnums is None:
+                if (argnums := self.grad_params.argnums) is None:
                     argnums = 0
                 if self.grad_params.scalar_out:
                     if self.grad_params.with_value:
