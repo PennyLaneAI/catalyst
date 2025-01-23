@@ -87,9 +87,6 @@ func.func @example_ion_two_qubit(%arg0: f64) -> () {
 
     // CHECK-NEXT: [[qubit1:%.+]] = ion.ion
     %1 = quantum.alloc( 2) : !quantum.reg
-
-    // COM: [[qubit0:%.+]] = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-    // COM: [[qubit1:%.+]] = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
 
@@ -235,10 +232,6 @@ func.func @example_ion_three_qubit(%arg0: f64) -> () {
     // CHECK-NEXT: [[qubit2:%.+]] = ion.ion
 
     %1 = quantum.alloc( 3) : !quantum.reg
-
-    // COM: [[qubit0:%.+]] = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-    // COM: [[qubit1:%.+]] = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-    // COM: [[qubit2:%.+]] = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
     %4 = quantum.extract %1[ 2] : !quantum.reg -> !quantum.bit
