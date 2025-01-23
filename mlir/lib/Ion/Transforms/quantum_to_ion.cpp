@@ -77,13 +77,16 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
 
         OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
 
-/*
-        if (LoadIon) {
-            // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
-            MLIRContext *ctx = op->getContext();
-            IRRewriter builder(ctx);
-            Ion ion = dataManager.getIonParams().at("Yb171");
+        // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
+        MLIRContext *ctx = op->getContext();
+        IRRewriter builder(ctx);
+        Ion ion = dataManager.getIonParams().at("Yb171");
 
+        // First, we need to convert each qubit to an ion
+        // A qubit is initilized as an extract op from an alloc op in quantum dialect
+        llvm::DenseMap</*quantum*/ Value, /*ion*/ Value> qubitMap;
+
+        op->walk([&](quantum::ExtractOp qExtract) {
             SmallVector<Attribute> levels, transitions;
             for (const Level &level : ion.levels) {
                 levels.push_back(cast<Attribute>(getLevelAttr(ctx, builder, level)));
@@ -92,36 +95,7 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                 transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
             }
 
-            builder.setInsertionPointToStart(&(op->getRegion(0).front()));
-            builder.create<ion::IonOp>(
-                op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
-                builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
-                builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
-                builder.getArrayAttr(transitions));
-        }
-*/
-
-        //if (LoadIon) {
-            // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change
-            MLIRContext *ctx = op->getContext();
-            IRRewriter builder(ctx);
-            Ion ion = dataManager.getIonParams().at("Yb171");
-
-            // First, we need to convert each qubit to an ion
-            // A qubit is initilized as an extract op from an alloc op in quantum dialect
-
-            llvm::DenseMap</*quantum*/Value, /*ion*/Value> qubitMap;
-
-        auto Qubit2Ion = [&](quantum::ExtractOp qExtract){
-            SmallVector<Attribute> levels, transitions;
-            for (const Level &level : ion.levels) {
-                levels.push_back(cast<Attribute>(getLevelAttr(ctx, builder, level)));
-            }
-            for (const Transition &transition : ion.transitions) {
-                transitions.push_back(cast<Attribute>(getTransitionAttr(ctx, builder, transition)));
-            }
-
-            //builder.setInsertionPointToStart(&(op->getRegion(0).front()));
+            // builder.setInsertionPointToStart(&(op->getRegion(0).front()));
             builder.setInsertionPointAfter(qExtract);
             ion::IonOp ionOp = builder.create<ion::IonOp>(
                 op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
@@ -129,15 +103,8 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                 builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
                 builder.getArrayAttr(transitions));
 
-            qubitMap.insert({qExtract.getQubit(),
-                                ionOp.getOutIon()});
-
-            //qExtract->getResult(0).replaceAllUsesWith(ionOp->getResult(0));
-            //builder.replaceOp(qExtract, ionOp);
-        };
-        //} // if (LoadIon)
-
-        op->walk(Qubit2Ion);
+            qubitMap.insert({qExtract.getQubit(), ionOp.getOutIon()});
+        });
 
         // Then, we decompose the quantum gates on qubits to pulses on qubits
         // We keep the quantum dialect at this stage since we still want the SSA def use
@@ -149,20 +116,25 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
             return signalPassFailure();
         }
 
-        // Finally, to aid api stub generation, we eliminate all quantum dialect
-        // We change all quantum.bit types to ion.ion types
+        // Finally, to aid ion api stub generation, we eliminate all quantum dialect
+        // We replace uses and change all quantum.bit types to ion.ion types
         for (auto [qubit, ion] : qubitMap) {
             qubit.replaceAllUsesWith(ion);
             qubit.getDefiningOp()->erase();
         }
 
         Type ionType = IonType::get(ctx);
-        op->walk( [&](ion::ParallelProtocolOp ppOp){
-            for (auto v : ppOp->getResults()){
+        op->walk([&](ion::ParallelProtocolOp ppOp) {
+            for (auto v : ppOp->getResults()) {
                 v.setType(ionType);
             }
+        });
+
+        SmallVector<quantum::AllocOp> qAllocOps;
+        op->walk([&](quantum::AllocOp alloc) { qAllocOps.push_back(alloc); });
+        for (auto alloc : qAllocOps) {
+            alloc->erase();
         }
-        );
     }
 };
 

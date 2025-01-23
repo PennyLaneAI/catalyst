@@ -45,6 +45,15 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
     Location loc = result.location;
     Type ionType = IonType::get(result.getContext());
 
+    // The parallel protocol op can interact with the outside world by accepting
+    // either ion types or qubit types.
+    // We allow qubit types because during `quantum-to-ion`, during gate-to-pulse
+    // decomposition, we still need the core quantum dialect to track SSA def use
+    // chains of qubit values.
+    // After gate-to-pulse decomposition is finished, we change all parallel protocol
+    // ops to return ion types.
+    // Note that the body region is shielded from the outside, so it's block can
+    // have an ion type argument directly
     result.addOperands(inQubits);
     for (Value v : inQubits) {
         result.addTypes(v.getType());
@@ -53,7 +62,6 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
     Region *bodyRegion = result.addRegion();
     Block *bodyBlock = builder.createBlock(bodyRegion);
     for (Value v : inQubits) {
-        //bodyBlock->addArgument(v.getType(), v.getLoc());
         bodyBlock->addArgument(ionType, v.getLoc());
     }
 
