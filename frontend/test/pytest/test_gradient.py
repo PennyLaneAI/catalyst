@@ -1783,6 +1783,7 @@ class TestGradientUsagePatterns:
 @pytest.mark.parametrize("argnums", [0, 1, (0, 1)])
 def test_grad_argnums(argnums):
     """Tests https://github.com/PennyLaneAI/catalyst/issues/1477"""
+
     @qjit
     @qml.qnode(device=qml.device("lightning.qubit", wires=4), interface="jax")
     def circuit(inputs, weights):
@@ -1795,8 +1796,7 @@ def test_grad_argnums(argnums):
     inputs = jnp.array([0.9653214, 0.31468165, 0.63302994])
 
     def compare_structure_and_value(o1, o2):
-        return tree_structure(o1) == tree_structure(o2) and \
-            tree_all(tree_map(jnp.allclose, o1, o2))
+        return tree_structure(o1) == tree_structure(o2) and tree_all(tree_map(jnp.allclose, o1, o2))
 
     result = grad(circuit, argnums=argnums)(weights, inputs)
     expected = jax.grad(circuit.original_function, argnums=argnums)(weights, inputs)
