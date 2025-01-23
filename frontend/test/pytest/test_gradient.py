@@ -19,7 +19,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
-from jax.tree_util import tree_flatten, tree_map, tree_all, tree_structure
+from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
