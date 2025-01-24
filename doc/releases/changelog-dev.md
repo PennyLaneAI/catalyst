@@ -14,6 +14,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
+  [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
+
 <h3>Internal changes ⚙️</h3>
 
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
@@ -49,4 +52,5 @@ Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Rohan Nolan Lasrado.
