@@ -14,6 +14,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Adjusted `wires` parameter of `qml.ControlledQubitUnitary` to be positional and removed `control_wires`. In comparison, new `wires` is defined as `control_wires + (target_)wires`.
+  [(#1483)](https://github.com/PennyLaneAI/catalyst/pull/1483)
+
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
@@ -48,6 +51,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
