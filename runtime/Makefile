@@ -27,7 +27,7 @@ endif
 
 ifeq ($(ENABLE_OQD), ON)
 	BUILD_TARGETS += rt_OQD_capi
-	#TEST_TARGETS += runner_tests_openqasm
+	TEST_TARGETS += runner_tests_oqd
 endif
 
 .PHONY: help
@@ -76,6 +76,10 @@ ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+ifeq ($(ENABLE_OQD), ON)
+	# Test the OQD CAPI tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -90,6 +94,9 @@ coverage: test_runner
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+ifeq ($(ENABLE_OQD), ON)
+	$(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
@@ -98,6 +105,7 @@ else
 	xcrun llvm-profdata merge $(RT_BUILD_DIR)/tests/*.profraw -o $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata
 	xcrun llvm-cov show -instr-profile $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata \
 		-object $(RT_BUILD_DIR)/tests/runner_tests_openqasm \
+		$(RT_BUILD_DIR)/tests/runner_tests_oqd \
 		$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime \
 		-format=html -output-dir=$(RT_BUILD_DIR)/coverage_html \
 		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
