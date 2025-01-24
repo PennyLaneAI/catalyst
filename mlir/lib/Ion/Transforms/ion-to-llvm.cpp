@@ -37,11 +37,13 @@ struct IonTypeConverter : public LLVMTypeConverter {
     IonTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
         addConversion([&](IonType type) { return convertIonType(type); });
+        addConversion([&](PulseType type) { return convertPulseType(type); });
         addConversion([&](catalyst::quantum::QubitType type) { return convertQubitType(type); });
     }
 
   private:
     Type convertIonType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
+    Type convertPulseType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
     Type convertQubitType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
 };
 

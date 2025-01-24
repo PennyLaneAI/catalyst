@@ -162,8 +162,12 @@ def PulseOp : Ion_Op<"pulse"> {
         Builtin_FloatAttr: $phase
     );
 
+    let results = (outs
+    PulseType:$out_pulse
+    );
+
     let assemblyFormat = [{
-        `(` $time `:` type($time) `)` $in_qubit attr-dict
+        `(` $time `:` type($time) `)` $in_qubit attr-dict `:` type($out_pulse)
     }];
 }
 

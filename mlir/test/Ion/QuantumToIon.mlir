@@ -357,54 +357,54 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
     // CHECK-NEXT: [[rabi3:%.+]] = arith.constant 99.989999999999994 : f64
     // CHECK-NEXT: [[timems3:%.+]] = arith.divf %arg0, [[rabi3]] : f64
-    // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg1 {
+    // CHECK-NEXT: [[p1:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.001000e+02 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-42, -37]> : vector<2xi64>>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg1 {
+    // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
+    // CHECK-NEXT: [[p2:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.045000e+02 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg1 {
+    // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
+    // CHECK-NEXT: [[p3:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 95.699999999999989 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg2 {
+    // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
+    // CHECK-NEXT: [[p4:%.+]] = ion.pulse([[timems3]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.001000e+02 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[-42, -37]> : vector<2xi64>>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg2 {
+    // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
+    // CHECK-NEXT: [[p5:%.+]] = ion.pulse([[timems3]] : f64) %arg2 {
     // CHECK-SAME:    beam = #ion.beam<
     // CHECK-SAME:        transition_index = 1 : i64,
     // CHECK-SAME:        rabi = 99.989999999999994 : f64,
     // CHECK-SAME:        detuning = 1.078000e+02 : f64,
     // CHECK-SAME:        polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:        wavevector = dense<[42, 37]> : vector<2xi64>>,
-    // CHECK-SAME:    phase = 0.000000e+00 : f64}
-    // CHECK-NEXT: ion.pulse([[timems3]] : f64) %arg2 {
+    // CHECK-SAME:    phase = 0.000000e+00 : f64} : !ion.pulse
+    // CHECK-NEXT: [[p6:%.+]] = ion.pulse([[timems3]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 92.399999999999991 : f64,
     // CHECK-SAME:         polarization = dense<[37, 42]> : vector<2xi64>,
     // CHECK-SAME:         wavevector = dense<[42, 37]> : vector<2xi64>>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
     %7:2 = quantum.custom "MS"(%arg0) %5#1, %6#1 : !quantum.bit, !quantum.bit

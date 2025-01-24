@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[qubit_ptr:.*]] = builtin.unrealized_conversion_cast %[[qubit:.*]] : !quantum.bit to !llvm.ptr
 
     // Ensure constants are correctly defined
-    // CHECK: %[[const_1:.*]] = llvm.mlir.constant(1 : i64)
     // CHECK: %[[phase:.*]] = llvm.mlir.constant(0.000000e+00 : f64) : f64
 
     // Create the beam struct
@@ -38,12 +37,12 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[beam_struct_polarization:.*]] = llvm.insertvalue %[[polarization:.*]], %[[beam_struct_detuning:.*]][3] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
     // CHECK: %[[wavevector:.*]] = llvm.mlir.constant(dense<[0, 1]> : vector<2xi64>) : vector<2xi64>
     // CHECK: %[[beam_struct_wavevector:.*]] = llvm.insertvalue %[[wavevector:.*]], %[[beam_struct_polarization:.*]][4] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
-    // CHECK: llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %[[phase:.*]], %4, %[[beam_struct_wavevector:.*]]) : (!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>) -> ()
+    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector:.*]]) : (!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>) -> !llvm.ptr
 
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
-    ion.pulse(%arg0: f64) %1 {
+    %2 = ion.pulse(%arg0: f64) %1 {
         beam=#ion.beam<
             transition_index=0,
             rabi=10.10,
@@ -52,7 +51,7 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
             wavevector=dense<[0, 1]>: vector<2xi64>
         >,
         phase=0.0
-    }
+    } : !ion.pulse
 
     return %1: !quantum.bit
 }

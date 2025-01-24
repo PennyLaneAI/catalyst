@@ -98,8 +98,7 @@ Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Mod
 {
     Value levelStruct = rewriter.create<LLVM::UndefOp>(loc, levelStructType);
     auto label = levelAttr.getLabel().getValue().str();
-    auto labelGlobal =
-        getGlobalString(loc, rewriter, label, mod);
+    auto labelGlobal = getGlobalString(loc, rewriter, label, mod);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(loc, levelStruct, labelGlobal, 0);
     levelStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, levelStruct,
@@ -158,7 +157,6 @@ Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Mod
 Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
                              ArrayAttr &transitionsAttr)
 {
-    LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
     LLVM::LLVMStructType TransitionStructType =
         LLVM::LLVMStructType::getLiteral(ctx, {
                                                   LLVM::LLVMPointerType::get(ctx), // level_0
@@ -326,12 +324,12 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
 
         // Create the Ion stub function
         Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx),
+            conv->convertType(PulseType::get(ctx)),
             {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
              createBeamStructType(ctx, rewriter, beamAttr)});
         std::string qirName = "__catalyst_pulse";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+        auto outPulse = rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 
         rewriter.eraseOp(op);
         return success();

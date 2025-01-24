@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,9 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
+// CHECK: llvm.mlir.global internal constant @upstate("upstate\00") {addr_space = 0 : i32}
+// CHECK: llvm.mlir.global internal constant @estate("estate\00") {addr_space = 0 : i32}
+// CHECK: llvm.mlir.global internal constant @downstate("downstate\00") {addr_space = 0 : i32}
 // CHECK: llvm.mlir.global internal constant @Yb171("Yb171\00") {addr_space = 0 : i32}
     
 // CHECK-LABEL: ion_op
@@ -29,43 +32,39 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     // CHECK: %[[pos:.*]] = llvm.mlir.constant(dense<[1, 2, -1]> : vector<3xi64>) : vector<3xi64>
 
     // Check level array initialization
-    // CHECK: %[[level_array_undef:.*]] = llvm.mlir.undef : !llvm.array<3 x struct<(i64, f64, f64, f64, f64, f64, f64, f64)>>
+    // CHECK: %[[level_array_undef:.*]] = llvm.mlir.undef : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>
 
     // Level 0
-    // CHECK: %[[level_struct_0_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
-    // CHECK: %[[level_0_principal:.*]] = llvm.mlir.constant(6 : i64)
-    // CHECK: %[[level_struct_0_principal:.*]] = llvm.insertvalue %[[level_0_principal]], %[[level_struct_0_undef]][0] : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
+    // CHECK: %[[level_struct_0_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
+    // CHECK: llvm.mlir.addressof @downstate
 
     // Level 1
-    // CHECK: %[[level_struct_1_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
-    // CHECK: %[[level_1_principal:.*]] = llvm.mlir.constant(6 : i64)
-    // CHECK: %[[level_struct_1_principal:.*]] = llvm.insertvalue %[[level_1_principal]], %[[level_struct_1_undef]][0] : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
+    // CHECK: %[[level_struct_1_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
+    // llvm.mlir.addressof @estate : !llvm.ptr
     
     // Level 2
-    // CHECK: %[[level_struct_2_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
-    // CHECK: %[[level_2_principal:.*]] = llvm.mlir.constant(5 : i64)
-    // CHECK: %[[level_struct_2_principal:.*]] = llvm.insertvalue %[[level_2_principal]], %[[level_struct_2_undef]][0] : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
+    // CHECK: %[[level_struct_2_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
+    // CHECK: llvm.mlir.addressof @upstate : !llvm.ptr
 
     // Levels Array
     // CHECK: %[[levels_array_size:.*]] = llvm.mlir.constant(3 : i64) : i64
-    // CHECK: %[[levels_array_ptr:.*]] = llvm.alloca %[[levels_array_size:.*]] x !llvm.array<3 x struct<(i64, f64, f64, f64, f64, f64, f64, f64)>> : (i64) -> !llvm.ptr
-    // CHECK: llvm.store %[[levels_array:.*]], %[[levels_array_ptr:.*]] : !llvm.array<3 x struct<(i64, f64, f64, f64, f64, f64, f64, f64)>>, !llvm.ptr
+    // CHECK: %[[levels_array_ptr:.*]] = llvm.alloca %[[levels_array_size:.*]] x !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>> : (i64) -> !llvm.ptr
+    // CHECK: llvm.store %[[levels_array:.*]], %[[levels_array_ptr:.*]] : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>, !llvm.ptr
     
     // Transition array initialization
-    // CHECK: llvm.mlir.undef : !llvm.array<3 x struct<(struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, f64)>>
+    // CHECK: llvm.mlir.undef : !llvm.array<3 x struct<(ptr, ptr, f64)>>
 
     // Transition 0
-    // CHECK: %[[transition_0_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, f64)>
+    // CHECK: %[[transition_0_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
     
     // Level 0
-    // CHECK: %[[level_struct_1_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, f64, f64, f64, f64, f64)>
-    // CHECK: llvm.insertvalue
+    // CHECK: llvm.mlir.addressof @estate
 
     // Transition 1
-    // CHECK: %[[transition_1_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, f64)>
+    // CHECK: %[[transition_1_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
 
     // Transition 2
-    // CHECK: %[[transition_2_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, struct<(i64, f64, f64, f64, f64, f64, f64, f64)>, f64)>
+    // CHECK: %[[transition_2_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
     
     // Final Ion Struct
     // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, vector<3xi64>, ptr, ptr)>
