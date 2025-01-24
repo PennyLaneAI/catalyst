@@ -306,7 +306,7 @@ jobs:
               -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON
 
-        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit rt_OQD_capi
 
     - name: Test Catalyst-Runtime
       run: |
