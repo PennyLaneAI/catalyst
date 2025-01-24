@@ -14,6 +14,8 @@ option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 
+option(ENABLE_OQD "Build OQD CAPI" OFF)
+
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -76,6 +78,7 @@ if(RUNTIME_ENABLE_WARNINGS)
 endif()
 
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
+message(STATUS "ENABLE_OQD is ${ENABLE_OQD}.")
 
 set(devices_list)
 list(APPEND devices_list rtd_null_qubit)
@@ -89,6 +92,10 @@ endif()
 add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
+
+if(ENABLE_OQD)
+    target_link_libraries(catalyst_qir_runtime INTERFACE rt_OQD_capi)
+endif()
 
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}

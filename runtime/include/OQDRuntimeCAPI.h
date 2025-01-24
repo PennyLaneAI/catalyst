@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
+#pragma once
+#ifndef OQDRUNTIMECAPI_H
+#define OQDRUNTIMECAPI_H
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
-void __catalyst__oqd__greetings() {
-	std::cout << "Hello OQD world!" << std::endl;
-}
+// OQD Runtime Instructions
+void __catalyst__oqd__greetings();
 
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
-}
+#endif
