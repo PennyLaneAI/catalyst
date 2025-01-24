@@ -16,7 +16,4 @@
 
 #include "TestUtils.hpp"
 
-TEST_CASE("Test hello world", "[OQD]")
-{
-    __catalyst__oqd__greetings();
-}
+TEST_CASE("Test hello world", "[OQD]") { __catalyst__oqd__greetings(); }

@@ -18,9 +18,5 @@
 
 extern "C" {
 
-void __catalyst__oqd__greetings() {
-	std::cout << "Hello OQD world!" << std::endl;
-}
-
-
+void __catalyst__oqd__greetings() { std::cout << "Hello OQD world!" << std::endl; }
 }
