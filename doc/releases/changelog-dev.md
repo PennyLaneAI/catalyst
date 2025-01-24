@@ -51,5 +51,6 @@ This release contains contributions from (in alphabetical order):
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
+Andrija Paurevic,
 Paul Haochen Wang,
 Rohan Nolan Lasrado.
