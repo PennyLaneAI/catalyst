@@ -17,14 +17,18 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 from copy import copy
 from functools import partial
-from typing import Callable
+from typing import Callable, Sequence
 
 import jax
 import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
-from pennylane.capture.primitives import cond_prim
+from pennylane.capture.primitives import (
+    AbstractMeasurement,
+    AbstractOperator,
+    cond_prim,
+)
 
 from catalyst.device import (
     extract_backend_info,
@@ -289,6 +293,66 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
             return jax.lax.convert_element_type(mval, dtype)
         return mval
 
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
+
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+
+        Returns:
+            list[TensorLike]: the results of the execution.
+
+        """
+        self._env = {}
+        self.setup()
+
+        for arg, invar in zip(args, jaxpr.invars, strict=True):
+            self._env[invar] = arg
+        for const, constvar in zip(consts, jaxpr.constvars, strict=True):
+            self._env[constvar] = const
+
+        for eqn in jaxpr.eqns:
+
+            if eqn.primitive.name == "cond":
+                invals = [self.read(invar) for invar in eqn.invars]
+                outvars, outvals = cond(self, *invals, **eqn.params)
+
+                if not eqn.primitive.multiple_results:
+                    outvals = [outvals]
+                for outvar, outval in zip(outvars, outvals, strict=True):
+                    self._env[outvar] = outval
+            else:
+                custom_handler = self._primitive_registrations.get(eqn.primitive, None)
+                if custom_handler:
+                    invals = [self.read(invar) for invar in eqn.invars]
+                    outvals = custom_handler(self, *invals, **eqn.params)
+                elif isinstance(eqn.outvars[0].aval, AbstractOperator):
+                    outvals = self.interpret_operation_eqn(eqn)
+                elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
+                    outvals = self.interpret_measurement_eqn(eqn)
+                else:
+                    invals = [self.read(invar) for invar in eqn.invars]
+                    outvals = eqn.primitive.bind(*invals, **eqn.params)
+
+                if not eqn.primitive.multiple_results:
+                    outvals = [outvals]
+                for outvar, outval in zip(eqn.outvars, outvals, strict=True):
+                    self._env[outvar] = outval
+
+        # Read the final result of the Jaxpr from the environment
+        outvals = []
+        for var in jaxpr.outvars:
+            outval = self.read(var)
+            if isinstance(outval, qml.operation.Operator):
+                outvals.append(self.interpret_operation(outval))
+            else:
+                outvals.append(outval)
+        self.cleanup()
+        self._env = {}
+        return outvals
+
 
 class BranchPlxprInterpreter(QFuncPlxprInterpreter):
     """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
@@ -334,10 +398,11 @@ def _(self, phase, *wires, n_wires):
 
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
-def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
+def cond(self, *invals, jaxpr_branches, consts_slices, args_slice):
     args = invals[args_slice]
 
     new_branch_jaxprs = []
+    qreg_var = None
     for const_slice, branch_plxpr in zip(consts_slices, jaxpr_branches):
         consts = invals[const_slice]
         if branch_plxpr is None:
@@ -345,6 +410,8 @@ def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
         else:
             f = partial(BranchPlxprInterpreter(self).eval, branch_plxpr, consts)
             branch_jaxpr = jax.make_jaxpr(f)(*args).jaxpr
+            if qreg_var is None:
+                qreg_var = branch_jaxpr.constvars[0]
             invars = []
             invars.append(branch_jaxpr.constvars[0])
             branch_jaxpr = branch_jaxpr.replace(invars=invars)
@@ -358,8 +425,10 @@ def _(self, *invals, jaxpr_branches, consts_slices, args_slice):
             ].replace(outvars=outvars)
             new_branch_jaxprs.append(branch_jaxpr)
 
-    return cond_p.bind(
-        *invals, branch_jaxprs=jaxpr_pad_consts(new_branch_jaxprs), nimplicit_outputs=None
+    new_invals = [invals[0], invals[2], invals[3], self.qreg]
+
+    return [qreg_var], cond_p.bind(
+        *new_invals, branch_jaxprs=jaxpr_pad_consts(new_branch_jaxprs), nimplicit_outputs=None
     )
 
 
