@@ -28,6 +28,7 @@ TEST_CASE("Test success of loading a device", "[NullQubit]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     CHECK(loadDevice("NullQubit", "librtd_null_qubit" + get_dylib_ext()));
+    CHECK(1 == 0);
 }
 
 TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[NullQubit]")
