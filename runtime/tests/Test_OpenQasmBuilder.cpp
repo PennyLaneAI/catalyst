@@ -27,6 +27,7 @@ using namespace Catalyst::Runtime::Device::OpenQasm;
 TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
 {
     // Check lookup supported gates
+    CHECK(1 == 0);
     CHECK(lookup_qasm_gate_name("PauliX") == "x");
     CHECK(lookup_qasm_gate_name("Hadamard") == "h");
     CHECK(lookup_qasm_gate_name("CNOT") == "cnot");

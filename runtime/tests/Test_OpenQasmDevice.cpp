@@ -86,6 +86,7 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
     {
         auto &&results = runner.runCircuit(circuit, "default", 100);
         CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
+        CHECK(1 == 0);
     }
 
     SECTION("Test BraketRunner::Probs()")
