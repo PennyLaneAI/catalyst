@@ -12,6 +12,7 @@ target_include_directories(catalyst_oqd_obj PUBLIC .
     ${runtime_includes}
 )
 
+set_property(TARGET catalyst_oqd_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 #####################
 # Shared Lib rt_OQD_capi
