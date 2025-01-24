@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-#include "RuntimeCAPI.h"
+#include "OQDRuntimeCAPI.h"
 
 extern "C" {
 
