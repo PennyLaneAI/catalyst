@@ -1229,7 +1229,10 @@ def trace_quantum_function(
                     output = return_values_flat
                     trees = return_values_tree
 
-                mcm_config = qnode.execute_kwargs["mcm_config"]
+                mcm_config = qml.devices.MCMConfig(
+                    postselect_mode=qnode.execute_kwargs["postselect_mode"],
+                    mcm_method=qnode.execute_kwargs["mcm_method"],
+                )
                 qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
