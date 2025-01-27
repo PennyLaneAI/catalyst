@@ -279,9 +279,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(IonTy, ptrType);
         std::string qirName = "__catalyst_ion";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, ionStructPtr);
-
-        rewriter.eraseOp(op);
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ionStructPtr);
 
         return success();
     }
@@ -294,6 +292,54 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
                                   catalyst::ion::ParallelProtocolOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        // replace region args with parallelProtocolOp args
+        Block *regionBlock = &op.getBodyRegion().front();
+        assert((regionBlock->getNumArguments() == op.getNumOperands()) &&
+               "ParallelProtocolOp should have the same number of arguments as its region");
+        for (const auto &[regionArg, opArg] :
+             llvm::zip(regionBlock->getArguments(), op.getOperands())) {
+            regionArg.replaceAllUsesWith(opArg);
+        }
+
+        // Clone the region operations outside ParallelProtocolOp.
+        SmallVector<Value> parallelPulses;
+        rewriter.setInsertionPoint(op);
+        for (auto &regionOp : regionBlock->getOperations()) {
+            if (auto pulseOp = dyn_cast<catalyst::ion::PulseOp>(&regionOp)) {
+                auto *clonedPulseOp = rewriter.clone(regionOp);
+                // keep track of parallel Pulses for the runtime call
+                parallelPulses.push_back(clonedPulseOp->getResult(0));
+            }
+            else if (!isa<catalyst::ion::YieldOp>(&regionOp)) {
+                // Clone other operations (e.g., llvm.fdiv) that aren't YieldOp
+                rewriter.clone(regionOp);
+            }
+        }
+
+        // Create an array of pulses
+        Type pulseArrayType =
+            LLVM::LLVMArrayType::get(conv->convertType(PulseType::get(ctx)), parallelPulses.size());
+        Value pulseArray = rewriter.create<LLVM::UndefOp>(loc, pulseArrayType);
+        for (size_t i = 0; i < parallelPulses.size(); i++) {
+            auto convertedPulse = rewriter
+                                      .create<UnrealizedConversionCastOp>(
+                                          loc, LLVM::LLVMPointerType::get(ctx), parallelPulses[i])
+                                      .getResult(0);
+            pulseArray = rewriter.create<LLVM::InsertValueOp>(loc, pulseArray, convertedPulse, i);
+        }
+
+        // Create the parallel protocol stub function
+        Type protocolResultType = conv->convertType(IonType::get(ctx));
+        Type protocolFuncType = LLVM::LLVMFunctionType::get(protocolResultType, pulseArrayType);
+        std::string protocolFuncName = "__catalyst_parallel_protocol";
+        LLVM::LLVMFuncOp protocolFnDecl =
+            ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, protocolFnDecl, pulseArray);
+
         return success();
     }
 };
@@ -329,9 +375,8 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
              createBeamStructType(ctx, rewriter, beamAttr)});
         std::string qirName = "__catalyst_pulse";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        auto outPulse = rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
 
-        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -344,8 +389,8 @@ namespace ion {
 void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<IonOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace ion
