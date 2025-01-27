@@ -687,6 +687,8 @@ jobs:
           COMPILER_LAUNCHER="" \
           make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
+        with:
+          fail_ci_if_error: true
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
