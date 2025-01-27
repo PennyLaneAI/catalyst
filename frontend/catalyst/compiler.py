@@ -164,6 +164,7 @@ class LinkerDriver:
             *system_flags,
             *lib_path_flags,
             "-lrt_capi",
+            "-lrt_OQD_capi",  # remove!
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
             f"-l{lapack_lib_name}",  # required for custom_calls lib

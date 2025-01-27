@@ -22,7 +22,15 @@ void __catalyst__oqd__greetings() { std::cout << "Hello OQD world!" << std::endl
 
 void __catalyst__oqd__ion(Ion *ion)
 {
-    std::cout << "Hello Ion!" << std::endl;
+    std::cout << "Hello Ion! " << (ion == nullptr) << std::endl;
+    std::cout << "ion ptr: " << ion << std::endl;
+    std::cout << "ion name: " << (ion->name)[0] << std::endl;
+    std::cout << ion->mass << std::endl;
+    std::cout << ion->charge << std::endl;
+    std::cout << ion->position << " is ptr, " << (ion->position)[0]
+    		<< " , zeroth val has addr" << &((ion->position)[0]) << " , "
+    			<< (ion->position)[1] << " , "
+    			<< (ion->position)[2] << std::endl;
     std::cout << ion->levels[0].spin << std::endl;
 }
 
