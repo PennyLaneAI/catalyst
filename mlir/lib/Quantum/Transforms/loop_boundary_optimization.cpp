@@ -14,19 +14,19 @@
 
 #define DEBUG_TYPE "loop-boundary"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/RegionKindInterface.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
