@@ -18,5 +18,4 @@
 
 TEST_CASE("Test hello world", "[OQD]") {
 	__catalyst__oqd__greetings();
-	CHECK(1 == 0);
 }
