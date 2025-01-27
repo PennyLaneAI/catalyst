@@ -19,4 +19,11 @@
 extern "C" {
 
 void __catalyst__oqd__greetings() { std::cout << "Hello OQD world!" << std::endl; }
+
+void __catalyst__oqd__ion(Ion *ion)
+{
+    std::cout << "Hello Ion!" << std::endl;
+    std::cout << ion->levels[0].spin << std::endl;
 }
+
+} // extern "C"

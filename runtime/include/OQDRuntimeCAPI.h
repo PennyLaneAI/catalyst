@@ -16,12 +16,44 @@
 #ifndef OQDRUNTIMECAPI_H
 #define OQDRUNTIMECAPI_H
 
+#include <cmath>
+#include <cstdint>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+struct Level {
+    char *label;
+    size_t principal;
+    double spin;
+    double orbital;
+    double nuclear;
+    double spin_orbital;
+    double spin_orbital_nuclear;
+    double spin_orbital_nuclear_magnetization;
+    double energy;
+};
+
+struct Transition {
+    char *level1;
+    char *level2;
+    double einstein_a;
+};
+
+struct Ion {
+    char *name;
+    double mass;
+    double charge;
+    size_t position[3];
+    Level *levels;
+    Transition *transitions;
+};
+
 // OQD Runtime Instructions
 void __catalyst__oqd__greetings();
+
+void __catalyst__oqd__ion(Ion *);
 
 #ifdef __cplusplus
 } // extern "C"
