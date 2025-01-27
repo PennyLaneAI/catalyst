@@ -83,7 +83,7 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         Ion ion = dataManager.getIonParams().at("Yb171");
 
         // First, we need to convert each qubit to an ion
-        // A qubit is initilized as an extract op from an alloc op in quantum dialect
+        // A qubit is initialized as an extract op from an alloc op in quantum dialect
         llvm::DenseMap</*quantum*/ Value, /*ion*/ Value> qubitMap;
 
         op->walk([&](quantum::ExtractOp qExtract) {
