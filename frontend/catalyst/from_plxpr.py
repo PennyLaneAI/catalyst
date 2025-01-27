@@ -367,18 +367,20 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
     """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
 
     Args:
-        parent_interpreter (QFuncPlxprInterpreter)
+        parent_device (qml.devices.Device)
+        parent_shots (qml.measurements.Shots)
+        parent_qreg (...)
 
     """
 
-    def __init__(self, parent_interpreter: QFuncPlxprInterpreter):
-        self._parent_interpreter = parent_interpreter
-        super().__init__(self._parent_interpreter._device, self._parent_interpreter._shots)
+    def __init__(self, parent_device, parent_shots, parent_qreg):
+        self._parent_qreg = parent_qreg
+        super().__init__(parent_device, parent_shots)
 
     def setup(self):
         """Initialize the stateref."""
         if self.stateref is None:
-            self.stateref = {"qreg": self._parent_interpreter.qreg, "wire_map": {}}
+            self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
     def cleanup(self):
@@ -420,7 +422,11 @@ def handle_cond(
         if plxpr_branch is None:
             jaxpr_branches.append(None)
         else:
-            func = partial(BranchPlxprInterpreter(self).eval, plxpr_branch, branch_consts)
+            func = partial(
+                BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
+                plxpr_branch,
+                branch_consts,
+            )
             jaxpr_branch = jax.make_jaxpr(func)(*args).jaxpr
             if qreg_var is None:
                 qreg_var = jaxpr_branch.constvars[0]
