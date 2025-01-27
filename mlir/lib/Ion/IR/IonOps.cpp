@@ -52,7 +52,7 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
     // chains of qubit values.
     // After gate-to-pulse decomposition is finished, we change all parallel protocol
     // ops to return ion types.
-    // Note that the body region is shielded from the outside, so it's block can
+    // Note that the body region is shielded from the outside, so its block can
     // have an ion type argument directly
     result.addOperands(inQubits);
     for (Value v : inQubits) {
