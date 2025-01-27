@@ -317,7 +317,16 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
             if eqn.primitive.name == "cond":
                 invals = [self.read(invar) for invar in eqn.invars]
-                outvars, outvals = cond(self, *invals, **eqn.params)
+                predicate_slice = slice(0, 1)
+                outvars, outvals = handle_cond(
+                    self,
+                    self.qreg,
+                    eqn.params["jaxpr_branches"],
+                    eqn.params["consts_slices"],
+                    eqn.params["args_slice"],
+                    predicate_slice,
+                    *invals,
+                )
 
                 if not eqn.primitive.multiple_results:
                     outvals = [outvals]
@@ -398,37 +407,43 @@ def _(self, phase, *wires, n_wires):
 
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
-def cond(self, *invals, jaxpr_branches, consts_slices, args_slice):
-    args = invals[args_slice]
-
-    new_branch_jaxprs = []
+def handle_cond(
+    self, qreg, plxpr_branches, consts_slices, args_slice, predicate_slice, *plxpr_invals
+):
+    args = plxpr_invals[args_slice]
+    branches_consts = [plxpr_invals[consts_slice] for consts_slice in consts_slices]
+    jaxpr_branches = []
     qreg_var = None
-    for const_slice, branch_plxpr in zip(consts_slices, jaxpr_branches):
-        consts = invals[const_slice]
-        if branch_plxpr is None:
-            new_branch_jaxprs.append(None)
-        else:
-            f = partial(BranchPlxprInterpreter(self).eval, branch_plxpr, consts)
-            branch_jaxpr = jax.make_jaxpr(f)(*args).jaxpr
-            if qreg_var is None:
-                qreg_var = branch_jaxpr.constvars[0]
-            invars = []
-            invars.append(branch_jaxpr.constvars[0])
-            branch_jaxpr = branch_jaxpr.replace(invars=invars)
-            outvars = []
-            outvars.append(copy(branch_jaxpr.constvars[0]))
-            branch_jaxpr = branch_jaxpr.replace(outvars=outvars)
-            constvars = branch_jaxpr.constvars[1:]
-            branch_jaxpr = branch_jaxpr.replace(constvars=constvars)
-            branch_jaxpr.eqns[len(branch_jaxpr.eqns) - 1] = branch_jaxpr.eqns[
-                len(branch_jaxpr.eqns) - 1
-            ].replace(outvars=outvars)
-            new_branch_jaxprs.append(branch_jaxpr)
 
-    new_invals = [invals[0], invals[2], invals[3], self.qreg]
+    for branch_consts, plxpr_branch in zip(branches_consts, plxpr_branches):
+
+        if plxpr_branch is None:
+            jaxpr_branches.append(None)
+        else:
+            func = partial(BranchPlxprInterpreter(self).eval, plxpr_branch, branch_consts)
+            jaxpr_branch = jax.make_jaxpr(func)(*args).jaxpr
+            if qreg_var is None:
+                qreg_var = jaxpr_branch.constvars[0]
+            invars = []
+            invars.append(jaxpr_branch.constvars[0])
+            jaxpr_branch = jaxpr_branch.replace(invars=invars)
+            outvars = []
+            outvars.append(copy(jaxpr_branch.constvars[0]))
+            jaxpr_branch = jaxpr_branch.replace(outvars=outvars)
+            constvars = jaxpr_branch.constvars[1:]
+            jaxpr_branch = jaxpr_branch.replace(constvars=constvars)
+            jaxpr_branch.eqns[len(jaxpr_branch.eqns) - 1] = jaxpr_branch.eqns[
+                len(jaxpr_branch.eqns) - 1
+            ].replace(outvars=outvars)
+            jaxpr_branches.append(jaxpr_branch)
+
+    # Rebuild the invals with the Catalyst jaxpr spec:
+    predicate = plxpr_invals[predicate_slice]
+    consts = [const for consts in branches_consts for const in consts]
+    cond_invals = [*predicate, *consts, *args, qreg]
 
     return [qreg_var], cond_p.bind(
-        *new_invals, branch_jaxprs=jaxpr_pad_consts(new_branch_jaxprs), nimplicit_outputs=None
+        *cond_invals, branch_jaxprs=jaxpr_pad_consts(jaxpr_branches), nimplicit_outputs=None
     )
 
 
