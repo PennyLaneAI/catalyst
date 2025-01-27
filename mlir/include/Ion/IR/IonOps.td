@@ -50,6 +50,7 @@ def LevelAttr : Ion_Attr<"Level", "level"> {
   let summary = "A class to represent an atomic level.";
 
   let parameters = (ins
+    "mlir::StringAttr":$label,
     "mlir::IntegerAttr":$principal,
     "mlir::FloatAttr":$spin,
     "mlir::FloatAttr":$orbital,
@@ -63,6 +64,7 @@ def LevelAttr : Ion_Attr<"Level", "level"> {
 
   let builders = [
     AttrBuilderWithInferredContext<(ins     
+    "mlir::StringAttr":$label,
     "mlir::IntegerAttr":$principal,
     "mlir::FloatAttr":$spin,
     "mlir::FloatAttr":$orbital,
@@ -71,7 +73,7 @@ def LevelAttr : Ion_Attr<"Level", "level"> {
     "mlir::FloatAttr":$spin_orbital_nuclear,
     "mlir::FloatAttr":$spin_orbital_nuclear_magnetization,
     "mlir::FloatAttr":$energy), [{
-      return $_get(principal.getContext(), principal, spin, orbital, nuclear, spin_orbital, spin_orbital_nuclear, spin_orbital_nuclear_magnetization, energy);
+      return $_get(principal.getContext(), label, principal, spin, orbital, nuclear, spin_orbital, spin_orbital_nuclear, spin_orbital_nuclear_magnetization, energy);
     }]>
   ];
 
@@ -82,14 +84,14 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
   let summary = "A class to represent a atomic transition between two levels.";
 
   let parameters = (ins
-    "LevelAttr":$level_0,
-    "LevelAttr":$level_1,
+    "mlir::StringAttr":$level_0,
+    "mlir::StringAttr":$level_1,
     "mlir::FloatAttr":$einstein_a
   );
 
   let builders = [
-    AttrBuilderWithInferredContext<(ins "LevelAttr":$level_0,
-                                        "LevelAttr":$level_1,
+    AttrBuilderWithInferredContext<(ins "mlir::StringAttr":$level_0,
+                                        "mlir::StringAttr":$level_1,
                                         "mlir::FloatAttr":$einstein_a), [{
       return $_get(einstein_a.getContext(), level_0, level_1, einstein_a);
     }]>
