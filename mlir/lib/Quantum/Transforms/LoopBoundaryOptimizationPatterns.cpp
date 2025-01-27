@@ -38,44 +38,122 @@ static const mlir::StringSet<> hamiltonianSet = {"H", "X", "Y", "Z"};
 
 namespace {
 
-// TODO: Reduce the complexity of the function
-// TODO: Support multi-qubit gates
+template <typename OpType> using OperationToQubits = std::map<OpType, std::vector<mlir::Value>>;
+
 template <typename OpType>
-std::map<OpType, std::vector<mlir::Value>> traceOperationQubit(mlir::Block *block)
+void traceOperandQubit(OpType &op, std::map<OpType, std::vector<mlir::Value>> &opToQubits)
 {
-    std::map<OpType, std::vector<mlir::Value>> opMap;
-    block->walk([&](OpType op) {
-        mlir::Value operand = op.getInQubits()[0];
+    if (opToQubits.find(op) != opToQubits.end()) {
+        return;
+    }
 
-        while (auto definingOp = dyn_cast_or_null<CustomOp>(operand.getDefiningOp())) {
-            operand = definingOp.getInQubits()[0];
+    mlir::Value rootInQubit;
+
+    for (auto qubit : op.getInQubits()) {
+        rootInQubit = qubit;
+        while (auto definingOp = dyn_cast_or_null<OpType>(rootInQubit.getDefiningOp())) {
+            for (auto [idx, outQubit] : llvm::enumerate(definingOp.getOutQubits())) {
+                if (outQubit == rootInQubit) {
+                    rootInQubit = definingOp.getInQubits()[idx];
+                }
+            }
         }
-
-        opMap[op].push_back(operand);
-    });
-    return opMap;
+        opToQubits[op].push_back(rootInQubit);
+    }
 }
 
-bool verifyEdgeQubitOperands(std::map<quantum::CustomOp, std::vector<mlir::Value>> opMap)
+template <typename OpType> 
+OperationToQubits<OpType> traceTopEdgeOperations(scf::ForOp forOp)
 {
-    quantum::CustomOp topEdgeOp = opMap.begin()->first;
-    quantum::CustomOp bottomEdgeOp = opMap.rbegin()->first;
-
-    if (topEdgeOp == bottomEdgeOp) {
-        return false;
-    }
-
-    if (topEdgeOp.getGateName() != bottomEdgeOp.getGateName()) {
-        return false;
-    }
-
-    for (auto [idx, rootTopEdgeQubit] : llvm::enumerate(opMap[topEdgeOp])) {
-        if (rootTopEdgeQubit != opMap[bottomEdgeOp][idx]) {
-            return false;
+    OperationToQubits<OpType> opToQubits;
+    for (auto arg : forOp.getRegionIterArgs()) {
+        for (mlir::Operation *user : arg.getUsers()) {
+            if (auto operation = dyn_cast_or_null<OpType>(user)) {
+                traceOperandQubit(operation, opToQubits);
+            }
         }
     }
+    return opToQubits;
+}
 
-    return true;
+template <typename OpType> 
+OperationToQubits<OpType> traceBottomEdgeOperations(scf::ForOp forOp)
+{
+    OperationToQubits<OpType> opToQubits;
+    Operation *terminator = forOp.getBody()->getTerminator();
+    for (auto operand : terminator->getOperands()) {
+
+        // check if operation is not quantum
+        auto operation = dyn_cast_or_null<OpType>(operand.getDefiningOp());
+        if (!operation) {
+            continue;
+        }
+        traceOperandQubit(operation, opToQubits);
+    }
+
+    return opToQubits;
+}
+
+template <typename OpType>
+std::vector<std::pair<OpType, OpType>>
+getVerifyEdgeOperationSet(OperationToQubits<OpType> bottomEdgeOperationSet,
+                          OperationToQubits<OpType> topEdgeOperationSet)
+{
+
+    std::vector<std::pair<OpType, OpType>> edgeOperationSet;
+
+    for (auto [bottomOp, bottomQubits] : bottomEdgeOperationSet) {
+        for (auto [topOp, topQubits] : topEdgeOperationSet) {
+            // convert const BottomOp to non-const
+            OpType bottomOpNonConst = bottomOp;
+            OpType topOpNonConst = topOp;
+
+            // check if the operation types are the same
+            if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName()) {
+                continue;
+            }
+
+            // operations should not be the same
+            if (topOp == bottomOp) {
+                continue;
+            }
+
+            // check if the qubits are the same
+            bool verifyEdgeOperationSet = true;
+            for (auto [idx, rootTopEdgeQubit] : llvm::enumerate(topQubits)) {
+                if (rootTopEdgeQubit != bottomQubits[idx]) {
+                    verifyEdgeOperationSet = false;
+                    break;
+                }
+            }
+
+            // check if the predecessor of the top op is not quantumCustom
+            for (auto operand : topOpNonConst.getInQubits()) {
+                if (operand.getDefiningOp()) {
+                    verifyEdgeOperationSet = false;
+                    break;
+                }
+            }
+
+            // check if the successor of the bottom op is not quantumCustom
+            // TODO: verify if it is not any quantum operation
+            for (auto op : bottomOpNonConst->getUsers()) {
+                if (isa<CustomOp>(op)) {
+                    verifyEdgeOperationSet = false;
+                    break;
+                }
+            }
+
+            // check if the operation is a rotation
+            if (!verifyEdgeOperationSet) {
+                continue;
+            }
+
+            // check if the operation has previous operations
+            edgeOperationSet.push_back(std::make_pair(topOp, bottomOp));
+        }
+    }
+    return edgeOperationSet;
 }
 
 struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::ForOp> {
@@ -91,36 +169,76 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
             return mlir::failure();
         }
 
-        auto opMap = traceOperationQubit<quantum::CustomOp>(forOp.getBody());
+        auto topEdgeOperationSet = traceTopEdgeOperations<CustomOp>(forOp);
 
-        quantum::CustomOp topEdgeOp = opMap.begin()->first;
-        quantum::CustomOp bottomEdgeOp = opMap.rbegin()->first;
+        auto bottomEdgeOperationSet = traceBottomEdgeOperations<CustomOp>(forOp);
 
-        if (verifyEdgeQubitOperands(opMap)) {
+        auto edgeOperationSet =
+            getVerifyEdgeOperationSet<CustomOp>(bottomEdgeOperationSet, topEdgeOperationSet);
 
-            ValueRange parentTopInQubits = topEdgeOp.getInQubits();
+        for (auto [topEdgeOp, bottomEdgeOp] : edgeOperationSet) {
 
-            // iter_args(%q_0 = %q)
-            // - %q_0 -> getRegionIterArg(0)
-            // - %q -> getInitArgs()[0]
+            auto topEdgeParams = topEdgeOp.getParams();
+            auto bottomEdgeParams = bottomEdgeOp.getParams();
 
+            // Hoist the top edge operation to the top of the loop
             rewriter.moveOpBefore(topEdgeOp, forOp);
             topEdgeOp.getOutQubits().replaceAllUsesWith(
                 topEdgeOp.getInQubits()); // config successor
 
-            for (auto [idx, arg] : llvm::enumerate(forOp.getInitArgs())) {
-                for (auto regionArg : forOp.getRegionIterArgs()) {
-                    if (regionArg == topEdgeOp.getInQubits()[idx]) {
+            for (auto [arg, regionArg] :
+                 llvm::zip(forOp.getInitArgs(), forOp.getRegionIterArgs())) {
+                for (auto [idx, qubit] : llvm::enumerate(topEdgeOp.getInQubits())) {
+                    if (qubit == regionArg) {
                         arg.replaceAllUsesWith(topEdgeOp.getOutQubits()[idx]);
-                        topEdgeOp.setOperand(idx, arg);
+                        unsigned qubitIndx = topEdgeParams.size() + idx;
+                        topEdgeOp.setOperand(qubitIndx, arg);
                     }
                 }
             }
 
+            if (topEdgeParams.size() > 0) {
+                auto cloneTopOp = topEdgeOp.clone();
+
+                for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
+                    cloneTopOp.setOperand(idx, param);
+                }
+                cloneTopOp.setQubitOperands(bottomEdgeOp.getInQubits());
+
+                rewriter.setInsertionPointAfter(bottomEdgeOp);
+                rewriter.insert(cloneTopOp);
+
+                auto cloneBottomOp = bottomEdgeOp.clone();
+
+                for (auto [idx, param] : llvm::enumerate(bottomEdgeParams)) {
+                    cloneBottomOp.setOperand(idx, param);
+                }
+                cloneBottomOp.setQubitOperands(cloneTopOp.getOutQubits());
+                bottomEdgeOp.setQubitOperands(cloneBottomOp.getOutQubits());
+
+                rewriter.setInsertionPointAfter(cloneTopOp);
+                rewriter.insert(cloneBottomOp);
+
+                // change the param of topEdgeOp to negative value
+                for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
+                    mlir::Value negParam =
+                        rewriter.create<arith::NegFOp>(bottomEdgeOp.getLoc(), param).getResult();
+                    bottomEdgeOp.setOperand(idx, negParam);
+                }
+            }
+
+            // Hoist the bottom edge operation to the bottom of the loop
             bottomEdgeOp.getOutQubits().replaceAllUsesWith(
                 bottomEdgeOp.getInQubits()); // config the successor
-            forOp.getResults().replaceAllUsesWith(bottomEdgeOp);
-            bottomEdgeOp.setQubitOperands(forOp.getResults()); // config predecessor
+            for (auto [arg, regionArg] : llvm::zip(forOp.getResults(), forOp.getRegionIterArgs())) {
+                for (auto [idx, qubit] : llvm::enumerate(bottomEdgeOperationSet[bottomEdgeOp])) {
+                    if (qubit == regionArg) {
+                        arg.replaceAllUsesWith(bottomEdgeOp.getOutQubits()[idx]);
+                        unsigned qubitIndx = topEdgeParams.size() + idx;
+                        bottomEdgeOp.setOperand(qubitIndx, arg);
+                    }
+                }
+            }
             rewriter.moveOpAfter(bottomEdgeOp, forOp);
 
             return mlir::success();
