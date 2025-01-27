@@ -14,7 +14,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
+  [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
+
 <h3>Internal changes ⚙️</h3>
+
+* Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
+  Instead `postselect_mode` and `mcm_method` should be accessed instead.
+  [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
 
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
@@ -48,4 +55,6 @@ This release contains contributions from (in alphabetical order):
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
-Paul Haochen Wang.
+Andrija Paurevic,
+Paul Haochen Wang,
+Rohan Nolan Lasrado.
