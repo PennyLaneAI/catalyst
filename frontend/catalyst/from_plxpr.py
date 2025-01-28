@@ -331,6 +331,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
                 if not eqn.primitive.multiple_results:
                     outvals = [outvals]
                 for outvar, outval in zip(outvars, outvals, strict=True):
+                    self.qreg = outval
                     self._env[outvar] = outval
             else:
                 custom_handler = self._primitive_registrations.get(eqn.primitive, None)
@@ -423,13 +424,12 @@ def handle_cond(
             jaxpr_branches.append(None)
         else:
             func = partial(
-                BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
+                BranchPlxprInterpreter(self._device, self._shots, qreg).eval,
                 plxpr_branch,
                 branch_consts,
             )
             jaxpr_branch = jax.make_jaxpr(func)(*args).jaxpr
-            if qreg_var is None:
-                qreg_var = jaxpr_branch.constvars[0]
+            qreg_var = jaxpr_branch.constvars[0]
             invars = []
             invars.append(jaxpr_branch.constvars[0])
             jaxpr_branch = jaxpr_branch.replace(invars=invars)
