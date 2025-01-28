@@ -25,7 +25,7 @@ extern "C" {
 
 struct Level {
     char *label;
-    size_t principal;
+    int64_t principal;
     double spin;
     double orbital;
     double nuclear;
@@ -45,7 +45,7 @@ struct Ion {
     char *name;
     double mass;
     double charge;
-    size_t position[3];
+    int64_t position[3];
     Level *levels;
     Transition *transitions;
 };
