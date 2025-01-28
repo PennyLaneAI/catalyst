@@ -317,16 +317,7 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
             if eqn.primitive.name == "cond":
                 invals = [self.read(invar) for invar in eqn.invars]
-                predicate_slice = slice(0, 1)
-                outvars, outvals = handle_cond(
-                    self,
-                    self.qreg,
-                    eqn.params["jaxpr_branches"],
-                    eqn.params["consts_slices"],
-                    eqn.params["args_slice"],
-                    predicate_slice,
-                    *invals,
-                )
+                outvars, outvals = handle_cond(self, *invals, **eqn.params)
 
                 if not eqn.primitive.multiple_results:
                     outvals = [outvals]
@@ -410,46 +401,49 @@ def _(self, phase, *wires, n_wires):
 
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
-def handle_cond(
-    self, qreg, plxpr_branches, consts_slices, args_slice, predicate_slice, *plxpr_invals
-):
+def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     args = plxpr_invals[args_slice]
     branches_consts = [plxpr_invals[consts_slice] for consts_slice in consts_slices]
-    jaxpr_branches = []
+    converted_jaxpr_branches = []
     qreg_var = None
 
-    for branch_consts, plxpr_branch in zip(branches_consts, plxpr_branches):
+    for branch_consts, plxpr_branch in zip(branches_consts, jaxpr_branches):
 
         if plxpr_branch is None:
-            jaxpr_branches.append(None)
+            converted_jaxpr_branches.append(None)
         else:
-            func = partial(
-                BranchPlxprInterpreter(self._device, self._shots, qreg).eval,
+            converted_func = partial(
+                BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
                 plxpr_branch,
                 branch_consts,
             )
-            jaxpr_branch = jax.make_jaxpr(func)(*args).jaxpr
-            qreg_var = jaxpr_branch.constvars[0]
+            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args).jaxpr
+            qreg_var = converted_jaxpr_branch.constvars[0]
             invars = []
-            invars.append(jaxpr_branch.constvars[0])
-            jaxpr_branch = jaxpr_branch.replace(invars=invars)
+            invars.append(converted_jaxpr_branch.constvars[0])
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=invars)
             outvars = []
-            outvars.append(copy(jaxpr_branch.constvars[0]))
-            jaxpr_branch = jaxpr_branch.replace(outvars=outvars)
-            constvars = jaxpr_branch.constvars[1:]
-            jaxpr_branch = jaxpr_branch.replace(constvars=constvars)
-            jaxpr_branch.eqns[len(jaxpr_branch.eqns) - 1] = jaxpr_branch.eqns[
-                len(jaxpr_branch.eqns) - 1
-            ].replace(outvars=outvars)
-            jaxpr_branches.append(jaxpr_branch)
+            outvars.append(copy(converted_jaxpr_branch.constvars[0]))
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=outvars)
+            constvars = converted_jaxpr_branch.constvars[1:]
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars)
+            converted_jaxpr_branch.eqns[len(converted_jaxpr_branch.eqns) - 1] = (
+                converted_jaxpr_branch.eqns[len(converted_jaxpr_branch.eqns) - 1].replace(
+                    outvars=outvars
+                )
+            )
+            converted_jaxpr_branches.append(converted_jaxpr_branch)
 
     # Rebuild the invals with the Catalyst jaxpr spec:
+    predicate_slice = slice(0, 1)
     predicate = plxpr_invals[predicate_slice]
     consts = [const for consts in branches_consts for const in consts]
-    cond_invals = [*predicate, *consts, *args, qreg]
+    cond_invals = [*predicate, *consts, *args, self.qreg]
 
     return [qreg_var], cond_p.bind(
-        *cond_invals, branch_jaxprs=jaxpr_pad_consts(jaxpr_branches), nimplicit_outputs=None
+        *cond_invals,
+        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
+        nimplicit_outputs=None,
     )
 
 
