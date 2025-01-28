@@ -16,9 +16,9 @@ module @f {
     %2 = llvm.getelementptr inbounds %1[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<6 x i8>
     %3 = llvm.mlir.constant(1.710000e+02 : f64) : f64
     %4 = llvm.mlir.constant(56.110000e+00 : f64) : f64
-    %posx = llvm.mlir.constant(123 : index) : i64
-    %posy = llvm.mlir.constant(456 : index) : i64
-    %posz = llvm.mlir.constant(789 : index) : i64
+    %posx = llvm.mlir.constant(123 : i64) : i64
+    %posy = llvm.mlir.constant(456 : i64) : i64
+    %posz = llvm.mlir.constant(789 : i64) : i64
     //%5 = llvm.mlir.constant(dense<[0, 11, 3]> : array<3xi64>) : array<3xi64>
     %6 = llvm.mlir.undef : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>
     %7 = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
