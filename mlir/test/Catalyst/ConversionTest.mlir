@@ -41,22 +41,30 @@ func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {
     // CHECK: [[memref:%.+]] = builtin.unrealized_conversion_cast %arg0
-    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(5 : i8)
-    // CHECK: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[struct:%.+]] = llvm.mlir.undef : !llvm.struct<(i64, ptr, i8)>
 
-    // CHECK: [[struct0:%.+]] = llvm.insertvalue [[rank]], [[struct]][0]
+    // CHECK-NEXT: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: [[struct_ptr1:%.+]] = llvm.alloca [[rank]] x !llvm.struct<(i64, ptr, i8)>
 
-    // CHECK: [[memref_ptr:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: llvm.store [[memref]], [[memref_ptr]]
-    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr]], [[struct0]][1]
+    // CHECK-NEXT: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: [[memref_ptr1:%.+]] = llvm.alloca [[rank]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 
-    // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
+    // CHECK-NEXT: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: [[struct_ptr0:%.+]] = llvm.alloca [[rank]] x !llvm.struct<(i64, ptr, i8)>
 
-    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} : (i64) -> !llvm.ptr
-    // CHECK: llvm.store [[struct2]], [[struct_ptr]]
+    // CHECK-NEXT: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: [[memref_ptr0:%.+]] = llvm.alloca [[rank]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+
+    // CHECK-NEXT: [[typeEnc:%.+]] = llvm.mlir.constant(5 : i8)
+
+    // CHECK-NEXT: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: [[struct:%.+]] = llvm.mlir.undef : !llvm.struct<(i64, ptr, i8)>
+    // CHECK-NEXT: [[struct0:%.+]] = llvm.insertvalue [[rank]], [[struct]][0]
+    // CHECK-NEXT: llvm.store [[memref]], [[memref_ptr0]]
+    // CHECK-NEXT: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr0]], [[struct0]][1]
+    // CHECK-NEXT: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
+    // CHECK: llvm.store [[struct2]], [[struct_ptr0]]
     // CHECK: [[memref_flag:%.+]] = llvm.mlir.constant(false)
-    // CHECK: llvm.call @__catalyst__rt__print_tensor([[struct_ptr]], [[memref_flag]])
+    // CHECK: llvm.call @__catalyst__rt__print_tensor([[struct_ptr0]], [[memref_flag]])
     "catalyst.print"(%arg0) : (memref<1xi64>) -> ()
 
     // CHECK: [[memref_flag2:%.+]] = llvm.mlir.constant(true)
@@ -86,6 +94,14 @@ func.func @dbprint_str() {
 
 func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK: [[convertedArg:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<3x3xf64> to !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK-NEXT: [[allocaArrayRes:%.+]] = llvm.alloca [[c1]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
+    // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK-NEXT: [[allocaRes:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
+    // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK-NEXT: [[allocaArray:%.+]] = llvm.alloca [[c1]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
+    // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK-NEXT: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
     // CHECK-NEXT: [[alloc:%.+]] = memref.alloc() : memref<3x3xf64>
     // CHECK-NEXT: [[allocConverted:%.+]] = builtin.unrealized_conversion_cast [[alloc]] : memref<3x3xf64> to !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
@@ -98,11 +114,9 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[getPtr:%.+]] = llvm.getelementptr inbounds [[argStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
     // CHECK-NEXT: [[encodeData:%.+]] = llvm.insertvalue [[getPtr]], [[encodeRank]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodeType:%.+]] = llvm.insertvalue [[numericTypeArg]], [[encodeData]][2] : !llvm.struct<(i64, ptr, i8)> 
-    // CHECK-NEXT: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
     // CHECK-NEXT: llvm.store [[encodeType]], [[alloca]] : !llvm.struct<(i64, ptr, i8)>, !llvm.ptr
     // CHECK-NEXT: [[undefPtr:%.+]] = llvm.mlir.undef : !llvm.array<1 x ptr>
     // CHECK-NEXT: [[allocaInserted:%.+]] = llvm.insertvalue [[alloca]], [[undefPtr]][0] : !llvm.array<1 x ptr> 
-    // CHECK-NEXT: [[allocaArray:%.+]] = llvm.alloca [[c1]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
     // CHECK-NEXT: llvm.store [[allocaInserted]], [[allocaArray]] : !llvm.array<1 x ptr>, !llvm.ptr
     // CHECK-NEXT: [[numericTypeRes:%.+]] = llvm.mlir.constant(7 : i8) : i8
     // CHECK-NEXT: [[c2_1:%.+]] = llvm.mlir.constant(2 : i64) : i64
@@ -113,11 +127,9 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[getPtrRes:%.+]] = llvm.getelementptr inbounds [[resStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
     // CHECK-NEXT: [[encodedResData:%.+]] = llvm.insertvalue [[getPtrRes]], [[encodedRes]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodedResType:%.+]] = llvm.insertvalue [[numericTypeRes]], [[encodedResData]][2] : !llvm.struct<(i64, ptr, i8)> 
-    // CHECK-NEXT: [[allocaRes:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
     // CHECK: llvm.store [[encodedResType]], [[allocaRes]] : !llvm.struct<(i64, ptr, i8)>, !llvm.ptr
     // CHECK: [[arrayRes:%.+]] = llvm.mlir.undef : !llvm.array<1 x ptr>
     // CHECK: [[allocaInsertedRes:%.+]] = llvm.insertvalue [[allocaRes]], [[arrayRes]][0] : !llvm.array<1 x ptr> 
-    // CHECK: [[allocaArrayRes:%.+]] = llvm.alloca [[c1]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
     // CHECK: llvm.store [[allocaInsertedRes]], [[allocaArrayRes]] : !llvm.array<1 x ptr>, !llvm.ptr
     // CHECK: llvm.call @lapack_dgesdd([[allocaArray]], [[allocaArrayRes]]) : (!llvm.ptr, !llvm.ptr) -> ()
     // CHECK: return [[alloc]] : memref<3x3xf64>
@@ -157,6 +169,8 @@ module @test1 {
   // CHECK-SAME: [[arg0:%.+]]: tensor<f64>
   // CHECK-SAME:)
   func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
+    // CHECK: [[ptr1:%.+]] = llvm.alloca {{.*}}
+    // CHECK: [[ptr0:%.+]] = llvm.alloca {{.*}}
     // CHECK: [[memref0:%.+]] = bufferization.to_memref [[arg0]]
     %0 = bufferization.to_memref %arg0 : memref<f64>
     // CHECK: [[struct0:%.+]] = builtin.unrealized_conversion_cast [[memref0]]
@@ -166,9 +180,7 @@ module @test1 {
     %2 = bufferization.to_memref %1 : memref<f64>
     // CHECK: [[struct1:%.+]] = builtin.unrealized_conversion_cast [[memref1]]
 
-    // CHECK: [[ptr0:%.+]] = llvm.alloca {{.*}}
     // CHECK: llvm.store [[struct0]], [[ptr0]]
-    // CHECK: [[ptr1:%.+]] = llvm.alloca {{.*}}
     // CHECK: llvm.store [[struct1]], [[ptr1]]
 
     // call @callback_1([[ptr0]], [[ptr1]])
