@@ -347,21 +347,35 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         if plxpr_branch is None:
             converted_jaxpr_branches.append(None)
         else:
+            # convert plxpr to Catalyst jaxpr
             converted_func = partial(
                 BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
                 plxpr_branch,
                 branch_consts,
             )
             converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args).jaxpr
+
+            # Unfortunately the obtained jaxpr does not comply with the Catalyst
+            # spec. We need to move some vars around as follows:
+
+            # Get the qreg var
             qreg_var = converted_jaxpr_branch.constvars[0]
+
+            # Insert the qreg var to the input vars
             invars = []
             invars.append(converted_jaxpr_branch.constvars[0])
             converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=invars)
+
+            # Insert the qreg var to the output vars
             outvars = []
             outvars.append(copy(converted_jaxpr_branch.constvars[0]))
             converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=outvars)
+
+            # Remove the qreg var from the constants
             constvars = converted_jaxpr_branch.constvars[1:]
             converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars)
+
+            # Insert the qreg var to the output vars of the last equation
             converted_jaxpr_branch.eqns[len(converted_jaxpr_branch.eqns) - 1] = (
                 converted_jaxpr_branch.eqns[len(converted_jaxpr_branch.eqns) - 1].replace(
                     outvars=outvars
@@ -369,23 +383,32 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
             )
             converted_jaxpr_branches.append(converted_jaxpr_branch)
 
-    # Rebuild the invals with the Catalyst jaxpr spec:
+    # The original vals do not comply as well with the Catalyst spec.
+    # We need to rebuild them accordingly:
+
+    # Extract the predicate
     predicate_slice = slice(0, 1)
     predicate = plxpr_invals[predicate_slice]
+
+    # Flatten the constants of all branches
     consts = [const for consts in branches_consts for const in consts]
     cond_invals = [*predicate, *consts, *args, self.qreg]
 
-    outvars = [qreg_var]
+    # Perform the binding
     outvals = cond_p.bind(
         *cond_invals,
         branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
         nimplicit_outputs=None,
     )
 
+    outvars = [qreg_var]
+
+    # Insert the output vars back to the environment and update the qreg
     for outvar, outval in zip(outvars, outvals, strict=True):
         self.qreg = outval
         self._env[outvar] = outval
 
+    # Return an empty list to skip post-processing
     return ()
 
 
