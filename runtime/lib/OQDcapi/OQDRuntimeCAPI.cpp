@@ -24,7 +24,7 @@ void __catalyst__oqd__ion(Ion *ion)
 {
     std::cout << "Hello Ion! " << (ion == nullptr) << std::endl;
     std::cout << "ion ptr: " << ion << std::endl;
-    std::cout << "ion name: " << (ion->name)[0] << std::endl;
+    std::cout << "ion name: " << ion->name << std::endl;
     std::cout << ion->mass << std::endl;
     std::cout << ion->charge << std::endl;
     std::cout << (ion->position)[0]  << " , "
