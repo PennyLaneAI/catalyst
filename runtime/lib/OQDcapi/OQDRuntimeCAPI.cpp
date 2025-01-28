@@ -27,11 +27,11 @@ void __catalyst__oqd__ion(Ion *ion)
     std::cout << "ion name: " << (ion->name)[0] << std::endl;
     std::cout << ion->mass << std::endl;
     std::cout << ion->charge << std::endl;
-    std::cout << ion->position << " is ptr, " << (ion->position)[0]
-    		<< " , zeroth val has addr" << &((ion->position)[0]) << " , "
+    std::cout << (ion->position)[0]  << " , "
     			<< (ion->position)[1] << " , "
     			<< (ion->position)[2] << std::endl;
     std::cout << ion->levels[0].spin << std::endl;
+    std::cout << ion->transitions[2].einstein_a << std::endl;
 }
 
 } // extern "C"
