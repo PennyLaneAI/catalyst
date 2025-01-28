@@ -17,18 +17,14 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 from copy import copy
 from functools import partial
-from typing import Callable, Sequence
+from typing import Callable
 
 import jax
 import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
-from pennylane.capture.primitives import (
-    AbstractMeasurement,
-    AbstractOperator,
-    cond_prim,
-)
+from pennylane.capture.primitives import cond_prim
 
 from catalyst.device import (
     extract_backend_info,
@@ -292,57 +288,6 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         if dtype != mval.dtype:
             return jax.lax.convert_element_type(mval, dtype)
         return mval
-
-    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
-        """Evaluate a jaxpr.
-
-        Args:
-            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
-            consts (list[TensorLike]): the constant variables for the jaxpr
-            *args (tuple[TensorLike]): The arguments for the jaxpr.
-
-        Returns:
-            list[TensorLike]: the results of the execution.
-
-        """
-        self._env = {}
-        self.setup()
-
-        for arg, invar in zip(args, jaxpr.invars, strict=True):
-            self._env[invar] = arg
-        for const, constvar in zip(consts, jaxpr.constvars, strict=True):
-            self._env[constvar] = const
-
-        for eqn in jaxpr.eqns:
-
-            custom_handler = self._primitive_registrations.get(eqn.primitive, None)
-            if custom_handler:
-                invals = [self.read(invar) for invar in eqn.invars]
-                outvals = custom_handler(self, *invals, **eqn.params)
-            elif isinstance(eqn.outvars[0].aval, AbstractOperator):
-                outvals = self.interpret_operation_eqn(eqn)
-            elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-                outvals = self.interpret_measurement_eqn(eqn)
-            else:
-                invals = [self.read(invar) for invar in eqn.invars]
-                outvals = eqn.primitive.bind(*invals, **eqn.params)
-
-            if not eqn.primitive.multiple_results:
-                outvals = [outvals]
-            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
-                self._env[outvar] = outval
-
-        # Read the final result of the Jaxpr from the environment
-        outvals = []
-        for var in jaxpr.outvars:
-            outval = self.read(var)
-            if isinstance(outval, qml.operation.Operator):
-                outvals.append(self.interpret_operation(outval))
-            else:
-                outvals.append(outval)
-        self.cleanup()
-        self._env = {}
-        return outvals
 
 
 class BranchPlxprInterpreter(QFuncPlxprInterpreter):
