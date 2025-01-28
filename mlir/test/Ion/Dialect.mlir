@@ -18,16 +18,18 @@ func.func @example_pulse(%arg0: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[i0:%.+]] = builtin.unrealized_conversion_cast [[q0:%.+]] : !quantum.bit to !ion.ion
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %ion = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.ion
 
-    // CHECK: ion.pulse(%arg0 : f64) [[q0]] : !quantum.bit {beam = #ion.beam<
+    // CHECK: ion.pulse(%arg0 : f64) [[i0]] : !ion.ion {beam = #ion.beam<
     // CHECK-SAME: transition_index = 0 : i64,
     // CHECK-SAME: rabi = 1.010000e+01 : f64,
     // CHECK-SAME: detuning = 1.111000e+01 : f64,
     // CHECK-SAME: polarization = dense<[0, 1]> : tensor<2xi64>,
     // CHECK-SAME: wavevector = dense<[0, 1]> : tensor<2xi64>>,
     // CHECK-SAME: phase = 0.000000e+00 : f64}
-    ion.pulse(%arg0: f64) %1 : !quantum.bit {
+    ion.pulse(%arg0: f64) %ion : !ion.ion {
         beam=#ion.beam<
             transition_index=0,
             rabi=10.10,
@@ -43,14 +45,16 @@ func.func @example_pulse(%arg0: f64) -> !quantum.bit {
 }
 
 
-func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
+func.func @example_parallel_protocol(%arg0: f64) -> !ion.ion {
     %0 = quantum.alloc( 1) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[i0:%.+]] = builtin.unrealized_conversion_cast [[q0:%.+]] : !quantum.bit to !ion.ion
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %ion = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.ion
 
-    // CHECK: [[paraproto:%.+]] = ion.parallelprotocol([[q0]] : !quantum.bit) : !quantum.bit {
-    %2 = ion.parallelprotocol(%1 : !quantum.bit): !quantum.bit {
+    // CHECK: [[paraproto:%.+]] = ion.parallelprotocol([[i0]] : !ion.ion) : !ion.ion {
+    %2 = ion.parallelprotocol(%ion : !ion.ion): !ion.ion {
         ^bb0(%arg1: !ion.ion):
         // CHECK: ion.pulse(%arg0 : f64) %arg1 : !ion.ion {beam = #ion.beam<
         // CHECK-SAME: transition_index = 1 : i64,
@@ -90,11 +94,11 @@ func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
         ion.yield %arg1: !ion.ion
     }
 
-    // CHECK: return [[paraproto]] : !quantum.bit
-    return %2: !quantum.bit
+    // CHECK: return [[paraproto]] : !ion.ion
+    return %2: !ion.ion
 }
 
-func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!ion.ion, !ion.ion) {
     %0 = quantum.alloc( 1) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -103,8 +107,13 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !q
     // CHECK: [[q1:%.+]] = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[paraproto:%.+]]{{:2}} = ion.parallelprotocol([[q0]], [[q1]] : !quantum.bit, !quantum.bit) : !quantum.bit, !quantum.bit {
-    %3:2 = ion.parallelprotocol(%1, %2 : !quantum.bit, !quantum.bit): !quantum.bit, !quantum.bit {
+    // CHECK: [[i0:%.+]] = builtin.unrealized_conversion_cast [[q0:%.+]] : !quantum.bit to !ion.ion
+    // CHECK: [[i1:%.+]] = builtin.unrealized_conversion_cast [[q1:%.+]] : !quantum.bit to !ion.ion
+    %ion0 = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.ion
+    %ion1 = builtin.unrealized_conversion_cast %2 : !quantum.bit to !ion.ion
+
+    // CHECK: [[paraproto:%.+]]{{:2}} = ion.parallelprotocol([[i0]], [[i1]] : !ion.ion, !ion.ion) : !ion.ion, !ion.ion {
+    %3:2 = ion.parallelprotocol(%ion0, %ion1 : !ion.ion, !ion.ion): !ion.ion, !ion.ion {
         ^bb0(%arg1: !ion.ion, %arg2: !ion.ion):
         // CHECK: ion.pulse(%arg0 : f64) %arg1 : !ion.ion {beam = #ion.beam<
         // CHECK-SAME: transition_index = 2 : i64,
@@ -144,8 +153,8 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !q
         ion.yield %arg1, %arg2: !ion.ion, !ion.ion
     }
 
-    // CHECK: return [[paraproto]]#0, [[paraproto]]#1 : !quantum.bit, !quantum.bit
-    return %3#0, %3#1: !quantum.bit, !quantum.bit
+    // CHECK: return [[paraproto]]#0, [[paraproto]]#1 : !ion.ion, !ion.ion
+    return %3#0, %3#1: !ion.ion, !ion.ion
 }
 
 // No FileCheck here, return success if the MLIR can be parsed
