@@ -157,7 +157,7 @@ def PulseOp : Ion_Op<"pulse"> {
 
     let arguments = (ins
         AnyFloat: $time,
-        AnyTypeOf<[IonType, QubitType]>: $in_qubit,
+        IonType: $in_qubit,
         BeamAttr: $beam,
         Builtin_FloatAttr: $phase
     );
@@ -172,10 +172,10 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
     let summary = "Represent a parallel protocol of pulses.";
 
     let arguments = (ins
-        Variadic<AnyTypeOf<[IonType, QubitType]>>: $in_qubits
+        Variadic<IonType>: $in_qubits
     );
 
-    let results = (outs Variadic<AnyTypeOf<[IonType, QubitType]>>:$out_qubits);
+    let results = (outs Variadic<IonType>:$out_qubits);
     let regions = (region SizedRegion<1>:$region);
 
     let builders = [
