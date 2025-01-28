@@ -111,7 +111,12 @@ class QFunc:
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
         if not dynamic_one_shot_called:
-            mcm_config = copy(self.execute_kwargs["mcm_config"])
+            mcm_config = copy(
+                qml.devices.MCMConfig(
+                    postselect_mode=self.execute_kwargs["postselect_mode"],
+                    mcm_method=self.execute_kwargs["mcm_method"],
+                )
+            )
             total_shots = get_device_shots(self.device)
             _validate_mcm_config(mcm_config, total_shots)
 
@@ -238,7 +243,8 @@ def dynamic_one_shot(qnode, **kwargs):
 
     single_shot_qnode = transform_to_single_shot(qnode)
     if mcm_config is not None:
-        single_shot_qnode.execute_kwargs["mcm_config"] = mcm_config
+        single_shot_qnode.execute_kwargs["postselect_mode"] = mcm_config.postselect_mode
+        single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
     total_shots = get_device_shots(dev)
