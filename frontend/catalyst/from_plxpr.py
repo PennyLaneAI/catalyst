@@ -327,11 +327,10 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
                 invals = [self.read(invar) for invar in eqn.invars]
                 outvals = eqn.primitive.bind(*invals, **eqn.params)
 
-            if eqn.primitive.name != "cond":
-                if not eqn.primitive.multiple_results:
-                    outvals = [outvals]
-                for outvar, outval in zip(eqn.outvars, outvals, strict=True):
-                    self._env[outvar] = outval
+            if not eqn.primitive.multiple_results:
+                outvals = [outvals]
+            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
+                self._env[outvar] = outval
 
         # Read the final result of the Jaxpr from the environment
         outvals = []
@@ -442,7 +441,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         self.qreg = outval
         self._env[outvar] = outval
 
-    return outvals
+    return ()
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
