@@ -25,24 +25,17 @@ TEST_CASE("Test ion generation", "[OQD]")
     char estate_name[] = "estate";
     char upstate_name[] = "upstate";
 
-    Level *levels = (Level *)malloc(3 * sizeof(Level));
-    Transition *transitions = (Transition *)malloc(3 * sizeof(Transition));
-
     Level downstate = {downstate_name, 6, 0.4, 0.5, 0.6, 0.8, 0.9, 1.0, 0.0};
     Level estate = {estate_name, 6, 1.4, 1.5, 1.6, 1.8, 1.9, 2.0, 1.264300e+10};
     Level upstate = {upstate_name, 5, 2.4, 2.5, 2.6, 2.8, 2.9, 3.0, 8.115200e+14};
-    levels[0] = downstate;
-    levels[1] = estate;
-    levels[2] = upstate;
+    Level levels[] = {downstate, estate, upstate};
 
     Transition de = {downstate_name, estate_name, 2.200000e+00};
     Transition du = {downstate_name, upstate_name, 1.100000e+00};
     Transition eu = {estate_name, upstate_name, 3.300000e+00};
-    transitions[0] = de;
-    transitions[1] = du;
-    transitions[2] = eu;
+    Transition transitions[] = {de, du, eu};
 
-    Ion ion = {name, 171.0, 1.0, {1, 2, 3}, levels, transitions};
+    Ion ion = {name, 171.0, 42.42, {1, 2, 3}, levels, transitions};
 
     __catalyst__oqd__ion(&ion);
 }
