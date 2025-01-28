@@ -315,28 +315,19 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
         for eqn in jaxpr.eqns:
 
-            if eqn.primitive.name == "cond":
+            custom_handler = self._primitive_registrations.get(eqn.primitive, None)
+            if custom_handler:
                 invals = [self.read(invar) for invar in eqn.invars]
-                outvars, outvals = handle_cond(self, *invals, **eqn.params)
-
-                if not eqn.primitive.multiple_results:
-                    outvals = [outvals]
-                for outvar, outval in zip(outvars, outvals, strict=True):
-                    self.qreg = outval
-                    self._env[outvar] = outval
+                outvals = custom_handler(self, *invals, **eqn.params)
+            elif isinstance(eqn.outvars[0].aval, AbstractOperator):
+                outvals = self.interpret_operation_eqn(eqn)
+            elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
+                outvals = self.interpret_measurement_eqn(eqn)
             else:
-                custom_handler = self._primitive_registrations.get(eqn.primitive, None)
-                if custom_handler:
-                    invals = [self.read(invar) for invar in eqn.invars]
-                    outvals = custom_handler(self, *invals, **eqn.params)
-                elif isinstance(eqn.outvars[0].aval, AbstractOperator):
-                    outvals = self.interpret_operation_eqn(eqn)
-                elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-                    outvals = self.interpret_measurement_eqn(eqn)
-                else:
-                    invals = [self.read(invar) for invar in eqn.invars]
-                    outvals = eqn.primitive.bind(*invals, **eqn.params)
+                invals = [self.read(invar) for invar in eqn.invars]
+                outvals = eqn.primitive.bind(*invals, **eqn.params)
 
+            if eqn.primitive.name != "cond":
                 if not eqn.primitive.multiple_results:
                     outvals = [outvals]
                 for outvar, outval in zip(eqn.outvars, outvals, strict=True):
@@ -401,7 +392,7 @@ def _(self, phase, *wires, n_wires):
 
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
-def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     args = plxpr_invals[args_slice]
     branches_consts = [plxpr_invals[consts_slice] for consts_slice in consts_slices]
     converted_jaxpr_branches = []
@@ -440,11 +431,18 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     consts = [const for consts in branches_consts for const in consts]
     cond_invals = [*predicate, *consts, *args, self.qreg]
 
-    return [qreg_var], cond_p.bind(
+    outvars = [qreg_var]
+    outvals = cond_p.bind(
         *cond_invals,
         branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
         nimplicit_outputs=None,
     )
+
+    for outvar, outval in zip(outvars, outvals, strict=True):
+        self.qreg = outval
+        self._env[outvar] = outval
+
+    return outvals
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
