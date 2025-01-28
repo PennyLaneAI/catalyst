@@ -4,8 +4,16 @@
 
 add_library(catalyst_oqd_obj OBJECT OQDRuntimeCAPI.cpp)
 
-# link to rt_backend
-target_link_libraries(catalyst_oqd_obj ${CMAKE_DL_LIBS})
+# Fetch json utilities
+include(FetchContent)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+FetchContent_MakeAvailable(json)
+
+# link to rt_backend and json utils
+target_link_libraries(catalyst_oqd_obj
+    PUBLIC ${CMAKE_DL_LIBS}
+    PRIVATE nlohmann_json::nlohmann_json
+)
 
 target_include_directories(catalyst_oqd_obj PUBLIC .
     ${CMAKE_CURRENT_SOURCE_DIR}
