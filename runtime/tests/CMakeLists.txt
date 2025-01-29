@@ -77,6 +77,7 @@ if(ENABLE_OQD)
     target_link_libraries(runner_tests_oqd PRIVATE
         Catch2::Catch2
         catalyst_qir_runtime
+        PRIVATE nlohmann_json::nlohmann_json
     )
 
     target_sources(runner_tests_oqd PRIVATE
