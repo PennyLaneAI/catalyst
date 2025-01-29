@@ -29,7 +29,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     // CHECK: %[[const_charge:.*]] = llvm.mlir.constant(1.000000e+00 : f64)
 
     // Check struct initialization for position
-    // CHECK: %[[pos:.*]] = llvm.mlir.constant(dense<[1, 2, -1]> : vector<3xi64>) : vector<3xi64>
+    // CHECK: %[[pos:.*]] = llvm.mlir.constant([1.000000e+00, 2.000000e+00, -1.000000e+00]) : !llvm.array<3 x f64>
 
     // Check level array initialization
     // CHECK: %[[level_array_undef:.*]] = llvm.mlir.undef : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>
@@ -67,17 +67,17 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     // CHECK: %[[transition_2_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
     
     // Final Ion Struct
-    // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, vector<3xi64>, ptr, ptr)>
-    // CHECK: %[[ion_name_ptr:.*]] = llvm.insertvalue %[[ptr_to_yb171]], %[[ion_struct_undef]][0] : !llvm.struct<(ptr, f64, f64, vector<3xi64>, ptr, ptr)> 
-    // CHECK: %[[ion_mass_ptr:.*]] = llvm.insertvalue %[[const_mass]], %[[ion_name_ptr]][1] : !llvm.struct<(ptr, f64, f64, vector<3xi64>, ptr, ptr)> 
-    // CHECK: %[[ion_charge_ptr:.*]] = llvm.insertvalue %[[const_charge]], %[[ion_mass_ptr]][2] : !llvm.struct<(ptr, f64, f64, vector<3xi64>, ptr, ptr)> 
+    // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)>
+    // CHECK: %[[ion_name_ptr:.*]] = llvm.insertvalue %[[ptr_to_yb171]], %[[ion_struct_undef]][0] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
+    // CHECK: %[[ion_mass_ptr:.*]] = llvm.insertvalue %[[const_mass]], %[[ion_name_ptr]][1] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
+    // CHECK: %[[ion_charge_ptr:.*]] = llvm.insertvalue %[[const_charge]], %[[ion_mass_ptr]][2] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
     // CHECK: %[[ion_ptr:.*]] = llvm.call @__catalyst_ion(%{{.*}}) : (!llvm.ptr) -> !llvm.ptr
 
     %0 = ion.ion {
         charge = 1.000000e+00 : f64, 
         mass = 1.710000e+02 : f64, 
         name = "Yb171", 
-        position = dense<[1, 2, -1]> : vector<3xi64>, 
+        position = array<f64: 1.0, 2.0, -1.0>,
         levels = [
             #ion.level<
                 label="downstate",

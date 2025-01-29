@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
-// CHECK: llvm.func @__catalyst_pulse(!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>) -> !llvm.ptr
+// CHECK: llvm.func @__catalyst_pulse(!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst_parallel_protocol(!llvm.array<2 x ptr>) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst_ion(!llvm.ptr) -> !llvm.ptr
 // CHECK: llvm.mlir.global internal constant @upstate("upstate\00") {addr_space = 0 : i32}
@@ -23,7 +23,7 @@
 // CHECK: llvm.mlir.global internal constant @Yb171("Yb171\00") {addr_space = 0 : i32}
     
 // CHECK-LABEL: parallel_protocol_op
-func.func public @parallel_protocol_op(%arg0: f64) -> !ion.ion {
+func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
     // Ion
     // CHECK: %[[ion:.*]] = llvm.call @__catalyst_ion
 
@@ -45,7 +45,7 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !ion.ion {
         charge = 1.000000e+00 : f64, 
         mass = 1.710000e+02 : f64, 
         name = "Yb171", 
-        position = dense<[1, 2, -1]> : vector<3xi64>, 
+        position = array<f64: 1.000000e+00, 2.000000e+00, -1.000000e+00>, 
         levels = [
             #ion.level<
                 label="downstate",
@@ -100,31 +100,34 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !ion.ion {
         ]
     } : !ion.ion
 
-    %pp= ion.parallelprotocol(%ion: !ion.ion) : !ion.ion {
-        ^bb0(%arg1: !ion.ion):
-          %p1 = ion.pulse(%arg0: f64) %arg1: !ion.ion {
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %q0 = quantum.extract %qreg[ 0] : !quantum.reg -> !quantum.bit
+
+    %pp= ion.parallelprotocol(%q0) : !quantum.bit{
+        ^bb0(%arg1: !quantum.bit):
+          %p1 = ion.pulse(%arg0: f64) %arg1 {
               beam=#ion.beam<
                   transition_index=1,
                   rabi=10.10,
                   detuning=11.11,
-                  polarization=dense<[0, 1]>: vector<2xi64>,
-                  wavevector=dense<[0, 1]>: vector<2xi64>
+                  polarization=[0, 1],
+                  wavevector=[0, 1]
               >,
               phase=0.0
-          }
+          } : !ion.pulse
           
-          %p2 = ion.pulse(%arg0: f64) %arg1: !ion.ion {
+          %p2 = ion.pulse(%arg0: f64) %arg1 {
               beam=#ion.beam<
                   transition_index=0,
                   rabi=10.10,
                   detuning=11.11,
-                  polarization=dense<[0, 1]>: vector<2xi64>,
-                  wavevector=dense<[0, 1]>: vector<2xi64>
+                  polarization=[0, 1],
+                  wavevector=[0, 1]
               >,
               phase=0.0
-          }
-          ion.yield %arg1: !ion.ion
+          } : !ion.pulse
+          ion.yield %arg1: !quantum.bit
     }
 
-    return %pp: !ion.ion
+    return %pp: !quantum.bit
 }

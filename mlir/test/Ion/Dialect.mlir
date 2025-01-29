@@ -24,16 +24,16 @@ func.func @example_pulse(%arg0: f64) -> !quantum.bit {
     // CHECK-SAME: transition_index = 0 : i64,
     // CHECK-SAME: rabi = 1.010000e+01 : f64,
     // CHECK-SAME: detuning = 1.111000e+01 : f64,
-    // CHECK-SAME: polarization = dense<[0, 1]> : tensor<2xi64>,
-    // CHECK-SAME: wavevector = dense<[0, 1]> : tensor<2xi64>>,
+    // CHECK-SAME: polarization = [0, 1],
+    // CHECK-SAME: wavevector = [0, 1]>,
     // CHECK-SAME: phase = 0.000000e+00 : f64}
     %2 = ion.pulse(%arg0: f64) %1 {
         beam=#ion.beam<
             transition_index=0,
             rabi=10.10,
             detuning=11.11,
-            polarization=dense<[0, 1]>: tensor<2xi64>,
-            wavevector=dense<[0, 1]>: tensor<2xi64>
+            polarization=[0, 1],
+            wavevector=[0, 1]
         >,
         phase=0.0
     } : !ion.pulse
@@ -56,16 +56,16 @@ func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
         // CHECK-SAME: transition_index = 1 : i64,
         // CHECK-SAME: rabi = 1.010000e+01 : f64,
         // CHECK-SAME: detuning = 1.111000e+01 : f64,
-        // CHECK-SAME: polarization = dense<[0, 1]> : tensor<2xi64>,
-        // CHECK-SAME: wavevector = dense<[0, 1]> : tensor<2xi64>>,
+        // CHECK-SAME: polarization = [0, 1],
+        // CHECK-SAME: wavevector = [0, 1]>,
         // CHECK-SAME: phase = 0.000000e+00 : f64}
         %3 = ion.pulse(%arg0: f64) %arg1 {
             beam=#ion.beam<
                 transition_index=1,
                 rabi=10.10,
                 detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
+                polarization=[0, 1],
+                wavevector=[0, 1]
             >,
             phase=0.0
         } : !ion.pulse
@@ -73,16 +73,16 @@ func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
         // CHECK-SAME: transition_index = 0 : i64,
         // CHECK-SAME: rabi = 1.010000e+01 : f64,
         // CHECK-SAME: detuning = 1.111000e+01 : f64,
-        // CHECK-SAME: polarization = dense<[0, 1]> : tensor<2xi64>,
-        // CHECK-SAME: wavevector = dense<[0, 1]> : tensor<2xi64>>,
+        // CHECK-SAME: polarization = [0, 1],
+        // CHECK-SAME: wavevector = [0, 1]>,
         // CHECK-SAME: phase = 0.000000e+00 : f64}
         %4 = ion.pulse(%arg0: f64) %arg1 {
             beam=#ion.beam<
                 transition_index=0,
                 rabi=10.10,
                 detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
+                polarization=[0, 1],
+                wavevector=[0, 1]
             >,
             phase=0.0
         } : !ion.pulse
@@ -110,16 +110,16 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !q
         // CHECK-SAME: transition_index = 2 : i64,
         // CHECK-SAME: rabi = 1.010000e+01 : f64,
         // CHECK-SAME: detuning = 1.111000e+01 : f64,
-        // CHECK-SAME: polarization = dense<[0, 1]> : tensor<2xi64>,
-        // CHECK-SAME: wavevector = dense<[0, 1]> : tensor<2xi64>>,
+        // CHECK-SAME: polarization = [0, 1],
+        // CHECK-SAME: wavevector = [0, 1]>,
         // CHECK-SAME: phase = 0.000000e+00 : f64}
         %4 = ion.pulse(%arg0: f64) %arg1 {
             beam=#ion.beam<
                 transition_index=2,
                 rabi=10.10,
                 detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
+                polarization=[0, 1],
+                wavevector=[0, 1]
             >,
             phase=0.0
         } : !ion.pulse
@@ -127,16 +127,16 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !q
         // CHECK-SAME: transition_index = 1 : i64,
         // CHECK-SAME: rabi = 1.010000e+01 : f64,
         // CHECK-SAME: detuning = 1.111000e+01 : f64,
-        // CHECK-SAME: polarization = dense<[0, 1]> : tensor<2xi64>,
-        // CHECK-SAME: wavevector = dense<[0, 1]> : tensor<2xi64>>,
+        // CHECK-SAME: polarization = [0, 1],
+        // CHECK-SAME: wavevector = [0, 1]>,
         // CHECK-SAME: phase = 0.000000e+00 : f64}
         %5 = ion.pulse(%arg0: f64) %arg2 {
             beam=#ion.beam<
                 transition_index=1,
                 rabi=10.10,
                 detuning=11.11,
-                polarization=dense<[0, 1]>: tensor<2xi64>,
-                wavevector=dense<[0, 1]>: tensor<2xi64>
+                polarization=[0, 1],
+                wavevector=[0, 1]
             >,
             phase=0.0
         } : !ion.pulse
@@ -154,7 +154,7 @@ func.func @example_ion() -> !ion.ion {
         name="YB117",
         mass=10.1,
         charge=12.1,
-        position=dense<[0, 1]>: tensor<2xi64>,
+        position= array<f64: 1.0, 2.0, -1.0>,
         levels=[
             #ion.level<
                 label="downstate",

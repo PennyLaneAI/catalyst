@@ -96,8 +96,7 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
             builder.create<ion::IonOp>(
                 op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
                 builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
-                builder.getI64VectorAttr(ion.position), builder.getArrayAttr(levels),
-                builder.getArrayAttr(transitions));
+                ion.position, builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
         }
 
         RewritePatternSet ionPatterns(&getContext());

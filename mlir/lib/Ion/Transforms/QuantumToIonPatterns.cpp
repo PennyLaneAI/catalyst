@@ -166,13 +166,13 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         auto beam0toEAttr = BeamAttr::get(
             op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
-            rewriter.getI64VectorAttr(beam.polarization),
-            rewriter.getI64VectorAttr(beam.wavevector));
+            rewriter.getDenseI64ArrayAttr(beam.polarization),
+            rewriter.getDenseI64ArrayAttr(beam.wavevector));
         auto beam1toEAttr = BeamAttr::get(
             op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
-            rewriter.getI64VectorAttr(beam.polarization),
-            rewriter.getI64VectorAttr(beam.wavevector));
+            rewriter.getDenseI64ArrayAttr(beam.polarization),
+            rewriter.getDenseI64ArrayAttr(beam.wavevector));
 
         // TODO (backlog): Pull the math formula from database and apply it in MLIR (but right now
         // it is not in the database)
@@ -302,8 +302,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       rewriter.getF64FloatAttr(beam.detuning),
-                                      rewriter.getI64VectorAttr(beam.polarization),
-                                      rewriter.getI64VectorAttr(beam.wavevector));
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit0, beam1Attr,
                                                  phase0Attr);
 
@@ -325,8 +325,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       // TODO: fill in formula with delta and mu once available
                                       rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
-                                      rewriter.getI64VectorAttr(beam.polarization),
-                                      rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit0, beam2Attr,
                                                  phase0Attr);
 
@@ -347,8 +347,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       // TODO: fill in formula with delta and mu once available
                                       rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
-                                      rewriter.getI64VectorAttr(beam.polarization),
-                                      rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit0, beam3Attr,
                                                  phase0Attr);
 
@@ -367,8 +367,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       rewriter.getF64FloatAttr(beam.detuning),
-                                      rewriter.getI64VectorAttr(beam.polarization),
-                                      rewriter.getI64VectorAttr(beam.wavevector));
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam4Attr,
                                                  phase0Attr);
 
@@ -390,8 +390,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       // TODO: fill in formula with delta and mu once available
                                       rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
-                                      rewriter.getI64VectorAttr(beam.polarization),
-                                      rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam5Attr,
                                                  phase0Attr);
 
@@ -413,8 +413,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       // TODO: fill in formula with delta and mu once available
                                       rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
-                                      rewriter.getI64VectorAttr(beam.polarization),
-                                      rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam6Attr,
                                                  phase0Attr);
                 });

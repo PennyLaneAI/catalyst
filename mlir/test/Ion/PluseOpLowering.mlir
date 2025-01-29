@@ -26,18 +26,18 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
 
     // Create the beam struct
      
-    // CHECK: %[[beam_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
+    // CHECK: %[[beam_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
     // CHECK: %[[transition_index:.*]] = llvm.mlir.constant(0 : i64) : i64
-    // CHECK: %[[beam_struct_transition_index:.*]] = llvm.insertvalue %[[transition_index:.*]], %[[beam_struct_undef:.*]][0] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
+    // CHECK: %[[beam_struct_transition_index:.*]] = llvm.insertvalue %[[transition_index:.*]], %[[beam_struct_undef:.*]][0] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
     // CHECK: %[[rabi:.*]] = llvm.mlir.constant(1.010000e+01 : f64) : f64
-    // CHECK: %[[beam_struct_rabi:.*]] = llvm.insertvalue %[[rabi:.*]], %[[beam_struct_transition_index:.*]][1] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)> 
+    // CHECK: %[[beam_struct_rabi:.*]] = llvm.insertvalue %[[rabi:.*]], %[[beam_struct_transition_index:.*]][1] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)> 
     // CHECK: %[[detuning:.*]] = llvm.mlir.constant(1.111000e+01 : f64) : f64
-    // CHECK: %[[beam_struct_detuning:.*]] = llvm.insertvalue %[[detuning:.*]], %[[beam_struct_rabi:.*]][2] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
-    // CHECK: %[[polarization:.*]] = llvm.mlir.constant(dense<[0, 1]> : vector<2xi64>) : vector<2xi64>
-    // CHECK: %[[beam_struct_polarization:.*]] = llvm.insertvalue %[[polarization:.*]], %[[beam_struct_detuning:.*]][3] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
-    // CHECK: %[[wavevector:.*]] = llvm.mlir.constant(dense<[0, 1]> : vector<2xi64>) : vector<2xi64>
-    // CHECK: %[[beam_struct_wavevector:.*]] = llvm.insertvalue %[[wavevector:.*]], %[[beam_struct_polarization:.*]][4] : !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>
-    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector:.*]]) : (!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, vector<2xi64>, vector<2xi64>)>) -> !llvm.ptr
+    // CHECK: %[[beam_struct_detuning:.*]] = llvm.insertvalue %[[detuning:.*]], %[[beam_struct_rabi:.*]][2] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[polarization:.*]] = llvm.mlir.constant([array<i64: 0, 1>]) : !llvm.array<2 x i64>
+    // CHECK: %[[beam_struct_polarization:.*]] = llvm.insertvalue %[[polarization:.*]], %[[beam_struct_detuning:.*]][3] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[wavevector:.*]] = llvm.mlir.constant([array<i64: 0, 1>]) : !llvm.array<2 x i64>
+    // CHECK: %[[beam_struct_wavevector:.*]] = llvm.insertvalue %[[wavevector:.*]], %[[beam_struct_polarization:.*]][4] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector:.*]]) : (!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>) -> !llvm.ptr
 
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
@@ -47,8 +47,8 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
             transition_index=0,
             rabi=10.10,
             detuning=11.11,
-            polarization=dense<[0, 1]>: vector<2xi64>,
-            wavevector=dense<[0, 1]>: vector<2xi64>
+            polarization=[0, 1],
+            wavevector=[0, 1]
         >,
         phase=0.0
     } : !ion.pulse

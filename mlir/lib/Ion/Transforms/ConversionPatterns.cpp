@@ -80,17 +80,19 @@ LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
                  IntegerType::get(ctx, 64), // transition index
                  Float64Type::get(ctx),     // rabi
                  Float64Type::get(ctx),     // detuning
-                 VectorType::get(           // polarization
-                     {beamAttr.getPolarization().size()}, rewriter.getIntegerType(64)),
-                 VectorType::get( // wavevector
-                     {beamAttr.getWavevector().size()}, rewriter.getIntegerType(64)),
+                 LLVM::LLVMArrayType::get(  // polarization
+                     rewriter.getIntegerType(64), beamAttr.getPolarization().size()),
+                 LLVM::LLVMArrayType::get( // wavevector
+                     rewriter.getIntegerType(64), beamAttr.getWavevector().size()),
              });
 }
 
 Value createPositionArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
-                          DenseIntElementsAttr &positionAttr)
+                          ::llvm::ArrayRef<double> &positionAttr)
 {
-    return rewriter.create<LLVM::ConstantOp>(loc, positionAttr);
+    auto arrayType = LLVM::LLVMArrayType::get(rewriter.getF64Type(), positionAttr.size());
+    return rewriter.create<LLVM::ConstantOp>(loc, arrayType,
+                                             rewriter.getF64ArrayAttr(positionAttr));
 }
 
 Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
@@ -213,10 +215,17 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
         loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, rabi), 1);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
+    auto polarizationType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), polarization.size());
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, polarization), 3);
+        loc, beamStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, polarizationType,
+                                          rewriter.getArrayAttr(polarization)),
+        3);
+    auto wavevectorType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), polarization.size());
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, wavevector), 4);
+        loc, beamStruct,
+        rewriter.create<LLVM::ConstantOp>(loc, wavevectorType, rewriter.getArrayAttr(wavevector)),
+        4);
     return beamStruct;
 }
 
@@ -254,11 +263,11 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         // Define the function signature for the Ion stub
         Type ionStructType = LLVM::LLVMStructType::getLiteral(
             ctx, {
-                     ptrType,               // name
-                     Float64Type::get(ctx), // mass
-                     Float64Type::get(ctx), // charge
-                     VectorType::get(       // position
-                         {positionAttr.size()}, rewriter.getIntegerType(64)),
+                     ptrType,                  // name
+                     Float64Type::get(ctx),    // mass
+                     Float64Type::get(ctx),    // charge
+                     LLVM::LLVMArrayType::get( // position
+                         rewriter.getF64Type(), positionAttr.size()),
                      ptrType, // levels
                      ptrType, // Transitions
                  });
