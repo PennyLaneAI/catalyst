@@ -24,6 +24,8 @@
 
 using json = nlohmann::json;
 
+static std::unique_ptr<json> JSON = nullptr;
+
 void to_json(json &j, const Level &l)
 {
     j = json{{"class_", "Level"},
@@ -46,6 +48,25 @@ void to_json(json &j, const Transition &tr)
 }
 
 extern "C" {
+
+void __catalyst__oqd__rt__initialize()
+{
+    JSON = std::make_unique<json>();
+    (*JSON)["class_"] = "AtomicCircuit";
+
+    json system = R"({
+  "class_": "System",
+  "ions": []
+})"_json;
+    (*JSON)["system"] = system;
+}
+
+void __catalyst__oqd__rt__finalize()
+{
+    std::ofstream out_json("output.json");
+    out_json << JSON->dump(2);
+    JSON = nullptr;
+}
 
 void __catalyst__oqd__greetings() { std::cout << "Hello OQD world!" << std::endl; }
 
@@ -82,8 +103,7 @@ void __catalyst__oqd__ion(Ion *ion)
         transition_in_json["level2"] = levels[labeled_levels[transition_in_json["level2"]]];
     }
 
-    std::ofstream out_json("ion_output.json");
-    out_json << j.dump(2);
+    (*JSON)["system"]["ions"].push_back(j);
 }
 
 } // extern "C"

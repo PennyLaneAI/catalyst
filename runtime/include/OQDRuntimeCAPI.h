@@ -55,6 +55,8 @@ struct Ion {
 // OQD Runtime Instructions
 void __catalyst__oqd__greetings();
 
+void __catalyst__oqd__rt__initialize();
+void __catalyst__oqd__rt__finalize();
 void __catalyst__oqd__ion(Ion *);
 
 #ifdef __cplusplus

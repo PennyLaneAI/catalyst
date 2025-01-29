@@ -49,6 +49,11 @@ TEST_CASE("Test ion generation", "[OQD]")
     // Example ion taken from opentoml example of one qubit RX(pi/2)
     // https://github.com/OpenQuantumDesign/TrICal/blob/dev_yihong/examples/2a_example_rx_pi_by_2.json
     json expected = json::parse(R"(
+{
+  "class_": "AtomicCircuit",
+  "system": {
+    "class_": "System",
+    "ions": [
       {
         "class_": "Ion",
         "mass": 171.0,
@@ -211,12 +216,16 @@ TEST_CASE("Test ion generation", "[OQD]")
           0.0
         ]
       }
+    ]
+  }
+}
 )");
-
+    __catalyst__oqd__rt__initialize();
     __catalyst__oqd__ion(&ion);
-    json observed = json::parse(std::ifstream("ion_output.json"));
+    __catalyst__oqd__rt__finalize();
 
+    json observed = json::parse(std::ifstream("output.json"));
     CHECK(expected == observed);
 
-    std::filesystem::remove("ion_output.json");
+    std::filesystem::remove("output.json");
 }
