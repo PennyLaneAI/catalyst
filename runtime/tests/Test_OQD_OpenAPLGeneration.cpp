@@ -35,7 +35,7 @@ TEST_CASE("Test ion generation", "[OQD]")
     Transition eu = {estate_name, upstate_name, 3.300000e+00};
     Transition transitions[] = {de, du, eu};
 
-    Ion ion = {name, 171.0, 42.42, {1, 2, 3}, levels, transitions};
+    Ion ion = {name, 171.0, 42.42, {1, 2, 3}, levels, 3, transitions, 3};
 
     __catalyst__oqd__ion(&ion);
 }

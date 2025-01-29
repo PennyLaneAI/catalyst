@@ -121,19 +121,21 @@ module @f {
     %103 = llvm.mlir.constant(3 : i64) : i64
     %104 = llvm.alloca %103 x !llvm.array<3 x struct<(ptr, ptr, f64)>> : (i64) -> !llvm.ptr
     llvm.store %102, %104 : !llvm.array<3 x struct<(ptr, ptr, f64)>>, !llvm.ptr
-    %105 = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %106 = llvm.insertvalue %2, %105[0] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %107 = llvm.insertvalue %3, %106[1] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %108 = llvm.insertvalue %4, %107[2] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
+    %105 = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %106 = llvm.insertvalue %2, %105[0] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %107 = llvm.insertvalue %3, %106[1] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %108 = llvm.insertvalue %4, %107[2] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
     //%109 = llvm.insertvalue %5, %108[3] : !llvm.struct<(ptr, f64, f64, array<3xi64>, ptr, ptr)>
-    %200 = llvm.insertvalue %posx, %108[3, 0] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %201 = llvm.insertvalue %posy, %200[3, 1] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %202 = llvm.insertvalue %posz, %201[3, 2] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %110 = llvm.insertvalue %71, %202[4] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %111 = llvm.insertvalue %104, %110[5] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>
-    %112 = llvm.alloca %0 x !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)> : (i64) -> !llvm.ptr
-    llvm.store %111, %112 : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, ptr)>, !llvm.ptr
-    llvm.call @__catalyst__oqd__ion(%112) : (!llvm.ptr) -> ()
+    %200 = llvm.insertvalue %posx, %108[3, 0] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %201 = llvm.insertvalue %posy, %200[3, 1] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %202 = llvm.insertvalue %posz, %201[3, 2] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %110 = llvm.insertvalue %71, %202[4] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %111 = llvm.insertvalue %70, %110[5] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %112 = llvm.insertvalue %104, %111[6] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %113 = llvm.insertvalue %103, %112[7] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
+    %114 = llvm.alloca %0 x !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)> : (i64) -> !llvm.ptr
+    llvm.store %113, %114 : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>, !llvm.ptr
+    llvm.call @__catalyst__oqd__ion(%114) : (!llvm.ptr) -> ()
     llvm.return
   }
 

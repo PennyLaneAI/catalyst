@@ -16,7 +16,7 @@
 #ifndef OQDRUNTIMECAPI_H
 #define OQDRUNTIMECAPI_H
 
-#include <cmath>
+#include <array>
 #include <cstdint>
 
 #ifdef __cplusplus
@@ -45,9 +45,11 @@ struct Ion {
     char *name;
     double mass;
     double charge;
-    int64_t position[3];
+    std::array<int64_t, 3> position;
     Level *levels;
+    int64_t num_of_levels;
     Transition *transitions;
+    int64_t num_of_transitions;
 };
 
 // OQD Runtime Instructions
