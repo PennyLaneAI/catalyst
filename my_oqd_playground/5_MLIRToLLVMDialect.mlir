@@ -137,9 +137,9 @@ module @f {
     %113 = llvm.insertvalue %103, %112[7] : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>
     %114 = llvm.alloca %0 x !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)> : (i64) -> !llvm.ptr
     llvm.store %113, %114 : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>, !llvm.ptr
-    llvm.call @__catalyst__oqd__rt__initialize() : () -> ()
+    //llvm.call @__catalyst__oqd__rt__initialize() : () -> ()
     llvm.call @__catalyst__oqd__ion(%114) : (!llvm.ptr) -> ()
-    llvm.call @__catalyst__oqd__rt__finalize() : () -> ()
+    //llvm.call @__catalyst__oqd__rt__finalize() : () -> ()
     llvm.return
   }
 
@@ -167,11 +167,13 @@ module @f {
   llvm.func @setup() {
     %0 = llvm.mlir.zero : !llvm.ptr
     llvm.call @__catalyst__rt__initialize(%0) : (!llvm.ptr) -> ()
+    llvm.call @__catalyst__oqd__rt__initialize() : () -> ()
     llvm.return
   }
 
   llvm.func @teardown() {
     llvm.call @__catalyst__rt__finalize() : () -> ()
+    llvm.call @__catalyst__oqd__rt__finalize() : () -> ()
     llvm.return
   }
 
