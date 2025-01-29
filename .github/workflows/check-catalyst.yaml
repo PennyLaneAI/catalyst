@@ -56,6 +56,7 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           ENABLE_ASAN=OFF \
+          ENABLE_OQD=ON \
           make runtime
 
           COMPILER_LAUNCHER="" \
