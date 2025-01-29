@@ -16,6 +16,7 @@
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
+#include "mlir/IR/IRMapping.h"
 
 using namespace mlir;
 using namespace catalyst::ion;
@@ -317,15 +318,18 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         // Clone the region operations outside ParallelProtocolOp.
         SmallVector<Value> parallelPulses;
         rewriter.setInsertionPoint(op);
+        IRMapping irMapping;
         for (auto &regionOp : regionBlock->getOperations()) {
             if (auto pulseOp = dyn_cast<catalyst::ion::PulseOp>(&regionOp)) {
-                auto *clonedPulseOp = rewriter.clone(regionOp);
+                auto *clonedPulseOp = rewriter.clone(regionOp, irMapping);
+                irMapping.map(regionOp.getResults(), clonedPulseOp->getResults());
                 // keep track of parallel Pulses for the runtime call
                 parallelPulses.push_back(clonedPulseOp->getResult(0));
             }
             else if (!isa<catalyst::ion::YieldOp>(&regionOp)) {
                 // Clone other operations (e.g., llvm.fdiv) that aren't YieldOp
-                rewriter.clone(regionOp);
+                auto *clonedRegionOp = rewriter.clone(regionOp, irMapping);
+                irMapping.map(regionOp.getResults(), clonedRegionOp->getResults());
             }
         }
 
