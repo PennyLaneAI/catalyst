@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fstream>
 #include <functional> // std::reference_wrapper
 #include <iostream>
 #include <unordered_map>
@@ -81,7 +82,8 @@ void __catalyst__oqd__ion(Ion *ion)
         transition_in_json["level2"] = levels[labeled_levels[transition_in_json["level2"]]];
     }
 
-    std::cout << j.dump(2) << std::endl;
+    std::ofstream out_json("ion_output.json");
+    out_json << j.dump(2);
 }
 
 } // extern "C"
