@@ -686,6 +686,7 @@ jobs:
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
+          ENABLE_OQD=ON \
           make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
