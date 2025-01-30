@@ -68,7 +68,9 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     void runOnOperation() final
     {
         func::FuncOp op = cast<func::FuncOp>(getOperation());
-        // auto module = getOperation();
+        if (!op->hasAttr("qnode")) {
+            return;
+        }
         auto &context = getContext();
         ConversionTarget target(context);
 

@@ -19,7 +19,7 @@
 // RUN: --split-input-file -verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: example_ion_two_qubit
-func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
+func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode} {
 
 
     // COM: attr-dict in op's assembly format sorts fields alphabetically
@@ -227,7 +227,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit {
 
 
 // CHECK-LABEL: example_ion_three_qubit
-func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) attributes {qnode} {
 
     // CHECK: {{%.+}} = ion.ion
 
