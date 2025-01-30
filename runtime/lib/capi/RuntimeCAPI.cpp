@@ -278,9 +278,6 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
                                  DeviceConfig device_config, int64_t shots)
 {
-    std::vector<intptr_t> config;
-    va_list args;
-    va_start(args, shots);
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
                  rtd_name, rtd_kwargs, device_config, shots);
 }
