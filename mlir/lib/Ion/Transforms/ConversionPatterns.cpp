@@ -166,8 +166,8 @@ Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx
         Value TransitionStruct = rewriter.create<LLVM::UndefOp>(loc, TransitionStructType);
         auto level0 = transitionAttr.getLevel_0().getValue().str();
         auto level1 = transitionAttr.getLevel_1().getValue().str();
-        auto level0_global = getGlobalString(loc, rewriter, level1, mod);
-        auto level1_global = getGlobalString(loc, rewriter, level0, mod);
+        auto level0_global = getGlobalString(loc, rewriter, level0, mod);
+        auto level1_global = getGlobalString(loc, rewriter, level1, mod);
         TransitionStruct =
             rewriter.create<LLVM::InsertValueOp>(loc, TransitionStruct, level0_global, 0);
         TransitionStruct =
