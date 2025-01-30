@@ -33,11 +33,15 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[beam_struct_rabi:.*]] = llvm.insertvalue %[[rabi:.*]], %[[beam_struct_transition_index:.*]][1] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)> 
     // CHECK: %[[detuning:.*]] = llvm.mlir.constant(1.111000e+01 : f64) : f64
     // CHECK: %[[beam_struct_detuning:.*]] = llvm.insertvalue %[[detuning:.*]], %[[beam_struct_rabi:.*]][2] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
-    // CHECK: %[[polarization:.*]] = llvm.mlir.constant([array<i64: 0, 1>]) : !llvm.array<2 x i64>
-    // CHECK: %[[beam_struct_polarization:.*]] = llvm.insertvalue %[[polarization:.*]], %[[beam_struct_detuning:.*]][3] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
-    // CHECK: %[[wavevector:.*]] = llvm.mlir.constant([array<i64: 0, 1>]) : !llvm.array<2 x i64>
-    // CHECK: %[[beam_struct_wavevector:.*]] = llvm.insertvalue %[[wavevector:.*]], %[[beam_struct_polarization:.*]][4] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
-    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector:.*]]) : (!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>) -> !llvm.ptr
+    // CHECK: %[[polarization_0:.*]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: %[[beam_struct_polarization_0:.*]] = llvm.insertvalue %[[polarization_0:.*]], %[[beam_struct_detuning:.*]][3, 0] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[polarization_1:.*]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: %[[beam_struct_polarization_1:.*]] = llvm.insertvalue %[[polarization_1:.*]], %[[beam_struct_detuning:.*]][3, 1] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[wavevector_0:.*]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: %[[beam_struct_wavevector_0:.*]] = llvm.insertvalue %[[wavevector_0:.*]], %[[beam_struct_polarization_1:.*]][4, 0] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[wavevector_1:.*]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: %[[beam_struct_wavevector_1:.*]] = llvm.insertvalue %[[wavevector_1:.*]], %[[beam_struct_wavevector_0:.*]][4, 1] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector_1:.*]]) : (!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>) -> !llvm.ptr
 
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit

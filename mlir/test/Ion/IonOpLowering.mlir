@@ -28,9 +28,6 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     // CHECK: %[[const_mass:.*]] = llvm.mlir.constant(1.710000e+02 : f64)
     // CHECK: %[[const_charge:.*]] = llvm.mlir.constant(1.000000e+00 : f64)
 
-    // Check struct initialization for position
-    // CHECK: %[[pos:.*]] = llvm.mlir.constant([1.000000e+00, 2.000000e+00, -1.000000e+00]) : !llvm.array<3 x f64>
-
     // Check level array initialization
     // CHECK: %[[level_array_undef:.*]] = llvm.mlir.undef : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>
 
