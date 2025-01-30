@@ -338,66 +338,80 @@ def _(self, phase, *wires, n_wires):
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
 def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+
+    # Inner functions
+
+    def emit_new_abstract_qreg_jaxpr():
+        """Emit a new Catalyst jaxpr branch that returns a qreg."""
+
+        return jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
+
+    def convert_branch_from_plxpr_to_jaxpr():
+        # Convert plxpr to Catalyst jaxpr
+        converted_func = partial(
+            BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
+            plxpr_branch,
+            branch_consts,
+        )
+        converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args).jaxpr
+
+        # Unfortunately the obtained jaxpr does not comply with the Catalyst
+        # spec. We need to move some vars around as follows:
+
+        # We assume the first constant is the qreg var.
+        # Get the input qreg var.
+        in_qreg_var = converted_jaxpr_branch.constvars[0]
+
+        # Create an output qreg var as a copy of the input one
+        out_qreg_var = copy(in_qreg_var)
+
+        # Overwrite the input vars with the input qreg var
+        converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=[in_qreg_var])
+
+        # Overwrite the output vars with the output qreg var
+        converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=[out_qreg_var])
+
+        # Remove the qreg var from the constants
+        constvars = converted_jaxpr_branch.constvars
+        converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars[1:])
+
+        # We assume the last equation of the branch is the one returning the qreg.
+        # Its output vars are outdated, so we update them with the output var qreg.
+        num_eqns = len(converted_jaxpr_branch.eqns)
+        if num_eqns > 1:
+            last_eqn = num_eqns - 1
+            converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[last_eqn].replace(
+                outvars=[out_qreg_var]
+            )
+
+        return converted_jaxpr_branch
+
+    def restructure_input_values():
+        """The original vals do not comply as well with the Catalyst spec. We need to rebuild them accordingly."""
+
+        # Extract the predicate
+        predicate_slice = slice(0, 1)
+        predicate = plxpr_invals[predicate_slice]
+
+        # Flatten the constants of all branches
+        consts = [const for consts in branches_consts for const in consts]
+        return [*predicate, *consts, *args, self.qreg]
+
+    # Logic
+
     args = plxpr_invals[args_slice]
     branches_consts = [plxpr_invals[consts_slice] for consts_slice in consts_slices]
     converted_jaxpr_branches = []
-    qreg_var = None
 
+    # Convert each branch from plxpr to jaxpr
     for branch_consts, plxpr_branch in zip(branches_consts, jaxpr_branches):
+        converted_jaxpr_branches.append(
+            emit_new_abstract_qreg_jaxpr()
+            if plxpr_branch is None
+            else convert_branch_from_plxpr_to_jaxpr()
+        )
 
-        if plxpr_branch is None:
-            # Make a Catalyst jaxpr branch that returns a qreg
-            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
-
-            # Add to list
-            converted_jaxpr_branches.append(converted_jaxpr_branch)
-        else:
-            # Convert plxpr to Catalyst jaxpr
-            converted_func = partial(
-                BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
-                plxpr_branch,
-                branch_consts,
-            )
-            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args).jaxpr
-
-            # Unfortunately the obtained jaxpr does not comply with the Catalyst
-            # spec. We need to move some vars around as follows:
-
-            # Get the qreg var
-            qreg_var = converted_jaxpr_branch.constvars[0]
-            out_qreg_var = copy(qreg_var)
-
-            # Insert the qreg var into the input vars
-            converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=[qreg_var])
-
-            # Insert a copy of the qreg var into the output vars
-            converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=[out_qreg_var])
-
-            # Remove the qreg var from the constants
-            constvars = converted_jaxpr_branch.constvars
-            converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars[1:])
-
-            # Insert a copy of the qreg var into the output vars of the last equation
-            num_eqns = len(converted_jaxpr_branch.eqns)
-            if num_eqns > 1:
-                last_eqn = num_eqns - 1
-                converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[
-                    last_eqn
-                ].replace(outvars=[out_qreg_var])
-
-            # Add to list
-            converted_jaxpr_branches.append(converted_jaxpr_branch)
-
-    # The original vals do not comply as well with the Catalyst spec.
-    # We need to rebuild them accordingly:
-
-    # Extract the predicate
-    predicate_slice = slice(0, 1)
-    predicate = plxpr_invals[predicate_slice]
-
-    # Flatten the constants of all branches
-    consts = [const for consts in branches_consts for const in consts]
-    cond_invals = [*predicate, *consts, *args, self.qreg]
+    cond_invals = restructure_input_values()
 
     # Perform the binding
     outvals = cond_p.bind(
@@ -406,12 +420,10 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         nimplicit_outputs=None,
     )
 
-    outvars = [qreg_var]
-
-    # Insert the output vars back to the environment and update the qreg
-    for outvar, outval in zip(outvars, outvals, strict=True):
-        self.qreg = outval
-        self._env[outvar] = outval
+    # We assume the first output value is the returned qreg.
+    # Update the current qreg.
+    assert len(outvals) > 0
+    self.qreg = outvals[0]
 
     # Return an empty list to skip post-processing
     return ()
