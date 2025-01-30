@@ -64,7 +64,9 @@ void __catalyst__oqd__rt__initialize()
 void __catalyst__oqd__rt__finalize()
 {
     std::ofstream out_json("output.json");
+    std::cout << "before dumping json\n";
     out_json << JSON->dump(2);
+    std::cout << "after dumping json\n";
     JSON = nullptr;
 }
 
@@ -72,6 +74,8 @@ void __catalyst__oqd__greetings() { std::cout << "Hello OQD world!" << std::endl
 
 void __catalyst__oqd__ion(Ion *ion)
 {
+    std::cout << "mass: " << ion->mass << "\n";
+    /*
     json j;
     j["class_"] = "Ion";
     j["mass"] = ion->mass;
@@ -84,6 +88,7 @@ void __catalyst__oqd__ion(Ion *ion)
     std::unordered_map<std::string, std::size_t> labeled_levels;
     std::vector<std::reference_wrapper<Level>> levels;
     for (std::size_t i = 0; i < ion->num_of_levels; i++) {
+        std::cout << (ion->levels)[i].label << "\n";
         labeled_levels.insert({(ion->levels)[i].label, i});
         levels.push_back(std::ref((ion->levels)[i]));
     }
@@ -102,8 +107,9 @@ void __catalyst__oqd__ion(Ion *ion)
         transition_in_json["level1"] = levels[labeled_levels[transition_in_json["level1"]]];
         transition_in_json["level2"] = levels[labeled_levels[transition_in_json["level2"]]];
     }
-
+    std::cout << j << "\n";
     (*JSON)["system"]["ions"].push_back(j);
+    */
 }
 
 } // extern "C"

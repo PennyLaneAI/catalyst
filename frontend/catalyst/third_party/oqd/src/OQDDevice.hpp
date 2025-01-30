@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "OQDRuntimeCAPI.h"
 #include "QuantumDevice.hpp"
 
 // catalyst/runtime/lib/backend/common/
@@ -33,6 +34,7 @@
 namespace Catalyst::Runtime::Device {
 class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
+    //void *config;
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
     static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
@@ -56,15 +58,23 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
+    explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")//, void *config)
     {
+      std::cout << "oqd device init init!\n";
+      __catalyst__oqd__greetings();
+      __catalyst__oqd__rt__initialize();
+
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
         runner = std::make_unique<OQDRunner>();
+
+
     }
-    ~OQDDevice() = default;
+    ~OQDDevice(){
+       __catalyst__oqd__rt__finalize();
+    };
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(OQDDevice);
 

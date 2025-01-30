@@ -25,6 +25,7 @@ set(OQD_LIBRARIES
 
 set_target_properties(rtd_oqd PROPERTIES BUILD_RPATH "$ORIGIN/../utils")
 target_link_directories(rtd_oqd PRIVATE ${runtime_lib})
+target_link_libraries(rtd_oqd PRIVATE ${runtime_lib}/librt_OQD_capi.so)
 
 file(COPY ${PROJECT_SOURCE_DIR}/oqd.toml DESTINATION ./backend)
 

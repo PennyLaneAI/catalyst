@@ -237,25 +237,26 @@ void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __catalyst__rt__initialize(uint32_t *seed)
 {
-#ifdef WITH_OQD_CAPI
-    __catalyst__oqd__rt__initialize();
-#endif
+//#ifdef WITH_OQD_CAPI
+//    __catalyst__oqd__rt__initialize();
+//#endif
     CTX = std::make_unique<ExecutionContext>(seed);
 }
 
 void __catalyst__rt__finalize()
 {
-#ifdef WITH_OQD_CAPI
-    __catalyst__oqd__rt__finalize();
-#endif
+//#ifdef WITH_OQD_CAPI
+//    __catalyst__oqd__rt__finalize();
+//#endif
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             int64_t shots)
+                                             int64_t shots, /*device_config = */...)
 {
     // Device library cannot be a nullptr
+    std::cout << "device_init capi!\n";
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
     RT_FAIL_IF(RTD_PTR, "Cannot re-initialize an ACTIVE device: Consider using "
@@ -274,8 +275,11 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 int64_t shots)
+                                 int64_t shots, /*device_config = */...)
 {
+    std::vector<intptr_t> config;
+    va_list args;
+    va_start(args, shots);
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
                  rtd_name, rtd_kwargs, shots);
 }

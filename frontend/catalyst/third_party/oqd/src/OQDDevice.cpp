@@ -19,6 +19,7 @@ namespace Catalyst::Runtime::Device {
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     RT_FAIL("Unsupported functionality");
+    //__oqd__ion(this->config);
 }
 
 void OQDDevice::ReleaseAllQubits() { RT_FAIL("Unsupported functionality"); }
