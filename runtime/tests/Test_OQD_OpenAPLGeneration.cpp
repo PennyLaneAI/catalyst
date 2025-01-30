@@ -226,7 +226,7 @@ TEST_CASE("Test ion generation", "[OQD]")
 
     json observed = json::parse(std::ifstream("output.json"));
     CHECK(expected == observed);
-    CHECK(1==0);
+    CHECK(1 == 0);
 
     std::filesystem::remove("output.json");
 }

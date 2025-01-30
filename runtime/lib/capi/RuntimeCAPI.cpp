@@ -34,10 +34,6 @@
 
 #include "RuntimeCAPI.h"
 
-#ifdef WITH_OQD_CAPI
-#include "OQDRuntimeCAPI.h"
-#endif
-
 namespace Catalyst::Runtime {
 
 /**
@@ -237,17 +233,11 @@ void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __catalyst__rt__initialize(uint32_t *seed)
 {
-//#ifdef WITH_OQD_CAPI
-//    __catalyst__oqd__rt__initialize();
-//#endif
     CTX = std::make_unique<ExecutionContext>(seed);
 }
 
 void __catalyst__rt__finalize()
 {
-//#ifdef WITH_OQD_CAPI
-//    __catalyst__oqd__rt__finalize();
-//#endif
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
 }

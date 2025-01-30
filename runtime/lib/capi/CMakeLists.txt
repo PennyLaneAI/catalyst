@@ -24,10 +24,6 @@ target_include_directories(catalyst_qir_qis_obj PUBLIC .
     ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver  # Timer.hpp
 )
 
-if(ENABLE_OQD)
-    add_compile_definitions(WITH_OQD_CAPI)
-endif()
-
 # The MLIR Runner Utils raises this warning so we need to disable it for our -Werror builds.
 if(RUNTIME_ENABLE_WARNINGS)
     target_compile_options(catalyst_qir_qis_obj PRIVATE "-Wno-unused-parameter")

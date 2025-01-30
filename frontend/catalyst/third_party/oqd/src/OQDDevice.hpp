@@ -59,23 +59,19 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")//, void *config)
+    explicit OQDDevice(
+        const std::string &kwargs = "{device_type : oqd, backend : default}")
     {
-      std::cout << "oqd device init init!\n";
-      __catalyst__oqd__greetings();
-      __catalyst__oqd__rt__initialize();
+        __catalyst__oqd__greetings();
+        __catalyst__oqd__rt__initialize();
 
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
         runner = std::make_unique<OQDRunner>();
-
-
     }
-    ~OQDDevice(){
-       __catalyst__oqd__rt__finalize();
-    };
+    ~OQDDevice() { __catalyst__oqd__rt__finalize(); };
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(OQDDevice);
 
