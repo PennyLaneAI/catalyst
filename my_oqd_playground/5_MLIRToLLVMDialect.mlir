@@ -9,13 +9,13 @@ module @f {
   llvm.mlir.global internal constant @"{'shots': 1000}"("{'shots': 1000}\00") {addr_space = 0 : i32}
   llvm.mlir.global internal constant @oqd("oqd\00") {addr_space = 0 : i32}
   llvm.mlir.global internal constant @"/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../catalyst/third_party/oqd/src/build/librtd_oqd.so"("/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../catalyst/third_party/oqd/src/build/librtd_oqd.so\00") {addr_space = 0 : i32}
-  llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64)
+  llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr, i64)
   llvm.func @_mlir_memref_to_llvm_free(!llvm.ptr)
   llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
 
-  llvm.func @__catalyst__oqd__ion(!llvm.ptr) -> ()
-  llvm.func @__catalyst__oqd__rt__initialize()
-  llvm.func @__catalyst__oqd__rt__finalize()
+  //llvm.func @__catalyst__oqd__ion(!llvm.ptr) -> ()
+  //llvm.func @__catalyst__oqd__rt__initialize()
+  //llvm.func @__catalyst__oqd__rt__finalize()
 
   llvm.mlir.global internal constant @upstate("upstate\00") {addr_space = 0 : i32}
   llvm.mlir.global internal constant @estate("estate\00") {addr_space = 0 : i32}
@@ -235,6 +235,7 @@ module @f {
     %70114 = llvm.alloca %700 x !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)> : (i64) -> !llvm.ptr
     llvm.store %70113, %70114 : !llvm.struct<(ptr, f64, f64, array<3 x i64>, ptr, i64, ptr, i64)>, !llvm.ptr
     //llvm.call @__catalyst__oqd__ion(%70114) : (!llvm.ptr) -> ()
+    //llvm.call @__catalyst__oqd__ion(%70114) : (!llvm.ptr) -> ()
 
 
     // regular catalyst
@@ -254,7 +255,11 @@ module @f {
     %13 = llvm.getelementptr inbounds %6[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<117 x i8>
     %14 = llvm.getelementptr inbounds %5[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<4 x i8>
     %15 = llvm.getelementptr inbounds %4[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<16 x i8>
-    llvm.call @__catalyst__rt__device_init(%13, %14, %15, %10, %70114) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr) -> ()
+    llvm.call @__catalyst__rt__device_init(%13, %14, %15, %70114, %10) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr, i64) -> ()
+
+    //llvm.call @__catalyst__oqd__ion(%70114) : (!llvm.ptr) -> ()
+    //llvm.call @__catalyst__oqd__ion(%70114) : (!llvm.ptr) -> ()
+
     %16 = llvm.call @__catalyst__rt__qubit_allocate_array(%3) : (i64) -> !llvm.ptr
     %17 = llvm.call @__catalyst__rt__array_get_element_ptr_1d(%16, %2) : (!llvm.ptr, i64) -> !llvm.ptr
     %18 = llvm.load %17 : !llvm.ptr -> !llvm.ptr

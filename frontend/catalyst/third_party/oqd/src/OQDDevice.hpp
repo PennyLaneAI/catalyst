@@ -27,6 +27,7 @@
 
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
+#include "Types.h"
 #include "Utils.hpp"
 
 #include "OQDRunner.hpp"
@@ -34,7 +35,6 @@
 namespace Catalyst::Runtime::Device {
 class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
-    //void *config;
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
     static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
@@ -45,6 +45,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
+    DeviceConfig config;
 
     std::unordered_map<std::string, std::string> device_kwargs;
 
@@ -80,5 +81,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
 
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
+
+    void SetDeviceConfig(DeviceConfig device_config) override;
 };
 } // namespace Catalyst::Runtime::Device

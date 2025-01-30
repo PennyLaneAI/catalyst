@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "OQDRuntimeCAPI.h"
 #include "OQDDevice.hpp"
+#include "Types.h"
 
 namespace Catalyst::Runtime::Device {
 
+void OQDDevice::SetDeviceConfig(DeviceConfig device_config){
+    this->config = device_config;
+    std::cout << "finished setting up oqd ion config!\n";
+};
+
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    RT_FAIL("Unsupported functionality");
-    //__oqd__ion(this->config);
+    for (size_t i=0; i<num_qubits; i++){
+        __catalyst__oqd__ion(reinterpret_cast<Ion*>(this->config));
+    }
+
+    // return some empty object to conform to the type
+    // so that the program execution does not break
+    return std::vector<QubitIdType>(num_qubits);
 }
 
 void OQDDevice::ReleaseAllQubits() { RT_FAIL("Unsupported functionality"); }
