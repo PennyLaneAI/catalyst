@@ -27,7 +27,7 @@ void OQDDevice::SetDeviceConfig(DeviceConfig device_config)
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     for (size_t i = 0; i < num_qubits; i++) {
-        __catalyst__oqd__ion(reinterpret_cast<Ion *>(this->config));
+        __catalyst__oqd__ion(static_cast<Ion *>(this->config));
     }
 
     // return some empty object to conform to the type
