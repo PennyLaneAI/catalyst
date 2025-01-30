@@ -88,14 +88,6 @@ LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
              });
 }
 
-Value createPositionArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx,
-                          ::llvm::ArrayRef<double> &positionAttr)
-{
-    auto arrayType = LLVM::LLVMArrayType::get(rewriter.getF64Type(), positionAttr.size());
-    return rewriter.create<LLVM::ConstantOp>(loc, arrayType,
-                                             rewriter.getF64ArrayAttr(positionAttr));
-}
-
 Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
                         LevelAttr &levelAttr, LLVM::LLVMStructType &levelStructType)
 {
@@ -206,8 +198,8 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
     auto transitionIndex = beamAttr.getTransitionIndex();
     auto rabi = beamAttr.getRabi();
     auto detuning = beamAttr.getDetuning();
-    auto polarization = beamAttr.getPolarization();
-    auto wavevector = beamAttr.getWavevector();
+    auto polarization = beamAttr.getPolarization().asArrayRef();
+    auto wavevector = beamAttr.getWavevector().asArrayRef();
 
     Value beamStruct = rewriter.create<LLVM::UndefOp>(loc, beamStructType);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
@@ -217,16 +209,21 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
     auto polarizationType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), polarization.size());
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, polarizationType,
-                                          rewriter.getArrayAttr(polarization)),
-        3);
-    auto wavevectorType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), polarization.size());
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct,
-        rewriter.create<LLVM::ConstantOp>(loc, wavevectorType, rewriter.getArrayAttr(wavevector)),
-        4);
+    for (int64_t i = 0; i < polarization.size(); i++) {
+        Value polarizaitonConst = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64Type(),
+            rewriter.getIntegerAttr(rewriter.getI64Type(), polarization[i]));
+        beamStruct = rewriter.create<LLVM::InsertValueOp>(loc, beamStruct, polarizaitonConst,
+                                                          ArrayRef<int64_t>({3, i}));
+    }
+    auto wavevectorType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), wavevector.size());
+    for (int64_t i = 0; i < wavevector.size(); i++) {
+        Value waveConst = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64Type(),
+            rewriter.getIntegerAttr(rewriter.getI64Type(), wavevector[i]));
+        beamStruct = rewriter.create<LLVM::InsertValueOp>(loc, beamStruct, waveConst,
+                                                          ArrayRef<int64_t>({4, i}));
+    }
     return beamStruct;
 }
 
@@ -254,8 +251,6 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         auto levelsAttr = op.getLevels();
         auto transitionsAttr = op.getTransitions();
 
-        Value positionArrayPtr = createPositionArray(loc, rewriter, ctx, positionAttr);
-
         Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, mod, levelsAttr);
 
         Value TransitionsArrayPtr =
@@ -278,7 +273,13 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, name, 0);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, mass, 1);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, charge, 2);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, positionArrayPtr, 3);
+        for (int64_t i = 0; i < positionAttr.size(); i++) {
+            Value posConst = rewriter.create<LLVM::ConstantOp>(
+                loc, rewriter.getF64Type(),
+                rewriter.getFloatAttr(rewriter.getF64Type(), positionAttr[i]));
+            ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, posConst,
+                                                             ArrayRef<int64_t>({3, i}));
+        }
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, levelsArrayPtr, 4);
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, TransitionsArrayPtr, 5);
         Value ionStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
