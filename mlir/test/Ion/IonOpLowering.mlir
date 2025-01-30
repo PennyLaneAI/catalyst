@@ -51,18 +51,21 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     // Transition array initialization
     // CHECK: llvm.mlir.undef : !llvm.array<3 x struct<(ptr, ptr, f64)>>
 
-    // Transition 0
-    // CHECK: %[[transition_0_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
-    
-    // Level 0
-    // CHECK: llvm.mlir.addressof @estate
-
     // Transition 1
     // CHECK: %[[transition_1_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
+    // CHECK: llvm.mlir.addressof @downstate
+    // CHECK: llvm.mlir.addressof @estate
 
     // Transition 2
     // CHECK: %[[transition_2_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
-    
+    // CHECK: llvm.mlir.addressof @downstate
+    // CHECK: llvm.mlir.addressof @upstate
+
+    // Transition 3
+    // CHECK: %[[transition_3_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
+    // CHECK: llvm.mlir.addressof @estate
+    // CHECK: llvm.mlir.addressof @upstate
+
     // Final Ion Struct
     // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)>
     // CHECK: %[[ion_name_ptr:.*]] = llvm.insertvalue %[[ptr_to_yb171]], %[[ion_struct_undef]][0] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
