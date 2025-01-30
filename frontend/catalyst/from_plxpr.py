@@ -346,10 +346,13 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     for branch_consts, plxpr_branch in zip(branches_consts, jaxpr_branches):
 
         if plxpr_branch is None:
+            # Make a Catalyst jaxpr branch that returns a qreg
             converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
+
+            # Add to list
             converted_jaxpr_branches.append(converted_jaxpr_branch)
         else:
-            # convert plxpr to Catalyst jaxpr
+            # Convert plxpr to Catalyst jaxpr
             converted_func = partial(
                 BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
                 plxpr_branch,
@@ -362,27 +365,27 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
             # Get the qreg var
             qreg_var = converted_jaxpr_branch.constvars[0]
+            out_qreg_var = copy(qreg_var)
 
-            # Insert the qreg var to the input vars
-            invars = []
-            invars.append(converted_jaxpr_branch.constvars[0])
-            converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=invars)
+            # Insert the qreg var into the input vars
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=[qreg_var])
 
-            # Insert the qreg var to the output vars
-            outvars = []
-            outvars.append(copy(converted_jaxpr_branch.constvars[0]))
-            converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=outvars)
+            # Insert a copy of the qreg var into the output vars
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=[out_qreg_var])
 
             # Remove the qreg var from the constants
-            constvars = converted_jaxpr_branch.constvars[1:]
-            converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars)
+            constvars = converted_jaxpr_branch.constvars
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars[1:])
 
-            # Insert the qreg var to the output vars of the last equation
-            converted_jaxpr_branch.eqns[len(converted_jaxpr_branch.eqns) - 1] = (
-                converted_jaxpr_branch.eqns[len(converted_jaxpr_branch.eqns) - 1].replace(
-                    outvars=outvars
-                )
-            )
+            # Insert a copy of the qreg var into the output vars of the last equation
+            num_eqns = len(converted_jaxpr_branch.eqns)
+            if num_eqns > 1:
+                last_eqn = num_eqns - 1
+                converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[
+                    last_eqn
+                ].replace(outvars=[out_qreg_var])
+
+            # Add to list
             converted_jaxpr_branches.append(converted_jaxpr_branch)
 
     # The original vals do not comply as well with the Catalyst spec.
