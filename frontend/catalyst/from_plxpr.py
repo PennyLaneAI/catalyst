@@ -345,7 +345,28 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     for branch_consts, plxpr_branch in zip(branches_consts, jaxpr_branches):
 
         if plxpr_branch is None:
-            converted_jaxpr_branches.append(None)
+            converted_jaxpr_branch = jax.make_jaxpr(lambda: self.qreg)().jaxpr
+
+            # Unfortunately the obtained jaxpr does not comply with the Catalyst
+            # spec. We need to move some vars around as follows:
+
+            # Get the qreg var
+            qreg_var = converted_jaxpr_branch.constvars[0]
+
+            # Insert the qreg var to the input vars
+            invars = []
+            invars.append(converted_jaxpr_branch.constvars[0])
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=invars)
+
+            # Insert the qreg var to the output vars
+            outvars = []
+            outvars.append(converted_jaxpr_branch.constvars[0])
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=outvars)
+
+            # Remove the qreg var from the constants
+            constvars = converted_jaxpr_branch.constvars[1:]
+            converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars)
+            converted_jaxpr_branches.append(converted_jaxpr_branch)
         else:
             # convert plxpr to Catalyst jaxpr
             converted_func = partial(

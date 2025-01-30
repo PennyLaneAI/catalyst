@@ -200,10 +200,9 @@ class TestCapture:
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
 
-    def test_cond_workflow(self, backend):
-        """Test the integration for a circuit with a cond primitive."""
+    def test_cond_workflow_if_else(self, backend):
+        """Test the integration for a circuit with a cond primitive with true and false branches."""
 
-        @qml.qjit(experimental_capture=True)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
@@ -218,4 +217,24 @@ class TestCapture:
 
             return qml.expval(qml.Z(0))
 
-        assert circuit(0.1) == 0.9950041652780258
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_if(self, backend):
+        """Test the integration for a circuit with a cond primitive with a true branch only."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            qml.cond(x > 1.4, ansatz_true)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(1.5)
+        assert default_capture_result == experimental_capture_result
