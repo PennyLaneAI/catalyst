@@ -210,6 +210,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
                                                          /* rtd_kwargs = */ charPtrType,
+                                                         /* device_config = */ charPtrType,
                                                          /* shots = */ int64Type});
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
@@ -224,7 +225,12 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         auto rtd_kwargs_gs = getGlobalString(
             loc, rewriter, rtd_kwargs, StringRef(rtd_kwargs.c_str(), rtd_kwargs.length() + 1), mod);
 
-        SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
+        // Create nullptr for device config
+        // Specific devices should fill these configs downstream, in the
+        // `--quantum-to-<specific_device_dialect>` lowerings
+        Value null_device_config = rewriter.create<LLVM::ZeroOp>(loc, charPtrType);
+
+        SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs, null_device_config};
 
         Value shots = op.getShots();
         if (!shots) {
