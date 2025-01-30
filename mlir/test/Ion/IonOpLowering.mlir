@@ -67,10 +67,10 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     // CHECK: llvm.mlir.addressof @upstate
 
     // Final Ion Struct
-    // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)>
-    // CHECK: %[[ion_name_ptr:.*]] = llvm.insertvalue %[[ptr_to_yb171]], %[[ion_struct_undef]][0] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
-    // CHECK: %[[ion_mass_ptr:.*]] = llvm.insertvalue %[[const_mass]], %[[ion_name_ptr]][1] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
-    // CHECK: %[[ion_charge_ptr:.*]] = llvm.insertvalue %[[const_charge]], %[[ion_mass_ptr]][2] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, ptr)> 
+    // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)>
+    // CHECK: %[[ion_name_ptr:.*]] = llvm.insertvalue %[[ptr_to_yb171]], %[[ion_struct_undef]][0] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)> 
+    // CHECK: %[[ion_mass_ptr:.*]] = llvm.insertvalue %[[const_mass]], %[[ion_name_ptr]][1] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)> 
+    // CHECK: %[[ion_charge_ptr:.*]] = llvm.insertvalue %[[const_charge]], %[[ion_mass_ptr]][2] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)> 
     // CHECK: %[[ion_ptr:.*]] = llvm.call @__catalyst_ion(%{{.*}}) : (!llvm.ptr) -> !llvm.ptr
 
     %0 = ion.ion {

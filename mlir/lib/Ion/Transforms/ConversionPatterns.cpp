@@ -208,7 +208,6 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
         loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, rabi), 1);
     beamStruct = rewriter.create<LLVM::InsertValueOp>(
         loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
-    auto polarizationType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), polarization.size());
     for (int64_t i = 0; i < polarization.size(); i++) {
         Value polarizaitonConst = rewriter.create<LLVM::ConstantOp>(
             loc, rewriter.getI64Type(),
@@ -216,7 +215,6 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
         beamStruct = rewriter.create<LLVM::InsertValueOp>(loc, beamStruct, polarizaitonConst,
                                                           ArrayRef<int64_t>({3, i}));
     }
-    auto wavevectorType = LLVM::LLVMArrayType::get(rewriter.getI64Type(), wavevector.size());
     for (int64_t i = 0; i < wavevector.size(); i++) {
         Value waveConst = rewriter.create<LLVM::ConstantOp>(
             loc, rewriter.getI64Type(),
@@ -264,8 +262,10 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
                      Float64Type::get(ctx),    // charge
                      LLVM::LLVMArrayType::get( // position
                          rewriter.getF64Type(), positionAttr.size()),
-                     ptrType, // levels
-                     ptrType, // Transitions
+                     ptrType,                   // levels
+                     IntegerType::get(ctx, 64), // number of levels
+                     ptrType,                   // Transitions
+                     IntegerType::get(ctx, 64), // number of Transitions
                  });
 
         // Create an instance of the Ion struct
@@ -281,7 +281,14 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
                                                              ArrayRef<int64_t>({3, i}));
         }
         ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, levelsArrayPtr, 4);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, TransitionsArrayPtr, 5);
+        ionStruct = rewriter.create<LLVM::InsertValueOp>(
+            loc, ionStruct,
+            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelsAttr.size()), 5);
+        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, TransitionsArrayPtr, 6);
+        ionStruct = rewriter.create<LLVM::InsertValueOp>(
+            loc, ionStruct,
+            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), transitionsAttr.size()),
+            7);
         Value ionStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
                                                              /*elementType=*/ionStructType, c1);
         rewriter.create<LLVM::StoreOp>(loc, ionStruct, ionStructPtr);
