@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Grover-like problem, PennyLane/PennyLane+JAX implementation """
+"""Grover-like problem, PennyLane/PennyLane+JAX implementation"""
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=too-many-instance-attributes

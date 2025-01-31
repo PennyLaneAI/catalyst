@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # RUN: %PYTHON %s | FileCheck %s
-""" Test the lowering cases involving quantum control """
+"""Test the lowering cases involving quantum control"""
 
 import os
 import pathlib
