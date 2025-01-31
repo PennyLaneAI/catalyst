@@ -37,6 +37,15 @@
 //  which also checks:
 //  4. If the gates are quantum.custom, then both gates have the same name.
 
+// More generally, we provide a VerifyHeterogeneousParentGateAnalysis, which
+// modifies requirement (1.) to verify that a gate and its parents have specific
+// types.
+// This allows for heterogeneous peephole optimizations like merging static and
+// non-static rotations (prior to lowering statics).
+//
+// We also provide a VerifyHeterogeneousParentGateAndNameAnalysis, which is a
+// heterogeneous analogue of VerifyParentGateAndNameAnalysis.
+
 #pragma once
 
 #include "mlir/IR/BuiltinOps.h"
@@ -51,12 +60,12 @@ using namespace catalyst;
 
 namespace catalyst {
 
-template <typename OpType> class VerifyParentGateAnalysis {
+template <typename OpType, typename ParentOpType> class VerifyHeterogeneousParentGateAnalysis {
   public:
-    VerifyParentGateAnalysis(OpType gate)
+    VerifyHeterogeneousParentGateAnalysis(OpType gate)
     {
         ValueRange inQubits = gate.getInQubits();
-        auto parentGate = dyn_cast_or_null<OpType>(inQubits[0].getDefiningOp());
+        auto parentGate = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
 
         if (!verifyParentGateType(gate, parentGate)) {
             setVerifierResult(false);
@@ -76,20 +85,18 @@ template <typename OpType> class VerifyParentGateAnalysis {
   private:
     bool succeeded = true;
 
-    bool verifyParentGateType(OpType op, OpType parentOp) const
+    bool verifyParentGateType(OpType op, ParentOpType parentOp) const
     {
-        // Verify that the parent gate is of the same type.
-        // If OpType is quantum.custom, also verify that parent gate has the
-        // same gate name.
+        // Verify that the parent gate is of the desired type.
 
-        if (!parentOp || !isa<OpType>(parentOp)) {
+        if (!parentOp || !isa<ParentOpType>(parentOp)) {
             return false;
         }
 
         return true;
     }
 
-    bool verifyAllInQubits(OpType op, OpType parentOp) const
+    bool verifyAllInQubits(OpType op, ParentOpType parentOp) const
     {
         // Verify that parent's results and current gate's inputs are in the same order
         // If the gates are controlled, both gates' control wires and values
@@ -134,15 +141,16 @@ template <typename OpType> class VerifyParentGateAnalysis {
     }
 };
 
-template <typename OpType>
-class VerifyParentGateAndNameAnalysis : public VerifyParentGateAnalysis<OpType> {
+template <typename OpType, typename ParentOpType>
+class VerifyHeterogeneousParentGateAndNameAnalysis : public VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>
+{
     // If OpType is quantum.custom, also verify that parent gate has the
     // same gate name.
   public:
-    VerifyParentGateAndNameAnalysis(OpType gate) : VerifyParentGateAnalysis<OpType>(gate)
+    VerifyHeterogeneousParentGateAndNameAnalysis(OpType gate) : VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>(gate)
     {
         ValueRange inQubits = gate.getInQubits();
-        auto parentGate = dyn_cast_or_null<OpType>(inQubits[0].getDefiningOp());
+        auto parentGate = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
 
         if (!parentGate) {
             this->setVerifierResult(false);
@@ -156,11 +164,27 @@ class VerifyParentGateAndNameAnalysis : public VerifyParentGateAnalysis<OpType> 
     }
 
   private:
-    bool verifyParentGateName(OpType op, OpType parentOp) const
+    bool verifyParentGateName(OpType op, ParentOpType parentOp) const
     {
         StringRef opGateName = op.getGateName();
         StringRef parentGateName = parentOp.getGateName();
         return opGateName == parentGateName;
     }
 };
+
+template <typename OpType>
+class VerifyParentGateAnalysis : public VerifyHeterogeneousParentGateAnalysis<OpType, OpType>
+{
+    // Verify that the parent gate is of the exact same type and signature
+  public:
+    VerifyParentGateAnalysis(OpType gate) : VerifyHeterogeneousParentGateAnalysis<OpType, OpType>(gate) {}
+};
+
+template <typename OpType>
+class VerifyParentGateAndNameAnalysis : public VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>
+{
+  public:
+    VerifyParentGateAndNameAnalysis(OpType gate) : VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>(gate) {}
+};
+
 } // namespace catalyst
