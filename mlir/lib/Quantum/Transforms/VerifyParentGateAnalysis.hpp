@@ -142,12 +142,13 @@ template <typename OpType, typename ParentOpType> class VerifyHeterogeneousParen
 };
 
 template <typename OpType, typename ParentOpType>
-class VerifyHeterogeneousParentGateAndNameAnalysis : public VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>
-{
+class VerifyHeterogeneousParentGateAndNameAnalysis
+    : public VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType> {
     // If OpType is quantum.custom, also verify that parent gate has the
     // same gate name.
   public:
-    VerifyHeterogeneousParentGateAndNameAnalysis(OpType gate) : VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>(gate)
+    VerifyHeterogeneousParentGateAndNameAnalysis(OpType gate)
+        : VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>(gate)
     {
         ValueRange inQubits = gate.getInQubits();
         auto parentGate = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
@@ -173,18 +174,23 @@ class VerifyHeterogeneousParentGateAndNameAnalysis : public VerifyHeterogeneousP
 };
 
 template <typename OpType>
-class VerifyParentGateAnalysis : public VerifyHeterogeneousParentGateAnalysis<OpType, OpType>
-{
+class VerifyParentGateAnalysis : public VerifyHeterogeneousParentGateAnalysis<OpType, OpType> {
     // Verify that the parent gate is of the exact same type and signature
   public:
-    VerifyParentGateAnalysis(OpType gate) : VerifyHeterogeneousParentGateAnalysis<OpType, OpType>(gate) {}
+    VerifyParentGateAnalysis(OpType gate)
+        : VerifyHeterogeneousParentGateAnalysis<OpType, OpType>(gate)
+    {
+    }
 };
 
 template <typename OpType>
-class VerifyParentGateAndNameAnalysis : public VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>
-{
+class VerifyParentGateAndNameAnalysis
+    : public VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType> {
   public:
-    VerifyParentGateAndNameAnalysis(OpType gate) : VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>(gate) {}
+    VerifyParentGateAndNameAnalysis(OpType gate)
+        : VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>(gate)
+    {
+    }
 };
 
 } // namespace catalyst

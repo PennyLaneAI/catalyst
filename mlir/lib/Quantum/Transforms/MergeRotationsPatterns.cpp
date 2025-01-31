@@ -31,48 +31,48 @@ static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift"
 
 namespace {
 
-    template <typename OpType>
-    SmallVector<mlir::Value> convertOpParamsToValues(OpType &op, mlir::PatternRewriter &rewriter);
-    // Helper function for extracting static or non-static CustomOp parameters as mlir::Values.
+template <typename OpType>
+SmallVector<mlir::Value> convertOpParamsToValues(OpType &op, mlir::PatternRewriter &rewriter);
+// Helper function for extracting static or non-static CustomOp parameters as mlir::Values.
 
-    template <>
-    SmallVector<mlir::Value> convertOpParamsToValues<CustomOp>(CustomOp &op, mlir::PatternRewriter &rewriter)
-    {
-        // In the case of a (non-static) CustomOp, the parameters are already mlir::Values, so we just
-        // collect them into a vector.
+template <>
+SmallVector<mlir::Value> convertOpParamsToValues<CustomOp>(CustomOp &op,
+                                                           mlir::PatternRewriter &rewriter)
+{
+    // In the case of a (non-static) CustomOp, the parameters are already mlir::Values, so we just
+    // collect them into a vector.
 
-        SmallVector<mlir::Value> values;
-        auto params = op.getParams();
-        for (auto param : params)
-        {
-            values.push_back(param);
-        }
-        return values;
+    SmallVector<mlir::Value> values;
+    auto params = op.getParams();
+    for (auto param : params) {
+        values.push_back(param);
     }
+    return values;
+}
 
-    template <>
-    SmallVector<mlir::Value> convertOpParamsToValues<StaticCustomOp>(StaticCustomOp &op, mlir::PatternRewriter &rewriter)
-    {
-        // In the case of a StaticCustomOp, the parameters are doubles, so we need to introduce arith ops to "convert"
-        // them into mlir::Values.
+template <>
+SmallVector<mlir::Value> convertOpParamsToValues<StaticCustomOp>(StaticCustomOp &op,
+                                                                 mlir::PatternRewriter &rewriter)
+{
+    // In the case of a StaticCustomOp, the parameters are doubles, so we need to introduce arith
+    // ops to "convert" them into mlir::Values.
 
-        SmallVector<mlir::Value> values;
-        auto params = op.getStaticParams();
-        for (auto param : params)
-        {
-            auto paramAttr = rewriter.getF64FloatAttr(param);
-            values.emplace_back(rewriter.create<arith::ConstantOp>(op.getLoc(), paramAttr));
-        }
-        return values;
+    SmallVector<mlir::Value> values;
+    auto params = op.getStaticParams();
+    for (auto param : params) {
+        auto paramAttr = rewriter.getF64FloatAttr(param);
+        values.emplace_back(rewriter.create<arith::ConstantOp>(op.getLoc(), paramAttr));
     }
+    return values;
+}
 
-template<typename ParentOpType, typename OpType>
+template <typename ParentOpType, typename OpType>
 struct MergeRotationsRewritePattern : public mlir::OpRewritePattern<OpType> {
     // Merge rotation patterns where at least one operand is non-static.
     // The result is a non-static CustomOp, as at least one operand is not known at compile time.
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
 
-    virtual mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
