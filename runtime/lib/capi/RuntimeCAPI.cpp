@@ -549,6 +549,7 @@ void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *mo
 
 void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers)
 {
+    std::cout << getQuantumDevicePtr() << "\n";
     getQuantumDevicePtr()->NamedOperation("RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
