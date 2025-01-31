@@ -322,7 +322,7 @@ def test_qnode_exception_dependency(order, backend):
 # TODO: add the following diff_methods once issue #419 is fixed:
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
-@pytest.mark.parametrize("inp", [(1.0)])
+@pytest.mark.parametrize("inp", [1.0])
 def test_gradient_exception(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
