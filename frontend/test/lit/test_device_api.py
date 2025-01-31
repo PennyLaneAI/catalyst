@@ -16,8 +16,7 @@
 
 # pylint: disable=line-too-long
 
-"""Test for the device API.
-"""
+"""Test for the device API."""
 import os
 import pathlib
 import platform
