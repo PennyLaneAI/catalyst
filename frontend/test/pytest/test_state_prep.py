@@ -26,6 +26,16 @@ from catalyst import qjit
 
 
 def generate_random_state(n=1, seed=None):
+    """Generate a random n-qubit state in state-vector representation.
+
+    Args:
+        n (int, optional): Number of qubits in the state. Defaults to 1.
+        seed (int, optional): Seed to the random-number generator. Defaults to None, in which case
+            a random seed is used.
+
+    Returns:
+        numpy.ndarray: The generated state vector.
+    """
     rng = np.random.default_rng(seed=seed)
     input_state = rng.random(2**n) + 1j * rng.random(2**n)
     return input_state / np.linalg.norm(input_state)
@@ -59,6 +69,7 @@ class Test2QubitStatePrep:
 
     @qjit
     @qml.qnode(dev)
+    @staticmethod
     def circuit_01(input_state):
         """A circuit that applies StatePrep on wire 0 and the Hadamard on wire 1.
 
@@ -74,6 +85,7 @@ class Test2QubitStatePrep:
 
     @qjit
     @qml.qnode(dev)
+    @staticmethod
     def circuit_10(input_state):
         """A circuit that applies StatePrep on wire 1 and the Hadamard on wire 0.
 
