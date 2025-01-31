@@ -124,6 +124,10 @@ struct QuantumDevice {
      */
     virtual void SetDevicePRNG([[maybe_unused]] std::mt19937 *gen){};
 
+    virtual void sayAloha(void *aloha){
+        std::cout << "aloha!\n";
+    };
+
     /**
      * @brief Start recording a quantum tape if provided.
      *
