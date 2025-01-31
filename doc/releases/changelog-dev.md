@@ -19,6 +19,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
+  Instead `postselect_mode` and `mcm_method` should be accessed instead.
+  [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
+
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
 
@@ -52,5 +56,6 @@ Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
+Andrija Paurevic,
 Paul Haochen Wang,
 Rohan Nolan Lasrado.
