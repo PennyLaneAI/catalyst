@@ -116,7 +116,7 @@ class TestReturnValues:
 
         assert isinstance(identity(1.0), jax.Array)
 
-    @pytest.mark.parametrize("dtype", [(jnp.float16)])
+    @pytest.mark.parametrize("dtype", [jnp.float16])
     def test_types_which_are_unhandled(self, dtype):
         """Test that there's a nice error message when a function returns an f16."""
 
