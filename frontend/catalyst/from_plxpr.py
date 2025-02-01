@@ -304,10 +304,7 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
 
     """
 
-    def __init__(self, parent_device, parent_shots):
-        super().__init__(parent_device, parent_shots)
-
-    def setup(self, qreg):
+    def set_qreg(self, qreg):
         """Initialize the stateref."""
         if self.stateref is None:
             self.stateref = {"qreg": qreg, "wire_map": {}}
@@ -336,7 +333,11 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         """
         self._env = {}
 
-        self.setup(args[len(args) - 1])
+        num_args = len(args)
+        assert num_args > 0
+        qreg = args[num_args - 1]
+
+        self.set_qreg(qreg)
 
         for const, constvar in zip(consts, jaxpr.constvars, strict=True):
             self._env[constvar] = const
@@ -346,19 +347,14 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             custom_handler = self._primitive_registrations.get(eqn.primitive, None)
             if custom_handler:
                 invals = [self.read(invar) for invar in eqn.invars]
-                outvals = custom_handler(self, *invals, **eqn.params)
+                custom_handler(self, *invals, **eqn.params)
             elif isinstance(eqn.outvars[0].aval, AbstractOperator):
-                outvals = self.interpret_operation_eqn(eqn)
+                self.interpret_operation_eqn(eqn)
             elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-                outvals = self.interpret_measurement_eqn(eqn)
+                self.interpret_measurement_eqn(eqn)
             else:
                 invals = [self.read(invar) for invar in eqn.invars]
-                outvals = eqn.primitive.bind(*invals, **eqn.params)
-
-            if not eqn.primitive.multiple_results:
-                outvals = [outvals]
-            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
-                self._env[outvar] = outval
+                eqn.primitive.bind(*invals, **eqn.params)
 
         outvals = [self.qreg]
 
