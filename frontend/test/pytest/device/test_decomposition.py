@@ -49,7 +49,7 @@ class TestGateAliases:
         qml.CRZ(0.1, wires=[0, 1]),
         qml.CRot(0.1, 0.2, 0.3, wires=[0, 1]),
         qml.ControlledPhaseShift(0.1, wires=[0, 1]),
-        qml.ControlledQubitUnitary([[1, 0], [0, 1j]], control_wires=1, wires=0),
+        qml.ControlledQubitUnitary([[1, 0], [0, 1j]], wires=[1, 0]),
     )
     control_base_ops = (
         qml.PauliX,

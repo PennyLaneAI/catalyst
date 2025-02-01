@@ -55,6 +55,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
