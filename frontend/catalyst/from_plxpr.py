@@ -15,16 +15,19 @@
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
-from copy import copy
 from functools import partial
-from typing import Callable
+from typing import Callable, Sequence
 
 import jax
 import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
-from pennylane.capture.primitives import cond_prim
+from pennylane.capture.primitives import (
+    AbstractMeasurement,
+    AbstractOperator,
+    cond_prim,
+)
 
 from catalyst.device import (
     extract_backend_info,
@@ -320,6 +323,50 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
         self.stateref = None
 
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
+
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+
+        Returns:
+            list[TensorLike]: the results of the execution.
+
+        """
+        self._env = {}
+        self.setup()
+
+        for const, constvar in zip(consts, jaxpr.constvars, strict=True):
+            self._env[constvar] = const
+
+        for eqn in jaxpr.eqns:
+
+            custom_handler = self._primitive_registrations.get(eqn.primitive, None)
+            if custom_handler:
+                invals = [self.read(invar) for invar in eqn.invars]
+                outvals = custom_handler(self, *invals, **eqn.params)
+            elif isinstance(eqn.outvars[0].aval, AbstractOperator):
+                outvals = self.interpret_operation_eqn(eqn)
+            elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
+                outvals = self.interpret_measurement_eqn(eqn)
+            else:
+                invals = [self.read(invar) for invar in eqn.invars]
+                outvals = eqn.primitive.bind(*invals, **eqn.params)
+
+            if not eqn.primitive.multiple_results:
+                outvals = [outvals]
+            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
+                self._env[outvar] = outval
+
+        outvals = [self.qreg]
+
+        self.cleanup()
+        self._env = {}
+
+        return outvals
+
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def _(self, *invals, n_wires):
@@ -362,14 +409,8 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         # Get the input qreg var.
         in_qreg_var = converted_jaxpr_branch.constvars[0]
 
-        # Create an output qreg var as a copy of the input one
-        out_qreg_var = copy(in_qreg_var)
-
         # Overwrite the input vars with the input qreg var
         converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=[in_qreg_var])
-
-        # Overwrite the output vars with the output qreg var
-        converted_jaxpr_branch = converted_jaxpr_branch.replace(outvars=[out_qreg_var])
 
         # Remove the qreg var from the constants
         constvars = converted_jaxpr_branch.constvars
@@ -381,7 +422,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         if num_eqns > 1:
             last_eqn = num_eqns - 1
             converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[last_eqn].replace(
-                outvars=[out_qreg_var]
+                outvars=converted_jaxpr_branch.outvars
             )
 
         return converted_jaxpr_branch
