@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Measurement cycle management entry point """
+"""Measurement cycle management entry point"""
 import sys
 
 from catalyst_benchmark.toplevel import (
