@@ -304,14 +304,13 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
 
     """
 
-    def __init__(self, parent_device, parent_shots, parent_qreg):
-        self._parent_qreg = parent_qreg
+    def __init__(self, parent_device, parent_shots):
         super().__init__(parent_device, parent_shots)
 
-    def setup(self):
+    def setup(self, qreg):
         """Initialize the stateref."""
         if self.stateref is None:
-            self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
+            self.stateref = {"qreg": qreg, "wire_map": {}}
 
     # pylint: disable=attribute-defined-outside-init
     def cleanup(self):
@@ -336,7 +335,8 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
 
         """
         self._env = {}
-        self.setup()
+
+        self.setup(args[len(args) - 1])
 
         for const, constvar in zip(consts, jaxpr.constvars, strict=True):
             self._env[constvar] = const
@@ -396,25 +396,12 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     def convert_branch_from_plxpr_to_jaxpr():
         # Convert plxpr to Catalyst jaxpr
         converted_func = partial(
-            BranchPlxprInterpreter(self._device, self._shots, self.qreg).eval,
+            BranchPlxprInterpreter(self._device, self._shots).eval,
             plxpr_branch,
             branch_consts,
         )
-        converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args).jaxpr
-
-        # Unfortunately the obtained jaxpr does not comply with the Catalyst
-        # spec. We need to move some vars around as follows:
-
-        # We assume the first constant is the qreg var.
-        # Get the input qreg var.
-        in_qreg_var = converted_jaxpr_branch.constvars[0]
-
-        # Overwrite the input vars with the input qreg var
-        converted_jaxpr_branch = converted_jaxpr_branch.replace(invars=[in_qreg_var])
-
-        # Remove the qreg var from the constants
-        constvars = converted_jaxpr_branch.constvars
-        converted_jaxpr_branch = converted_jaxpr_branch.replace(constvars=constvars[1:])
+        args_plus_qreg = [*args, self.qreg]
+        converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
 
         # We assume the last equation of the branch is the one returning the qreg.
         # Its output vars are outdated, so we update them with the output var qreg.
