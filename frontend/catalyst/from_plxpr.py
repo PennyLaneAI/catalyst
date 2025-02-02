@@ -298,10 +298,8 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
     """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
 
     Args:
-        parent_device (qml.devices.Device)
-        parent_shots (qml.measurements.Shots)
-        parent_qreg (...)
-
+        device (qml.devices.Device)
+        shots (qml.measurements.Shots)
     """
 
     def set_qreg(self, qreg):
@@ -333,6 +331,7 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         """
         self._env = {}
 
+        # We assume the last argument is the qreg
         num_args = len(args)
         assert num_args > 0
         qreg = args[num_args - 1]
@@ -381,61 +380,50 @@ def _(self, phase, *wires, n_wires):
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
 def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
-
-    # Inner functions
-
-    def emit_new_abstract_qreg_jaxpr():
-        """Emit a new Catalyst jaxpr branch that returns a qreg."""
-
-        return jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
-
-    def convert_branch_from_plxpr_to_jaxpr():
-        # Convert plxpr to Catalyst jaxpr
-        converted_func = partial(
-            BranchPlxprInterpreter(self._device, self._shots).eval,
-            plxpr_branch,
-            branch_consts,
-        )
-        args_plus_qreg = [*args, self.qreg]
-        converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
-
-        # We assume the last equation of the branch is the one returning the qreg.
-        # Its output vars are outdated, so we update them with the output var qreg.
-        num_eqns = len(converted_jaxpr_branch.eqns)
-        if num_eqns > 1:
-            last_eqn = num_eqns - 1
-            converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[last_eqn].replace(
-                outvars=converted_jaxpr_branch.outvars
-            )
-
-        return converted_jaxpr_branch
-
-    def restructure_input_values():
-        """The original vals do not comply as well with the Catalyst spec. We need to rebuild them accordingly."""
-
-        # Extract the predicate
-        predicate_slice = slice(0, 1)
-        predicate = plxpr_invals[predicate_slice]
-
-        # Flatten the constants of all branches
-        consts = [const for consts in branches_consts for const in consts]
-        return [*predicate, *consts, *args, self.qreg]
-
-    # Logic
-
     args = plxpr_invals[args_slice]
-    branches_consts = [plxpr_invals[consts_slice] for consts_slice in consts_slices]
+    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
     converted_jaxpr_branches = []
+    all_consts = []
 
     # Convert each branch from plxpr to jaxpr
-    for branch_consts, plxpr_branch in zip(branches_consts, jaxpr_branches):
-        converted_jaxpr_branches.append(
-            emit_new_abstract_qreg_jaxpr()
-            if plxpr_branch is None
-            else convert_branch_from_plxpr_to_jaxpr()
-        )
+    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
+        # Store all branches consts in a flat list
+        branch_consts = plxpr_invals[const_slice]
+        all_consts = all_consts + [*branch_consts]
 
-    cond_invals = restructure_input_values()
+        converted_jaxpr_branch = None
+
+        if plxpr_branch is None:
+            # Emit a new Catalyst jaxpr branch that simply returns a qreg
+            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
+        else:
+            # Convert branch from plxpr to Catalyst jaxpr
+            converted_func = partial(
+                BranchPlxprInterpreter(self._device, self._shots).eval,
+                plxpr_branch,
+                branch_consts,
+            )
+            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
+
+            # We assume the last equation of the branch is the one returning the qreg.
+            # Its output vars are outdated, so we update them with the output var qreg.
+            num_eqns = len(converted_jaxpr_branch.eqns)
+            if num_eqns > 1:
+                last_eqn = num_eqns - 1
+                converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[
+                    last_eqn
+                ].replace(outvars=converted_jaxpr_branch.outvars)
+
+        converted_jaxpr_branches.append(converted_jaxpr_branch)
+
+    # The slice (0,1) of the plxpr input values contains the true predicate of the plxpr cond,
+    # whereas the slice (1,2) refers to the false predicate, which is always True.
+    # We extract the true predicate and discard the false one.
+    predicate_slice = slice(0, 1)
+    predicate = plxpr_invals[predicate_slice]
+
+    # Build Catalyst compatible input values
+    cond_invals = [*predicate, *all_consts, *args_plus_qreg]
 
     # Perform the binding
     outvals = cond_p.bind(
