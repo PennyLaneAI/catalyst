@@ -27,6 +27,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Utils.h"
@@ -178,8 +179,7 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
 
     // Memref
     Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Value memrefPtr = rewriter.create<LLVM::AllocaOp>(
-        loc, LLVM::LLVMPointerType::get(rewriter.getContext()), llvmMemrefType, c1);
+    Value memrefPtr = getStaticAlloca(loc, rewriter, llvmMemrefType, c1);
     rewriter.create<LLVM::StoreOp>(loc, memrefLlvm, memrefPtr);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, memrefPtr, 1);
 

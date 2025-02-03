@@ -15,8 +15,10 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/PatternMatch.h"
 
+using namespace mlir;
+
 namespace catalyst {
 
-LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty, int val);
+LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty, Value val);
 
 } // namespace catalyst

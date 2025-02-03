@@ -26,8 +26,9 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty
     Block *entryBlock = &parentRegion->front();
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     if (insertionBlock == entryBlock) {
-       // ... noop ...
-    } else {
+        // ... noop ...
+    }
+    else {
         Operation *possible_terminator = entryBlock->getTerminator();
         if (possible_terminator) {
             // we need it before the terminator
@@ -39,10 +40,8 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty
             __builtin_unreachable();
         }
     }
-    auto alloca = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+    return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                            ty, value);
 }
-
-
 
 } // namespace catalyst
