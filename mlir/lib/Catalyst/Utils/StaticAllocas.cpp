@@ -19,7 +19,7 @@ using namespace mlir;
 
 namespace catalyst {
 
-LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty, int val)
+LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty, Value value)
 {
     Block *insertionBlock = rewriter.getInsertionBlock();
     Region *parentRegion = insertionBlock->getParent();
@@ -31,15 +31,18 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty
         Operation *possible_terminator = entryBlock->getTerminator();
         if (possible_terminator) {
             // we need it before the terminator
+            Operation *value_def = value.getDefiningOp();
+            rewriter.moveOpBefore(value_def, possible_terminator);
             rewriter.setInsertionPoint(possible_terminator);
         }
         else {
             __builtin_unreachable();
         }
     }
-    Value value = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(val));
-    return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+    auto alloca = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                            ty, value);
 }
+
+
 
 } // namespace catalyst
