@@ -17,6 +17,10 @@
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
+* Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
+  give incorrect results for circuits containing `qml.StatePrep`.
+  [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
+
 <h3>Internal changes ⚙️</h3>
 
 * Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
@@ -46,12 +50,17 @@
   - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
+* Update source code to comply with changes requested by black v25.1.0
+  [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,

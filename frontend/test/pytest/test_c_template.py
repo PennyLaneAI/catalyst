@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for contents of c_template
-"""
+"""Unit tests for contents of c_template"""
 import numpy as np
 
 from catalyst.utils.c_template import CType, CVariable
