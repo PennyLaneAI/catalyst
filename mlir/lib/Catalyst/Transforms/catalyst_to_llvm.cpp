@@ -472,7 +472,6 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         rewriter.setInsertionPointToStart(entry);
 
         auto ctx = rewriter.getContext();
-        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
         auto one = rewriter.getI64IntegerAttr(1);
         auto loc = op.getLoc();
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, one);
@@ -502,7 +501,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
             Type structTy = typeConverter->convertType(arg.getType());
             auto structVal =
                 rewriter.create<UnrealizedConversionCastOp>(loc, structTy, arg).getResult(0);
-            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structTy, c1);
+            Value ptr = getStaticAlloca(loc, rewriter, structTy, c1);
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             callArgs.push_back(ptr);
         }
