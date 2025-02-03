@@ -302,21 +302,6 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         shots (qml.measurements.Shots)
     """
 
-    def set_qreg(self, qreg):
-        """Initialize the stateref."""
-        if self.stateref is None:
-            self.stateref = {"qreg": qreg, "wire_map": {}}
-
-    # pylint: disable=attribute-defined-outside-init
-    def cleanup(self):
-        """Perform any final steps after processing the plxpr.
-
-        For conversion to catalyst, this reinserts extracted qubits.
-        """
-        for orig_wire, wire in self.wire_map.items():
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
-        self.stateref = None
-
     def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
         """Evaluate a jaxpr.
 
@@ -336,8 +321,11 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         assert num_args > 0
         qreg = args[num_args - 1]
 
-        self.set_qreg(qreg)
+        # Initialize the stateref
+        if self.stateref is None:
+            self.stateref = {"qreg": qreg, "wire_map": {}}
 
+        # Insert constants into the environment
         for const, constvar in zip(consts, jaxpr.constvars, strict=True):
             self._env[constvar] = const
 
@@ -355,9 +343,14 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
                 invals = [self.read(invar) for invar in eqn.invars]
                 eqn.primitive.bind(*invals, **eqn.params)
 
+        # Reinsert extracted qubits
+        for orig_wire, wire in self.wire_map.items():
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+
         outvals = [self.qreg]
 
-        self.cleanup()
+        self.stateref = None
+
         self._env = {}
 
         return outvals
@@ -387,6 +380,7 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
     # Convert each branch from plxpr to jaxpr
     for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
+
         # Store all branches consts in a flat list
         branch_consts = plxpr_invals[const_slice]
         all_consts = all_consts + [*branch_consts]
@@ -404,15 +398,6 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
                 branch_consts,
             )
             converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
-
-            # We assume the last equation of the branch is the one returning the qreg.
-            # Its output vars are outdated, so we update them with the output var qreg.
-            num_eqns = len(converted_jaxpr_branch.eqns)
-            if num_eqns > 1:
-                last_eqn = num_eqns - 1
-                converted_jaxpr_branch.eqns[last_eqn] = converted_jaxpr_branch.eqns[
-                    last_eqn
-                ].replace(outvars=converted_jaxpr_branch.outvars)
 
         converted_jaxpr_branches.append(converted_jaxpr_branch)
 
