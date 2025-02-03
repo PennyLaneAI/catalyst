@@ -17,6 +17,10 @@
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
+* Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
+  give incorrect results for circuits containing `qml.StatePrep`.
+  [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
+
 <h3>Internal changes ⚙️</h3>
 
 * Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
@@ -55,6 +59,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 Christina Lee,
