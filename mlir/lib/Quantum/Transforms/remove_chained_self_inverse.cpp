@@ -21,12 +21,14 @@
 #include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -65,6 +67,8 @@ struct RemoveChainedSelfInversePass
         Operation *module = getOperation();
 
         RewritePatternSet patterns(&getContext());
+        scf::ForOp::getCanonicalizationPatterns(patterns, &getContext());
+        populateLoopBoundaryPatterns(patterns); // Loop boundary optimization
         populateSelfInversePatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {

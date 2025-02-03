@@ -14,13 +14,16 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
+#include "llvm/Support/Debug.h"
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -44,6 +47,9 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         Operation *module = getOperation();
 
         RewritePatternSet patternsCanonicalization(&getContext());
+
+        scf::ForOp::getCanonicalizationPatterns(patternsCanonicalization, &getContext());
+
         catalyst::quantum::StaticCustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                        &getContext());
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
@@ -55,6 +61,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         }
 
         RewritePatternSet patterns(&getContext());
+        populateLoopBoundaryPatterns(patterns); // Loop boundary optimization
         populateMergeRotationsPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
