@@ -314,6 +314,7 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             list[TensorLike]: the results of the execution.
 
         """
+        # pylint: disable=attribute-defined-outside-init
         self._env = {}
 
         # We assume the last argument is the qreg
@@ -345,12 +346,14 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
 
         # Reinsert extracted qubits
         for orig_wire, wire in self.wire_map.items():
+            # pylint: disable=attribute-defined-outside-init
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
         outvals = [self.qreg]
 
         self.stateref = None
 
+        # pylint: disable=attribute-defined-outside-init
         self._env = {}
 
         return outvals
