@@ -33,7 +33,7 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty
         if (possible_terminator) {
             // we need it before the terminator
             Operation *value_def = value.getDefiningOp();
-            rewriter.moveOpBefore(value_def, possible_terminator);
+            rewriter.moveOpBefore(value_def, &entryBlock->front());
             rewriter.setInsertionPoint(possible_terminator);
         }
         else {
