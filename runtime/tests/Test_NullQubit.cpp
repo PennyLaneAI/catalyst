@@ -48,6 +48,18 @@ TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]")
     sim->AllocateQubit();
 }
 
+TEST_CASE("Test NullQubit qubit device config setting is successful.", "[NullQubit]")
+{
+    std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
+    struct Config {
+        std::string name;
+        size_t a_number;
+        std::array<double, 2> a_list;
+    };
+    Config config{"null", 42, {3.14, 2.718}};
+    sim->SetDeviceConfig(&config);
+}
+
 TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
 {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
