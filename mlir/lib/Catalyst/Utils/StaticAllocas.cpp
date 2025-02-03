@@ -19,7 +19,7 @@ using namespace mlir;
 
 namespace catalyst {
 
-LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty, Value value)
+LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, Value value)
 {
     Block *insertionBlock = rewriter.getInsertionBlock();
     Region *parentRegion = insertionBlock->getParent();

@@ -19,6 +19,6 @@ using namespace mlir;
 
 namespace catalyst {
 
-LLVM::AllocaOp getStaticAlloca(Location &loc, PatternRewriter &rewriter, Type ty, Value val);
+LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, Value val);
 
 } // namespace catalyst
