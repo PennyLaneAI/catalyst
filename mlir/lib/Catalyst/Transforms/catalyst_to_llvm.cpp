@@ -380,8 +380,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
-            LLVM::AllocaOp alloca =
-                rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedArg.getType(), c1, 0);
+            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedArg.getType, c1);
             rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca);
             encodedArgs.push_back(alloca);
         }
