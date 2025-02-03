@@ -19,6 +19,8 @@
 #include <array>
 #include <cstdint>
 
+#include "Types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,12 +54,22 @@ struct Ion {
     int64_t num_of_transitions;
 };
 
+struct Beam {
+    int64_t transition_index;
+    double rabi;
+    double detuning;
+    std::array<int64_t, 3> polarization;
+    std::array<int64_t, 3> wavevector;
+};
+
 // OQD Runtime Instructions
 void __catalyst__oqd__greetings();
 
 void __catalyst__oqd__rt__initialize();
 void __catalyst__oqd__rt__finalize();
 void __catalyst__oqd__ion(Ion *);
+void __catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam);
+
 
 #ifdef __cplusplus
 } // extern "C"

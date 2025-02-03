@@ -47,6 +47,14 @@ void to_json(json &j, const Transition &tr)
              {"level2", tr.level2}};
 }
 
+template <typename T>
+json &numerical_json_factory(T value){
+    static json j;
+    j["class_"] = "MathNum";
+    j["value"] = value;
+    return j;
+}
+
 extern "C" {
 
 void __catalyst__oqd__rt__initialize()
@@ -104,6 +112,34 @@ void __catalyst__oqd__ion(Ion *ion)
     }
 
     (*JSON)["system"]["ions"].push_back(j);
+}
+
+void __catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam) {
+    std::cout << "qubit is " << reinterpret_cast<QubitIdType>(qubit) << "\n";
+
+    size_t wire = reinterpret_cast<QubitIdType>(qubit);
+
+    json j;
+    j["class_"] = "Pulse";
+    j["duration"] = duration;
+
+    json j_beam;
+    j_beam["class_"] = "Beam";
+    j_beam["target"] = wire;
+    j_beam["polarization"] = beam->polarization;
+    j_beam["wavevector"] = beam->wavevector;
+    j_beam["rabi"] = numerical_json_factory<double>(beam->rabi);
+    j_beam["detuning"] = numerical_json_factory<double>(beam->detuning);
+    j_beam["phase"] = numerical_json_factory<double>(phase);
+
+    const auto &transitions = (*JSON)["system"]["ions"][wire]["transitions"];
+    j_beam["transition"] = transitions[beam->transition_index];
+
+
+    j["beam"] = j_beam;
+
+    std::cout << j.dump() << "\n";
+
 }
 
 } // extern "C"
