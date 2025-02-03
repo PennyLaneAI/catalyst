@@ -258,7 +258,9 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
     getQuantumDevicePtr()->SetDeviceShots(shots);
-    getQuantumDevicePtr()->SetDeviceConfig(device_config);
+    if (device_config != nullptr) {
+        getQuantumDevicePtr()->SetDeviceConfig(device_config);
+    }
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
