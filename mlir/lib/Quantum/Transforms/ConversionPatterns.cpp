@@ -20,6 +20,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
