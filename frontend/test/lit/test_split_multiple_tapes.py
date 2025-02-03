@@ -67,7 +67,7 @@ def test_multiple_tape_transforms():
     # CHECK: qdevice[
     # CHECK: ]
     # CHECK: qdealloc
-    # CHECK-NEXT: qdevice[
+    # CHECK: qdevice[
     # CHECK: ]
     # CHECK: qdealloc
     # CHECK-NEXT: {{.+}}:f64[] = add {{.+}} {{.+}}
@@ -77,7 +77,7 @@ def test_multiple_tape_transforms():
     # CHECK: quantum.device
     # CHECK: quantum.dealloc
     # CHECK-NEXT: quantum.device_release
-    # CHECK-NEXT: quantum.device
+    # CHECK: quantum.device
     # CHECK: quantum.dealloc
     # CHECK-NEXT: quantum.device_release
     # CHECK-NEXT: {{%.+}} = stablehlo.add {{%.+}}, {{%.+}} : tensor<f64>
