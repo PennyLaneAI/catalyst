@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
@@ -42,6 +43,27 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, V
     }
     return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                            ty, value);
+}
+
+mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter, MemRefType paramCountType) {
+    Block *insertionBlock = rewriter.getInsertionBlock();
+    Region *parentRegion = insertionBlock->getParent();
+    Block *entryBlock = &parentRegion->front();
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    if (insertionBlock == entryBlock) {
+        // ... noop ...
+    }
+    else {
+        Operation *possible_terminator = entryBlock->getTerminator();
+        if (possible_terminator) {
+            // we need it before the terminator
+            rewriter.setInsertionPoint(possible_terminator);
+        }
+        else {
+            __builtin_unreachable();
+        }
+    }
+    return rewriter.create<memref::AllocaOp>(loc, paramCountType);
 }
 
 } // namespace catalyst

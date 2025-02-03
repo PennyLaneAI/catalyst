@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
@@ -20,5 +21,6 @@ using namespace mlir;
 namespace catalyst {
 
 LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, Value val);
+memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter, MemRefType paramCountType);
 
 } // namespace catalyst

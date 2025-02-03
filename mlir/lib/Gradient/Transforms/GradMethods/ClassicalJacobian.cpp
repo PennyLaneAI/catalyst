@@ -26,6 +26,7 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 
 namespace catalyst {
 namespace gradient {
@@ -66,7 +67,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // Store the counter in memory since we don't want to deal with returning the SSA value
         // for updated parameter counts from arbitrary regions/ops.
         MemRefType paramCountType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramCountBuffer = rewriter.create<memref::AllocaOp>(loc, paramCountType);
+        Value paramCountBuffer = getStaticMemrefAlloca(loc, rewriter, paramCountType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramCountBuffer);
 
