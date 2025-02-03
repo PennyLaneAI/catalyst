@@ -439,8 +439,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         }
 
         // Get allocation for packed results pointers.
-        LLVM::AllocaOp allocaRes =
-            rewriter.create<LLVM::AllocaOp>(loc, ptr, arrRes.getType(), c1, 0);
+        LLVM::AllocaOp allocaRes = getStaticAlloca(loc, rewriter, arrRes.getType(), c1);
 
         // Store constructed results pointers array on the stack.
         rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes);
