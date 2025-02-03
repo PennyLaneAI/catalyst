@@ -59,6 +59,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Yushao Chen,
 Sengthai Heng,
 Christina Lee,
