@@ -51,12 +51,16 @@
     `@__catalyst_ion`, `@ __catalyst_pulse_op`, `@ __catalyst_parallel_protocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
+* Update source code to comply with changes requested by black v25.1.0
+  [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
