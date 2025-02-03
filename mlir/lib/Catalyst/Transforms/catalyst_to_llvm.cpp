@@ -547,13 +547,11 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
         // Just change the calling convention from scalar replacement of aggregates
         // to pointer to struct.
         auto loc = op.getLoc();
-        auto ctx = rewriter.getContext();
         SmallVector<Value> callArgs;
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto structVal : adaptor.getInputs()) {
-            Type ptrTy = LLVM::LLVMPointerType::get(ctx);
             // allocate a memref descriptor on the stack
-            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structVal.getType(), c1);
+            Value ptr = getStaticAlloca(loc, rewriter, structVal.getType(), c1);
             // store the memref descriptor on the pointer
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             // add the ptr to the arguments
