@@ -33,6 +33,7 @@
 #include "mlir/IR/IRMapping.h"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -85,8 +86,6 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                              RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     ModuleOp moduleOp = func->getParentOfType<ModuleOp>();
-    MLIRContext *ctx = rewriter.getContext();
-    auto ptrType = LLVM::LLVMPointerType::get(ctx);
     std::optional<SymbolTable::UseRange> uses = func.getSymbolUses(moduleOp);
     if (uses.has_value()) {
         for (auto use : *uses) {
@@ -100,9 +99,8 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                 SmallVector<Value> outputs;
                 auto wrapMemref = [&](Value memref) {
                     Type convertedType = typeConverter->convertType(memref.getType());
-                    Value space =
-                        rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                        /*elementType=*/convertedType, c1);
+                    Value space = getStaticAlloca(loc, rewriter, convertedType, c1);
+
                     Value convertedValue =
                         rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memref)
                             .getResult(0);
