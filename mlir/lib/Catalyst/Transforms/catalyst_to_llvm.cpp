@@ -380,7 +380,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedArg.getType, c1);
+            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedArg.getType(), c1);
             rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca);
             encodedArgs.push_back(alloca);
         }
@@ -400,7 +400,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             insertValueArgs(pair.value(), offset);
         }
         // Get allocation for packed arguments pointers.
-        LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, arrArgs.getType(), c1, 0);
+        LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, arrArgs.getType(), c1);
 
         // Store constructed arguments pointers array into the alloca.
         rewriter.create<LLVM::StoreOp>(loc, arrArgs, alloca);
