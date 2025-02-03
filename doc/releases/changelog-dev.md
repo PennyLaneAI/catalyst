@@ -46,12 +46,16 @@
   - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
+* Update source code to comply with changes requested by black v25.1.0
+  [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,

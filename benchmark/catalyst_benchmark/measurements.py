@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" This file contains a libraru of single value measurement procedures plus the self-checking
+"""This file contains a libraru of single value measurement procedures plus the self-checking
 routine ensuring the numeric equivalence across similar problems."""
 
 # pylint: disable=import-outside-toplevel
@@ -134,7 +134,10 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_catalyst import (
             ProblemCVQE as Problem,
         )
-        from catalyst_benchmark.test_cases.chemvqe_catalyst import qcompile, workflow
+        from catalyst_benchmark.test_cases.chemvqe_catalyst import (
+            qcompile,
+            workflow,
+        )
 
         p = Problem(
             qml.device("lightning.qubit", wires=a.nqubits),
@@ -215,7 +218,10 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_catalyst import (
             ProblemCVQE as Problem,
         )
-        from catalyst_benchmark.test_cases.chemvqe_catalyst import qcompile, workflow
+        from catalyst_benchmark.test_cases.chemvqe_catalyst import (
+            qcompile,
+            workflow,
+        )
 
         p = Problem(qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method)
     elif a.problem == "chemvqe-hybrid":
@@ -319,7 +325,9 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             qcompile_hybrid as qcompile,
         )
-        from catalyst_benchmark.test_cases.chemvqe_pennylane import size
+        from catalyst_benchmark.test_cases.chemvqe_pennylane import (
+            size,
+        )
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             workflow_hybrid as workflow,
         )
@@ -414,7 +422,9 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             qcompile_hybrid as qcompile,
         )
-        from catalyst_benchmark.test_cases.chemvqe_pennylane import size
+        from catalyst_benchmark.test_cases.chemvqe_pennylane import (
+            size,
+        )
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             workflow_hybrid as workflow,
         )
@@ -504,7 +514,9 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             qcompile_hybrid as qcompile,
         )
-        from catalyst_benchmark.test_cases.chemvqe_pennylane import size
+        from catalyst_benchmark.test_cases.chemvqe_pennylane import (
+            size,
+        )
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             workflow_hybrid as workflow,
         )
@@ -584,7 +596,9 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             qcompile_hybrid as qcompile,
         )
-        from catalyst_benchmark.test_cases.chemvqe_pennylane import size
+        from catalyst_benchmark.test_cases.chemvqe_pennylane import (
+            size,
+        )
         from catalyst_benchmark.test_cases.chemvqe_pennylane import (
             workflow_hybrid as workflow,
         )
