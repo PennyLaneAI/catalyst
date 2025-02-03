@@ -246,7 +246,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
 
         Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+        Value paramsProcessed = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
