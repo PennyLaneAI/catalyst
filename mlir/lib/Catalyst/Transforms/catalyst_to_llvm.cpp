@@ -246,8 +246,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
 
             Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
-            Value structPtr = rewriter.create<LLVM::AllocaOp>(
-                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
+            Value structPtr = getStaticAlloca(loc, rewriter, structType, c1);
             rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
 
             Value printDescriptor = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
