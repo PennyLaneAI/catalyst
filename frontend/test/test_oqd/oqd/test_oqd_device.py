@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the OQD device.
-"""
+"""Tests for the OQD device."""
 
 import pennylane as qml
 import pytest
