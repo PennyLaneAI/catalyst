@@ -33,7 +33,7 @@ using namespace catalyst::quantum;
 
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
 static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
-static const mlir::StringSet<> hamiltonianSet = {"H", "PauliX", "PauliY", "PauliZ", "X", "Y", "Z"};
+static const mlir::StringSet<> hamiltonianSet = { "Hadamard", "PauliX", "PauliY", "PauliZ","H", "X", "Y", "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
 namespace {
@@ -498,10 +498,11 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
 };
 
 
-void handleOperationParams(mlir::Operation &cloneOp, QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForOp forOp, mlir::PatternRewriter &rewriter) {
-        for (auto [idx, param] : llvm::enumerate(topEdgeOp.op.getParams())) {
-            // If param is in forOp, then it is a loop invariant
+// This function aims to set the operands of the cloneOp with paramOp's params.
+void setParamOperation(mlir::Operation &cloneOp, QuantumOpInfo paramOp, QuantumOpInfo bottomEdgeOp, scf::ForOp forOp, mlir::PatternRewriter &rewriter) {
+        for (auto [idx, param] : llvm::enumerate(paramOp.op.getParams())) {
             auto regionIterArgs = forOp.getRegionIterArgs();
+            // If param is in forOp, then it is a loop invariant
             if (std::find(regionIterArgs.begin(), regionIterArgs.end(), param) !=
                 regionIterArgs.end()) {
                 cloneOp.setOperand(idx, param);
@@ -531,66 +532,23 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
     auto bottomEdgeParams = bottomEdgeOp.op.getParams();
 
     if (topEdgeParams.size() > 0 && topEdgeParams.size() == bottomEdgeParams.size()) {
+        // Create the clone of the top edge operation
         auto cloneTopOp = topEdgeOp.op.clone();
-        // Check if the topEdgeParams is a tensor.extract
-        for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
-            // If param is in forOp, then it is a loop invariant
-            auto regionIterArgs = forOp.getRegionIterArgs();
-            if (std::find(regionIterArgs.begin(), regionIterArgs.end(), param) !=
-                regionIterArgs.end()) {
-                cloneTopOp.setOperand(idx, param);
-                continue;
-            }
-            if (auto tensorExtractOp = param.getDefiningOp<tensor::ExtractOp>()) {
-                auto tensorExtractOpClone = tensorExtractOp.clone();
-                param = tensorExtractOpClone.getResult();
-                cloneTopOp.setOperand(idx, param);
-                rewriter.setInsertionPoint(bottomEdgeOp.op);
-                rewriter.insert(tensorExtractOpClone);
-            }
-            else if (auto invarOp = findInitValue(forOp, param)) {
-                cloneTopOp.setOperand(idx, invarOp);
-            }
-            else {
-                cloneTopOp.setOperand(idx, param);
-            }
-        }
-
+        setParamOperation(*cloneTopOp, topEdgeOp, bottomEdgeOp, forOp, rewriter);
         cloneTopOp.setQubitOperands(bottomEdgeOp.op.getInQubits());
         rewriter.setInsertionPoint(bottomEdgeOp.op);
         rewriter.insert(cloneTopOp);
 
+        // Create the clone of the bottom edge operation
         auto cloneBottomOp = bottomEdgeOp.op.clone();
-
-        // Handle the parameters of the bottom edge operation
-        for (auto [idx, param] : llvm::enumerate(bottomEdgeParams)) {
-            auto regionIterArgs = forOp.getRegionIterArgs();
-            if (std::find(regionIterArgs.begin(), regionIterArgs.end(), param) !=
-                regionIterArgs.end()) {
-                cloneTopOp.setOperand(idx, param);
-                continue;
-            }
-            if (auto tensorExtractOp = param.getDefiningOp<tensor::ExtractOp>()) {
-                auto tensorExtractOpClone = tensorExtractOp.clone();
-                param = tensorExtractOpClone.getResult();
-                cloneBottomOp.setOperand(idx, param);
-                rewriter.setInsertionPoint(bottomEdgeOp.op);
-                rewriter.insert(tensorExtractOpClone);
-            }
-            else if (auto invarOp = findInitValue(forOp, param)) {
-                cloneBottomOp.setOperand(idx, invarOp);
-            }
-            else {
-                cloneBottomOp.setOperand(idx, param);
-            }
-        }
+        setParamOperation(*cloneBottomOp, bottomEdgeOp, bottomEdgeOp, forOp, rewriter);
         cloneBottomOp.setQubitOperands(cloneTopOp.getOutQubits());
         bottomEdgeOp.op.setQubitOperands(cloneBottomOp.getOutQubits());
 
         rewriter.setInsertionPoint(bottomEdgeOp.op);
         rewriter.insert(cloneBottomOp);
 
-        // change the param of topEdgeOp to negative value
+        // Update the param of topEdgeOp to negative value
         for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
             mlir::Value negParam =
                 rewriter.create<arith::NegFOp>(cloneTopOp.getLoc(), param).getResult();

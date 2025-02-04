@@ -349,3 +349,70 @@ func.func @test_loop_boundary_register_3(%arg0: tensor<i64>, %arg1: tensor<f64>)
 }
 
 // -----
+
+ func.func public @test_loop_boundary_from_frontend(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<f64> {
+      // CHECK-LABEL: func.func public @test_loop_boundary_from_frontend(
+      // CHECK-SAME: [[arg0:%.+]]: tensor<i64>, 
+      // CHECK-SAME: [[arg1:%.+]]: tensor<f64>) -> tensor<f64> {
+      // CHECK-DAG: [[ex_0:%.+]] = quantum.extract %0[ 0]
+      // CHECK-DAG: [[ex_1:%.+]] = tensor.extract [[arg1]][] : tensor<f64>
+      // CHECK: [[q_0:%.+]] = quantum.custom "RX"([[ex_1]]) [[ex_0]]
+      // CHECK: [[in_0:%.+]] = quantum.insert %0[ 0], [[q_0]]
+      %c = stablehlo.constant dense<0> : tensor<i64>
+      %extracted = tensor.extract %c[] : tensor<i64>
+      %c_0 = stablehlo.constant dense<2> : tensor<i64>
+      %0 = quantum.alloc( 2) : !quantum.reg
+      %c_1 = stablehlo.constant dense<0> : tensor<i64>
+      %c_2 = stablehlo.constant dense<1> : tensor<i64>
+      %c_3 = stablehlo.constant dense<0> : tensor<i64>
+      %extracted_4 = tensor.extract %c_1[] : tensor<i64>
+      %1 = arith.index_cast %extracted_4 : i64 to index
+      %extracted_5 = tensor.extract %arg0[] : tensor<i64>
+      %2 = arith.index_cast %extracted_5 : i64 to index
+      %extracted_6 = tensor.extract %c_2[] : tensor<i64>
+      %3 = arith.index_cast %extracted_6 : i64 to index
+      // CHECK: [[scf:%.+]]:2 = scf.for {{.*}} iter_args([[arg3:%.+]] = [[arg1]], [[arg4:%.+]] = [[in_0]])
+      %4:2 = scf.for %arg2 = %1 to %2 step %3 iter_args(%arg3 = %arg1, %arg4 = %0) -> (tensor<f64>, !quantum.reg) {
+        // CHECK-NOT: "RX"
+        %8 = arith.index_cast %arg2 : index to i64
+        %from_elements_9 = tensor.from_elements %8 : tensor<i64>
+        %9 = stablehlo.sine %arg3 : tensor<f64>
+        %c_10 = stablehlo.constant dense<0> : tensor<i64>
+        %extracted_11 = tensor.extract %c_10[] : tensor<i64>
+        %10 = quantum.extract %arg4[%extracted_11] : !quantum.reg -> !quantum.bit
+        %extracted_12 = tensor.extract %arg3[] : tensor<f64>
+        %out_qubits = quantum.custom "RX"(%extracted_12) %10 : !quantum.bit
+
+        // CHECK: [[ex_2:%.+]] = quantum.extract [[arg4]][ 0]
+        // CHECK: [[q_2:%.+]] = quantum.custom "Hadamard"() [[ex_2]]
+        // CHECK: [[ex_3:%.+]] = tensor.extract [[arg1]][]
+        // CHECK: [[q_3:%.+]] = quantum.custom "RX"([[ex_3]]) [[q_2]]
+        // CHECK: [[ex_4:%.+]] = tensor.extract [[arg3]][]
+        // CHECK: [[q_4:%.+]] = quantum.custom "RX"([[ex_4]]) [[q_3]]
+        %out_qubits_13 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+        %extracted_14 = tensor.extract %arg3[] : tensor<f64>
+        %out_qubits_15 = quantum.custom "RX"(%extracted_14) %out_qubits_13 : !quantum.bit
+        %c_16 = stablehlo.constant dense<0> : tensor<i64>
+        %extracted_17 = tensor.extract %c_16[] : tensor<i64>
+        %11 = quantum.insert %arg4[%extracted_17], %out_qubits_15 : !quantum.reg, !quantum.bit
+        scf.yield %9, %11 : tensor<f64>, !quantum.reg
+      }
+
+        // %5 = arith.negf %extracted_0 : f64
+        // %6 = quantum.extract %4#1[ 0] : !quantum.reg -> !quantum.bit
+        // %out_qubits_1 = quantum.custom "RX"(%5) %6 : !quantum.bit
+        // %7 = quantum.insert %4#1[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
+      
+      // CHECK: [[negf:%.+]] = arith.negf [[extract_0]]
+      // CHECK: [[ex_5:%.+]] = quantum.extract [[scf]]#1[ 0]
+      // CHECK: [[q_5:%.+]] = quantum.custom "RX"([[negf]]) [[ex_5]]
+      // CHECK: [[insert_0:%.+]] = quantum.insert [[scf]]#1[ 0], [[q_5]]
+      %c_7 = stablehlo.constant dense<0> : tensor<i64>
+      %extracted_8 = tensor.extract %c_7[] : tensor<i64>
+      %5 = quantum.extract %4#1[%extracted_8] : !quantum.reg -> !quantum.bit
+      %6 = quantum.namedobs %5[ PauliZ] : !quantum.obs
+      %7 = quantum.expval %6 : f64
+      %from_elements = tensor.from_elements %7 : tensor<f64>
+      quantum.dealloc %4#1 : !quantum.reg
+      return %from_elements : tensor<f64>
+    }
