@@ -62,14 +62,21 @@ struct Beam {
     std::array<int64_t, 3> wavevector;
 };
 
+struct Pulse {
+    Beam *beam;
+    size_t target;
+    double duration;
+    double phase;
+};
+
 // OQD Runtime Instructions
 void __catalyst__oqd__greetings();
 
 void __catalyst__oqd__rt__initialize();
 void __catalyst__oqd__rt__finalize();
 void __catalyst__oqd__ion(Ion *);
-void __catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam);
-
+Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam);
+void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t n);
 
 #ifdef __cplusplus
 } // extern "C"

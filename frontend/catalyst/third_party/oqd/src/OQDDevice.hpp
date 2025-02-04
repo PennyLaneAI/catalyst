@@ -59,8 +59,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OQDDevice(
-        const std::string &kwargs = "{device_type : oqd, backend : default}")
+    explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
     {
         __catalyst__oqd__greetings();
         __catalyst__oqd__rt__initialize();

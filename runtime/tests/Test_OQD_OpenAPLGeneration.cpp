@@ -17,8 +17,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "RuntimeCAPI.h"
 #include "OQDRuntimeCAPI.h"
+#include "RuntimeCAPI.h"
 #include "TestUtils.hpp"
 
 using json = nlohmann::json;
@@ -218,6 +218,10 @@ TEST_CASE("Test ion generation", "[OQD]")
         ]
       }
     ]
+  },
+  "protocol": {
+    "class_": "SequentialProtocol",
+    "sequence": []
   }
 }
 )");
@@ -232,8 +236,10 @@ TEST_CASE("Test ion generation", "[OQD]")
     std::filesystem::remove("output.json");
 }
 
+TEST_CASE("Test pulse generation", "[OQD]")
+{
 
-TEST_CASE("Test pulse generation", "[OQD]"){
+    size_t num_qubits = 2;
 
     char name[] = "Yb171";
     char l0_label[] = "l0";
@@ -255,7 +261,11 @@ TEST_CASE("Test pulse generation", "[OQD]"){
 
     Ion ion = {name, 171.0, 1.0, {0, 0, 0}, levels, 4, transitions, 4};
 
-    Beam beam = {0, 1.2, 3.4, {1, 2, 3}, {-1, -2, -3}};
+    Beam beam1 = {0, 1.2, 3.4, {1, 2, 3}, {-1, -2, -3}};
+    Beam beam2 = {2, 1.2, 5.6, {1, 2, 3}, {-1, -2, -3}};
+
+    Beam beam3 = {0, 7.8, 11.1, {2, 1, 3}, {-1, -2, -3}};
+    Beam beam4 = {2, 7.8, 22.2, {3, 1, 4}, {-1, -2, -3}};
 
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
@@ -264,19 +274,30 @@ TEST_CASE("Test pulse generation", "[OQD]"){
                                 (int8_t *)rtd_kwargs.c_str(), nullptr, 1000);
     __catalyst__oqd__rt__initialize();
 
-    QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(num_qubits);
 
-    QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+    QUBIT **target0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+    QUBIT **target1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
+    for (size_t i = 0; i < num_qubits; i++) {
+        __catalyst__oqd__ion(&ion);
+    }
 
+    Pulse *pulse1 = __catalyst__oqd__pulse(*target0, 1.3, 0.00, &beam1);
+    Pulse *pulse2 = __catalyst__oqd__pulse(*target0, 1.3, 3.14, &beam2);
+    Pulse *pulses12[] = {pulse1, pulse2};
+    __catalyst__oqd__ParallelProtocol(pulses12, 2);
 
-    __catalyst__oqd__ion(&ion);
-    __catalyst__oqd__pulse(*target, 3.14, 0.00, &beam);
-
-
+    Pulse *pulse3 = __catalyst__oqd__pulse(*target0, 2.3, -6.28, &beam3);
+    Pulse *pulse4 = __catalyst__oqd__pulse(*target1, 4.5, -3.14, &beam4);
+    Pulse *pulses34[] = {pulse3, pulse4};
+    __catalyst__oqd__ParallelProtocol(pulses34, 2);
 
     __catalyst__rt__qubit_release_array(qs);
     __catalyst__oqd__rt__finalize();
     __catalyst__rt__device_release();
     __catalyst__rt__finalize();
+
+    json observed = json::parse(std::ifstream("output.json"));
+    std::cout << observed.dump() << "\n";
 }

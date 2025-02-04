@@ -25,6 +25,15 @@
 using json = nlohmann::json;
 
 static std::unique_ptr<json> JSON = nullptr;
+static std::unique_ptr<std::vector<Pulse *>> PulseGarbageCan = nullptr;
+
+template <typename T> json &numerical_json_factory(T value)
+{
+    static json j;
+    j["class_"] = "MathNum";
+    j["value"] = value;
+    return j;
+}
 
 void to_json(json &j, const Level &l)
 {
@@ -47,18 +56,31 @@ void to_json(json &j, const Transition &tr)
              {"level2", tr.level2}};
 }
 
-template <typename T>
-json &numerical_json_factory(T value){
-    static json j;
-    j["class_"] = "MathNum";
-    j["value"] = value;
-    return j;
+void to_json(json &j, const Pulse &p)
+{
+    j = json{{"class_", "Pulse"}, {"duration", p.duration}};
+
+    json j_beam;
+    j_beam["class_"] = "Beam";
+    j_beam["target"] = p.target;
+    j_beam["polarization"] = p.beam->polarization;
+    j_beam["wavevector"] = p.beam->wavevector;
+    j_beam["rabi"] = numerical_json_factory<double>(p.beam->rabi);
+    j_beam["detuning"] = numerical_json_factory<double>(p.beam->detuning);
+    j_beam["phase"] = numerical_json_factory<double>(p.phase);
+
+    const auto &transitions = (*JSON)["system"]["ions"][p.target]["transitions"];
+    j_beam["transition"] = transitions[p.beam->transition_index];
+
+    j["beam"] = j_beam;
 }
 
 extern "C" {
 
 void __catalyst__oqd__rt__initialize()
 {
+    PulseGarbageCan = std::make_unique<std::vector<Pulse *>>();
+
     JSON = std::make_unique<json>();
     (*JSON)["class_"] = "AtomicCircuit";
 
@@ -67,10 +89,22 @@ void __catalyst__oqd__rt__initialize()
   "ions": []
 })"_json;
     (*JSON)["system"] = system;
+
+    // The main openapl program is a sequential protocol
+    // Each gate is a parallel protocol in the main sequential protocol
+    json protocol = R"({
+  "class_": "SequentialProtocol",
+  "sequence": []
+})"_json;
+    (*JSON)["protocol"] = protocol;
 }
 
 void __catalyst__oqd__rt__finalize()
 {
+    for (auto pulse : *PulseGarbageCan) {
+        delete pulse;
+    }
+
     std::ofstream out_json("output.json");
     out_json << JSON->dump(2);
     JSON = nullptr;
@@ -114,32 +148,29 @@ void __catalyst__oqd__ion(Ion *ion)
     (*JSON)["system"]["ions"].push_back(j);
 }
 
-void __catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam) {
-    std::cout << "qubit is " << reinterpret_cast<QubitIdType>(qubit) << "\n";
-
+Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam)
+{
     size_t wire = reinterpret_cast<QubitIdType>(qubit);
 
+    // Since this is CAPI, we cannot return smart pointer.
+    // This means we have to new and delete manually.
+    Pulse *pulse = new Pulse({beam, wire, duration, phase});
+    PulseGarbageCan->push_back(pulse);
+    return pulse;
+}
+
+void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t num_of_pulses)
+{
     json j;
-    j["class_"] = "Pulse";
-    j["duration"] = duration;
+    j["class_"] = "ParallelProtocol";
 
-    json j_beam;
-    j_beam["class_"] = "Beam";
-    j_beam["target"] = wire;
-    j_beam["polarization"] = beam->polarization;
-    j_beam["wavevector"] = beam->wavevector;
-    j_beam["rabi"] = numerical_json_factory<double>(beam->rabi);
-    j_beam["detuning"] = numerical_json_factory<double>(beam->detuning);
-    j_beam["phase"] = numerical_json_factory<double>(phase);
+    std::vector<std::reference_wrapper<Pulse>> pulses_json;
+    for (std::size_t i = 0; i < num_of_pulses; i++) {
+        pulses_json.push_back(std::ref(*(pulses[i])));
+    }
+    j["sequence"] = pulses_json;
 
-    const auto &transitions = (*JSON)["system"]["ions"][wire]["transitions"];
-    j_beam["transition"] = transitions[beam->transition_index];
-
-
-    j["beam"] = j_beam;
-
-    std::cout << j.dump() << "\n";
-
+    (*JSON)["protocol"]["sequence"].push_back(j);
 }
 
 } // extern "C"
