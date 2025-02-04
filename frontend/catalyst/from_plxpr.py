@@ -359,6 +359,7 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         return outvals
 
 
+@BranchPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
 def _(self, *invals, n_wires):
     wires = [self.get_wire(w) for w in invals[1:]]
@@ -368,12 +369,14 @@ def _(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
+@BranchPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 @QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
 def _(self, phase, *wires, n_wires):
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
 
 # pylint: disable=unused-argument, too-many-arguments
+@BranchPlxprInterpreter.register_primitive(cond_prim)
 @QFuncPlxprInterpreter.register_primitive(cond_prim)
 def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     args = plxpr_invals[args_slice]
