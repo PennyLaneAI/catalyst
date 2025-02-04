@@ -29,7 +29,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -66,9 +65,17 @@ struct RemoveChainedSelfInversePass
 
         Operation *module = getOperation();
 
+        RewritePatternSet patternsLoopBoundary(&getContext());
+
+        scf::ForOp::getCanonicalizationPatterns(patternsLoopBoundary, &getContext());
+        populateLoopBoundaryPatterns(patternsLoopBoundary);
+
+        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsLoopBoundary)))) {
+            return signalPassFailure();
+        }
+
         RewritePatternSet patterns(&getContext());
         scf::ForOp::getCanonicalizationPatterns(patterns, &getContext());
-        populateLoopBoundaryPatterns(patterns); // Loop boundary optimization
         populateSelfInversePatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {

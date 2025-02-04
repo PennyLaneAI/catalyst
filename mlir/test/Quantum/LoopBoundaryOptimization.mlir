@@ -172,6 +172,32 @@ func.func @test_loop_boundary_rotation(%q0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
+func.func @test_loop_boundary_register(%start: index, %stop: index) -> (!quantum.bit){
+    
+    %0 = quantum.alloc(1) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit_0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit_1:%.+]] = {{.*}} "H"() [[qubit_0]] : !quantum.bit
+    // CHECK: [[qubit_2:%.+]] = scf.for {{.*}} iter_args([[arg0:%.+]] = [[qubit_1]])
+    %scf = scf.for %i = %start to %stop step %start iter_args(%arg0 = %1) -> (!quantum.bit) {
+        // CHECK-NOT: "H"
+        %2 = quantum.custom "H"() %arg0 : !quantum.bit
+        // CHECK: [[qubit_3:%.+]] = {{.*}} "X"() [[arg0]]
+        %3 = quantum.custom "X"() %2 : !quantum.bit
+        // CHECK-NOT: "H"
+        %4 = quantum.custom "H"() %3 : !quantum.bit
+        // CHECK: scf.yield [[qubit_3]]
+        scf.yield %4 : !quantum.bit
+    }
+    // CHECK: [[qubit_4:%.+]] = {{.*}} "H"() [[qubit_2]]
+    // CHECK: return [[qubit_4]]
+    func.return %scf : !quantum.bit
+}
+
+// -----
+
 func.func @test_loop_boundary_rotation_1(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
 
     %stop = arith.constant 10 : index
@@ -215,31 +241,6 @@ func.func @test_loop_boundary_rotation_1(%q0: !quantum.bit, %q1: !quantum.bit) -
 }
 
 // -----
-
-func.func @test_loop_boundary_register(%start: index, %stop: index) -> (!quantum.bit){
-    
-    %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-
-    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
-    // CHECK: [[qubit_0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[qubit_1:%.+]] = {{.*}} "H"() [[qubit_0]] : !quantum.bit
-    // CHECK: [[qubit_2:%.+]] = scf.for {{.*}} iter_args([[arg0:%.+]] = [[qubit_1]])
-    %scf = scf.for %i = %start to %stop step %start iter_args(%arg0 = %1) -> (!quantum.bit) {
-        // CHECK-NOT: "H"
-        %2 = quantum.custom "H"() %arg0 : !quantum.bit
-        // CHECK: [[qubit_3:%.+]] = {{.*}} "X"() [[arg0]]
-        %3 = quantum.custom "X"() %2 : !quantum.bit
-        // CHECK-NOT: "H"
-        %4 = quantum.custom "H"() %3 : !quantum.bit
-        // CHECK: scf.yield [[qubit_3]]
-        scf.yield %4 : !quantum.bit
-    }
-    // CHECK: [[qubit_4:%.+]] = {{.*}} "H"() [[qubit_2]]
-    // CHECK: return [[qubit_4]]
-    func.return %scf : !quantum.bit
-}
-
 
 func.func @test_loop_boundary_register_2(%start: index, %stop: index, 
                                         %arg0: tensor<f64>, %arg1: tensor<f64>) -> (!quantum.reg){
@@ -287,6 +288,64 @@ func.func @test_loop_boundary_register_2(%start: index, %stop: index,
     // CHECK: [[insert_3:%.+]] = quantum.insert [[insert_2]][ 0], [[qubit_9]]#0 : !quantum.reg
     // CHECK: return [[insert_3]]
     func.return %scf : !quantum.reg
+}
+
+// -----
+
+func.func @test_loop_boundary_register_3(%arg0: tensor<i64>, %arg1: tensor<f64>) -> !quantum.reg {
+    %c0_i64 = arith.constant 0 : i64
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %extracted = tensor.extract %arg0[] : tensor<i64>
+    %1 = arith.index_cast %extracted : i64 to index
+    // CHECK-LABEL: func.func @test_loop_boundary_register_3(
+    // CHECK-SAME: [[arg0:%.+]]: tensor<i64>,
+    // CHECK-SAME: [[arg1:%.+]]: tensor<f64>
+    // CHECK-DAG: [[alloc:%.+]] = quantum.alloc 
+    // CHECK-DAG: [[extract_0:%.+]] = tensor.extract [[arg1]][] : tensor<f64>
+    // CHECK-DAG: [[qubit_0:%.+]] = quantum.extract [[alloc]][ 0]
+    // CHECK: [[qubit_1:%.+]] = {{.*}} "RX"([[extract_0]]) [[qubit_0]]
+    // CHECK: [[insert_0:%.+]] = quantum.insert [[alloc]][ 0], [[qubit_1]]
+    // CHECK: [[scf:%.+]] = scf.for {{.*}} iter_args([[arg3:%.+]] = [[insert_0]])
+    %2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %0) -> (!quantum.reg) {
+        // CHECK-DAG: [[extract_1:%.+]] = quantum.extract [[arg3]][ 0]
+        // CHECK: [[extract_2:%.+]] = tensor.extract [[arg1]][]
+        // CHECK: [[qubit_2:%.+]] = {{.*}} "Hadamard"() [[extract_1]]
+        // CHECK-DAG: [[extract_3:%.+]] = quantum.extract [[arg3]][ 1]
+        // CHECK: [[qubit_3:%.+]]:2 = {{.*}} "CNOT"() [[qubit_2]], [[extract_3]]
+        // CHECK: [[add_1:%.+]] = arith.addf [[extract_2]], [[extract_2]]
+        // CHECK: [[extract_4:%.+]] = tensor.extract [[arg1]][]
+        // CHECK: [[qubit_4:%.+]] = {{.*}} "RX"([[extract_4]]) [[qubit_3]]#0
+        // CHECK: [[qubit_5:%.+]] = {{.*}} "RX"([[add_1]]) [[qubit_4]]
+        %5 = quantum.extract %arg3[ 0] : !quantum.reg -> !quantum.bit
+        %extracted_1 = tensor.extract %arg1[] : tensor<f64>
+        %out_qubits_2 = quantum.custom "RX"(%extracted_1) %5 : !quantum.bit
+        %out_qubits_3 = quantum.custom "Hadamard"() %out_qubits_2 : !quantum.bit
+        %6 = quantum.extract %arg3[ 1] : !quantum.reg -> !quantum.bit
+        %out_qubits_4:2 = quantum.custom "CNOT"() %out_qubits_3, %6 : !quantum.bit, !quantum.bit
+        %7 = arith.addf %extracted_1, %extracted_1 : f64
+        %out_qubits_5 = quantum.custom "RX"(%7) %out_qubits_4#0 : !quantum.bit
+        %8 = quantum.insert %arg3[ 0], %out_qubits_5 : !quantum.reg, !quantum.bit
+        %9 = quantum.insert %8[ 1], %out_qubits_4#1 : !quantum.reg, !quantum.bit
+        scf.yield %9 : !quantum.reg
+    }
+
+    // CHECK: [[negf:%.+]] = arith.negf [[extract_0]]
+    // CHECK: [[extract_5:%.+]] = quantum.extract [[scf]][ 0]
+    // CHECK: [[qubit_6:%.+]] = {{.*}} "RX"([[negf]]) [[extract_5]]
+    // CHECK: [[insert_1:%.+]] = quantum.insert [[scf]][ 0], [[qubit_6]]
+    
+    // CHECK: [[extract_6:%.+]] = quantum.extract [[insert_1]][ 0]
+    // CHECK: [[extract_7:%.+]] = tensor.extract [[arg1]][]
+    // CHECK: [[qubit_5:%.+]] = {{.*}} "RX"([[extract_7]]) [[extract_6]]
+    // CHECK: [[insert_2:%.+]] = quantum.insert [[insert_1]][ 0], [[qubit_5]]
+    // CHECK: return [[insert_2]]
+    %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
+    %extracted_0 = tensor.extract %arg1[] : tensor<f64>
+    %out_qubits = quantum.custom "RX"(%extracted_0) %3 : !quantum.bit
+    %4 = quantum.insert %2[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    return %4 : !quantum.reg
 }
 
 // -----
