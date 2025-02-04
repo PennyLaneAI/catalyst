@@ -83,7 +83,7 @@ LLVM::AllocaOp getStaticAlloca2(Location &loc, RewriterBase &rewriter, Type ty, 
         // we need it before the terminator
         Operation *value_def = value.getDefiningOp();
         rewriter.moveOpBefore(value_def, &entryBlock->front());
-        rewriter.setInsertionPointAfter(value_def);
+        rewriter.setInsertionPoint(possible_terminator);
     }
     return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                            ty, value);
