@@ -33,7 +33,7 @@ using namespace catalyst::quantum;
 
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
 static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
-static const mlir::StringSet<> hamiltonianSet = {"H", "X", "Y", "Z"};
+static const mlir::StringSet<> hamiltonianSet = {"H", "PauliX", "PauliY", "PauliZ", "X", "Y", "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
 namespace {
@@ -148,7 +148,6 @@ getVerifyEdgeOperationSet(QubitOriginMap<OpType> bottomEdgeOpSet,
             }
         }
     }
-
     return edgeOperationSet;
 }
 
@@ -232,7 +231,10 @@ template <typename OpType> mlir::Value findRootQubit(mlir::Value qubit)
 QubitOrigin determineQubitOrigin(mlir::Value qubit)
 {
     if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-        unsigned long position = extractOp.getIdxAttr().value();
+        unsigned long position = 0;
+        if (extractOp.getIdxAttr().has_value()) {
+            position = extractOp.getIdxAttr().value();
+        }
         return QubitOrigin(extractOp.getQreg(), position, true);
     }
     return QubitOrigin(qubit, 0, false);
@@ -264,10 +266,13 @@ template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::Fo
         mlir::Type argType = initArg.getType();
 
         if (isa<quantum::QuregType>(argType)) {
-
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto extractOp = dyn_cast<quantum::ExtractOp>(userOp)) {
-                    unsigned long position = extractOp.getIdxAttr().value();
+                    unsigned long position = 0;
+                    if (extractOp.getIdxAttr().has_value()) {
+                        position = extractOp.getIdxAttr().value();
+                    }
+
                     QubitOrigin qubitOrigin(regionArg, position, true);
 
                     for (Operation *extractUserOp : extractOp.getResult().getUsers()) {
@@ -295,7 +300,6 @@ template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::Fo
         // Handle single qubit arguments.
         else if (isa<quantum::QubitType>(argType)) {
             QubitOrigin qubitOrigin(regionArg, 0, false);
-
             for (Operation *userOp : regionArg.getUsers()) {
                 if (auto quantumOp = dyn_cast<CustomOp>(userOp)) {
                     // Ensure the vector is properly sized.
@@ -321,9 +325,7 @@ template <typename OpType> QubitOriginMap<OpType> traceBottomEdgeOperations(scf:
 
     for (auto operand : terminator->getOperands()) {
         Operation *definingOp = operand.getDefiningOp();
-
         while (InsertOp insertOp = dyn_cast_or_null<quantum::InsertOp>(definingOp)) {
-
             operand = insertOp.getQubit();
             auto operation = dyn_cast_or_null<OpType>(operand.getDefiningOp());
             if (!operation) {
@@ -381,6 +383,10 @@ void hoistTopEdgeOperation(QuantumOpInfo topOpInfo, scf::ForOp forOp,
         if (auto extractOp = dyn_cast_or_null<tensor::ExtractOp>(param.getDefiningOp())) {
             auto extractOpClone = extractOp.clone();
             extractOpClone->setOperands(extractOp.getOperands());
+            auto tensor = extractOp.getTensor();
+            if (auto initParam = findInitValue(forOp, tensor)) {
+                extractOpClone->setOperands(initParam);
+            }
             topOpInfo.op.setOperand(idx, extractOpClone.getResult());
             rewriter.setInsertionPoint(topOpInfo.op);
             rewriter.insert(extractOpClone);
@@ -491,6 +497,32 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
     }
 };
 
+
+void handleOperationParams(mlir::Operation &cloneOp, QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForOp forOp, mlir::PatternRewriter &rewriter) {
+        for (auto [idx, param] : llvm::enumerate(topEdgeOp.op.getParams())) {
+            // If param is in forOp, then it is a loop invariant
+            auto regionIterArgs = forOp.getRegionIterArgs();
+            if (std::find(regionIterArgs.begin(), regionIterArgs.end(), param) !=
+                regionIterArgs.end()) {
+                cloneOp.setOperand(idx, param);
+                continue;
+            }
+            if (auto tensorExtractOp = param.getDefiningOp<tensor::ExtractOp>()) {
+                auto tensorExtractOpClone = tensorExtractOp.clone();
+                param = tensorExtractOpClone.getResult();
+                cloneOp.setOperand(idx, param);
+                rewriter.setInsertionPoint(bottomEdgeOp.op);
+                rewriter.insert(tensorExtractOpClone);
+            }
+            else if (auto invarOp = findInitValue(forOp, param)) {
+                cloneOp.setOperand(idx, invarOp);
+            }
+            else {
+                cloneOp.setOperand(idx, param);
+            }
+        }
+}
+
 // Handles parameter adjustments when moving operations across loop boundaries.
 void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForOp forOp,
                   mlir::PatternRewriter &rewriter)
@@ -500,7 +532,6 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
 
     if (topEdgeParams.size() > 0 && topEdgeParams.size() == bottomEdgeParams.size()) {
         auto cloneTopOp = topEdgeOp.op.clone();
-
         // Check if the topEdgeParams is a tensor.extract
         for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
             // If param is in forOp, then it is a loop invariant
@@ -510,7 +541,6 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
                 cloneTopOp.setOperand(idx, param);
                 continue;
             }
-
             if (auto tensorExtractOp = param.getDefiningOp<tensor::ExtractOp>()) {
                 auto tensorExtractOpClone = tensorExtractOp.clone();
                 param = tensorExtractOpClone.getResult();
@@ -557,13 +587,14 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
         cloneBottomOp.setQubitOperands(cloneTopOp.getOutQubits());
         bottomEdgeOp.op.setQubitOperands(cloneBottomOp.getOutQubits());
 
-        rewriter.setInsertionPointAfter(cloneTopOp);
+        rewriter.setInsertionPoint(bottomEdgeOp.op);
         rewriter.insert(cloneBottomOp);
 
         // change the param of topEdgeOp to negative value
         for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
             mlir::Value negParam =
-                rewriter.create<arith::NegFOp>(bottomEdgeOp.op.getLoc(), param).getResult();
+                rewriter.create<arith::NegFOp>(cloneTopOp.getLoc(), param).getResult();
+            rewriter.moveOpBefore(negParam.getDefiningOp(), cloneTopOp);
             bottomEdgeOp.op.setOperand(idx, negParam);
         }
     }
@@ -587,11 +618,9 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
         auto edgeOperationSet = getVerifyEdgeOperationSet<CustomOp>(bottomEdgeOpSet, topEdgeOpSet);
 
         for (auto [topEdgeOp, bottomEdgeOp] : edgeOperationSet) {
-
             hoistTopEdgeOperation<CustomOp>(topEdgeOp, forOp, rewriter);
             handleParams(topEdgeOp, bottomEdgeOp, forOp, rewriter);
             hoistBottomEdgeOperation<CustomOp>(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
-
             return mlir::success();
         }
 
