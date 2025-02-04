@@ -14,8 +14,8 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
-// CHECK: llvm.func @__catalyst_pulse(!llvm.ptr, f64, f64, !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>) -> !llvm.ptr
-// CHECK: llvm.func @__catalyst_parallel_protocol(!llvm.array<2 x ptr>) -> !llvm.ptr
+// CHECK: llvm.func @__catalyst_pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
+// CHECK: llvm.func @__catalyst_parallel_protocol(!llvm.ptr, i64) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst_ion(!llvm.ptr) -> !llvm.ptr
 // CHECK: llvm.mlir.global internal constant @upstate("upstate\00") {addr_space = 0 : i32}
 // CHECK: llvm.mlir.global internal constant @estate("estate\00") {addr_space = 0 : i32}
@@ -37,9 +37,15 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[pulse_array:.*]] = llvm.mlir.undef : !llvm.array<2 x ptr>
     // CHECK: %[[pulse_array_insert_0:.*]] = llvm.insertvalue %[[pulse_1_ptr:.*]], %[[pulse_array:.*]][0] : !llvm.array<2 x ptr> 
     // CHECK: %[[pulse_array_insert_1:.*]] = llvm.insertvalue %[[pulse_2_ptr:.*]], %[[pulse_array:.*]][1] : !llvm.array<2 x ptr> 
+    
+    // Store pulse array on stack 
+    // CHECK: %[[c1:.*]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: %[[pulse_array_ptr:.*]] = llvm.alloca %[[c1:.*]] x !llvm.array<2 x ptr> : (i64) -> !llvm.ptr
+    // CHECK: llvm.store %[[pulse_array_insert_1:.*]], %[[pulse_array_ptr:.*]] : !llvm.array<2 x ptr>, !llvm.ptr
 
     // Parallel Protocol Stub
-    // CHECK: %[[pp:.*]] = llvm.call @__catalyst_parallel_protocol(%[[pulse_array_insert_1:.*]]) : (!llvm.array<2 x ptr>) -> !llvm.ptr
+    // CHECK: %[[pulse_array_size:.*]] = llvm.mlir.constant(2 : i64) : i64
+    // CHECK: %[[pp:.*]] = llvm.call @__catalyst_parallel_protocol(%[[pulse_array_ptr:.*]], %[[pulse_array_size:.*]]) : (!llvm.ptr, i64) -> !llvm.ptr
 
     %ion = ion.ion {
         charge = 1.000000e+00 : f64, 

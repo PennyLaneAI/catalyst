@@ -143,36 +143,36 @@ Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx
                                                   LLVM::LLVMPointerType::get(ctx), // level_1
                                                   Float64Type::get(ctx),           // einstein_a
                                               });
-    Value TransitionsArray = rewriter.create<LLVM::UndefOp>(
+    Value transitionsArray = rewriter.create<LLVM::UndefOp>(
         loc, LLVM::LLVMArrayType::get(transitionStructType, transitionsAttr.size()));
 
     for (size_t i = 0; i < transitionsAttr.size(); ++i) {
         auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
-        Value TransitionStruct = rewriter.create<LLVM::UndefOp>(loc, transitionStructType);
+        Value transitionStruct = rewriter.create<LLVM::UndefOp>(loc, transitionStructType);
         auto level0 = transitionAttr.getLevel_0().getValue().str();
         auto level1 = transitionAttr.getLevel_1().getValue().str();
         auto level0_global = getGlobalString(loc, rewriter, level0, mod);
         auto level1_global = getGlobalString(loc, rewriter, level1, mod);
-        TransitionStruct =
-            rewriter.create<LLVM::InsertValueOp>(loc, TransitionStruct, level0_global, 0);
-        TransitionStruct =
-            rewriter.create<LLVM::InsertValueOp>(loc, TransitionStruct, level1_global, 1);
-        TransitionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, TransitionStruct,
+        transitionStruct =
+            rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level0_global, 0);
+        transitionStruct =
+            rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level1_global, 1);
+        transitionStruct = rewriter.create<LLVM::InsertValueOp>(
+            loc, transitionStruct,
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
                                               transitionAttr.getEinsteinA()),
             2);
-        TransitionsArray =
-            rewriter.create<LLVM::InsertValueOp>(loc, TransitionsArray, TransitionStruct, i);
+        transitionsArray =
+            rewriter.create<LLVM::InsertValueOp>(loc, transitionsArray, transitionStruct, i);
     }
 
-    Value TransitionsArraySize =
+    Value transitionsArraySize =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(transitionsAttr.size()));
     Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
     Value transitionsArrayPtr = rewriter.create<LLVM::AllocaOp>(
         loc, /*resultType=*/ptrType,
-        /*elementType=*/TransitionsArray.getType(), TransitionsArraySize);
-    rewriter.create<LLVM::StoreOp>(loc, TransitionsArray, transitionsArrayPtr);
+        /*elementType=*/transitionsArray.getType(), transitionsArraySize);
+    rewriter.create<LLVM::StoreOp>(loc, transitionsArray, transitionsArrayPtr);
     return transitionsArrayPtr;
 }
 
@@ -207,7 +207,12 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
         beamStruct = rewriter.create<LLVM::InsertValueOp>(
             loc, beamStruct, waveConst, ArrayRef<int64_t>({4, static_cast<int64_t>(i)}));
     }
-    return beamStruct;
+    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+    Value beamStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
+                                                          /*elementType=*/beamStructType, c1);
+    rewriter.create<LLVM::StoreOp>(loc, beamStruct, beamStructPtr);
+    return beamStructPtr;
 }
 
 struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
@@ -338,13 +343,27 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
             pulseArray = rewriter.create<LLVM::InsertValueOp>(loc, pulseArray, convertedPulse, i);
         }
 
+        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        Value pulseArrayPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
+                                                              /*elementType=*/pulseArrayType, c1);
+        rewriter.create<LLVM::StoreOp>(loc, pulseArray, pulseArrayPtr);
+
+        Value pulseArraySize = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(parallelPulses.size()));
+        SmallVector<Value> operands;
+        operands.push_back(pulseArrayPtr);
+        operands.push_back(pulseArraySize);
+
         // Create the parallel protocol stub function
         Type protocolResultType = conv->convertType(IonType::get(ctx));
-        Type protocolFuncType = LLVM::LLVMFunctionType::get(protocolResultType, pulseArrayType);
+        Type protocolFuncType =
+            LLVM::LLVMFunctionType::get(protocolResultType, {ptrType, pulseArraySize.getType()});
         std::string protocolFuncName = "__catalyst_parallel_protocol";
         LLVM::LLVMFuncOp protocolFnDecl =
             ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, protocolFnDecl, pulseArray);
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, protocolFnDecl, operands);
 
         return success();
     }
@@ -366,19 +385,19 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
         auto inQubit = adaptor.getInQubit();
         auto beamAttr = op.getBeam();
 
-        Value BeamStruct = createBeamStruct(loc, rewriter, ctx, beamAttr);
+        Value beamStructPtr = createBeamStruct(loc, rewriter, ctx, beamAttr);
 
         SmallVector<Value> operands;
         operands.push_back(inQubit);
         operands.push_back(time);
         operands.push_back(phase);
-        operands.push_back(BeamStruct);
+        operands.push_back(beamStructPtr);
 
         // Create the Ion stub function
         Type qirSignature = LLVM::LLVMFunctionType::get(
             conv->convertType(PulseType::get(ctx)),
             {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
-             createBeamStructType(ctx, rewriter, beamAttr)});
+             LLVM::LLVMPointerType::get(rewriter.getContext())});
         std::string qirName = "__catalyst_pulse";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
