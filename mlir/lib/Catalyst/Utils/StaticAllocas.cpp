@@ -31,15 +31,11 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, V
     }
     else {
         Operation *possible_terminator = entryBlock->getTerminator();
-        if (possible_terminator) {
-            // we need it before the terminator
-            Operation *value_def = value.getDefiningOp();
-            rewriter.moveOpBefore(value_def, &entryBlock->front());
-            rewriter.setInsertionPoint(possible_terminator);
-        }
-        else {
-            __builtin_unreachable();
-        }
+        assert(possible_terminator && "blocks must have a terminator");
+        // we need it before the terminator
+        Operation *value_def = value.getDefiningOp();
+        rewriter.moveOpBefore(value_def, &entryBlock->front());
+        rewriter.setInsertionPoint(possible_terminator);
     }
     return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                            ty, value);
@@ -56,15 +52,11 @@ LLVM::AllocaOp getStaticAlloca2(Location &loc, RewriterBase &rewriter, Type ty, 
     }
     else {
         Operation *possible_terminator = entryBlock->getTerminator();
-        if (possible_terminator) {
-            // we need it before the terminator
-            Operation *value_def = value.getDefiningOp();
-            rewriter.moveOpBefore(value_def, &entryBlock->front());
-            rewriter.setInsertionPointAfter(value_def);
-        }
-        else {
-            __builtin_unreachable();
-        }
+        assert(possible_terminator && "blocks must have a terminator");
+        // we need it before the terminator
+        Operation *value_def = value.getDefiningOp();
+        rewriter.moveOpBefore(value_def, &entryBlock->front());
+        rewriter.setInsertionPointAfter(value_def);
     }
     return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                            ty, value);
@@ -82,13 +74,9 @@ mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewrit
     }
     else {
         Operation *possible_terminator = entryBlock->getTerminator();
-        if (possible_terminator) {
-            // we need it before the terminator
-            rewriter.setInsertionPoint(possible_terminator);
-        }
-        else {
-            __builtin_unreachable();
-        }
+        assert(possible_terminator && "blocks must have a terminator");
+        // we need it before the terminator
+        rewriter.setInsertionPoint(possible_terminator);
     }
     return rewriter.create<memref::AllocaOp>(loc, paramCountType);
 }
