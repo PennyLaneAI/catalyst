@@ -294,6 +294,81 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         return mval
 
 
+@QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
+def _(self, *invals, n_wires):
+    wires = [self.get_wire(w) for w in invals[1:]]
+    outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
+    for wire_values, new_wire in zip(invals[1:], outvals):
+        self.wire_map[wire_values] = new_wire
+
+
+# pylint: disable=unused-argument
+@QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
+def _(self, phase, *wires, n_wires):
+    gphase_p.bind(phase, ctrl_len=0, adjoint=False)
+
+
+# pylint: disable=unused-argument, too-many-arguments
+@QFuncPlxprInterpreter.register_primitive(cond_prim)
+def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+    args = plxpr_invals[args_slice]
+    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
+    converted_jaxpr_branches = []
+    all_consts = []
+
+    # Convert each branch from plxpr to jaxpr
+    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
+
+        # Store all branches consts in a flat list
+        branch_consts = plxpr_invals[const_slice]
+        all_consts = all_consts + [*branch_consts]
+
+        converted_jaxpr_branch = None
+
+        if plxpr_branch is None:
+            # Emit a new Catalyst jaxpr branch that simply returns a qreg
+            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
+        else:
+            # Convert branch from plxpr to Catalyst jaxpr
+            converted_func = partial(
+                BranchPlxprInterpreter(self._device, self._shots).eval,
+                plxpr_branch,
+                branch_consts,
+            )
+            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
+
+        converted_jaxpr_branches.append(converted_jaxpr_branch)
+
+    # The slice (0,1) of the plxpr input values contains the true predicate of the plxpr cond,
+    # whereas the slice (1,2) refers to the false predicate, which is always True.
+    # We extract the true predicate and discard the false one.
+    predicate_slice = slice(0, 1)
+    predicate = plxpr_invals[predicate_slice]
+
+    # Build Catalyst compatible input values
+    cond_invals = [*predicate, *all_consts, *args_plus_qreg]
+
+    # Perform the binding
+    outvals = cond_p.bind(
+        *cond_invals,
+        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
+        nimplicit_outputs=None,
+    )
+
+    # We assume the first output value is the returned qreg.
+    # Update the current qreg.
+    assert len(outvals) > 0
+    self.qreg = outvals[0]
+
+    # Return an empty list to skip post-processing
+    return ()
+
+
+# Derived interpreters must be declared after the primitive registrations of their
+# parents or be placed in a separate file, in order to access those registrations.
+# This is due to the registrations being done outside the parent class definition.
+
+
 class BranchPlxprInterpreter(QFuncPlxprInterpreter):
     """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
 
@@ -357,79 +432,6 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         self._env = {}
 
         return outvals
-
-
-@BranchPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
-@QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
-def _(self, *invals, n_wires):
-    wires = [self.get_wire(w) for w in invals[1:]]
-    outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
-    for wire_values, new_wire in zip(invals[1:], outvals):
-        self.wire_map[wire_values] = new_wire
-
-
-# pylint: disable=unused-argument
-@BranchPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
-@QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
-def _(self, phase, *wires, n_wires):
-    gphase_p.bind(phase, ctrl_len=0, adjoint=False)
-
-
-# pylint: disable=unused-argument, too-many-arguments
-@BranchPlxprInterpreter.register_primitive(cond_prim)
-@QFuncPlxprInterpreter.register_primitive(cond_prim)
-def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
-    args = plxpr_invals[args_slice]
-    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
-    converted_jaxpr_branches = []
-    all_consts = []
-
-    # Convert each branch from plxpr to jaxpr
-    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
-
-        # Store all branches consts in a flat list
-        branch_consts = plxpr_invals[const_slice]
-        all_consts = all_consts + [*branch_consts]
-
-        converted_jaxpr_branch = None
-
-        if plxpr_branch is None:
-            # Emit a new Catalyst jaxpr branch that simply returns a qreg
-            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
-        else:
-            # Convert branch from plxpr to Catalyst jaxpr
-            converted_func = partial(
-                BranchPlxprInterpreter(self._device, self._shots).eval,
-                plxpr_branch,
-                branch_consts,
-            )
-            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
-
-        converted_jaxpr_branches.append(converted_jaxpr_branch)
-
-    # The slice (0,1) of the plxpr input values contains the true predicate of the plxpr cond,
-    # whereas the slice (1,2) refers to the false predicate, which is always True.
-    # We extract the true predicate and discard the false one.
-    predicate_slice = slice(0, 1)
-    predicate = plxpr_invals[predicate_slice]
-
-    # Build Catalyst compatible input values
-    cond_invals = [*predicate, *all_consts, *args_plus_qreg]
-
-    # Perform the binding
-    outvals = cond_p.bind(
-        *cond_invals,
-        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        nimplicit_outputs=None,
-    )
-
-    # We assume the first output value is the returned qreg.
-    # Update the current qreg.
-    assert len(outvals) > 0
-    self.qreg = outvals[0]
-
-    # Return an empty list to skip post-processing
-    return ()
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):
