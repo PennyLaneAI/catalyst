@@ -32,7 +32,7 @@ using namespace catalyst;
 using namespace catalyst::quantum;
 
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
-static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ"};
+static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
 static const mlir::StringSet<> hamiltonianSet = {"H", "X", "Y", "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
@@ -77,12 +77,10 @@ struct QuantumOpInfo {
 };
 
 // Map the operation to the list of qubit origins
-template <typename OpType> 
-using QubitOriginMap = std::map<OpType, std::vector<QubitOrigin>>;
+template <typename OpType> using QubitOriginMap = std::map<OpType, std::vector<QubitOrigin>>;
 
 // Checks if the given operation is a valid quantum operation based on its gate name.
-template <typename OpType> 
-bool isValidQuantumOperation(OpType &op)
+template <typename OpType> bool isValidQuantumOperation(OpType &op)
 {
     auto gateName = op.getGateName();
     return hamiltonianSet.contains(gateName) || rotationsSet.contains(gateName) ||
@@ -90,8 +88,7 @@ bool isValidQuantumOperation(OpType &op)
 }
 
 // Determines if the given operation has any successors that are quantum CustomOps.
-template <typename OpType> 
-bool hasQuantumCustomSuccessor(OpType &op)
+template <typename OpType> bool hasQuantumCustomSuccessor(OpType &op)
 {
     return llvm::any_of(op->getUsers(), [](Operation *user) { return isa<OpType>(user); });
 }
@@ -107,8 +104,7 @@ bool verifyQubitOrigins(const std::vector<QubitOrigin> &topOrigins,
 }
 
 // Checks if the top operation has any quantum CustomOp predecessors.
-template <typename OpType> 
-bool hasQuantumCustomPredecessor(OpType &op)
+template <typename OpType> bool hasQuantumCustomPredecessor(OpType &op)
 {
     for (auto operand : op.getInQubits()) {
         if (auto definingOp = operand.getDefiningOp()) {
@@ -258,8 +254,7 @@ template <typename OpType> void traceOriginQubit(OpType &op, QubitOriginMap<OpTy
 
 // Traces quantum operations at the top edge of a loop to identify candidates for hoisting.
 // Returns a map from quantum operations to the origins of their input qubits.
-template <typename OpType> 
-QubitOriginMap<OpType> traceTopEdgeOperations(scf::ForOp forOp)
+template <typename OpType> QubitOriginMap<OpType> traceTopEdgeOperations(scf::ForOp forOp)
 {
     QubitOriginMap<OpType> qubitOriginMap;
     auto initArgs = forOp.getInitArgs();
@@ -319,8 +314,7 @@ QubitOriginMap<OpType> traceTopEdgeOperations(scf::ForOp forOp)
 
 // Traces quantum operations at the bottom edge of a loop to identify candidates for hoisting.
 // Returns a map from quantum operations to the origins of their input qubits.
-template <typename OpType> 
-QubitOriginMap<OpType> traceBottomEdgeOperations(scf::ForOp forOp)
+template <typename OpType> QubitOriginMap<OpType> traceBottomEdgeOperations(scf::ForOp forOp)
 {
     QubitOriginMap<OpType> qubitOriginMap;
     Operation *terminator = forOp.getBody()->getTerminator();
