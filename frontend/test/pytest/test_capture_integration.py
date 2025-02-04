@@ -296,10 +296,12 @@ class TestCapture:
             def ansatz_true():
                 qml.RX(x, wires=0)
                 qml.Hadamard(wires=0)
+                # pylint: disable=pointless-statement
                 x + 1  # simple primitive
 
             def ansatz_false():
                 qml.RY(x, wires=0)
+                # pylint: disable=pointless-statement
                 x + 1  # simple primitive
 
             qml.cond(x > 1.4, ansatz_true, ansatz_false)()
