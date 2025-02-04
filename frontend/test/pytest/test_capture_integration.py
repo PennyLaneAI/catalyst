@@ -259,6 +259,5 @@ class TestCapture:
             return qml.expval(qml.Z(0))
 
         default_capture_result = qml.qjit(circuit)(0.1)
-        print(default_capture_result)
         experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
         assert default_capture_result == experimental_capture_result
