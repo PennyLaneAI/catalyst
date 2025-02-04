@@ -339,8 +339,8 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
         converted_jaxpr_branches.append(converted_jaxpr_branch)
 
-    # The slice (0,1) of the plxpr input values contains the true predicate of the plxpr cond,
-    # whereas the slice (1,2) refers to the false predicate, which is always True.
+    # The slice [0,1) of the plxpr input values contains the true predicate of the plxpr cond,
+    # whereas the slice [1,2) refers to the false predicate, which is always True.
     # We extract the true predicate and discard the false one.
     predicate_slice = slice(0, 1)
     predicate = plxpr_invals[predicate_slice]
