@@ -239,7 +239,8 @@ class TestCapture:
         assert default_capture_result == experimental_capture_result
 
     def test_cond_workflow_with_custom_primitive(self, backend):
-        """Test the integration for a circuit with a cond primitive containing a custom primitive."""
+        """Test the integration for a circuit with a cond primitive containing a custom
+        primitive."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
