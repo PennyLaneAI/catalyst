@@ -2,6 +2,30 @@
 
 <h3>New features since last release</h3>
 
+* Add loop boundary optimization pass that identifies and optimizes redundant quantum operations that occur at loop iteration boundaries, where operations at iteration boundaries often cancel each other out. 
+  [(#1476)](https://github.com/PennyLaneAI/catalyst/pull/1476)
+
+  This optimization help to eliminates redundant operations that aims to reduce quantum circuit depth and gate count.This pass is supported into `cancel_inverses` and `merge_rotations`.
+
+  For example,
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qjit
+  @catalyst.passes.cancel_inverses
+  @qml.qnode(dev)
+  def circuit():
+      for i in range(3):
+          qml.Hadamard(0)
+          qml.CNOT([0, 1])
+          qml.Hadamard(0)
+      return qml.expval(qml.Z(0))
+  ```
+
+  Note that this pass works with perfectly matching operations such as Pauli gates, Hadamard gate, CNOT and rotations gates.
+
+
 <h3>Improvements 🛠</h3>
 
 * Changed pattern rewritting in `quantum-to-ion` lowering pass to use MLIR's dialect conversion
