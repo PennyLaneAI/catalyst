@@ -22,6 +22,7 @@ namespace catalyst {
 
 LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, Value val);
 LLVM::AllocaOp getStaticAlloca2(Location &loc, RewriterBase &rewriter, Type ty, Value val);
-memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter, MemRefType paramCountType);
+memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter,
+                                       MemRefType paramCountType);
 
 } // namespace catalyst

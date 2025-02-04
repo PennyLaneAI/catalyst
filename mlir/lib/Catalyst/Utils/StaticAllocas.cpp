@@ -70,7 +70,9 @@ LLVM::AllocaOp getStaticAlloca2(Location &loc, RewriterBase &rewriter, Type ty, 
                                            ty, value);
 }
 
-mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter, MemRefType paramCountType) {
+mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter,
+                                             MemRefType paramCountType)
+{
     Block *insertionBlock = rewriter.getInsertionBlock();
     Region *parentRegion = insertionBlock->getParent();
     Block *entryBlock = &parentRegion->front();

@@ -18,9 +18,9 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "Catalyst/Utils/StaticAllocas.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -114,7 +114,8 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     Value valuePtr = nullPtr;
     if (!controlledQubits.empty()) {
         ctrlPtr = catalyst::getStaticAlloca2(loc, rewriter, ptrType, numControlledVal).getResult();
-        valuePtr = catalyst::getStaticAlloca2(loc, rewriter, boolType, numControlledVal).getResult();
+        valuePtr =
+            catalyst::getStaticAlloca2(loc, rewriter, boolType, numControlledVal).getResult();
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
