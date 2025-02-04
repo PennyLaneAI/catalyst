@@ -33,7 +33,8 @@ using namespace catalyst::quantum;
 
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
 static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
-static const mlir::StringSet<> hamiltonianSet = { "Hadamard", "PauliX", "PauliY", "PauliZ","H", "X", "Y", "Z"};
+static const mlir::StringSet<> hamiltonianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
+                                                 "H",        "X",      "Y",      "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
 namespace {
@@ -497,31 +498,32 @@ void hoistBottomEdgeOperation(QuantumOpInfo bottomOpInfo, scf::ForOp forOp,
     }
 };
 
-
 // This function aims to set the operands of the cloneOp with paramOp's params.
-void setParamOperation(mlir::Operation &cloneOp, QuantumOpInfo paramOp, QuantumOpInfo bottomEdgeOp, scf::ForOp forOp, mlir::PatternRewriter &rewriter) {
-        for (auto [idx, param] : llvm::enumerate(paramOp.op.getParams())) {
-            auto regionIterArgs = forOp.getRegionIterArgs();
-            // If param is in forOp, then it is a loop invariant
-            if (std::find(regionIterArgs.begin(), regionIterArgs.end(), param) !=
-                regionIterArgs.end()) {
-                cloneOp.setOperand(idx, param);
-                continue;
-            }
-            if (auto tensorExtractOp = param.getDefiningOp<tensor::ExtractOp>()) {
-                auto tensorExtractOpClone = tensorExtractOp.clone();
-                param = tensorExtractOpClone.getResult();
-                cloneOp.setOperand(idx, param);
-                rewriter.setInsertionPoint(bottomEdgeOp.op);
-                rewriter.insert(tensorExtractOpClone);
-            }
-            else if (auto invarOp = findInitValue(forOp, param)) {
-                cloneOp.setOperand(idx, invarOp);
-            }
-            else {
-                cloneOp.setOperand(idx, param);
-            }
+void setParamOperation(mlir::Operation &cloneOp, QuantumOpInfo paramOp, QuantumOpInfo bottomEdgeOp,
+                       scf::ForOp forOp, mlir::PatternRewriter &rewriter)
+{
+    for (auto [idx, param] : llvm::enumerate(paramOp.op.getParams())) {
+        auto regionIterArgs = forOp.getRegionIterArgs();
+        // If param is in forOp, then it is a loop invariant
+        if (std::find(regionIterArgs.begin(), regionIterArgs.end(), param) !=
+            regionIterArgs.end()) {
+            cloneOp.setOperand(idx, param);
+            continue;
         }
+        if (auto tensorExtractOp = param.getDefiningOp<tensor::ExtractOp>()) {
+            auto tensorExtractOpClone = tensorExtractOp.clone();
+            param = tensorExtractOpClone.getResult();
+            cloneOp.setOperand(idx, param);
+            rewriter.setInsertionPoint(bottomEdgeOp.op);
+            rewriter.insert(tensorExtractOpClone);
+        }
+        else if (auto invarOp = findInitValue(forOp, param)) {
+            cloneOp.setOperand(idx, invarOp);
+        }
+        else {
+            cloneOp.setOperand(idx, param);
+        }
+    }
 }
 
 // Handles parameter adjustments when moving operations across loop boundaries.
