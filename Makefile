@@ -16,6 +16,7 @@ OQD_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqd/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
+ENABLE_OQD?=OFF
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -125,7 +126,9 @@ oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
 oqd:
+ifeq ($(ENABLE_OQD), ON)
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
+endif
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
 test: test-runtime test-frontend test-demos
@@ -145,7 +148,9 @@ test-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
 test-oqd:
+ifeq ($(ENABLE_OQD), ON)
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src test
+endif
 
 lit:
 ifeq ($(ENABLE_ASAN),ON)
@@ -264,7 +269,9 @@ clean-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
 
 clean-oqd:
+ifeq ($(ENABLE_OQD), ON)
 	$(MAKE) -C frontend/catalyst/third_party/oqd/src clean
+endif
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
