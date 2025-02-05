@@ -28,6 +28,10 @@ target_link_libraries(runner_tests_oqd PRIVATE
     ${OQD_LIBRARIES}
 )
 
+if(ENABLE_OQD)
+    target_link_libraries(rtd_oqd PRIVATE ${runtime_lib}/librt_OQD_capi.so)
+endif()
+
 target_sources(runner_tests_oqd PRIVATE
     Test_OQDDevice.cpp
 )
