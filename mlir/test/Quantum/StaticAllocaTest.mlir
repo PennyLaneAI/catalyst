@@ -75,10 +75,30 @@ module @static_alloca_hamiltonian {
   func.func @test(%arg0: memref<1xf64>, %arg1 : !quantum.obs) -> () {
     // CHECK-NOT: ^bb1:
     // CHECK:     [[one:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK:     llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK-NEXT:     llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: ^bb1:
     cf.br ^bb1
   ^bb1:
     %0 = quantum.hamiltonian(%arg0: memref<1xf64>) %arg1 : !quantum.obs
     return
   }
 }
+
+// -----
+
+// CHECK-LABEL: @static_alloca_sample
+module @static_alloca_sample {
+  // CHECK-LABEL: @test
+  func.func @test(%arg0 : !quantum.bit, %alloc : memref<1x1xf64>) -> () {
+    // CHECK-NOT: ^bb1:
+    // CHECK:      [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: ^bb1:
+    cf.br ^bb1
+  ^bb1:
+    %obs = quantum.compbasis %arg0 : !quantum.obs
+    quantum.sample %obs in(%alloc : memref<1x1xf64>)
+    return
+  }
+}
+// -----
