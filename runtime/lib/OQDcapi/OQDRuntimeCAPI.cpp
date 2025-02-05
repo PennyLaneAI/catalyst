@@ -105,7 +105,7 @@ void __catalyst__oqd__rt__finalize()
         delete pulse;
     }
 
-    std::ofstream out_json("output.json");
+    std::ofstream out_json("__openapl__output.json");
     out_json << JSON->dump(2);
     JSON = nullptr;
 }
