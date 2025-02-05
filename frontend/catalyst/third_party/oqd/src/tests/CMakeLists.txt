@@ -26,11 +26,8 @@ target_link_directories(runner_tests_oqd PRIVATE ${runtime_lib})
 target_link_libraries(runner_tests_oqd PRIVATE
     Catch2::Catch2
     ${OQD_LIBRARIES}
+    ${runtime_lib}/librt_OQD_capi.so
 )
-
-if(ENABLE_OQD)
-    target_link_libraries(rtd_oqd PRIVATE ${runtime_lib}/librt_OQD_capi.so)
-endif()
 
 target_sources(runner_tests_oqd PRIVATE
     Test_OQDDevice.cpp
