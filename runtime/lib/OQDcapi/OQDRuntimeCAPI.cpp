@@ -110,8 +110,6 @@ void __catalyst__oqd__rt__finalize()
     JSON = nullptr;
 }
 
-void __catalyst__oqd__greetings() { std::cout << "Hello OQD world!" << std::endl; }
-
 void __catalyst__oqd__ion(Ion *ion)
 {
     json j;

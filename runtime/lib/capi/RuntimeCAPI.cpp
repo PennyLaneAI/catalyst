@@ -243,7 +243,6 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
                                              DeviceConfig device_config, int64_t shots)
 {
     // Device library cannot be a nullptr
-    std::cout << "device_init capi!\n";
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
     RT_FAIL_IF(RTD_PTR, "Cannot re-initialize an ACTIVE device: Consider using "
