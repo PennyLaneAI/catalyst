@@ -19,14 +19,10 @@ module @static_alloca_print {
   // CHECK-LABEL: @test
   func.func @test(%arg0: memref<i64>) -> () {
     // CHECK-NOT: ^bb1:
-    // CHECK: [[one_1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[one_2:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.alloca [[one_2]] x !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: [[one_1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.alloca [[one_1]] x !llvm.struct<(i64, ptr, i8)>
-    %1 = llvm.mlir.constant(1 : i64) : i64
-    %2 = llvm.mlir.constant(1 : i64) : i64
-    %3 = llvm.alloca %2 x !llvm.struct<(ptr, ptr, i64)> : (i64) -> !llvm.ptr
-    %4 = llvm.alloca %1 x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
     cf.br ^bb1
   ^bb1:
     "catalyst.print"(%arg0) <{print_descriptor}> : (memref<i64>) -> ()
