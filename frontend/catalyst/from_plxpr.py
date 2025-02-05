@@ -23,10 +23,6 @@ import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
-from pennylane.capture.primitives import (
-    AbstractMeasurement,
-    AbstractOperator,
-)
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 
 from catalyst.device import (
@@ -380,11 +376,12 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
 
     def setup(self):
         """Override the parent setup."""
-        pass
 
     def cleanup(self):
-        """Override the parent cleanup."""
-        pass
+        """Reinsert extracted qubits."""
+        for orig_wire, wire in self.wire_map.items():
+            # pylint: disable=attribute-defined-outside-init
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
     # pylint: disable=too-many-branches
     def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
@@ -413,11 +410,6 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             self.stateref = {"qreg": qreg, "wire_map": {}}
 
         outvals = super().eval(jaxpr, consts, *args)
-
-        # Reinsert extracted qubits
-        for orig_wire, wire in self.wire_map.items():
-            # pylint: disable=attribute-defined-outside-init
-            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
         # Add the qreg to the output values
         outvals = [*outvals, self.qreg]
