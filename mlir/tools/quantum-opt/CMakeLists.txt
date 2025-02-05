@@ -10,6 +10,7 @@ set(LIBS
     MLIRCatalystTransforms
     MLIRQuantum
     quantum-transforms
+    MLIRQEC
     MLIRGradient
     gradient-transforms
     MLIRMitigation
