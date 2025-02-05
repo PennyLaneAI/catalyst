@@ -378,6 +378,14 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         shots (qml.measurements.Shots)
     """
 
+    def setup(self):
+        """Override the parent setup."""
+        pass
+
+    def cleanup(self):
+        """Override the parent cleanup."""
+        pass
+
     # pylint: disable=too-many-branches
     def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
         """Evaluate a jaxpr.
@@ -391,9 +399,6 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             list[TensorLike]: the results of the execution.
 
         """
-        # pylint: disable=attribute-defined-outside-init
-        self._env = {}
-
         # We assume the last argument is the qreg
         num_args = len(args)
         assert num_args > 0
@@ -407,38 +412,7 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         if self.stateref is None:
             self.stateref = {"qreg": qreg, "wire_map": {}}
 
-        for arg, invar in zip(args, jaxpr.invars, strict=True):
-            self._env[invar] = arg
-        for const, constvar in zip(consts, jaxpr.constvars, strict=True):
-            self._env[constvar] = const
-
-        for eqn in jaxpr.eqns:
-
-            custom_handler = self._primitive_registrations.get(eqn.primitive, None)
-            if custom_handler:
-                invals = [self.read(invar) for invar in eqn.invars]
-                outvals = custom_handler(self, *invals, **eqn.params)
-            elif isinstance(eqn.outvars[0].aval, AbstractOperator):
-                outvals = self.interpret_operation_eqn(eqn)
-            elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-                outvals = self.interpret_measurement_eqn(eqn)
-            else:
-                invals = [self.read(invar) for invar in eqn.invars]
-                outvals = eqn.primitive.bind(*invals, **eqn.params)
-
-            if not eqn.primitive.multiple_results:
-                outvals = [outvals]
-            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
-                self._env[outvar] = outval
-
-        # Read the final result of the Jaxpr from the environment
-        outvals = []
-        for var in jaxpr.outvars:
-            outval = self.read(var)
-            if isinstance(outval, qml.operation.Operator):
-                outvals.append(self.interpret_operation(outval))
-            else:
-                outvals.append(outval)
+        outvals = super().eval(jaxpr, consts, *args)
 
         # Reinsert extracted qubits
         for orig_wire, wire in self.wire_map.items():
