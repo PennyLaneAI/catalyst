@@ -36,12 +36,12 @@ module @static_alloca_qubit_unitary_ctrl {
   // CHECK-LABEL: @test
   func.func @test(%arg0: memref<2x2xcomplex<f64>>, %arg1 : !quantum.bit, %arg2 : !quantum.bit, %arg3 : i1) -> () {
     // CHECK-NOT: ^bb1:
-    // CHECK:      [[one0:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK-NEXT: [[one1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK-NEXT: [[one2:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[one2:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK-NEXT: llvm.alloca [[one2]] x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK-NEXT: [[one1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK-NEXT: llvm.alloca [[one1]] x !llvm.ptr
     // CHECK-NEXT: llvm.alloca [[one1]] x i1
+    // CHECK-NEXT: [[one0:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK-NEXT: llvm.alloca [[one0]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     cf.br ^bb1
   ^bb1:
