@@ -24,16 +24,16 @@
   @qml.qnode(dev)
   def circuit(x: float):
 
-    def ansatz_true():
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
+      def ansatz_true():
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
 
-    def ansatz_false():
-        qml.RY(x, wires=0)
+      def ansatz_false():
+          qml.RY(x, wires=0)
 
-    qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+      qml.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-    return qml.expval(qml.Z(0))
+      return qml.expval(qml.Z(0))
   ```
 
 <h3>Breaking changes 💔</h3>
