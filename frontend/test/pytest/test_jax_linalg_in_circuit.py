@@ -31,7 +31,7 @@ class TestExpmInCircuit:
     def test_expm_in_circuit(self):
         """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
 
-        @qjit
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_expm():
             generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
