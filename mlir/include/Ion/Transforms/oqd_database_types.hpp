@@ -95,11 +95,11 @@ struct Ion {
     // It contains the innate properties of the qubit.
     std::string name;
     double mass, charge;
-    std::vector<int64_t> position;
+    std::vector<double> position;
     std::vector<Level> levels;
     std::vector<Transition> transitions;
 
-    Ion(std::string _name, double _mass, double _charge, std::vector<int64_t> _position,
+    Ion(std::string _name, double _mass, double _charge, std::vector<double> _position,
         std::vector<Level> _levels, std::vector<Transition> _transitions)
         : name(_name), mass(_mass), charge(_charge), position(_position), levels(_levels),
           transitions(_transitions)

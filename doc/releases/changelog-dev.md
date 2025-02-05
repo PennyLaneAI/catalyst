@@ -50,6 +50,11 @@
   - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
+  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
+    introduces oqd device specific stubs that will be implemented in oqd runtime including: 
+    `@__catalyst_ion`, `@ __catalyst_pulse_op`, `@ __catalyst_parallel_protocol`.
+    [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
+
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
