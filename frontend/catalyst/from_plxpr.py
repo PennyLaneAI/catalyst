@@ -26,8 +26,8 @@ from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_
 from pennylane.capture.primitives import (
     AbstractMeasurement,
     AbstractOperator,
-    cond_prim,
 )
+from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 
 from catalyst.device import (
     extract_backend_info,
@@ -311,7 +311,7 @@ def _(self, phase, *wires, n_wires):
 
 
 # pylint: disable=unused-argument, too-many-arguments
-@QFuncPlxprInterpreter.register_primitive(cond_prim)
+@QFuncPlxprInterpreter.register_primitive(plxpr_cond_prim)
 def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     args = plxpr_invals[args_slice]
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
