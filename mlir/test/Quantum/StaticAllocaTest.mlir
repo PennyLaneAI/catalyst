@@ -137,3 +137,19 @@ module @static_alloca_set_state {
   }
 }
 
+// -----
+
+// CHECK-LABEL: @static_alloca_basis_state
+module @static_alloca_basis_state {
+  // CHECK-LABEL: @test
+  func.func @test(%arg0 : memref<1xi1>, %arg1 : !quantum.bit) -> () {
+    // CHECK-NOT: ^bb1:
+    // CHECK:      [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: ^bb1:
+    cf.br ^bb1
+  ^bb1:
+    %0 = quantum.set_basis_state(%arg0) %arg1 : (memref<1xi1>, !quantum.bit) -> !quantum.bit
+    return
+  }
+}
