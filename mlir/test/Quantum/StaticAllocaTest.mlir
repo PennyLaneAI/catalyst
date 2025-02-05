@@ -101,4 +101,21 @@ module @static_alloca_sample {
     return
   }
 }
+
 // -----
+
+// CHECK-LABEL: @static_alloca_state
+module @static_alloca_state {
+  // CHECK-LABEL: @test
+  func.func @test(%arg0 : !quantum.bit, %alloc : memref<2xcomplex<f64>>) -> () {
+    cf.br^bb1
+    // CHECK-NOT: ^bb1:
+    // CHECK:      [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-NEXT: llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: ^bb1:
+  ^bb1:
+    %obs = quantum.compbasis %arg0 : !quantum.obs
+    quantum.state %obs in(%alloc : memref<2xcomplex<f64>>)
+    return
+  }
+}
