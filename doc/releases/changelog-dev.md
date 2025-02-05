@@ -8,6 +8,9 @@
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
+* Extend `merge-rotations` peephole optimisation pass to also merge compatible (controlled) rotation gates where rotation angles are any combination of static constants or dynamic values.
+  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -61,9 +64,10 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Yushao Chen,
+Zach Goldthorpe,
 Sengthai Heng,
+Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
-Paul Haochen Wang,
-Rohan Nolan Lasrado.
+Paul Haochen Wang.

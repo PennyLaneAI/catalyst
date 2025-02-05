@@ -31,13 +31,9 @@ static const mlir::StringSet<> rotationsSet = {"RX",  "RY",  "RZ",  "PhaseShift"
 
 namespace {
 
-template <typename OpType>
-SmallVector<mlir::Value> convertOpParamsToValues(OpType &op, mlir::PatternRewriter &rewriter);
-// Helper function for extracting static or non-static CustomOp parameters as mlir::Values.
-
-template <>
-SmallVector<mlir::Value> convertOpParamsToValues<CustomOp>(CustomOp &op,
-                                                           mlir::PatternRewriter &rewriter)
+// convertOpParamsToValues: helper function for extracting static or non-static CustomOp parameters
+// as mlir::Values
+SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, mlir::PatternRewriter &rewriter)
 {
     // In the case of a (non-static) CustomOp, the parameters are already mlir::Values, so we just
     // collect them into a vector.
@@ -50,9 +46,8 @@ SmallVector<mlir::Value> convertOpParamsToValues<CustomOp>(CustomOp &op,
     return values;
 }
 
-template <>
-SmallVector<mlir::Value> convertOpParamsToValues<StaticCustomOp>(StaticCustomOp &op,
-                                                                 mlir::PatternRewriter &rewriter)
+SmallVector<mlir::Value> convertOpParamsToValues(StaticCustomOp &op,
+                                                 mlir::PatternRewriter &rewriter)
 {
     // In the case of a StaticCustomOp, the parameters are doubles, so we need to introduce arith
     // ops to "convert" them into mlir::Values.

@@ -38,13 +38,20 @@
 //  4. If the gates are quantum.custom, then both gates have the same name.
 
 // More generally, we provide a VerifyHeterogeneousParentGateAnalysis, which
-// modifies requirement (1.) to verify that a gate and its parents have specific
-// types.
-// This allows for heterogeneous peephole optimizations like merging static and
-// non-static rotations (prior to lowering statics).
+// modifies requirement (1.) to verify that a gate and its parents have
+// specified types.
+// Specifically, VerifyHeterogeneousParentGateAnalysis<OpT, ParentOpT> checks
+// that:
+//  1'. The gate must have type `OpT`, and its parent must have type `ParentOpT`.
+//
+//  along with conditions (2.) and (3.) of VerifyParentGateAnalysis.
 //
 // We also provide a VerifyHeterogeneousParentGateAndNameAnalysis, which is a
 // heterogeneous analogue of VerifyParentGateAndNameAnalysis.
+// Specifically, this analysis extends VerifyHeterogeneousParentGateAnalysis
+// to also check:
+//  4'. If the gate and its parent are quantum.(static_)custom, then
+//      both gates have the same name.
 
 #pragma once
 
@@ -80,6 +87,7 @@ template <typename OpType, typename ParentOpType> class VerifyHeterogeneousParen
 
     bool getVerifierResult() { return succeeded; }
 
+  protected:
     void setVerifierResult(bool b) { succeeded = b; }
 
   private:
