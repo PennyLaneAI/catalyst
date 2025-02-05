@@ -612,6 +612,3 @@ module @test_set_basis_state {
         return
     }
 }
-
-// -----
-
