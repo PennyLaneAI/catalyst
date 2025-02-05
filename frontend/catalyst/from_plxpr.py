@@ -376,6 +376,7 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         shots (qml.measurements.Shots)
     """
 
+    # pylint: disable=too-many-branches
     def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
         """Evaluate a jaxpr.
 
