@@ -8,6 +8,34 @@
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
+* Catalyst now supports experimental capture of `cond` control flow.
+  [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
+  
+  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
+  `experimental_capture=True` in the qjit decorator.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  @qml.qnode(dev)
+  def circuit(x: float):
+
+    def ansatz_true():
+        qml.RX(x, wires=0)
+        qml.Hadamard(wires=0)
+
+    def ansatz_false():
+        qml.RY(x, wires=0)
+
+    qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+    return qml.expval(qml.Z(0))
+  ```
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -71,4 +99,5 @@ Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
 Paul Haochen Wang,
-Rohan Nolan Lasrado.
+Rohan Nolan Lasrado,
+Raul Torres.
