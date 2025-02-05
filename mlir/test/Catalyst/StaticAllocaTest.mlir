@@ -54,3 +54,27 @@ module @static_alloca_custom_call {
     return
   }
 }
+
+// -----
+
+// CHECK-LABEL: @static_alloca_callback
+module @static_alloca_callback {
+  // CHECK-LABEL: @callback
+  // This is good enough, if there are no jumps, it means this is the entry block
+  // This always happens for callbacks since the callback function is just a wrapper
+  // function without any logic.
+  // CHECK-NOT: ^bb1
+  catalyst.callback @callback(memref<f64>, memref<f64>) attributes {argc = 2 : i64, id = 4 : i64, resc = 3 : i64}
+
+  // CHECK-LABEL: @test
+  func.func @test(%arg0 : memref<f64>) -> () {
+    // CHECK-NOT: ^bb1:
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: ^bb1:
+    cf.br ^bb1
+  ^bb1:
+    catalyst.callback_call @callback(%arg0, %arg0) : (memref<f64>, memref<f64>) -> ()
+    return
+  }
+}
