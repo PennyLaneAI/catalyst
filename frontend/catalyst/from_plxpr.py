@@ -233,6 +233,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         for wire_values, new_wire in zip(op.wires, out_qubits):
             self.wire_map[wire_values] = new_wire
 
+        return out_qubits
+
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
         if obs.arithmetic_depth > 0:
@@ -395,13 +397,18 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         # We assume the last argument is the qreg
         num_args = len(args)
         assert num_args > 0
-        qreg = args[num_args - 1]
+        qreg_pos = num_args - 1
+        qreg = args[qreg_pos]
+
+        # Retrive the original args (without the qreg)
+        args = args[:qreg_pos]
 
         # Initialize the stateref
         if self.stateref is None:
             self.stateref = {"qreg": qreg, "wire_map": {}}
 
-        # Insert constants into the environment
+        for arg, invar in zip(args, jaxpr.invars, strict=True):
+            self._env[invar] = arg
         for const, constvar in zip(consts, jaxpr.constvars, strict=True):
             self._env[constvar] = const
 
