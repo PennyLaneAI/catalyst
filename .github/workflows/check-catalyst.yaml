@@ -67,6 +67,7 @@ jobs:
           make oqc
 
           OQD_BUILD_DIR="$(pwd)/oqd-build" \
+          ENABLE_OQD=ON \
           make oqd
 
       - name: Upload Catalyst-Runtime Artifact
@@ -659,6 +660,7 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          ENABLE_OQD=ON \
           make test-oqd
 
   runtime-code-cov:
