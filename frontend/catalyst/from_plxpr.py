@@ -377,8 +377,14 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         shots (qml.measurements.Shots)
     """
 
+    def __init__(self, device, shots: qml.measurements.Shots):
+        self._parent_qreg = None
+        super().__init__(device, shots)
+
     def setup(self):
-        """Override the parent setup."""
+        """Initialize the stateref."""
+        if self.stateref is None:
+            self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
 
     def cleanup(self):
         """Reinsert extracted qubits."""
@@ -403,14 +409,10 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         num_args = len(args)
         assert num_args > 0
         qreg_pos = num_args - 1
-        qreg = args[qreg_pos]
+        self._parent_qreg = args[qreg_pos]
 
         # Retrive the original args (without the qreg)
         args = args[:qreg_pos]
-
-        # Initialize the stateref
-        if self.stateref is None:
-            self.stateref = {"qreg": qreg, "wire_map": {}}
 
         outvals = super().eval(jaxpr, consts, *args)
 
@@ -418,9 +420,6 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         outvals = [*outvals, self.qreg]
 
         self.stateref = None
-
-        # pylint: disable=attribute-defined-outside-init
-        self._env = {}
 
         return outvals
 
