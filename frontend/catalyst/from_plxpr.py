@@ -293,7 +293,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
-def _(self, *invals, n_wires):
+def handle_qubit_unitary(self, *invals, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
     wires = [self.get_wire(w) for w in invals[1:]]
     outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
@@ -302,13 +303,15 @@ def _(self, *invals, n_wires):
 
 # pylint: disable=unused-argument
 @QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
-def _(self, phase, *wires, n_wires):
+def handle_global_phase(self, phase, *wires, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
 
 
 # pylint: disable=unused-argument, too-many-arguments
 @QFuncPlxprInterpreter.register_primitive(plxpr_cond_prim)
-def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
     args = plxpr_invals[args_slice]
     args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
     converted_jaxpr_branches = []
