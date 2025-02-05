@@ -120,7 +120,7 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime runtime
+	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
