@@ -23,7 +23,6 @@
 
 using json = nlohmann::json;
 
-
 TEST_CASE("Test OpenAPL Program generation", "[OQD]")
 {
     json expected = json::parse(R"(
@@ -661,7 +660,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
 
     json observed = json::parse(std::ifstream("output.json"));
     CHECK(expected == observed);
-    CHECK(1==0);
+    CHECK(1 == 0);
 
     std::filesystem::remove("output.json");
 }
