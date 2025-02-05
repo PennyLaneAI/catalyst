@@ -296,13 +296,11 @@ class TestCapture:
             def ansatz_true():
                 qml.RX(x, wires=0)
                 qml.Hadamard(wires=0)
-                # pylint: disable=pointless-statement
-                x + 1  # simple primitive
+                return x + 1  # simple primitive
 
             def ansatz_false():
                 qml.RY(x, wires=0)
-                # pylint: disable=pointless-statement
-                x + 1  # simple primitive
+                return x + 1  # simple primitive
 
             qml.cond(x > 1.4, ansatz_true, ansatz_false)()
 
@@ -310,4 +308,32 @@ class TestCapture:
 
         default_capture_result = qml.qjit(circuit)(0.1)
         experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_nested(self, backend):
+        """Test the integration for a circuit with a nested cond primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, y: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            def ansatz_false():
+
+                def branch_true():
+                    qml.RY(y, wires=0)
+
+                def branch_false():
+                    qml.RZ(y, wires=0)
+
+                qml.cond(y > 1.4, branch_true, branch_false)()
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1, 1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1, 1.5)
         assert default_capture_result == experimental_capture_result
