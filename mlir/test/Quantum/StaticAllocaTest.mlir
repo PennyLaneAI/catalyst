@@ -66,3 +66,19 @@ module @static_alloca_hermitian {
     return
   }
 }
+
+// -----
+
+// CHECK-LABEL: @static_alloca_hamiltonian
+module @static_alloca_hamiltonian {
+  // CHECK-LABEL: @test
+  func.func @test(%arg0: memref<1xf64>, %arg1 : !quantum.obs) -> () {
+    // CHECK-NOT: ^bb1:
+    // CHECK:     [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK:     llvm.alloca [[one]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    cf.br ^bb1
+  ^bb1:
+    %0 = quantum.hamiltonian(%arg0: memref<1xf64>) %arg1 : !quantum.obs
+    return
+  }
+}
