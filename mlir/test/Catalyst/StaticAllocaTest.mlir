@@ -14,8 +14,8 @@
 
 // RUN: quantum-opt --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: @static_alloca_qubit_unitary
-module @static_alloca_qubit_unitary {
+// CHECK-LABEL: @static_alloca_print
+module @static_alloca_print {
   // CHECK-LABEL: @test
   func.func @test(%arg0: memref<i64>) -> () {
     // CHECK-NOT: ^bb1:
@@ -34,3 +34,23 @@ module @static_alloca_qubit_unitary {
   }
 }
 
+// -----
+
+
+// CHECK-LABEL: @static_alloca_custom_call
+module @static_alloca_custom_call {
+  // CHECK-LABEL: @custom_call
+  func.func @custom_call(%arg0: memref<3x3xf64>, %arg1: memref<3x3xf64>) -> () {
+    // CHECK-NOT: ^bb1:
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
+    // CHECK: llvm.alloca [[one]] x !llvm.array<1 x ptr>
+    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
+    // CHECK: llvm.alloca [[one]] x !llvm.array<1 x ptr>
+    // CHECK: ^bb1:
+    cf.br ^bb1
+  ^bb1:
+    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> memref<3x3xf64>
+    return
+  }
+}
