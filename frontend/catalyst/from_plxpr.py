@@ -355,13 +355,12 @@ def _(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         nimplicit_outputs=None,
     )
 
-    # We assume the first output value is the returned qreg.
-    # Update the current qreg.
-    assert len(outvals) > 0
-    self.qreg = outvals[0]
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg = outvals.pop()
 
-    # Return an empty list to skip post-processing
-    return ()
+    # Return only the output values that match the plxpr output values
+    return outvals
 
 
 # Derived interpreters must be declared after the primitive registrations of their
@@ -410,21 +409,36 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             custom_handler = self._primitive_registrations.get(eqn.primitive, None)
             if custom_handler:
                 invals = [self.read(invar) for invar in eqn.invars]
-                custom_handler(self, *invals, **eqn.params)
+                outvals = custom_handler(self, *invals, **eqn.params)
             elif isinstance(eqn.outvars[0].aval, AbstractOperator):
-                self.interpret_operation_eqn(eqn)
+                outvals = self.interpret_operation_eqn(eqn)
             elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
-                self.interpret_measurement_eqn(eqn)
+                outvals = self.interpret_measurement_eqn(eqn)
             else:
                 invals = [self.read(invar) for invar in eqn.invars]
-                eqn.primitive.bind(*invals, **eqn.params)
+                outvals = eqn.primitive.bind(*invals, **eqn.params)
+
+            if not eqn.primitive.multiple_results:
+                outvals = [outvals]
+            for outvar, outval in zip(eqn.outvars, outvals, strict=True):
+                self._env[outvar] = outval
+
+        # Read the final result of the Jaxpr from the environment
+        outvals = []
+        for var in jaxpr.outvars:
+            outval = self.read(var)
+            if isinstance(outval, qml.operation.Operator):
+                outvals.append(self.interpret_operation(outval))
+            else:
+                outvals.append(outval)
 
         # Reinsert extracted qubits
         for orig_wire, wire in self.wire_map.items():
             # pylint: disable=attribute-defined-outside-init
             self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
 
-        outvals = [self.qreg]
+        # Add the qreg to the output values
+        outvals = [*outvals, self.qreg]
 
         self.stateref = None
 
