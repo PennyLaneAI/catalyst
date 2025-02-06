@@ -17,8 +17,6 @@ option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(MLIR REQUIRED CONFIG)
-
 set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")

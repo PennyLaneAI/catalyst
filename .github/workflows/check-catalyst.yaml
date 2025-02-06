@@ -58,21 +58,13 @@ jobs:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
 
-      - name: Get Cached LLVM Build
-        id: cache-llvm-build
-        uses: actions/cache@v4
-        with:
-          path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-          fail-on-cache-miss: true
-
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
           make runtime
 
@@ -81,11 +73,11 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make oqc
 
           OQD_BUILD_DIR="$(pwd)/oqd-build" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make oqd
 
       - name: Upload Catalyst-Runtime Artifact
@@ -709,20 +701,12 @@ jobs:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
 
-      - name: Get Cached LLVM Build
-        id: cache-llvm-build
-        uses: actions/cache@v4
-        with:
-          path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-          fail-on-cache-miss: true
-
       - name: Run the main runtime test suite for coverage
         run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
