@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <nlohmann/json.hpp>
+
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 #include "Ion/IR/IonOps.h"
@@ -20,6 +22,7 @@
 
 using namespace mlir;
 using namespace catalyst::ion;
+using json = nlohmann::json;
 
 namespace {
 
@@ -239,55 +242,109 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         auto levelsAttr = op.getLevels();
         auto transitionsAttr = op.getTransitions();
 
-        Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, mod, levelsAttr);
+        json ion_json = R"({
+  "class_": "Ion",
+  "levels": [],
+  "transitions" : []
+})"_json;
+        ion_json["mass"] = op.getMass().getValue().convertToDouble();
+        ion_json["charge"] = op.getCharge().getValueAsDouble();
 
-        Value transitionsArrayPtr =
-            createTransitionsArray(loc, rewriter, ctx, mod, transitionsAttr);
+        assert(positionAttr.size() == 3 && "Position must have 3 coordinates!");
+        std::array<double, 3> position = {positionAttr[0], positionAttr[1], positionAttr[2]};
+        ion_json["position"] = position;
 
-        // Define the function signature for the Ion stub
-        Type ionStructType = LLVM::LLVMStructType::getLiteral(
-            ctx, {
-                     ptrType,                  // name
-                     Float64Type::get(ctx),    // mass
-                     Float64Type::get(ctx),    // charge
-                     LLVM::LLVMArrayType::get( // position
-                         rewriter.getF64Type(), positionAttr.size()),
-                     ptrType,                   // levels
-                     IntegerType::get(ctx, 64), // number of levels
-                     ptrType,                   // Transitions
-                     IntegerType::get(ctx, 64), // number of Transitions
-                 });
+        DenseMap<StringRef, size_t> LevelLabel2Index;
+        for (size_t i = 0; i < levelsAttr.size(); i++) {
+            auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
 
-        // Create an instance of the Ion struct
-        Value ionStruct = rewriter.create<LLVM::UndefOp>(loc, ionStructType);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, name, 0);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, mass, 1);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, charge, 2);
-        for (size_t i = 0; i < positionAttr.size(); i++) {
-            Value posConst = rewriter.create<LLVM::ConstantOp>(
-                loc, rewriter.getF64Type(),
-                rewriter.getFloatAttr(rewriter.getF64Type(), positionAttr[i]));
-            ionStruct = rewriter.create<LLVM::InsertValueOp>(
-                loc, ionStruct, posConst, ArrayRef<int64_t>({3, static_cast<int64_t>(i)}));
+            json this_level =
+                json{{"class_", "Level"},
+                     {"principal", levelAttr.getPrincipal().getInt()},
+                     {"spin", levelAttr.getSpin().getValue().convertToDouble()},
+                     {"orbital", levelAttr.getOrbital().getValue().convertToDouble()},
+                     {"nuclear", levelAttr.getNuclear().getValue().convertToDouble()},
+                     {"spin_orbital", levelAttr.getSpinOrbital().getValue().convertToDouble()},
+                     {"spin_orbital_nuclear",
+                      levelAttr.getSpinOrbitalNuclear().getValue().convertToDouble()},
+                     {"spin_orbital_nuclear_magnetization",
+                      levelAttr.getSpinOrbitalNuclearMagnetization().getValue().convertToDouble()},
+                     {"energy", levelAttr.getEnergy().getValue().convertToDouble()},
+                     {"label", levelAttr.getLabel().getValue().str()}};
+
+            ion_json["levels"].push_back(this_level);
+            LevelLabel2Index[levelAttr.getLabel().getValue().str()] = i;
         }
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, levelsArrayPtr, 4);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, ionStruct,
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelsAttr.size()), 5);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, transitionsArrayPtr, 6);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, ionStruct,
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), transitionsAttr.size()),
-            7);
-        Value ionStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                             /*elementType=*/ionStructType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, ionStruct, ionStructPtr);
 
-        // Create the Ion stub function
-        Type qirSignature = LLVM::LLVMFunctionType::get(IonTy, ptrType);
-        std::string qirName = "__catalyst_ion";
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ionStructPtr);
+        for (size_t i = 0; i < transitionsAttr.size(); i++) {
+            auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
+
+            json level1 =
+                ion_json["levels"][LevelLabel2Index[transitionAttr.getLevel_0().getValue().str()]];
+            json level2 =
+                ion_json["levels"][LevelLabel2Index[transitionAttr.getLevel_1().getValue().str()]];
+
+            json this_transition =
+                json{{"class_", "Transition"},
+                     {"einsteinA", transitionAttr.getEinsteinA().getValue().convertToDouble()},
+                     {"level1", level1},
+                     {"level2", level2}};
+            ion_json["transitions"].push_back(this_transition);
+        }
+
+        llvm::errs() << ion_json.dump() << "\n";
+
+        // Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, mod, levelsAttr);
+
+        // Value transitionsArrayPtr =
+        //     createTransitionsArray(loc, rewriter, ctx, mod, transitionsAttr);
+
+        // // Define the function signature for the Ion stub
+        // Type ionStructType = LLVM::LLVMStructType::getLiteral(
+        //     ctx, {
+        //              ptrType,                  // name
+        //              Float64Type::get(ctx),    // mass
+        //              Float64Type::get(ctx),    // charge
+        //              LLVM::LLVMArrayType::get( // position
+        //                  rewriter.getF64Type(), positionAttr.size()),
+        //              ptrType,                   // levels
+        //              IntegerType::get(ctx, 64), // number of levels
+        //              ptrType,                   // Transitions
+        //              IntegerType::get(ctx, 64), // number of Transitions
+        //          });
+
+        // // Create an instance of the Ion struct
+        // Value ionStruct = rewriter.create<LLVM::UndefOp>(loc, ionStructType);
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, name, 0);
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, mass, 1);
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, charge, 2);
+        // for (size_t i = 0; i < positionAttr.size(); i++) {
+        //     Value posConst = rewriter.create<LLVM::ConstantOp>(
+        //         loc, rewriter.getF64Type(),
+        //         rewriter.getFloatAttr(rewriter.getF64Type(), positionAttr[i]));
+        //     ionStruct = rewriter.create<LLVM::InsertValueOp>(
+        //         loc, ionStruct, posConst, ArrayRef<int64_t>({3, static_cast<int64_t>(i)}));
+        // }
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, levelsArrayPtr, 4);
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(
+        //     loc, ionStruct,
+        //     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelsAttr.size()), 5);
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, transitionsArrayPtr, 6);
+        // ionStruct = rewriter.create<LLVM::InsertValueOp>(
+        //     loc, ionStruct,
+        //     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(),
+        //     transitionsAttr.size()), 7);
+        // Value ionStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
+        //                                                      /*elementType=*/ionStructType, c1);
+        // rewriter.create<LLVM::StoreOp>(loc, ionStruct, ionStructPtr);
+
+        // // Create the Ion stub function
+        // Type qirSignature = LLVM::LLVMFunctionType::get(IonTy, ptrType);
+        // std::string qirName = "__catalyst_ion";
+        // LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        // //rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ionStructPtr);
+
+        rewriter.eraseOp(op);
 
         return success();
     }
