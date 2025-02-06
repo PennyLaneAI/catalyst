@@ -1,6 +1,8 @@
 set(LIBRARY_NAME ion-transforms)
 
 file(GLOB SRC
+    ion-to-llvm.cpp
+    ConversionPatterns.cpp
     quantum_to_ion.cpp
     QuantumToIonPatterns.cpp
 )
@@ -37,6 +39,8 @@ target_link_libraries(${LIBRARY_NAME} PRIVATE tomlplusplus::tomlplusplus)
 # tmol++ source has a warning which we want to ignore
 # This is because toml++ ships source-only, not an executable, so we have to compile it
 set_source_files_properties(
+  ion-to-llvm.cpp
+  ConversionPatterns.cpp
   quantum_to_ion.cpp
   QuantumToIonPatterns.cpp
   PROPERTIES
