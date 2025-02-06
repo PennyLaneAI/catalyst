@@ -224,9 +224,10 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
             // Use stack allocation for selector vector as it's not expected to be too big.
-            selectorBuffer = getStaticMemrefAlloca(loc, rewriter, selectorBufferType);
-            auto gradientsProcessedTy = MemRefType::get({}, rewriter.getIndexType());
-            gradientsProcessed = getStaticMemrefAlloca(loc, rewriter, gradientsProcessedTy);
+            selectorBuffer = rewriter.create<memref::AllocaOp>(loc, selectorBufferType);
+
+            gradientsProcessed = rewriter.create<memref::AllocaOp>(
+                loc, MemRefType::get({}, rewriter.getIndexType()));
 
             rewriter.create<memref::StoreOp>(loc, cZero, gradientsProcessed);
 

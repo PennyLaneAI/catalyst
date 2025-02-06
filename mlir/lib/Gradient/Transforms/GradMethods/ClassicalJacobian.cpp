@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
-#include "Catalyst/Utils/StaticAllocas.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
@@ -67,7 +66,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // Store the counter in memory since we don't want to deal with returning the SSA value
         // for updated parameter counts from arbitrary regions/ops.
         MemRefType paramCountType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramCountBuffer = getStaticMemrefAlloca(loc, rewriter, paramCountType);
+        Value paramCountBuffer = rewriter.create<memref::AllocaOp>(loc, paramCountType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramCountBuffer);
 
@@ -152,7 +151,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
 
         qnodeQuantumArgs.push_back(paramsTensor);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
+        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
@@ -246,7 +245,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
 
         Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
+        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
