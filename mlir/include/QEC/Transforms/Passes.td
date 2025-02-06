@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s
+#ifndef QEC_PASSES
+#define QEC_PASSES
 
-func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
-    %theta = arith.constant 0.1 : f64
-    qec.ppr ["X", "Z"] (%theta) %q1, %q2 : !quantum.bit, !quantum.bit
-    func.return
+include "mlir/Pass/PassBase.td"
+
+def LoweringToQECPass : Pass<"convert-to-qec"> {
+    let summary = "Convert quantum dialects to the QEC dialect.";
+
+    let dependentDialects = [
+        "quantum::QuantumDialect",
+        "qec::QECDialect"
+    ];
+
+    let constructor = "catalyst::createLowerToQECPass()";
 }
+
+#endif // QEC_PASSES

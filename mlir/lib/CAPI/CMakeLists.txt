@@ -12,4 +12,6 @@ add_mlir_public_c_api_library(QuantumCAPI
     mitigation-transforms
     MLIRIon
     ion-transforms
+    MLIRQEC
+    qec-transforms
 )

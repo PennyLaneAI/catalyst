@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s
+#pragma once
 
-func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
-    %theta = arith.constant 0.1 : f64
-    qec.ppr ["X", "Z"] (%theta) %q1, %q2 : !quantum.bit, !quantum.bit
-    func.return
-}
+#include <memory>
+
+#include "mlir/Pass/Pass.h"
+
+namespace catalyst {
+
+std::unique_ptr<mlir::Pass> createLowerToQECPass();
+
+} // namespace catalyst

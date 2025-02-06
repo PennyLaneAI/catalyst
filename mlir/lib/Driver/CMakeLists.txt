@@ -37,6 +37,8 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
+    MLIRQEC
+    qec-transforms
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest

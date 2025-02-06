@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s
+#pragma once
 
-func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
-    %theta = arith.constant 0.1 : f64
-    qec.ppr ["X", "Z"] (%theta) %q1, %q2 : !quantum.bit, !quantum.bit
-    func.return
-}
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
+
+namespace catalyst {
+namespace qec {
+
+void populateQECLoweringPatterns(mlir::RewritePatternSet &);
+
+} // namespace qec
+} // namespace catalyst
