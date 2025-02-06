@@ -6,6 +6,7 @@ set(LIBS
     MLIRLspServerLib
     MLIRCatalyst
     MLIRQuantum
+    MLIRQEC
     MLIRGradient
     MLIRMitigation
     MLIRIon

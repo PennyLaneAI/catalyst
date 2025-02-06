@@ -42,6 +42,7 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
     mlir::registerPass(catalyst::createInlineNestedModulePass);
+    mlir::registerPass(catalyst::createIonConversionPass);
     mlir::registerPass(catalyst::createMemrefCopyToLinalgCopyPass);
     mlir::registerPass(catalyst::createMemrefToLLVMWithTBAAPass);
     mlir::registerPass(catalyst::createMitigationLoweringPass);

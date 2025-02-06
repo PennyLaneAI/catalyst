@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+// RUN: quantum-opt %s
 
-#include <memory>
-
-#include "mlir/Pass/Pass.h"
-
-namespace catalyst {
-
-std::unique_ptr<mlir::Pass> createQuantumToIonPass();
-std::unique_ptr<mlir::Pass> createIonConversionPass();
-
-} // namespace catalyst
+func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %theta = arith.constant 0.1 : f64
+    qec.ppr [X, Z] (%theta) %q1, %q2 : !quantum.bit, !quantum.bit
+    func.return
+}
