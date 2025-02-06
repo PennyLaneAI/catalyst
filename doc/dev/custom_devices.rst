@@ -154,7 +154,11 @@ There are two things that are needed in order to integrate with PennyLane device
 
 * Adding a ``get_c_interface`` method to your ``qml.devices.Device`` class.
 * Adding a ``config_filepath`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
-* Optionally, adding a ``device_kwargs`` dictionary for runtime parameters to pass from the PennyLane device to the ``QuantumDevice`` upon initialization.
+
+Optionally, on top of the above two requirements, you can also add the following:
+
+* A ``device_kwargs`` dictionary for runtime parameters to pass from the PennyLane device to the ``QuantumDevice`` upon initialization.
+* A ``get_compilation_pipelines`` function that returns a list of catalyst compilation pipelines that the device requires for compilation.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
@@ -334,3 +338,30 @@ of the ``QuantumDevice`` constructor to variables. For example:
 
 In the above example, a dictionary will be constructed at runtime and passed to the constructor of
 the ``QuantumDevice`` implementation.
+
+Finally, if the device requires compilation pipelines, a ``get_compilation_pipelines`` method
+should be added to the device class. This method should return a list of Catalyst compilation
+pipelines that the device requires for compilation. For example:
+
+.. code-block:: python
+
+    class CustomDevice(qml.devices.Device):
+        """Custom Device"""
+
+        config_filepath = pathlib.Path("absolute/path/to/configuration/file.toml")
+
+        ...
+
+        def get_compilation_pipelines(self):
+            return [
+            (
+                "pipeline_A",
+                [
+                    "pass_1",
+                    "pass_2",
+                ],
+            ),]
+
+In the above example, the device requires a compilation pipeline named "pipeline_A" which include
+the passes "pass_1", and "pass_2". The pass names should match the names of the registerd passes in 
+Catalyst. Note that this pipeline would override the default pipeline in Catalyst.
