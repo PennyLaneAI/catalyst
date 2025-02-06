@@ -227,7 +227,6 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
 
             gradientsProcessed = rewriter.create<memref::AllocaOp>(
                 loc, MemRefType::get({}, rewriter.getIndexType()));
-
             rewriter.create<memref::StoreOp>(loc, cZero, gradientsProcessed);
 
             for (Type gradType : gradResTypes) {
