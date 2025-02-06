@@ -27,12 +27,7 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, V
     Region *parentRegion = insertionBlock->getParent();
     Block *entryBlock = &parentRegion->front();
     PatternRewriter::InsertionGuard insertGuard(rewriter);
-    if (insertionBlock == entryBlock) {
-        // If we are already in the entry basic block
-        // we don't need to do anything fancy.
-        // ... noop ...
-    }
-    else {
+    if (insertionBlock != entryBlock) {
         // If we are not already in the entry basic block
         Operation *possible_terminator = entryBlock->getTerminator();
         assert(possible_terminator && "blocks must have a terminator");
@@ -63,10 +58,7 @@ LLVM::AllocaOp getStaticAlloca2(Location &loc, RewriterBase &rewriter, Type ty, 
     Region *parentRegion = insertionBlock->getParent();
     Block *entryBlock = &parentRegion->front();
     PatternRewriter::InsertionGuard insertGuard(rewriter);
-    if (insertionBlock == entryBlock) {
-        // ... noop ...
-    }
-    else {
+    if (insertionBlock != entryBlock) {
         Operation *possible_terminator = entryBlock->getTerminator();
         assert(possible_terminator && "blocks must have a terminator");
         auto operation = entryBlock->rbegin();
@@ -94,10 +86,7 @@ mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewrit
     Region *parentRegion = insertionBlock->getParent();
     Block *entryBlock = &parentRegion->front();
     PatternRewriter::InsertionGuard insertGuard(rewriter);
-    if (insertionBlock == entryBlock) {
-        // ... noop ...
-    }
-    else {
+    if (insertionBlock != entryBlock) {
         Operation *possible_terminator = entryBlock->getTerminator();
         assert(possible_terminator && "blocks must have a terminator");
         // we need it before the terminator
