@@ -198,3 +198,157 @@ class TestCapture:
         actual = catalyst_capture_circuit(theta)
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
+
+    def test_cond_workflow_if_else(self, backend):
+        """Test the integration for a circuit with a cond primitive with true and false branches."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_if(self, backend):
+        """Test the integration for a circuit with a cond primitive with a true branch only."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            qml.cond(x > 1.4, ansatz_true)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(1.5)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_with_custom_primitive(self, backend):
+        """Test the integration for a circuit with a cond primitive containing a custom
+        primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.GlobalPhase(jnp.pi / 4)  # Custom primitive
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+                qml.GlobalPhase(jnp.pi / 2)  # Custom primitive
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_with_abstract_measurement(self, backend):
+        """Test the integration for a circuit with a cond primitive containing an
+        abstract measurement."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                qml.state()  # Abstract measurement
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+                qml.state()  # Abstract measurement
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_with_simple_primitive(self, backend):
+        """Test the integration for a circuit with a cond primitive containing an
+        simple primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+                return x + 1  # simple primitive
+
+            def ansatz_false():
+                qml.RY(x, wires=0)
+                return x + 1  # simple primitive
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_nested(self, backend):
+        """Test the integration for a circuit with a nested cond primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float, y: float):
+
+            def ansatz_true():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            def ansatz_false():
+
+                def branch_true():
+                    qml.RY(y, wires=0)
+
+                def branch_false():
+                    qml.RZ(y, wires=0)
+
+                qml.cond(y > 1.4, branch_true, branch_false)()
+
+            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1, 1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1, 1.5)
+        assert default_capture_result == experimental_capture_result
+
+    def test_cond_workflow_operator(self, backend):
+        """Test the integration for a circuit with a cond primitive returning
+        an Operator."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            qml.cond(x > 1.4, qml.RX, qml.RY)(x, wires=0)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(0.1)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(0.1)
+        assert default_capture_result == experimental_capture_result
