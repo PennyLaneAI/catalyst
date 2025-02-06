@@ -28,27 +28,6 @@ string(REGEX MATCH "llvm=([0-9a-f]+)" _ ${DEPENDENCY_VERSIONS})
 set(LLVM_HASH ${CMAKE_MATCH_1})
 message(STATUS "Detected LLVM version - ${LLVM_HASH}")
 
-FetchContent_Declare(
-    MLIRRunnerUtils
-    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/RunnerUtils.h
-    DOWNLOAD_NO_EXTRACT True
-    SOURCE_DIR        mlir/ExecutionEngine
-)
-
-FetchContent_Declare(
-    MLIRCRunnerUtils
-    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/CRunnerUtils.h
-    DOWNLOAD_NO_EXTRACT True
-    SOURCE_DIR          mlir/ExecutionEngine
-)
-
-FetchContent_Declare(
-    MLIRFloat16Bits
-    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/Float16bits.h
-    DOWNLOAD_NO_EXTRACT True
-    SOURCE_DIR          mlir/ExecutionEngine
-)
-
 # Note on pybind11 vs python discovery order:
 # If Python is looked for first, then we have to look for all the components needed by pybind11.
 # In particular, if pybind11::embed is used, then we need to find both headers (Development.Module)
@@ -93,6 +72,7 @@ target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}
     ${backend_includes}
+    ${MLIR_INCLUDE_DIRS}
 )
 
 if(ENABLE_CODE_COVERAGE)
