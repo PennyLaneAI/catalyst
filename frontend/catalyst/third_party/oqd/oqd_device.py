@@ -45,7 +45,17 @@ class OQDDevice(Device):
 
         return "oqd", lib_path
 
-    def __init__(self, wires, shots, backend="default", **kwargs):
+    def __init__(self, wires, shots=None, backend="default", **kwargs):
+        self.device_toml = kwargs.pop("device_toml", [])
+        self.qubit_toml = kwargs.pop("qubit_toml", [])
+        self.gate_toml = kwargs.pop("gate_toml", [])
+        if not self.device_toml:
+            raise ValueError("device-toml file must be provided.")
+        if not self.qubit_toml:
+            raise ValueError("qubit-toml file must be provided.")
+        if not self.gate_toml:
+            raise ValueError("gate-toml file must be provided.")
+
         self._backend = backend
         _check_backend(backend=backend)
         super().__init__(wires=wires, shots=shots, **kwargs)
@@ -76,6 +86,57 @@ class OQDDevice(Device):
     def execute(self, circuits, execution_config):
         """Python execution is not supported."""
         raise NotImplementedError("The OQD device only supports Catalyst.")
+
+    def get_compilation_pipelines(self):
+        """Create a list of pipelines that include passes to run during Catalyst compilation"""
+        pipelines = [
+            (
+                "enforce-runtime-invariants-pipeline",
+                [
+                    "enforce-runtime-invariants-pipeline",
+                ],
+            ),
+            (
+                "hlo-lowering-pipeline",
+                [
+                    "hlo-lowering-pipeline",
+                ],
+            ),
+            (
+                "quantum-compilation-pipeline",
+                [
+                    "quantum-compilation-pipeline",
+                ],
+            ),
+            (
+                "bufferization-pipeline",
+                [
+                    "bufferization-pipeline",
+                ],
+            ),
+            (
+                "oqd_pipeline",
+                [
+                    "func.func(ions-decomposition)",
+                    "func.func(quantum-to-ion{"
+                    + "device-toml-loc="
+                    + f"{self.device_toml}"
+                    + "qubit-toml-loc="
+                    + f"{self.qubit_toml}"
+                    + "gate-to-pulse-toml-loc="
+                    + f"{self.gate_toml}"
+                    + "})",
+                    "convert-ion-to-llvm",
+                ],
+            ),
+            (
+                "llvm-dialect-lowering-pipeline",
+                [
+                    "llvm-dialect-lowering-pipeline",
+                ],
+            ),
+        ]
+        return pipelines
 
 
 def _check_backend(backend):

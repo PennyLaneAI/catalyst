@@ -510,13 +510,17 @@ class QJIT(CatalystCallable):
 
     @debug_logger
     def __call__(self, *args, **kwargs):
+        isQNode = isinstance(self.user_function, qml.QNode)
+
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
-            isQNode = isinstance(self.user_function, qml.QNode)
             if isQNode and self.compile_options.static_argnums:
                 kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
 
             return self.user_function(*args, **kwargs)
+
+        if isQNode and hasattr(self.device, "get_compilation_pipelines"):
+            self.compile_options.pipelines = self.device.get_compilation_pipelines()
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
