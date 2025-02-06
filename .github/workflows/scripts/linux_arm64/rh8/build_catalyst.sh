@@ -42,7 +42,8 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
     -DPython_EXECUTABLE=${PYTHON} \
-    -DENABLE_OPENQASM=ON
+    -DENABLE_OPENQASM=ON \
+    -DMLIR_DIR="/catalyst/llvm-build"
 cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
 # Build OQC
