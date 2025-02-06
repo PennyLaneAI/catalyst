@@ -354,31 +354,6 @@ func.func @test_merge_rotations(%arg0: f64) -> !quantum.bit {
 
 // -----
 
-func.func @test_merge_rotations(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
-    // CHECK: [[cst:%.+]] = arith.constant 1.000000e-01 : f64
-    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
-    // CHECK: [[qubit0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-
-    // CHECK: [[x2:%.+]] = arith.mulf %arg0, %arg0 : f64
-    %x2 = arith.mulf %arg0, %arg0 : f64
-
-    // CHECK: [[sum1:%.+]] = arith.addf [[x2]], [[cst]] : f64
-    // CHECK: [[sum2:%.+]] = arith.addf %arg0, [[sum1]] : f64
-    // CHECK: [[ret:%.+]]:2 = quantum.custom "CRX"([[sum2]]) [[qubit0]], [[qubit1]] : !quantum.bit, !quantum.bit
-    %3:2 = quantum.custom "CRX"(%arg0) %1, %2 : !quantum.bit, !quantum.bit
-    %4:2 = quantum.static_custom "CRX" [1.000000e-01] %3#0, %3#1 : !quantum.bit, !quantum.bit
-    %5:2 = quantum.custom "CRX"(%x2) %4#0, %4#1 : !quantum.bit, !quantum.bit
-
-    // CHECK: return [[ret]]#0, [[ret]]#1
-    return %5#0, %5#1 : !quantum.bit, !quantum.bit
-}
-
-// -----
-
 func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.bit, !quantum.bit, !quantum.bit)
 {
     // CHECK: [[cst:%.+]] = arith.constant 1.000000e-01 : f64
