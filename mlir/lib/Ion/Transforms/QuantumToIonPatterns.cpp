@@ -166,13 +166,13 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         auto beam0toEAttr = BeamAttr::get(
             op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
-            rewriter.getI64VectorAttr(beam.polarization),
-            rewriter.getI64VectorAttr(beam.wavevector));
+            rewriter.getDenseI64ArrayAttr(beam.polarization),
+            rewriter.getDenseI64ArrayAttr(beam.wavevector));
         auto beam1toEAttr = BeamAttr::get(
             op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
             rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
-            rewriter.getI64VectorAttr(beam.polarization),
-            rewriter.getI64VectorAttr(beam.wavevector));
+            rewriter.getDenseI64ArrayAttr(beam.polarization),
+            rewriter.getDenseI64ArrayAttr(beam.wavevector));
 
         // TODO (backlog): Pull the math formula from database and apply it in MLIR (but right now
         // it is not in the database)
@@ -180,6 +180,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
         auto loc = op.getLoc();
         auto qubits = op.getInQubits();
+        MLIRContext *ctx = op.getContext();
 
         auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
             loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
@@ -188,8 +189,10 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                 auto angle = op.getParams().front();
                 auto time = computePulseDuration(rewriter, loc, angle, beam.rabi);
                 auto qubit = qubits.front();
-                builder.create<ion::PulseOp>(loc, time, qubit, beam0toEAttr, phase1Attr);
-                builder.create<ion::PulseOp>(loc, time, qubit, beam1toEAttr, phase2Attr);
+                builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit, beam0toEAttr,
+                                             phase1Attr);
+                builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit, beam1toEAttr,
+                                             phase2Attr);
             });
         rewriter.replaceOp(op, ppOp);
         return success();
@@ -205,6 +208,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                   const std::vector<PhononMode> &phonons)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
+    MLIRContext *ctx = op.getContext();
 
     auto qubitIndex0 = walkBackQubitSSA(op, 0);
     auto qubitIndex1 = walkBackQubitSSA(op, 1);
@@ -294,13 +298,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     target=qubit0,
                     //     time=ms_angle/rabi
                     // )
-                    auto beam1Attr = BeamAttr::get(
-                        op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
-                        rewriter.getF64FloatAttr(beam.rabi),
-                        rewriter.getF64FloatAttr(beam.detuning),
-                        rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(beam.wavevector));
-                    builder.create<ion::PulseOp>(loc, time, qubit0, beam1Attr, phase0Attr);
+                    auto beam1Attr =
+                        BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      rewriter.getF64FloatAttr(beam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
+                    builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit0, beam1Attr,
+                                                 phase0Attr);
 
                     // Pulse2(
                     //     transition=Transition(level1=1,level2=e),
@@ -315,14 +320,15 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    auto beam2Attr = BeamAttr::get(
-                        op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                        rewriter.getF64FloatAttr(beam.rabi),
-                        // TODO: fill in formula with delta and mu once available
-                        rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
-                        rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
-                    builder.create<ion::PulseOp>(loc, time, qubit0, beam2Attr, phase0Attr);
+                    auto beam2Attr =
+                        BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      // TODO: fill in formula with delta and mu once available
+                                      rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                    builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit0, beam2Attr,
+                                                 phase0Attr);
 
                     // Pulse3(
                     //     transition=Transition(level1=1,level2=e),
@@ -336,14 +342,15 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    auto beam3Attr = BeamAttr::get(
-                        op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                        rewriter.getF64FloatAttr(beam.rabi),
-                        // TODO: fill in formula with delta and mu once available
-                        rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
-                        rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
-                    builder.create<ion::PulseOp>(loc, time, qubit0, beam3Attr, phase0Attr);
+                    auto beam3Attr =
+                        BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      // TODO: fill in formula with delta and mu once available
+                                      rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                    builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit0, beam3Attr,
+                                                 phase0Attr);
 
                     // Pulse4(
                     //     transition=Transition(level1=0,level2=e),
@@ -356,13 +363,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     //     time=ms_angle/rabi
                     // )
 
-                    auto beam4Attr = BeamAttr::get(
-                        op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
-                        rewriter.getF64FloatAttr(beam.rabi),
-                        rewriter.getF64FloatAttr(beam.detuning),
-                        rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(beam.wavevector));
-                    builder.create<ion::PulseOp>(loc, time, qubit1, beam4Attr, phase0Attr);
+                    auto beam4Attr =
+                        BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      rewriter.getF64FloatAttr(beam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
+                    builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam4Attr,
+                                                 phase0Attr);
 
                     // Pulse5(
                     //     transition=Transition(level1=1,level2=e),
@@ -377,14 +385,15 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    auto beam5Attr = BeamAttr::get(
-                        op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                        rewriter.getF64FloatAttr(beam.rabi),
-                        // TODO: fill in formula with delta and mu once available
-                        rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
-                        rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
-                    builder.create<ion::PulseOp>(loc, time, qubit1, beam5Attr, phase0Attr);
+                    auto beam5Attr =
+                        BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      // TODO: fill in formula with delta and mu once available
+                                      rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                    builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam5Attr,
+                                                 phase0Attr);
 
                     // Pulse6(
                     //     transition=Transition(level1=1,level2=e),
@@ -399,14 +408,15 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // )
 
                     // TODO: Also need delta and mu (waiting on OQD to provide them)
-                    auto beam6Attr = BeamAttr::get(
-                        op.getContext(), rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                        rewriter.getF64FloatAttr(beam.rabi),
-                        // TODO: fill in formula with delta and mu once available
-                        rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
-                        rewriter.getI64VectorAttr(beam.polarization),
-                        rewriter.getI64VectorAttr(flipSign(beam.wavevector)));
-                    builder.create<ion::PulseOp>(loc, time, qubit1, beam6Attr, phase0Attr);
+                    auto beam6Attr =
+                        BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      // TODO: fill in formula with delta and mu once available
+                                      rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                    builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam6Attr,
+                                                 phase0Attr);
                 });
             rewriter.replaceOp(op, ppOp);
             return success();

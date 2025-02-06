@@ -8,6 +8,34 @@
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
+* Catalyst now supports experimental capture of `cond` control flow.
+  [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
+  
+  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
+  `experimental_capture=True` in the qjit decorator.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  @qml.qnode(dev)
+  def circuit(x: float):
+
+      def ansatz_true():
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+
+      def ansatz_false():
+          qml.RY(x, wires=0)
+
+      qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+      return qml.expval(qml.Z(0))
+  ```
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -17,7 +45,15 @@
 * Fixed `argnums` parameter of `grad` and `value_and_grad` being ignored.
   [(#1478)](https://github.com/PennyLaneAI/catalyst/pull/1478)
 
+* Fixed an issue ([(#1488)](https://github.com/PennyLaneAI/catalyst/pull/1488)) where Catalyst could
+  give incorrect results for circuits containing `qml.StatePrep`.
+  [(#1491)](https://github.com/PennyLaneAI/catalyst/pull/1491)
+
 <h3>Internal changes ⚙️</h3>
+
+* Update deprecated access to `QNode.execute_kwargs["mcm_config"]`.
+  Instead `postselect_mode` and `mcm_method` should be accessed instead.
+  [(#1452)](https://github.com/PennyLaneAI/catalyst/pull/1452)
 
 * `from_plxpr` now uses the `qml.capture.PlxprInterpreter` class for reduced code duplication.
   [(#1398)](https://github.com/PennyLaneAI/catalyst/pull/1398)
@@ -42,14 +78,26 @@
   - The region of a `ParallelProtocolOp` is now always terminated with a `ion::YieldOp` with explicitly yielded SSA values. This ensures the op is well-formed, and improves readability.
     [(#1475)](https://github.com/PennyLaneAI/catalyst/pull/1475)
 
+  - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
+    introduces oqd device specific stubs that will be implemented in oqd runtime including: 
+    `@__catalyst_ion`, `@ __catalyst_pulse_op`, `@ __catalyst_parallel_protocol`.
+    [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
+
+* Update source code to comply with changes requested by black v25.1.0
+  [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
+Andrija Paurevic,
 Paul Haochen Wang,
-Rohan Nolan Lasrado.
+Rohan Nolan Lasrado,
+Raul Torres.

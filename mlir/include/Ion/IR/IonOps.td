@@ -107,8 +107,8 @@ def BeamAttr : Ion_Attr<"Beam", "beam"> {
     OptionalParameter<"mlir::IntegerAttr">:$transition_index,
     "mlir::FloatAttr":$rabi,
     "mlir::FloatAttr":$detuning,
-    "mlir::DenseIntElementsAttr": $polarization,
-    "mlir::DenseIntElementsAttr": $wavevector
+    "mlir::DenseI64ArrayAttr": $polarization,
+    "mlir::DenseI64ArrayAttr": $wavevector
   );
 
 
@@ -137,7 +137,7 @@ def IonOp : Ion_Op<"ion"> {
     Builtin_StringAttr:$name,
     Builtin_FloatAttr:$mass,
     Builtin_FloatAttr:$charge,
-    AnyIntElementsAttr: $position,
+    DenseF64ArrayAttr: $position,
     LevelArrayAttr: $levels,
     TransitionArrayAttr: $transitions
   );
@@ -162,8 +162,12 @@ def PulseOp : Ion_Op<"pulse"> {
         Builtin_FloatAttr: $phase
     );
 
+    let results = (outs
+    PulseType:$out_pulse
+    );
+
     let assemblyFormat = [{
-        `(` $time `:` type($time) `)` $in_qubit attr-dict
+        `(` $time `:` type($time) `)` $in_qubit attr-dict `:` type($out_pulse)
     }];
 }
 

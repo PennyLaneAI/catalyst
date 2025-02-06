@@ -176,8 +176,8 @@ class OQDDatabaseManager {
             double mass = data->at_path("mass").as_floating_point()->get();
             double charge = data->at_path("charge").as_floating_point()->get();
 
-            std::vector<int64_t> position =
-                tomlArray2StdVector<int64_t>(*(data->at_path("position").as_array()));
+            std::vector<double> position =
+                tomlArray2StdVector<double>(*(data->at_path("position").as_array()));
 
             Level downstate = parseSingleLevel(data->at_path("levels")["downstate"]);
             Level upstate = parseSingleLevel(data->at_path("levels")["upstate"]);

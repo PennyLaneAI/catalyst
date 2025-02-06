@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Jax extras module containing functions related to the Python program tracing  """
+"""Jax extras module containing functions related to the Python program tracing"""
 
 # pylint: disable=line-too-long
 
@@ -235,7 +235,9 @@ def stable_toposort(end_nodes: list) -> list:
     while childless_nodes:
         node = childless_nodes.pop()
         sorted_nodes.append(node)
-        for parent in node.parents:
+        # pylint: disable=unnecessary-lambda
+        sorted_parents = sorted(node.parents, key=lambda n: end_nodes.index(n))
+        for parent in sorted_parents:
             if child_counts[parent.id] == 1:
                 childless_nodes.append(parent)
             else:

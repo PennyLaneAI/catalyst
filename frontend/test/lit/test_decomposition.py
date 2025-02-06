@@ -178,11 +178,13 @@ def test_decompose_singleexcitationplus():
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
+        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q0:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_theta_div_2_scalar:%.+]] = tensor.extract [[a_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
@@ -191,8 +193,6 @@ def test_decompose_singleexcitationplus():
         # CHECK: [[s2q1:%.+]] = quantum.custom "PauliX"() [[s1]]#1
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q0:%.+]] = quantum.custom "PauliX"() [[s1]]#0
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[b_theta_div_2_scalar:%.+]] = tensor.extract [[b_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"

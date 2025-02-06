@@ -24,7 +24,7 @@ oqd_config_schema = "v0.1"
 [ions.Yb171]
 mass = 171.0
 charge = +1.0
-position = [1, 2, -1]
+position = [1.0, 2.0, -1.0]
 
 levels.downstate.label = "downstate"
 levels.downstate.principal = 6
