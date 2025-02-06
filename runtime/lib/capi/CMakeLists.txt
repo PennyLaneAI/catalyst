@@ -4,11 +4,6 @@
 
 add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 
-# include external MLIR runner utils
-FetchContent_MakeAvailable(MLIRRunnerUtils)
-FetchContent_MakeAvailable(MLIRCRunnerUtils)
-FetchContent_MakeAvailable(MLIRFloat16Bits)
-
 # link to rt_backend
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS})
 
@@ -20,7 +15,7 @@ target_link_libraries(catalyst_qir_qis_obj
 target_include_directories(catalyst_qir_qis_obj PUBLIC .
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${runtime_includes}
-    ${mlirrunnerutils_SOURCE_DIR}/../..  # includes are relative to mlir/ExecutionEngine
+    ${MLIR_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver  # Timer.hpp
 )
 
