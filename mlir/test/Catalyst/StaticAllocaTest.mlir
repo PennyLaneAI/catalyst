@@ -19,10 +19,10 @@ module @static_alloca_print {
   // CHECK-LABEL: @test
   func.func @test(%arg0: memref<i64>) -> () {
     // CHECK-NOT: ^bb1:
-    // CHECK: [[one_2:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.alloca [[one_2]] x !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[one_1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.alloca [[one_1]] x !llvm.struct<(i64, ptr, i8)>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64)>
     cf.br ^bb1
   ^bb1:
     "catalyst.print"(%arg0) <{print_descriptor}> : (memref<i64>) -> ()
@@ -39,10 +39,10 @@ module @static_alloca_custom_call {
   func.func @custom_call(%arg0: memref<3x3xf64>, %arg1: memref<3x3xf64>) -> () {
     // CHECK-NOT: ^bb1:
     // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
     // CHECK: llvm.alloca [[one]] x !llvm.array<1 x ptr>
     // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
     // CHECK: llvm.alloca [[one]] x !llvm.array<1 x ptr>
+    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
     // CHECK: ^bb1:
     cf.br ^bb1
   ^bb1:
