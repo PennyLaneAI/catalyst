@@ -16,23 +16,27 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
 from functools import partial
-from typing import Callable
+from typing import Callable, Sequence
 
 import jax
+import jax.core
 import pennylane as qml
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
+from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 
 from catalyst.device import (
     extract_backend_info,
     get_device_capabilities,
     get_device_shots,
 )
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras import jaxpr_pad_consts, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.tracing import bind_flexible_primitive
 from catalyst.jax_primitives import (
     AbstractQbit,
+    AbstractQreg,
     compbasis_p,
+    cond_p,
     counts_p,
     expval_p,
     gphase_p,
@@ -225,6 +229,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
         for wire_values, new_wire in zip(op.wires, out_qubits):
             self.wire_map[wire_values] = new_wire
 
+        return out_qubits
+
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
         if obs.arithmetic_depth > 0:
@@ -287,7 +293,8 @@ class QFuncPlxprInterpreter(PlxprInterpreter):
 
 
 @QFuncPlxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
-def _(self, *invals, n_wires):
+def handle_qubit_unitary(self, *invals, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
     wires = [self.get_wire(w) for w in invals[1:]]
     outvals = qunitary_p.bind(invals[0], *wires, qubits_len=n_wires, ctrl_len=0, adjoint=False)
     for wire_values, new_wire in zip(invals[1:], outvals):
@@ -296,8 +303,125 @@ def _(self, *invals, n_wires):
 
 # pylint: disable=unused-argument
 @QFuncPlxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
-def _(self, phase, *wires, n_wires):
+def handle_global_phase(self, phase, *wires, n_wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
     gphase_p.bind(phase, ctrl_len=0, adjoint=False)
+
+
+# pylint: disable=unused-argument, too-many-arguments
+@QFuncPlxprInterpreter.register_primitive(plxpr_cond_prim)
+def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive"""
+    args = plxpr_invals[args_slice]
+    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
+    converted_jaxpr_branches = []
+    all_consts = []
+
+    # Convert each branch from plxpr to jaxpr
+    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
+
+        # Store all branches consts in a flat list
+        branch_consts = plxpr_invals[const_slice]
+        all_consts = all_consts + [*branch_consts]
+
+        converted_jaxpr_branch = None
+
+        if plxpr_branch is None:
+            # Emit a new Catalyst jaxpr branch that simply returns a qreg
+            converted_jaxpr_branch = jax.make_jaxpr(lambda x: x)(AbstractQreg()).jaxpr
+        else:
+            # Convert branch from plxpr to Catalyst jaxpr
+            converted_func = partial(
+                BranchPlxprInterpreter(self._device, self._shots).eval,
+                plxpr_branch,
+                branch_consts,
+            )
+            converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*args_plus_qreg).jaxpr
+
+        converted_jaxpr_branches.append(converted_jaxpr_branch)
+
+    # The slice [0,1) of the plxpr input values contains the true predicate of the plxpr cond,
+    # whereas the slice [1,2) refers to the false predicate, which is always True.
+    # We extract the true predicate and discard the false one.
+    predicate_slice = slice(0, 1)
+    predicate = plxpr_invals[predicate_slice]
+
+    # Build Catalyst compatible input values
+    cond_invals = [*predicate, *all_consts, *args_plus_qreg]
+
+    # Perform the binding
+    outvals = cond_p.bind(
+        *cond_invals,
+        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
+        nimplicit_outputs=None,
+    )
+
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg = outvals.pop()
+
+    # Return only the output values that match the plxpr output values
+    return outvals
+
+
+# Derived interpreters must be declared after the primitive registrations of their
+# parents or be placed in a separate file, in order to access those registrations.
+# This is due to the registrations being done outside the parent class definition.
+
+
+class BranchPlxprInterpreter(QFuncPlxprInterpreter):
+    """An interpreter that converts a plxpr branch into catalyst-variant jaxpr branch.
+
+    Args:
+        device (qml.devices.Device)
+        shots (qml.measurements.Shots)
+    """
+
+    def __init__(self, device, shots: qml.measurements.Shots):
+        self._parent_qreg = None
+        super().__init__(device, shots)
+
+    def setup(self):
+        """Initialize the stateref."""
+        if self.stateref is None:
+            self.stateref = {"qreg": self._parent_qreg, "wire_map": {}}
+
+    def cleanup(self):
+        """Reinsert extracted qubits."""
+        for orig_wire, wire in self.wire_map.items():
+            # pylint: disable=attribute-defined-outside-init
+            self.qreg = qinsert_p.bind(self.qreg, orig_wire, wire)
+
+    # pylint: disable=too-many-branches
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
+
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+
+        Returns:
+            list[TensorLike]: the results of the execution.
+
+        """
+        # We assume the last argument is the qreg
+        num_args = len(args)
+        assert num_args > 0
+        qreg_pos = num_args - 1
+        self._parent_qreg = args[qreg_pos]
+
+        # Retrive the original args (without the qreg)
+        args = args[:qreg_pos]
+
+        outvals = super().eval(jaxpr, consts, *args)
+
+        # Add the qreg to the output values
+        outvals = [*outvals, self.qreg]
+
+        self.stateref = None
+
+        return outvals
 
 
 def trace_from_pennylane(fn, static_argnums, abstracted_axes, sig, kwargs):

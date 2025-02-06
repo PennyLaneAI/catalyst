@@ -54,14 +54,14 @@ def test_static_params():
 
 # CHECK-LABEL: public @jit_circuit
 # CHECK: %[[REG:.*]] = quantum.alloc( 4) : !quantum.reg
-# CHECK: %[[BIT1:.*]] = quantum.extract %[[REG]][ 0] : !quantum.reg -> !quantum.bit
+# CHECK: %[[BIT2:.*]] = quantum.extract %[[REG]][ 2]
+# CHECK: %[[RZ:.*]] = quantum.static_custom "RZ"
+# CHECK: %[[BIT0:.*]] = quantum.extract %[[REG]][ 0] : !quantum.reg -> !quantum.bit
 # CHECK: %[[ROT:.*]] = quantum.static_custom "Rot"
 # CHECK: %[[RX:.*]] = quantum.static_custom "RX"
 # CHECK: %[[BIT1:.*]] = quantum.extract %[[REG]][ 1]
 # CHECK: %[[RY1:.*]] = quantum.static_custom "RY"
 # CHECK: %[[XX1:.*]] = quantum.static_custom "IsingXX"
-# CHECK: %[[BIT2:.*]] = quantum.extract %[[REG]][ 2]
-# CHECK: %[[RZ:.*]] = quantum.static_custom "RZ"
 # CHECK: %[[XX2:.*]] = quantum.static_custom "IsingXX"
 # CHECK: %[[ZZ:.*]] = quantum.static_custom "IsingZZ"
 # CHECK: %[[CRX:.*]] = quantum.static_custom "CRX"

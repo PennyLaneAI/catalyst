@@ -43,4 +43,16 @@ def QuantumToIonPass : Pass<"quantum-to-ion"> {
     let constructor = "catalyst::createQuantumToIonPass()";
 }
 
+def IonConversionPass : Pass<"convert-ion-to-llvm"> {
+    let summary = "Perform a dialect conversion from ion to LLVM";
+
+    let dependentDialects = [
+       "mlir::func::FuncDialect",
+       "mlir::LLVM::LLVMDialect",
+       "catalyst::quantum::QuantumDialect"
+    ];
+
+    let constructor = "catalyst::createIonConversionPass()";
+}
+
 #endif // ION_PASSES
