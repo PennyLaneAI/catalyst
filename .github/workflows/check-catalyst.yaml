@@ -631,13 +631,12 @@ jobs:
         make pytest TEST_BRAKET=LOCAL
 
   runtime-device-tests:
-    name: Runtime Tests (Linux)
+    name: Third-Party Device Tests (C++)
     needs: [constants, runtime, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       fail-fast: false
       matrix:
-        backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
@@ -657,7 +656,6 @@ jobs:
           path: runtime-build/lib
 
       - name: Build Runtime test suite for OQC device
-        if: ${{ matrix.backend == 'oqc' }}
         run: |
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
@@ -665,7 +663,6 @@ jobs:
           make test-oqc
 
       - name: Build Runtime test suite for OQD device
-        if: ${{ matrix.backend == 'oqd' }}
         run: |
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
@@ -673,7 +670,7 @@ jobs:
           make test-oqd
 
   runtime-code-cov:
-    name: Runtime Code Coverage (Linux)
+    name: Runtime Tests & Coverage
     needs: [constants, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
