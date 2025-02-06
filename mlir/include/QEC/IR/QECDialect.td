@@ -50,6 +50,7 @@ def QECDialect : Dialect {
     /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
     // let useDefaultTypePrinterParser = 1;
     // let useDefaultAttributePrinterParser = 1;
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -74,6 +75,7 @@ def PauliEnum : I32EnumAttr<"Pauli",
 
 // def PauliLetter : EnumAttr<QECDialect, PauliEnum, "Single Pauli operator.">;
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
+
 
 //===----------------------------------------------------------------------===//
 // QEC dialect operations.
