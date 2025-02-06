@@ -287,6 +287,7 @@ html_theme_options = {
     ],
     "toc_overview": True,
     "github_repo": "PennyLaneAI/catalyst",
+    "search_on_pennylane_ai": True,
 }
 
 edit_on_github_project = "PennyLaneAI/catalyst"
