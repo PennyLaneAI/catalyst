@@ -521,7 +521,11 @@ class QJIT(CatalystCallable):
 
         # pylint: disable=no-member
         if isQNode and hasattr(self.device, "get_compilation_pipelines"):
-            self.compile_options.pipelines = self.device.get_compilation_pipelines()
+            # TODO: This line is not currently covered by tests. This will be resolved as soon as
+            # the OQD runtime is implemented and integration tests are added.
+            self.compile_options.pipelines = (
+                self.device.get_compilation_pipelines()
+            )  # pragma: nocover
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
