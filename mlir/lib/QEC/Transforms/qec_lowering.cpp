@@ -46,7 +46,8 @@ struct LoweringToQECPass : impl::LoweringToQECPassBase<LoweringToQECPass> {
 
         target.addLegalDialect<arith::ArithDialect, func::FuncDialect, qec::QECDialect>();
 
-        target.addIllegalDialect<quantum::QuantumDialect>();
+        target.addIllegalOp<quantum::CustomOp>();
+        target.addIllegalOp<quantum::MeasureOp>();
 
         RewritePatternSet patterns(&getContext());
         populateQECLoweringPatterns(patterns);
