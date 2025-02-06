@@ -519,6 +519,7 @@ class QJIT(CatalystCallable):
 
             return self.user_function(*args, **kwargs)
 
+        # pylint: disable=no-member
         if isQNode and hasattr(self.device, "get_compilation_pipelines"):
             self.compile_options.pipelines = self.device.get_compilation_pipelines()
 
