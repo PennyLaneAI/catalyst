@@ -25,7 +25,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
