@@ -14,65 +14,11 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
-// CHECK: llvm.mlir.global internal constant @upstate("upstate\00") {addr_space = 0 : i32}
-// CHECK: llvm.mlir.global internal constant @estate("estate\00") {addr_space = 0 : i32}
-// CHECK: llvm.mlir.global internal constant @downstate("downstate\00") {addr_space = 0 : i32}
-// CHECK: llvm.mlir.global internal constant @Yb171("Yb171\00") {addr_space = 0 : i32}
     
 // CHECK-LABEL: ion_op
 func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    // Ensure constants are correctly defined
-    // CHECK: %[[const_1:.*]] = llvm.mlir.constant(1 : i64)
-    // CHECK: %[[addr_of_yb171:.*]] = llvm.mlir.addressof @Yb171 : !llvm.ptr
-    // CHECK: %[[ptr_to_yb171:.*]] = llvm.getelementptr inbounds %[[addr_of_yb171]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<6 x i8>
-    // CHECK: %[[const_mass:.*]] = llvm.mlir.constant(1.710000e+02 : f64)
-    // CHECK: %[[const_charge:.*]] = llvm.mlir.constant(1.000000e+00 : f64)
 
-    // Check level array initialization
-    // CHECK: %[[level_array_undef:.*]] = llvm.mlir.undef : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>
-
-    // Level 0
-    // CHECK: %[[level_struct_0_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
-    // CHECK: llvm.mlir.addressof @downstate
-
-    // Level 1
-    // CHECK: %[[level_struct_1_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
-    // llvm.mlir.addressof @estate : !llvm.ptr
-    
-    // Level 2
-    // CHECK: %[[level_struct_2_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>
-    // CHECK: llvm.mlir.addressof @upstate : !llvm.ptr
-
-    // Levels Array
-    // CHECK: %[[levels_array_size:.*]] = llvm.mlir.constant(3 : i64) : i64
-    // CHECK: %[[levels_array_ptr:.*]] = llvm.alloca %[[levels_array_size:.*]] x !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>> : (i64) -> !llvm.ptr
-    // CHECK: llvm.store %[[levels_array:.*]], %[[levels_array_ptr:.*]] : !llvm.array<3 x struct<(ptr, i64, f64, f64, f64, f64, f64, f64, f64)>>, !llvm.ptr
-    
-    // Transition array initialization
-    // CHECK: llvm.mlir.undef : !llvm.array<3 x struct<(ptr, ptr, f64)>>
-
-    // Transition 1
-    // CHECK: %[[transition_1_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
-    // CHECK: llvm.mlir.addressof @downstate
-    // CHECK: llvm.mlir.addressof @estate
-
-    // Transition 2
-    // CHECK: %[[transition_2_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
-    // CHECK: llvm.mlir.addressof @downstate
-    // CHECK: llvm.mlir.addressof @upstate
-
-    // Transition 3
-    // CHECK: %[[transition_3_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, ptr, f64)>
-    // CHECK: llvm.mlir.addressof @estate
-    // CHECK: llvm.mlir.addressof @upstate
-
-    // Final Ion Struct
-    // CHECK: %[[ion_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)>
-    // CHECK: %[[ion_name_ptr:.*]] = llvm.insertvalue %[[ptr_to_yb171]], %[[ion_struct_undef]][0] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)> 
-    // CHECK: %[[ion_mass_ptr:.*]] = llvm.insertvalue %[[const_mass]], %[[ion_name_ptr]][1] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)> 
-    // CHECK: %[[ion_charge_ptr:.*]] = llvm.insertvalue %[[const_charge]], %[[ion_mass_ptr]][2] : !llvm.struct<(ptr, f64, f64, array<3 x f64>, ptr, i64, ptr, i64)> 
-    // CHECK: %[[ion_ptr:.*]] = llvm.call @__catalyst_ion(%{{.*}}) : (!llvm.ptr) -> !llvm.ptr
-
+    %c0_i64 = arith.constant 0 : i64
     quantum.device shots(%c0_i64) ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}"]
 
     %0 = ion.ion {

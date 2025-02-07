@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
 #include "OQDDevice.hpp"
 #include "OQDRuntimeCAPI.h"
 #include "Types.h"
@@ -23,15 +25,17 @@ void OQDDevice::SetDeviceConfig(DeviceConfig device_config) { this->config = dev
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     for (size_t i = 0; i < num_qubits; i++) {
-        __catalyst__oqd__ion(static_cast<Ion *>(this->config));
+        __catalyst__oqd__ion(this->ion_specs);
     }
 
-    // return some empty object to conform to the type
-    // so that the program execution does not break
-    return std::vector<QubitIdType>(num_qubits);
+    // need to return a vector from 0 to num_qubits
+    std::vector<QubitIdType> result(num_qubits);
+    std::generate_n(result.begin(), num_qubits,
+                    []() { static size_t i=0; return i++; });
+    return result;
 }
 
-void OQDDevice::ReleaseAllQubits() { RT_FAIL("Unsupported functionality"); }
+void OQDDevice::ReleaseAllQubits() { this->ion_specs=""; }
 
 void OQDDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
 {

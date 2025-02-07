@@ -46,6 +46,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
     DeviceConfig config;
+    std::string ion_specs;
 
     std::unordered_map<std::string, std::string> device_kwargs;
 
@@ -62,6 +63,11 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
     {
         __catalyst__oqd__rt__initialize();
+
+        std::string ion_token = "ION:";
+        size_t ion_token_pos = kwargs.find(ion_token);
+        ion_specs = kwargs.substr(ion_token_pos+ion_token.length());
+        // TODO: remove ion specs from kwargs
 
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")

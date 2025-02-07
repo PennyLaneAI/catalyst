@@ -14,14 +14,17 @@
 
 #include <nlohmann/json.hpp>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/IRMapping.h"
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
-#include "mlir/IR/IRMapping.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::ion;
+using namespace catalyst::quantum;
 using json = nlohmann::json;
 
 namespace {
@@ -115,69 +118,69 @@ Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Mod
     return levelStruct;
 }
 
-Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
-                        ArrayAttr &levelsAttr)
-{
-    LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
-    Value levelsArray = rewriter.create<LLVM::UndefOp>(
-        loc, LLVM::LLVMArrayType::get(levelStructType, levelsAttr.size()));
+// Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
+//                         ArrayAttr &levelsAttr)
+// {
+//     LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
+//     Value levelsArray = rewriter.create<LLVM::UndefOp>(
+//         loc, LLVM::LLVMArrayType::get(levelStructType, levelsAttr.size()));
 
-    for (size_t i = 0; i < levelsAttr.size(); ++i) {
-        auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
-        Value levelStruct = createLevelStruct(loc, rewriter, ctx, mod, levelAttr, levelStructType);
-        levelsArray = rewriter.create<LLVM::InsertValueOp>(loc, levelsArray, levelStruct, i);
-    }
-    Value levelArraySize =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(levelsAttr.size()));
-    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value levelsArrayPtr =
-        rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                        /*elementType=*/levelsArray.getType(), levelArraySize);
-    rewriter.create<LLVM::StoreOp>(loc, levelsArray, levelsArrayPtr);
-    return levelsArrayPtr;
-}
+//     for (size_t i = 0; i < levelsAttr.size(); ++i) {
+//         auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
+//         Value levelStruct = createLevelStruct(loc, rewriter, ctx, mod, levelAttr, levelStructType);
+//         levelsArray = rewriter.create<LLVM::InsertValueOp>(loc, levelsArray, levelStruct, i);
+//     }
+//     Value levelArraySize =
+//         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(levelsAttr.size()));
+//     Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+//     Value levelsArrayPtr =
+//         rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
+//                                         /*elementType=*/levelsArray.getType(), levelArraySize);
+//     rewriter.create<LLVM::StoreOp>(loc, levelsArray, levelsArrayPtr);
+//     return levelsArrayPtr;
+// }
 
-Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
-                             ArrayAttr &transitionsAttr)
-{
-    auto transitionStructType =
-        LLVM::LLVMStructType::getLiteral(ctx, {
-                                                  LLVM::LLVMPointerType::get(ctx), // level_0
-                                                  LLVM::LLVMPointerType::get(ctx), // level_1
-                                                  Float64Type::get(ctx),           // einstein_a
-                                              });
-    Value transitionsArray = rewriter.create<LLVM::UndefOp>(
-        loc, LLVM::LLVMArrayType::get(transitionStructType, transitionsAttr.size()));
+// Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
+//                              ArrayAttr &transitionsAttr)
+// {
+//     auto transitionStructType =
+//         LLVM::LLVMStructType::getLiteral(ctx, {
+//                                                   LLVM::LLVMPointerType::get(ctx), // level_0
+//                                                   LLVM::LLVMPointerType::get(ctx), // level_1
+//                                                   Float64Type::get(ctx),           // einstein_a
+//                                               });
+//     Value transitionsArray = rewriter.create<LLVM::UndefOp>(
+//         loc, LLVM::LLVMArrayType::get(transitionStructType, transitionsAttr.size()));
 
-    for (size_t i = 0; i < transitionsAttr.size(); ++i) {
-        auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
-        Value transitionStruct = rewriter.create<LLVM::UndefOp>(loc, transitionStructType);
-        auto level0 = transitionAttr.getLevel_0().getValue().str();
-        auto level1 = transitionAttr.getLevel_1().getValue().str();
-        auto level0_global = getGlobalString(loc, rewriter, level0, mod);
-        auto level1_global = getGlobalString(loc, rewriter, level1, mod);
-        transitionStruct =
-            rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level0_global, 0);
-        transitionStruct =
-            rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level1_global, 1);
-        transitionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, transitionStruct,
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                              transitionAttr.getEinsteinA()),
-            2);
-        transitionsArray =
-            rewriter.create<LLVM::InsertValueOp>(loc, transitionsArray, transitionStruct, i);
-    }
+//     for (size_t i = 0; i < transitionsAttr.size(); ++i) {
+//         auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
+//         Value transitionStruct = rewriter.create<LLVM::UndefOp>(loc, transitionStructType);
+//         auto level0 = transitionAttr.getLevel_0().getValue().str();
+//         auto level1 = transitionAttr.getLevel_1().getValue().str();
+//         auto level0_global = getGlobalString(loc, rewriter, level0, mod);
+//         auto level1_global = getGlobalString(loc, rewriter, level1, mod);
+//         transitionStruct =
+//             rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level0_global, 0);
+//         transitionStruct =
+//             rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level1_global, 1);
+//         transitionStruct = rewriter.create<LLVM::InsertValueOp>(
+//             loc, transitionStruct,
+//             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
+//                                               transitionAttr.getEinsteinA()),
+//             2);
+//         transitionsArray =
+//             rewriter.create<LLVM::InsertValueOp>(loc, transitionsArray, transitionStruct, i);
+//     }
 
-    Value transitionsArraySize =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(transitionsAttr.size()));
-    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value transitionsArrayPtr = rewriter.create<LLVM::AllocaOp>(
-        loc, /*resultType=*/ptrType,
-        /*elementType=*/transitionsArray.getType(), transitionsArraySize);
-    rewriter.create<LLVM::StoreOp>(loc, transitionsArray, transitionsArrayPtr);
-    return transitionsArrayPtr;
-}
+//     Value transitionsArraySize =
+//         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(transitionsAttr.size()));
+//     Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+//     Value transitionsArrayPtr = rewriter.create<LLVM::AllocaOp>(
+//         loc, /*resultType=*/ptrType,
+//         /*elementType=*/transitionsArray.getType(), transitionsArraySize);
+//     rewriter.create<LLVM::StoreOp>(loc, transitionsArray, transitionsArrayPtr);
+//     return transitionsArrayPtr;
+// }
 
 Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
 {
@@ -221,23 +224,32 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
 struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
     using OpConversionPattern<catalyst::ion::IonOp>::OpConversionPattern;
 
+    // Create the ion JSON and pass it into the device kwargs as a JSON string
     LogicalResult matchAndRewrite(catalyst::ion::IonOp op, catalyst::ion::IonOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        const TypeConverter *conv = getTypeConverter();
+        func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
+        //llvm::errs() << funcOp << "\n";
 
-        Type IonTy = conv->convertType(IonType::get(ctx));
-        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
+        StringRef deviceKwargs = deviceInitOp.getKwargs();
+
+        //std::string aloha = "aloha!";
+        //llvm::errs() << deviceKwargs+aloha << "\n";
+        //ModuleOp mod = op->getParentOfType<ModuleOp>();
+        //const TypeConverter *conv = getTypeConverter();
+
+        //Type IonTy = conv->convertType(IonType::get(ctx));
+        //Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        //Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
         // Extract relevant ion properties
-        auto nameStr = op.getName().getValue().str();
-        auto name = getGlobalString(loc, rewriter, nameStr, mod);
-        auto mass = rewriter.create<LLVM::ConstantOp>(loc, op.getMass());
-        auto charge = rewriter.create<LLVM::ConstantOp>(loc, op.getCharge());
+        //auto nameStr = op.getName().getValue().str();
+        //auto name = getGlobalString(loc, rewriter, nameStr, mod);
+        //auto mass = rewriter.create<LLVM::ConstantOp>(loc, op.getMass());
+        //auto charge = rewriter.create<LLVM::ConstantOp>(loc, op.getCharge());
         auto positionAttr = op.getPosition();
         auto levelsAttr = op.getLevels();
         auto transitionsAttr = op.getTransitions();
@@ -292,7 +304,12 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
             ion_json["transitions"].push_back(this_transition);
         }
 
-        llvm::errs() << ion_json.dump() << "\n";
+        //llvm::errs() << ion_json.dump() << "\n";
+        //llvm::errs() << deviceKwargs << "\n";
+        //StringRef deviceKwargsWithIon = (deviceKwargs + "ION:" + ion_json.dump()).getSingleStringRef();
+        //deviceKwargs += StringRef("ION:");
+        deviceInitOp.setKwargs(deviceKwargs.str() + "ION:" + std::string(ion_json.dump()));
+        //llvm::errs() << deviceInitOp << "\n";
 
         // Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, mod, levelsAttr);
 

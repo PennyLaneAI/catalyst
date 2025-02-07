@@ -38,6 +38,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
         "levels": [
           {
             "class_": "Level",
+            "label": "l0",
             "principal": 6,
             "spin": 0.5,
             "orbital": 0.0,
@@ -49,6 +50,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
           },
           {
             "class_": "Level",
+            "label": "l1",
             "principal": 6,
             "spin": 0.5,
             "orbital": 0.0,
@@ -60,6 +62,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
           },
           {
             "class_": "Level",
+            "label": "l2",
             "principal": 5,
             "spin": 0.5,
             "orbital": 1.0,
@@ -71,6 +74,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
           },
           {
             "class_": "Level",
+            "label": "l3",
             "principal": 5,
             "spin": 0.5,
             "orbital": 1.0,
@@ -86,6 +90,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l0",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -97,6 +102,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l2",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -112,6 +118,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l0",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -123,6 +130,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l3",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -138,6 +146,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l1",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -149,6 +158,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l2",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -164,6 +174,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l1",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -175,6 +186,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l3",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -200,6 +212,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
         "levels": [
           {
             "class_": "Level",
+            "label": "l0",
             "principal": 6,
             "spin": 0.5,
             "orbital": 0.0,
@@ -211,6 +224,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
           },
           {
             "class_": "Level",
+            "label": "l1",
             "principal": 6,
             "spin": 0.5,
             "orbital": 0.0,
@@ -222,6 +236,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
           },
           {
             "class_": "Level",
+            "label": "l2",
             "principal": 5,
             "spin": 0.5,
             "orbital": 1.0,
@@ -233,6 +248,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
           },
           {
             "class_": "Level",
+            "label": "l3",
             "principal": 5,
             "spin": 0.5,
             "orbital": 1.0,
@@ -248,6 +264,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l0",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -259,6 +276,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l2",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -274,6 +292,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l0",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -285,6 +304,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l3",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -300,6 +320,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l1",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -311,6 +332,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l2",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -326,6 +348,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             "class_": "Transition",
             "level1": {
               "class_": "Level",
+              "label": "l1",
               "principal": 6,
               "spin": 0.5,
               "orbital": 0.0,
@@ -337,6 +360,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
             },
             "level2": {
               "class_": "Level",
+              "label": "l3",
               "principal": 5,
               "spin": 0.5,
               "orbital": 1.0,
@@ -371,6 +395,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 "class_": "Transition",
                 "level1": {
                   "class_": "Level",
+                  "label": "l0",
                   "principal": 6,
                   "spin": 0.5,
                   "orbital": 0.0,
@@ -382,6 +407,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 },
                 "level2": {
                   "class_": "Level",
+                  "label": "l2",
                   "principal": 5,
                   "spin": 0.5,
                   "orbital": 1.0,
@@ -427,6 +453,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 "class_": "Transition",
                 "level1": {
                   "class_": "Level",
+                  "label": "l1",
                   "principal": 6,
                   "spin": 0.5,
                   "orbital": 0.0,
@@ -438,6 +465,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 },
                 "level2": {
                   "class_": "Level",
+                  "label": "l2",
                   "principal": 5,
                   "spin": 0.5,
                   "orbital": 1.0,
@@ -488,6 +516,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 "class_": "Transition",
                 "level1": {
                   "class_": "Level",
+                  "label": "l0",
                   "principal": 6,
                   "spin": 0.5,
                   "orbital": 0.0,
@@ -499,6 +528,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 },
                 "level2": {
                   "class_": "Level",
+                  "label": "l3",
                   "principal": 5,
                   "spin": 0.5,
                   "orbital": 1.0,
@@ -544,6 +574,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 "class_": "Transition",
                 "level1": {
                   "class_": "Level",
+                  "label": "l1",
                   "principal": 6,
                   "spin": 0.5,
                   "orbital": 0.0,
@@ -555,6 +586,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
                 },
                 "level2": {
                   "class_": "Level",
+                  "label": "l3",
                   "principal": 5,
                   "spin": 0.5,
                   "orbital": 1.0,
@@ -601,25 +633,25 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
 
     size_t num_qubits = 2;
 
-    char name[] = "Yb171";
-    char l0_label[] = "l0";
-    char l1_label[] = "l1";
-    char l2_label[] = "l2";
-    char l3_label[] = "l3";
+    // char name[] = "Yb171";
+    // char l0_label[] = "l0";
+    // char l1_label[] = "l1";
+    // char l2_label[] = "l2";
+    // char l3_label[] = "l3";
 
-    Level l0 = {l0_label, 6, 0.5, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0};
-    Level l1 = {l1_label, 6, 0.5, 0.0, 0.5, 0.5, 1.0, 0.0, 62.83185307179586};
-    Level l2 = {l2_label, 5, 0.5, 1.0, 0.5, 0.5, 1.0, -1.0, 628.3185307179587};
-    Level l3 = {l3_label, 5, 0.5, 1.0, 0.5, 0.5, 1.0, 1.0, 1256.6370614359173};
-    Level levels[] = {l0, l1, l2, l3};
+    // Level l0 = {l0_label, 6, 0.5, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0};
+    // Level l1 = {l1_label, 6, 0.5, 0.0, 0.5, 0.5, 1.0, 0.0, 62.83185307179586};
+    // Level l2 = {l2_label, 5, 0.5, 1.0, 0.5, 0.5, 1.0, -1.0, 628.3185307179587};
+    // Level l3 = {l3_label, 5, 0.5, 1.0, 0.5, 0.5, 1.0, 1.0, 1256.6370614359173};
+    // Level levels[] = {l0, l1, l2, l3};
 
-    Transition tr0 = {l0_label, l2_label, 1.0};
-    Transition tr1 = {l0_label, l3_label, 1.0};
-    Transition tr2 = {l1_label, l2_label, 1.0};
-    Transition tr3 = {l1_label, l3_label, 1.0};
-    Transition transitions[] = {tr0, tr1, tr2, tr3};
+    // Transition tr0 = {l0_label, l2_label, 1.0};
+    // Transition tr1 = {l0_label, l3_label, 1.0};
+    // Transition tr2 = {l1_label, l2_label, 1.0};
+    // Transition tr3 = {l1_label, l3_label, 1.0};
+    // Transition transitions[] = {tr0, tr1, tr2, tr3};
 
-    Ion ion = {name, 171.0, 1.0, {0, 0, 0}, levels, 4, transitions, 4};
+    // Ion ion = {name, 171.0, 1.0, {0, 0, 0}, levels, 4, transitions, 4};
 
     Beam beam1 = {0, 31.41592653589793, 157.07963267948966, {1, 0, 0}, {0, 1, 0}};
     Beam beam2 = {2, 31.41592653589793, 157.07963267948966, {1, 0, 0}, {0, 1, 0}};
@@ -628,20 +660,195 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
     Beam beam4 = {3, 31.41592653589793, 157.07963267948966, {0, 0, 1}, {1, 0, 0}};
 
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
-        std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
+        std::array<std::string, 3>{"/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../catalyst/third_party/oqd/src/build/librtd_oqd.so", "oqd", R"({'shots': 0, 'mcmc': False}ION:
+      {
+        "class_": "Ion",
+        "mass": 171.0,
+        "charge": 1.0,
+        "levels": [
+          {
+            "class_": "Level",
+            "label": "l0",
+            "principal": 6,
+            "spin": 0.5,
+            "orbital": 0.0,
+            "nuclear": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 0.0,
+            "spin_orbital_nuclear_magnetization": 0.0,
+            "energy": 0.0
+          },
+          {
+            "class_": "Level",
+            "label": "l1",
+            "principal": 6,
+            "spin": 0.5,
+            "orbital": 0.0,
+            "nuclear": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": 0.0,
+            "energy": 62.83185307179586
+          },
+          {
+            "class_": "Level",
+            "label": "l2",
+            "principal": 5,
+            "spin": 0.5,
+            "orbital": 1.0,
+            "nuclear": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": -1.0,
+            "energy": 628.3185307179587
+          },
+          {
+            "class_": "Level",
+            "label": "l3",
+            "principal": 5,
+            "spin": 0.5,
+            "orbital": 1.0,
+            "nuclear": 0.5,
+            "spin_orbital": 0.5,
+            "spin_orbital_nuclear": 1.0,
+            "spin_orbital_nuclear_magnetization": 1.0,
+            "energy": 1256.6370614359173
+          }
+        ],
+        "transitions": [
+          {
+            "class_": "Transition",
+            "level1": {
+              "class_": "Level",
+              "label": "l0",
+              "principal": 6,
+              "spin": 0.5,
+              "orbital": 0.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 0.0,
+              "spin_orbital_nuclear_magnetization": 0.0,
+              "energy": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "label": "l2",
+              "principal": 5,
+              "spin": 0.5,
+              "orbital": 1.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": -1.0,
+              "energy": 628.3185307179587
+            },
+            "einsteinA": 1.0
+          },
+          {
+            "class_": "Transition",
+            "level1": {
+              "class_": "Level",
+              "label": "l0",
+              "principal": 6,
+              "spin": 0.5,
+              "orbital": 0.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 0.0,
+              "spin_orbital_nuclear_magnetization": 0.0,
+              "energy": 0.0
+            },
+            "level2": {
+              "class_": "Level",
+              "label": "l3",
+              "principal": 5,
+              "spin": 0.5,
+              "orbital": 1.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 1.0,
+              "energy": 1256.6370614359173
+            },
+            "einsteinA": 1.0
+          },
+          {
+            "class_": "Transition",
+            "level1": {
+              "class_": "Level",
+              "label": "l1",
+              "principal": 6,
+              "spin": 0.5,
+              "orbital": 0.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 0.0,
+              "energy": 62.83185307179586
+            },
+            "level2": {
+              "class_": "Level",
+              "label": "l2",
+              "principal": 5,
+              "spin": 0.5,
+              "orbital": 1.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": -1.0,
+              "energy": 628.3185307179587
+            },
+            "einsteinA": 1.0
+          },
+          {
+            "class_": "Transition",
+            "level1": {
+              "class_": "Level",
+              "label": "l1",
+              "principal": 6,
+              "spin": 0.5,
+              "orbital": 0.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 0.0,
+              "energy": 62.83185307179586
+            },
+            "level2": {
+              "class_": "Level",
+              "label": "l3",
+              "principal": 5,
+              "spin": 0.5,
+              "orbital": 1.0,
+              "nuclear": 0.5,
+              "spin_orbital": 0.5,
+              "spin_orbital_nuclear": 1.0,
+              "spin_orbital_nuclear_magnetization": 1.0,
+              "energy": 1256.6370614359173
+            },
+            "einsteinA": 1.0
+          }
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      })"};
+
     __catalyst__rt__initialize(nullptr);
     __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                 (int8_t *)rtd_kwargs.c_str(), nullptr, 1000);
-    __catalyst__oqd__rt__initialize();
+    //__catalyst__oqd__rt__initialize();
 
     QirArray *qs = __catalyst__rt__qubit_allocate_array(num_qubits);
 
     QUBIT **target0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
     QUBIT **target1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
-    for (size_t i = 0; i < num_qubits; i++) {
-        __catalyst__oqd__ion(&ion);
-    }
+    //for (size_t i = 0; i < num_qubits; i++) {
+    //    __catalyst__oqd__ion("hi!");
+    //}
 
     Pulse *pulse1 = __catalyst__oqd__pulse(*target0, 2.0, 0.00, &beam1);
     Pulse *pulse2 = __catalyst__oqd__pulse(*target0, 2.0, 3.14, &beam2);
@@ -654,7 +861,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
     __catalyst__oqd__ParallelProtocol(pulses34, 2);
 
     __catalyst__rt__qubit_release_array(qs);
-    __catalyst__oqd__rt__finalize();
+    //__catalyst__oqd__rt__finalize();
     __catalyst__rt__device_release();
     __catalyst__rt__finalize();
 
@@ -662,5 +869,5 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
     CHECK(expected == observed);
     CHECK(1 == 0);
 
-    std::filesystem::remove("__openapl__output.json");
+    //std::filesystem::remove("__openapl__output.json");
 }
