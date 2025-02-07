@@ -28,7 +28,6 @@
 #include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "mlir/Support/LogicalResult.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -52,9 +51,9 @@ const llvm::StringMap<GateConversion> gateMap = {{"H", {{"Z", "X", "Z"}, M_PI / 
                                                  {"CNOT", {{"Z", "X"}, M_PI / 4}}};
 
 // Get the Pauli operators and theta for a given gate
-template <typename OriginOp> GateConversion getPauliOperators(OriginOp *op)
+GateConversion getPauliOperators(CustomOp op)
 {
-    mlir::StringRef opName = op->getGateName();
+    mlir::StringRef opName = op.getGateName();
     auto gateConversion = gateMap.find(opName);
 
     if (gateConversion == gateMap.end()) {
@@ -65,41 +64,39 @@ template <typename OriginOp> GateConversion getPauliOperators(OriginOp *op)
     return gateConversion->second;
 }
 
-template <typename OriginOp, typename LoweredQECOp>
-LoweredQECOp convertCustomOpToPPR(OriginOp *op, ConversionPatternRewriter &rewriter)
+// Convert a CustomOp to a PPRotationOp
+PPRotationOp convertCustomOpToPPR(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    auto loc = op->getLoc();
+    auto loc = op.getLoc();
     auto gateConversion = getPauliOperators(op);
 
     if (gateConversion.pauliOperators.empty()) {
-        return PPRotationOp();
+        return nullptr;
     }
 
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-    ValueRange inQubits = op->getInQubits();
-    TypeRange outQubitsTypes = op->getOutQubits().getTypes();
+    ValueRange inQubits = op.getInQubits();
+    TypeRange outQubitsTypes = op.getOutQubits().getType();
     Value thetaValue = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getF64Type(), rewriter.getF64FloatAttr(gateConversion.theta));
 
-    // Create a new PPRotationOp with the Pauli operators and theta
     auto pprOp =
-        rewriter.create<LoweredQECOp>(loc, outQubitsTypes, pauliProduct, thetaValue, inQubits);
+        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, thetaValue, inQubits);
 
-    // Replace the original operation with the new PPRotationOp
     return pprOp;
 }
 
-template <typename OriginOp, typename LoweredQECOp>
-LoweredQECOp convertMeasureOpToPPM(OriginOp *op, ConversionPatternRewriter &rewriter)
+// Convert a MeasureOp to a PPMeasurementOp
+PPMeasurementOp convertMeasureOpToPPM(MeasureOp op, ConversionPatternRewriter &rewriter)
 {
-    auto loc = op->getLoc();
+    auto loc = op.getLoc();
 
-    // pauli product is always Z
+    // Pauli product is always Z
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr({"Z"});
-    ValueRange inQubits = op->getInQubit();
-    TypeRange outQubitsTypes = op->getResults().getType();
+    ValueRange inQubits = op.getInQubit();
+    TypeRange outQubitsTypes = op.getOutQubit().getType();
 
-    auto ppmOp = rewriter.create<LoweredQECOp>(loc, outQubitsTypes, pauliProduct, inQubits);
+    auto ppmOp = rewriter.create<PPMeasurementOp>(loc, outQubitsTypes, pauliProduct, inQubits);
 
     return ppmOp;
 }
@@ -117,13 +114,12 @@ struct QECOpLowering : public ConversionPattern {
         Operation *loweredOp = nullptr;
 
         // cast to OriginOp
-        if (llvm::isa<quantum::CustomOp>(op)) {
-            auto originOp = llvm::cast<quantum::CustomOp>(op);
-            loweredOp = convertCustomOpToPPR<CustomOp, PPRotationOp>(&originOp, rewriter);
-
-        }else if (llvm::isa<quantum::MeasureOp>(op)) {
-            auto originOp = llvm::cast<quantum::MeasureOp>(op);
-            loweredOp = convertMeasureOpToPPM<MeasureOp, PPMeasurementOp>(&originOp, rewriter);
+        if (isa<quantum::CustomOp>(op)) {
+            auto originOp = cast<quantum::CustomOp>(op);
+            loweredOp = convertCustomOpToPPR(originOp, rewriter);
+        }else if (isa<quantum::MeasureOp>(op)) {
+            auto originOp = cast<quantum::MeasureOp>(op);
+            loweredOp = convertMeasureOpToPPM(originOp, rewriter);
         }
 
         if (!loweredOp) {
@@ -132,12 +128,9 @@ struct QECOpLowering : public ConversionPattern {
 
         rewriter.replaceOp(op, loweredOp);
         return success();
-
-        return failure();
     }
 };
 
-// TODO: add more lowering patterns here. e.g. StaticCustomOp, UnitaryCustomOp, etc.
 using CustomOpLowering = QECOpLowering<quantum::CustomOp, qec::PPRotationOp>;
 using MeasureOpLowering = QECOpLowering<quantum::MeasureOp, qec::PPMeasurementOp>;
 
