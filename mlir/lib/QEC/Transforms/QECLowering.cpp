@@ -71,6 +71,9 @@ PPRotationOp convertCustomOpToPPR(CustomOp op, ConversionPatternRewriter &rewrit
     auto gateConversion = getPauliOperators(op);
 
     if (gateConversion.pauliOperators.empty()) {
+        auto msg = "Unsupported gate: " + op.getGateName().str() + " for lowering to PPR.";
+        msg += " Supported gates are: H, S, T, CNOT.";
+        op->emitError(msg);
         return nullptr;
     }
 
@@ -94,7 +97,7 @@ PPMeasurementOp convertMeasureOpToPPM(MeasureOp op, ConversionPatternRewriter &r
     // Pauli product is always Z
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr({"Z"});
     ValueRange inQubits = op.getInQubit();
-    TypeRange outQubitsTypes = op.getOutQubit().getType();
+    TypeRange outQubitsTypes = op->getResults().getType();
 
     auto ppmOp = rewriter.create<PPMeasurementOp>(loc, outQubitsTypes, pauliProduct, inQubits);
 
@@ -117,12 +120,14 @@ struct QECOpLowering : public ConversionPattern {
         if (isa<quantum::CustomOp>(op)) {
             auto originOp = cast<quantum::CustomOp>(op);
             loweredOp = convertCustomOpToPPR(originOp, rewriter);
-        }else if (isa<quantum::MeasureOp>(op)) {
+        }
+        else if (isa<quantum::MeasureOp>(op)) {
             auto originOp = cast<quantum::MeasureOp>(op);
             loweredOp = convertMeasureOpToPPM(originOp, rewriter);
         }
 
         if (!loweredOp) {
+            op->emitError("Failed to lower operation to QEC dialect.");
             return failure();
         }
 

@@ -41,7 +41,6 @@ struct LoweringToQECPass : impl::LoweringToQECPassBase<LoweringToQECPass> {
 
     void runOnOperation() final
     {
-
         ConversionTarget target(getContext());
 
         target.addLegalDialect<arith::ArithDialect, func::FuncDialect, qec::QECDialect>();
