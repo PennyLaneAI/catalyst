@@ -156,9 +156,10 @@ func.func @test_loop_boundary_rotation(%q0: !quantum.bit) -> !quantum.bit {
     // CHECK: [[qubit_0:%.+]] = quantum.custom "RX"([[phi]]) [[arg0]] : !quantum.bit
     // CHECK: [[scf:%.+]] = scf.for {{.*}} iter_args([[q_arg:%.+]] = [[qubit_0]]) -> (!quantum.bit) {
     %scf = scf.for %i = %start to %stop step %step iter_args(%q_arg = %q0) -> (!quantum.bit) {
+        // CHECK-NOT: "RX"
         // CHECK: [[qubit_1:%.+]] = quantum.custom "Z"() [[q_arg]] : !quantum.bit
-        // CHECK-DAG: [[qubit_2:%.+]] = quantum.custom "RX"([[phi]]) [[qubit_1]] : !quantum.bit
-        // CHECK-DAG: [[qubit_3:%.+]] = quantum.custom "RX"([[theta]]) [[qubit_2]] : !quantum.bit
+        // CHECK: [[qubit_2:%.+]] = quantum.custom "RX"([[phi]]) [[qubit_1]] : !quantum.bit
+        // CHECK: [[qubit_3:%.+]] = quantum.custom "RX"([[theta]]) [[qubit_2]] : !quantum.bit
         %q_0 = quantum.custom "RX"(%phi) %q_arg : !quantum.bit
         %q_1 = quantum.custom "Z"() %q_0 : !quantum.bit
         %q_2 = quantum.custom "RX"(%theta) %q_1 : !quantum.bit
@@ -166,32 +167,6 @@ func.func @test_loop_boundary_rotation(%q0: !quantum.bit) -> !quantum.bit {
     }
 
     // CHECK: [[qubit_4:%.+]] = quantum.custom "RX"([[cst]]) [[scf]] : !quantum.bit
-    // CHECK: return [[qubit_4]]
-    func.return %scf : !quantum.bit
-}
-
-// -----
-
-func.func @test_loop_boundary_register(%start: index, %stop: index) -> (!quantum.bit){
-    
-    %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-
-    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
-    // CHECK: [[qubit_0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[qubit_1:%.+]] = {{.*}} "H"() [[qubit_0]] : !quantum.bit
-    // CHECK: [[qubit_2:%.+]] = scf.for {{.*}} iter_args([[arg0:%.+]] = [[qubit_1]])
-    %scf = scf.for %i = %start to %stop step %start iter_args(%arg0 = %1) -> (!quantum.bit) {
-        // CHECK-NOT: "H"
-        %2 = quantum.custom "H"() %arg0 : !quantum.bit
-        // CHECK: [[qubit_3:%.+]] = {{.*}} "X"() [[arg0]]
-        %3 = quantum.custom "X"() %2 : !quantum.bit
-        // CHECK-NOT: "H"
-        %4 = quantum.custom "H"() %3 : !quantum.bit
-        // CHECK: scf.yield [[qubit_3]]
-        scf.yield %4 : !quantum.bit
-    }
-    // CHECK: [[qubit_4:%.+]] = {{.*}} "H"() [[qubit_2]]
     // CHECK: return [[qubit_4]]
     func.return %scf : !quantum.bit
 }
@@ -242,6 +217,64 @@ func.func @test_loop_boundary_rotation_1(%q0: !quantum.bit, %q1: !quantum.bit) -
 
 // -----
 
+func.func @test_loop_boundary_rotation_2(%q0: !quantum.bit) -> !quantum.bit {
+    %start = arith.constant 0 : index
+    %stop = arith.constant 10 : index
+    %step = arith.constant 1 : index
+
+    // CHECK-LABEL:func.func @test_loop_boundary_rotation_2(
+    // CHECK-SAME:[[arg0:%.+]]: !quantum.bit) -> !quantum.bit {
+    // CHECK-DAG: [[cst:%.+]] = arith.constant -2.000000e-01 : f64
+    // CHECK-DAG: [[theta:%.+]] = arith.constant 5.000000e-01 : f64
+    // CHECK-DAG: [[phi:%.+]] = arith.constant 2.000000e-01 : f64
+    // CHECK: [[qubit_0:%.+]] = quantum.custom "RX"([[phi]]) [[arg0]] : !quantum.bit
+    // CHECK: [[scf:%.+]] = scf.for {{.*}} iter_args([[q_arg:%.+]] = [[qubit_0]]) -> (!quantum.bit) {
+    %scf = scf.for %i = %start to %stop step %step iter_args(%q_arg = %q0) -> (!quantum.bit) {
+        // CHECK-NOT: "RX"
+        // CHECK: [[qubit_1:%.+]] = quantum.custom "Z"() [[q_arg]] : !quantum.bit
+        // CHECK: [[qubit_2:%.+]] = quantum.custom "RX"([[phi]]) [[qubit_1]] : !quantum.bit
+        // CHECK: [[qubit_3:%.+]] = quantum.custom "RX"([[theta]]) [[qubit_2]] : !quantum.bit
+        %phi = arith.constant 0.2 : f64
+        %theta = arith.constant 0.5 : f64
+        %q_0 = quantum.custom "RX"(%phi) %q_arg : !quantum.bit
+        %q_1 = quantum.custom "Z"() %q_0 : !quantum.bit
+        %q_2 = quantum.custom "RX"(%theta) %q_1 : !quantum.bit
+        scf.yield %q_2 : !quantum.bit
+    }
+
+    // CHECK: [[qubit_4:%.+]] = quantum.custom "RX"([[cst]]) [[scf]] : !quantum.bit
+    // CHECK: return [[qubit_4]]
+    func.return %scf : !quantum.bit
+}
+
+// -----
+
+func.func @test_loop_boundary_register_1(%start: index, %stop: index) -> (!quantum.bit){
+    
+    %0 = quantum.alloc(1) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit_0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit_1:%.+]] = {{.*}} "H"() [[qubit_0]] : !quantum.bit
+    // CHECK: [[qubit_2:%.+]] = scf.for {{.*}} iter_args([[arg0:%.+]] = [[qubit_1]])
+    %scf = scf.for %i = %start to %stop step %start iter_args(%arg0 = %1) -> (!quantum.bit) {
+        // CHECK-NOT: "H"
+        %2 = quantum.custom "H"() %arg0 : !quantum.bit
+        // CHECK: [[qubit_3:%.+]] = {{.*}} "X"() [[arg0]]
+        %3 = quantum.custom "X"() %2 : !quantum.bit
+        // CHECK-NOT: "H"
+        %4 = quantum.custom "H"() %3 : !quantum.bit
+        // CHECK: scf.yield [[qubit_3]]
+        scf.yield %4 : !quantum.bit
+    }
+    // CHECK: [[qubit_4:%.+]] = {{.*}} "H"() [[qubit_2]]
+    // CHECK: return [[qubit_4]]
+    func.return %scf : !quantum.bit
+}
+
+// -----
+
 func.func @test_loop_boundary_register_2(%start: index, %stop: index, 
                                         %arg0: tensor<f64>, %arg1: tensor<f64>) -> (!quantum.reg){
 
@@ -265,6 +298,7 @@ func.func @test_loop_boundary_register_2(%start: index, %stop: index,
     // CHECK: [[insert_1:%.+]] = quantum.insert [[insert_0]][ 1], [[qubit_2]]#1 : !quantum.reg
     // CHECK: [[scf:%.+]] = scf.for {{.*}} iter_args([[arg0:%.+]] = [[insert_1]]) -> (!quantum.reg)
     %scf = scf.for %i = %start to %stop step %start iter_args(%q_arr = %0) -> (!quantum.reg) {
+        // CHECK-NOT: "CNOT"
         // CHECK: [[qubit_3:%.+]] = quantum.extract [[arg0]][ 0] : !quantum.reg -> !quantum.bit
         // CHECK: [[qubit_4:%.+]] = quantum.extract [[arg0]][ 1] : !quantum.reg -> !quantum.bit
         %1 = quantum.extract %q_arr[0] : !quantum.reg -> !quantum.bit
@@ -309,6 +343,8 @@ func.func @test_loop_boundary_register_3(%arg0: tensor<i64>, %arg1: tensor<f64>)
     // CHECK: [[insert_0:%.+]] = quantum.insert [[alloc]][ 0], [[qubit_1]]
     // CHECK: [[scf:%.+]] = scf.for {{.*}} iter_args([[arg3:%.+]] = [[insert_0]])
     %2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %0) -> (!quantum.reg) {
+        // CHECK-NOT: "RX"
+        // CHECK-NOT: "Hadamard"
         // CHECK-DAG: [[extract_1:%.+]] = quantum.extract [[arg3]][ 0]
         // CHECK: [[extract_2:%.+]] = tensor.extract [[arg1]][]
         // CHECK: [[qubit_2:%.+]] = {{.*}} "Hadamard"() [[extract_1]]

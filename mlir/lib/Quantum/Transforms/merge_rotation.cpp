@@ -46,15 +46,6 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
 
         Operation *module = getOperation();
 
-        RewritePatternSet patternsLoopBoundary(&getContext());
-
-        scf::ForOp::getCanonicalizationPatterns(patternsLoopBoundary, &getContext());
-        populateLoopBoundaryPatterns(patternsLoopBoundary);
-
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsLoopBoundary)))) {
-            return signalPassFailure();
-        }
-
         RewritePatternSet patternsCanonicalization(&getContext());
 
         catalyst::quantum::StaticCustomOp::getCanonicalizationPatterns(patternsCanonicalization,
@@ -68,6 +59,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         }
 
         RewritePatternSet patterns(&getContext());
+        populateLoopBoundaryPatterns(patterns);
         populateMergeRotationsPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {

@@ -65,17 +65,8 @@ struct RemoveChainedSelfInversePass
 
         Operation *module = getOperation();
 
-        RewritePatternSet patternsLoopBoundary(&getContext());
-
-        scf::ForOp::getCanonicalizationPatterns(patternsLoopBoundary, &getContext());
-        populateLoopBoundaryPatterns(patternsLoopBoundary);
-
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsLoopBoundary)))) {
-            return signalPassFailure();
-        }
-
         RewritePatternSet patterns(&getContext());
-        scf::ForOp::getCanonicalizationPatterns(patterns, &getContext());
+        populateLoopBoundaryPatterns(patterns);
         populateSelfInversePatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {

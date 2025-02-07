@@ -23,7 +23,7 @@
       return qml.expval(qml.Z(0))
   ```
 
-  Note that this pass works with perfectly matching operations such as Pauli gates, Hadamard gate, CNOT and rotations gates.
+  Note that this optimization specifically targets operations that are exact inverses of each other when applied in sequence. For example, consecutive Hadamard gates (H†H = I) pairs will be identified and eliminated.
 
 
 <h3>Improvements 🛠</h3>

@@ -50,12 +50,12 @@ struct LoopBoundaryOptimizationPass
 
         Operation *module = getOperation();
 
-        RewritePatternSet patternsCanonicalization(&getContext());
-        scf::ForOp::getCanonicalizationPatterns(patternsCanonicalization, &getContext());
+        // RewritePatternSet patternsCanonicalization(&getContext());
+        // scf::ForOp::getCanonicalizationPatterns(patternsCanonicalization, &getContext());
 
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
-            return signalPassFailure();
-        }
+        // if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
+        //     return signalPassFailure();
+        // }
 
         RewritePatternSet patterns(&getContext());
         populateLoopBoundaryPatterns(patterns);
