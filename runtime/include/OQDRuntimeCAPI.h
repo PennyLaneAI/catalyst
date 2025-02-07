@@ -43,17 +43,6 @@ struct Transition {
     double einstein_a;
 };
 
-struct Ion {
-    char *name;
-    double mass;
-    double charge;
-    std::array<int64_t, 3> position;
-    Level *levels;
-    int64_t num_of_levels;
-    Transition *transitions;
-    int64_t num_of_transitions;
-};
-
 struct Beam {
     int64_t transition_index;
     double rabi;
