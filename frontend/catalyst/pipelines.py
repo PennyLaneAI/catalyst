@@ -296,7 +296,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         # of this list to here that does folding
         # add-exception-handling will fail to add async.drop_ref
         # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
-        "add-exception-handling",
+        "add-exception-handling" if options.async_qnodes else None,
         "emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
