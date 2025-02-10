@@ -8,6 +8,37 @@
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
+* Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
+  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
+
+* Catalyst now supports experimental capture of `cond` control flow.
+  [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
+  
+  To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
+  `experimental_capture=True` in the qjit decorator.
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(experimental_capture=True)
+  @qml.qnode(dev)
+  def circuit(x: float):
+
+      def ansatz_true():
+          qml.RX(x, wires=0)
+          qml.Hadamard(wires=0)
+
+      def ansatz_false():
+          qml.RY(x, wires=0)
+
+      qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+
+      return qml.expval(qml.Z(0))
+  ```
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -66,9 +97,11 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Yushao Chen,
+Zach Goldthorpe,
 Sengthai Heng,
+Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
-Paul Haochen Wang,
-Rohan Nolan Lasrado.
+Raul Torres,
+Paul Haochen Wang.
