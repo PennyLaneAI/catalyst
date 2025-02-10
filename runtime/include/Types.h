@@ -32,8 +32,6 @@ using RESULT = bool;
 using Result = RESULT *;
 using QirArray = void *;
 
-using DeviceConfig = void *;
-
 using ObsIdType = intptr_t;
 
 enum ObsId : int8_t {

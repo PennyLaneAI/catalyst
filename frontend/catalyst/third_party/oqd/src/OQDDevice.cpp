@@ -20,8 +20,6 @@
 
 namespace Catalyst::Runtime::Device {
 
-void OQDDevice::SetDeviceConfig(DeviceConfig device_config) { this->config = device_config; };
-
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     for (size_t i = 0; i < num_qubits; i++) {

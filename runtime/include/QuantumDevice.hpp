@@ -360,20 +360,5 @@ struct QuantumDevice {
      */
     virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
                           const std::vector<size_t> &trainParams) = 0;
-
-    /**
-     * @brief Set the device-dependent configurations of the device.
-     *
-     * Certain devices might want to record extra information specific
-     * to the device, for example the ion species and energy levels on
-     * an ion-based quantum computer hardware device.
-     *
-     * Such information should be recorded in a struct, and the struct's
-     * pointer is recorded here by the device.
-     *
-     * @param device_config The pointer to a struct recording the
-     * device-specific configurations.
-     */
-    virtual void SetDeviceConfig([[maybe_unused]] DeviceConfig device_config){};
 };
 } // namespace Catalyst::Runtime

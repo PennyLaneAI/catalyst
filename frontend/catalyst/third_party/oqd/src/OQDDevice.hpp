@@ -45,7 +45,6 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
-    DeviceConfig config;
     std::string ion_specs;
 
     std::unordered_map<std::string, std::string> device_kwargs;
@@ -82,6 +81,5 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
 
-    void SetDeviceConfig(DeviceConfig device_config) override;
 };
 } // namespace Catalyst::Runtime::Device

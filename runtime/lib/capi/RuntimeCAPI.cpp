@@ -240,7 +240,7 @@ void __catalyst__rt__finalize()
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             DeviceConfig device_config, int64_t shots)
+                                             int64_t shots)
 {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
@@ -254,9 +254,6 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
     RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
     getQuantumDevicePtr()->SetDeviceShots(shots);
-    if (device_config != nullptr) {
-        getQuantumDevicePtr()->SetDeviceConfig(device_config);
-    }
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
@@ -264,10 +261,10 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 DeviceConfig device_config, int64_t shots)
+                                 int64_t shots)
 {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs, device_config, shots);
+                 rtd_name, rtd_kwargs, shots);
 }
 
 static int __catalyst__rt__device_release__impl()
