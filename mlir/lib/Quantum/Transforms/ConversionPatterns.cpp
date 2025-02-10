@@ -109,8 +109,10 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
     if (!controlledQubits.empty()) {
-        ctrlPtr = catalyst::getStaticAlloca(loc, rewriter, ptrType, controlledQubits.size()).getResult();
-        valuePtr = catalyst::getStaticAlloca(loc, rewriter, boolType, controlledQubits.size()).getResult();
+        ctrlPtr =
+            catalyst::getStaticAlloca(loc, rewriter, ptrType, controlledQubits.size()).getResult();
+        valuePtr =
+            catalyst::getStaticAlloca(loc, rewriter, boolType, controlledQubits.size()).getResult();
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
@@ -128,7 +130,8 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     }
 
     rewriter.create<LLVM::StoreOp>(loc, adjointVal, adjointPtr);
-    auto ctrlQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
+    auto ctrlQubits =
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
     rewriter.create<LLVM::StoreOp>(loc, ctrlQubits, numControlledPtr);
     rewriter.create<LLVM::StoreOp>(loc, ctrlPtr, controlledWiresPtr);
     rewriter.create<LLVM::StoreOp>(loc, valuePtr, controlledValuesPtr);
