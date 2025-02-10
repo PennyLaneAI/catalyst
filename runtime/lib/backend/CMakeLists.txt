@@ -2,6 +2,7 @@ add_subdirectory(null_qubit)
 configure_file(null_qubit/null_qubit.toml null_qubit.toml)
 
 add_subdirectory(oqd)
+configure_file(oqd/oqd.toml oqd.toml)
 
 if(ENABLE_OPENQASM)
 add_subdirectory(openqasm)
