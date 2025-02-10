@@ -632,7 +632,7 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
 )");
 
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
-        std::array<std::string, 3>{"/home/paul.wang/catalyst_new/catalyst/frontend/catalyst/utils/../../catalyst/third_party/oqd/src/build/librtd_oqd.so", "oqd", R"({'shots': 0, 'mcmc': False}ION:
+        std::array<std::string, 3>{"../../frontend/catalyst/third_party/oqd/src/build/librtd_oqd.so", "oqd", R"({'shots': 0, 'mcmc': False}ION:
       {
         "class_": "Ion",
         "mass": 171.0,
