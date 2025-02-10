@@ -27,7 +27,6 @@
 
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
-#include "Types.h"
 #include "Utils.hpp"
 
 #include "OQDRunner.hpp"
