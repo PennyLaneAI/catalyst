@@ -21,6 +21,161 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     %c0_i64 = arith.constant 0 : i64
     quantum.device shots(%c0_i64) ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}"]
 
+// CHECK: quantum.device
+// CHECK-SAME: ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}ION:
+// COM: nlohmann-json library dumps double quotation literals in json strings as \22
+// COM: nlohmann-json library dumps JSON specs in alphabetical order
+// CHECK-SAME: {
+// CHECK-SAME:   \22charge\22:1.0,
+// CHECK-SAME:   \22class_\22:\22Ion\22,
+// CHECK-SAME:   \22levels\22:[
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Level\22,
+// CHECK-SAME:       \22energy\22:0.0,
+// CHECK-SAME:       \22label\22:\22l0\22,
+// CHECK-SAME:       \22nuclear\22:0.5,
+// CHECK-SAME:       \22orbital\22:0.0,
+// CHECK-SAME:       \22principal\22:6,
+// CHECK-SAME:       \22spin\22:0.5,
+// CHECK-SAME:       \22spin_orbital\22:0.5,
+// CHECK-SAME:       \22spin_orbital_nuclear\22:0.0,
+// CHECK-SAME:       \22spin_orbital_nuclear_magnetization\22:0.0
+// CHECK-SAME:     },
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Level\22,
+// CHECK-SAME:       \22energy\22:62.83185307179586,
+// CHECK-SAME:       \22label\22:\22l1\22,
+// CHECK-SAME:       \22nuclear\22:0.5,
+// CHECK-SAME:       \22orbital\22:0.0,
+// CHECK-SAME:       \22principal\22:6,
+// CHECK-SAME:       \22spin\22:0.5,
+// CHECK-SAME:       \22spin_orbital\22:0.5,
+// CHECK-SAME:       \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:       \22spin_orbital_nuclear_magnetization\22:0.0
+// CHECK-SAME:     },
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Level\22,
+// CHECK-SAME:       \22energy\22:628.3185307179587,
+// CHECK-SAME:       \22label\22:\22l2\22,
+// CHECK-SAME:       \22nuclear\22:0.5,
+// CHECK-SAME:       \22orbital\22:1.0,
+// CHECK-SAME:       \22principal\22:5,
+// CHECK-SAME:       \22spin\22:0.5,
+// CHECK-SAME:       \22spin_orbital\22:0.5,
+// CHECK-SAME:       \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:       \22spin_orbital_nuclear_magnetization\22:-1.0
+// CHECK-SAME:     },
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Level\22,
+// CHECK-SAME:       \22energy\22:1256.6370614359173,
+// CHECK-SAME:       \22label\22:\22l3\22,
+// CHECK-SAME:       \22nuclear\22:0.5,
+// CHECK-SAME:       \22orbital\22:1.0,
+// CHECK-SAME:       \22principal\22:5,
+// CHECK-SAME:       \22spin\22:0.5,
+// CHECK-SAME:       \22spin_orbital\22:0.5,
+// CHECK-SAME:       \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:       \22spin_orbital_nuclear_magnetization\22:1.0
+// CHECK-SAME:     }
+// CHECK-SAME:   ],
+// CHECK-SAME:   \22mass\22:171.0,
+// CHECK-SAME:   \22position\22:[1.0,2.0,-1.0],
+// CHECK-SAME:   \22transitions\22:[
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Transition\22,
+// CHECK-SAME:       \22einsteinA\22:2.2,
+// CHECK-SAME:       \22level1\22:
+// CHECK-SAME:       {
+// CHECK-SAME:           \22class_\22:\22Level\22,
+// CHECK-SAME:           \22energy\22:0.0,
+// CHECK-SAME:           \22label\22:\22l0\22,
+// CHECK-SAME:           \22nuclear\22:0.5,
+// CHECK-SAME:           \22orbital\22:0.0,
+// CHECK-SAME:           \22principal\22:6,
+// CHECK-SAME:           \22spin\22:0.5,
+// CHECK-SAME:           \22spin_orbital\22:0.5,
+// CHECK-SAME:           \22spin_orbital_nuclear\22:0.0,
+// CHECK-SAME:           \22spin_orbital_nuclear_magnetization\22:0.0
+// CHECK-SAME:       },
+// CHECK-SAME:       \22level2\22:
+// CHECK-SAME:       {
+// CHECK-SAME:         \22class_\22:\22Level\22,
+// CHECK-SAME:         \22energy\22:628.3185307179587,
+// CHECK-SAME:         \22label\22:\22l2\22,
+// CHECK-SAME:         \22nuclear\22:0.5,
+// CHECK-SAME:         \22orbital\22:1.0,
+// CHECK-SAME:         \22principal\22:5,
+// CHECK-SAME:         \22spin\22:0.5,
+// CHECK-SAME:         \22spin_orbital\22:0.5,
+// CHECK-SAME:         \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:         \22spin_orbital_nuclear_magnetization\22:-1.0
+// CHECK-SAME:       }
+// CHECK-SAME:     },
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Transition\22,
+// CHECK-SAME:       \22einsteinA\22:1.1,
+// CHECK-SAME:       \22level1\22:
+// CHECK-SAME:       {
+// CHECK-SAME:         \22class_\22:\22Level\22,
+// CHECK-SAME:         \22energy\22:62.83185307179586,
+// CHECK-SAME:         \22label\22:\22l1\22,
+// CHECK-SAME:         \22nuclear\22:0.5,
+// CHECK-SAME:         \22orbital\22:0.0,
+// CHECK-SAME:         \22principal\22:6,
+// CHECK-SAME:         \22spin\22:0.5,
+// CHECK-SAME:         \22spin_orbital\22:0.5,
+// CHECK-SAME:        \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:         \22spin_orbital_nuclear_magnetization\22:0.0
+// CHECK-SAME:       },
+// CHECK-SAME:       \22level2\22:
+// CHECK-SAME:       {
+// CHECK-SAME:         \22class_\22:\22Level\22,
+// CHECK-SAME:         \22energy\22:628.3185307179587,
+// CHECK-SAME:         \22label\22:\22l2\22,
+// CHECK-SAME:         \22nuclear\22:0.5,
+// CHECK-SAME:         \22orbital\22:1.0,
+// CHECK-SAME:         \22principal\22:5,
+// CHECK-SAME:         \22spin\22:0.5,
+// CHECK-SAME:         \22spin_orbital\22:0.5,
+// CHECK-SAME:         \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:         \22spin_orbital_nuclear_magnetization\22:-1.0
+// CHECK-SAME:       }
+// CHECK-SAME:     },
+// CHECK-SAME:     {
+// CHECK-SAME:       \22class_\22:\22Transition\22,
+// CHECK-SAME:       \22einsteinA\22:3.3,
+// CHECK-SAME:       \22level1\22:
+// CHECK-SAME:       {
+// CHECK-SAME:           \22class_\22:\22Level\22,
+// CHECK-SAME:           \22energy\22:0.0,
+// CHECK-SAME:           \22label\22:\22l0\22,
+// CHECK-SAME:           \22nuclear\22:0.5,
+// CHECK-SAME:           \22orbital\22:0.0,
+// CHECK-SAME:           \22principal\22:6,
+// CHECK-SAME:           \22spin\22:0.5,
+// CHECK-SAME:           \22spin_orbital\22:0.5,
+// CHECK-SAME:           \22spin_orbital_nuclear\22:0.0,
+// CHECK-SAME:           \22spin_orbital_nuclear_magnetization\22:0.0
+// CHECK-SAME:       },
+// CHECK-SAME:       \22level2\22:
+// CHECK-SAME:       {
+// CHECK-SAME:         \22class_\22:\22Level\22,
+// CHECK-SAME:         \22energy\22:1256.6370614359173,
+// CHECK-SAME:         \22label\22:\22l3\22,
+// CHECK-SAME:         \22nuclear\22:0.5,
+// CHECK-SAME:         \22orbital\22:1.0,
+// CHECK-SAME:         \22principal\22:5,
+// CHECK-SAME:         \22spin\22:0.5,
+// CHECK-SAME:         \22spin_orbital\22:0.5,
+// CHECK-SAME:         \22spin_orbital_nuclear\22:1.0,
+// CHECK-SAME:         \22spin_orbital_nuclear_magnetization\22:1.0
+// CHECK-SAME:       }
+// CHECK-SAME:     }
+// CHECK-SAME:   ]
+// CHECK-SAME: }
+// CHECK-SAME: "]
+
+
     %0 = ion.ion {
         charge = 1.000000e+00 : f64, 
         mass = 1.710000e+02 : f64, 
@@ -28,53 +183,64 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
         position = array<f64: 1.0, 2.0, -1.0>,
         levels = [
             #ion.level<
-                label="downstate",
+                label="l0",
                 principal = 6 : i64, 
-                spin = 4.000000e-01 : f64, 
-                orbital = 5.000000e-01 : f64, 
-                nuclear = 6.000000e-01 : f64, 
-                spin_orbital = 8.000000e-01 : f64, 
-                spin_orbital_nuclear = 9.000000e-01 : f64, 
-                spin_orbital_nuclear_magnetization = 1.000000e+00 : f64, 
+                spin = 5.000000e-01 : f64,
+                orbital = 0.000000e+00 : f64,
+                nuclear = 5.000000e-01 : f64,
+                spin_orbital = 5.000000e-01 : f64,
+                spin_orbital_nuclear = 0.000000e+00 : f64,
+                spin_orbital_nuclear_magnetization = 0.000000e+00 : f64,
                 energy = 0.000000e+00 : f64
             >, 
             #ion.level<
-                label="estate",
+                label="l1",
                 principal = 6 : i64, 
-                spin = 1.400000e+00 : f64, 
-                orbital = 1.500000e+00 : f64, 
-                nuclear = 1.600000e+00 : f64, 
-                spin_orbital = 1.800000e+00 : f64, 
-                spin_orbital_nuclear = 1.900000e+00 : f64, 
-                spin_orbital_nuclear_magnetization = 2.000000e+00 : f64, 
-                energy = 1.264300e+10 : f64
+                spin = 5.000000e-01 : f64,
+                orbital = 0.000000e+00 : f64,
+                nuclear = 5.000000e-01 : f64,
+                spin_orbital = 5.000000e-01 : f64,
+                spin_orbital_nuclear = 1.000000e+00 : f64,
+                spin_orbital_nuclear_magnetization = 0.000000e+00 : f64,
+                energy = 62.83185307179586 : f64
             >, 
             #ion.level<
-                label="upstate",
+                label="l2",
                 principal = 5 : i64, 
-                spin = 2.400000e+00 : f64, 
-                orbital = 2.500000e+00 : f64, 
-                nuclear = 2.600000e+00 : f64, 
-                spin_orbital = 2.800000e+00 : f64, 
-                spin_orbital_nuclear = 2.900000e+00 : f64, 
-                spin_orbital_nuclear_magnetization = 3.000000e+00 : f64, 
-                energy = 8.115200e+14 : f64
+                spin = 5.000000e-01 : f64,
+                orbital = 1.000000e+00 : f64,
+                nuclear = 5.000000e-01 : f64,
+                spin_orbital = 5.000000e-01 : f64,
+                spin_orbital_nuclear = 1.000000e+00 : f64,
+                spin_orbital_nuclear_magnetization = -1.000000e+00 : f64,
+                energy = 628.3185307179587 : f64
+            >,
+            #ion.level<
+                label="l3",
+                principal = 5 : i64,
+                spin = 5.000000e-01 : f64,
+                orbital = 1.000000e+00 : f64,
+                nuclear = 5.000000e-01 : f64,
+                spin_orbital = 5.000000e-01 : f64,
+                spin_orbital_nuclear = 1.000000e+00 : f64,
+                spin_orbital_nuclear_magnetization = 1.000000e+00 : f64,
+                energy = 1256.6370614359173 : f64
             >
         ], 
         transitions = [
             #ion.transition<
-                level_0 = "downstate",
-                level_1 = "estate",
+                level_0 = "l0",
+                level_1 = "l2",
                 einstein_a = 2.200000e+00 : f64
-            >, 
+            >,
             #ion.transition<
-                level_0 = "downstate", 
-                level_1 = "upstate", 
+                level_0 = "l1",
+                level_1 = "l2",
                 einstein_a = 1.100000e+00 : f64
-            >, 
+            >,
             #ion.transition<
-                level_0 = "estate", 
-                level_1 = "upstate", 
+                level_0 = "l0",
+                level_1 = "l3",
                 einstein_a = 3.300000e+00 : f64
             >
         ]

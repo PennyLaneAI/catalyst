@@ -129,7 +129,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         std::array<double, 3> position = {positionAttr[0], positionAttr[1], positionAttr[2]};
         ion_json["position"] = position;
 
-        DenseMap<StringRef, size_t> LevelLabel2Index;
+        std::map<std::string, size_t> LevelLabel2Index;
         for (size_t i = 0; i < levelsAttr.size(); i++) {
             auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
 
@@ -153,6 +153,10 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
 
         for (size_t i = 0; i < transitionsAttr.size(); i++) {
             auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
+
+            assert(LevelLabel2Index.count(transitionAttr.getLevel_0().getValue().str()) == 1
+            && LevelLabel2Index.count(transitionAttr.getLevel_1().getValue().str()) == 1
+            && "A transition level's label must refer to an existing level in the ion!");
 
             json level1 =
                 ion_json["levels"][LevelLabel2Index[transitionAttr.getLevel_0().getValue().str()]];
