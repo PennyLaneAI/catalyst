@@ -161,9 +161,9 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
             && LevelLabel2Index.count(level1_label) == 1
             && "A transition level's label must refer to an existing level in the ion!");
 
-            json level1 =
+            const json &level1 =
                 ion_json["levels"][LevelLabel2Index[level0_label]];
-            json level2 =
+            const json &level2 =
                 ion_json["levels"][LevelLabel2Index[level1_label]];
 
             json this_transition =
