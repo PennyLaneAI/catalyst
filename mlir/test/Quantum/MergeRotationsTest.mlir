@@ -328,3 +328,54 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64, %arg2: f64) -> (!quantum
     // CHECK: return [[ret]]#0, [[ret]]#1
     return %4#0, %4#1 : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+func.func @test_merge_rotations(%arg0: f64) -> !quantum.bit {
+    // CHECK: [[cst:%.+]] = arith.constant 1.000000e-01 : f64
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[x2:%.+]] = arith.mulf %arg0, %arg0 : f64
+    %x2 = arith.mulf %arg0, %arg0 : f64
+
+    // CHECK: [[sum1:%.+]] = arith.addf [[x2]], [[cst]] : f64
+    // CHECK: [[sum2:%.+]] = arith.addf %arg0, [[sum1]] : f64
+    // CHECK: [[ret:%.+]] = quantum.custom "RX"([[sum2]]) [[qubit]] : !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+    %3 = quantum.static_custom "RX" [1.000000e-01] %2 : !quantum.bit
+    %4 = quantum.custom "RX"(%x2) %3 : !quantum.bit
+
+    // CHECK: return [[ret]]
+    return %4 : !quantum.bit
+}
+
+// -----
+
+func.func @test_merge_rotations(%arg0: f64, %arg1: i1, %arg2: i1) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+{
+    // CHECK: [[cst:%.+]] = arith.constant 1.000000e-01 : f64
+    // CHECK: [[reg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ctrl0:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ctrl1:%.+]] = quantum.extract [[reg]][ 2] : !quantum.reg -> !quantum.bit
+    %reg = quantum.alloc( 3) : !quantum.reg
+    %0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %reg[ 2] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[x2:%.+]] = arith.mulf %arg0, %arg0 : f64
+    %x2 = arith.mulf %arg0, %arg0 : f64
+
+    // CHECK: [[sum1:%.+]] = arith.addf [[x2]], [[cst]] : f64
+    // CHECK: [[sum2:%.+]] = arith.addf %arg0, [[sum1]] : f64
+    // CHECK: [[ret:%.+]], [[ctrl_ret:%.+]]:2 = quantum.custom "RX"([[sum2]]) [[qubit]] ctrls([[ctrl0]], [[ctrl1]]) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_0, %ctrl_out_0:2 = quantum.custom "RX"(%arg0) %0 ctrls(%1, %2) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_1, %ctrl_out_1:2 = quantum.static_custom "RX" [1.000000e-01] %out_0 ctrls(%ctrl_out_0#0, %ctrl_out_0#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_2, %ctrl_out_2:2 = quantum.custom "RX"(%x2) %out_1 ctrls(%ctrl_out_1#0, %ctrl_out_1#1) ctrlvals(%arg1, %arg2) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+
+    // CHECK: return [[ret]], [[ctrl_ret]]#0, [[ctrl_ret]]#1
+    return %out_2, %ctrl_out_2#0, %ctrl_out_2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}

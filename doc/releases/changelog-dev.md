@@ -8,6 +8,9 @@
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
+* Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
+  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
+
 * Catalyst now supports experimental capture of `cond` control flow.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   
@@ -94,7 +97,9 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Yushao Chen,
+Zach Goldthorpe,
 Sengthai Heng,
+Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
