@@ -104,5 +104,4 @@ Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
 Paul Haochen Wang,
-Rohan Nolan Lasrado,
 Raul Torres.
