@@ -1,5 +1,8 @@
 add_subdirectory(null_qubit)
 configure_file(null_qubit/null_qubit.toml null_qubit.toml)
+
+add_subdirectory(oqd)
+
 if(ENABLE_OPENQASM)
 add_subdirectory(openqasm)
 configure_file(openqasm/braket_local_qubit.toml braket_local_qubit.toml)

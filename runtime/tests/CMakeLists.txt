@@ -30,10 +30,12 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     pybind11::embed
     catalyst_qir_runtime
     rtd_null_qubit
+    rtd_oqd_device
 )
 
 target_sources(runner_tests_qir_runtime PRIVATE
     Test_NullQubit.cpp
+    Test_OQDDevice.cpp
 )
 
 catch_discover_tests(runner_tests_qir_runtime)

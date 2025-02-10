@@ -15,7 +15,7 @@ ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
 LLVM_DIR?=$(MK_DIR)/../mlir/llvm-project/
 
-BUILD_TARGETS := rt_capi rtd_null_qubit
+BUILD_TARGETS := rt_capi rtd_null_qubit rtd_oqd_device
 TEST_TARGETS := runner_tests_qir_runtime
 
 PLATFORM := $(shell uname -s)
