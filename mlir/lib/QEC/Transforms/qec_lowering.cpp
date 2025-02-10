@@ -18,6 +18,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 

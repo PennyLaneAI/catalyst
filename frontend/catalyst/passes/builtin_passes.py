@@ -357,3 +357,61 @@ def ions_decomposition(qnode):  # pragma: nocover
         return qnode(*args, **kwargs)
 
     return wrapper
+
+
+def clifford_t_ppr(qnode):
+    """
+    Specify that the ``-convert-to-qec`` MLIR compiler pass
+    for decomposing clifford+T gates into CNOTs and single qubit rotations will be applied.
+
+    The full list of supported gates are as follows:
+
+    :class:`qml.H <pennylane.H>`,
+    :class:`qml.S <pennylane.S>`,
+    :class:`qml.T <pennylane.T>`,
+    :class:`qml.CNOT <pennylane.CNOT>`,
+    Args:
+        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    In this example the three :class:`qml.RX <pennylane.RX>` will be merged in a single
+    one with the sum of angles as parameter.
+
+    .. code-block:: python
+
+        from catalyst.passes import clifford_t_ppr
+        from catalyst.debug import get_compilation_stage
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit
+        @clifford_t_ppr
+        @qml.qnode(dev)
+        def circuit():
+            qml.H(0)
+            qml.S(1)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return qml.expval(qml.PauliZ(0))
+
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    <MLIR only shows PPR operations>
+    """
+    if not isinstance(qnode, qml.QNode):
+        raise TypeError(f"A QNode is expected, got the classical function {qnode}")
+    
+    clone = copy.copy(qnode)
+    clone.__name__ += "_clifford_t_ppr"
+
+    @functools.wraps(clone)
+    def wrapper(*args, **kwargs):
+        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline.append(Pass("convert-to-qec"))
+        kwargs["pass_pipeline"] = pass_pipeline
+        return clone(*args, **kwargs)
+
+    return wrapper

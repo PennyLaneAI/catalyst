@@ -32,6 +32,7 @@
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 

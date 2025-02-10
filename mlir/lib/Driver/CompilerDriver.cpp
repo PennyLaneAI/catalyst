@@ -69,6 +69,8 @@
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
+#include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Passes.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
@@ -295,6 +297,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     // Catalyst
     registry.insert<CatalystDialect>();
     registry.insert<quantum::QuantumDialect>();
+    registry.insert<qec::QECDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
