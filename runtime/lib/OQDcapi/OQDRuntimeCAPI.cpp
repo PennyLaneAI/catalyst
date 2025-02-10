@@ -35,27 +35,6 @@ template <typename T> json &numerical_json_factory(T value)
     return j;
 }
 
-void to_json(json &j, const Level &l)
-{
-    j = json{{"class_", "Level"},
-             {"principal", l.principal},
-             {"spin", l.spin},
-             {"orbital", l.orbital},
-             {"nuclear", l.nuclear},
-             {"spin_orbital", l.spin_orbital},
-             {"spin_orbital_nuclear", l.spin_orbital_nuclear},
-             {"spin_orbital_nuclear_magnetization", l.spin_orbital_nuclear_magnetization},
-             {"energy", l.energy}};
-}
-
-void to_json(json &j, const Transition &tr)
-{
-    j = json{{"class_", "Transition"},
-             {"einsteinA", tr.einstein_a},
-             {"level1", tr.level1},
-             {"level2", tr.level2}};
-}
-
 void to_json(json &j, const Pulse &p)
 {
     j = json{{"class_", "Pulse"}, {"duration", p.duration}};

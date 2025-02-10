@@ -25,24 +25,6 @@
 extern "C" {
 #endif
 
-struct Level {
-    char *label;
-    int64_t principal;
-    double spin;
-    double orbital;
-    double nuclear;
-    double spin_orbital;
-    double spin_orbital_nuclear;
-    double spin_orbital_nuclear_magnetization;
-    double energy;
-};
-
-struct Transition {
-    char *level1;
-    char *level2;
-    double einstein_a;
-};
-
 struct Beam {
     int64_t transition_index;
     double rabi;
