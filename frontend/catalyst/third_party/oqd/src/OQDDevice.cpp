@@ -16,7 +16,6 @@
 
 #include "OQDDevice.hpp"
 #include "OQDRuntimeCAPI.h"
-#include "Types.h"
 
 namespace Catalyst::Runtime::Device {
 
