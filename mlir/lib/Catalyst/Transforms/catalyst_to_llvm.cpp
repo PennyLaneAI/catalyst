@@ -178,8 +178,7 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, rank, 0);
 
     // Memref
-    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Value memrefPtr = getStaticAlloca(loc, rewriter, llvmMemrefType, c1);
+    Value memrefPtr = getStaticAlloca(loc, rewriter, llvmMemrefType, 1);
     rewriter.create<LLVM::StoreOp>(loc, memrefLlvm, memrefPtr);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, memrefPtr, 1);
 
@@ -244,9 +243,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Value structValue =
                 EncodeOpaqueMemRef(loc, rewriter, memrefType, llvmMemrefType, llvmMemref);
 
-            Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
-            Value structPtr = getStaticAlloca(loc, rewriter, structType, c1);
+            Value structPtr = getStaticAlloca(loc, rewriter, structType, 1);
             rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
 
             Value printDescriptor = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
@@ -373,14 +370,13 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
                                            operandsConverted.end()};
 
         // Encode args
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         SmallVector<LLVM::AllocaOp> encodedArgs;
         for (auto tuple : llvm::zip(args, argsConverted)) {
             auto memref_type = cast<MemRefType>(std::get<0>(tuple).getType());
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedArg.getType(), c1);
+            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedArg.getType(), 1);
             rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca);
             encodedArgs.push_back(alloca);
         }
@@ -400,7 +396,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             insertValueArgs(pair.value(), offset);
         }
         // Get allocation for packed arguments pointers.
-        LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, arrArgs.getType(), c1);
+        LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, arrArgs.getType(), 1);
 
         // Store constructed arguments pointers array into the alloca.
         rewriter.create<LLVM::StoreOp>(loc, arrArgs, alloca);
@@ -417,7 +413,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             Type llvmMemrefType = std::get<1>(tuple).getType();
             auto encodedRes =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedRes.getType(), c1);
+            LLVM::AllocaOp alloca = getStaticAlloca(loc, rewriter, encodedRes.getType(), 1);
             rewriter.create<LLVM::StoreOp>(loc, encodedRes, alloca);
             encodedRess.push_back(alloca);
         }
@@ -439,7 +435,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         }
 
         // Get allocation for packed results pointers.
-        LLVM::AllocaOp allocaRes = getStaticAlloca(loc, rewriter, arrRes.getType(), c1);
+        LLVM::AllocaOp allocaRes = getStaticAlloca(loc, rewriter, arrRes.getType(), 1);
 
         // Store constructed results pointers array on the stack.
         rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes);
@@ -472,9 +468,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
         rewriter.setInsertionPointToStart(entry);
 
         auto ctx = rewriter.getContext();
-        auto one = rewriter.getI64IntegerAttr(1);
         auto loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, one);
         auto idAttr = op.getIdAttr();
         auto constantId = rewriter.create<LLVM::ConstantOp>(loc, idAttr);
         auto argcAttr = op.getArgcAttr();
@@ -501,7 +495,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
             Type structTy = typeConverter->convertType(arg.getType());
             auto structVal =
                 rewriter.create<UnrealizedConversionCastOp>(loc, structTy, arg).getResult(0);
-            Value ptr = getStaticAlloca(loc, rewriter, structTy, c1);
+            Value ptr = getStaticAlloca(loc, rewriter, structTy, 1);
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             callArgs.push_back(ptr);
         }
@@ -548,10 +542,9 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
         // to pointer to struct.
         auto loc = op.getLoc();
         SmallVector<Value> callArgs;
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto structVal : adaptor.getInputs()) {
             // allocate a memref descriptor on the stack
-            Value ptr = getStaticAlloca(loc, rewriter, structVal.getType(), c1);
+            Value ptr = getStaticAlloca(loc, rewriter, structVal.getType(), 1);
             // store the memref descriptor on the pointer
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             // add the ptr to the arguments

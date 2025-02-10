@@ -88,7 +88,6 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
 
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
 
-    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
     Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
 
     if (!adjoint && controlledQubits.empty() && controlledValues.empty()) {
@@ -96,11 +95,8 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     }
 
     auto adjointVal = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getBoolAttr(adjoint));
-    auto numControlledVal =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()))
-            .getResult();
     auto structType = LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
-    auto modifiersPtr = catalyst::getStaticAlloca(loc, rewriter, structType, c1).getResult();
+    auto modifiersPtr = catalyst::getStaticAlloca(loc, rewriter, structType, 1).getResult();
     auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
                                                    llvm::ArrayRef<LLVM::GEPArg>{0, 0}, true);
     auto numControlledPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
@@ -113,8 +109,8 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
     if (!controlledQubits.empty()) {
-        ctrlPtr = catalyst::getStaticAlloca(loc, rewriter, ptrType, numControlledVal).getResult();
-        valuePtr = catalyst::getStaticAlloca(loc, rewriter, boolType, numControlledVal).getResult();
+        ctrlPtr = catalyst::getStaticAlloca(loc, rewriter, ptrType, controlledQubits.size()).getResult();
+        valuePtr = catalyst::getStaticAlloca(loc, rewriter, boolType, controlledQubits.size()).getResult();
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
@@ -132,7 +128,8 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     }
 
     rewriter.create<LLVM::StoreOp>(loc, adjointVal, adjointPtr);
-    rewriter.create<LLVM::StoreOp>(loc, numControlledVal, numControlledPtr);
+    auto ctrlQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
+    rewriter.create<LLVM::StoreOp>(loc, ctrlQubits, numControlledPtr);
     rewriter.create<LLVM::StoreOp>(loc, ctrlPtr, controlledWiresPtr);
     rewriter.create<LLVM::StoreOp>(loc, valuePtr, controlledValuesPtr);
 
@@ -500,8 +497,7 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
         args.insert(args.begin() + 1, modifiersPtr);
         // Replace the memref argument (LLVM struct) with a pointer to memref.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        args[0] = catalyst::getStaticAlloca(loc, rewriter, matrixType, c1);
+        args[0] = catalyst::getStaticAlloca(loc, rewriter, matrixType, 1);
         rewriter.create<LLVM::StoreOp>(loc, adaptor.getMatrix(), args[0]);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
@@ -593,8 +589,7 @@ struct HermitianOpPattern : public OpConversionPattern<HermitianOp> {
         args.insert(args.begin() + 1,
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
         // Replace the memref argument (LLVM struct) with a pointer to memref.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        args[0] = catalyst::getStaticAlloca(loc, rewriter, matrixType, c1);
+        args[0] = catalyst::getStaticAlloca(loc, rewriter, matrixType, 1);
         rewriter.create<LLVM::StoreOp>(loc, adaptor.getMatrix(), args[0]);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
@@ -659,8 +654,7 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
         args.insert(args.begin() + 1,
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numTerms)));
         // Replace the memref argument (LLVM struct) with a pointer to memref.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        args[0] = catalyst::getStaticAlloca(loc, rewriter, vectorType, c1);
+        args[0] = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
         rewriter.create<LLVM::StoreOp>(loc, adaptor.getCoeffs(), args[0]);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
@@ -729,8 +723,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
 
         // We need to handle the C ABI convention of passing the result memref
         // as a struct pointer in the first argument to the C function.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value structPtr = catalyst::getStaticAlloca(loc, rewriter, structType, c1);
+        Value structPtr = catalyst::getStaticAlloca(loc, rewriter, structType, 1);
 
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
@@ -870,8 +863,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
 
         // We need to handle the C ABI convention of passing the result memref
         // as a struct pointer in the first argument to the C function.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value structPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, c1);
+        Value structPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
         rewriter.create<LLVM::StoreOp>(loc, adaptor.getStateIn(), structPtr);
 
         // For now obtain the qubit values from an unrealized cast created by the
@@ -921,9 +913,8 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         auto structTy = adaptor.getInState().getType();
 
         Location loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
-        auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, structTy, c1);
+        auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, structTy, 1);
         auto allocaPtr = allocaOp.getResult();
 
         auto size = adaptor.getInQubits().size();
@@ -961,9 +952,8 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         auto structTy = adaptor.getBasisState().getType();
 
         Location loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
-        auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, structTy, c1);
+        auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, structTy, 1);
         auto allocaPtr = allocaOp.getResult();
 
         auto size = adaptor.getInQubits().size();

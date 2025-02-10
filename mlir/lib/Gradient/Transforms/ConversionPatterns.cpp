@@ -93,13 +93,11 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(callOp);
 
-                Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
                 SmallVector<Value> operands;
                 SmallVector<Value> outputs;
                 auto wrapMemref = [&](Value memref) {
                     Type convertedType = typeConverter->convertType(memref.getType());
-                    Value space = getStaticAlloca(loc, rewriter, convertedType, c1);
+                    Value space = getStaticAlloca(loc, rewriter, convertedType, 1);
 
                     Value convertedValue =
                         rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memref)

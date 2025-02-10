@@ -40,6 +40,7 @@ module @static_alloca_qubit_unitary_ctrl {
     // CHECK-NEXT: llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK-NEXT: llvm.alloca [[c1]] x i1
+    // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK-NEXT: llvm.alloca [[c1]] x !llvm.ptr
     // CHECK-NEXT: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK-NEXT: llvm.alloca [[c1]] x !llvm.struct<(i1, i64, ptr, ptr)>
