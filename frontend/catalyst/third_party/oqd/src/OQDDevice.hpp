@@ -63,12 +63,15 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     {
         __catalyst__oqd__rt__initialize();
 
+        // The OQD kwarg string format is:
+        // deviceKwargs.str() + "ION:" + std::string(ion_json.dump())
+        // where deviceKwargs us the usual kwargs like {'shots': 0, 'mcmc': False}
+        // and ion_json is a JSON spec string for the ion
         std::string ion_token = "ION:";
         size_t ion_token_pos = kwargs.find(ion_token);
         ion_specs = kwargs.substr(ion_token_pos+ion_token.length());
-        // TODO: remove ion specs from kwargs
 
-        device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs.substr(0, ion_token_pos));
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
