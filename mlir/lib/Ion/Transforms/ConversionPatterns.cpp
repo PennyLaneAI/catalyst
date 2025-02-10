@@ -48,38 +48,6 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
 }
 
-Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, ModuleOp mod)
-{
-    StringRef value = StringRef(key.data(), key.size() + 1);
-    auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
-    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
-    if (!glb) {
-        OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
-        rewriter.setInsertionPointToStart(mod.getBody());
-        glb = rewriter.create<LLVM::GlobalOp>(loc, type, true, LLVM::Linkage::Internal, key,
-                                              rewriter.getStringAttr(value));
-    }
-    return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                        type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
-}
-
-LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx)
-{
-    return LLVM::LLVMStructType::getLiteral(
-        ctx, {
-                 LLVM::LLVMPointerType::get(ctx), // label
-                 IntegerType::get(ctx, 64),       // principal
-                 Float64Type::get(ctx),           // spin
-                 Float64Type::get(ctx),           // orbital
-                 Float64Type::get(ctx),           // nuclear
-                 Float64Type::get(ctx),           // spin_orbital
-                 Float64Type::get(ctx),           // spin_orbital_nuclear
-                 Float64Type::get(ctx),           // spin_orbital_nuclear_magnetization
-                 Float64Type::get(ctx),           // energy
-             });
-}
-
 LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter, BeamAttr &beamAttr)
 {
     return LLVM::LLVMStructType::getLiteral(
@@ -92,30 +60,6 @@ LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
                  LLVM::LLVMArrayType::get( // wavevector
                      rewriter.getIntegerType(64), beamAttr.getWavevector().size()),
              });
-}
-
-Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
-                        LevelAttr &levelAttr, LLVM::LLVMStructType &levelStructType)
-{
-    Value levelStruct = rewriter.create<LLVM::UndefOp>(loc, levelStructType);
-    auto label = levelAttr.getLabel().getValue().str();
-    auto labelGlobal = getGlobalString(loc, rewriter, label, mod);
-    std::vector<Value> fieldValues = {
-        labelGlobal,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelAttr.getPrincipal()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpin()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getOrbital()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getNuclear()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpinOrbital()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                          levelAttr.getSpinOrbitalNuclear()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                          levelAttr.getSpinOrbitalNuclearMagnetization()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getEnergy())};
-    for (size_t i = 0; i < fieldValues.size(); i++) {
-        levelStruct = rewriter.create<LLVM::InsertValueOp>(loc, levelStruct, fieldValues[i], i);
-    }
-    return levelStruct;
 }
 
 Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
@@ -164,8 +108,6 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
     LogicalResult matchAndRewrite(catalyst::ion::IonOp op, catalyst::ion::IonOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = this->getContext();
         func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
 
         DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
