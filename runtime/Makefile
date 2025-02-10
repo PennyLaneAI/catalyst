@@ -12,10 +12,11 @@ RT_BUILD_DIR?=$(MK_DIR)/build
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=RelWithDebInfo
 ENABLE_OPENQASM?=ON
+ENABLE_OQD?=OFF
 ENABLE_ASAN?=OFF
 LLVM_DIR?=$(MK_DIR)/../mlir/llvm-project/
 
-BUILD_TARGETS := rt_capi rtd_null_qubit rtd_oqd_device
+BUILD_TARGETS := rt_capi rtd_null_qubit
 TEST_TARGETS := runner_tests_qir_runtime
 
 PLATFORM := $(shell uname -s)
@@ -23,6 +24,11 @@ PLATFORM := $(shell uname -s)
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
 	TEST_TARGETS += runner_tests_openqasm
+endif
+
+ifeq ($(ENABLE_OQD), ON)
+	BUILD_TARGETS += rtd_oqd_device
+	TEST_TARGETS += runner_tests_oqd
 endif
 
 .PHONY: help
@@ -49,6 +55,7 @@ configure:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
+		-DENABLE_OQD=$(ENABLE_OQD) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN)
@@ -71,6 +78,10 @@ ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+ifeq ($(ENABLE_OQD), ON)
+	# Test the OQD devices C++ tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -84,6 +95,9 @@ coverage: test_runner
 	$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
+endif
+ifeq ($(ENABLE_OQD), ON)
+	$(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
