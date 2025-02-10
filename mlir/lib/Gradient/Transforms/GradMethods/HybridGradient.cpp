@@ -23,6 +23,7 @@
 #include "HybridGradient.hpp"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -307,7 +308,7 @@ static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
     rewriter.setInsertionPointToStart(&modifiedCallee.getFunctionBody().front());
 
     MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-    Value paramCounter = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+    Value paramCounter = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
     Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
     rewriter.create<memref::StoreOp>(loc, cZero, paramCounter);
     Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
