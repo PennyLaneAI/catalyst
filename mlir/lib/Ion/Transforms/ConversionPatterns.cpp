@@ -154,14 +154,17 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         for (size_t i = 0; i < transitionsAttr.size(); i++) {
             auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
 
-            assert(LevelLabel2Index.count(transitionAttr.getLevel_0().getValue().str()) == 1
-            && LevelLabel2Index.count(transitionAttr.getLevel_1().getValue().str()) == 1
+            std::string level0_label = transitionAttr.getLevel_0().getValue().str();
+            std::string level1_label = transitionAttr.getLevel_1().getValue().str();
+
+            assert(LevelLabel2Index.count(level0_label) == 1
+            && LevelLabel2Index.count(level1_label) == 1
             && "A transition level's label must refer to an existing level in the ion!");
 
             json level1 =
-                ion_json["levels"][LevelLabel2Index[transitionAttr.getLevel_0().getValue().str()]];
+                ion_json["levels"][LevelLabel2Index[level0_label]];
             json level2 =
-                ion_json["levels"][LevelLabel2Index[transitionAttr.getLevel_1().getValue().str()]];
+                ion_json["levels"][LevelLabel2Index[level1_label]];
 
             json this_transition =
                 json{{"class_", "Transition"},
