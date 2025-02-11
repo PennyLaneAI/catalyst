@@ -14,17 +14,17 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
-// CHECK: llvm.func @__catalyst_pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
-// CHECK: llvm.func @__catalyst_parallel_protocol(!llvm.ptr, i64) -> !llvm.ptr
+// CHECK: llvm.func @__catalyst__oqd__pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
+// CHECK: llvm.func @__catalyst__oqd__ParallelProtocol(!llvm.ptr, i64) -> !llvm.ptr
     
 // CHECK-LABEL: parallel_protocol_op
 func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
 
     // Pulse 1
-    // CHECK: %[[pulse_1:.*]] = llvm.call @__catalyst_pulse
+    // CHECK: %[[pulse_1:.*]] = llvm.call @__catalyst__oqd__pulse
     
     // Pulse 2
-    // CHECK: %[[pulse_2:.*]] = llvm.call @__catalyst_pulse
+    // CHECK: %[[pulse_2:.*]] = llvm.call @__catalyst__oqd__pulse
 
     // Pulse array
     // CHECK: %[[pulse_array:.*]] = llvm.mlir.undef : !llvm.array<2 x ptr>
@@ -38,7 +38,7 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
 
     // Parallel Protocol Stub
     // CHECK: %[[pulse_array_size:.*]] = llvm.mlir.constant(2 : i64) : i64
-    // CHECK: %[[pp:.*]] = llvm.call @__catalyst_parallel_protocol(%[[pulse_array_ptr:.*]], %[[pulse_array_size:.*]]) : (!llvm.ptr, i64) -> !llvm.ptr
+    // CHECK: %[[pp:.*]] = llvm.call @__catalyst__oqd__ParallelProtocol(%[[pulse_array_ptr:.*]], %[[pulse_array_size:.*]]) : (!llvm.ptr, i64) -> !llvm.ptr
 
 
     %qreg = quantum.alloc( 1) : !quantum.reg

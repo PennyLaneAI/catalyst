@@ -247,7 +247,7 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         Type protocolResultType = conv->convertType(IonType::get(ctx));
         Type protocolFuncType =
             LLVM::LLVMFunctionType::get(protocolResultType, {ptrType, pulseArraySize.getType()});
-        std::string protocolFuncName = "__catalyst_parallel_protocol";
+        std::string protocolFuncName = "__catalyst__oqd__ParallelProtocol";
         LLVM::LLVMFuncOp protocolFnDecl =
             ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, protocolFnDecl, operands);
@@ -285,7 +285,7 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
             conv->convertType(PulseType::get(ctx)),
             {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
              LLVM::LLVMPointerType::get(rewriter.getContext())});
-        std::string qirName = "__catalyst_pulse";
+        std::string qirName = "__catalyst__oqd__pulse";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
 
