@@ -34,6 +34,7 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit_clean
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
@@ -119,7 +120,7 @@ class TestDecomposition:
             qml.SingleExcitationPlus(theta, wires=[0, 1])
             return qml.state()
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
         assert "PauliX" in mlir
         assert "CNOT" in mlir
         assert "ControlledPhaseShift" in mlir
@@ -146,7 +147,7 @@ class TestDecomposition:
             qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qml.state()
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
@@ -278,7 +279,7 @@ class TestPreprocessHybridOp:
             adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
 
         assert "quantum.adjoint" in mlir
         assert "RX" in mlir
@@ -313,7 +314,7 @@ class TestPreprocessHybridOp:
             return qml.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        mlir = qml.qjit(circuit, target="mlir").mlir
+        mlir = qjit_clean(circuit, target="mlir").mlir
         assert "RX" in mlir
         assert "CNOT" in mlir
         assert "PhaseShift" in mlir

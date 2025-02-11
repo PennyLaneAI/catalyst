@@ -19,7 +19,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import api_extensions, cond, measure, qjit
+from catalyst import api_extensions, cond, measure
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -69,7 +70,7 @@ class TestCond:
     def test_simple_cond(self, backend):
         """Test basic function with conditional."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @cond(n > 4)
@@ -174,7 +175,7 @@ class TestCond:
     def test_qubit_manipulation_cond(self, backend):
         """Test conditional with quantum operation."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 4)
