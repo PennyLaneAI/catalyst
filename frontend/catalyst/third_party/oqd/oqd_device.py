@@ -34,6 +34,7 @@ class OQDDevice(Device):
 
     config_filepath = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/backend" + "/oqd.toml"
 
+    # pylint: disable=line-too-long
     @staticmethod
     def get_c_interface():
         """Returns a tuple consisting of the device name, and
