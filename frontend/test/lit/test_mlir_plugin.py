@@ -67,7 +67,7 @@ import pennylane as qml
 
 import catalyst
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit_cleanup
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.runtime_environment import get_bin_path
 
@@ -94,18 +94,22 @@ plugin_path = get_bin_path("cli", "CATALYST_BIN_DIR") + f"/../lib/StandalonePlug
 plugin = Path(plugin_path)
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
 options = CompileOptions(
-    pipelines=custom_pipeline, lower_to_llvm=False, pass_plugins=[plugin], dialect_plugins=[plugin]
+    pipelines=custom_pipeline,
+    lower_to_llvm=False,
+    pass_plugins=[plugin],
+    dialect_plugins=[plugin],
+    keep_intermediate=True,
 )
 workspace = WorkspaceManager.get_or_create_workspace("test", None)
 custom_compiler = Compiler(options)
-_, mlir_string = custom_compiler.run_from_ir(mlir_module, "test", workspace)
+xxx, mlir_string = custom_compiler.run_from_ir(mlir_module, "test", workspace)
 print(mlir_string)
 
 
 def test_pass_options():
     """Is the option in the generated MLIR?"""
 
-    @qjit(target="mlir")
+    @qjit_cleanup(target="mlir")
     # CHECK: options = "an-option maxValue=1"
     @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1)
     @qml.qnode(qml.device("null.qubit", wires=1))
