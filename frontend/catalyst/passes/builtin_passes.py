@@ -378,8 +378,7 @@ def clifford_t_ppr(qnode):
 
     **Example**
 
-    In this example the three :class:`qml.RX <pennylane.RX>` will be merged in a single
-    one with the sum of angles as parameter.
+    In this example the Clifford+T gates will be converted into PPRs.
 
     .. code-block:: python
 
