@@ -23,6 +23,7 @@ from catalyst.utils.filesystem import WorkspaceManager
 
 # pylint: disable=unused-argument,too-many-arguments
 
+
 def qjit_for_lit_tests(
     fn=None,
     *,
@@ -55,6 +56,7 @@ def qjit_for_lit_tests(
 
 class QJITForLitTests(QJIT):
     """QJIT subclass that always sets keep_intermediates but does not pollute the cwd"""
+
     def __init__(self, *args, **kwargs):
         compile_options = args[1]
         compile_options.keep_intermediate = True
