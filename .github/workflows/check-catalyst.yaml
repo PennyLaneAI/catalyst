@@ -66,6 +66,7 @@ jobs:
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
+          ENABLE_OQD=ON \
           make runtime
 
           COMPILER_LAUNCHER="" \
@@ -669,6 +670,7 @@ jobs:
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
+          ENABLE_OQD=ON \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
