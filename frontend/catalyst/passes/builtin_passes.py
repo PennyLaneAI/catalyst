@@ -362,7 +362,7 @@ def ions_decomposition(qnode):  # pragma: nocover
 def clifford_t_ppr(qnode):
     """
     Specify that the ``-convert-to-qec`` MLIR compiler pass
-    for decomposing clifford+T gates into CNOTs and single qubit rotations will be applied.
+    for converting clifford+T gates into Pauli product rotations will be applied.
 
     The full list of supported gates are as follows:
 
