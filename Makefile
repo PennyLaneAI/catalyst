@@ -82,6 +82,7 @@ help:
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
 	@echo "  clean-oqd          to clean build files of OQD Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
+	@echo "  clean-catalyst     to uninstall Catalyst and delete all temporary, cache, and build files for catalyst dialects and runtime (but keeping llvm build files)"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
@@ -222,7 +223,7 @@ plugin-wheel: plugin
 	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin.egg-info
 	rm -r $(MK_DIR)/standalone_plugin_wheel/build
 
-.PHONY: clean clean-all
+.PHONY: clean clean-all clean-catalyst
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -235,6 +236,7 @@ clean:
 	rm -rf .benchmarks
 
 clean-all: clean clean-mlir clean-runtime clean-oqc clean-oqd
+clean-catalyst: clean clean-dialects clean-runtime clean-oqc clean-oqd
 
 .PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-mhlo clean-enzyme
 clean-mlir:
