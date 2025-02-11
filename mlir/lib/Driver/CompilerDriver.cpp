@@ -513,7 +513,7 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
     };
 
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
-    pm.enableVerifier(false);
+    pm.enableVerifier(config.shouldVerifyPasses());
     if (failed(applyPassManagerCLOptions(pm)))
         return failure();
     if (failed(config.setupPassPipeline(pm)))
