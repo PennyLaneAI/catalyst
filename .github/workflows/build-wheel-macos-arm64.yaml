@@ -323,14 +323,6 @@ jobs:
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
-    # Build OQD-Runtime
-    - name: Build OQD-Runtime
-      run: |
-          OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
-          RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
-          PYTHON=$(which python${{ matrix.python_version }}) \
-          make oqd
-
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
@@ -368,7 +360,6 @@ jobs:
         DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
         RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
         OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
-        OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
         ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
         make wheel
 

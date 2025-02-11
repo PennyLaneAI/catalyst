@@ -51,10 +51,6 @@ export OQC_BUILD_DIR="/catalyst/oqc-build"
 export RT_BUILD_DIR="/catalyst/runtime-build"
 make oqc
 
-# Build OQD
-export OQD_BUILD_DIR="/catalyst/oqd-build"
-make oqd
-
 # Build Catalyst dialects
 cmake -S mlir -B /catalyst/quantum-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -85,7 +81,6 @@ export MHLO_BUILD_DIR=/catalyst/mhlo-build
 export DIALECTS_BUILD_DIR=/catalyst/quantum-build
 export RT_BUILD_DIR=/catalyst/runtime-build
 export OQC_BUILD_DIR=/catalyst/oqc-build
-export OQD_BUILD_DIR=/catalyst/oqd-build
 export ENZYME_BUILD_DIR=/catalyst/enzyme-build
 export PYTHON=/usr/bin/python3
 make wheel
