@@ -206,12 +206,12 @@ class TestCapture:
         def circuit(n, x):
 
             @qml.for_loop(0, n, 1)
-            def loop_rx(i, x):
+            def loop_rx(_, x):
                 qml.RX(x, wires=0)
                 return jnp.sin(x)
 
             # apply the for loop
-            final_x = loop_rx(x)
+            loop_rx(x)
 
             return qml.expval(qml.Z(0))
 
