@@ -374,7 +374,7 @@ def clifford_t_ppr(qnode):
         fn (QNode): QNode to apply the pass to
 
     Returns:
-        ~.QNode:
+        ~.QNode
 
     **Example**
 
