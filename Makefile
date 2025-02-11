@@ -227,7 +227,7 @@ plugin-wheel: plugin
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	find frontend/catalyst -name "*.so" -exec rm -v {} +
+	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
