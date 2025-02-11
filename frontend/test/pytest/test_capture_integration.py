@@ -205,7 +205,7 @@ class TestCapture:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, x):
 
-            @qml.for_loop(0, n, 1)
+            @qml.for_loop(1, n, 1)
             def loop_rx(_, x):
                 qml.RX(x, wires=0)
                 return jnp.sin(x)

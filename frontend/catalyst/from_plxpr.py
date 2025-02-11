@@ -389,9 +389,8 @@ def handle_for_loop(
     args = plxpr_invals[args_slice]
 
     # Add the iteration start and the qreg to the args
-    it_start = 0
-    it_start_plus_args_plus_qreg = [
-        it_start,
+    start_plus_args_plus_qreg = [
+        start,
         *args,
         self.qreg,
     ]
@@ -404,13 +403,13 @@ def handle_for_loop(
         jaxpr_body_fn,
         consts,
     )
-    converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*it_start_plus_args_plus_qreg).jaxpr
+    converted_jaxpr_branch = jax.make_jaxpr(converted_func)(*start_plus_args_plus_qreg).jaxpr
     converted_closed_jaxpr_branch = jax.core.ClosedJaxpr(
         convert_constvars_jaxpr(converted_jaxpr_branch), ()
     )
 
     # Build Catalyst compatible input values
-    for_loop_invals = [start, stop, step, *consts, *it_start_plus_args_plus_qreg]
+    for_loop_invals = [start, stop, step, *consts, *start_plus_args_plus_qreg]
 
     # Config additional for loop settings
     apply_reverse_transform = isinstance(step, int) and step < 0
