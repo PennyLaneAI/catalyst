@@ -74,4 +74,3 @@ func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
     // CHECK: return [[tensor_0]], [[tensor_1]] : tensor<i1>, tensor<i1>
     return %from_elements_0, %from_elements_1 : tensor<i1>, tensor<i1>
   }
-  
