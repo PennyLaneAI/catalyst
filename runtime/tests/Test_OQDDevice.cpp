@@ -28,4 +28,5 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
     REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("Unsupported functionality"));
     REQUIRE_THROWS_WITH(device.Expval(0), Catch::Contains("Unsupported functionality"));
     REQUIRE_THROWS_WITH(device.Var(0), Catch::Contains("Unsupported functionality"));
+    CHECK(1==0);
 }
