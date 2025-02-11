@@ -77,7 +77,6 @@ help:
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
-	@echo "  clean-frontend     to clean build files of Catalyst Frontend"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
