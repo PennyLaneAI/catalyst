@@ -371,7 +371,7 @@ def clifford_t_ppr(qnode):
     :class:`qml.T <pennylane.T>`,
     :class:`qml.CNOT <pennylane.CNOT>`,
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): QNode to apply the pass to
 
     Returns:
         ~.QNode:
