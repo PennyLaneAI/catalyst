@@ -16,8 +16,6 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
-
 from catalyst import pure_callback
 from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 

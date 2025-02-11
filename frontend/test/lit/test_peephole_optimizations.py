@@ -24,8 +24,6 @@ running -apply-transform-sequence.
 
 # pylint: disable=line-too-long
 
-import shutil
-
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
