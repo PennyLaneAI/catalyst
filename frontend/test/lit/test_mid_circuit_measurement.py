@@ -16,7 +16,8 @@
 
 import pennylane as qml
 
-from catalyst import measure, qjit
+from catalyst import measure
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 
 @qjit(target="mlir")

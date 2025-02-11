@@ -24,8 +24,8 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
 
-from catalyst import qjit
 from catalyst.compiler import get_lib_path
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 from catalyst.device import get_device_capabilities
 
 TEST_PATH = os.path.dirname(__file__)

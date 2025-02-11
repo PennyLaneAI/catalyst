@@ -29,8 +29,9 @@ import shutil
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
-from catalyst import pipeline, qjit
+from catalyst import pipeline
 from catalyst.debug import get_compilation_stage
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 from catalyst.passes import cancel_inverses, merge_rotations
 
 
@@ -43,7 +44,6 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
     print(get_compilation_stage(QJIT, "QuantumCompilationPass"))
-    shutil.rmtree(QJIT.__name__)
 
 
 #

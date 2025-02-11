@@ -16,7 +16,8 @@
 
 import pennylane as qml
 
-from catalyst import for_loop, qjit
+from catalyst import for_loop
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 
 # CHECK-NOT: Verification failed

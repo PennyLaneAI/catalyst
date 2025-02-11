@@ -27,7 +27,7 @@ import numpy as np
 import pennylane as qml
 from lit_util_printers import print_jaxpr, print_mlir
 
-from catalyst import qjit
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 
 def test_multiple_tape_transforms():

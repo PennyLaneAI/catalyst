@@ -27,8 +27,8 @@ from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
-from catalyst import qjit
 from catalyst.compiler import get_lib_path
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 TEST_PATH = os.path.dirname(__file__)
 CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")

@@ -18,7 +18,8 @@
 
 import pennylane as qml
 
-from catalyst import cond, measure, qjit
+from catalyst import cond, measure
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 
 # CHECK-NOT: Verification failed

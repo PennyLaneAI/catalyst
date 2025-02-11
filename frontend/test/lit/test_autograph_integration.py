@@ -21,7 +21,8 @@ import inspect
 import pennylane as qml
 from jax.core import ShapedArray
 
-from catalyst import jacobian, mitigate_with_zne, qjit, vmap
+from catalyst import jacobian, mitigate_with_zne, vmap
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 # pylint: disable=missing-function-docstring
 

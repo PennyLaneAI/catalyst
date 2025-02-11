@@ -67,6 +67,7 @@ import pennylane as qml
 
 import catalyst
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.runtime_environment import get_bin_path
 
@@ -104,7 +105,7 @@ print(mlir_string)
 def test_pass_options():
     """Is the option in the generated MLIR?"""
 
-    @qml.qjit(target="mlir")
+    @qjit(target="mlir")
     # CHECK: options = "an-option maxValue=1"
     @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1)
     @qml.qnode(qml.device("null.qubit", wires=1))

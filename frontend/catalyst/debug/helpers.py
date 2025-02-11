@@ -15,10 +15,13 @@
 import copy
 import functools
 
-from catalyst.jit import QJIT
 from catalyst.compiler import CompileOptions
+from catalyst.jit import QJIT
+from catalyst.utils.filesystem import WorkspaceManager
 
-def qjit_for_lit_tests(fn=None,
+
+def qjit_for_lit_tests(
+    fn=None,
     *,
     autograph=False,
     autograph_include=(),
@@ -37,22 +40,25 @@ def qjit_for_lit_tests(fn=None,
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
-    ):
-    
+):
+
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
     if fn is None:
         return functools.partial(qjit_for_lit_tests, **kwargs)
-    
+
     return QJITForLitTests(fn, CompileOptions(**kwargs))
+
 
 class QJITForLitTests(QJIT):
     def __init__(self, *args, **kwargs):
         compile_options = args[1]
         compile_options.keep_intermediate = True
-        compile_options.target = "mlir"
         super().__init__(*(args[0], compile_options), **kwargs)
 
-    def __del__(self):
-        self.workspace.cleanup()
+    def _get_workspace(self):
+        """Get or create a workspace to use for compilation."""
 
+        workspace_name = self.__name__
+        preferred_workspace_dir = None
+        return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
