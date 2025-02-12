@@ -57,7 +57,8 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
     {
         return TransitionAttr::get(ctx, builder.getStringAttr(transition.level_0),
                                    builder.getStringAttr(transition.level_1),
-                                   builder.getF64FloatAttr(transition.einstein_a));
+                                   builder.getF64FloatAttr(transition.einstein_a),
+                                   builder.getStringAttr(transition.multipole));
     }
 
     bool canScheduleOn(RegisteredOperationName opInfo) const override

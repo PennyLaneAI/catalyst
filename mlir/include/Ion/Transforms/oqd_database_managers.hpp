@@ -160,13 +160,14 @@ class OQDDatabaseManager {
             double einstein_a = transition_entry["einstein_a"].as_floating_point()->get();
             std::string level1 = transition_entry["level1"].as_string()->get();
             std::string level2 = transition_entry["level2"].as_string()->get();
+            std::string multipole = transition_entry["multipole"].as_string()->get();
 
             std::set<std::string> levelEncodings{"downstate", "upstate", "estate"};
             assert((levelEncodings.count(level1) & levelEncodings.count(level2)) &&
                    "Only \"downstate\", \"upstate\" and \"estate\" are allowed in the atom's "
                    "transition levels.");
 
-            return Transition(level1, level2, einstein_a);
+            return Transition(level1, level2, multipole, einstein_a);
         };
 
         for (auto &ion_it : *(ionsToml.as_table())) {

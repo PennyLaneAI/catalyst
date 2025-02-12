@@ -86,14 +86,16 @@ def TransitionAttr : Ion_Attr<"Transition", "transition"> {
   let parameters = (ins
     "mlir::StringAttr":$level_0,
     "mlir::StringAttr":$level_1,
-    "mlir::FloatAttr":$einstein_a
+    "mlir::FloatAttr":$einstein_a,
+    "mlir::StringAttr":$multipole
   );
 
   let builders = [
     AttrBuilderWithInferredContext<(ins "mlir::StringAttr":$level_0,
                                         "mlir::StringAttr":$level_1,
-                                        "mlir::FloatAttr":$einstein_a), [{
-      return $_get(einstein_a.getContext(), level_0, level_1, einstein_a);
+                                        "mlir::FloatAttr":$einstein_a,
+                                        "mlir::StringAttr":$multipole), [{
+      return $_get(einstein_a.getContext(), level_0, level_1, einstein_a, multipole);
     }]>
   ];
 

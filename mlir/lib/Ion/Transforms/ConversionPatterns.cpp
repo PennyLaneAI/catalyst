@@ -154,6 +154,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         for (size_t i = 0; i < transitionsAttr.size(); i++) {
             auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
 
+            std::string multipole = transitionAttr.getMultipole().getValue().str();
             std::string level0_label = transitionAttr.getLevel_0().getValue().str();
             std::string level1_label = transitionAttr.getLevel_1().getValue().str();
 
@@ -170,6 +171,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
                      {"level1", level1},
                      {"level2", level2},
                      {"label", level0_label + "->" + level1_label}};
+                     {"multipole", multipole}};
             ion_json["transitions"].push_back(this_transition);
         }
         deviceInitOp.setKwargs(deviceKwargs.str() + "ION:" + std::string(ion_json.dump()));
