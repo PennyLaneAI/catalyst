@@ -244,13 +244,16 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         operands.push_back(pulseArraySize);
 
         // Create the parallel protocol stub function
-        Type protocolResultType = conv->convertType(IonType::get(ctx));
         Type protocolFuncType =
-            LLVM::LLVMFunctionType::get(protocolResultType, {ptrType, pulseArraySize.getType()});
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {ptrType, pulseArraySize.getType()});
         std::string protocolFuncName = "__catalyst__oqd__ParallelProtocol";
         LLVM::LLVMFuncOp protocolFnDecl =
             ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, protocolFnDecl, operands);
+        rewriter.create<LLVM::CallOp>(loc, protocolFnDecl, operands);
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.replaceOp(op, values);
 
         return success();
     }
