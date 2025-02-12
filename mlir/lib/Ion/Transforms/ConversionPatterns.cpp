@@ -173,6 +173,8 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
         }
         deviceInitOp.setKwargs(deviceKwargs.str() + "ION:" + std::string(ion_json.dump()));
 
+        deviceInitOp.setLib("oqd.qubit");
+
         rewriter.eraseOp(op);
         return success();
     }

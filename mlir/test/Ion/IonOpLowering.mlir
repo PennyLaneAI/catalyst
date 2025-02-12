@@ -22,7 +22,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
     quantum.device shots(%c0_i64) ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}"]
 
 // CHECK: quantum.device
-// CHECK-SAME: ["blah.so", "OQD", "{'shots': 0, 'mcmc': False}ION:
+// CHECK-SAME: ["oqd.qubit", "OQD", "{'shots': 0, 'mcmc': False}ION:
 // COM: nlohmann-json library dumps double quotation literals in json strings as \22
 // COM: nlohmann-json library dumps JSON specs in alphabetical order
 // CHECK-SAME: {
