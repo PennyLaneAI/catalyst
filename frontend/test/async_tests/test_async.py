@@ -18,7 +18,8 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
+from catalyst import adjoint, cond, for_loop, grad, measure, while_loop
+from catalyst.debug.helpers import qjit_for_lit_tests as qjit
 
 # We are explicitly testing that when something is not assigned
 # the use is awaited.
