@@ -168,7 +168,6 @@ class TestCapture:
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
 
-    @pytest.mark.xfail(reason="For not supported.")
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
         """Test the integration for a circuit with a for loop."""
@@ -177,7 +176,7 @@ class TestCapture:
         @qml.qnode(qml.device(backend, wires=4))
         def catalyst_capture_circuit(x):
 
-            @qml.for_loop(1, 1, 4)
+            @qml.for_loop(1, 4, 1)
             def loop(i):
                 qml.CNOT(wires=[0, i])
                 qml.RX(x, wires=i)
