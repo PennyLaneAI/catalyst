@@ -15,10 +15,8 @@
 #ifndef QEC_DIALECT
 #define QEC_DIALECT
 
-// include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/DialectBase.td"
-// include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 include "Quantum/IR/QuantumDialect.td"
@@ -52,22 +50,6 @@ def QECDialect : Dialect {
     // let useDefaultAttributePrinterParser = 1;
 
 }
-
-//===----------------------------------------------------------------------===//
-// QEC dialect enums.
-//===----------------------------------------------------------------------===//
-
-// def PauliEnum : I32EnumAttr<"Pauli",
-//     "Kinds of Pauli operators",
-//     [
-//         I32EnumAttrCase<"I", 0>,
-//         I32EnumAttrCase<"X", 1>,
-//         I32EnumAttrCase<"Y", 2>,
-//         I32EnumAttrCase<"Z", 3>,
-//     ]> {
-//     let cppNamespace = "catalyst::qec";
-//     let genSpecializedAttr = 0;
-// }
 
 //===----------------------------------------------------------------------===//
 // QEC dialect attributes.

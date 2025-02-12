@@ -80,9 +80,6 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleT
 sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.ModuleType(
     "mlir_quantum._mlir_libs._quantumDialects.mitigation"
 )
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.qec"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.qec"
-)
 
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *

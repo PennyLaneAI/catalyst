@@ -18,13 +18,8 @@
 #include "mlir/Pass/Pass.h"
 
 #include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Passes.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
-
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -42,14 +37,16 @@ struct LoweringToQECPass : impl::LoweringToQECPassBase<LoweringToQECPass> {
 
     void runOnOperation() final
     {
-        ConversionTarget target(getContext());
+        auto ctx = &getContext();
+        ConversionTarget target(*ctx);
 
-        target.addLegalDialect<arith::ArithDialect, func::FuncDialect, qec::QECDialect>();
+        target.addIllegalOp<quantum::CustomOp, quantum::MeasureOp>();
 
-        target.addIllegalOp<quantum::CustomOp>();
-        target.addIllegalOp<quantum::MeasureOp>();
+        target.markUnknownOpDynamicallyLegal([](Operation *op) {
+            return !isa<quantum::CustomOp>(op) && !isa<quantum::MeasureOp>(op);
+        });
 
-        RewritePatternSet patterns(&getContext());
+        RewritePatternSet patterns(ctx);
         populateQECLoweringPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {

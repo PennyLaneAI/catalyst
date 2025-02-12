@@ -26,11 +26,15 @@ func.func @test_qec_lowering(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // CHECK: [[cst_2:%.+]] = arith.constant 0.39
     // CHECK: [[q1_2:%.+]] = qec.ppr ["Z"]([[cst_2]]) [[q1_1]]
     // CHECK: [[cst_3:%.+]] = arith.constant 0.78
-    // CHECK: [[q1_3:%.+]] = qec.ppr ["Z", "X"]([[cst_3]]) [[q1_2]], [[q2]]
+    // CHECK: [[q1_3:%.+]]:2 = qec.ppr ["Z", "X"]([[cst_3]]) [[q1_2]], [[q2]]
     %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
     %q1_1 = quantum.custom "S"() %q1_0 : !quantum.bit
     %q1_2 = quantum.custom "T"() %q1_1 : !quantum.bit
     %q1_3:2 = quantum.custom "CNOT"() %q1_2, %q2 : !quantum.bit, !quantum.bit
+    // CHECK: [[cst_4:%.+]] = arith.constant -0.78
+    // CHECK: [[q1_4:%.+]] = qec.ppr ["Z"]([[cst_4]]) [[q1_3]]#0
+    // CHECK: [[cst_5:%.+]] = arith.constant -0.78
+    // CHECK: [[q1_5:%.+]] = qec.ppr ["X"]([[cst_5]]) [[q1_3]]#1
     // CHECK-NOT: quantum.custom
     // CHECK-NEXT: return
     func.return
@@ -56,14 +60,18 @@ func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
     %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
     // CHECK: [[cst_3:%.+]] = arith.constant 0.78
     // CHECK: [[q_3:%.+]]:2 = qec.ppr ["Z", "X"]([[cst_3]]) [[q0_2]], [[q1_1]]
+    // CHECK: [[cst_4:%.+]] = arith.constant -0.78
+    // CHECK: [[q_4:%.+]] = qec.ppr ["Z"]([[cst_4]]) [[q_3]]#0
+    // CHECK: [[cst_5:%.+]] = arith.constant -0.78
+    // CHECK: [[q_5:%.+]] = qec.ppr ["X"]([[cst_5]]) [[q_3]]#1
     %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
 
-    // CHECK: [[mres_0:%.+]], [[q0_4:%.+]] = qec.ppm ["Z"] [[q_3]]#0
+    // CHECK: [[mres_0:%.+]], [[q0_4:%.+]] = qec.ppm ["Z"] [[q_4]]
     // CHECK: [[tensor_0:%.+]] = tensor.from_elements [[mres_0]] : tensor<i1>
     %mres_0, %out_qubit_0 = quantum.measure %out_qubits_2#0 : i1, !quantum.bit
     %from_elements_0 = tensor.from_elements %mres_0 : tensor<i1>
 
-    // CHECK: [[mres_1:%.+]], [[q0_5:%.+]] = qec.ppm ["Z"] [[q_3]]#1
+    // CHECK: [[mres_1:%.+]], [[q0_5:%.+]] = qec.ppm ["Z"] [[q_5]]
     // CHECK: [[tensor_1:%.+]] = tensor.from_elements [[mres_1]] : tensor<i1>
     %mres_1, %out_qubit_1 = quantum.measure %out_qubits_2#1 : i1, !quantum.bit
     %from_elements_1 = tensor.from_elements %mres_1 : tensor<i1>
@@ -73,4 +81,4 @@ func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
     quantum.dealloc %4 : !quantum.reg
     // CHECK: return [[tensor_0]], [[tensor_1]] : tensor<i1>, tensor<i1>
     return %from_elements_0, %from_elements_1 : tensor<i1>, tensor<i1>
-  }
+}

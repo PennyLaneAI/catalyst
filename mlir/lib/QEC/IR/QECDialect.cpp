@@ -15,7 +15,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for enums
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -58,7 +57,7 @@ void QECDialect::initialize()
 // QEC enum definitions.
 //===----------------------------------------------------------------------===//
 
-#include "QEC/IR/QECEnums.cpp.inc"
+// #include "QEC/IR/QECEnums.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC attribute definitions.

@@ -20,8 +20,8 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Ion/IR/IonDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "Quantum/IR/QuantumDialect.h"
 #include "QEC/IR/QECDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Quantum, quantum, catalyst::quantum::QuantumDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Gradient, gradient, catalyst::gradient::GradientDialect)

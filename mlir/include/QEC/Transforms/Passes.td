@@ -21,8 +21,7 @@ def LoweringToQECPass : Pass<"convert-to-qec"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [
-        "quantum::QuantumDialect",
-        "qec::QECDialect"
+        "catalyst::qec::QECDialect",
     ];
 
     let constructor = "catalyst::createLowerToQECPass()";
