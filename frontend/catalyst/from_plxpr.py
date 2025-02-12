@@ -409,7 +409,7 @@ def handle_for_loop(
     )
 
     # Build Catalyst compatible input values
-    for_loop_invals = [start, stop, step, *consts, *start_plus_args_plus_qreg]
+    for_loop_invals = [*consts, start, stop, step, *start_plus_args_plus_qreg]
 
     # Config additional for loop settings
     apply_reverse_transform = isinstance(step, int) and step < 0
