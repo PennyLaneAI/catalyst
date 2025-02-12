@@ -27,12 +27,14 @@ auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 
     // need to return a vector from 0 to num_qubits
     std::vector<QubitIdType> result(num_qubits);
-    std::generate_n(result.begin(), num_qubits,
-                    []() { static size_t i=0; return i++; });
+    std::generate_n(result.begin(), num_qubits, []() {
+        static size_t i = 0;
+        return i++;
+    });
     return result;
 }
 
-void OQDDevice::ReleaseAllQubits() { this->ion_specs=""; }
+void OQDDevice::ReleaseAllQubits() { this->ion_specs = ""; }
 
 void OQDDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
 {

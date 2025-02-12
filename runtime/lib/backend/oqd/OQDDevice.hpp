@@ -68,7 +68,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
         // and ion_json is a JSON spec string for the ion
         std::string ion_token = "ION:";
         size_t ion_token_pos = kwargs.find(ion_token);
-        ion_specs = kwargs.substr(ion_token_pos+ion_token.length());
+        ion_specs = kwargs.substr(ion_token_pos + ion_token.length());
 
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs.substr(0, ion_token_pos));
         device_shots = device_kwargs.contains("shots")
