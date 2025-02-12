@@ -859,7 +859,6 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
 
     json observed = json::parse(std::ifstream("__openapl__output.json"));
     CHECK(expected == observed);
-    CHECK(1 == 0);
 
     std::filesystem::remove("__openapl__output.json");
 }
