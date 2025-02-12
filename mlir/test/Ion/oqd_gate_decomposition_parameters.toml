@@ -62,7 +62,7 @@ wavevector = [9,10,11]
 [[beams2]]
 rabi = 4.56
 detuning = 7.89
-polarization = [1,2]
+polarization = [1,2,3]
 wavevector = [-3,4,5]
 
 [[beams2]]
