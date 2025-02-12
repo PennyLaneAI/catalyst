@@ -32,34 +32,34 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:        #ion.level<
     // CHECK-SAME:            label = "downstate",
     // CHECK-SAME:            principal = 6
-    // CHECK-SAME:            spin = 4.000000e-01
-    // CHECK-SAME:            orbital = 5.000000e-01
-    // CHECK-SAME:            nuclear = 6.000000e-01
-    // CHECK-SAME:            spin_orbital = 8.000000e-01
-    // CHECK-SAME:            spin_orbital_nuclear = 9.000000e-01
-    // CHECK-SAME:            spin_orbital_nuclear_magnetization = 1.000000e+00
+    // CHECK-SAME:            spin = 5.000000e-01
+    // CHECK-SAME:            orbital = 1.000000e+00
+    // CHECK-SAME:            nuclear = 1.500000e+00
+    // CHECK-SAME:            spin_orbital = 2.000000e+00
+    // CHECK-SAME:            spin_orbital_nuclear = 2.500000e+00
+    // CHECK-SAME:            spin_orbital_nuclear_magnetization = -3.000000e+00
     // CHECK-SAME:            energy = 0.000000e+00
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.level<
     // CHECK-SAME:            label = "upstate",
     // CHECK-SAME:            principal = 6
-    // CHECK-SAME:            spin = 1.400000e+00
-    // CHECK-SAME:            orbital = 1.500000e+00
-    // CHECK-SAME:            nuclear = 1.600000e+00
-    // CHECK-SAME:            spin_orbital = 1.800000e+00
-    // CHECK-SAME:            spin_orbital_nuclear = 1.900000e+00
-    // CHECK-SAME:            spin_orbital_nuclear_magnetization = 2.000000e+00
+    // CHECK-SAME:            spin = 1.500000e+00
+    // CHECK-SAME:            orbital = 2.000000e+00
+    // CHECK-SAME:            nuclear = 2.500000e+00
+    // CHECK-SAME:            spin_orbital = 3.000000e+00
+    // CHECK-SAME:            spin_orbital_nuclear = 3.500000e+00
+    // CHECK-SAME:            spin_orbital_nuclear_magnetization = -4.000000e+00
     // CHECK-SAME:            energy = 1.264300e+10
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.level<
     // CHECK-SAME:            label = "estate",
     // CHECK-SAME:            principal = 5
-    // CHECK-SAME:            spin = 2.400000e+00
-    // CHECK-SAME:            orbital = 2.500000e+00
-    // CHECK-SAME:            nuclear = 2.600000e+00
-    // CHECK-SAME:            spin_orbital = 2.800000e+00
-    // CHECK-SAME:            spin_orbital_nuclear = 2.900000e+00
-    // CHECK-SAME:            spin_orbital_nuclear_magnetization = 3.000000e+00
+    // CHECK-SAME:            spin = 2.500000e+00
+    // CHECK-SAME:            orbital = 3.000000e+00
+    // CHECK-SAME:            nuclear = 3.500000e+00
+    // CHECK-SAME:            spin_orbital = 4.000000e+00
+    // CHECK-SAME:            spin_orbital_nuclear = 4.500000e+00
+    // CHECK-SAME:            spin_orbital_nuclear_magnetization = -5.000000e+00
     // CHECK-SAME:            energy = 8.115200e+14
     // CHECK-SAME:        >
     // CHECK-SAME:    ],
@@ -70,17 +70,20 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:        #ion.transition<
     // CHECK-SAME:            level_0 = "downstate",
     // CHECK-SAME:            level_1 = "estate",
-    // CHECK-SAME:            einstein_a = 2.200000e+00
+    // CHECK-SAME:            einstein_a = 2.200000e+00 : f64,
+    // CHECK-SAME:            multipole = "E2"
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.transition<
     // CHECK-SAME:            level_0 = "downstate",
     // CHECK-SAME:            level_1 = "upstate",
-    // CHECK-SAME:            einstein_a = 1.100000e+00
+    // CHECK-SAME:            einstein_a = 1.100000e+00 : f64,
+    // CHECK-SAME:            multipole = "M1"
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.transition<
     // CHECK-SAME:            level_0 = "estate",
     // CHECK-SAME:            level_1 = "upstate",
-    // CHECK-SAME:            einstein_a = 3.300000e+00
+    // CHECK-SAME:            einstein_a = 3.300000e+00 : f64,
+    // CHECK-SAME:            multipole = "E1"
     // CHECK-SAME:        >
     // CHECK-SAME:    ]
     // CHECK-SAME: } : !ion.ion
@@ -101,16 +104,16 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.100000e+00 : f64,
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
-    // CHECK-SAME:         polarization = [0, 1],
-    // CHECK-SAME:         wavevector = [-2, 3]>,
+    // CHECK-SAME:         polarization = [0, 1, 2],
+    // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timerx1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.100000e+00 : f64,
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
-    // CHECK-SAME:         polarization = [0, 1],
-    // CHECK-SAME:         wavevector = [-2, 3]>,
+    // CHECK-SAME:         polarization = [0, 1, 2],
+    // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
@@ -125,16 +128,16 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.100000e+00 : f64,
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
-    // CHECK-SAME:         polarization = [0, 1],
-    // CHECK-SAME:         wavevector = [-2, 3]>,
+    // CHECK-SAME:         polarization = [0, 1, 2],
+    // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timery1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.100000e+00 : f64,
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
-    // CHECK-SAME:         polarization = [0, 1],
-    // CHECK-SAME:         wavevector = [-2, 3]>,
+    // CHECK-SAME:         polarization = [0, 1, 2],
+    // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 3.1415926535{{[0-9]*}} : f64}
     // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
@@ -149,16 +152,16 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.100000e+00 : f64,
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
-    // CHECK-SAME:         polarization = [0, 1],
-    // CHECK-SAME:         wavevector = [-2, 3]>,
+    // CHECK-SAME:         polarization = [0, 1, 2],
+    // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timerx2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.100000e+00 : f64,
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
-    // CHECK-SAME:         polarization = [0, 1],
-    // CHECK-SAME:         wavevector = [-2, 3]>,
+    // CHECK-SAME:         polarization = [0, 1, 2],
+    // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
     // CHECK-NEXT: }
@@ -173,48 +176,48 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 4.560000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [9, 10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [9, 10, 11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 5.660000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 3.4{{.*}} : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 4.560000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [9, 10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [9, 10, 11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 8.960000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 0.1{{.*}} : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
@@ -250,48 +253,48 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 4.560000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [9, 10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [9, 10, 11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 5.660000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 3.4599999999999995 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 4.560000e+00 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [9, 10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [9, 10, 11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg2 {
     // CHECK-SAME:    beam = #ion.beam<
     // CHECK-SAME:        transition_index = 1 : i64,
     // CHECK-SAME:        rabi = 1.230000e+00 : f64,
     // CHECK-SAME:        detuning = 8.960000e+00 : f64,
-    // CHECK-SAME:        polarization = [7, 8],
-    // CHECK-SAME:        wavevector = [-9, -10]>,
+    // CHECK-SAME:        polarization = [7, 8, 9],
+    // CHECK-SAME:        wavevector = [-9, -10, -11]>,
     // CHECK-SAME:    phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 1.230000e+00 : f64,
     // CHECK-SAME:         detuning = 0.15999999999999925 : f64,
-    // CHECK-SAME:         polarization = [7, 8],
-    // CHECK-SAME:         wavevector = [-9, -10]>,
+    // CHECK-SAME:         polarization = [7, 8, 9],
+    // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
@@ -306,48 +309,48 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 7.8899999999999996 : f64,
-    // CHECK-SAME:         polarization = [1, 2],
-    // CHECK-SAME:         wavevector = [-3, 4]>,
+    // CHECK-SAME:         polarization = [1, 2, 3],
+    // CHECK-SAME:         wavevector = [-3, 4, 5]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 8.990000e+00 : f64,
-    // CHECK-SAME:         polarization = [1, 2],
-    // CHECK-SAME:         wavevector = [3, -4]>,
+    // CHECK-SAME:         polarization = [1, 2, 3],
+    // CHECK-SAME:         wavevector = [3, -4, -5]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 6.7899999999999991 : f64,
-    // CHECK-SAME:         polarization = [1, 2],
-    // CHECK-SAME:         wavevector = [3, -4]>,
+    // CHECK-SAME:         polarization = [1, 2, 3],
+    // CHECK-SAME:         wavevector = [3, -4, -5]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 7.8899999999999996 : f64,
-    // CHECK-SAME:         polarization = [1, 2],
-    // CHECK-SAME:         wavevector = [-3, 4]>,
+    // CHECK-SAME:         polarization = [1, 2, 3],
+    // CHECK-SAME:         wavevector = [-3, 4, 5]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg2 {
     // CHECK-SAME:    beam = #ion.beam<
     // CHECK-SAME:        transition_index = 1 : i64,
     // CHECK-SAME:        rabi = 4.560000e+00 : f64,
     // CHECK-SAME:        detuning = 1.559000e+01 : f64,
-    // CHECK-SAME:        polarization = [1, 2],
-    // CHECK-SAME:        wavevector = [3, -4]>,
+    // CHECK-SAME:        polarization = [1, 2, 3],
+    // CHECK-SAME:        wavevector = [3, -4, -5]>,
     // CHECK-SAME:    phase = 0.000000e+00 : f64}
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 4.560000e+00 : f64,
     // CHECK-SAME:         detuning = 0.1899999999999995 : f64,
-    // CHECK-SAME:         polarization = [1, 2],
-    // CHECK-SAME:         wavevector = [3, -4]>,
+    // CHECK-SAME:         polarization = [1, 2, 3],
+    // CHECK-SAME:         wavevector = [3, -4, -5]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }
@@ -362,48 +365,48 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.001000e+02 : f64,
-    // CHECK-SAME:         polarization = [37, 42],
-    // CHECK-SAME:         wavevector = [-42, -37]>,
+    // CHECK-SAME:         polarization = [37, 42, 43],
+    // CHECK-SAME:         wavevector = [-42, -37, -43]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT: [[p2:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.045000e+02 : f64,
-    // CHECK-SAME:         polarization = [37, 42],
-    // CHECK-SAME:         wavevector = [42, 37]>,
+    // CHECK-SAME:         polarization = [37, 42, 43],
+    // CHECK-SAME:         wavevector = [42, 37, 43]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT: [[p3:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 95.699999999999989 : f64,
-    // CHECK-SAME:         polarization = [37, 42],
-    // CHECK-SAME:         wavevector = [42, 37]>,
+    // CHECK-SAME:         polarization = [37, 42, 43],
+    // CHECK-SAME:         wavevector = [42, 37, 43]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT: [[p4:%.+]] = ion.pulse([[timems3]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 1.001000e+02 : f64,
-    // CHECK-SAME:         polarization = [37, 42],
-    // CHECK-SAME:         wavevector = [-42, -37]>,
+    // CHECK-SAME:         polarization = [37, 42, 43],
+    // CHECK-SAME:         wavevector = [-42, -37, -43]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT: [[p5:%.+]] = ion.pulse([[timems3]] : f64) %arg2 {
     // CHECK-SAME:    beam = #ion.beam<
     // CHECK-SAME:        transition_index = 1 : i64,
     // CHECK-SAME:        rabi = 99.989999999999994 : f64,
     // CHECK-SAME:        detuning = 1.078000e+02 : f64,
-    // CHECK-SAME:        polarization = [37, 42],
-    // CHECK-SAME:        wavevector = [42, 37]>,
+    // CHECK-SAME:        polarization = [37, 42, 43],
+    // CHECK-SAME:        wavevector = [42, 37, 43]>,
     // CHECK-SAME:    phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT: [[p6:%.+]] = ion.pulse([[timems3]] : f64) %arg2 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 1 : i64,
     // CHECK-SAME:         rabi = 99.989999999999994 : f64,
     // CHECK-SAME:         detuning = 92.399999999999991 : f64,
-    // CHECK-SAME:         polarization = [37, 42],
-    // CHECK-SAME:         wavevector = [42, 37]>,
+    // CHECK-SAME:         polarization = [37, 42, 43],
+    // CHECK-SAME:         wavevector = [42, 37, 43]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
     // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
     // CHECK-NEXT: }

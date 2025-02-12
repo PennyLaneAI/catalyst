@@ -234,17 +234,20 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
             #ion.transition<
                 level_0 = "l0",
                 level_1 = "l2",
-                einstein_a = 2.200000e+00 : f64
+                einstein_a = 2.200000e+00 : f64,
+                multipole = "M1"
             >,
             #ion.transition<
                 level_0 = "l1",
                 level_1 = "l2",
-                einstein_a = 1.100000e+00 : f64
+                einstein_a = 1.100000e+00 : f64,
+                multipole = "E1"
             >,
             #ion.transition<
                 level_0 = "l0",
                 level_1 = "l3",
-                einstein_a = 3.300000e+00 : f64
+                einstein_a = 3.300000e+00 : f64,
+                multipole = "E2"
             >
         ]
     } : !ion.ion
