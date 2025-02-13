@@ -39,6 +39,11 @@
       return qml.expval(qml.Z(0))
   ```
 
+* Changes to reduce compile time:
+
+  - Turn off MLIR's verifier.
+    [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
