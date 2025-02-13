@@ -155,9 +155,28 @@ class QPRSerializer {
             moduleStrings.emplace_back(gateOp.getGateName());
             gate.setName(moduleStrings.size() - 1);
             gate.setNumQubits(gateOp.getInQubits().size() + gateOp.getInCtrlQubits().size());
+            gate.setNumParams(gateOp.getParams().size());
 
-            // TODO: need to define signature of gates first
-            defaultSignatureMapping(op, operation, functionValues, mlirValueMap);
+            auto opInputs = operation.initInputs(gate.getNumQubits() + gate.getNumParams());
+            unsigned int argIdx = 0;
+            for (mlir::Value arg : gateOp.getInQubits()) {
+                opInputs.set(argIdx++, mlirValueMap[arg]);
+            }
+            for (mlir::Value arg : gateOp.getInCtrlQubits()) { // relative location TBD
+                opInputs.set(argIdx++, mlirValueMap[arg]);
+            }
+            for (mlir::Value arg : gateOp.getParams()) {
+                opInputs.set(argIdx++, mlirValueMap[arg]);
+            }
+
+            auto opOutputs = operation.initOutputs(gate.getNumQubits());
+            unsigned int resIdx = 0;
+            for (mlir::Value res : gateOp.getOutQubits()) {
+                opOutputs.set(resIdx++, trackNewValue(res, functionValues, mlirValueMap));
+            }
+            for (mlir::Value res : gateOp.getOutCtrlQubits()) { // relative location TBD
+                opOutputs.set(resIdx++, trackNewValue(res, functionValues, mlirValueMap));
+            }
         }
         else if (auto measureOp = dyn_cast<quantum::MeasureOp>(op)) {
             QubitOp::Builder qubitOp = instruction.initQubit();
@@ -184,7 +203,7 @@ class QPRSerializer {
         }
         else if (auto deallocOp = dyn_cast<quantum::DeallocOp>(op)) {
             QuregOp::Builder quregOp = instruction.initQureg();
-            quregOp.setFreeZero(); // TODO: update to setFree()
+            quregOp.setFree();
 
             defaultSignatureMapping(op, operation, functionValues, mlirValueMap);
         }
