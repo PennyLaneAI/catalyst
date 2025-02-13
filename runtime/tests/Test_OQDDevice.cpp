@@ -40,7 +40,24 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
     REQUIRE_THROWS_WITH(device.Var(0), Catch::Contains("Unsupported functionality"));
 }
 
-TEST_CASE("Test OpenAPL Program generation", "[OQD]")
+TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
+{
+    auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"})");
+
+    CHECK(device.getIonSpecs() == "{\"name\":\"Yb171\"}");
+
+    std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(3);
+    CHECK(allocaedQubits[0] == 0);
+    CHECK(allocaedQubits[1] == 1);
+    CHECK(allocaedQubits[2] == 2);
+
+    device.ReleaseAllQubits();
+    CHECK(device.getIonSpecs() == "");
+
+    std::filesystem::remove("__openapl__output.json");
+}
+
+TEST_CASE("Test OpenAPL Program generation", "[oqd]")
 {
     json expected = json::parse(R"(
 {
@@ -842,6 +859,9 @@ TEST_CASE("Test OpenAPL Program generation", "[OQD]")
 
     QUBIT **target0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
     QUBIT **target1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+
+    CHECK(reinterpret_cast<QubitIdType>(*target0) == 0);
+    CHECK(reinterpret_cast<QubitIdType>(*target1) == 1);
 
     Pulse *pulse1 = __catalyst__oqd__pulse(*target0, 2.0, 0.00, &beam1);
     Pulse *pulse2 = __catalyst__oqd__pulse(*target0, 2.0, 3.14, &beam2);

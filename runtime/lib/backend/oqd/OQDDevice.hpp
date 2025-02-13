@@ -82,5 +82,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
 
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
+
+    const std::string &getIonSpecs() { return ion_specs; }
 };
 } // namespace Catalyst::Runtime::Device

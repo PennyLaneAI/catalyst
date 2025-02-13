@@ -19,6 +19,8 @@
 
 namespace Catalyst::Runtime::Device {
 
+auto OQDDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
+
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     for (size_t i = 0; i < num_qubits; i++) {
@@ -27,14 +29,16 @@ auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 
     // need to return a vector from 0 to num_qubits
     std::vector<QubitIdType> result(num_qubits);
-    std::generate_n(result.begin(), num_qubits, []() {
-        static size_t i = 0;
-        return i++;
-    });
+    std::generate_n(result.begin(), num_qubits,
+                    [&]() { return this->qubit_manager.Allocate(num_qubits); });
     return result;
 }
 
-void OQDDevice::ReleaseAllQubits() { this->ion_specs = ""; }
+void OQDDevice::ReleaseAllQubits()
+{
+    this->ion_specs = "";
+    this->qubit_manager.ReleaseAll();
+}
 
 void OQDDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
 {
@@ -78,7 +82,6 @@ void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     RT_FAIL("Unsupported functionality");
 }
 
-auto OQDDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
 void OQDDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
 void OQDDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
