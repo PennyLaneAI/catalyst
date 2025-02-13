@@ -18,6 +18,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -43,53 +44,34 @@ class QPRSerializer {
     void generateModule()
     {
         module = message.initRoot<Module>();
-        auto functions = module.initFunctions(moduleFunctions.size());
 
+        auto functions = module.initFunctions(moduleFunctions.size());
         unsigned int funIdx = 0;
         for (func::FuncOp fun : moduleFunctions) {
             Function::Builder function = functions[funIdx++];
-            moduleStrings.emplace_back(fun.getName());
-            function.setName(moduleStrings.size() - 1);
-            generateRegion(function, fun);
+            generateFunction(fun, function);
         }
 
         auto strings = module.initStrings(moduleStrings.size());
-        for (size_t i = 0; i < moduleStrings.size(); i++) {
-            strings.set(i, moduleStrings[i]);
+        unsigned int stringIdx = 0;
+        for (std::string &string : moduleStrings) {
+            strings.set(stringIdx++, string);
         }
     }
 
-    void generateRegion(Function::Builder function, func::FuncOp fun)
+    void generateFunction(func::FuncOp fun, Function::Builder &function)
     {
         // Ordered list of values populated during traversal. They will be copied into value storage
-        // as is. Note that the same value can appear multiple times contrary to the value map.
+        // in the gathered order. Note that the same value can appear multiple times, contrary to
+        // the value map used within a region.
         std::vector<mlir::Value> functionValues;
-        llvm::DenseMap<mlir::Value, unsigned int> mlirValueMap;
 
-        auto &mlirOps = fun.getBody().front().getOperations(); // assume no CFG
+        moduleStrings.emplace_back(fun.getName());
+        function.setName(moduleStrings.size() - 1);
 
+        // populate the function body
         ::Region::Builder region = function.initBody();
-        auto operations = region.initOperations(mlirOps.size() - 1); // exclude terminator
-        auto sources = region.initSources(fun.getNumArguments());
-        auto targets = region.initTargets(fun.getNumResults());
-
-        // set the sources
-        unsigned int sourceIdx = 0;
-        for (mlir::Value arg : fun.getArguments()) {
-            sources.set(sourceIdx++, trackNewValue(arg, functionValues, mlirValueMap));
-        }
-
-        // process operations
-        unsigned int opIdx = 0;
-        for (mlir::Operation &op : mlirOps) {
-            generateOp(op, opIdx++, operations, functionValues, mlirValueMap);
-        }
-
-        // set the targets
-        unsigned int targetIdx = 0;
-        for (mlir::Value res : fun.getBody().front().getTerminator()->getOperands()) {
-            targets.set(targetIdx++, mlirValueMap[res]);
-        }
+        generateRegion(fun.getBody(), region, functionValues);
 
         // populate the values
         auto values = function.initValues(functionValues.size());
@@ -100,15 +82,45 @@ class QPRSerializer {
         }
     }
 
-    void generateOp(mlir::Operation &op, unsigned int opIdx, capnp::List<::Op>::Builder &operations,
+    void generateRegion(mlir::Region &body, ::Region::Builder &region,
+                        std::vector<mlir::Value> &functionValues)
+    {
+        // Map MLIR values to their storage index in the current QPR function.
+        llvm::DenseMap<mlir::Value, unsigned int> mlirValueMap;
+
+        auto &mlirOps = body.front().getOperations(); // assume no CFG
+        mlir::Operation *terminator = body.back().getTerminator();
+
+        auto operations = region.initOperations(mlirOps.size() - 1); // exclude terminator
+        auto sources = region.initSources(body.getNumArguments());
+        auto targets = region.initTargets(terminator->getNumOperands());
+
+        // set the sources
+        unsigned int sourceIdx = 0;
+        for (mlir::Value arg : body.getArguments()) {
+            sources.set(sourceIdx++, trackNewValue(arg, functionValues, mlirValueMap));
+        }
+
+        // process operations
+        unsigned int opIdx = 0;
+        for (mlir::Operation &op : mlirOps) {
+            if (!op.hasTrait<OpTrait::IsTerminator>()) {
+                ::Op::Builder operation = operations[opIdx++];
+                generateOp(op, operation, functionValues, mlirValueMap);
+            }
+        }
+
+        // set the targets
+        unsigned int targetIdx = 0;
+        for (mlir::Value res : terminator->getOperands()) {
+            targets.set(targetIdx++, mlirValueMap[res]);
+        }
+    }
+
+    void generateOp(mlir::Operation &op, ::Op::Builder &operation,
                     std::vector<mlir::Value> &functionValues,
                     llvm::DenseMap<mlir::Value, unsigned int> &mlirValueMap)
     {
-        if (op.hasTrait<OpTrait::IsTerminator>()) {
-            return;
-        }
-
-        ::Op::Builder operation = operations[opIdx];
         ::Op::Instruction::Builder instruction = operation.initInstruction();
 
         if (auto constOp = dyn_cast<arith::ConstantOp>(op)) {
@@ -207,6 +219,27 @@ class QPRSerializer {
 
             defaultSignatureMapping(op, operation, functionValues, mlirValueMap);
         }
+        else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+            ScfOp::Builder scfOp = instruction.initScf();
+            ::Region::Builder body = scfOp.initFor();
+
+            auto opInputs = operation.initInputs(forOp.getNumRegionIterArgs() + 1);
+            opInputs.set(0, mlirValueMap[forOp.getUpperBound()]); // TODO: need extra instructions
+            unsigned int argIdx = 1;
+            for (mlir::Value arg : forOp.getInitArgs()) {
+                opInputs.set(argIdx++, mlirValueMap[arg]);
+            }
+
+            // QPR nested regions do not support accessing outside values, that is QPR regions
+            // are IsolatedFromAbove, which MLIR SCF regions are not.
+            generateRegion(forOp.getBodyRegion(), body, functionValues);
+
+            auto opOutputs = operation.initOutputs(forOp.getNumRegionIterArgs());
+            unsigned int resIdx = 0;
+            for (mlir::Value res : forOp.getResults()) {
+                opOutputs.set(resIdx++, trackNewValue(res, functionValues, mlirValueMap));
+            }
+        }
         else {
             llvm::outs() << "Unsupported operation: " << op.getName() << ". Abort.\n";
             std::exit(-1);
@@ -247,6 +280,9 @@ class QPRSerializer {
         else if (isa<quantum::QuregType>(val)) {
             type.setQureg();
         }
+        else if (auto idxVal = dyn_cast<mlir::IndexType>(val)) {
+            type.setInt(64);
+        }
         else if (auto intVal = dyn_cast<mlir::IntegerType>(val)) {
             type.setInt(intVal.getWidth());
         }
@@ -270,7 +306,7 @@ class QPRSerializer {
 
     void writeOut()
     {
-        int fd = open("./test_file.txt", O_RDWR | O_CREAT | O_TRUNC, 0644);
+        int fd = open("catalyst.qpr", O_RDWR | O_CREAT | O_TRUNC, 0644);
         if (fd < 0) {
             llvm::outs() << "Could not open file for writing. Abort.\n";
             std::exit(-1);
