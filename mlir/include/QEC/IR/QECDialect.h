@@ -32,12 +32,6 @@
 #define GET_TYPEDEF_CLASSES
 #include "QEC/IR/QECDialectTypes.h.inc"
 
-//===----------------------------------------------------------------------===//
-// QEC attribute declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_ATTRDEF_CLASSES
-#include "QEC/IR/QECAttributes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC ops declarations.
