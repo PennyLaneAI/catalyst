@@ -35,11 +35,6 @@ void QECDialect::initialize()
 #include "QEC/IR/QECDialectTypes.cpp.inc"
         >();
 
-    addAttributes<
-#define GET_ATTRDEF_LIST
-#include "QEC/IR/QECAttributes.cpp.inc"
-        >();
-
     addOperations<
 #define GET_OP_LIST
 #include "QEC/IR/QECDialect.cpp.inc"
@@ -52,19 +47,6 @@ void QECDialect::initialize()
 
 #define GET_TYPEDEF_CLASSES
 #include "QEC/IR/QECDialectTypes.cpp.inc"
-
-//===----------------------------------------------------------------------===//
-// QEC enum definitions.
-//===----------------------------------------------------------------------===//
-
-// #include "QEC/IR/QECEnums.cpp.inc"
-
-//===----------------------------------------------------------------------===//
-// QEC attribute definitions.
-//===----------------------------------------------------------------------===//
-
-#define GET_ATTRDEF_CLASSES
-#include "QEC/IR/QECAttributes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC op definitions.
