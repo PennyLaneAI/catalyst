@@ -64,6 +64,13 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
   "class_": "AtomicCircuit",
   "system": {
     "class_": "System",
+    "modes":[
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,0.0,1.0],
+        "energy": 3.3
+      }
+    ],
     "ions": [
       {
         "class_": "Ion",
@@ -857,6 +864,11 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           0.0,
           0.0
         ]
+      }PHONON:
+      {
+        "class_": "Phonon",
+        "eigenvector": [0.0,0.0,1.0],
+        "energy": 3.3
       })"};
 
     size_t num_qubits = 2;
