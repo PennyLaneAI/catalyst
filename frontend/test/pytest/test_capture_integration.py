@@ -250,6 +250,27 @@ class TestCapture:
         assert jnp.allclose(default_capture_result, jnp.eye(2**4)[0])
         assert jnp.allclose(experimental_capture_result, default_capture_result)
 
+    def test_while_loop_workflow(self, backend):
+        """Test the integration for a circuit with a while_loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+
+            @qml.while_loop(lambda x: x < 2.0)
+            def loop_rx(x):
+                # perform some work and update (some of) the arguments
+                qml.RX(x, wires=0)
+                return x**2
+
+            # apply the while loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(1.5)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(1.5)
+        assert default_capture_result == experimental_capture_result
+
     def test_cond_workflow_if_else(self, backend):
         """Test the integration for a circuit with a cond primitive with true and false branches."""
 

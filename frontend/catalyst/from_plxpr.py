@@ -26,6 +26,7 @@ from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, disable, enable, enabled, qnode_prim
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
+from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.device import (
     extract_backend_info,
@@ -59,6 +60,7 @@ from catalyst.jax_primitives import (
     sample_p,
     state_p,
     var_p,
+    while_p,
 )
 
 measurement_map = {
@@ -421,6 +423,74 @@ def handle_for_loop(
         body_jaxpr=converted_closed_jaxpr_branch,
         body_nconsts=len(consts),
         apply_reverse_transform=apply_reverse_transform,
+        nimplicit=0,
+        preserve_dimensions=not expansion_strategy.input_unshare_variables,
+    )
+
+    # We assume the last output value is the returned qreg.
+    # Update the current qreg and remove it from the output values.
+    self.qreg = outvals.pop()
+
+    # Return only the output values that match the plxpr output values
+    return outvals
+
+
+# pylint: disable=unused-argument, too-many-arguments
+
+
+@QFuncPlxprInterpreter.register_primitive(plxpr_while_loop_prim)
+def handle_while_loop(
+    self,
+    *plxpr_invals,
+    jaxpr_body_fn,
+    jaxpr_cond_fn,
+    body_slice,
+    cond_slice,
+    args_slice,
+    abstract_shapes_slice,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive"""
+    consts_body = plxpr_invals[body_slice]
+    consts_cond = plxpr_invals[cond_slice]
+    args = plxpr_invals[args_slice]
+    args_plus_qreg = [*args, self.qreg]  # Add the qreg to the args
+
+    # Convert for while body from plxpr to Catalyst jaxpr
+    converted_body_func = partial(
+        BranchPlxprInterpreter(self._device, self._shots).eval,
+        jaxpr_body_fn,
+        consts_body,
+    )
+    converted_body_jaxpr_branch = jax.make_jaxpr(converted_body_func)(*args_plus_qreg).jaxpr
+    converted_body_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+        convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
+    )
+
+    # Convert for condition from plxpr to Catalyst jaxpr
+    converted_cond_func = partial(
+        BranchPlxprInterpreter(self._device, self._shots).eval,
+        jaxpr_cond_fn,
+        consts_cond,
+    )
+    converted_cond_jaxpr_branch = jax.make_jaxpr(converted_cond_func)(*args_plus_qreg).jaxpr
+    converted_cond_closed_jaxpr_branch = jax.core.ClosedJaxpr(
+        convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
+    )
+
+    # Build Catalyst compatible input values
+    while_loop_invals = [*consts_cond, *consts_body, *args_plus_qreg]
+
+    # Config additional while  loop settings
+    cond_nconsts = len(converted_cond_closed_jaxpr_branch.consts)
+    body_nconsts = len(converted_body_closed_jaxpr_branch.consts)
+    expansion_strategy = for_loop_expansion_strategy(False)
+
+    outvals = while_p.bind(
+        *while_loop_invals,
+        cond_jaxpr=converted_cond_closed_jaxpr_branch,
+        body_jaxpr=converted_body_closed_jaxpr_branch,
+        cond_nconsts=cond_nconsts,
+        body_nconsts=body_nconsts,
         nimplicit=0,
         preserve_dimensions=not expansion_strategy.input_unshare_variables,
     )
