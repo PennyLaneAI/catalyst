@@ -17,6 +17,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
@@ -179,9 +180,8 @@ namespace catalyst {
 #define GEN_PASS_DEF_ANNOTATEFUNCTIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPass> {
-    using AnnotateFunctionPassBase::AnnotateFunctionPassBase;
-
+struct AnnotateFunctionPassVerified
+    : public PassWrapper<AnnotateFunctionPassVerified, OperationPass<>> {
     void runOnOperation() final
     {
         MLIRContext *context = &getContext();
@@ -191,6 +191,21 @@ struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPas
         patterns.add<PropagateAnnotationPattern>(context, cg);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+            signalPassFailure();
+        }
+    }
+};
+
+struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPass> {
+    using AnnotateFunctionPassBase::AnnotateFunctionPassBase;
+
+    void runOnOperation() final
+    {
+        MLIRContext *ctx = &getContext();
+        auto pm = mlir::PassManager::on<mlir::ModuleOp>(ctx);
+        pm.addPass(std::make_unique<AnnotateFunctionPassVerified>());
+        pm.enableVerifier(true);
+        if (failed(pm.run(getOperation()))) {
             signalPassFailure();
         }
     }
