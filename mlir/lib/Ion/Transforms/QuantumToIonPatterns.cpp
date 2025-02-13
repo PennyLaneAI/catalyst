@@ -205,7 +205,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                   const std::vector<Beam> &beams2,
-                                  const std::vector<PhononMode> &phonons)
+                                  const std::vector<Phonon> &phonons)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
     MLIRContext *ctx = op.getContext();
@@ -223,7 +223,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
         auto qubitIndex1Value = qubitIndex1.value();
         auto nQubits = allocOp.getNqubitsAttr();
         if (nQubits.has_value()) {
-            if (static_cast<size_t>(qubitIndex0Value) >= phonons.size()) {
+            if (static_cast<size_t>(qubitIndex0Value) * 3 >= phonons.size()) {
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex0Value
                                << " used as input to MS gate; there are only " << phonons.size()
                                << " phonon parameters in the database."
@@ -232,7 +232,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 return failure();
             }
 
-            if (static_cast<size_t>(qubitIndex1Value) >= phonons.size()) {
+            if (static_cast<size_t>(qubitIndex1Value) * 3 >= phonons.size()) {
                 op.emitError() << "Missing phonon parameters for qubit " << qubitIndex1Value
                                << " used as input to MS gate; there are only " << phonons.size()
                                << " phonon parameters in the database."
@@ -241,9 +241,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 return failure();
             }
 
-            // Assume that each ion has 3 phonons (x, y, z)
-            const Phonon &phonon0ComX = phonons[qubitIndex0Value].COM_x;
-            const Phonon &phonon1ComX = phonons[qubitIndex1Value].COM_x;
+            const Phonon &phonon0ComX = phonons[qubitIndex0Value * 3];
+            const Phonon &phonon1ComX = phonons[qubitIndex1Value * 3];
 
             auto twoQubitComboIndex =
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
@@ -438,7 +437,7 @@ struct QuantumToIonRewritePattern : public mlir::OpConversionPattern<CustomOp> {
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
-    std::vector<PhononMode> phonons;
+    std::vector<Phonon> phonons;
 
     QuantumToIonRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
         : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)
