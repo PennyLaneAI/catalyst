@@ -61,6 +61,12 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                                    builder.getStringAttr(transition.multipole));
     }
 
+    PhononAttr getPhononAttr(MLIRContext *ctx, IRRewriter &builder, Phonon phonon)
+    {
+        return PhononAttr::get(ctx, builder.getF64FloatAttr(phonon.energy),
+                               builder.getDenseF64ArrayAttr(phonon.eigenvector));
+    }
+
     bool canScheduleOn(RegisteredOperationName opInfo) const override
     {
         return opInfo.hasInterface<FunctionOpInterface>();
@@ -100,6 +106,12 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
                 op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
                 builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
                 ion.position, builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
+
+            SmallVector<Attribute> phonons;
+            for (const Phonon &phonon : dataManager.getPhononParams()) {
+                phonons.push_back(cast<Attribute>(getPhononAttr(ctx, builder, phonon)));
+            }
+            builder.create<ion::ModesOp>(op->getLoc(), builder.getArrayAttr(phonons));
         }
 
         RewritePatternSet ionPatterns(&getContext());

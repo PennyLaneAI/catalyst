@@ -183,6 +183,41 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
     }
 };
 
+struct ModesOpPattern : public OpConversionPattern<catalyst::ion::ModesOp> {
+    using OpConversionPattern<catalyst::ion::ModesOp>::OpConversionPattern;
+
+    // Create the modes JSON and pass it into the device kwargs as a JSON string
+    LogicalResult matchAndRewrite(catalyst::ion::ModesOp op, catalyst::ion::ModesOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
+
+        DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
+
+        auto modesAttr = op.getModes();
+        for (size_t i = 0; i < modesAttr.size(); i++) {
+            StringRef deviceKwargs = deviceInitOp.getKwargs();
+            auto phononAttr = cast<PhononAttr>(modesAttr[i]);
+
+            json phonon_json = R"({
+                            "class_": "Phonon",
+                            "energy": [],
+                            "eigenvector" : []
+                        })"_json;
+            phonon_json["energy"] = phononAttr.getEnergy().getValue().convertToDouble();
+            auto eigenvector = phononAttr.getEignevector();
+            for (int j = 0; j < eigenvector.size(); j++) {
+                phonon_json["eigenvector"].push_back(eigenvector[j]);
+            }
+            deviceInitOp.setKwargs(deviceKwargs.str() +
+                                   "PHONON:" + std::string(phonon_json.dump()));
+        }
+
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::ParallelProtocolOp> {
     using OpConversionPattern<catalyst::ion::ParallelProtocolOp>::OpConversionPattern;
 
@@ -307,6 +342,7 @@ namespace ion {
 void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<IonOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<ModesOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
 }
