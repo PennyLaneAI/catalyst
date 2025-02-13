@@ -815,7 +815,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 }
 
 std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
-//std::vector<Pipeline> parsePipelines(const std::string &catalystPipeline)
 {
     std::vector<Pipeline> allPipelines;
     for (const auto &pipelineStr : catalystPipeline) {
@@ -832,7 +831,7 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
         llvm::StringRef passesStr = pipelineRef.slice(delim + 1, pipelineRef.size()).trim();
 
         Pipeline pipeline;
-        
+
         llvm::SmallVector<std::string> _pipelines;
         _pipelines.push_back(passesStr.str());
         pipeline.setName(pipelineName.str());
@@ -869,9 +868,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                               cl::init(false), cl::cat(CatalystCat));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
                           cl::cat(CatalystCat));
-    cl::list<std::string> CatalystPipeline(
-        "catalyst-pipeline", cl::desc("Catalyst Compiler pass pipelines"), cl::ZeroOrMore,
-        cl::cat(CatalystCat));
+    cl::list<std::string> CatalystPipeline("catalyst-pipeline",
+                                           cl::desc("Catalyst Compiler pass pipelines"),
+                                           cl::ZeroOrMore, cl::cat(CatalystCat));
     cl::opt<std::string> CheckpointStage("checkpoint-stage", cl::desc("Checkpoint stage"),
                                          cl::init(""), cl::cat(CatalystCat));
     cl::opt<enum Action> LoweringAction(
