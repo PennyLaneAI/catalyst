@@ -396,7 +396,7 @@ def clifford_t_ppr(qnode):
             qml.T(0)
             qml.CNOT([0, 1])
             return qml.expval(qml.PauliZ(0))
-    
+
     Example MLIR Representation:
     .. code-block:: mlir
          . . .
@@ -408,7 +408,7 @@ def clifford_t_ppr(qnode):
         %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
         %m1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
         %m2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
-        . . . 
+        . . .
     """
     if not isinstance(qnode, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
