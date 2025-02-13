@@ -84,6 +84,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
 // CHECK-SAME:     {
 // CHECK-SAME:       \22class_\22:\22Transition\22,
 // CHECK-SAME:       \22einsteinA\22:2.2,
+// CHECK-SAME:       \22label\22:\22l0->l2\22,
 // CHECK-SAME:       \22level1\22:
 // CHECK-SAME:       {
 // CHECK-SAME:           \22class_\22:\22Level\22,
@@ -114,6 +115,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
 // CHECK-SAME:     {
 // CHECK-SAME:       \22class_\22:\22Transition\22,
 // CHECK-SAME:       \22einsteinA\22:1.1,
+// CHECK-SAME:       \22label\22:\22l1->l2\22,
 // CHECK-SAME:       \22level1\22:
 // CHECK-SAME:       {
 // CHECK-SAME:         \22class_\22:\22Level\22,
@@ -144,6 +146,7 @@ func.func public @ion_op(%arg0: tensor<f64>, %arg1: tensor<f64>) attributes {dif
 // CHECK-SAME:     {
 // CHECK-SAME:       \22class_\22:\22Transition\22,
 // CHECK-SAME:       \22einsteinA\22:3.3,
+// CHECK-SAME:       \22label\22:\22l0->l3\22,
 // CHECK-SAME:       \22level1\22:
 // CHECK-SAME:       {
 // CHECK-SAME:           \22class_\22:\22Level\22,

@@ -122,6 +122,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
         "transitions": [
           {
             "class_": "Transition",
+            "label": "l0->l2",
             "level1": {
               "class_": "Level",
               "label": "l0",
@@ -150,6 +151,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l0->l3",
             "level1": {
               "class_": "Level",
               "label": "l0",
@@ -178,6 +180,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l1->l2",
             "level1": {
               "class_": "Level",
               "label": "l1",
@@ -206,6 +209,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l1->l3",
             "level1": {
               "class_": "Level",
               "label": "l1",
@@ -296,6 +300,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
         "transitions": [
           {
             "class_": "Transition",
+            "label": "l0->l2",
             "level1": {
               "class_": "Level",
               "label": "l0",
@@ -324,6 +329,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l0->l3",
             "level1": {
               "class_": "Level",
               "label": "l0",
@@ -352,6 +358,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l1->l2",
             "level1": {
               "class_": "Level",
               "label": "l1",
@@ -380,6 +387,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l1->l3",
             "level1": {
               "class_": "Level",
               "label": "l1",
@@ -427,6 +435,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
               "class_": "Beam",
               "transition": {
                 "class_": "Transition",
+                "label": "l0->l2",
                 "level1": {
                   "class_": "Level",
                   "label": "l0",
@@ -485,6 +494,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
               "class_": "Beam",
               "transition": {
                 "class_": "Transition",
+                "label": "l1->l2",
                 "level1": {
                   "class_": "Level",
                   "label": "l1",
@@ -548,6 +558,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
               "class_": "Beam",
               "transition": {
                 "class_": "Transition",
+                "label": "l0->l3",
                 "level1": {
                   "class_": "Level",
                   "label": "l0",
@@ -606,6 +617,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
               "class_": "Beam",
               "transition": {
                 "class_": "Transition",
+                "label": "l1->l3",
                 "level1": {
                   "class_": "Level",
                   "label": "l1",
@@ -725,6 +737,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
         "transitions": [
           {
             "class_": "Transition",
+            "label": "l0->l2",
             "level1": {
               "class_": "Level",
               "label": "l0",
@@ -753,6 +766,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l0->l3",
             "level1": {
               "class_": "Level",
               "label": "l0",
@@ -781,6 +795,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l1->l2",
             "level1": {
               "class_": "Level",
               "label": "l1",
@@ -809,6 +824,7 @@ TEST_CASE("Test OpenAPL Program generation", "[oqd]")
           },
           {
             "class_": "Transition",
+            "label": "l1->l3",
             "level1": {
               "class_": "Level",
               "label": "l1",
