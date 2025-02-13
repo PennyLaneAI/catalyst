@@ -35,7 +35,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(tomlplusplus)
 
 # Fetch json utilities
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+FetchContent_Declare(
+  json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.11.3
+)
 FetchContent_MakeAvailable(json)
 target_link_libraries(ion-transforms
     PRIVATE nlohmann_json::nlohmann_json
