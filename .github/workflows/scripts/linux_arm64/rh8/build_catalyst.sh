@@ -42,17 +42,15 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
     -DPython_EXECUTABLE=${PYTHON} \
-    -DENABLE_OPENQASM=ON
+    -DENABLE_OPENQASM=ON \
+    -DENABLE_OQD=OFF \
+    -DMLIR_INCLUDE_DIRS="/catalyst/mlir/llvm-project/mlir/include"
 cmake --build runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
 
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
 export RT_BUILD_DIR="/catalyst/runtime-build"
 make oqc
-
-# Build OQD
-export OQD_BUILD_DIR="/catalyst/oqd-build"
-make oqd
 
 # Build Catalyst dialects
 cmake -S mlir -B /catalyst/quantum-build -G Ninja \
@@ -84,7 +82,6 @@ export MHLO_BUILD_DIR=/catalyst/mhlo-build
 export DIALECTS_BUILD_DIR=/catalyst/quantum-build
 export RT_BUILD_DIR=/catalyst/runtime-build
 export OQC_BUILD_DIR=/catalyst/oqc-build
-export OQD_BUILD_DIR=/catalyst/oqd-build
 export ENZYME_BUILD_DIR=/catalyst/enzyme-build
 export PYTHON=/usr/bin/python3
 make wheel

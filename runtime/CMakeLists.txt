@@ -13,6 +13,7 @@ option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
+option(ENABLE_OQD "Build OQD backend device" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -27,27 +28,6 @@ file(READ ../.dep-versions DEPENDENCY_VERSIONS)
 string(REGEX MATCH "llvm=([0-9a-f]+)" _ ${DEPENDENCY_VERSIONS})
 set(LLVM_HASH ${CMAKE_MATCH_1})
 message(STATUS "Detected LLVM version - ${LLVM_HASH}")
-
-FetchContent_Declare(
-    MLIRRunnerUtils
-    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/RunnerUtils.h
-    DOWNLOAD_NO_EXTRACT True
-    SOURCE_DIR        mlir/ExecutionEngine
-)
-
-FetchContent_Declare(
-    MLIRCRunnerUtils
-    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/CRunnerUtils.h
-    DOWNLOAD_NO_EXTRACT True
-    SOURCE_DIR          mlir/ExecutionEngine
-)
-
-FetchContent_Declare(
-    MLIRFloat16Bits
-    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/Float16bits.h
-    DOWNLOAD_NO_EXTRACT True
-    SOURCE_DIR          mlir/ExecutionEngine
-)
 
 # Note on pybind11 vs python discovery order:
 # If Python is looked for first, then we have to look for all the components needed by pybind11.
@@ -76,6 +56,7 @@ if(RUNTIME_ENABLE_WARNINGS)
 endif()
 
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
+message(STATUS "ENABLE_OQD is ${ENABLE_OQD}.")
 
 set(devices_list)
 list(APPEND devices_list rtd_null_qubit)
@@ -86,6 +67,11 @@ if(ENABLE_OPENQASM)
     list(APPEND devices_list rtd_openqasm)
 endif()
 
+if(ENABLE_OQD)
+    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/oqd")
+    list(APPEND devices_list rtd_oqd_device)
+endif()
+
 add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
@@ -93,6 +79,7 @@ target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}
     ${backend_includes}
+    ${MLIR_INCLUDE_DIRS}
 )
 
 if(ENABLE_CODE_COVERAGE)

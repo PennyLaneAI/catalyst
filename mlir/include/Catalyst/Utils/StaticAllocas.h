@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,5 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define CATCH_CONFIG_MAIN
-#include <catch2/catch.hpp>
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/PatternMatch.h"
+
+using namespace mlir;
+
+namespace catalyst {
+
+LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, int val);
+memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter,
+                                       MemRefType paramCountType);
+
+} // namespace catalyst

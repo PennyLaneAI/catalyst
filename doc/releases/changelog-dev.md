@@ -32,6 +32,9 @@
   infrastracture.
   [(#1442)](https://github.com/PennyLaneAI/catalyst/pull/1442)
 
+* Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
+  [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
+
 * Catalyst now supports experimental capture of `cond` control flow.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
   
@@ -59,6 +62,11 @@
 
       return qml.expval(qml.Z(0))
   ```
+
+* Changes to reduce compile time:
+
+  - Turn off MLIR's verifier.
+    [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
 
 <h3>Breaking changes 💔</h3>
 
@@ -107,6 +115,9 @@
     `@__catalyst_ion`, `@ __catalyst_pulse_op`, `@ __catalyst_parallel_protocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
+  - The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
+    [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)
+
 * Update source code to comply with changes requested by black v25.1.0
   [(#1490)](https://github.com/PennyLaneAI/catalyst/pull/1490)
 
@@ -118,10 +129,11 @@ This release contains contributions from (in alphabetical order):
 
 Joey Carter,
 Yushao Chen,
+Zach Goldthorpe,
 Sengthai Heng,
+Rohan Nolan Lasrado,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Andrija Paurevic,
-Paul Haochen Wang,
-Rohan Nolan Lasrado,
-Raul Torres.
+Raul Torres,
+Paul Haochen Wang.
