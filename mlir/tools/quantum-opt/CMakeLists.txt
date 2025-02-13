@@ -21,6 +21,7 @@ set(LIBS
     MLIRCatalystTest
     MLIRTestDialect
     ${ALL_MHLO_PASSES}
+    qpr-transforms
 )
 
 add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)

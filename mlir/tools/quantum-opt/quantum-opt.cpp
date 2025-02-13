@@ -34,6 +34,8 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
+std::unique_ptr<mlir::Pass> createQPRExportPass();
+
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
@@ -42,6 +44,7 @@ int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
+    mlir::registerPass(createQPRExportPass);
     mlir::mhlo::registerAllMhloPasses();
 
     mlir::DialectRegistry registry;
