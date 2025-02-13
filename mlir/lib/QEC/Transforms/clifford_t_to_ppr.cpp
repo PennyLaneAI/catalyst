@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "convert-to-qec"
+#define DEBUG_TYPE "convert-clifford-t-to-ppr"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -28,12 +28,12 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_LOWERINGTOQECPASS
-#define GEN_PASS_DECL_LOWERINGTOQECPASS
+#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DECL_CLIFFORDTTOPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct LoweringToQECPass : impl::LoweringToQECPassBase<LoweringToQECPass> {
-    using LoweringToQECPassBase::LoweringToQECPassBase;
+struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
+    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
 
     void runOnOperation() final
     {
@@ -47,7 +47,7 @@ struct LoweringToQECPass : impl::LoweringToQECPassBase<LoweringToQECPass> {
         });
 
         RewritePatternSet patterns(ctx);
-        populateQECLoweringPatterns(patterns);
+        populateCliffordTToPPRPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             return signalPassFailure();
@@ -60,7 +60,7 @@ struct LoweringToQECPass : impl::LoweringToQECPassBase<LoweringToQECPass> {
 /// Create a pass for lowering operations in the `QECDialect`.
 std::unique_ptr<mlir::Pass> createLowerToQECPass()
 {
-    return std::make_unique<qec::LoweringToQECPass>();
+    return std::make_unique<qec::CliffordTToPPRPass>();
 }
 
 } // namespace catalyst

@@ -1,8 +1,8 @@
 set(LIBRARY_NAME qec-transforms)
 
 file(GLOB SRC
-    QECLowering.cpp
-    qec_lowering.cpp
+    CliffordTToPPR.cpp
+    clifford_t_to_ppr.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

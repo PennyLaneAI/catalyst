@@ -361,7 +361,7 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 def clifford_t_ppr(qnode):
     """
-    Specify that the ``-convert-to-qec`` MLIR compiler pass
+    Specify that the ``-convert-clifford-t-to-ppr`` MLIR compiler pass
     for converting clifford+T gates into Pauli product rotations will be applied.
 
     The full list of supported gates are as follows:
@@ -396,9 +396,19 @@ def clifford_t_ppr(qnode):
             qml.T(0)
             qml.CNOT([0, 1])
             return qml.expval(qml.PauliZ(0))
-
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
-    <MLIR only shows PPR operations>
+    
+    Example MLIR Representation:
+    .. code-block:: mlir
+         . . .
+        %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
+        %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit
+        %q0_1 = qec.ppr ["Z"](%pi8) %q0_0 : !quantum.bit
+        %01_0 = qec.ppr ["Z", "X"](%pi4) %5, %2 : !quantum.bit, !quantum.bit
+        %q0_1 = qec.ppr ["Z"](%n_pi4) %01#0 : !quantum.bit
+        %q1_2 = qec.ppr ["X"](%n_pi4) %01#1 : !quantum.bit
+        %m1, %q0_3 = qec.ppm ["Z"] %q0_1 : !quantum.bit
+        %m2, %q1_3 = qec.ppm ["Z"] %q1_2 : !quantum.bit
+        . . . 
     """
     if not isinstance(qnode, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
@@ -409,7 +419,7 @@ def clifford_t_ppr(qnode):
     @functools.wraps(clone)
     def wrapper(*args, **kwargs):
         pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline.append(Pass("convert-to-qec"))
+        pass_pipeline.append(Pass("convert-clifford-t-to-ppr"))
         kwargs["pass_pipeline"] = pass_pipeline
         return clone(*args, **kwargs)
 

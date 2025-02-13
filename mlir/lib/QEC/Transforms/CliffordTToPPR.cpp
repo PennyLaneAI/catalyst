@@ -244,7 +244,7 @@ using MeasureOpLowering = QECOpLowering<quantum::MeasureOp, qec::PPMeasurementOp
 namespace catalyst {
 namespace qec {
 
-void populateQECLoweringPatterns(RewritePatternSet &patterns)
+void populateCliffordTToPPRPatterns(RewritePatternSet &patterns)
 {
     patterns.add<CustomOpLowering>(patterns.getContext());
     patterns.add<MeasureOpLowering>(patterns.getContext());

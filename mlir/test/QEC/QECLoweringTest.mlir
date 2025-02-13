@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --convert-to-qec --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --convert-clifford-t-to-ppr --split-input-file -verify-diagnostics %s | FileCheck %s
 
-func.func @test_qec_lowering(%q1 : !quantum.bit, %q2 : !quantum.bit){
+func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 4 = 0.78539816
     // pi / 8 = 826990
     // CHECK-NOT: quantum.custom
@@ -41,7 +41,7 @@ func.func @test_qec_lowering(%q1 : !quantum.bit, %q2 : !quantum.bit){
 
 // -----
 
-func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
+func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
     // CHECK: [[q0:%.+]] = quantum.alloc( 2) : !quantum.reg
     %0 = quantum.alloc( 2) : !quantum.reg
     // CHECK: [[q1_0:%.+]] = quantum.extract [[q0]][ 1]
@@ -83,7 +83,7 @@ func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
 
 // -----
 
-func.func @test_qec_lowering_2(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+func.func @test_clifford_t_to_ppr_2(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
     %0 = quantum.custom "X"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: H, S, T, CNOT}}
     %1 = quantum.custom "S"() %0 : !quantum.bit

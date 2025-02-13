@@ -17,7 +17,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LoweringToQECPass : Pass<"convert-to-qec"> {
+def CliffordTToPPRPass : Pass<"convert-clifford-t-to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [
