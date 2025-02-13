@@ -30,7 +30,7 @@
     The PPRs and PPMs are currently only represented symbolically. However, these operations are not yet executable on any backend since they exist purely as intermediate representations for analysis and potential future execution when a suitable backend is available.
     
     Example MLIR Representation:
-    ```llvmir
+    ```mlir
       . . .
       %q0_0 = qec.ppr ["Z", "X", "Z"](%pi4) %qreg_0 : !quantum.bit
       %q1_0 = qec.ppr ["Z"](%pi4) %qreg_1 : !quantum.bit

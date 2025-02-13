@@ -45,17 +45,12 @@ def QECDialect : Dialect {
     /// This is the C++ namespace that the dialect, and all sub-components, get placed in.
     let cppNamespace = "::catalyst::qec";
 
-    /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
-    // let useDefaultTypePrinterParser = 1;
-    // let useDefaultAttributePrinterParser = 1;
-
 }
 
 //===----------------------------------------------------------------------===//
 // QEC dialect attributes.
 //===----------------------------------------------------------------------===//
 
-// def PauliLetter : EnumAttr<QECDialect, PauliEnum, "Single Pauli operator.">;
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
 
 
