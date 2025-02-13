@@ -402,7 +402,7 @@ def clifford_t_ppr(qnode):
     """
     if not isinstance(qnode, qml.QNode):
         raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-    
+
     clone = copy.copy(qnode)
     clone.__name__ += "_clifford_t_ppr"
 
