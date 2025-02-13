@@ -66,7 +66,7 @@ struct RemoveChainedSelfInversePass
         Operation *module = getOperation();
 
         RewritePatternSet patterns(&getContext());
-        populateLoopBoundaryPatterns(patterns);
+        populateLoopBoundaryPatterns(patterns, 2);
         populateSelfInversePatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {

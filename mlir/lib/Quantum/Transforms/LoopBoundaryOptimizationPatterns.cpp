@@ -31,13 +31,23 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::quantum;
 
+namespace {
+
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
 static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
 static const mlir::StringSet<> hamiltonianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
                                                  "H",        "X",      "Y",      "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
-namespace {
+// This mode is used to determine which gates are allowed at the loop boundary.
+// All: All gates are allowed
+// Rotation: Only rotation gates are allowed
+// Hamiltonian: Only Hamiltonian and multi-qubit gates are allowed
+enum class Mode {
+    All = 0,
+    Rotation = 1,
+    NonRotation = 2, // Always end with a Hamiltonian gate
+};
 
 // TODO: Move to a separate file
 //===----------------------------------------------------------------------===//
@@ -81,11 +91,19 @@ struct QuantumOpInfo {
 template <typename OpType> using QubitOriginMap = std::map<OpType, std::vector<QubitOrigin>>;
 
 // Checks if the given operation is a valid quantum operation based on its gate name.
-template <typename OpType> bool isValidQuantumOperation(OpType &op)
+template <typename OpType> bool isValidQuantumOperation(OpType &op, Mode mode)
 {
     auto gateName = op.getGateName();
-    return hamiltonianSet.contains(gateName) || rotationsSet.contains(gateName) ||
-           multiQubitSet.contains(gateName);
+
+    switch (mode) {
+    case Mode::Rotation:
+        return rotationsSet.contains(gateName);
+    case Mode::NonRotation:
+        return hamiltonianSet.contains(gateName) || multiQubitSet.contains(gateName);
+    case Mode::All:
+        return hamiltonianSet.contains(gateName) || rotationsSet.contains(gateName) ||
+               multiQubitSet.contains(gateName);
+    }
 }
 
 // Determines if the given operation has any successors that are quantum CustomOps.
@@ -124,8 +142,7 @@ bool isValidEdgePair(OpType &bottomOp, std::vector<QubitOrigin> &bottomQubitOrig
 {
     auto bottomOpNonConst = bottomOp;
     auto topOpNonConst = topOp;
-    if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() ||
-        !isValidQuantumOperation(bottomOpNonConst) || topOp == bottomOp ||
+    if (bottomOpNonConst.getGateName() != topOpNonConst.getGateName() || topOp == bottomOp ||
         !verifyQubitOrigins(topQubitOrigins, bottomQubitOrigins) ||
         hasQuantumCustomSuccessor(bottomOp) || hasQuantumCustomPredecessor(topOpNonConst)) {
         return false;
@@ -565,7 +582,15 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
 //===----------------------------------------------------------------------===//
 
 struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::ForOp> {
-    using mlir::OpRewritePattern<scf::ForOp>::OpRewritePattern;
+    // using mlir::OpRewritePattern<scf::ForOp>::OpRewritePattern;
+
+    Mode mode;
+
+    LoopBoundaryForLoopRewritePattern(mlir::MLIRContext *context, Mode loopBoundaryMode,
+                                      mlir::PatternBenefit benefit = 1)
+        : mlir::OpRewritePattern<scf::ForOp>(context, benefit), mode(loopBoundaryMode)
+    {
+    }
 
     mlir::LogicalResult matchAndRewrite(scf::ForOp forOp,
                                         mlir::PatternRewriter &rewriter) const override
@@ -578,10 +603,12 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
         auto edgeOperationSet = getVerifyEdgeOperationSet<CustomOp>(bottomEdgeOpSet, topEdgeOpSet);
 
         for (auto [topEdgeOp, bottomEdgeOp] : edgeOperationSet) {
-            hoistTopEdgeOperation<CustomOp>(topEdgeOp, forOp, rewriter);
-            handleParams(topEdgeOp, bottomEdgeOp, forOp, rewriter);
-            hoistBottomEdgeOperation<CustomOp>(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
-            return mlir::success();
+            if (isValidQuantumOperation<CustomOp>(topEdgeOp.op, mode)) {
+                hoistTopEdgeOperation<CustomOp>(topEdgeOp, forOp, rewriter);
+                handleParams(topEdgeOp, bottomEdgeOp, forOp, rewriter);
+                hoistBottomEdgeOperation<CustomOp>(bottomEdgeOp, forOp, bottomEdgeOpSet, rewriter);
+                return mlir::success();
+            }
         }
 
         return mlir::failure();
@@ -593,9 +620,14 @@ struct LoopBoundaryForLoopRewritePattern : public mlir::OpRewritePattern<scf::Fo
 namespace catalyst {
 namespace quantum {
 
-void populateLoopBoundaryPatterns(mlir::RewritePatternSet &patterns)
+void populateLoopBoundaryPatterns(mlir::RewritePatternSet &patterns, unsigned int mode)
 {
-    patterns.add<LoopBoundaryForLoopRewritePattern>(patterns.getContext(), 1);
+    if (mode > static_cast<unsigned int>(Mode::NonRotation)) {
+        llvm::errs() << "Invalid mode value: " << mode << ". Defaulting to Mode::All.\n";
+        mode = static_cast<unsigned int>(Mode::All);
+    }
+    Mode loopBoundaryMode = static_cast<Mode>(mode);
+    patterns.add<LoopBoundaryForLoopRewritePattern>(patterns.getContext(), loopBoundaryMode, 1);
 }
 
 } // namespace quantum

@@ -59,7 +59,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         }
 
         RewritePatternSet patterns(&getContext());
-        populateLoopBoundaryPatterns(patterns);
+        populateLoopBoundaryPatterns(patterns, 1);
         populateMergeRotationsPatterns(patterns);
 
         if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
