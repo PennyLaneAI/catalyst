@@ -7,9 +7,9 @@ add_library(catalyst_oqd_obj OBJECT OQDRuntimeCAPI.cpp)
 # Fetch json utilities
 include(FetchContent)
 FetchContent_Declare(
-  json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG        v3.11.3
+   json
+   URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+   URL_HASH  SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
 )
 FetchContent_MakeAvailable(json)
 
