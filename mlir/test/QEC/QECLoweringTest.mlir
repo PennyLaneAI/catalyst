@@ -16,54 +16,52 @@
 
 func.func @test_qec_lowering(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 4 = 0.78539816
-    // pi / 8 = 0.3926990
+    // pi / 8 = 826990
     // CHECK-NOT: quantum.custom
     // CHECK: ([[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
-    // CHECK: [[cst_0:%.+]] = arith.constant 0.78
+    // CHECK: [[cst_0:%.+]] = arith.constant 4
     // CHECK: [[q1_0:%.+]] = qec.ppr ["Z", "X", "Z"]([[cst_0]]) [[q1]]
-    // CHECK: [[cst_1:%.+]] = arith.constant 0.78
+    // CHECK: [[cst_1:%.+]] = arith.constant 4
     // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"]([[cst_1]]) [[q1_0]]
-    // CHECK: [[cst_2:%.+]] = arith.constant 0.39
+    // CHECK: [[cst_2:%.+]] = arith.constant 8
     // CHECK: [[q1_2:%.+]] = qec.ppr ["Z"]([[cst_2]]) [[q1_1]]
-    // CHECK: [[cst_3:%.+]] = arith.constant 0.78
+    // CHECK: [[cst_3:%.+]] = arith.constant 4
     // CHECK: [[q1_3:%.+]]:2 = qec.ppr ["Z", "X"]([[cst_3]]) [[q1_2]], [[q2]]
     %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
     %q1_1 = quantum.custom "S"() %q1_0 : !quantum.bit
     %q1_2 = quantum.custom "T"() %q1_1 : !quantum.bit
     %q1_3:2 = quantum.custom "CNOT"() %q1_2, %q2 : !quantum.bit, !quantum.bit
-    // CHECK: [[cst_4:%.+]] = arith.constant -0.78
+    // CHECK: [[cst_4:%.+]] = arith.constant -4
     // CHECK: [[q1_4:%.+]] = qec.ppr ["Z"]([[cst_4]]) [[q1_3]]#0
-    // CHECK: [[cst_5:%.+]] = arith.constant -0.78
-    // CHECK: [[q1_5:%.+]] = qec.ppr ["X"]([[cst_5]]) [[q1_3]]#1
+    // CHECK: [[q1_5:%.+]] = qec.ppr ["X"]([[cst_4]]) [[q1_3]]#1
     // CHECK-NOT: quantum.custom
     // CHECK-NEXT: return
     func.return
 }
 
-// ---- 
+// -----
 
 func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
     // CHECK: [[q0:%.+]] = quantum.alloc( 2) : !quantum.reg
     %0 = quantum.alloc( 2) : !quantum.reg
     // CHECK: [[q1_0:%.+]] = quantum.extract [[q0]][ 1]
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[cst_0:%.+]] = arith.constant 0.78
+    // CHECK: [[cst_0:%.+]] = arith.constant 4
     // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"]([[cst_0]]) [[q1_0]]
     %out_qubits = quantum.custom "S"() %1 : !quantum.bit
     // CHECK: [[q0_0:%.+]] = quantum.extract [[q0]][ 0]
     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[cst_1:%.+]] = arith.constant 0.78
+    // CHECK: [[cst_1:%.+]] = arith.constant 4
     // CHECK: [[q0_1:%.+]] = qec.ppr ["Z", "X", "Z"]([[cst_1]]) [[q0_0]]
     %out_qubits_0 = quantum.custom "Hadamard"() %2 : !quantum.bit
-    // CHECK: [[cst_2:%.+]] = arith.constant 0.39
+    // CHECK: [[cst_2:%.+]] = arith.constant 8
     // CHECK: [[q0_2:%.+]] = qec.ppr ["Z"]([[cst_2]]) [[q0_1]]
     %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
-    // CHECK: [[cst_3:%.+]] = arith.constant 0.78
+    // CHECK: [[cst_3:%.+]] = arith.constant 4
     // CHECK: [[q_3:%.+]]:2 = qec.ppr ["Z", "X"]([[cst_3]]) [[q0_2]], [[q1_1]]
-    // CHECK: [[cst_4:%.+]] = arith.constant -0.78
+    // CHECK: [[cst_4:%.+]] = arith.constant -4
     // CHECK: [[q_4:%.+]] = qec.ppr ["Z"]([[cst_4]]) [[q_3]]#0
-    // CHECK: [[cst_5:%.+]] = arith.constant -0.78
-    // CHECK: [[q_5:%.+]] = qec.ppr ["X"]([[cst_5]]) [[q_3]]#1
+    // CHECK: [[q_5:%.+]] = qec.ppr ["X"]([[cst_4]]) [[q_3]]#1
     %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
 
     // CHECK: [[mres_0:%.+]], [[q0_4:%.+]] = qec.ppm ["Z"] [[q_4]]
@@ -81,4 +79,15 @@ func.func public @test_qec_lowering_1() -> (tensor<i1>, tensor<i1>) {
     quantum.dealloc %4 : !quantum.reg
     // CHECK: return [[tensor_0]], [[tensor_1]] : tensor<i1>, tensor<i1>
     return %from_elements_0, %from_elements_1 : tensor<i1>, tensor<i1>
+}
+
+// -----
+
+func.func @test_qec_lowering_2(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
+    %0 = quantum.custom "X"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: H, S, T, CNOT}}
+    %1 = quantum.custom "S"() %0 : !quantum.bit
+    %2 = quantum.custom "T"() %1 : !quantum.bit
+    %3:2 = quantum.custom "CNOT"() %2, %q2 : !quantum.bit, !quantum.bit
+    func.return
 }
