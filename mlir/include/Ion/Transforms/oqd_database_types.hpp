@@ -39,21 +39,12 @@ struct Beam {
 struct Phonon {
     // This struct contains the calibrated phonon parameters on one axis.
     double energy;
-    std::vector<int64_t> eigenvector;
+    std::vector<double> eigenvector;
 
-    Phonon(double _energy, std::vector<int64_t> _eigenvector)
+    Phonon(double _energy, std::vector<double> _eigenvector)
         : energy(_energy), eigenvector(_eigenvector)
     {
     }
-};
-
-struct PhononMode {
-    // This struct contains the calibrated phonon parameters for one ion.
-    Phonon COM_x;
-    Phonon COM_y;
-    Phonon COM_z;
-
-    PhononMode(Phonon x, Phonon y, Phonon z) : COM_x(x), COM_y(y), COM_z(z) {}
 };
 
 //

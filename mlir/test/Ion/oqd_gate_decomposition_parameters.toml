@@ -79,42 +79,39 @@ wavevector = [-42,-37,-43]
 # -------
 
 [[phonons]]
-[phonons.COM_x]
 energy = 1.1
-eigenvector = [1, 0, 0]
+eigenvector = [1.0, 0.0, 0.0]
 
-[phonons.COM_y]
+[[phonons]]
 energy = 2.2
-eigenvector = [0, 1, 0]
+eigenvector = [0.0, 1.0, 0.0]
 
-[phonons.COM_z]
+[[phonons]]
 energy = 3.3
-eigenvector = [0, 0, 1]
+eigenvector = [0.0, 0.0, 1.0]
 
 
 [[phonons]]
-[phonons.COM_x]
 energy = 4.4
-eigenvector = [1, 0, 0]
+eigenvector = [1.0, 0.0, 0.0]
 
-[phonons.COM_y]
+[[phonons]]
 energy = 5.5
-eigenvector = [0, 1, 0]
+eigenvector = [0.0, 1.0, 0.0]
 
-[phonons.COM_z]
+[[phonons]]
 energy = 6.6
-eigenvector = [0, 0, 1]
+eigenvector = [0.0, 0.0, 1.0]
 
 
 [[phonons]]
-[phonons.COM_x]
 energy = 7.7
-eigenvector = [1, 0, 0]
+eigenvector = [1.0, 0.0, 0.0]
 
-[phonons.COM_y]
+[[phonons]]
 energy = 8.8
-eigenvector = [0, 1, 0]
+eigenvector = [0.0, 1.0, 0.0]
 
-[phonons.COM_z]
+[[phonons]]
 energy = 9.9
-eigenvector = [0, 0, 1]
+eigenvector = [0.0, 0.0, 1.0]
