@@ -305,6 +305,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$GITHUB_WORKSPACE/runtime-build/lib" \
               -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON \
+              -DENABLE_OQD=OFF \
               -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
 
         cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
@@ -322,14 +323,6 @@ jobs:
           RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
           PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
-
-    # Build OQD-Runtime
-    - name: Build OQD-Runtime
-      run: |
-          OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
-          RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
-          PYTHON=$(which python${{ matrix.python_version }}) \
-          make oqd
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -368,7 +361,6 @@ jobs:
         DIALECTS_BUILD_DIR="$GITHUB_WORKSPACE/quantum-build" \
         RT_BUILD_DIR="$GITHUB_WORKSPACE/runtime-build" \
         OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
-        OQD_BUILD_DIR="$GITHUB_WORKSPACE/oqd-build" \
         ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
         make wheel
 

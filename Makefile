@@ -12,10 +12,10 @@ MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
-OQD_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqd/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
+ENABLE_OQD?=OFF
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -73,16 +73,14 @@ help:
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  oqc                to build Catalyst-OQC Runtime"
-	@echo "  oqd                to build Catalyst-OQD Runtime"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
-	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
-	@echo "  clean-frontend     to clean build files of Catalyst Frontend"
+	@echo "  clean              to uninstall Catalyst and delete frontend build and cache files"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
-	@echo "  clean-oqd          to clean build files of OQD Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
+	@echo "  clean-catalyst     to uninstall Catalyst and delete all temporary, cache, and build files for catalyst dialects and runtime (but keeping llvm build files)"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
@@ -90,8 +88,8 @@ help:
 
 
 .PHONY: all catalyst
-all: runtime oqc oqd mlir frontend
-catalyst: runtime dialects plugin oqd frontend
+all: runtime oqc mlir frontend
+catalyst: runtime dialects plugin frontend
 
 .PHONY: frontend
 frontend:
@@ -102,7 +100,7 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime oqc oqd
+.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
@@ -119,15 +117,12 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime runtime
+	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-oqd:
-	$(MAKE) -C frontend/catalyst/third_party/oqd/src oqd
-
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-oqd test-toml-spec
+.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 
 test-toml-spec:
@@ -143,9 +138,6 @@ test-frontend: lit pytest
 
 test-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
-
-test-oqd:
-	$(MAKE) -C frontend/catalyst/third_party/oqd/src test
 
 lit:
 ifeq ($(ENABLE_ASAN),ON)
@@ -223,11 +215,11 @@ plugin-wheel: plugin
 	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin.egg-info
 	rm -r $(MK_DIR)/standalone_plugin_wheel/build
 
-.PHONY: clean clean-all
+.PHONY: clean clean-all clean-catalyst
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	find frontend/catalyst -name "*.so" -exec rm -v {} +
+	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
@@ -235,7 +227,8 @@ clean:
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
 
-clean-all: clean clean-mlir clean-runtime clean-oqc clean-oqd
+clean-all: clean clean-mlir clean-runtime clean-oqc
+clean-catalyst: clean clean-dialects clean-runtime clean-oqc
 
 .PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-mhlo clean-enzyme
 clean-mlir:
@@ -256,15 +249,12 @@ clean-mhlo:
 clean-enzyme:
 	$(MAKE) -C mlir clean-enzyme
 
-.PHONY: clean-runtime clean-oqc clean-oqd
+.PHONY: clean-runtime clean-oqc
 clean-runtime:
 	$(MAKE) -C runtime clean
 
 clean-oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
-
-clean-oqd:
-	$(MAKE) -C frontend/catalyst/third_party/oqd/src clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
