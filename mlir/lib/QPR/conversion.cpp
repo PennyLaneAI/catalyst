@@ -33,21 +33,28 @@ using namespace catalyst;
 
 class QPRSerializer {
     capnp::MallocMessageBuilder message;
-    Module::Builder module = nullptr;
 
-    std::vector<func::FuncOp> moduleFunctions;
+    mlir::ModuleOp mlirModule;
+    llvm::DenseMap<func::FuncOp, unsigned int> moduleFunctions;
     std::vector<std::string> moduleStrings;
 
   public:
-    void addFunction(func::FuncOp fun) { moduleFunctions.push_back(fun); }
+    QPRSerializer(mlir::ModuleOp mod) : mlirModule(mod) {};
 
     void generateModule()
     {
-        module = message.initRoot<Module>();
+        Module::Builder module = message.initRoot<Module>();
+
+        // Iterate once over functions so that they are available to reference in function
+        // calls.
+        auto mlirFunctions = mlirModule.getOps<func::FuncOp>();
+        for (func::FuncOp fun : mlirFunctions) {
+            moduleFunctions[fun] = moduleFunctions.size();
+        }
 
         auto functions = module.initFunctions(moduleFunctions.size());
         unsigned int funIdx = 0;
-        for (func::FuncOp fun : moduleFunctions) {
+        for (func::FuncOp fun : mlirFunctions) {
             Function::Builder function = functions[funIdx++];
             generateFunction(fun, function);
         }
@@ -240,6 +247,19 @@ class QPRSerializer {
                 opOutputs.set(resIdx++, trackNewValue(res, functionValues, mlirValueMap));
             }
         }
+        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
+            FuncOp::Builder funcOp = instruction.initFunc();
+
+            mlir::Operation *callee = mlirModule.lookupSymbol(callOp.getCallee());
+            if (auto funCallee = dyn_cast<func::FuncOp>(callee)) {
+                funcOp.setFuncCall(moduleFunctions[funCallee]);
+            }
+            else {
+                llvm::outs() << "Callee is not a function: " << callee->getDialect() << "."
+                             << callee->getName() << ". Abort.\n";
+                std::exit(-1);
+            }
+        }
         else {
             llvm::outs() << "Unsupported operation: " << op.getName() << ". Abort.\n";
             std::exit(-1);
@@ -322,13 +342,9 @@ struct QPRExportPass : public PassWrapper<QPRExportPass, OperationPass<ModuleOp>
 
     void runOnOperation() final
     {
-        QPRSerializer serializer;
-
         ModuleOp module = getOperation();
-        for (func::FuncOp fun : module.getOps<func::FuncOp>()) {
-            serializer.addFunction(fun);
-        }
 
+        QPRSerializer serializer(module);
         serializer.generateModule();
         serializer.writeOut();
     }
