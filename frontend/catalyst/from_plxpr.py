@@ -340,7 +340,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         else:
             # Convert branch from plxpr to Catalyst jaxpr
             converted_func = partial(
-                BranchPlxprInterpreter(self._device, self._shots, return_qreg=True).eval,
+                BranchPlxprInterpreter(self._device, self._shots).eval,
                 plxpr_branch,
                 branch_consts,
             )
@@ -401,7 +401,7 @@ def handle_for_loop(
 
     # Convert for loop body from plxpr to Catalyst jaxpr
     converted_func = partial(
-        BranchPlxprInterpreter(self._device, self._shots, return_qreg=True).eval,
+        BranchPlxprInterpreter(self._device, self._shots).eval,
         jaxpr_body_fn,
         consts,
     )
@@ -457,7 +457,7 @@ def handle_while_loop(
 
     # Convert for while body from plxpr to Catalyst jaxpr
     converted_body_func = partial(
-        BranchPlxprInterpreter(self._device, self._shots, return_qreg=True).eval,
+        BranchPlxprInterpreter(self._device, self._shots).eval,
         jaxpr_body_fn,
         consts_body,
     )
@@ -468,7 +468,7 @@ def handle_while_loop(
 
     # Convert for condition from plxpr to Catalyst jaxpr
     converted_cond_func = partial(
-        BranchPlxprInterpreter(self._device, self._shots, return_qreg=False).eval,
+        PredicatePlxprInterpreter().eval,
         jaxpr_cond_fn,
         consts_cond,
     )
@@ -516,9 +516,8 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
         shots (qml.measurements.Shots)
     """
 
-    def __init__(self, device, shots: qml.measurements.Shots, return_qreg=True):
+    def __init__(self, device, shots: qml.measurements.Shots):
         self._parent_qreg = None
-        self.return_qreg = return_qreg
         super().__init__(device, shots)
 
     def setup(self):
@@ -556,9 +555,42 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
 
         outvals = super().eval(jaxpr, consts, *args)
 
-        # Add the qreg to the output values if required
-        if self.return_qreg:
-            outvals = [*outvals, self.qreg]
+        # Add the qreg to the output values
+        outvals = [*outvals, self.qreg]
+
+        self.stateref = None
+
+        return outvals
+
+
+class PredicatePlxprInterpreter(PlxprInterpreter):
+    """An interpreter that converts a plxpr predicate into catalyst-variant jaxpr branch."""
+
+    # pylint: disable=too-many-branches
+    def eval(self, jaxpr: "jax.core.Jaxpr", consts: Sequence, *args) -> list:
+        """Evaluate a jaxpr.
+
+        Args:
+            jaxpr (jax.core.Jaxpr): the jaxpr to evaluate
+            consts (list[TensorLike]): the constant variables for the jaxpr
+            *args (tuple[TensorLike]): The arguments for the jaxpr.
+
+        Returns:
+            list[TensorLike]: the results of the execution.
+
+        In order to comply with the Catalyst jaxpr, the input vars include the qreg
+        although it is not used.
+        """
+
+        # We assume the last argument is the qreg
+        num_args = len(args)
+        assert num_args > 0
+        qreg_pos = num_args - 1
+
+        # Retrive the original args (without the qreg)
+        args = args[:qreg_pos]
+
+        outvals = super().eval(jaxpr, consts, *args)
 
         self.stateref = None
 
