@@ -256,7 +256,10 @@ class TestCapture:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
 
-            @qml.while_loop(lambda x: x < 2.0)
+            def while_cond(x):
+                return x < 2.0
+
+            @qml.while_loop(while_cond)
             def loop_rx(x):
                 # perform some work and update (some of) the arguments
                 qml.RX(x, wires=0)
