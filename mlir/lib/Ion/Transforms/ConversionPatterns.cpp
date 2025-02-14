@@ -170,7 +170,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
                      {"einsteinA", transitionAttr.getEinsteinA().getValue().convertToDouble()},
                      {"level1", level1},
                      {"level2", level2},
-                     {"label", level0_label + "->" + level1_label}};
+                     {"label", level0_label + "->" + level1_label},
                      {"multipole", multipole}};
             ion_json["transitions"].push_back(this_transition);
         }
