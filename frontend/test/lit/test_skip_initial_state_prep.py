@@ -71,3 +71,17 @@ def state_prep_example_double():
 #       CHECK:   quantum.set_state
 #   CHECK-NOT:   quantum.set_state
 print(state_prep_example_double.mlir)
+
+@qml.qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=5, shots=100))
+def multiple_basis_embedding():
+    """Ok, so we only have one, but we also need to guarantee that it is the first one"""
+    # CHECK-LABEL: func.func private @multiple_basis_embedding
+    # CHECK-NOT: quantum.custom
+    # CHECK: quantum.set_basis_state
+    qml.BasisEmbedding(2, wires=[0, 1, 2])
+    qml.BasisEmbedding(3, wires=[3, 4])
+    qml.ctrl(qml.X(0), control=[1, 2])
+    return qml.counts(wires=[3, 4])
+
+print(multiple_basis_embedding.mlir)
