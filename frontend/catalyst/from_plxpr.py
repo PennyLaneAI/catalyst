@@ -436,8 +436,6 @@ def handle_for_loop(
 
 
 # pylint: disable=unused-argument, too-many-arguments
-
-
 @QFuncPlxprInterpreter.register_primitive(plxpr_while_loop_prim)
 def handle_while_loop(
     self,
