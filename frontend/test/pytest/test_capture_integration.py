@@ -168,7 +168,6 @@ class TestCapture:
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
 
-    @pytest.mark.xfail(reason="For not supported.")
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
         """Test the integration for a circuit with a for loop."""
@@ -177,7 +176,7 @@ class TestCapture:
         @qml.qnode(qml.device(backend, wires=4))
         def catalyst_capture_circuit(x):
 
-            @qml.for_loop(1, 1, 4)
+            @qml.for_loop(1, 4, 1)
             def loop(i):
                 qml.CNOT(wires=[0, i])
                 qml.RX(x, wires=i)
@@ -198,6 +197,58 @@ class TestCapture:
         actual = catalyst_capture_circuit(theta)
         desired = pl_circuit(theta)
         assert jnp.allclose(actual, desired)
+
+    def test_forloop_workflow(self, backend):
+        """Test the integration for a circuit with a for loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n, x):
+
+            @qml.for_loop(1, n, 1)
+            def loop_rx(_, x):
+                qml.RX(x, wires=0)
+                return jnp.sin(x)
+
+            # apply the for loop
+            loop_rx(x)
+
+            return qml.expval(qml.Z(0))
+
+        default_capture_result = qml.qjit(circuit)(10, 0.3)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(10, 0.3)
+        assert default_capture_result == experimental_capture_result
+
+    def test_nested_loops(self, backend):
+        """Test the integration for a circuit with a nested for loop primitive."""
+
+        @qml.qnode(qml.device(backend, wires=4))
+        def circuit(n):
+            # Input state: equal superposition
+            @qml.for_loop(0, n, 1)
+            def init(i):
+                qml.Hadamard(wires=i)
+
+            # QFT
+            @qml.for_loop(0, n, 1)
+            def qft(i):
+                qml.Hadamard(wires=i)
+
+                @qml.for_loop(i + 1, n, 1)
+                def inner(j):
+                    qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
+
+                inner()
+
+            init()
+            qft()
+
+            # Expected output: |100...>
+            return qml.state()
+
+        default_capture_result = qml.qjit(circuit)(4)
+        experimental_capture_result = qml.qjit(circuit, experimental_capture=True)(4)
+        assert jnp.allclose(default_capture_result, jnp.eye(2**4)[0])
+        assert jnp.allclose(experimental_capture_result, default_capture_result)
 
     def test_cond_workflow_if_else(self, backend):
         """Test the integration for a circuit with a cond primitive with true and false branches."""
