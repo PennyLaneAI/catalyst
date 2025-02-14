@@ -592,8 +592,6 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
 
         outvals = super().eval(jaxpr, consts, *args)
 
-        self.stateref = None
-
         return outvals
 
 
