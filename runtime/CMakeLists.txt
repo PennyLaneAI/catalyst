@@ -13,6 +13,7 @@ option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
+option(ENABLE_OQD "Build OQD backend device" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -55,6 +56,7 @@ if(RUNTIME_ENABLE_WARNINGS)
 endif()
 
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
+message(STATUS "ENABLE_OQD is ${ENABLE_OQD}.")
 
 set(devices_list)
 list(APPEND devices_list rtd_null_qubit)
@@ -63,6 +65,11 @@ list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_qubit")
 if(ENABLE_OPENQASM)
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
     list(APPEND devices_list rtd_openqasm)
+endif()
+
+if(ENABLE_OQD)
+    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/oqd")
+    list(APPEND devices_list rtd_oqd_device)
 endif()
 
 add_library(catalyst_qir_runtime INTERFACE)
