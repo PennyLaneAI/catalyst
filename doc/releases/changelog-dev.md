@@ -52,8 +52,9 @@
 * Extend `merge-rotations` peephole optimization pass to also merge compatible rotation gates (either both controlled, or both uncontrolled) where rotation angles are any combination of static constants or dynamic values.
   [(#1489)](https://github.com/PennyLaneAI/catalyst/pull/1489)
 
-* Catalyst now supports experimental capture of `cond` control flow.
+* Catalyst now supports experimental capture of `cond` and `for_loop` control flow.
   [(#1468)](https://github.com/PennyLaneAI/catalyst/pull/1468)
+  [(#1509)](https://github.com/PennyLaneAI/catalyst/pull/1509)
   
   To trigger the PennyLane pipeline for capturing the program as a Jaxpr, simply set
   `experimental_capture=True` in the qjit decorator.
@@ -79,6 +80,11 @@
 
       return qml.expval(qml.Z(0))
   ```
+
+* Changes to reduce compile time:
+
+  - Turn off MLIR's verifier.
+    [(#1513)](https://github.com/PennyLaneAI/catalyst/pull/1513)
 
 <h3>Breaking changes 💔</h3>
 

@@ -56,7 +56,14 @@ jobs:
           path: mlir/llvm-project
           key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
           enableCrossOsArchive: true
-          fail-on-cache-miss: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
 
       - name: Build Catalyst-Runtime
         run: |
@@ -663,7 +670,14 @@ jobs:
           path: mlir/llvm-project
           key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
           enableCrossOsArchive: true
-          fail-on-cache-miss: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
 
       - name: Run the main runtime test suite for coverage
         run: |
