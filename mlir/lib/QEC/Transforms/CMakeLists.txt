@@ -3,6 +3,8 @@ set(LIBRARY_NAME qec-transforms)
 file(GLOB SRC
     CliffordTToPPR.cpp
     clifford_t_to_ppr.cpp
+    CommuteCliffordTPPR.cpp
+    commute_clifford_t_ppr.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

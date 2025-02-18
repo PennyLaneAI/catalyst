@@ -12,17 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#define DEBUG_TYPE "commute-clifford-t-ppr"
 
-#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+
+#include "QEC/IR/QECDialect.h"
+#include "QEC/Transforms/Patterns.h"
+
+using namespace mlir;
+using namespace catalyst::qec;
+
+namespace {
+
+    struct CommuteCliffordTPPR : public OpRewritePattern<PPRotationOp> {
+        using OpRewritePattern::OpRewritePattern;
+
+        LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
+            
+            return failure();
+        }
+    };
+}
 
 namespace catalyst {
 namespace qec {
 
-void populateCliffordTToPPRPatterns(mlir::RewritePatternSet &);
-void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &);
+void populateCommuteCliffordTPPRPatterns(mlir::RewritePatternSet &patterns)
+{
+    patterns.add<CommuteCliffordTPPR>(patterns.getContext(), 1);
+}
+}
 
-} // namespace qec
-} // namespace catalyst
+}
