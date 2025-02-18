@@ -283,7 +283,8 @@ class TestCapture:
         assert default_capture_result_0_iterations == experimental_capture_result_0_iterations
 
     def test_while_loop_workflow_closure(self, backend):
-        """Test the integration for a circuit with a while_loop primitive using a closure variable."""
+        """Test the integration for a circuit with a while_loop primitive using
+        a closure variable."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float, step: float):
