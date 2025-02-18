@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "OQDRuntimeCAPI.h"
 #include "QuantumDevice.hpp"
 
 // catalyst/runtime/lib/backend/common/
@@ -43,6 +44,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
+    std::string ion_specs;
 
     std::unordered_map<std::string, std::string> device_kwargs;
 
@@ -58,17 +60,29 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
   public:
     explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
     {
-        device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
+        __catalyst__oqd__rt__initialize();
+
+        // The OQD kwarg string format is:
+        // deviceKwargs.str() + "ION:" + std::string(ion_json.dump())
+        // where deviceKwargs are the usual kwargs like {'shots': 0, 'mcmc': False}
+        // and ion_json is a JSON spec string for the ion
+        std::string ion_token = "ION:";
+        size_t ion_token_pos = kwargs.find(ion_token);
+        ion_specs = kwargs.substr(ion_token_pos + ion_token.length());
+
+        device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs.substr(0, ion_token_pos));
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
         runner = std::make_unique<OQDRunner>();
     }
-    ~OQDDevice() = default;
+    ~OQDDevice() { __catalyst__oqd__rt__finalize(); };
 
     QUANTUM_DEVICE_DEL_DECLARATIONS(OQDDevice);
 
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
+
+    const std::string &getIonSpecs() { return ion_specs; }
 };
 } // namespace Catalyst::Runtime::Device

@@ -28,7 +28,11 @@ Additionally, all measurements will always return ``true``.
 
             auto AllocateQubit() -> QubitIdType override { return 0; }
             auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override {
-                return std::vector<QubitIdType>(num_qubits);
+                std::vector<QubitIdType> qubits(num_qubits);
+                for (size_t i = 0; i < num_qubits; i++){
+                    qubits[i] = i;
+                }
+                return qubits;
             }
             [[nodiscard]] auto Zero() const -> Result override { return NULL; }
             [[nodiscard]] auto One() const -> Result override { return NULL; }
@@ -81,6 +85,12 @@ Additionally, all measurements will always return ``true``.
 
             void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
         };
+
+.. warning::
+
+    While the above is an empty device with all no-operations,
+    it should be noted that the semantics of the ``AllocateQubits`` method require it to return a vector from 0 to ``num_qubits-1``.
+    Devices not following this rule will not be able to properly query wire indices of the qubits.
 
 In addition to implementing the ``QuantumDevice`` class, one must implement an entry point for the
 device library with the name ``<DeviceIdentifier>Factory``, where ``DeviceIdentifier`` is used to

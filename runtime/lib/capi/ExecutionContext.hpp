@@ -202,6 +202,10 @@ class RTDevice {
             rtd_name = "OpenQasmDevice";
             _complete_dylib_os_extension(rtd_lib, "openqasm");
         }
+        else if (rtd_lib == "oqd.qubit") {
+            rtd_name = "oqd";
+            _complete_dylib_os_extension(rtd_lib, "oqd_device");
+        }
     }
 
   public:

@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <nlohmann/json.hpp>
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/IRMapping.h"
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
-#include "mlir/IR/IRMapping.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::ion;
+using namespace catalyst::quantum;
+using json = nlohmann::json;
 
 namespace {
 
@@ -42,38 +48,6 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
 }
 
-Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, ModuleOp mod)
-{
-    StringRef value = StringRef(key.data(), key.size() + 1);
-    auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
-    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
-    if (!glb) {
-        OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
-        rewriter.setInsertionPointToStart(mod.getBody());
-        glb = rewriter.create<LLVM::GlobalOp>(loc, type, true, LLVM::Linkage::Internal, key,
-                                              rewriter.getStringAttr(value));
-    }
-    return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                        type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
-}
-
-LLVM::LLVMStructType createLevelStructType(MLIRContext *ctx)
-{
-    return LLVM::LLVMStructType::getLiteral(
-        ctx, {
-                 LLVM::LLVMPointerType::get(ctx), // label
-                 IntegerType::get(ctx, 64),       // principal
-                 Float64Type::get(ctx),           // spin
-                 Float64Type::get(ctx),           // orbital
-                 Float64Type::get(ctx),           // nuclear
-                 Float64Type::get(ctx),           // spin_orbital
-                 Float64Type::get(ctx),           // spin_orbital_nuclear
-                 Float64Type::get(ctx),           // spin_orbital_nuclear_magnetization
-                 Float64Type::get(ctx),           // energy
-             });
-}
-
 LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter, BeamAttr &beamAttr)
 {
     return LLVM::LLVMStructType::getLiteral(
@@ -86,94 +60,6 @@ LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
                  LLVM::LLVMArrayType::get( // wavevector
                      rewriter.getIntegerType(64), beamAttr.getWavevector().size()),
              });
-}
-
-Value createLevelStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
-                        LevelAttr &levelAttr, LLVM::LLVMStructType &levelStructType)
-{
-    Value levelStruct = rewriter.create<LLVM::UndefOp>(loc, levelStructType);
-    auto label = levelAttr.getLabel().getValue().str();
-    auto labelGlobal = getGlobalString(loc, rewriter, label, mod);
-    std::vector<Value> fieldValues = {
-        labelGlobal,
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelAttr.getPrincipal()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpin()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getOrbital()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getNuclear()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getSpinOrbital()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                          levelAttr.getSpinOrbitalNuclear()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                          levelAttr.getSpinOrbitalNuclearMagnetization()),
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(), levelAttr.getEnergy())};
-    for (size_t i = 0; i < fieldValues.size(); i++) {
-        levelStruct = rewriter.create<LLVM::InsertValueOp>(loc, levelStruct, fieldValues[i], i);
-    }
-    return levelStruct;
-}
-
-Value createLevelsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
-                        ArrayAttr &levelsAttr)
-{
-    LLVM::LLVMStructType levelStructType = createLevelStructType(ctx);
-    Value levelsArray = rewriter.create<LLVM::UndefOp>(
-        loc, LLVM::LLVMArrayType::get(levelStructType, levelsAttr.size()));
-
-    for (size_t i = 0; i < levelsAttr.size(); ++i) {
-        auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
-        Value levelStruct = createLevelStruct(loc, rewriter, ctx, mod, levelAttr, levelStructType);
-        levelsArray = rewriter.create<LLVM::InsertValueOp>(loc, levelsArray, levelStruct, i);
-    }
-    Value levelArraySize =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(levelsAttr.size()));
-    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value levelsArrayPtr =
-        rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                        /*elementType=*/levelsArray.getType(), levelArraySize);
-    rewriter.create<LLVM::StoreOp>(loc, levelsArray, levelsArrayPtr);
-    return levelsArrayPtr;
-}
-
-Value createTransitionsArray(Location loc, OpBuilder &rewriter, MLIRContext *ctx, ModuleOp &mod,
-                             ArrayAttr &transitionsAttr)
-{
-    auto transitionStructType =
-        LLVM::LLVMStructType::getLiteral(ctx, {
-                                                  LLVM::LLVMPointerType::get(ctx), // level_0
-                                                  LLVM::LLVMPointerType::get(ctx), // level_1
-                                                  Float64Type::get(ctx),           // einstein_a
-                                              });
-    Value transitionsArray = rewriter.create<LLVM::UndefOp>(
-        loc, LLVM::LLVMArrayType::get(transitionStructType, transitionsAttr.size()));
-
-    for (size_t i = 0; i < transitionsAttr.size(); ++i) {
-        auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
-        Value transitionStruct = rewriter.create<LLVM::UndefOp>(loc, transitionStructType);
-        auto level0 = transitionAttr.getLevel_0().getValue().str();
-        auto level1 = transitionAttr.getLevel_1().getValue().str();
-        auto level0_global = getGlobalString(loc, rewriter, level0, mod);
-        auto level1_global = getGlobalString(loc, rewriter, level1, mod);
-        transitionStruct =
-            rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level0_global, 0);
-        transitionStruct =
-            rewriter.create<LLVM::InsertValueOp>(loc, transitionStruct, level1_global, 1);
-        transitionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, transitionStruct,
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64Type(),
-                                              transitionAttr.getEinsteinA()),
-            2);
-        transitionsArray =
-            rewriter.create<LLVM::InsertValueOp>(loc, transitionsArray, transitionStruct, i);
-    }
-
-    Value transitionsArraySize =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(transitionsAttr.size()));
-    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value transitionsArrayPtr = rewriter.create<LLVM::AllocaOp>(
-        loc, /*resultType=*/ptrType,
-        /*elementType=*/transitionsArray.getType(), transitionsArraySize);
-    rewriter.create<LLVM::StoreOp>(loc, transitionsArray, transitionsArrayPtr);
-    return transitionsArrayPtr;
 }
 
 Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
@@ -218,77 +104,79 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
 struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
     using OpConversionPattern<catalyst::ion::IonOp>::OpConversionPattern;
 
+    // Create the ion JSON and pass it into the device kwargs as a JSON string
     LogicalResult matchAndRewrite(catalyst::ion::IonOp op, catalyst::ion::IonOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = this->getContext();
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        const TypeConverter *conv = getTypeConverter();
+        func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
 
-        Type IonTy = conv->convertType(IonType::get(ctx));
-        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
+        StringRef deviceKwargs = deviceInitOp.getKwargs();
 
-        // Extract relevant ion properties
-        auto nameStr = op.getName().getValue().str();
-        auto name = getGlobalString(loc, rewriter, nameStr, mod);
-        auto mass = rewriter.create<LLVM::ConstantOp>(loc, op.getMass());
-        auto charge = rewriter.create<LLVM::ConstantOp>(loc, op.getCharge());
         auto positionAttr = op.getPosition();
         auto levelsAttr = op.getLevels();
         auto transitionsAttr = op.getTransitions();
 
-        Value levelsArrayPtr = createLevelsArray(loc, rewriter, ctx, mod, levelsAttr);
+        json ion_json = R"({
+  "class_": "Ion",
+  "levels": [],
+  "transitions" : []
+})"_json;
+        ion_json["mass"] = op.getMass().getValue().convertToDouble();
+        ion_json["charge"] = op.getCharge().getValueAsDouble();
 
-        Value transitionsArrayPtr =
-            createTransitionsArray(loc, rewriter, ctx, mod, transitionsAttr);
+        assert(positionAttr.size() == 3 && "Position must have 3 coordinates!");
+        std::array<double, 3> position = {positionAttr[0], positionAttr[1], positionAttr[2]};
+        ion_json["position"] = position;
 
-        // Define the function signature for the Ion stub
-        Type ionStructType = LLVM::LLVMStructType::getLiteral(
-            ctx, {
-                     ptrType,                  // name
-                     Float64Type::get(ctx),    // mass
-                     Float64Type::get(ctx),    // charge
-                     LLVM::LLVMArrayType::get( // position
-                         rewriter.getF64Type(), positionAttr.size()),
-                     ptrType,                   // levels
-                     IntegerType::get(ctx, 64), // number of levels
-                     ptrType,                   // Transitions
-                     IntegerType::get(ctx, 64), // number of Transitions
-                 });
+        std::map<std::string, size_t> LevelLabel2Index;
+        for (size_t i = 0; i < levelsAttr.size(); i++) {
+            auto levelAttr = cast<LevelAttr>(levelsAttr[i]);
 
-        // Create an instance of the Ion struct
-        Value ionStruct = rewriter.create<LLVM::UndefOp>(loc, ionStructType);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, name, 0);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, mass, 1);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, charge, 2);
-        for (size_t i = 0; i < positionAttr.size(); i++) {
-            Value posConst = rewriter.create<LLVM::ConstantOp>(
-                loc, rewriter.getF64Type(),
-                rewriter.getFloatAttr(rewriter.getF64Type(), positionAttr[i]));
-            ionStruct = rewriter.create<LLVM::InsertValueOp>(
-                loc, ionStruct, posConst, ArrayRef<int64_t>({3, static_cast<int64_t>(i)}));
+            json this_level =
+                json{{"class_", "Level"},
+                     {"principal", levelAttr.getPrincipal().getInt()},
+                     {"spin", levelAttr.getSpin().getValue().convertToDouble()},
+                     {"orbital", levelAttr.getOrbital().getValue().convertToDouble()},
+                     {"nuclear", levelAttr.getNuclear().getValue().convertToDouble()},
+                     {"spin_orbital", levelAttr.getSpinOrbital().getValue().convertToDouble()},
+                     {"spin_orbital_nuclear",
+                      levelAttr.getSpinOrbitalNuclear().getValue().convertToDouble()},
+                     {"spin_orbital_nuclear_magnetization",
+                      levelAttr.getSpinOrbitalNuclearMagnetization().getValue().convertToDouble()},
+                     {"energy", levelAttr.getEnergy().getValue().convertToDouble()},
+                     {"label", levelAttr.getLabel().getValue().str()}};
+
+            ion_json["levels"].push_back(this_level);
+            LevelLabel2Index[levelAttr.getLabel().getValue().str()] = i;
         }
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, levelsArrayPtr, 4);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, ionStruct,
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), levelsAttr.size()), 5);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(loc, ionStruct, transitionsArrayPtr, 6);
-        ionStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, ionStruct,
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64Type(), transitionsAttr.size()),
-            7);
-        Value ionStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                             /*elementType=*/ionStructType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, ionStruct, ionStructPtr);
 
-        // Create the Ion stub function
-        Type qirSignature = LLVM::LLVMFunctionType::get(IonTy, ptrType);
-        std::string qirName = "__catalyst_ion";
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ionStructPtr);
+        for (size_t i = 0; i < transitionsAttr.size(); i++) {
+            auto transitionAttr = cast<TransitionAttr>(transitionsAttr[i]);
 
+            std::string level0_label = transitionAttr.getLevel_0().getValue().str();
+            std::string level1_label = transitionAttr.getLevel_1().getValue().str();
+
+            assert(LevelLabel2Index.count(level0_label) == 1 &&
+                   LevelLabel2Index.count(level1_label) == 1 &&
+                   "A transition level's label must refer to an existing level in the ion!");
+
+            const json &level1 = ion_json["levels"][LevelLabel2Index[level0_label]];
+            const json &level2 = ion_json["levels"][LevelLabel2Index[level1_label]];
+
+            json this_transition =
+                json{{"class_", "Transition"},
+                     {"einsteinA", transitionAttr.getEinsteinA().getValue().convertToDouble()},
+                     {"level1", level1},
+                     {"level2", level2},
+                     {"label", level0_label + "->" + level1_label}};
+            ion_json["transitions"].push_back(this_transition);
+        }
+        deviceInitOp.setKwargs(deviceKwargs.str() + "ION:" + std::string(ion_json.dump()));
+
+        deviceInitOp.setLib("oqd.qubit");
+
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -357,13 +245,16 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         operands.push_back(pulseArraySize);
 
         // Create the parallel protocol stub function
-        Type protocolResultType = conv->convertType(IonType::get(ctx));
-        Type protocolFuncType =
-            LLVM::LLVMFunctionType::get(protocolResultType, {ptrType, pulseArraySize.getType()});
-        std::string protocolFuncName = "__catalyst_parallel_protocol";
+        Type protocolFuncType = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                            {ptrType, pulseArraySize.getType()});
+        std::string protocolFuncName = "__catalyst__oqd__ParallelProtocol";
         LLVM::LLVMFuncOp protocolFnDecl =
             ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, protocolFnDecl, operands);
+        rewriter.create<LLVM::CallOp>(loc, protocolFnDecl, operands);
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.replaceOp(op, values);
 
         return success();
     }
@@ -398,7 +289,7 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
             conv->convertType(PulseType::get(ctx)),
             {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
              LLVM::LLVMPointerType::get(rewriter.getContext())});
-        std::string qirName = "__catalyst_pulse";
+        std::string qirName = "__catalyst__oqd__pulse";
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
 
