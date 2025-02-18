@@ -217,6 +217,9 @@ def stable_toposort(end_nodes: list) -> list:
         return []
     # end_nodes = _remove_duplicates(end_nodes)
 
+    def key(n):
+        return n.id
+
     child_counts = {}
     stack = list(end_nodes)
     while stack:
@@ -236,8 +239,8 @@ def stable_toposort(end_nodes: list) -> list:
         node = childless_nodes.pop()
         sorted_nodes.append(node)
         # pylint: disable=unnecessary-lambda
-        sorted_parents = sorted(node.parents, key=lambda n: end_nodes.index(n))
-        for parent in sorted_parents:
+        node.parents.sort(key=key)
+        for parent in node.parents:
             if child_counts[parent.id] == 1:
                 childless_nodes.append(parent)
             else:
