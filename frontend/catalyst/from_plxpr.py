@@ -415,7 +415,6 @@ def handle_for_loop(
 
     # Config additional for loop settings
     apply_reverse_transform = isinstance(step, int) and step < 0
-    expansion_strategy = for_loop_expansion_strategy(False)
 
     # Perform the binding
     outvals = for_p.bind(
@@ -424,7 +423,7 @@ def handle_for_loop(
         body_nconsts=len(consts),
         apply_reverse_transform=apply_reverse_transform,
         nimplicit=0,
-        preserve_dimensions=not expansion_strategy.input_unshare_variables,
+        preserve_dimensions=True,
     )
 
     # We assume the last output value is the returned qreg.
@@ -478,11 +477,13 @@ def handle_while_loop(
     # Build Catalyst compatible input values
     while_loop_invals = [*consts_cond, *consts_body, *args_plus_qreg]
 
-    # Config additional while  loop settings
-    cond_nconsts = len(converted_cond_closed_jaxpr_branch.consts)
-    body_nconsts = len(converted_body_closed_jaxpr_branch.consts)
-    expansion_strategy = for_loop_expansion_strategy(False)
+    # In the converted closed jaxpr all the constants have been moved to the start of the
+    # input values. For this reason, we cannot get the number of constants from it.
+    # Instead, we get this amount from the plxpr input values.
+    cond_nconsts = len(consts_cond)
+    body_nconsts = len(consts_body)
 
+    # Perform the binding
     outvals = while_p.bind(
         *while_loop_invals,
         cond_jaxpr=converted_cond_closed_jaxpr_branch,
@@ -490,7 +491,7 @@ def handle_while_loop(
         cond_nconsts=cond_nconsts,
         body_nconsts=body_nconsts,
         nimplicit=0,
-        preserve_dimensions=not expansion_strategy.input_unshare_variables,
+        preserve_dimensions=True,
     )
 
     # We assume the last output value is the returned qreg.
@@ -542,16 +543,14 @@ class BranchPlxprInterpreter(QFuncPlxprInterpreter):
             list[TensorLike]: the results of the execution.
 
         """
-        # We assume the last argument is the qreg
-        num_args = len(args)
-        assert num_args > 0
-        qreg_pos = num_args - 1
-        self._parent_qreg = args[qreg_pos]
 
-        # Retrive the original args (without the qreg)
-        args = args[:qreg_pos]
+        # We assume we have at least one argument (the qreg)
+        assert len(args) > 0
 
-        outvals = super().eval(jaxpr, consts, *args)
+        self._parent_qreg = args[-1]
+
+        # Send the original args (without the qreg)
+        outvals = super().eval(jaxpr, consts, *args[:-1])
 
         # Add the qreg to the output values
         outvals = [*outvals, self.qreg]
@@ -580,15 +579,11 @@ class PredicatePlxprInterpreter(PlxprInterpreter):
         although it is not used.
         """
 
-        # We assume the last argument is the qreg
-        num_args = len(args)
-        assert num_args > 0
-        qreg_pos = num_args - 1
+        # We assume we have at least one argument (the qreg)
+        assert len(args) > 0
 
-        # Retrive the original args (without the qreg)
-        args = args[:qreg_pos]
-
-        outvals = super().eval(jaxpr, consts, *args)
+        # Send the original args (without the qreg)
+        outvals = super().eval(jaxpr, consts, *args[:-1])
 
         return outvals
 
