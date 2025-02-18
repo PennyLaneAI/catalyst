@@ -56,6 +56,16 @@ levels.estate.spin_orbital_nuclear = 4.5
 levels.estate.spin_orbital_nuclear_magnetization = -5.0
 levels.estate.energy = 811.52e12
 
+levels.estate2.label = "estate2"
+levels.estate2.principal = 5
+levels.estate2.spin = 0.5
+levels.estate2.orbital = 1.0
+levels.estate2.nuclear = 0.5
+levels.estate2.spin_orbital = 0.5
+levels.estate2.spin_orbital_nuclear = 1.0
+levels.estate2.spin_orbital_nuclear_magnetization = 1.0
+levels.estate2.energy = 1256.637
+
 [ions.Yb171.transitions.downstate_upstate]
 level1 = "downstate"
 level2 = "upstate"
