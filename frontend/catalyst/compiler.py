@@ -172,7 +172,7 @@ class LinkerDriver:
         ]
 
         # If OQD runtime capi is built, link to it as well
-        if os.path.isfile(os.path.join(rt_lib_path, "librtd_oqd_device" + file_extension)):
+        if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
 
         return default_flags
