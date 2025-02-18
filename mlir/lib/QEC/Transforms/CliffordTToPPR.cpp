@@ -51,18 +51,19 @@ GateEnum hashGate(CustomOp op)
 // Structure to define gate conversion rules
 struct GateConversion {
     SmallVector<StringRef> pauliOperators;
-    double theta;
-    GateConversion(SmallVector<StringRef> pauliOperators, double theta)
-        : pauliOperators(pauliOperators), theta(theta)
+    int denominator;
+    GateConversion(SmallVector<StringRef> pauliOperators, int denominator)
+        : pauliOperators(pauliOperators), denominator(denominator)
     {
     }
-    GateConversion() : pauliOperators(), theta(0.0) {}
+    GateConversion() : pauliOperators(), denominator(0) {}
 };
 
-Value getTheta(Location loc, GateConversion gateConversion, ConversionPatternRewriter &rewriter)
+Value getDenominator(Location loc, GateConversion gateConversion,
+                     ConversionPatternRewriter &rewriter)
 {
-    return rewriter.create<arith::ConstantOp>(loc, rewriter.getF64Type(),
-                                              rewriter.getF64FloatAttr(gateConversion.theta));
+    return rewriter.create<arith::ConstantOp>(loc, rewriter.getI16Type(),
+                                              rewriter.getI16IntegerAttr(gateConversion.denominator));
 }
 
 std::pair<ValueRange, TypeRange> getInQubitsAndOutQubits(CustomOp op)
@@ -84,11 +85,11 @@ PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
     auto loc = op->getLoc();
 
     auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-    auto thetaValue = getTheta(loc, gateConversion, rewriter);
+    auto denValue = getDenominator(loc, gateConversion, rewriter);
     auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
 
-    auto pprOp =
-        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, thetaValue, inQubits);
+    auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, denValue,
+                                              inQubits);
 
     return pprOp;
 }
@@ -111,24 +112,23 @@ LogicalResult multiQubitConversion(CustomOp op, StringRef P1, StringRef P2,
 
     // G0 = (P1 ⊗ P2)π/4
     auto pauliProduct = rewriter.getStrArrayAttr(g0.pauliOperators);
-    auto thetaValue = getTheta(loc, g0, rewriter);
+    auto denValue = getDenominator(loc, g0, rewriter);
     auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
-    auto G0 =
-        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, thetaValue, inQubits);
+    auto G0 = rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, denValue, inQubits);
 
     // G1 = (P1 ⊗ 1)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g1.pauliOperators);
-    thetaValue = getTheta(loc, g1, rewriter);
+    denValue = getDenominator(loc, g1, rewriter);
     SmallVector<Value> inQubitsValues{G0.getOutQubits()[0]};
     SmallVector<Type> outQubitsTypesList{G0.getOutQubits()[0].getType()};
-    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, thetaValue,
+    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, denValue,
                                             inQubitsValues);
 
     // G2 = (1 ⊗ P2)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g2.pauliOperators);
     SmallVector<Value> inQubitsValues2{G0.getOutQubits()[1]};
     SmallVector<Type> inQubitsTypesList2{G0.getOutQubits()[1].getType()};
-    auto G2 = rewriter.create<PPRotationOp>(loc, inQubitsTypesList2, pauliProduct, thetaValue,
+    auto G2 = rewriter.create<PPRotationOp>(loc, inQubitsTypesList2, pauliProduct, denValue,
                                             inQubitsValues2);
 
     rewriter.replaceOp(op, {G1.getOutQubits()[0], G2.getOutQubits()[0]});
