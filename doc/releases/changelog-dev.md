@@ -89,8 +89,13 @@
 
   - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
     introduces oqd device specific stubs that will be implemented in oqd runtime including: 
-    `@__catalyst_ion`, `@ __catalyst_pulse_op`, `@ __catalyst_parallel_protocol`.
+    `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
+
+  - The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
+  `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
+  are called in the llvm dialect after the aforementioned lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce JSON specs that OpenAPL expects.
+    [(#1516)](https://github.com/PennyLaneAI/catalyst/pull/1516)
 
   - The OQD device is moved from `frontend/catalyst/third_party/oqd` to `runtime/lib/backend/oqd`. An overall switch, `ENABLE_OQD`, is added to control the OQD build system from a single entry point. The switch is `OFF` by default, and OQD can be built from source via `make all ENABLE_OQD=ON`, or `make runtime ENABLE_OQD=ON`.
     [(#1508)](https://github.com/PennyLaneAI/catalyst/pull/1508)

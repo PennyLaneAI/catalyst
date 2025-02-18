@@ -44,7 +44,7 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[c1:.*]] = llvm.mlir.constant(1 : i64) : i64
     // CHECK: %[[beam_ptr:.*]] = llvm.alloca %[[c1:.*]] x !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)> : (i64) -> !llvm.ptr
     // CHECK: llvm.store %[[beam_struct_wavevector_1:.*]], %[[beam_ptr:.*]] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>, !llvm.ptr
-    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst_pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector_1:.*]]) : (!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
+    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst__oqd__pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector_1:.*]]) : (!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
 
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
