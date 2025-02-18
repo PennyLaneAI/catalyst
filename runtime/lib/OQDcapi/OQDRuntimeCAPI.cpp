@@ -37,6 +37,11 @@ template <typename T> json &numerical_json_factory(T value)
 
 void to_json(json &j, const Pulse &p)
 {
+    RT_FAIL_IF(p.target >= (*JSON)["system"]["ions"].size(), "ion index out of range");
+
+    const auto &transitions = (*JSON)["system"]["ions"][p.target]["transitions"];
+    RT_FAIL_IF(p.beam->transition_index >= transitions.size(), "transition index out of range");
+
     j = json{{"class_", "Pulse"}, {"duration", p.duration}};
 
     json j_beam;
@@ -47,8 +52,6 @@ void to_json(json &j, const Pulse &p)
     j_beam["rabi"] = numerical_json_factory<double>(p.beam->rabi);
     j_beam["detuning"] = numerical_json_factory<double>(p.beam->detuning);
     j_beam["phase"] = numerical_json_factory<double>(p.phase);
-
-    const auto &transitions = (*JSON)["system"]["ions"][p.target]["transitions"];
     j_beam["transition"] = transitions[p.beam->transition_index];
 
     j["beam"] = j_beam;
