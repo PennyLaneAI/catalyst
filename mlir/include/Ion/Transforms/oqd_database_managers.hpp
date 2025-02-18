@@ -29,7 +29,7 @@ namespace ion {
 class OQDDatabaseManager {
   public:
     OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
-                       const std::string &Gate2PulseDecompTomlLoc)
+                       const std::string &Gate2PulseDecompTomlLoc, size_t n_qubits)
     {
         sourceTomlDevice = toml::parse_file(DeviceTomlLoc);
         sourceTomlQubit = toml::parse_file(QubitTomlLoc);
@@ -42,7 +42,7 @@ class OQDDatabaseManager {
         loadBeams1Params();
         loadBeams2Params();
 
-        loadPhononParams();
+        loadPhononParams(n_qubits);
 
         loadIonParams();
     }
@@ -106,9 +106,10 @@ class OQDDatabaseManager {
         }
     }
 
-    void loadPhononParams()
-    {
-        toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition["phonons"];
+    void loadPhononParams(size_t n_qubits)
+    {   
+        std::string phonon_str = "phonons" + std::to_string(n_qubits);
+        toml::node_view<toml::node> phononsToml = sourceTomlGateDecomposition[phonon_str];
         size_t numPhonons = phononsToml.as_array()->size();
 
         auto parseSingleDirection = [](auto direction) {

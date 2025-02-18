@@ -92,15 +92,15 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:    modes = [
     // CHECK-SAME:        #ion.phonon<
     // CHECK-SAME:            energy = 1.100000e+00 : f64,
-    // CHECK-SAME:            eignevector = [1.000000e+00, 0.000000e+00, 0.000000e+00]
+    // CHECK-SAME:            eigenvector = [1.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00, 0.000000e+00, 0.000000e+00]
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.phonon<
     // CHECK-SAME:            energy = 2.200000e+00 : f64,
-    // CHECK-SAME:            eignevector = [0.000000e+00, 1.000000e+00, 0.000000e+00]
+    // CHECK-SAME:            eigenvector = [0.000000e+00, 1.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00, 0.000000e+00]
     // CHECK-SAME:        >,
     // CHECK-SAME:        #ion.phonon<
     // CHECK-SAME:            energy = 3.300000e+00 : f64,
-    // CHECK-SAME:            eignevector = [0.000000e+00, 0.000000e+00, 1.000000e+00]
+    // CHECK-SAME:            eigenvector = [0.000000e+00, 0.000000e+00, 1.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00]
     // CHECK-SAME:        >
     // CHECK-SAME:    ]
     // CHECK-SAME: } 

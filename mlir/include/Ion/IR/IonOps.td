@@ -122,7 +122,7 @@ def PhononAttr : Ion_Attr<"Phonon", "phonon"> {
 
   let parameters = (ins
     "mlir::FloatAttr":$energy,
-    "mlir::DenseF64ArrayAttr": $eignevector
+    "mlir::DenseF64ArrayAttr": $eigenvector
   );
 
   let assemblyFormat = "`<` struct(params) `>`";

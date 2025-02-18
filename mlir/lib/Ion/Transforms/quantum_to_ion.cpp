@@ -84,8 +84,11 @@ struct QuantumToIonPass : impl::QuantumToIonPassBase<QuantumToIonPass> {
         target.addIllegalOp<catalyst::quantum::CustomOp>();
         target.addLegalDialect<IonDialect>();
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+        
+        auto allocOp = *op.getOps<quantum::AllocOp>().begin();
+        auto nQubits = allocOp.getNqubitsAttr().value();
 
-        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc);
+        OQDDatabaseManager dataManager(DeviceTomlLoc, QubitTomlLoc, Gate2PulseDecompTomlLoc, nQubits);
 
         if (LoadIon) {
             // FIXME(?): we only load Yb171 ion since the hardware ion species is unlikely to change

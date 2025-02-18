@@ -72,46 +72,90 @@ polarization = [37,42,43]
 wavevector = [-42,-37,-43]
 
 
-# Phonons
+# Phonon modes
 # Each qubit has a phonon triplet (x,y,z)
 # A list of phonon triplets, one triplet per qubit, is stored here
 # On a single direction, a phonon has a calibrated energy.
+# phonons1 are the phonons modes of a single-ion system.
+# phonons2 are the phonons modes of a two-ion system.
+# phonons3 are the phonons modes of a three-ion system.
 # -------
 
-[[phonons]]
+[[phonons1]]
 energy = 1.1
 eigenvector = [1.0, 0.0, 0.0]
 
-[[phonons]]
+[[phonons1]]
 energy = 2.2
 eigenvector = [0.0, 1.0, 0.0]
 
-[[phonons]]
+[[phonons1]]
 energy = 3.3
 eigenvector = [0.0, 0.0, 1.0]
 
 
-[[phonons]]
+
+[[phonons2]]
+energy = 1.1
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+[[phonons2]]
+energy = 2.2
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+[[phonons2]]
+energy = 3.3
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
+[[phonons2]]
 energy = 4.4
-eigenvector = [1.0, 0.0, 0.0]
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 
-[[phonons]]
+[[phonons2]]
 energy = 5.5
-eigenvector = [0.0, 1.0, 0.0]
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
 
-[[phonons]]
+[[phonons2]]
 energy = 6.6
-eigenvector = [0.0, 0.0, 1.0]
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
 
 
-[[phonons]]
+
+[[phonons3]]
+energy = 1.1
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+[[phonons3]]
+energy = 2.2
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+[[phonons3]]
+energy = 3.3
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
+[[phonons3]]
+energy = 4.4
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+[[phonons3]]
+energy = 5.5
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+[[phonons3]]
+energy = 6.6
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
+[[phonons3]]
 energy = 7.7
-eigenvector = [1.0, 0.0, 0.0]
+eigenvector = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 
-[[phonons]]
+[[phonons3]]
 energy = 8.8
-eigenvector = [0.0, 1.0, 0.0]
+eigenvector = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
 
-[[phonons]]
+[[phonons3]]
 energy = 9.9
-eigenvector = [0.0, 0.0, 1.0]
+eigenvector = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]

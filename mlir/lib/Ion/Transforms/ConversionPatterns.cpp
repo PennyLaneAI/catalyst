@@ -205,7 +205,7 @@ struct ModesOpPattern : public OpConversionPattern<catalyst::ion::ModesOp> {
                             "eigenvector" : []
                         })"_json;
             phonon_json["energy"] = phononAttr.getEnergy().getValue().convertToDouble();
-            auto eigenvector = phononAttr.getEignevector();
+            auto eigenvector = phononAttr.getEigenvector();
             for (int j = 0; j < eigenvector.size(); j++) {
                 phonon_json["eigenvector"].push_back(eigenvector[j]);
             }
