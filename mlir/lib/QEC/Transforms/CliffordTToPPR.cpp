@@ -62,8 +62,8 @@ struct GateConversion {
 Value getDenominator(Location loc, GateConversion gateConversion,
                      ConversionPatternRewriter &rewriter)
 {
-    return rewriter.create<arith::ConstantOp>(loc, rewriter.getI16Type(),
-                                              rewriter.getI16IntegerAttr(gateConversion.denominator));
+    return rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getI16Type(), rewriter.getI16IntegerAttr(gateConversion.denominator));
 }
 
 std::pair<ValueRange, TypeRange> getInQubitsAndOutQubits(CustomOp op)
@@ -88,8 +88,8 @@ PPRotationOp singleQubitConversion(CustomOp op, GateConversion gateConversion,
     auto denValue = getDenominator(loc, gateConversion, rewriter);
     auto [inQubits, outQubitsTypes] = getInQubitsAndOutQubits(op);
 
-    auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, denValue,
-                                              inQubits);
+    auto pprOp =
+        rewriter.create<PPRotationOp>(loc, outQubitsTypes, pauliProduct, denValue, inQubits);
 
     return pprOp;
 }
