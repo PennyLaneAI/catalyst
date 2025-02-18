@@ -47,16 +47,7 @@ class OQDDevice(Device):
 
         return "oqd", lib_path
 
-    def __init__(self, wires, shots=None, backend="default", **kwargs):
-        self.device_toml = kwargs.pop("device_toml", [])
-        self.qubit_toml = kwargs.pop("qubit_toml", [])
-        self.gate_toml = kwargs.pop("gate_toml", [])
-        if not self.device_toml:
-            raise ValueError("device-toml file must be provided.")
-        if not self.qubit_toml:
-            raise ValueError("qubit-toml file must be provided.")
-        if not self.gate_toml:
-            raise ValueError("gate-toml file must be provided.")
+    def __init__(self, wires, shots, backend="default", **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
         super().__init__(wires=wires, shots=shots, **kwargs)
