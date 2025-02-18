@@ -34,7 +34,7 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit_clean
+from catalyst.debug.helpers import qjit_for_tests as qjit_clean
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode

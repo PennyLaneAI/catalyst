@@ -24,7 +24,7 @@ from catalyst.utils.filesystem import WorkspaceManager
 # pylint: disable=unused-argument,too-many-arguments
 
 
-def qjit_for_lit_tests(
+def qjit_for_tests(
     fn=None,
     *,
     autograph=False,
@@ -49,12 +49,12 @@ def qjit_for_lit_tests(
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
     if fn is None:
-        return functools.partial(qjit_for_lit_tests, **kwargs)
+        return functools.partial(qjit_for_tests, **kwargs)
 
-    return QJITForLitTests(fn, CompileOptions(**kwargs))
+    return QJITForTests(fn, CompileOptions(**kwargs))
 
 
-class QJITForLitTests(QJIT):
+class QJITForTests(QJIT):
     """QJIT subclass that always sets keep_intermediates but does not pollute the cwd"""
 
     def __init__(self, *args, **kwargs):

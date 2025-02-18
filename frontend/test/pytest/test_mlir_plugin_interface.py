@@ -21,7 +21,7 @@ import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_tests as qjit
 
 
 def test_path_does_not_exists():

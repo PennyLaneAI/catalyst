@@ -17,7 +17,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 from catalyst import pure_callback
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_tests as qjit
 
 
 def i(x):

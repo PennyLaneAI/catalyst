@@ -18,7 +18,7 @@ import pennylane as qml
 import pytest
 from pennylane.devices import NullQubit
 
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_tests as qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 

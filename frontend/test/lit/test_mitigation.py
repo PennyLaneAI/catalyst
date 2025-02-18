@@ -19,7 +19,7 @@
 import pennylane as qml
 
 from catalyst import mitigate_with_zne
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_tests as qjit
 
 # pylint: disable=line-too-long
 

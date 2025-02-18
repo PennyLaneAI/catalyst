@@ -24,7 +24,7 @@ from numpy import array_equal
 from numpy.testing import assert_allclose
 
 from catalyst import cond, for_loop, while_loop
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_tests as qjit
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext

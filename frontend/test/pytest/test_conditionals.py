@@ -20,7 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import api_extensions, cond, measure
-from catalyst.debug.helpers import qjit_for_lit_tests as qjit
+from catalyst.debug.helpers import qjit_for_tests as qjit
 
 # pylint: disable=missing-function-docstring
 
