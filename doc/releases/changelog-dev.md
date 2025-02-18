@@ -89,7 +89,7 @@
 
   - Add a new pass `convert-ion-to-llvm` which lowers the Ion dialect to llvm dialect. This pass 
     introduces oqd device specific stubs that will be implemented in oqd runtime including: 
-    `@__catalyst__oqd__ion`, `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
+    `@ __catalyst__oqd__pulse`, `@ __catalyst__oqd__ParallelProtocol`.
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
   - The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
