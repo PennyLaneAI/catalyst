@@ -158,9 +158,9 @@ class OQDDatabaseManager {
             std::string level2 = transition_entry["level2"].as_string()->get();
             std::string multipole = transition_entry["multipole"].as_string()->get();
 
-            std::set<std::string> levelEncodings{"downstate", "upstate", "estate"};
+            std::set<std::string> levelEncodings{"downstate", "upstate", "estate", "estate2"};
             assert((levelEncodings.count(level1) & levelEncodings.count(level2)) &&
-                   "Only \"downstate\", \"upstate\" and \"estate\" are allowed in the atom's "
+                   "Only \"downstate\", \"upstate\", \"estate\" and \"estate2\" are allowed in the atom's "
                    "transition levels.");
 
             return Transition(level1, level2, multipole, einstein_a);
@@ -179,7 +179,8 @@ class OQDDatabaseManager {
             Level downstate = parseSingleLevel(data->at_path("levels")["downstate"]);
             Level upstate = parseSingleLevel(data->at_path("levels")["upstate"]);
             Level estate = parseSingleLevel(data->at_path("levels")["estate"]);
-            std::vector<Level> levels{downstate, upstate, estate};
+            Level estate2 = parseSingleLevel(data->at_path("levels")["estate2"]);
+            std::vector<Level> levels{downstate, upstate, estate, estate2};
 
             std::vector<Transition> transitions;
             auto *transitionsTable = data->at_path("transitions").as_table();
