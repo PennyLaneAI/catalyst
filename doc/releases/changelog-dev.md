@@ -93,7 +93,7 @@
     [(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)
 
   - The OQD device can now generate OpenAPL JSON specs during runtime. The oqd stubs
-  `@__catalyst__oqd__ion`, `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
+  `@ __catalyst__oqd__pulse`, and `@ __catalyst__oqd__ParallelProtocol`, which
   are called in the llvm dialect after the aforementioned lowering ([(#1466)](https://github.com/PennyLaneAI/catalyst/pull/1466)), are defined to produce JSON specs that OpenAPL expects.
     [(#1516)](https://github.com/PennyLaneAI/catalyst/pull/1516)
 
