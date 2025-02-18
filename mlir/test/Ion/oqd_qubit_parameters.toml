@@ -57,21 +57,18 @@ levels.estate.spin_orbital_nuclear_magnetization = -5.0
 levels.estate.energy = 811.52e12
 
 [ions.Yb171.transitions.downstate_upstate]
-label = "downstate->upstate"
 level1 = "downstate"
 level2 = "upstate"
 einstein_a = 1.1
 multipole = "M1"
 
 [ions.Yb171.transitions.downstate_estate]
-label = "downstate->estate"
 level1 = "downstate"
 level2 = "estate"
 einstein_a = 2.2
 multipole = "E2"
 
 [ions.Yb171.transitions.estate_upstate]
-label = "estate->upstate"
 level1 = "estate"
 level2 = "upstate"
 einstein_a = 3.3
