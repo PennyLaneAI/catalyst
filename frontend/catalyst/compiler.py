@@ -170,6 +170,12 @@ class LinkerDriver:
             "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
+
+        # If OQD runtime capi is built, link to it as well
+        # TODO: This is not ideal and should be replaced when the compiler is device aware
+        if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
+            default_flags.append("-lrt_OQD_capi")
+
         return default_flags
 
     @staticmethod
