@@ -35,7 +35,7 @@ namespace {
 
 // TODO: Add and test CRX, CRY, CRZ, ControlledPhaseShift, PhaseShift
 static const mlir::StringSet<> rotationsSet = {"RX", "RY", "RZ"};
-static const mlir::StringSet<> hamiltonianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
+static const mlir::StringSet<> hermitianSet = {"Hadamard", "PauliX", "PauliY", "PauliZ",
                                                  "H",        "X",      "Y",      "Z"};
 static const mlir::StringSet<> multiQubitSet = {"CNOT", "CZ", "SWAP"};
 
