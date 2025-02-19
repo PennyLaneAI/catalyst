@@ -37,7 +37,9 @@ enum LevelTransition {
     // Encoding of level transitions for a pulse
     // For example, "DOWN_E" means the transition from downstate to estate
     DOWN_E = 0,
-    UP_E = 1,
+    DOWN_E2 = 1,
+    UP_E = 2,
+    UP_E2 = 3,
 };
 
 /**
