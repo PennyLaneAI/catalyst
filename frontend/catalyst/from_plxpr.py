@@ -474,19 +474,13 @@ def handle_while_loop(
     # Build Catalyst compatible input values
     while_loop_invals = [*consts_cond, *consts_body, *args_plus_qreg]
 
-    # In the converted closed jaxpr all the constants have been moved to the start of the
-    # input values. For this reason, we cannot get the number of constants from it.
-    # Instead, we get this amount from the plxpr input values.
-    cond_nconsts = len(consts_cond)
-    body_nconsts = len(consts_body)
-
     # Perform the binding
     outvals = while_p.bind(
         *while_loop_invals,
         cond_jaxpr=converted_cond_closed_jaxpr_branch,
         body_jaxpr=converted_body_closed_jaxpr_branch,
-        cond_nconsts=cond_nconsts,
-        body_nconsts=body_nconsts,
+        cond_nconsts=len(consts_cond),
+        body_nconsts=len(consts_body),
         nimplicit=0,
         preserve_dimensions=True,
     )
