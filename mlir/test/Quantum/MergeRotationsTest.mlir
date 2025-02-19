@@ -390,10 +390,10 @@ func.func @test_loop_boundary_rotation(%q0: !quantum.bit, %q1: !quantum.bit) -> 
     %beta = arith.constant 0.3 : f64
 
     // Quantum circuit:           // Expected output:
-    // RX(theta) Q0               // RX(theta+theta) Q0
+    // RX(beta) Q0               // RX(beta+theta) Q0
     //                            // 
     // for _ in range(n)          // for _ in range(n):
-    //    RX(theta) Q0      ->    //    RX(theta) Q0
+    //    RX(theta) Q0      ->    //
     //    X Q1                    //    X Q1
     //    CNOT Q0, Q1             //    CNOT Q0, Q1
     //    RX(theta) Q0            //    RX(theta+theta) Q0
